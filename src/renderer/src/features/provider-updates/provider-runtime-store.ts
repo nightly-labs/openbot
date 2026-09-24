@@ -6,11 +6,15 @@ import {
   type ProviderRuntimeSnapshot,
   type ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
+import {
+  type ProviderUpdate,
+  providerUpdateAvailable,
+  providerUpdatesToAnnounce,
+} from "@openbot/ui/features/provider-updates/provider-update";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
-import { errorMessage } from "../../error-message";
-import { type ProviderUpdate, providerUpdatesToAnnounce } from "./provider-update";
 import {
   dismissProviderUpdateToast,
   hideProviderUpdateToast,
@@ -65,7 +69,7 @@ export function createProviderRuntimeStore(
 
   /**
    * The one thing an Update button does, wherever it is: the provider row, the notification, and the
-   * Retry the notification offers after a failure. OpenBot installs its pinned runtime.
+   * Retry the notification offers after a failure. With no newer version known, it asks for one.
    */
   function startProviderUpdate(provider: AgentProviderId): Promise<void> {
     return runProviderUpdate(provider).catch((error: unknown) => {
@@ -79,7 +83,34 @@ export function createProviderRuntimeStore(
 
   function runProviderUpdate(provider: AgentProviderId): Promise<void> {
     if (!isLocalServer()) return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
+    const update = providerUpdate(provider);
+    // A CLI the user installed is not downloaded, but it has a version, and the row offers it the
+    // same check as a managed runtime. Only a newer version is a reason to download.
+    const installed =
+      update.runtime.phase === "ready" ||
+      (update.runtime.phase === "not-downloaded" && update.runtime.version !== null);
+    if (installed && !providerUpdateAvailable(update.runtime, update.availableVersion)) {
+      return checkProviderUpdates(provider);
+    }
     return downloadProviderRuntime(provider);
+  }
+
+  /**
+   * Asks main for the latest release, in the notification the answer then fills: the offer, or
+   * "up to date", which counts itself out. A failure reaches `startProviderUpdate`, whose Retry
+   * checks again.
+   */
+  async function checkProviderUpdates(provider: AgentProviderId): Promise<void> {
+    if (!api) throw new Error("Provider updates are unavailable.");
+    showProviderUpdateToast({ ...providerUpdate(provider), checking: true }, () => {});
+    applyProviderRuntimeSnapshot(await api.checkForUpdates());
+    if (disposed) return;
+    const update = providerUpdate(provider);
+    if (providerUpdateAvailable(update.runtime, update.availableVersion)) {
+      showProviderUpdateToast(update, () => void startProviderUpdate(provider));
+    } else {
+      reportProviderUpdateToast(update, () => {});
+    }
   }
 
   /** Puts a failure the update never got far enough to report on the notification, with a Retry. */

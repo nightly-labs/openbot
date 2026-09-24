@@ -4,6 +4,7 @@ import { useAgents } from "./features/agents/agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServerSelection } from "./features/servers/server-selection";
+import { providerKeyApi } from "./features/settings/provider-key-api";
 import { AccountLogin, InitialSetup, OnboardingFlow } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
@@ -37,8 +38,10 @@ export function AppAccessGate() {
   const { agentStatus } = useAgents();
   const {
     providerRuntimeStatuses,
+    providerAvailableVersions,
     providerRuntimeDownloadsAvailable,
     downloadProviderRuntime,
+    startProviderUpdate,
     cancelProviderRuntimeDownload,
     refreshingProviders,
     connectProvider,
@@ -88,6 +91,10 @@ export function AppAccessGate() {
                       providerRuntimeStatuses={
                         providerRuntimeDownloadsAvailable() ? providerRuntimeStatuses() : undefined
                       }
+                      providerAvailableVersions={
+                        providerRuntimeDownloadsAvailable() ? providerAvailableVersions() : undefined
+                      }
+                      onUpdateProvider={providerRuntimeDownloadsAvailable() ? startProviderUpdate : undefined}
                       onDownloadProvider={providerRuntimeDownloadsAvailable() ? downloadProviderRuntime : undefined}
                       onCancelProviderDownload={
                         providerRuntimeDownloadsAvailable() ? cancelProviderRuntimeDownload : undefined
@@ -95,6 +102,7 @@ export function AppAccessGate() {
                       onConnectProvider={connectProvider}
                       onInstallProvider={openProviderInstallGuide}
                       onSignInProvider={providerRuntimeDownloadsAvailable() ? undefined : connectProvider}
+                      providerKeys={providerRuntimeDownloadsAvailable() ? providerKeyApi : undefined}
                       codeLogin={codeLogin}
                       onRefreshProviders={providerRuntimeDownloadsAvailable() ? undefined : refreshAgentProviders}
                       onSave={setup.saveSetup}

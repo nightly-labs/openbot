@@ -18,7 +18,8 @@ export function serverSupportsCapability(
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
       capability === "browser-view" ||
-      capability === "mcp-servers-v1") &&
+      capability === "mcp-servers-v1" ||
+      capability === "storage-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;

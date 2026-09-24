@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "blocked": {
+    "codex": [],
+    "claude": [],
+    "opencode": [],
+    "grok": []
+  }
+}

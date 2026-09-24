@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
@@ -36,6 +37,7 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
+import { writeJsonFileAtomically } from "./atomic-json-file";
 import {
   BrowserCdpEngine,
   type BrowserScreencastFrame,
@@ -72,8 +74,10 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { isMissingFileError } from "./file-errors";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
+import { withTimeout } from "./with-timeout";
 
 interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
@@ -145,6 +149,13 @@ interface InternalTab {
   openerTabId?: string;
   /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
+  /**
+   * The current document received a secret and was kept, with its filled fields empty and no
+   * readable copy of the value, so a
+   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
+   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
+   */
+  secretDocument?: boolean;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
@@ -152,6 +163,11 @@ interface InternalTab {
   ownerAgentId: string | null;
   revision: number;
   queue: Promise<unknown>;
+  /**
+   * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
+   * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
+   */
+  pendingRestore?: () => Promise<void>;
   focusOnVisible: boolean;
   environment: BrowserEnvironment;
   engine: BrowserCdpEngine;
@@ -271,13 +287,22 @@ export class BrowserHost {
       await tab.engine.navigate(tab.requestedUrl);
       tab.contents.navigationHistory.clear();
     };
+    for (const tab of tabs) tab.pendingRestore = () => restoreTab(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    const activeReady = activeTab ? restoreTab(activeTab).catch(() => undefined) : Promise.resolve();
-    if (activeTab) activeTab.queue = activeReady;
+    if (activeTab) this.#wake(activeTab);
+    // A view that never navigated is a debugger target that never answers, which stops a CDP client
+    // from attaching to the app. A blank page answers, and costs far less than the saved page.
     for (const tab of tabs) {
-      if (tab === activeTab) continue;
-      tab.queue = activeReady.then(() => restoreTab(tab)).catch(() => undefined);
+      if (tab.pendingRestore) void tab.contents.loadURL("about:blank").catch(() => undefined);
     }
+  }
+
+  /** Starts the held-back first load of a restored tab, once, ahead of anything else queued on it. */
+  #wake(tab: InternalTab): void {
+    const pending = tab.pendingRestore;
+    if (!pending) return;
+    tab.pendingRestore = undefined;
+    tab.queue = tab.queue.then(pending).catch(() => undefined);
   }
 
   onChanged(listener: (...args: BrowserHostEvents["changed"]) => void): () => void {
@@ -524,10 +549,9 @@ export class BrowserHost {
     this.#requireToolTab(params, args.tabId);
     const tab = this.#requireTab(args.tabId);
     if (tab.secret) throw new Error("Authentication is already active.");
-    if (tab.hasSharedBrowsingContext)
-      throw new Error("Secure input is unavailable in tabs with shared popup contexts. Use takeover.");
     const url = new URL(currentTabUrl(tab));
     if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    this.#requireIsolatedFromConnectedTabs(tab, url.origin);
     if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
     if (
       (args.method === "password" && args.targets.length !== 1) ||
@@ -540,7 +564,7 @@ export class BrowserHost {
     this.#invalidateViews(tab);
     this.#syncAttachedView();
     try {
-      const enter = await this.#enqueue(
+      const entry = await this.#enqueue(
         args.tabId,
         async (_tab, keepQueueBlocked) => {
           await this.#recorder.discard(args.tabId, "requested");
@@ -567,19 +591,22 @@ export class BrowserHost {
         },
         submit: async (secret) => {
           if (tab.secret !== protection || protection.submitted) throw new Error("Authentication request expired.");
+          // A connected page can navigate to the secret's site while the card is open.
+          this.#requireIsolatedFromConnectedTabs(tab, url.origin);
           if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
             throw new Error("Enter the requested number of digits.");
           protection.submitted = true;
           this.#invalidateViews(tab);
           protection.running = true;
           this.#syncAttachedView();
+          let kept = false;
           try {
             await this.#enqueue(
               args.tabId,
               async (_tab, keepQueueBlocked) => {
                 await this.#boundEngineOperation(
                   tab,
-                  enter(secret),
+                  entry.enter(secret),
                   10_000,
                   "Authentication submission timed out.",
                   keepQueueBlocked,
@@ -599,6 +626,18 @@ export class BrowserHost {
                   });
                 }
                 if (!protection.replaced) {
+                  // A reload would restart a single-page sign-in at its first step. Keep the
+                  // document when its fields are empty and nothing a snapshot reads shows the value.
+                  const cleared = await this.#boundEngineOperation(
+                    tab,
+                    entry.clear(secret),
+                    10_000,
+                    "Authentication field cleanup timed out.",
+                    keepQueueBlocked,
+                  ).catch(() => false);
+                  if (cleared && !protection.replaced) kept = true;
+                }
+                if (!protection.replaced && !kept) {
                   // Load with GET rather than replaying a possible form POST. Keep capture
                   // blocked until navigation has replaced the document and this operation ends.
                   await this.#boundEngineOperation(
@@ -619,10 +658,14 @@ export class BrowserHost {
               tab.contents.navigationHistory.clear();
               tab.secret = undefined;
               this.#syncAttachedView();
+            } else if (kept) {
+              tab.secretDocument = true;
+              tab.secret = undefined;
+              this.#syncAttachedView();
             }
             this.#emitChanged();
           }
-          return protection.replaced ? "submitted" : "takeover";
+          return protection.replaced || kept ? "submitted" : "takeover";
         },
       };
     } catch {
@@ -630,6 +673,42 @@ export class BrowserHost {
       this.#syncAttachedView();
       throw new Error("Secure authentication is unavailable. Use browser takeover.");
     }
+  }
+
+  /**
+   * Pages in one opener group can keep references to each other's documents, including a document
+   * that received a secret and was later replaced. The browser blocks that access between sites, so
+   * secure input is allowed in a connected tab only when no frame in another connected tab has the
+   * secret's site.
+   */
+  #requireIsolatedFromConnectedTabs(tab: InternalTab, origin: string): void {
+    if (!tab.hasSharedBrowsingContext) return;
+    const site = approximateSite(origin);
+    for (const connected of this.#connectedTabs(tab)) {
+      if (connected === tab || connected.contents.isDestroyed()) continue;
+      const origins = connected.contents.mainFrame.framesInSubtree.map((frame) => frame.origin);
+      if (origins.some((frameOrigin) => frameOrigin !== "null" && approximateSite(frameOrigin) === site))
+        throw new Error(
+          "Secure input is unavailable while a connected popup or opener tab shows the same site. Use takeover.",
+        );
+    }
+  }
+
+  #requireNoSecretDocument(tab: InternalTab, action: string): void {
+    if ([...this.#connectedTabs(tab)].some((connected) => connected.secretDocument))
+      throw new Error(
+        `${action} is unavailable while a page that received a secret is open. Use snapshots and actions until it navigates.`,
+      );
+  }
+
+  #connectedTabs(tab: InternalTab): Set<InternalTab> {
+    const connected = new Set([tab]);
+    for (const current of connected) {
+      for (const candidate of this.#tabs.values()) {
+        if (candidate.openerTabId === current.id || candidate.id === current.openerTabId) connected.add(candidate);
+      }
+    }
+    return connected;
   }
 
   endTakeover(tabId: string): void {
@@ -1038,7 +1117,10 @@ export class BrowserHost {
           const { args } = call;
           const tabId = args.tabId;
           this.#requireToolTab(params, tabId);
-          await this.#enqueue(tabId, (tab) => this.#recorder.start(tabId, tab.contents));
+          await this.#enqueue(tabId, (tab) => {
+            this.#requireNoSecretDocument(tab, "Recording");
+            return this.#recorder.start(tabId, tab.contents);
+          });
           return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
         }
         case "recording_stop": {
@@ -1408,6 +1490,10 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      if (tab.secretDocument) {
+        tab.secretDocument = false;
+        contents.navigationHistory.clear();
+      }
       if (tab.secret?.submitted) {
         tab.secret.replaced = true;
         if (!tab.secret.running) {
@@ -1792,6 +1878,7 @@ export class BrowserHost {
     const tab = this.#requireTab(tabId);
     const started = tab.queue.then(() => {
       if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
+      this.#requireNoSecretDocument(tab, "Page evaluation");
       const deadline = Date.now() + timeoutMs;
       const timeoutMessage = "Browser evaluate timed out.";
       let unwound: Promise<void> | undefined;
@@ -1865,6 +1952,7 @@ export class BrowserHost {
 
   #syncAttachedView(): void {
     const tab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : null;
+    if (tab) this.#wake(tab);
     const targetWindow = this.#target === "picture-in-picture" ? this.#pictureInPictureWindow : this.#window;
     if (
       !this.#visible ||
@@ -1956,6 +2044,7 @@ export class BrowserHost {
   #requireTab(tabId: string): InternalTab {
     const tab = this.#tabs.get(tabId);
     if (!tab) throw new Error(`Unknown browser tab: ${tabId}`);
+    this.#wake(tab);
     return tab;
   }
 
@@ -2082,16 +2171,7 @@ export class BrowserHost {
     this.#persistQueue = this.#persistQueue
       .catch(() => undefined)
       .then(async () => {
-        const temporaryPath = `${this.#statePath}.${randomUUID()}.tmp`;
-        try {
-          await writeFile(temporaryPath, `${JSON.stringify(state)}\n`, {
-            encoding: "utf8",
-            mode: 0o600,
-          });
-          await rename(temporaryPath, this.#statePath);
-        } finally {
-          await rm(temporaryPath, { force: true }).catch(() => undefined);
-        }
+        await writeJsonFileAtomically(this.#statePath, state);
       });
     return this.#persistQueue;
   }
@@ -2258,15 +2338,11 @@ async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
       tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
     };
   } catch (error) {
-    if (isMissingFile(error) || error instanceof SyntaxError) {
+    if (isMissingFileError(error) || error instanceof SyntaxError) {
       return { version: 2, activeTabId: null, tabs: [] };
     }
     throw error;
   }
-}
-
-function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isAllowedMainUrl(value: string): boolean {
@@ -2335,7 +2411,7 @@ function toPublicTab(tab: InternalTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.secret ? "Secure authentication" : tab.contents.getTitle() || "New tab",
+    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
     url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
@@ -2346,6 +2422,27 @@ function toPublicTab(tab: InternalTab): BrowserTab {
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
   };
+}
+
+/**
+ * Returns the last two host labels, or the whole host for an IP address. Without the public suffix
+ * list, this can join two sites (for example under `co.uk`) but never splits one site, so a match
+ * can only refuse secure input, not permit it.
+ */
+function approximateSite(origin: string): string {
+  const hostname = new URL(origin).hostname;
+  if (isIP(hostname.replace(/^\[|\]$/gu, "")) !== 0) return hostname;
+  return hostname.split(".").slice(-2).join(".");
+}
+
+/** A restored tab that has not loaded yet shows a blank page; its host name stands in for its title. */
+function restoredTabTitle(tab: InternalTab): string | null {
+  if (!tab.pendingRestore) return null;
+  try {
+    return new URL(tab.requestedUrl).hostname || null;
+  } catch {
+    return null;
+  }
 }
 
 function currentTabUrl(tab: InternalTab): string {
@@ -2589,20 +2686,6 @@ function uniqueDownloadPath(root: string, name: string, reserved: Set<string>): 
   for (let suffix = 1; ; suffix += 1) {
     const candidate = join(root, suffix === 1 ? name : `${stem} (${suffix})${extension}`);
     if (!reserved.has(candidate) && !existsSync(candidate)) return candidate;
-  }
-}
-
-async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
-  let timeout: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error(message)), milliseconds);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
   }
 }
 

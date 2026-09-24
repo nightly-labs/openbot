@@ -1,10 +1,14 @@
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { Progress, TOAST_DURATION, toast } from "@openbot/ui";
+import { createDigitRoll } from "@openbot/ui/digit-roll";
+import {
+  type ProviderUpdate,
+  type ProviderUpdatePresentation,
+  presentProviderUpdate,
+} from "@openbot/ui/features/provider-updates/provider-update";
 import type { JSX } from "@solidjs/web";
 import { createRoot, createSignal, Show } from "solid-js";
-import { Progress, TOAST_DURATION, toast } from "../../components/ui";
-import { createDigitRoll } from "../../digit-roll";
-import { type ProviderUpdate, type ProviderUpdatePresentation, presentProviderUpdate } from "./provider-update";
 
 /**
  * The provider update, as one notification the user acts on and then watches.
@@ -56,8 +60,8 @@ function ProviderUpdatePercent(props: { percent: number }): JSX.Element {
 }
 
 /**
- * One line naming the state, and - while the update runs - the bar reporting it, in the row the
- * action button holds otherwise, so the box the user pressed Update on answers in the same place.
+ * One line naming the state, and - while the update runs - the bar reporting it on a line under it,
+ * so the box the user pressed Update on answers in the same place.
  * "Setting up" has no measurable end, so its bar is indeterminate and the percentage goes away
  * rather than sitting at a number that has stopped moving.
  */

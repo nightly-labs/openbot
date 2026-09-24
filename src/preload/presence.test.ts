@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi, ScopedTeamPresenceSnapshot } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { expect, it, vi } from "vitest";
 
 const bridge = vi.hoisted(() => {
@@ -34,12 +34,12 @@ it("delivers settings presence for an unselected server and removes the subscrip
   const stopSelected = bridge.api.current.servers.onPresence(selected);
   const stopSettings = bridge.api.current.servers.onPresence(settings, "remote");
   const remote = { serverId: "remote", members: [], updatedAt: "2026-09-08T00:00:00Z" };
-  for (const handler of bridge.listeners.get(IPC_CHANNELS.serversPresence) ?? [])
+  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.presence.channel) ?? [])
     handler(null, { serverId: "remote", snapshot: remote });
   expect(settings).toHaveBeenCalledWith(remote);
   expect(selected).not.toHaveBeenCalled();
   stopSettings();
-  for (const handler of bridge.listeners.get(IPC_CHANNELS.serversPresence) ?? [])
+  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.presence.channel) ?? [])
     handler(null, { serverId: "remote", snapshot: remote });
   expect(settings).toHaveBeenCalledTimes(1);
   stopSelected();

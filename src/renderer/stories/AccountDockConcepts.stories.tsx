@@ -1,10 +1,10 @@
 import type { AccountUsage, AgentSummary, ServerSummary, UpdateStatus } from "@openbot/contracts/ipc";
+import { AccountUpdateIsland } from "@openbot/ui/features/account/AccountUpdateIsland";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import productionLogoUrl from "../src/assets/openbot-logo-production.png";
-import { AccountUpdateIsland } from "../src/features/account/AccountUpdateIsland";
 import { STORY_AGENT_SUMMARIES, STORY_SERVERS, STORY_UPDATE_STATUS, STORY_USAGE } from "../src/preview/fixtures";
 import { OpenBotPlayground } from "../src/preview/OpenBotPlayground";
 import "./AccountDockConcepts.css";
@@ -55,6 +55,7 @@ const CONCEPT_AGENTS: AgentSummary[] = [
   ...STORY_AGENT_SUMMARIES,
   ...CONCEPT_AGENT_NAMES.map((name, index) => {
     const source = STORY_AGENT_SUMMARIES[index % STORY_AGENT_SUMMARIES.length];
+    if (!source) throw new Error("Story agent summaries are empty.");
     const id = `dock-concept-agent-${index + 1}`;
     return {
       ...source,

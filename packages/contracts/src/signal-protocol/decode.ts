@@ -22,6 +22,7 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
   const kind = value.type;
   switch (kind) {
     case "account-profile-changed":
+    case "account-servers-changed":
       return { type: kind, version };
     case "ready":
       return {

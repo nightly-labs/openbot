@@ -1,7 +1,7 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { BrowserSecretCard } from "../src/features/conversation/BrowserSecretCard";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 
 const request: BrowserTakeoverRequest = {
@@ -85,6 +85,15 @@ export const SubmittingPassword: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.type(canvas.getByLabelText("Password"), "example-password");
+    await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
+  },
+};
+
+export const SubmittingCode: Story = {
+  args: { onRespond: () => new Promise<void>(() => {}) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText("6-digit code"), "123456");
     await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
   },
 };

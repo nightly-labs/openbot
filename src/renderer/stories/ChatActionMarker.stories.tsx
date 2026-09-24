@@ -1,10 +1,10 @@
+import { Heading, Text } from "@openbot/ui";
+import type { AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { createSignal } from "solid-js";
 import { expect, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Heading, Text } from "../src/components/ui";
-import type { AgentProfile, ChatActionMarkerModel } from "../src/data";
 import { AgentSkillsModal } from "../src/features/conversation/AgentSkillsModal";
-import { ChatActionMarker } from "../src/features/conversation/ChatActionMarker";
 
 const agents: AgentProfile[] = [
   agent("research", "Research"),
@@ -105,7 +105,9 @@ export const AllStates: Story = {
   ),
   play: async ({ canvas, userEvent }) => {
     onOpenRoutine.mockClear();
-    await userEvent.click(canvas.getAllByRole("button", { name: "Open routine Morning brief" })[0]);
+    const [routineButton] = canvas.getAllByRole("button", { name: "Open routine Morning brief" });
+    if (!routineButton) throw new Error("Routine button is missing.");
+    await userEvent.click(routineButton);
     await expect(onOpenRoutine).toHaveBeenCalledWith({ routineId: "routine-1", name: "Morning brief" });
   },
 };
@@ -190,6 +192,38 @@ export const ReducedMotion: Story = {
     </main>
   ),
   parameters: { chromatic: { prefersReducedMotion: "reduce" } },
+};
+
+export const RoutineRunSummary: Story = {
+  render: () => (
+    <main class="foundation-story">
+      <Heading as="h1" size="lg">
+        Completed routine run
+      </Heading>
+      <Text tone="secondary">The latest state stays visible. Earlier states are available on demand.</Text>
+      <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Routine run summary">
+        <ChatActionMarker
+          marker={{
+            ...routineMarker("succeeded"),
+            runId: "run-summary",
+            previousTransitions: [
+              { status: "queued", timestamp: "2026-09-01T08:00:00.000Z" },
+              { status: "running", timestamp: "2026-09-01T08:01:00.000Z" },
+              { status: "needs-attention", timestamp: "2026-09-01T08:02:00.000Z" },
+              { status: "running", timestamp: "2026-09-01T08:03:00.000Z" },
+            ],
+          }}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onOpenRoutine={onOpenRoutine}
+        />
+      </section>
+    </main>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Show history for Morning brief" }));
+    await expect(canvas.getByRole("list", { name: "Earlier routine states" })).toBeVisible();
+  },
 };
 
 const timestamp = "2026-09-01T08:00:00.000Z";

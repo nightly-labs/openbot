@@ -16,7 +16,8 @@
     "airtable",
     "firecrawl",
     "brave-search",
-    "resend"
+    "resend",
+    "composio"
   ],
   "featured": ["aave", "canva", "github", "notion", "figma"]
 }

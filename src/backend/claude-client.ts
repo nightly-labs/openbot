@@ -7,6 +7,7 @@ import {
   createSdkMcpServer,
   getSessionMessages,
   type ModelInfo,
+  type Options,
   type PermissionResult,
   query,
   type SDKUserMessage,
@@ -17,7 +18,7 @@ import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
-import type { ClaudeCliInfo } from "./cli";
+import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import {
   claudeMcpServers,
   type McpAuthorizationSource,
@@ -68,7 +69,15 @@ interface ActiveTurn {
   id: string;
   itemId: string;
   reasoningItemId: string;
+  /** Text held back from the reader until a step boundary or the end of the turn classifies it. */
   text: string;
+  /** Every assistant character this turn has produced, which is what a repeat is measured against. */
+  seenText: string;
+  /** What the narration already took, which the answer can no longer be rewritten over. */
+  publishedText: string;
+  /** The segment published last, which a message contradicting it can still put right. */
+  lastNarration: { id: string; text: string } | null;
+  narrationCount: number;
   thinking: string;
   thinkingStarted: boolean;
   thinkingStreamId: string | null;
@@ -87,7 +96,26 @@ interface ThreadRuntime {
   query: ClaudeQuery;
   activeTurn: ActiveTurn | null;
   consume: Promise<void>;
+  idleRelease: ReturnType<typeof setTimeout> | null;
+  /**
+   * When the thread last finished a turn, so the longest idle process is the first to go. `0` for a
+   * thread that is open for a turn that has not started yet: only the timeout closes it.
+   */
+  idleSince: number;
 }
+
+/**
+ * How long a thread with no turn keeps its `claude` process. Each process holds hundreds of MB with
+ * its MCP servers, and the SDK resumes the same session from disk, so an idle thread costs only a
+ * slower first message when the user comes back.
+ */
+export const CLAUDE_THREAD_IDLE_RELEASE_MS = 10 * 60_000;
+
+/**
+ * How many idle threads keep their `claude` process before the timeout. A user who runs one turn on
+ * each of five agents otherwise holds five processes of about 140 MB each for ten minutes.
+ */
+export const CLAUDE_IDLE_THREAD_LIMIT = 2;
 
 interface PendingServerRequest {
   resolve: (value: unknown) => void;
@@ -133,6 +161,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
   readonly #threads = new Map<string, ThreadRuntime>();
+  /** Threads whose process was closed for being idle, with the config that resumes them. */
+  readonly #releasedThreads = new Map<string, ThreadConfig>();
+  readonly #waking = new Map<string, Promise<void>>();
+  readonly #startingTurns = new Set<string>();
   readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
@@ -169,7 +201,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   async stop(): Promise<void> {
     this.#running = false;
+    this.#releasedThreads.clear();
     for (const runtime of this.#threads.values()) {
+      if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
       runtime.input.close();
       runtime.query.close();
     }
@@ -187,9 +221,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * thread: a turn that still runs would end with the query that carries it.
    */
   async releaseThread(threadId: string): Promise<void> {
+    this.#releasedThreads.delete(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
-    this.#threads.delete(threadId);
+    await this.#closeRuntime(runtime);
+  }
+
+  async #closeRuntime(runtime: ThreadRuntime): Promise<void> {
+    this.#threads.delete(runtime.id);
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
     runtime.input.close();
     runtime.query.close();
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
@@ -224,6 +264,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
           if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
           this.#threads.delete(threadId);
+          if (current.idleRelease) clearTimeout(current.idleRelease);
           current.input.close();
           current.query.close();
           await current.consume;
@@ -240,7 +281,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "turn/steer":
         return decoder(await this.#steerTurn(params));
       case "turn/interrupt": {
-        const runtime = this.#requireThread(requiredString(params, "threadId"));
+        const threadId = requiredString(params, "threadId");
+        // A released thread has no turn to stop.
+        if (this.#releasedThreads.has(threadId) && !this.#threads.has(threadId)) return decoder({});
+        const runtime = this.#requireThread(threadId);
         await runtime.query.interrupt();
         return decoder({});
       }
@@ -270,17 +314,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     pending.reject(new Error(error.message));
   }
 
+  /**
+   * A model list or a usage read runs no tools, so it starts none of the user's MCP servers. Each
+   * server is a process of its own (`npx chrome-devtools-mcp` is about 480 MB), and these reads run
+   * at every start and on every usage refresh.
+   */
+  #probeOptions(): Options {
+    return {
+      cwd: process.cwd(),
+      pathToClaudeCodeExecutable: this.#cli.executable,
+      settingSources: ["user", "project", "local"],
+      mcpServers: {},
+      strictMcpConfig: true,
+      persistSession: false,
+      env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
+    };
+  }
+
   async #listModels(timeoutMs?: number): Promise<unknown[]> {
     const input = new AsyncMessageQueue();
     const claudeQuery = this.#createQuery({
       prompt: input,
-      options: {
-        cwd: process.cwd(),
-        pathToClaudeCodeExecutable: this.#cli.executable,
-        settingSources: ["user", "project", "local"],
-        persistSession: false,
-        env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
-      },
+      options: this.#probeOptions(),
     });
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -345,13 +400,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const input = new AsyncMessageQueue();
     const claudeQuery = this.#createQuery({
       prompt: input,
-      options: {
-        cwd: process.cwd(),
-        pathToClaudeCodeExecutable: this.#cli.executable,
-        settingSources: ["user", "project", "local"],
-        persistSession: false,
-        env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
-      },
+      options: this.#probeOptions(),
     });
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -431,6 +480,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           preset: "claude_code",
           append: config.developerInstructions,
         },
+        // The developer instructions carry the profile and the memories, and `thread/resume` above
+        // restarts the query when they change. A recorded prompt would be sent instead of them on
+        // every later request and resume, so the agent kept an edited profile's old text. The CLI
+        // flag, not the SDK's `systemPromptSnapshot` option: the CLI records by default and ignores
+        // that option.
+        ...(claudeTakesPromptSnapshotFlag(this.#cli.version) ? { extraArgs: { "system-prompt-snapshot": "off" } } : {}),
         ...(config.profileGeneration ? { tools: [] } : {}),
         settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
         // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
@@ -458,15 +513,81 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       query: claudeQuery,
       activeTurn: null,
       consume: Promise.resolve(),
+      idleRelease: null,
+      idleSince: 0,
     };
     runtime.consume = this.#consume(runtime);
     this.#threads.set(threadId, runtime);
+    this.#releasedThreads.delete(threadId);
+    this.#armIdleRelease(runtime);
+  }
+
+  /** Closes the thread's process once it has had no turn for `CLAUDE_THREAD_IDLE_RELEASE_MS`. */
+  #armIdleRelease(runtime: ThreadRuntime): void {
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
+    runtime.idleRelease = null;
+    // A session that is not persisted has nothing on disk to resume from.
+    if (!runtime.config.persistSession) return;
+    runtime.idleRelease = setTimeout(() => {
+      runtime.idleRelease = null;
+      if (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn) return;
+      this.#releaseThread(runtime);
+    }, CLAUDE_THREAD_IDLE_RELEASE_MS);
+    runtime.idleRelease.unref?.();
+  }
+
+  /** An armed release timer marks a thread that is idle and can be resumed from its session. */
+  #releaseIdleThreadsOverLimit(): void {
+    const idle = [...this.#threads.values()]
+      .filter(
+        (runtime) =>
+          runtime.idleRelease !== null &&
+          runtime.idleSince > 0 &&
+          !runtime.activeTurn &&
+          !this.#startingTurns.has(runtime.id),
+      )
+      .sort((left, right) => left.idleSince - right.idleSince);
+    for (const runtime of idle.slice(0, Math.max(0, idle.length - CLAUDE_IDLE_THREAD_LIMIT))) {
+      this.#releaseThread(runtime);
+    }
+  }
+
+  #releaseThread(runtime: ThreadRuntime): void {
+    this.#releasedThreads.set(runtime.id, runtime.config);
+    void this.#closeRuntime(runtime);
+  }
+
+  /** The runtime of a thread, started again from its session when it was released for being idle. */
+  async #wakeThread(threadId: string): Promise<ThreadRuntime> {
+    const config = this.#releasedThreads.get(threadId);
+    if (config && !this.#threads.has(threadId)) {
+      let waking = this.#waking.get(threadId);
+      if (!waking) {
+        waking = this.#startThread(threadId, config, true).finally(() => this.#waking.delete(threadId));
+        this.#waking.set(threadId, waking);
+      }
+      await waking;
+    }
+    return this.#requireThread(threadId);
   }
 
   async #startTurn(params: unknown): Promise<TurnResponse> {
     const threadId = requiredString(params, "threadId");
-    const runtime = this.#requireThread(threadId);
+    // Waking the thread yields before its idle timer is cleared, and another thread going idle in
+    // that gap must not release this one.
+    this.#startingTurns.add(threadId);
+    try {
+      return await this.#openTurn(threadId, params);
+    } finally {
+      this.#startingTurns.delete(threadId);
+    }
+  }
+
+  async #openTurn(threadId: string, params: unknown): Promise<TurnResponse> {
+    const runtime = await this.#wakeThread(threadId);
     if (runtime.activeTurn) throw new Error("The Claude thread already has an active turn.");
+    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
+    runtime.idleRelease = null;
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -494,6 +615,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       itemId: `${turnId}:assistant`,
       reasoningItemId: `${turnId}:reasoning`,
       text: "",
+      seenText: "",
+      publishedText: "",
+      lastNarration: null,
+      narrationCount: 0,
       thinking: "",
       thinkingStarted: false,
       thinkingStreamId: null,
@@ -560,7 +685,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
       if (event && isRecord(event) && event.type === "content_block_delta" && isRecord(delta)) {
-        if (delta.type === "text_delta" && isString(delta.text)) this.#appendDelta(runtime, delta.text);
+        if (delta.type === "text_delta" && isString(delta.text)) this.#bufferText(runtime, delta.text);
         else if (delta.type === "thinking_delta" && isString(delta.thinking)) {
           this.#appendThinkingDelta(runtime, delta.thinking, message.uuid);
         }
@@ -574,6 +699,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const text = messageText(message.message);
       if (!turn || !message.uuid) return;
       const thinking = messageThinking(message.message);
+      /* The deltas never announced this block, so its own order is all there is to say what came
+         before it. Text the message placed there is narration, and only that much may go. */
+      if (thinking && message.uuid !== turn.thinkingStreamId) {
+        const before = textBeforeThinking(message.message);
+        if (before) {
+          turn.assistantMessages.set(message.uuid, before);
+          const upToBoundary = [...turn.assistantMessages.values()].join("");
+          this.#reconcileText(runtime, upToBoundary);
+          this.#flushNarration(runtime);
+        }
+      }
       if (thinking) {
         turn.thinkingMessages.set(message.uuid, thinking);
         const completeThinking = [...turn.thinkingMessages.values()].join("\n");
@@ -581,16 +717,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           this.#appendThinkingDelta(runtime, completeThinking.slice(turn.thinking.length));
         }
       }
-      for (const toolCall of messageToolCalls(message.message)) {
+      /* Hold this message's own text first. Claude can omit the stream deltas and send one message
+         carrying the narration together with the call it introduces, and a flush that ran before
+         the text was held would see an empty buffer and leave that narration for the answer. */
+      if (text) {
+        turn.assistantMessages.set(message.uuid, text);
+        this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+      }
+      const toolCalls = messageToolCalls(message.message);
+      // A tool call closes the step, which makes the text before it narration rather than an answer.
+      if (toolCalls.length > 0) this.#flushNarration(runtime);
+      for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
         turn.toolCalls.set(toolCall.id, toolCall.name);
         this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
-      }
-      if (!text) return;
-      turn.assistantMessages.set(message.uuid, text);
-      const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText.startsWith(turn.text)) {
-        this.#appendDelta(runtime, completeText.slice(turn.text.length));
       }
       return;
     }
@@ -634,9 +774,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
-      const completeText = [...turn.assistantMessages.values()].join("");
-      if (completeText) turn.text = completeText;
-      else if (!turn.text && fallback) this.#appendDelta(runtime, fallback);
+      this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+      if (!turn.seenText && fallback) this.#bufferText(runtime, fallback);
     }
     const interrupted =
       message.terminal_reason === "aborted_streaming" ||
@@ -664,6 +803,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #appendThinkingDelta(runtime: ThreadRuntime, delta: string, streamId?: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
+    /* A thinking block beginning closes the step. Filling in the rest of one that already began
+       does not, and a message carries that backfill with no stream of its own: flushing there
+       would publish text the turn holds for its answer as narration and end with no answer. */
+    if (streamId !== undefined && streamId !== turn.thinkingStreamId) this.#flushNarration(runtime);
     if (!turn.thinkingStarted) {
       turn.thinkingStarted = true;
       this.emit("notification", {
@@ -689,19 +832,90 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  #appendDelta(runtime: ThreadRuntime, delta: string): void {
+  /* Claude cannot say which text is its answer while the text arrives: the narration before a tool
+     call reads the same as the reply that ends the turn. Hold it here instead of streaming it into
+     the answer item, where every word of it drew a chat bubble that the end of the turn rewrote. */
+  #bufferText(runtime: ThreadRuntime, delta: string): void {
     const turn = runtime.activeTurn;
     if (!turn || !delta) return;
     turn.text += delta;
+    turn.seenText += delta;
+  }
+
+  /**
+   * Let the complete assistant messages correct what the stream delivered.
+   *
+   * A delta can go missing, and the complete messages are the ones Claude stands behind. They can
+   * only rewrite what no step boundary has published yet, so this has to run before every flush
+   * while the current step can still be corrected: publishing a stale step would strand every
+   * later comparison behind text Claude never sent, and the answer would be dropped with it.
+   */
+  #reconcileText(runtime: ThreadRuntime, completeText: string): void {
+    const turn = runtime.activeTurn;
+    if (!turn) return;
+    if (completeText.startsWith(turn.seenText)) {
+      this.#bufferText(runtime, completeText.slice(turn.seenText.length));
+      return;
+    }
+    if (completeText.length === 0) return;
+    if (completeText.startsWith(turn.publishedText)) {
+      turn.text = completeText.slice(turn.publishedText.length);
+      turn.seenText = completeText;
+      return;
+    }
+    this.#correctNarration(runtime, completeText);
+  }
+
+  /**
+   * Put right the narration a boundary published before any message stood behind it.
+   *
+   * Thinking closes a step while the message carrying the text is still arriving, so the only text
+   * there is to publish is what the deltas gave. When the message then disagrees, the published
+   * segment is republished under its own ID rather than left to strand every later comparison
+   * behind words Claude never sent. Text already held for the answer is not taken into it.
+   */
+  #correctNarration(runtime: ThreadRuntime, completeText: string): void {
+    const turn = runtime.activeTurn;
+    const last = turn?.lastNarration;
+    if (!turn || !last) return;
+    const prefix = turn.publishedText.slice(0, turn.publishedText.length - last.text.length);
+    if (!completeText.startsWith(prefix)) return;
+    const heldBack = turn.text.length > 0 && completeText.endsWith(turn.text) ? turn.text.length : 0;
+    const corrected = completeText.slice(prefix.length, completeText.length - heldBack);
+    if (!corrected || corrected === last.text) return;
+    last.text = corrected;
+    turn.publishedText = `${prefix}${corrected}`;
+    // Whatever the correction did not take is the answer's again, so the two stay in step.
+    turn.text = completeText.slice(prefix.length + corrected.length);
+    turn.seenText = completeText;
     this.emit("notification", {
-      method: "item/agentMessage/delta",
+      method: "item/completed",
       params: {
         threadId: runtime.id,
         turnId: turn.id,
-        itemId: turn.itemId,
-        delta,
+        item: { id: last.id, type: "agentMessage", phase: "commentary", text: corrected },
       },
     });
+  }
+
+  /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */
+  #flushNarration(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (!turn?.text) return;
+    const text = turn.text;
+    const id = `${turn.id}:narration:${turn.narrationCount}`;
+    this.emit("notification", {
+      method: "item/completed",
+      params: {
+        threadId: runtime.id,
+        turnId: turn.id,
+        item: { id, type: "agentMessage", phase: "commentary", text },
+      },
+    });
+    turn.lastNarration = { id, text };
+    turn.narrationCount += 1;
+    turn.publishedText += text;
+    turn.text = turn.text.slice(text.length);
   }
 
   #completeTurn(runtime: ThreadRuntime, status: string, error: unknown): void {
@@ -736,17 +950,21 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       params: { threadId: runtime.id, turn: { id: turn.id, status } },
     });
     runtime.activeTurn = null;
+    runtime.idleSince = Date.now();
+    this.#armIdleRelease(runtime);
+    this.#releaseIdleThreadsOverLimit();
   }
 
   async #readThread(threadId: string): Promise<ThreadResponse> {
-    const runtime = this.#threads.get(threadId);
-    const messages = await this.#readSessionMessages(
-      threadId,
-      runtime?.config.cwd ? { dir: runtime.config.cwd } : undefined,
-    );
+    const cwd = this.#threads.get(threadId)?.config.cwd ?? this.#releasedThreads.get(threadId)?.cwd;
+    const messages = await this.#readSessionMessages(threadId, cwd ? { dir: cwd } : undefined);
     const turns: NonNullable<ThreadResponse["thread"]["turns"]> = [];
     let current: (typeof turns)[number] | null = null;
     let currentThinking: ThreadItem | null = null;
+    /* Only a turn's last answer is an answer. Every earlier one was narration between tool calls,
+       so it is demoted as soon as the next one proves it was not the end of the turn. A restored
+       thread otherwise reopens with the chat bubbles a live turn no longer draws. */
+    let currentAnswer: ThreadItem | null = null;
     for (const message of messages) {
       if (message.parent_tool_use_id) continue;
       const text = messageText(message.message);
@@ -766,15 +984,36 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         };
         turns.push(current);
         currentThinking = null;
+        currentAnswer = null;
       } else if (message.type === "assistant") {
         const thinking = messageThinking(message.message);
-        if (!thinking && !text) continue;
-        if (!current) {
+        const endsStep = messageToolCalls(message.message).length > 0;
+        if (!thinking && !text && !endsStep) continue;
+        if (!current && (thinking || text)) {
           current = { id: message.uuid, status: "completed", items: [] };
           turns.push(current);
           currentThinking = null;
+          currentAnswer = null;
         }
+        if (!current) continue;
+        /* One message can hold text on both sides of its thinking, and only what follows can be
+           the answer. The live turn splits it there, so restoring has to split it the same way. */
+        const beforeThinking = thinking ? textBeforeThinking(message.message) : "";
         if (thinking) {
+          /* Thinking closes the step for a live turn, so it has to close it here as well. A turn
+             that stopped while thinking otherwise keeps the text that led to it as the answer. */
+          if (currentAnswer) {
+            currentAnswer.phase = "commentary";
+            currentAnswer = null;
+          }
+          if (beforeThinking) {
+            current.items?.push({
+              id: `${message.uuid}:narration`,
+              type: "agentMessage",
+              phase: "commentary",
+              text: beforeThinking,
+            });
+          }
           if (currentThinking) {
             currentThinking.text = `${currentThinking.text ?? ""}\n${thinking}`;
           } else {
@@ -787,7 +1026,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             current.items?.push(currentThinking);
           }
         }
-        if (text) current.items?.push({ id: message.uuid, type: "agentMessage", text });
+        const answerText = text.slice(beforeThinking.length);
+        if (answerText) {
+          if (currentAnswer) currentAnswer.phase = "commentary";
+          currentAnswer = { id: message.uuid, type: "agentMessage", text: answerText };
+          current.items?.push(currentAnswer);
+        }
+        /* A tool call closes the step here too, including one the same message introduced. Without
+           this, a turn that stopped on its tool call keeps the narration that led to it as the
+           answer, and restores the bubble the live path removed. */
+        if (endsStep && currentAnswer) {
+          currentAnswer.phase = "commentary";
+          currentAnswer = null;
+        }
       }
     }
     return { thread: { id: threadId, turns } };
@@ -1020,6 +1271,21 @@ function messageText(message: unknown): string {
     .join("\n");
 }
 
+/** The text a message placed before its first thinking block, with the break that follows it. */
+function textBeforeThinking(message: unknown): string {
+  if (!isRecord(message) || !Array.isArray(message.content)) return "";
+  const blocks = message.content.filter(isRecord);
+  const boundary = blocks.findIndex((block) => block.type === "thinking");
+  if (boundary < 0) return "";
+  const before = blocks
+    .slice(0, boundary)
+    .filter((block) => block.type === "text" && isString(block.text))
+    .map((block) => String(block.text));
+  if (before.length === 0) return "";
+  const follows = blocks.slice(boundary + 1).some((block) => block.type === "text" && isString(block.text));
+  return `${before.join("\n")}${follows ? "\n" : ""}`;
+}
+
 function messageThinking(message: unknown): string {
   if (!isRecord(message) || !Array.isArray(message.content)) return "";
   return message.content
@@ -1054,8 +1320,8 @@ function dynamicContent(value: unknown): CallToolResult["content"] {
     return [{ type: "text" as const, text: value.text }];
   }
   if (value.type === "inputImage" && isString(value.imageUrl)) {
-    const match = value.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
-    if (match) return [{ type: "image" as const, mimeType: match[1], data: match[2] }];
+    const [, mimeType, data] = value.imageUrl.match(/^data:([^;]+);base64,(.+)$/s) ?? [];
+    if (mimeType !== undefined && data !== undefined) return [{ type: "image" as const, mimeType, data }];
   }
   return [];
 }

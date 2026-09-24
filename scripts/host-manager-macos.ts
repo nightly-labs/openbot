@@ -121,19 +121,19 @@ export async function bundleVersion(app = SHARED_APP): Promise<string> {
   ]);
 }
 
-async function bundleProcesses(): Promise<Array<{ uid: number; pid: number; main: boolean }>> {
+export async function bundleProcesses(): Promise<Array<{ uid: number; pid: number; main: boolean }>> {
   // comm reports executable paths, without workspace paths or prompts in command arguments.
   const output = await command("/bin/ps", ["-axo", "pid=,uid=,comm="]);
   if (!output) throw new Error("Process scan returned no processes.");
   const processes: Array<{ uid: number; pid: number; main: boolean }> = [];
   for (const line of output.split("\n")) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line);
-    if (!match) throw new Error("Invalid process scan.");
-    if (match[3].startsWith(`${SHARED_APP}/`))
+    const [, pid, uid, executable] = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line) ?? [];
+    if (executable === undefined) throw new Error("Invalid process scan.");
+    if (executable.startsWith(`${SHARED_APP}/`))
       processes.push({
-        pid: Number(match[1]),
-        uid: Number(match[2]),
-        main: match[3] === `${SHARED_APP}/Contents/MacOS/OpenBot`,
+        pid: Number(pid),
+        uid: Number(uid),
+        main: executable === `${SHARED_APP}/Contents/MacOS/OpenBot`,
       });
   }
   return processes;
@@ -238,7 +238,9 @@ export function isNewerRelease(candidate: string, current: string): boolean {
   const next = candidate.split(".").map(Number);
   const previous = current.split(".").map(Number);
   for (let index = 0; index < 3; index += 1) {
-    if (next[index] !== previous[index]) return next[index] > previous[index];
+    const nextPart = next[index] ?? 0;
+    const previousPart = previous[index] ?? 0;
+    if (nextPart !== previousPart) return nextPart > previousPart;
   }
   return false;
 }

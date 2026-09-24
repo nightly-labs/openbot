@@ -1,3 +1,4 @@
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -145,6 +146,21 @@ export function mergeProviderHistory(
 function reconcileClaudeHistory(stored: ConversationSnapshot, imported: ConversationSnapshot): ConversationSnapshot {
   const storedMessages = new Map(stored.messages.map((message) => [message.id, message]));
   const turns = new Map<string, ConversationMessage[]>();
+  /* A turn's narration is imported under the session's own message IDs, which never match the IDs a
+     live turn published it under. A turn this app already holds therefore keeps the narration it
+     recorded, and the imported copy is dropped rather than stored a second time on every restart. */
+  const storedNarrationTurns = new Set<string>();
+  for (const message of stored.messages) {
+    if (!isClaudeNarration(message) || !message.turnId) continue;
+    storedNarrationTurns.add(message.turnId);
+  }
+  const importedNarration = new Map<string, ConversationMessage[]>();
+  for (const message of imported.messages) {
+    if (!isClaudeNarration(message) || !message.turnId) continue;
+    const parts = importedNarration.get(message.turnId) ?? [];
+    parts.push(message);
+    importedNarration.set(message.turnId, parts);
+  }
   for (const message of imported.messages) {
     if (message.author !== "assistant" || message.itemType !== "agentMessage" || !message.turnId) continue;
     const parts = turns.get(message.turnId) ?? [];
@@ -153,26 +169,94 @@ function reconcileClaudeHistory(stored: ConversationSnapshot, imported: Conversa
   }
   const replacements = new Map<string, ConversationMessage>();
   const omitted = new Set<string>();
+  /** Stored rows this has to rewrite that the import carries no entry of its own for. */
+  const appended: ConversationMessage[] = [];
   for (const [turnId, parts] of turns) {
     // Live Claude output combines SDK replies under one ID. Keep that ID and its metadata.
     const answer = storedMessages.get(`${turnId}:assistant`);
     if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
-    // Existing split records can have saved references. Never remove or combine them.
-    if (parts.some((part) => storedMessages.has(part.id))) continue;
     const text = parts.map((part) => part.text).join("");
-    if (!answer.text || !text.startsWith(answer.text)) continue;
+    const narration = importedNarration.get(turnId) ?? [];
+    /* A turn released before narration rode the thinking disclosure stored the narration and the
+       answer together under this one ID. The import now splits the two, so the aggregate matches
+       neither half on its own: match it whole, and keep only the answer as its text. Without this
+       the backfill leaves the aggregate bubble in place and stores the split copy beside it. */
+    const aggregate = narration.length > 0 && answer.text === `${narration.map((part) => part.text).join("")}${text}`;
+    /* Existing split records can have saved references. Never remove or combine them - but a
+       database holding the aggregate and its canonical rows together must still read as one
+       answer, so the aggregate keeps only the answer and the rows repeating it stop being
+       bubbles. A row already demoted stays demoted, whatever the import calls it. */
+    if (parts.some((part) => storedMessages.has(part.id))) {
+      for (const part of parts) {
+        const existing = storedMessages.get(part.id);
+        if (!existing || !(aggregate || existing.itemType === "commentary")) continue;
+        replacements.set(part.id, { ...existing, ...part, itemType: "commentary" });
+      }
+      if (aggregate && answer.text) appended.push({ ...answer, text });
+      continue;
+    }
+    if (!answer.text || !(aggregate || text.startsWith(answer.text))) continue;
     const first = parts[0];
     const last = parts.at(-1);
     if (!first || !last) continue;
     replacements.set(first.id, { ...answer, text, status: last.status });
     for (const part of parts.slice(1)) omitted.add(part.id);
+    if (!storedNarrationTurns.has(turnId)) continue;
+    for (const part of narration) {
+      if (!storedMessages.has(part.id)) omitted.add(part.id);
+    }
+  }
+  /* A turn that ended on its tool call said something and then answered nothing, so it imports as
+     narration with no `agentMessage` and the loop above never reaches it. Left there, a released
+     build's narration keeps the bubble the upgrade was meant to take away, and a turn this app
+     recorded itself gains a second copy of its narration on every restart. */
+  for (const [turnId, narration] of importedNarration) {
+    if (turns.has(turnId)) continue;
+    if (storedNarrationTurns.has(turnId)) {
+      for (const part of narration) {
+        if (!storedMessages.has(part.id)) omitted.add(part.id);
+      }
+      continue;
+    }
+    const answer = storedMessages.get(`${turnId}:assistant`);
+    if (answer?.author !== "assistant" || answer.itemType !== "agentMessage" || answer.turnId !== turnId) continue;
+    if (narration.some((part) => storedMessages.has(part.id))) continue;
+    const text = narration.map((part) => part.text).join("");
+    if (!answer.text || answer.text !== text) continue;
+    const first = narration[0];
+    const last = narration.at(-1);
+    if (!first || !last) continue;
+    // Keep the ID and what is saved against it, and let the narration stop being an answer.
+    replacements.set(first.id, { ...answer, itemType: "commentary", text, status: last.status });
+    for (const part of narration.slice(1)) omitted.add(part.id);
   }
   return {
     ...imported,
-    messages: imported.messages
-      .filter((message) => !omitted.has(message.id))
-      .map((message) => replacements.get(message.id) ?? message),
+    messages: [
+      ...imported.messages
+        .filter((message) => !omitted.has(message.id))
+        .map((message) => replacements.get(message.id) ?? message),
+      ...appended,
+    ],
   };
+}
+
+/**
+ * The narration of a turn, which is the text it said between its tool calls.
+ *
+ * Thinking is commentary too, and has been stored under `${turnId}:reasoning` since long before
+ * narration was. Counting it as narration breaks this both ways: the reasoning text joins the
+ * comparison that recognises a released turn's combined answer, and a turn that only ever had
+ * thinking looks like one whose narration is already stored, so the imported narration is dropped
+ * as a repeat and the text is lost.
+ */
+function isClaudeNarration(message: ConversationMessage): boolean {
+  return (
+    message.author === "assistant" &&
+    message.itemType === "commentary" &&
+    Boolean(message.turnId) &&
+    message.id !== `${message.turnId}:reasoning`
+  );
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {
@@ -181,55 +265,6 @@ function isProviderAssistantMessage(message: ConversationMessage): boolean {
 
 function providerMessageIdentity(message: ConversationMessage): string {
   return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
-}
-
-export function sortConversationMessages(messages: ConversationMessage[]): void {
-  const originalIndexes = new Map(messages.map((message, index) => [message, index]));
-  const groupKeys = new Map<ConversationMessage, string>();
-  const groups = new Map<string, { startedAt: number; firstIndex: number }>();
-
-  for (const [index, message] of messages.entries()) {
-    const groupKey = message.turnId ? `turn:${message.turnId}` : `message:${index}`;
-    const createdAt = messageTime(message);
-    const group = groups.get(groupKey);
-    groupKeys.set(message, groupKey);
-    if (group) {
-      group.startedAt = Math.min(group.startedAt, createdAt);
-      group.firstIndex = Math.min(group.firstIndex, index);
-    } else {
-      groups.set(groupKey, { startedAt: createdAt, firstIndex: index });
-    }
-  }
-
-  messages.sort((left, right) => {
-    const leftGroup = groups.get(groupKeys.get(left) ?? "");
-    const rightGroup = groups.get(groupKeys.get(right) ?? "");
-    if (leftGroup && rightGroup && leftGroup !== rightGroup) {
-      if (leftGroup.startedAt !== rightGroup.startedAt) return leftGroup.startedAt - rightGroup.startedAt;
-      if (leftGroup.firstIndex !== rightGroup.firstIndex) return leftGroup.firstIndex - rightGroup.firstIndex;
-    }
-
-    if (left.turnId && left.turnId === right.turnId) {
-      const rankDifference = turnMessageRank(left) - turnMessageRank(right);
-      if (rankDifference !== 0) return rankDifference;
-    }
-    const timeDifference = messageTime(left) - messageTime(right);
-    if (timeDifference !== 0) return timeDifference;
-    return (originalIndexes.get(left) ?? 0) - (originalIndexes.get(right) ?? 0);
-  });
-}
-
-function messageTime(message: ConversationMessage): number {
-  const timestamp = Date.parse(message.createdAt);
-  return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
-}
-
-function turnMessageRank(message: ConversationMessage): 0 | 1 | 2 | 3 {
-  if (message.exchange?.direction === "incoming" || message.author === "user") return 0;
-  if (message.author === "assistant" && message.itemType === "commentary") return 1;
-  if (message.exchange?.direction === "outgoing") return 2;
-  if (message.author === "assistant") return 3;
-  return 2;
 }
 
 function isImageGenerationItem(item: { type: string }): boolean {

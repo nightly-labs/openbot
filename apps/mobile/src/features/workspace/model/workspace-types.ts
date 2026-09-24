@@ -1,3 +1,4 @@
+import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
   AgentAnalytics,
   AgentAnalyticsInput,
@@ -12,12 +13,14 @@ import type {
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  InstalledSkill,
   QueueSnapshot,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  StorageUsage,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -80,6 +83,8 @@ export interface MobileWorkspaceContextValue {
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  /** The files this host accepts beyond the base list, as the desktop picker reads them. */
+  attachmentSupport: (serverId: string) => AttachmentSupport;
   changeQueue: (
     agentId: string,
     serverId: string,
@@ -126,6 +131,12 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  /** Null when the host does not advertise `installed-skills`. */
+  loadAgentSkills: (agentId: string, serverId: string) => Promise<InstalledSkill[] | null>;
+  /** Null when the host does not advertise `storage-v1`. */
+  loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
+  /** Owners and admins only; the host refuses a member. */
+  deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   loadOlderMessages: (agentId: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;
@@ -136,7 +147,13 @@ export interface MobileWorkspaceContextValue {
     replyToMessageId?: string | null,
     serverId?: string,
   ) => Promise<string>;
-  uploadAttachment: (agentId: string, input: RemoteFileUpload, serverId?: string) => Promise<DraftAttachment>;
+  uploadAttachment: (
+    agentId: string,
+    input: RemoteFileUpload,
+    serverId?: string,
+    /** Hears the fraction of the file sent so far, from 0 to 1. */
+    onProgress?: (fraction: number) => void,
+  ) => Promise<DraftAttachment>;
   downloadAttachment: (serverId: string, attachmentId: string) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hideAgent: (agentId: string) => void;

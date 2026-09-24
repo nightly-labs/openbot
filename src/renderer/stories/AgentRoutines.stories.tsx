@@ -5,7 +5,7 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AgentRoutinesSettings } from "../src/features/conversation/AgentRoutinesSettings";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
 import { agentRoutinesPort } from "../src/features/conversation/routines-port";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
 const morningBrief: Routine = {
@@ -93,11 +93,11 @@ function FullSettingsPanelStory() {
     <main class="agent-memories-story-stage">
       <AgentSettingsPanel
         onOpenUsage={fn()}
-        agent={STORY_AGENTS[0]}
+        agent={STORY_AGENT}
         runtimeSettings={{
-          provider: STORY_AGENTS[0].provider,
-          model: STORY_AGENTS[0].model,
-          reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+          provider: STORY_AGENT.provider,
+          model: STORY_AGENT.model,
+          reasoningEffort: STORY_AGENT.reasoningEffort,
         }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -166,7 +166,7 @@ export const UnsavedChangesConfirmation: Story = {
     await userEvent.type(canvas.getByRole("textbox", { name: "Name" }), "Changed morning brief");
     await userEvent.click(canvas.getByRole("button", { name: "Back to Routines" }));
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog")).toHaveAccessibleName("Discard changes?");
+    await expect(await body.findByRole("alertdialog")).toHaveAccessibleName("Discard changes?");
     await expect(body.getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
     await expect(body.getByRole("button", { name: "Discard changes" })).toBeInTheDocument();
   },

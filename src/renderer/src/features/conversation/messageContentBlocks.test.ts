@@ -1,5 +1,5 @@
+import { messageContentBlocks } from "@openbot/ui/features/conversation/DataTable";
 import { describe, expect, it } from "vitest";
-import { messageContentBlocks } from "./DataTable";
 
 describe("messageContentBlocks", () => {
   it("parses GFM tables with optional outer pipes, alignment, and escaped pipes", () => {

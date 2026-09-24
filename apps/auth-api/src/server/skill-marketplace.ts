@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isSkillCategory, type SkillCategory } from "@openbot/contracts/ipc";
+import { isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH, type SkillCategory } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { unzipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
@@ -535,7 +535,7 @@ function parseSkillMetadata(
   if (!isDynamicRecord(value)) throw new SkillMarketplaceError(400, "invalid_skill", "SKILL.md metadata is invalid.");
   const name = isString(value.name) ? value.name.trim() : "";
   const description = isString(value.description) ? value.description.trim() : "";
-  if (!name || name.length > 80 || !description || description.length > 500) {
+  if (!name || name.length > 80 || !description || description.length > SKILL_DESCRIPTION_MAX_LENGTH) {
     throw new SkillMarketplaceError(
       400,
       "invalid_skill",

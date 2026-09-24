@@ -4,6 +4,8 @@ import { createTranslate } from "./message";
 
 describe("resolveLocale", () => {
   it("reads a system locale by its language subtag", () => {
+    expect(resolveLocale("system", "fr-FR")).toBe("fr");
+    expect(resolveLocale("system", "fr")).toBe("fr");
     expect(resolveLocale("system", "ja-JP")).toBe("ja");
     expect(resolveLocale("system", "ja")).toBe("ja");
   });
@@ -13,6 +15,7 @@ describe("resolveLocale", () => {
   });
 
   it("lets an explicit choice override the computer", () => {
+    expect(resolveLocale("fr", "ja-JP")).toBe("fr");
     expect(resolveLocale("ja", "en-US")).toBe("ja");
     expect(resolveLocale("en", "ja-JP")).toBe("en");
   });
@@ -20,8 +23,14 @@ describe("resolveLocale", () => {
 
 describe("translateFor", () => {
   it("returns the translation for the locale", () => {
+    expect(translateFor("fr")("menu.stopAllAgents")).toBe("Arrêter tous les agents");
     expect(translateFor("ja")("menu.stopAllAgents")).toBe("すべてのエージェントを停止");
     expect(translateFor("en")("menu.stopAllAgents")).toBe("Stop all agents");
+  });
+
+  it("uses French plural forms", () => {
+    expect(translateFor("fr")("provider.endpointCount", { count: 1 })).toBe("1 point de terminaison");
+    expect(translateFor("fr")("provider.endpointCount", { count: 2 })).toBe("2 points de terminaison");
   });
 
   it("fills a placeholder", () => {

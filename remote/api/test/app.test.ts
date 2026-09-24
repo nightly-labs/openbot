@@ -60,4 +60,34 @@ describe("signed account notifications", () => {
     expect((await send(body, "")).status).toBe(401);
     expect(changed).not.toHaveBeenCalled();
   });
+
+  it("forwards a changed server list to the account that joined or lost one", async () => {
+    const config = readRemoteApiConfig({
+      REMOTE_TICKET_JWKS_URL: "https://api.example.test/.well-known/jwks.json",
+      REMOTE_TLS_DISABLED: "true",
+      REMOTE_CONTROL_PLANE_URL: "http://127.0.0.1:3100",
+      REMOTE_SESSION_SECRET: "s".repeat(32),
+      REMOTE_AUTH_WEBHOOK_SECRET: "w".repeat(32),
+      TURN_SHARED_SECRET: "t".repeat(32),
+      TURN_HOST: "localhost",
+    });
+    const signal = new SignalService(new RemoteTokenService(config), 8);
+    const changed = vi.spyOn(signal, "serversChanged");
+    const app = createRemoteApiApp(config, signal);
+    const body = '{ "type": "account-servers-changed", "userId": "user-1" }';
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const response = await app.handle(
+      new Request("http://localhost/internal/auth-events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "OpenBot-Timestamp": timestamp,
+          "OpenBot-Signature": signServiceRequest(body, timestamp, config.authWebhookSecret),
+        },
+        body,
+      }),
+    );
+    expect(response.status, await response.text()).toBe(204);
+    expect(changed).toHaveBeenCalledWith("user-1");
+  });
 });

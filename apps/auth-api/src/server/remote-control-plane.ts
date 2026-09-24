@@ -84,7 +84,11 @@ interface TicketSignerConfig {
 type RemoteFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type RemoteAuthEvent =
   | { type: "remote-auth-changed"; hostId: string; authEpoch: number }
-  | { type: "remote-session-ended"; hostId: string; sessionId: string };
+  | { type: "remote-session-ended"; hostId: string; sessionId: string }
+  // Addressed to an account rather than to a host: the device that accepted an invitation already
+  // knows, and the user's other devices are the ones with a stale server list. Signal forwards it
+  // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
+  | { type: "account-servers-changed"; userId: string };
 
 interface RemoteAuthEventRow {
   event_id: string;
@@ -281,6 +285,10 @@ export class RemoteControlPlane {
         )
         .bind(membershipId, user.id, now, now, hostId, user.id),
       this.#authEpochEventStatement(hostId, now, user.id),
+      // Only for a host this account did not have. Publishing an existing one again rotates its
+      // credential without changing anyone's server list, and this owner's other devices would
+      // re-read the account for nothing on every start of the host.
+      ...(existing ? [] : [this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now)]),
     ]);
     if (registration.some((result) => (result.meta.changes ?? 0) !== 1)) {
       throw new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
@@ -615,8 +623,9 @@ export class RemoteControlPlane {
       this.#database
         .prepare("UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
         .bind(now, invite.host_id, user.id),
+      this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now),
     ]);
-    if ((accepted[2].meta.changes ?? 0) !== 1 || (accepted[3].meta.changes ?? 0) !== 1) {
+    if ((accepted[2]?.meta.changes ?? 0) !== 1 || (accepted[3]?.meta.changes ?? 0) !== 1) {
       throw new RemoteControlPlaneError(409, "invite_already_used", "The invitation was already used.");
     }
     const membership = await this.#database
@@ -699,6 +708,9 @@ export class RemoteControlPlane {
         ),
       ),
       this.#authEpochEventStatement(input.hostId, now),
+      // The member whose membership this is, and not the owner who changed it: a revoked server
+      // has to leave that member's list on every device they are signed in on.
+      this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now),
     ]);
     await this.#flushAuthEvents();
   }
@@ -785,12 +797,20 @@ export class RemoteControlPlane {
     return { sessionId: active.session_id, hostId, expiresAt: active.expires_at };
   }
 
-  async endSession(userId: string, sessionId: string): Promise<void> {
+  async endSession(userId: string, sessionId: string, authSessionHash?: string): Promise<void> {
     const session = await this.#database
-      .prepare("SELECT host_id, user_id FROM remote_sessions WHERE session_id = ? AND ended_at IS NULL LIMIT 1")
+      .prepare(
+        "SELECT host_id, user_id, auth_session_hash FROM remote_sessions WHERE session_id = ? AND ended_at IS NULL LIMIT 1",
+      )
       .bind(sessionId)
-      .first<{ host_id: string; user_id: string }>();
+      .first<{ host_id: string; user_id: string; auth_session_hash: string | null }>();
     if (!session) return;
+    if (authSessionHash !== undefined && (session.user_id !== userId || session.auth_session_hash !== authSessionHash))
+      throw new RemoteControlPlaneError(
+        403,
+        "session_inactive",
+        "The remote session does not belong to this browser session.",
+      );
     if (session.user_id !== userId) await this.#requireRole(session.host_id, userId, ["owner"]);
     const now = this.#now();
     const event = { type: "remote-session-ended" as const, hostId: session.host_id, sessionId };
@@ -878,7 +898,7 @@ export class RemoteControlPlane {
     );
   }
 
-  async issueSessionTicket(userId: string, sessionId: string, clientPublicKey: string) {
+  async issueSessionTicket(userId: string, sessionId: string, clientPublicKey: string, authSessionHash?: string) {
     const boundClientPublicKey = requiredText(clientPublicKey, 8_192, "client public key");
     const now = this.#now();
     const session = await this.#database
@@ -888,12 +908,12 @@ export class RemoteControlPlane {
          FROM remote_sessions s
          JOIN remote_memberships m ON m.membership_id = s.membership_id
          JOIN remote_hosts h ON h.host_id = s.host_id
-         WHERE s.session_id = ? AND s.user_id = ? AND (s.auth_session_hash IS NULL OR EXISTS(
+         WHERE s.session_id = ? AND s.user_id = ? AND (? IS NULL OR s.auth_session_hash = ?) AND (s.auth_session_hash IS NULL OR EXISTS(
            SELECT 1 FROM auth_sessions a WHERE a.token_hash = s.auth_session_hash
              AND a.user_id = s.user_id AND a.revoked_at IS NULL AND a.expires_at > ?
          )) LIMIT 1`,
       )
-      .bind(sessionId, userId, now)
+      .bind(sessionId, userId, authSessionHash ?? null, authSessionHash ?? null, now)
       .first<RemoteSessionRow>();
     if (!session || session.ended_at || session.expires_at <= now || session.status !== "active") {
       throw new RemoteControlPlaneError(403, "session_inactive", "The remote session is not active.");

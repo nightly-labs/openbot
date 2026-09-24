@@ -7,7 +7,7 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import type { MarketplacePluginApp, MarketplacePluginDetail } from "./marketplace-plugins";
+import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
 /**
  * The configuration an app installs as. The catalog states the name and how the server is reached -
@@ -684,6 +684,70 @@ const RESEND: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/resend",
 };
 
+const COMPOSIO: MarketplacePluginDetail = {
+  id: "plugin-composio",
+  slug: "composio",
+  name: "Composio",
+  tagline: "Many apps through your own Composio link",
+  description:
+    "Composio connects agents to Gmail, Slack, GitHub, and hundreds of other apps through one MCP server. Create the server in your Composio account, add the apps you want to it, and paste its link here. Add an API key only if your server requires one.",
+  category: "automation",
+  creatorName: "composio.dev",
+  iconUrl: "https://composio.dev/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-inbox", text: "Summarize my unread email and draft replies to the urgent ones." },
+    { id: "prompt-handoff", text: "Post a summary of this pull request to our team channel." },
+    { id: "prompt-apps", text: "Which apps and actions can you use through Composio?" },
+  ],
+  apps: [
+    {
+      id: "app-composio-mcp",
+      name: "Composio",
+      description: "The apps you add to your Composio MCP server, over the link from your Composio account.",
+      iconUrl: "https://composio.dev/favicon.ico",
+      server: {
+        name: "composio",
+        transport: "http",
+        url: "https://composio.dev/",
+        auth: [
+          {
+            id: "composio-link",
+            kind: "key",
+            label: "MCP link",
+            fields: [
+              {
+                id: "url",
+                label: "MCP URL",
+                url: true,
+                placeholder: "https://backend.composio.dev/v3/mcp/…",
+                hint: "The URL of an MCP server in your Composio account",
+              },
+              {
+                id: "api-key",
+                label: "API key",
+                header: "x-api-key",
+                hint: "Only if your server requires one. Find it in your Composio account settings.",
+                optional: true,
+              },
+            ],
+            docsUrl: "https://docs.composio.dev/docs/single-toolkit-mcp",
+            docsLabel: "Create a server",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://composio.dev",
+  privacyPolicyUrl: "https://composio.dev/privacy-policy",
+  termsUrl: "https://composio.dev/terms-of-service",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-19T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/composio",
+};
+
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   AAVE,
   CANVA,
@@ -699,4 +763,5 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIRECRAWL,
   BRAVE_SEARCH,
   RESEND,
+  COMPOSIO,
 ];

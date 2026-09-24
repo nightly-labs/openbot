@@ -8,10 +8,12 @@ import {
   type ChannelTask,
   type CreateAgentInput,
   emptyAnalyticsTotals,
+  type InstalledSkill,
   parseChannelCommand,
   type Routine,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
+  type StorageUsage,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -20,7 +22,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { act, isValidElement, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, expect, it, vi } from "vitest";
 import type { ChatTarget } from "@/features/chat/model/chat-target";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -73,6 +75,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   dispatch: vi.fn(),
   alert: vi.fn(),
+  shareFile: vi.fn(),
   back: vi.fn(),
   recordId: "",
   blocked: false,
@@ -160,7 +163,9 @@ const workspace = {
   unreadAgentIds: [],
   createAgent: vi.fn(async (_input: CreateAgentInput) => {}),
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
-    workspace.agents = [{ ...workspace.agents[0], ...input }];
+    const [agent] = workspace.agents;
+    assert(agent);
+    workspace.agents = [{ ...agent, ...input }];
   }),
   loadAgentAvatar: vi.fn(async (_id: string, _url: string, _serverId: string) => "data:image/png;base64,iVBORw0KGgo="),
   setAgentAvatar: vi.fn(
@@ -193,6 +198,11 @@ const workspace = {
   loadAgentMemories: vi.fn<() => Promise<AgentMemory[]>>(async () => []),
   loadAgentRoutines: vi.fn<() => Promise<Routine[]>>(async () => []),
   loadAgentAnalytics: vi.fn<() => Promise<AgentAnalytics | null>>(async () => null),
+  loadAgentSkills: vi.fn<() => Promise<InstalledSkill[] | null>>(async () => []),
+  loadAgentStorage: vi.fn<(agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>>(
+    async () => null,
+  ),
+  deleteStoredFile: vi.fn(async () => {}),
 };
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({ useMobileWorkspace: () => workspace }));
 vi.mock("@/features/auth/context/mobile-session-context", () => ({
@@ -354,6 +364,7 @@ vi.mock("@/shared/components/sheet-scroll-view", () => ({
   SheetScrollView: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }));
 vi.mock("@/features/settings/components/settings-content", () => ({
+  SettingsNote: ({ children }: PropsWithChildren) => <p>{children}</p>,
   SettingsSection: ({ title, children }: PropsWithChildren<{ title: string }>) => (
     <section aria-label={title}>{children}</section>
   ),
@@ -363,9 +374,12 @@ vi.mock("@/features/settings/components/settings-content", () => ({
     trailing,
   }: PropsWithChildren<{ onPress?: () => void; trailing?: import("react").ReactNode }>) =>
     onPress ? (
-      <button type="button" onClick={onPress}>
-        {children}
-      </button>
+      <div>
+        <button type="button" onClick={onPress}>
+          {children}
+        </button>
+        {trailing}
+      </div>
     ) : (
       <div>
         {children}
@@ -480,6 +494,12 @@ vi.mock("lucide-react-native", () => ({
   ArrowLeft: () => null,
   Eye: () => null,
   TriangleAlert: () => null,
+  Trash2: () => null,
+}));
+vi.mock("@/features/chat/components/attachment-preview", () => ({
+  AttachmentThumbnail: () => null,
+  formatFileSize: (bytes: number) => `${bytes} B`,
+  useAttachmentFile: () => ({ uri: null, busy: false, share: mocks.shareFile }),
 }));
 
 const container = document.createElement("div");
@@ -487,7 +507,17 @@ document.body.append(container);
 let root = createRoot(container);
 let client = new QueryClient();
 async function renderSheet(
-  page: "info" | "appearance" | "usage" | "memories" | "routines" | "runtime" | "memory" | "routine" = "info",
+  page:
+    | "info"
+    | "appearance"
+    | "usage"
+    | "memories"
+    | "skills"
+    | "files"
+    | "routines"
+    | "runtime"
+    | "memory"
+    | "routine" = "info",
 ) {
   await act(() =>
     root.render(
@@ -529,6 +559,10 @@ beforeEach(() => {
   workspace.loadAgentMemories.mockReset().mockResolvedValue([]);
   workspace.loadAgentRoutines.mockReset().mockResolvedValue([]);
   workspace.loadAgentAnalytics.mockReset().mockResolvedValue(null);
+  workspace.loadAgentSkills.mockReset().mockResolvedValue([]);
+  workspace.loadAgentStorage.mockReset().mockResolvedValue(null);
+  workspace.deleteStoredFile.mockReset().mockResolvedValue();
+  mocks.shareFile.mockClear();
   channelRows = [channel];
   actionTasks = [];
   failChannelSave = false;
@@ -647,6 +681,14 @@ it("validates input, retains failed edits, and confirms cancellation", async () 
   expect(mocks.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
 });
 
+it("saves an agent without instructions, as the host and desktop allow", async () => {
+  workspace.agents = [{ ...original, description: "" }];
+  await renderSheet();
+  await edit("Title", "Planner");
+  await click("Save changes");
+  expect(workspace.updateAgent).toHaveBeenCalledWith({ agentId: original.id, title: "Planner" }, original.serverId);
+});
+
 it("keeps edits through host loss and accepts desktop changes in untouched fields", async () => {
   await renderSheet();
   await edit("Name", "My draft");
@@ -710,6 +752,84 @@ it("prevents duplicate saves and dismissal while a save is pending", async () =>
   expect(workspace.updateAgent).toHaveBeenCalledTimes(1);
   await act(async () => finish());
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+});
+
+it("lists the host skills read-only and hides built-in skills", async () => {
+  const skill = { installedVersion: 1, availableVersion: 1, state: "installed" as const };
+  workspace.loadAgentSkills.mockResolvedValue([
+    { ...skill, skillId: "writer", slug: "writer", name: "Writer", description: "Drafts posts" },
+    { ...skill, skillId: "managed", slug: "managed", name: "Built in", origin: "managed" },
+    { ...skill, skillId: "notes", slug: "notes", name: "Notes", enabled: false },
+  ]);
+  await renderSheet("skills");
+  await screen.findByText("Writer");
+  expect(workspace.loadAgentSkills).toHaveBeenCalledWith(original.id, original.serverId);
+  expect(screen.getByText("Drafts posts")).toBeTruthy();
+  expect(screen.getByText("Notes")).toBeTruthy();
+  expect(screen.queryByText("Built in")).toBeNull();
+  expect(screen.getByText("Skills for this agent are managed on the host.")).toBeTruthy();
+
+  await act(() => root.unmount());
+  root = createRoot(container);
+  client.clear();
+  workspace.loadAgentSkills.mockResolvedValue(null);
+  await renderSheet("skills");
+  await screen.findByText("This host does not support skills. Update OpenBot on the host.");
+});
+
+it("shows the agent files and lets an admin delete one, then measures again", async () => {
+  const usage: StorageUsage = {
+    scope: "agent",
+    agentId: original.id,
+    conversationId: null,
+    scannedAt: "2026-09-14T00:00:00Z",
+    freeBytes: null,
+    breakdown: [{ category: "attachments", bytes: 12, removable: false }],
+    agents: [],
+    conversations: [],
+    files: [
+      {
+        id: "file-one",
+        name: "plan.pdf",
+        size: 12,
+        kind: "file",
+        mimeType: "application/pdf",
+        previewKind: "pdf",
+        previewUrl: null,
+        source: "attachment",
+        agentId: original.id,
+        conversation: null,
+        messageId: "message-one",
+        createdAt: "2026-09-14T00:00:00Z",
+        status: "available",
+        deletable: true,
+      },
+    ],
+    truncated: false,
+  };
+  workspace.loadAgentStorage.mockResolvedValue(usage);
+  await renderSheet("files");
+  await screen.findByText("plan.pdf");
+  expect(workspace.loadAgentStorage).toHaveBeenLastCalledWith(original.id, original.serverId, false);
+  // A member reads the files but cannot delete them.
+  expect(screen.queryByRole("button", { name: "Delete plan.pdf" })).toBeNull();
+  await click("plan.pdf");
+  expect(mocks.shareFile).toHaveBeenCalledOnce();
+
+  await act(() => root.unmount());
+  root = createRoot(container);
+  client.clear();
+  workspace.servers = [{ ...host, role: "admin" }];
+  await renderSheet("files");
+  await screen.findByRole("button", { name: "Delete plan.pdf" });
+  await click("Delete plan.pdf");
+  workspace.loadAgentStorage.mockResolvedValue({ ...usage, files: [] });
+  await act(async () => mocks.alert.mock.calls.at(-1)?.[2][1].onPress());
+  await waitFor(() => expect(workspace.deleteStoredFile).toHaveBeenCalledWith("file-one", original.serverId));
+  await waitFor(() =>
+    expect(workspace.loadAgentStorage).toHaveBeenLastCalledWith(original.id, original.serverId, true),
+  );
+  await waitFor(() => expect(screen.queryByText("plan.pdf")).toBeNull());
 });
 
 it("shows host memories, routine status, and usage on separate pages", async () => {
@@ -1446,7 +1566,10 @@ it("keeps a failed action in the sheet for retry and supports reassign", async (
   await click("Resume");
   const retries = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
   expect(retries).toHaveLength(2);
-  expect(retries[1][1]).toEqual(retries[0][1]);
+  const [firstRetry, secondRetry] = retries;
+  assert(firstRetry);
+  assert(secondRetry);
+  expect(secondRetry[1]).toEqual(firstRetry[1]);
   failChannelSave = false;
   await click("Reassign");
   await click("Travel");

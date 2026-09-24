@@ -16,6 +16,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
+import recordedSchemaHistory from "./openbot-database-schema-history.json";
 
 const appliedAt = "2026-09-03T10:00:00.000Z";
 
@@ -49,6 +50,79 @@ describe("OpenBot database build paths", () => {
     expect(readAppliedVersions(upgraded)).toEqual(readAppliedVersions(fresh));
   });
 });
+
+// A migration runs on every computer that upgrades past its version, and there is no backup. So a
+// shipped migration must never change: the fix is a new migration. The history file records what each
+// version added, changed or dropped, as normalized DDL, with `null` for a dropped declaration. The
+// entries only grow. A change to a recorded entry is allowed only for a version that has not shipped.
+// Data-only statements, such as an UPDATE, leave no trace in the schema, so review still covers them.
+describe("OpenBot database migration history", () => {
+  it("keeps the schema change of every recorded migration", async () => {
+    const actual = await schemaChangesByVersion();
+
+    for (const [version, recorded] of Object.entries(recordedSchemaHistory)) {
+      expect(actual[version], `Migration ${version} shipped. Add a new migration instead of editing it.`).toEqual(
+        recorded,
+      );
+    }
+    const unrecorded = Object.keys(actual).filter((version) => !Object.hasOwn(recordedSchemaHistory, version));
+    const missing = Object.fromEntries(unrecorded.map((version) => [version, actual[version]]));
+    expect(
+      unrecorded,
+      `Add each new migration to openbot-database-schema-history.json: ${JSON.stringify(missing, null, 2)}`,
+    ).toEqual([]);
+  });
+});
+
+type SchemaChanges = Record<string, string | null>;
+
+const STOP_MESSAGE = "stopped after one migration";
+
+// Runs the upgrade path one migration at a time. A temporary trigger lets exactly one more version into
+// `schema_migrations` per call, so the next migration rolls back and the database stays at the version
+// before it. The next call resumes from there, as an install on that version would.
+async function schemaChangesByVersion(): Promise<Record<string, SchemaChanges>> {
+  const database = await openDatabase();
+  database.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");
+  const changes: Record<string, SchemaChanges> = {};
+  let before = new Map<string, string>();
+
+  for (;;) {
+    const appliedBefore = readAppliedVersions(database).length;
+    database.exec(`
+      DROP TRIGGER IF EXISTS temp.stop_after_one_migration;
+      CREATE TEMP TRIGGER stop_after_one_migration BEFORE INSERT ON schema_migrations
+      WHEN (SELECT COUNT(*) FROM schema_migrations) > ${appliedBefore}
+      BEGIN SELECT RAISE(ABORT, '${STOP_MESSAGE}'); END;
+    `);
+    try {
+      migrateOpenBotDatabase(database, { appliedAt });
+    } catch (error) {
+      if (!(error instanceof Error && error.cause instanceof Error && error.cause.message.includes(STOP_MESSAGE))) {
+        throw error;
+      }
+    }
+
+    const applied = readAppliedVersions(database);
+    const version = applied.at(-1);
+    if (applied.length === appliedBefore || version === undefined) return changes;
+    const after = new Map(
+      readNormalizedDeclarations(database).map((declaration) => [
+        `${declaration.type} ${declaration.name}`,
+        declaration.sql.join(" "),
+      ]),
+    );
+    changes[String(version)] = diffDeclarations(before, after);
+    before = after;
+  }
+}
+
+function diffDeclarations(before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): SchemaChanges {
+  const changes: SchemaChanges = {};
+  for (const [key, sql] of after) if (before.get(key) !== sql) changes[key] = sql;
+  for (const key of before.keys()) if (!after.has(key)) changes[key] = null;
+  return changes;
+}
 
 // An empty database has no tables, so `migrateOpenBotDatabase` takes the
 // `createLatestDatabase` branch - the path every new install follows.

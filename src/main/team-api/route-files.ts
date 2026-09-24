@@ -44,8 +44,9 @@ export async function routeFiles(
       throw new HttpError(400, "The attachment MIME type is too long.");
     }
     const bytes = await readBinary(request, ATTACHMENT_LIMITS.fileBytes);
-    const attachments = await agents.prepareImportedAttachments([], [{ name, mimeType, bytes }]);
-    return json(201, attachments[0]);
+    const [attachment] = await agents.prepareImportedAttachments([], [{ name, mimeType, bytes }]);
+    if (!attachment) throw new Error("The attachment was not prepared.");
+    return json(201, attachment);
   }
   const attachmentMatch = url.pathname.match(/^\/v1\/attachments\/([^/]+)$/);
   if (attachmentMatch) {

@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   type BrowserViewSessionResponse,
+  browserViewClientAcksFrames,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
@@ -21,6 +22,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
 import type { BrowserHost } from "../backend/browser-host";
+import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -30,6 +32,20 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
  * behind must show the page as it is now, not replay the seconds the link was slow.
  */
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
+/**
+ * Frames kept after the one the client has drawn. A client that asked to name frames and then
+ * stops saying which one is on screen would otherwise keep one entry per frame for the whole
+ * view. Past this the view is closed. The drawn frame is not dropped in place: that is what made
+ * a click land on the wrong page.
+ */
+const MAX_UNACKNOWLEDGED_FRAMES = 120;
+
+/** Frames older than the one on the member's screen. The named frame itself stays, so a click on it still expands. */
+function forgetFramesBefore(sizes: Map<number, { width: number; height: number }>, drawn: number): void {
+  for (const sequence of sizes.keys()) {
+    if (sequence < drawn) sizes.delete(sequence);
+  }
+}
 const MAX_SESSIONS = 4;
 const MAX_INPUT_MESSAGE_BYTES = 4 * 1024;
 
@@ -50,6 +66,13 @@ interface ManagedViewSession {
   /** The size of the last frame sent, which is what a fractional input coordinate refers to. */
   frameWidth: number;
   frameHeight: number;
+  /**
+   * The shape of each frame this session sent and the client may still be drawing, by sequence.
+   * Only a client that acknowledged frames at connect fills this. An older client names no frame,
+   * so there is nothing to look up, and keeping one entry per frame would grow for the whole view.
+   */
+  frameSizes: Map<number, { width: number; height: number }>;
+  rememberFrames: boolean;
 }
 
 export class BrowserViewGateway {
@@ -75,6 +98,8 @@ export class BrowserViewGateway {
       stopView: null,
       frameWidth: 0,
       frameHeight: 0,
+      frameSizes: new Map(),
+      rememberFrames: false,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -118,6 +143,11 @@ export class BrowserViewGateway {
       socket.destroy();
       return;
     }
+    // A new socket is a new stream. Sizes from the previous one name frames this client never saw.
+    session.frameWidth = 0;
+    session.frameHeight = 0;
+    session.frameSizes.clear();
+    session.rememberFrames = browserViewClientAcksFrames(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => void this.#connect(session, client));
   }
 
@@ -151,10 +181,19 @@ export class BrowserViewGateway {
         session.tabId,
         (frame) => {
           if (session.socket !== client || client.readyState !== webSockets.WebSocket.OPEN) return;
-          session.frameWidth = frame.width;
-          session.frameHeight = frame.height;
+          // A dropped frame is one the client never sees, so it cannot be the frame a fraction is a
+          // fraction of. Recording its shape here would expand the client's next point with a size
+          // only this side knows about, and the click would land somewhere the user never pointed.
           if (client.bufferedAmount > MAX_BUFFERED_FRAME_BYTES) return;
           client.send(encodeBrowserViewFrame(frame), { binary: true });
+          session.frameWidth = frame.width;
+          session.frameHeight = frame.height;
+          if (session.rememberFrames) {
+            session.frameSizes.set(frame.sequence, { width: frame.width, height: frame.height });
+            if (session.frameSizes.size > MAX_UNACKNOWLEDGED_FRAMES) {
+              void this.#closeSession(session, "The live view fell too far behind.");
+            }
+          }
         },
         () => {
           void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
@@ -177,20 +216,40 @@ export class BrowserViewGateway {
       session.socket?.close(1008, "Invalid browser view input.");
       return;
     }
+    // The client has drawn this frame. Older ones are no longer on screen, including when the
+    // member never moves the pointer. A frame this session did not send is not a frame to trust.
+    if (input.type === "ack") {
+      if (!session.frameSizes.has(input.sequence)) return;
+      forgetFramesBefore(session.frameSizes, input.sequence);
+      return;
+    }
     // Input that arrives before the first frame has no frame to be a fraction of.
-    if (input.type === "pointer" && (session.frameWidth === 0 || session.frameHeight === 0)) return;
-    await this.#options.browser
-      .dispatchViewInput(
-        session.tabId,
-        input.type === "pointer"
-          ? { ...input, x: input.x * session.frameWidth, y: input.y * session.frameHeight }
-          : input,
-      )
-      .catch(() => undefined);
+    let frame = { width: session.frameWidth, height: session.frameHeight };
+    if (input.type === "pointer") {
+      if (frame.width === 0 || frame.height === 0) return;
+      // A client from before the sequence field names no frame and gets the newest one: that is
+      // what every client got before a point could name its own. A named frame this session did
+      // not send, or one the client has already moved past, is not that client. Expanding it with
+      // a newer size clicks a page the user was not looking at, so the point is dropped.
+      if (input.sequence !== undefined) {
+        const named = session.frameSizes.get(input.sequence);
+        if (!named) return;
+        frame = named;
+        forgetFramesBefore(session.frameSizes, input.sequence);
+      }
+    }
+    // The sequence names a frame on this socket. The page is dispatched pixels, and knows nothing
+    // about how they were carried here.
+    const dispatched =
+      input.type === "pointer"
+        ? { ...input, sequence: undefined, x: input.x * frame.width, y: input.y * frame.height }
+        : input;
+    await this.#options.browser.dispatchViewInput(session.tabId, dispatched).catch(() => undefined);
   }
 
   async #detach(session: ManagedViewSession, client: Ws.WebSocket): Promise<void> {
     if (session.socket !== client) return;
+    this.#sessions.delete(session.id);
     session.socket = null;
     const stopView = session.stopView;
     session.stopView = null;
@@ -206,15 +265,4 @@ export class BrowserViewGateway {
     client?.close(1000, reason.slice(0, 120));
     await stopView?.().catch(() => undefined);
   }
-}
-
-function rawDataSize(data: Ws.RawData): number {
-  if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.byteLength, 0);
-  return data.byteLength;
-}
-
-function rawDataText(data: Ws.RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
 }

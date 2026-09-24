@@ -1,0 +1,488 @@
+.conversation-title {
+  display: flex;
+  height: var(--openbot-control-sm);
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--openbot-radius-sm);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-align: left;
+  transition: background var(--openbot-duration-hover) ease;
+}
+
+.conversation-title:hover {
+  background: var(--openbot-hover);
+}
+
+.conversation-title h1 {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: 0;
+}
+
+.conversation-access-lock {
+  display: inline-flex;
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.conversation-access-lock svg {
+  width: 14px;
+  height: 14px;
+}
+
+.conversation-header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.provider-model-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.provider-model-trigger {
+  display: flex;
+  width: max-content;
+  max-width: 190px;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-overlay);
+  padding: 0 9px 0 8px;
+  color: var(--openbot-text-primary);
+  cursor: pointer;
+  box-shadow: inset 0 1px var(--openbot-hover);
+  transition:
+    border-color var(--openbot-duration-hover) ease,
+    background-color var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.provider-model-trigger:hover:not(:disabled),
+.provider-model-trigger[aria-expanded="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-surface);
+}
+
+.provider-model-trigger:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.provider-model-trigger:focus-visible,
+.provider-model-rail-button:focus-visible,
+.provider-model-option:focus-visible {
+  outline: 1px solid var(--openbot-accent);
+  outline-offset: 1px;
+}
+
+.provider-model-trigger:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.provider-model-trigger-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.provider-model-trigger-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-md);
+  font-weight: 470;
+  line-height: 18px;
+}
+
+.provider-model-picker-field {
+  width: 100%;
+}
+
+.provider-model-trigger-field {
+  width: 100%;
+  max-width: none;
+  height: 44px;
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--openbot-hover);
+  padding: 0 11px 0 12px;
+  box-shadow: none;
+}
+
+.provider-model-trigger-field:hover:not(:disabled),
+.provider-model-trigger-field[aria-expanded="true"] {
+  border-color: transparent;
+  background: var(--openbot-border);
+}
+
+.provider-model-trigger-field .provider-model-field-label {
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: 400;
+  line-height: 17px;
+}
+
+.provider-model-trigger-field .provider-model-trigger-value {
+  max-width: calc(100% - 84px);
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.provider-model-mark {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  overflow: visible;
+  fill: var(--openbot-provider-current);
+}
+
+.provider-model-mark-large {
+  width: 19px;
+  height: 19px;
+  flex-basis: 19px;
+}
+
+.provider-model-chevron {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: none;
+  stroke: var(--openbot-text-muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--openbot-duration-normal) ease;
+}
+
+.provider-model-trigger[aria-expanded="true"] .provider-model-chevron {
+  transform: rotate(180deg);
+}
+
+.provider-model-popover {
+  position: relative;
+  z-index: 40;
+  width: min(360px, calc(100vw - 24px));
+  min-height: 226px;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-primary);
+  box-shadow:
+    0 22px 60px var(--openbot-bg-overlay),
+    0 3px 12px var(--openbot-shadow-popover-ambient);
+}
+
+.provider-model-layout {
+  max-height: min(520px, calc(100dvh - 100px), var(--kb-popper-content-available-height, 520px));
+  display: flex;
+  width: 100%;
+  min-height: inherit;
+}
+
+.provider-model-rail {
+  display: flex;
+  width: 52px;
+  flex: 0 0 52px;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border-right: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-sidebar);
+  padding: 9px 7px;
+}
+
+.provider-model-rail-tooltip-trigger {
+  display: flex;
+}
+
+.provider-model-rail-tooltip {
+  z-index: var(--openbot-layer-popover);
+  display: flex;
+  max-width: min(240px, calc(100vw - 16px));
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-md);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.provider-model-rail-tooltip small {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.provider-model-rail-button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    opacity var(--openbot-duration-hover) ease;
+}
+
+.provider-model-rail-button:hover,
+.provider-model-rail-button-selected {
+  background: var(--openbot-bg-surface);
+}
+
+.provider-model-rail-button .provider-model-mark {
+  opacity: 0.48;
+}
+
+.provider-model-rail-button-selected .provider-model-mark {
+  fill: var(--openbot-text-primary);
+  opacity: 1;
+}
+
+.provider-model-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  padding: 10px 10px 11px;
+}
+
+.provider-model-panel:not([data-selected]) {
+  display: none;
+}
+
+.provider-model-heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-height: 54px;
+  /* The right inset lives on the text, not the row, so the action button can line its right edge up
+   * with the search field and the model rows below it. */
+  padding: 3px 0 8px 4px;
+}
+
+.provider-model-heading-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+/* The icons are raw lucide exports with no intrinsic size, and only the icon-only button sizes
+ * carry a rule, so an icon beside a label needs one here to match every other button. */
+.provider-model-heading .ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.provider-model-heading strong,
+.provider-model-heading span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-model-empty {
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-sidebar);
+  padding: 10px 11px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: 18px;
+}
+
+.provider-model-heading strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-lg);
+  font-weight: 620;
+  line-height: 20px;
+}
+
+.provider-model-heading span {
+  margin-top: 1px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+.provider-model-list {
+  display: grid;
+  gap: 3px;
+}
+
+.provider-model-effort {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 9px 4px 0;
+  border-top: 1px solid var(--openbot-border);
+  padding-top: 10px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+}
+
+.provider-model-effort-select {
+  width: 128px;
+}
+
+.provider-model-effort-select .ui-select-trigger {
+  background: var(--openbot-bg-sidebar);
+}
+
+.provider-model-option {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: transparent;
+  padding: 7px 9px;
+  color: var(--openbot-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.provider-model-option:hover:not(:disabled),
+.provider-model-option:focus-visible {
+  background: var(--openbot-bg-control-hover);
+}
+
+.provider-model-option-selected {
+  background: var(--openbot-hover);
+}
+
+.provider-model-option-selected:hover:not(:disabled),
+.provider-model-option-selected:focus-visible {
+  background: var(--openbot-bg-control-active);
+}
+
+.provider-model-option:disabled {
+  color: var(--openbot-text-dim);
+  cursor: not-allowed;
+}
+
+.provider-model-option-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.provider-model-option-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+}
+
+.provider-model-option-name small {
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-xs);
+  background: var(--openbot-bg-sidebar);
+  padding: 1px 5px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
+  line-height: 15px;
+}
+
+.provider-model-check {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: var(--openbot-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Off the shared glyph scale on purpose, like the badge tick in primitives.css: a
+   * selected-state check is an indicator, and the scale value paints it too fine here. */
+  stroke-width: 1.75;
+}
+
+@media (max-width: 720px) {
+  .provider-model-trigger {
+    max-width: 148px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-model-chevron,
+  .provider-model-trigger,
+  .provider-model-rail-button,
+  .provider-model-option {
+    transition: none;
+  }
+}
+
+.computer-button-agent-active {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent-soft);
+  box-shadow: 0 0 10px var(--openbot-accent-strong);
+  color: var(--openbot-accent);
+}
+
+.computer-button[aria-expanded="true"] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.computer-control-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--openbot-bg-canvas);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+  animation: browser-control-pulse 1.25s ease-in-out infinite;
+}
+
+.browser-tab-close:active,
+.browser-new-tab:active,
+.browser-toolbar-button:active:not(:disabled) {
+  transform: scale(0.92);
+  transition-duration: var(--openbot-duration-fast);
+}

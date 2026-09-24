@@ -45,7 +45,7 @@ const MEDIAN_SECONDS = median(Object.values(DURATIONS));
 function median(values: number[]): number {
   if (values.length === 0) return 1;
   const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.floor(sorted.length / 2)];
+  return sorted[Math.floor(sorted.length / 2)] ?? 1;
 }
 
 function seconds(specification: TestSpecification): number {
@@ -73,6 +73,8 @@ export default class BalancedSequencer extends BaseSequencer {
       shortest.files.push(specification);
     }
 
-    return super.sort(shards[shard.index - 1].files);
+    const current = shards[shard.index - 1];
+    if (!current) throw new Error(`Shard ${shard.index} of ${shard.count} does not exist.`);
+    return super.sort(current.files);
   }
 }

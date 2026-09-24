@@ -54,9 +54,10 @@ export function scrubbedBrowserUserAgent(userAgent: string): string {
 export function applySiteIdentity(url: string, requestHeaders: Record<string, string>): Record<string, string> {
   const headers = { ...requestHeaders };
   if (siteIdentityForUrl(url) !== "scrubbed") return headers;
-  const userAgentName = Object.keys(headers).find((candidate) => candidate.toLowerCase() === "user-agent");
-  if (userAgentName === undefined) return headers;
-  const scrubbed = scrubbedBrowserUserAgent(headers[userAgentName]);
+  const userAgent = Object.entries(headers).find(([candidate]) => candidate.toLowerCase() === "user-agent");
+  if (userAgent === undefined) return headers;
+  const [userAgentName, userAgentValue] = userAgent;
+  const scrubbed = scrubbedBrowserUserAgent(userAgentValue);
   if (userAgentName !== "User-Agent") delete headers[userAgentName];
   headers["User-Agent"] = scrubbed;
   return headers;

@@ -97,12 +97,9 @@ export function isApprovalAutomationPreference(value: unknown): value is Approva
 }
 
 export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreference, agentId: string): boolean {
-  return (
-    preference.turbo ||
-    (Object.hasOwn(preference.autoApproveOverrides, agentId)
-      ? preference.autoApproveOverrides[agentId]
-      : preference.defaultAutoApprove)
-  );
+  if (preference.turbo) return true;
+  if (!Object.hasOwn(preference.autoApproveOverrides, agentId)) return preference.defaultAutoApprove;
+  return preference.autoApproveOverrides[agentId] === true;
 }
 
 /**

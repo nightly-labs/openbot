@@ -1,9 +1,9 @@
 import type { AgentApproval, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
+import { Toaster, toast } from "@openbot/ui";
+import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
+import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { Toaster, toast } from "../../components/ui";
-import { BrowserSecretCard } from "./BrowserSecretCard";
-import { ApprovalCard, BrowserTakeoverCard, ChoiceCard } from "./ConversationPrompts";
 
 describe("ChoiceCard", () => {
   it("uses radio semantics and submits a selected predefined answer", async () => {
@@ -97,6 +97,24 @@ describe("ApprovalCard", () => {
     expect(send).toHaveBeenCalledTimes(1);
     response.resolve(false);
     await vi.waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it("shows a failed approval response and permits retry", async () => {
+    const approve = vi.fn().mockRejectedValueOnce(new Error("The host is offline.")).mockResolvedValueOnce(true);
+    render(() => (
+      <>
+        <Toaster />
+        <ApprovalCard approval={approval} onApprove={approve} onReject={async () => true} />
+      </>
+    ));
+
+    const allow = screen.getByRole("button", { name: "Allow" });
+    await fireEvent.click(allow);
+    expect(await screen.findByText("The host is offline.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(allow).toBeEnabled());
+
+    await fireEvent.click(allow);
+    await vi.waitFor(() => expect(approve).toHaveBeenCalledTimes(2));
   });
 
   it("offers no standing grant where the caller gives none", () => {
@@ -231,28 +249,35 @@ describe("secure authentication card", () => {
     await fireEvent.input(screen.getByLabelText("6-digit code"), { target: { value: "123456" } });
     await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(responses).toEqual([{ requestId: "auth", agentId: "agent", decision: "cancel" }]);
-    expect(screen.getByLabelText("6-digit code")).toHaveValue("");
+    expect(await screen.findByLabelText("6-digit code")).toHaveValue("");
   });
 
-  it("hides the submitted password input and restores it empty after a rejected response", async () => {
-    let rejectResponse: ((error: Error) => void) | undefined;
-    render(() => (
-      <BrowserSecretCard
-        request={{ ...request, secret: { ...request.secret, method: "password" } }}
-        onRespond={() =>
-          new Promise<void>((_resolve, reject) => {
-            rejectResponse = reject;
-          })
-        }
-      />
-    ));
-    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "private-password" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByRole("button", { name: "Submitting…" })).toBeDisabled();
-    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
-    if (!rejectResponse) throw new Error("Missing pending response.");
-    rejectResponse(new Error("private-password"));
-    expect(await screen.findByRole("alert")).not.toHaveTextContent("private-password");
-    expect(screen.getByLabelText("Password")).toHaveValue("");
-  });
+  it.each([
+    ["password", "Password", "private-password"],
+    ["otp", "6-digit code", "123456"],
+    ["authenticator", "6-digit code", "123456"],
+  ] as const)(
+    "hides the submitted %s input and restores it empty after a rejected response",
+    async (method, label, secret) => {
+      let rejectResponse: ((error: Error) => void) | undefined;
+      render(() => (
+        <BrowserSecretCard
+          request={{ ...request, secret: { ...request.secret, method } }}
+          onRespond={() =>
+            new Promise<void>((_resolve, reject) => {
+              rejectResponse = reject;
+            })
+          }
+        />
+      ));
+      await fireEvent.input(screen.getByLabelText(label), { target: { value: secret } });
+      await fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      expect(await screen.findByRole("button", { name: "Submitting…" })).toBeDisabled();
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      if (!rejectResponse) throw new Error("Missing pending response.");
+      rejectResponse(new Error(secret));
+      expect(await screen.findByRole("alert")).not.toHaveTextContent(secret);
+      expect(screen.getByLabelText(label)).toHaveValue("");
+    },
+  );
 });

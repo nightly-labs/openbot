@@ -15,22 +15,25 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentProfileDraft } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
+  type AgentAccess,
   type AgentModelId,
   type AgentProviderId,
   type AgentReasoningEffort,
   type AgentSummary,
   type AvatarImageInput,
   type CreateAgentInput,
+  DEFAULT_AGENT_ACCESS,
   type DuplicateAgentResult,
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
   defaultProviderModel,
+  isAgentAccess,
   isAgentModel,
   isAvatarHue,
   isAvatarSeed,
@@ -46,12 +49,15 @@ import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 
-type StoredAgent = AgentSummary;
-type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider"> & {
+type StoredAgent = AgentSummary & { access: AgentAccess };
+type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access"> & {
   avatarUrl?: string | null;
   provider?: AgentProviderId;
+  // Absent on every agent stored before the setting existed, which keeps the access it always had.
+  access?: AgentAccess;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -87,7 +93,7 @@ const LEGACY_AVATAR_COLORS = [
 ] as const;
 
 export const NEW_AGENT_PREVIEW = "No messages yet";
-export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-5.6-luna";
+export const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
 // A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
 // GPT-5.6 model -- which is not the one this product leads with: a new agent starts on the fast
@@ -302,6 +308,7 @@ export class AgentStore {
     record.provider = source.provider;
     record.model = source.model;
     record.reasoningEffort = source.reasoningEffort;
+    record.access = source.access;
     record.avatarSeed = source.avatarSeed;
     record.avatarHue = source.avatarHue;
 
@@ -515,6 +522,10 @@ export class AgentStore {
     if (input.reasoningEffort !== undefined) {
       if (!isReasoningEffort(input.reasoningEffort)) throw new Error("Invalid reasoning effort.");
       next.reasoningEffort = input.reasoningEffort;
+    }
+    if (input.access !== undefined) {
+      if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
+      next.access = input.access;
     }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
@@ -1107,6 +1118,7 @@ export class AgentStore {
       provider: DEFAULT_AGENT_PROVIDER,
       model: DEFAULT_AGENT_MODEL,
       reasoningEffort: DEFAULT_REASONING_EFFORT,
+      access: DEFAULT_AGENT_ACCESS,
       threadId: null,
       workspacePath: join(this.#agentsRoot, id),
       preview: NEW_AGENT_PREVIEW,
@@ -1185,10 +1197,10 @@ async function rewriteInternalWorkspaceSymlinks(
         let sourceRelativePath: string;
         try {
           const canonicalTarget = await realpath(resolvedSourceTarget);
-          if (!isPathWithin(canonicalSourceRoot, canonicalTarget)) continue;
+          if (!isPathInside(canonicalSourceRoot, canonicalTarget)) continue;
           sourceRelativePath = relative(canonicalSourceRoot, canonicalTarget);
         } catch {
-          if (!isPathWithin(sourceRoot, resolvedSourceTarget)) continue;
+          if (!isPathInside(sourceRoot, resolvedSourceTarget)) continue;
           sourceRelativePath = relative(sourceRoot, resolvedSourceTarget);
         }
         const finalTarget = join(finalRoot, sourceRelativePath);
@@ -1201,11 +1213,6 @@ async function rewriteInternalWorkspaceSymlinks(
     }
   };
   await visit(stagedRoot, sourceRoot, finalRoot);
-}
-
-function isPathWithin(root: string, candidate: string): boolean {
-  const path = relative(resolve(root), resolve(candidate));
-  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
 async function workspaceMetadataFingerprint(root: string): Promise<string> {
@@ -1318,6 +1325,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
   const record = value;
   return (
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
+    (record.access === undefined || isAgentAccess(record.access)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1368,6 +1376,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
   const model = isAgentModel(value.model)
     ? value.model
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
+  const access =
+    value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1397,6 +1407,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     avatarHue: value.avatarHue === null || isAvatarHue(value.avatarHue) ? value.avatarHue : reset("avatarHue", null),
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
+    ...(access === undefined ? {} : { access }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };
@@ -1454,6 +1465,7 @@ function migrateLegacyAgent(agent: LegacyStoredAgent): StoredAgent {
     provider: providerForLegacyModel(agent.model),
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
+    access: DEFAULT_AGENT_ACCESS,
     threadId: agent.threadId,
     workspacePath: agent.workspacePath,
     preview: agent.preview,
@@ -1468,6 +1480,7 @@ function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {
   return {
     ...agent,
     provider: agent.provider ?? providerForLegacyModel(agent.model),
+    access: agent.access ?? DEFAULT_AGENT_ACCESS,
     avatarUrl: isString(agent.avatarUrl) && parseAgentAvatarUrl(agent.avatarUrl, agent.id) ? agent.avatarUrl : null,
     ...(agent.marketplaceSource === undefined
       ? {}

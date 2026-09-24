@@ -1,19 +1,20 @@
+import { Button } from "@openbot/ui";
+import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
+import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
+import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
+import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { createMemo, For, Loading, lazy, Show, untrack } from "solid-js";
-import { Button } from "../../components/ui";
-import type { AgentMessage, ChatActionMarkerModel } from "../../data";
-import { AgentActivityIndicator } from "./AgentActivity";
-import { AttachmentCards } from "./AttachmentCards";
-import { ChatActionMarker } from "./ChatActionMarker";
-import { ChatMessageRow } from "./ChatMessageRow";
-import { ChatSearch } from "./ChatSearch";
-import { BrowserTakeoverCard } from "./ConversationPrompts";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
-import { ScrollToLatestButton } from "./MessageNavigation";
-import { MessageActions } from "./MessageRendering";
-import { UnreadMessagesBanner, UnreadMessagesDivider } from "./UnreadMessages";
 
 /** A message that renders only an action marker, with no bubble of its own. */
 function markerOnlyMessage(message: AgentMessage): boolean {
@@ -113,6 +114,7 @@ export function ConversationTimeline() {
     setUnreadMessagesDividerElement,
     setVirtualRootElement,
   } = useConversationViewScope();
+  const runtime = conversationRuntime(props);
   const virtualMessageRows = createMemo(() => messageVirtualizer.getVirtualItems());
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
@@ -380,7 +382,7 @@ export function ConversationTimeline() {
                             onAttachmentAction={attachmentAction}
                             onOpenSharedFile={openSharedFile}
                             onOpenWorkspaceFile={openWorkspaceFile}
-                            onDownloadAttachments={downloadAttachments}
+                            onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}
                             actions={
                               <MessageActions
@@ -503,6 +505,10 @@ export function ConversationTimeline() {
                 onOpen={openBrowserTakeoverTab}
                 onComplete={() => respondToBrowserTakeover("complete")}
                 onCancel={() => respondToBrowserTakeover("cancel")}
+                browserSecret={{
+                  loadPreview: runtime.browser.capturePreview,
+                  onRespond: runtime.agent.respondToBrowserSecret,
+                }}
               />
             </Loading>
           </Show>
@@ -525,7 +531,9 @@ export function ConversationTimeline() {
   );
 }
 
-const ApprovalCard = lazy(() => import("./ConversationPrompts").then((module) => ({ default: module.ApprovalCard })));
+const ApprovalCard = lazy(() =>
+  import("@openbot/ui/features/conversation/ConversationPrompts").then((module) => ({ default: module.ApprovalCard })),
+);
 const QuestionPromptBubble = lazy(() =>
-  import("../../components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
+  import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
 );

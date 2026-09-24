@@ -133,37 +133,3 @@ export function mcpToolRuntimeNote(status: ProviderRuntimeStatus | undefined): s
     return "The runtime a STDIO server is started with did not download. A server still starts if this computer has Node.";
   return null;
 }
-
-const MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY = "openbot:mcp-config-door-notice";
-
-/** Reads and writes the one flag below, so a test can answer twice without a browser. */
-type NoticeStorage = Pick<Storage, "getItem" | "setItem">;
-
-/**
- * The one-time notice that OpenBot alone now decides which MCP servers an agent gets, or `null`
- * when it is not due.
- *
- * Due once per computer, and only for a user who had finished onboarding before this release: a
- * first install has no server in another file to lose. The flag is written on the call that
- * answers, including the call that answers `null`, so the notice cannot arrive twice and cannot
- * arrive late to somebody who started here.
- *
- * The caller must hold a loaded setup state. `completed` is `false` while it is still being read,
- * and that answer would write the flag for a user who is about to lose servers.
- */
-export function takeMcpConfigDoorNotice(setupCompleted: boolean, storage: NoticeStorage = window.localStorage) {
-  try {
-    if (storage.getItem(MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY) === "shown") return null;
-    storage.setItem(MCP_CONFIG_DOOR_NOTICE_STORAGE_KEY, "shown");
-    if (!setupCompleted) return null;
-  } catch {
-    // A window that cannot keep the flag would raise the notice at every start, which is worse
-    // than never raising it.
-    return null;
-  }
-  return {
-    title: "OpenBot now decides your MCP servers",
-    description:
-      "Claude and Codex agents get only the servers in Settings, MCP. A server declared in ~/.claude/settings.json, a project .mcp.json or ~/.codex/config.toml no longer reaches an agent. Add it in OpenBot to keep it.",
-  };
-}

@@ -1,5 +1,5 @@
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui";
 import { useI18n } from "../../i18n-context";
 import { APP_LANGUAGE_OPTIONS, type AppLanguage, type AppLanguageOption, appLanguageOption } from "./app-languages";
 

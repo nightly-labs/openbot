@@ -2,6 +2,7 @@ import type { AgentModelId, AgentProviderId, AppSetupState } from "@openbot/cont
 import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import { onboardingPort } from "./onboarding-port";
 
 /**
  * First run and the review of it: what the user chose during onboarding, the
@@ -36,7 +37,7 @@ const Setup = createSimpleContext({
     onSettled(() => {
       // `finally`, not `then`: a failed read still ends the loading screen, and
       // a null `setupState` is the same "not configured yet" the view handles.
-      void window.openbot
+      void onboardingPort()
         .getSetupState()
         .then(setSetupState)
         .finally(() => setSetupLoaded(true));
@@ -63,7 +64,7 @@ const Setup = createSimpleContext({
     async function saveSetup(preferredProvider: AgentProviderId, preferredModel?: AgentModelId | null) {
       const wasCompleted = setupState()?.completed === true;
       const analytics = desktopAnalytics.scope();
-      const state = await window.openbot.saveSetup({
+      const state = await onboardingPort().saveSetup({
         preferredProvider,
         preferredModel: preferredModel === undefined ? keptModel(preferredProvider) : preferredModel,
       });
@@ -78,7 +79,7 @@ const Setup = createSimpleContext({
     }
 
     async function previewInvite(input: { inviteUrl: string }) {
-      return window.openbot.servers.previewInvite(input);
+      return onboardingPort().servers.previewInvite(input);
     }
 
     return {

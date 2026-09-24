@@ -5,6 +5,20 @@ browser data, and team data stay on the computer that runs OpenBot. The optional
 service stores the minimum central data needed for email sign-in, account avatars, remote host
 configuration, memberships, invitations, and logical sessions.
 
+The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
+and attachment data travel through the existing encrypted host connection, not through the
+account Worker. The browser keeps chat pages, drafts, search results, and file previews in memory;
+it does not create a persistent offline chat cache. Files that the user downloads are saved by
+their browser. The host must stay online.
+
+Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.
+Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
+local storage separately for each account. The shared file preview can also store its panel width.
+Signing out revokes that credential's remote sessions and tells other open tabs to clear private
+state. Host identity pins remain so a later sign-in cannot silently trust a replacement host key.
+The web client adds no chat or account analytics events. It does not send email codes, credentials,
+message content, file content, or search queries to telemetry.
+
 Production builds of OpenBot desktop, the configured mobile app, and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 
@@ -24,6 +38,13 @@ names are not part of the analytics payload; the client shows them from the agen
 reads. These records are separate from product analytics and are not sent
 to OpenPanel or stored by the account service or Signal service. Conversation clearing retains usage;
 agent deletion removes it. A duplicate agent starts with no usage history.
+
+Authenticated members of a host team can also see that host's storage through the Team API: how
+much disk space each location, agent and chat uses, and the name, size, type, date and chat title of
+each sent or generated file. The response contains no file paths, and workspace and download files
+are counted only as totals. Only owners and admins can delete a file or clear caches and logs. A
+deleted file is removed from the host's disk; the message that sent it stays and shows that the file
+is not available.
 
 Costs are API-equivalent estimates in USD, not subscription charges. Missing usage, unknown prices,
 and incomplete billing inputs remain marked as unavailable or partial.
@@ -181,6 +202,13 @@ Other attachments are downloaded when you choose Open or save. The phone creates
 the system share sheet and removes it when that sheet closes. The app you select can keep its own copy.
 Cloudflare account storage does not receive these files.
 
+Mobile dictation uses the phone's speech recognition only after you press the microphone. It asks
+for on-device recognition. On iOS, this applies when the phone supports it for your language. On
+Android, it applies when the language model is installed. Otherwise, or when on-device recognition
+fails before it recognizes any speech, the phone's recognition service, Apple or Google, receives the
+audio. The recognized text goes into the message field and is sent
+only when you send the message. OpenBot does not store or send the audio.
+
 ## Email delivery and infrastructure providers
 
 OpenBot sends sign-in and team invitation messages through the configured SMTP provider. The
@@ -249,6 +277,11 @@ Network traffic can also occur when:
   the grant the browser returns, and to renew the token. Nothing about the user's agents,
   conversations or files is sent in those requests;
 - an installed build checks GitHub Releases for updates;
+- OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
+  `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
+  OpenCode, and `x.ai/cli` for Grok, and it reads a list of blocked versions from
+  `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
+  conversation or file data;
 - a user opens an explicitly labeled external support or setup link.
 
 Plugin pages on openbot.run show each listing's own icon. The page asks `openbot.run` for that
@@ -331,7 +364,7 @@ Marketplace submissions from the desktop app show the publisher’s current acco
 
 ### OpenCode
 
-OpenBot downloads the pinned OpenCode CLI from `registry.npmjs.org` and its license from
+OpenBot downloads the OpenCode CLI from `registry.npmjs.org` and its license from
 `github.com/anomalyco/opencode`, then starts it with `opencode acp`. Prompts, attachments, and tool
 results go to that local process. OpenCode can send them to the model provider selected in its
 configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
@@ -412,9 +445,12 @@ values are held in memory for the operation; cancellation and submission clear t
 OpenBot blocks agent browser access while consent is pending. Before entering a submitted value, it
 blocks image capture and live browser streams, and stops
 and discards the active browser recording before entry. After entry, protection stays until the
-browser replaces the document. After a same-page submission, OpenBot automatically loads the current
-URL as a new document with a GET request. This can reset an unfinished login step. Failed submission
-or reload requires manual takeover. Recording does not restart
+browser replaces the document. After a same-page submission, OpenBot clears the filled fields and,
+when the value no longer appears in the page title, address, text, field values, or attributes, keeps
+the page, so a later login step on the same page stays available. Page code can still hold the
+value, so page evaluation and recording stay blocked in that tab and its connected popup or opener
+tabs until the page navigates. Otherwise OpenBot loads the current URL as a new
+document with a GET request instead. Failed submission or reload requires manual takeover. Recording does not restart
 automatically, and the tab's back/forward history is cleared after replacement to prevent restoring
 the sensitive document. The destination site receives the value and controls its own processing.
 This protection does not isolate credentials from the operating system or agents with unrestricted

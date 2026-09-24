@@ -1,9 +1,9 @@
 import type { AgentModelOption, AgentProviderStatus, AgentStatus } from "@openbot/contracts/ipc";
+import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { STORY_MODELS } from "../preview/fixtures";
-import { ProviderModelPicker } from "./ProviderModelPicker";
 
 const agentStatus: AgentStatus = {
   phase: "ready",
@@ -187,7 +187,7 @@ describe("ProviderModelPicker", () => {
     );
 
     await fireEvent.click(within(dialog).getByRole("tab", { name: /Claude:/ }));
-    expect(within(dialog).getByRole("option", { name: "Claude Sonnet 5, default" })).toBeDisabled();
+    expect(within(dialog).getByRole("option", { name: "Claude Opus 5.5, default" })).toBeDisabled();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -218,13 +218,14 @@ describe("ProviderModelPicker", () => {
   });
 });
 
-const openCodeModels: AgentModelOption[] = [
+const openCodeModelNames: [string, string][] = [
   ["openai/gpt", "OpenAI/GPT"],
   ["opencode/free", "OpenCode Zen/Example Free"],
   ["opencode/free/low", "OpenCode Zen/Example Free (low)"],
   ["opencode/free/high", "OpenCode Zen/Example Free (high)"],
   ["opencode/unknown", "OpenCode Zen/Unknown price"],
-].map(([id, name]) => ({
+];
+const openCodeModels: AgentModelOption[] = openCodeModelNames.map(([id, name]) => ({
   provider: "opencode",
   id,
   name,

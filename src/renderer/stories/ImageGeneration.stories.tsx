@@ -1,7 +1,7 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { ImageGeneration, type ImageGenerationProps } from "@openbot/ui/features/conversation/ImageGeneration";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ImageGeneration, type ImageGenerationProps } from "../src/features/conversation/ImageGeneration";
 
 const generatedPreview = new URL("../src/assets/openbot-logo-production.png", import.meta.url).href;
 

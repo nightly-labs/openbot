@@ -1,14 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
+import { Button, CirclePause, Clock3, ConfirmDialog, Input, Plus, Switch, Textarea } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { SettingsBackIcon, SettingsForwardIcon } from "@openbot/ui/components/SettingsPanel";
+import { errorMessage } from "@openbot/ui/error-message";
+import { RoutineRunHistory } from "@openbot/ui/features/conversation/RoutineRunHistory";
+import { RoutineScheduleEditor } from "@openbot/ui/features/conversation/RoutineScheduleEditor";
+import { defaultRoutineSchedule, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { SettingsBackIcon, SettingsForwardIcon } from "../../components/SettingsPanel";
-import { Button, CirclePause, Clock3, Dialog, Input, Plus, Switch, Textarea } from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { RoutineRunHistory } from "./RoutineRunHistory";
-import { RoutineScheduleEditor } from "./RoutineScheduleEditor";
-import { defaultRoutineSchedule, routineScheduleSummary } from "./routine-schedule-ui";
 import type { RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
@@ -493,30 +493,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           )}
         </Show>
       </div>
-      <Dialog.Root
+      <ConfirmDialog
         open={pendingExit() !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingExit(null);
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay class="agent-memory-confirm-overlay" />
-          <Dialog.Content class="agent-memory-confirm-dialog">
-            <div class="agent-memory-confirm-content">
-              <Dialog.Title>Discard changes?</Dialog.Title>
-              <Dialog.Description>Your unsaved changes to this routine will be lost.</Dialog.Description>
-              <div class="agent-memory-confirm-actions">
-                <Button variant="ghost" type="button" onClick={() => setPendingExit(null)}>
-                  Keep editing
-                </Button>
-                <Button variant="destructive" type="button" onClick={discardChanges}>
-                  Discard changes
-                </Button>
-              </div>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onCancel={() => setPendingExit(null)}
+        onConfirm={discardChanges}
+        title="Discard changes?"
+        description="Your unsaved changes to this routine will be lost."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        initialFocus="cancel"
+      />
     </div>
   );
 }

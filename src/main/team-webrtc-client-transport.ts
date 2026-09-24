@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -97,9 +98,24 @@ interface ActiveHost {
   } | null;
 }
 
+/**
+ * A session kept after a connect attempt failed. The control plane keeps a session until the client
+ * ends it, so the next attempt only needs a ticket for it.
+ */
+interface RetainedSession {
+  sessionId: string;
+  expiresAt: number;
+  principalId: string;
+  connected: false;
+  connecting: null;
+}
+
 export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTransportEvents> {
   readonly #options: TeamWebRtcClientTransportOptions;
   readonly #active = new Map<string, ActiveHost>();
+  // A failed attempt used to end its session, so each retry against an offline host was a create, a
+  // ticket and an end: three Worker requests and a Signal webhook. Only `disconnect` ends it now.
+  readonly #retainedSessions = new Map<string, RetainedSession>();
   readonly #files: TeamWebRtcFileTransfer;
   readonly #pending = new Map<
     string,
@@ -263,10 +279,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
             ? channelRequest(path, init.body)
             : isMcpRoute(path)
               ? mcpRequest(path, init.body)
-              : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
-                  preserveSemanticTags: init.preserveSemanticTags,
-                  agentCreateModel: init.agentCreateModel,
-                }),
+              : isStorageRoute(path)
+                ? storageRequest(path, init.body)
+                : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
+                    preserveSemanticTags: init.preserveSemanticTags,
+                    agentCreateModel: init.agentCreateModel,
+                  }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
         ...(bodyTransferId ? { bodyTransferId } : {}),
         ...(init.contentType ? { contentType: init.contentType } : {}),
@@ -309,7 +327,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ? channelResponse(path, envelope.status, envelope.body)
           : isMcpRoute(path)
             ? mcpResponse(path, envelope.status, envelope.body)
-            : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+            : isStorageRoute(path)
+              ? storageResponse(path, envelope.status, envelope.body)
+              : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
       }
@@ -319,9 +339,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   async disconnect(hostId: string): Promise<void> {
     const active = this.#active.get(hostId);
+    const sessionId = active?.sessionId || this.#retainedSessions.get(hostId)?.sessionId;
     if (active) active.cancelled = true;
     if (active?.expirationTimer) clearTimeout(active.expirationTimer);
     this.#active.delete(hostId);
+    this.#retainedSessions.delete(hostId);
     this.#files.setPeerAuthenticated(hostId, false);
     let disconnectError: unknown;
     try {
@@ -329,12 +351,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     } catch (error) {
       disconnectError = error;
     }
-    if (active?.sessionId) await this.#options.endSession(active.sessionId).catch(() => undefined);
+    if (sessionId) await this.#options.endSession(sessionId).catch(() => undefined);
     if (disconnectError) throw disconnectError;
   }
 
   async stop(): Promise<void> {
-    await Promise.allSettled([...this.#active.keys()].map((hostId) => this.disconnect(hostId)));
+    const hostIds = new Set([...this.#active.keys(), ...this.#retainedSessions.keys()]);
+    await Promise.allSettled([...hostIds].map((hostId) => this.disconnect(hostId)));
     this.#options.bridge.off("connected", this.#onConnected);
     this.#options.bridge.off("disconnected", this.#onDisconnected);
     this.#options.bridge.off("data", this.#onData);
@@ -350,7 +373,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   async #ensureConnected(hostId: string): Promise<void> {
     const principalId = this.#options.getPrincipalId();
-    let current = this.#active.get(hostId);
+    let current: ActiveHost | RetainedSession | undefined =
+      this.#active.get(hostId) ?? this.#retainedSessions.get(hostId);
     if (current?.expiresAt && current.expiresAt <= Date.now() + 30_000) {
       await this.disconnect(hostId);
       current = undefined;
@@ -376,6 +400,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       throw error;
     });
     active.connecting = operation;
+    this.#retainedSessions.delete(hostId);
     this.#active.set(hostId, active);
     return operation;
   }
@@ -404,7 +429,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         bootstrap = await this.#options.issueTicket(sessionId, clientPublicKey);
         await this.#assertCurrent(hostId, active, sessionId);
       } catch (error) {
-        if (!existingSessionId) throw error;
+        // Only an ended session is replaced. Another failure keeps it, so a retry costs one ticket.
+        if (!existingSessionId || !isEndedSessionError(error)) throw error;
         await this.#options.endSession(existingSessionId).catch(() => undefined);
         const session = await this.#options.startSession(hostId);
         sessionId = session.sessionId;
@@ -416,7 +442,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         await this.#assertCurrent(hostId, active, sessionId);
       }
     } catch (error) {
-      if (sessionId) await this.#options.endSession(sessionId).catch(() => undefined);
+      if (sessionId && !this.#retainSession(hostId, active, sessionId)) {
+        await this.#options.endSession(sessionId).catch(() => undefined);
+      }
       throw error;
     }
     if (startedNewSession) this.#lastEventSequence.delete(hostId);
@@ -469,11 +497,25 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.#scheduleExpiration(hostId, active);
     } catch (error) {
       cleanupConnectionWait();
+      const retained = this.#retainSession(hostId, active, sessionId);
       if (this.#active.get(hostId) === active) this.#active.delete(hostId);
       await this.#options.bridge.disconnect(hostId).catch(() => undefined);
-      await this.#options.endSession(sessionId).catch(() => undefined);
+      if (!retained) await this.#options.endSession(sessionId).catch(() => undefined);
       throw error;
     }
+  }
+
+  /** Keeps the session of an attempt that failed on its own. A cancelled attempt ends its session. */
+  #retainSession(hostId: string, active: ActiveHost, sessionId: string): boolean {
+    if (active.cancelled || this.#active.get(hostId) !== active) return false;
+    this.#retainedSessions.set(hostId, {
+      sessionId,
+      expiresAt: active.expiresAt,
+      principalId: active.principalId,
+      connected: false,
+      connecting: null,
+    });
+    return true;
   }
 
   async #assertCurrent(hostId: string, active: ActiveHost, sessionId: string): Promise<void> {
@@ -810,4 +852,9 @@ function binaryBody(value: unknown): Uint8Array | null {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
   return null;
+}
+
+/** The account API answers 403 or 404 for a session that ended, expired, or does not exist. */
+function isEndedSessionError(error: unknown): boolean {
+  return error instanceof Error && "status" in error && (error.status === 403 || error.status === 404);
 }

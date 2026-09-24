@@ -1,7 +1,11 @@
+import type { AgentProfile } from "@openbot/ui/data";
+import { type AgentActivityLabel, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
+import {
+  agentActivityExitDelay,
+  agentActivityExitDuration,
+  agentActivityShowDelay,
+} from "@openbot/ui/features/conversation/activity-timing";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
-import type { AgentProfile } from "../../../data";
-import { type AgentActivityLabel, nextAgentActivityLabel } from "../AgentActivity";
-import { agentActivityExitDelay, agentActivityExitDuration, agentActivityShowDelay } from "../activity-timing";
 import type { ConversationProps } from "../conversation-types";
 
 export interface RenderedAgentActivity {

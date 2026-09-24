@@ -1,5 +1,5 @@
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, AgentSummary, ConversationSnapshot, QueueHold, QueueSnapshot } from "@openbot/contracts/ipc";
-import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";

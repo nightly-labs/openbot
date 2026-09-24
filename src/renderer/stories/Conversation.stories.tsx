@@ -7,15 +7,15 @@ import type {
   QueueSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import type { AgentMessage as RendererAgentMessage } from "@openbot/ui/data";
+import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, onSettled, type ParentProps, Show } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { clipboardFiles } from "../../preload/clipboard-files";
-import type { AgentMessage as RendererAgentMessage } from "../src/data";
 import { AuthProvider } from "../src/features/account/account-context";
 import { Conversation, createConversationController } from "../src/features/conversation/Conversation";
-import { BrowserTakeoverCard } from "../src/features/conversation/ConversationPrompts";
 import { ConversationView } from "../src/features/conversation/ConversationView";
 import { ConversationControllerProvider } from "../src/features/conversation/conversation-controller-context";
 import { composerDraftKey } from "../src/features/conversation/conversation-keys";
@@ -26,6 +26,7 @@ import { UsageProvider } from "../src/features/usage/usage-context";
 import { PlatformProvider } from "../src/platform";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 import {
+  requireFixture,
   STORY_AGENT_STATUS,
   STORY_AGENTS,
   STORY_ATTACHMENTS,
@@ -37,12 +38,14 @@ import {
 } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
+const storyAttachment = requireFixture(STORY_ATTACHMENTS[0], "Story attachment");
+
 const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((message) => ({
   id: message.id,
   author: message.author === "user" ? "you" : "agent",
   body:
     message.id === "message-agent-1"
-      ? `${message.text}\n\nPlease review ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
+      ? `${message.text}\n\nPlease review ${serializeAttachmentReference(storyAttachment.name, storyAttachment.id)} before editing the implementation notes.\n\nTransformers scale well with data and compute [1], though attention is quadratic in sequence length [2].`
       : message.text,
   time: "10:00",
   itemType: message.itemType,
@@ -157,15 +160,18 @@ const generatedImageAttachment: AttachmentSummary = {
   previewKind: "image",
   previewUrl: generatedImagePreview,
 };
-const queuePreviewAttachments: AttachmentSummary[] = [
-  { ...generatedImageAttachment, id: "queue-preview-primary", name: "command-search.png" },
-  {
-    ...generatedImageAttachment,
-    id: "queue-preview-alternate",
-    name: "message-search.png",
-    previewUrl: generatedImagePreviewAlternate,
-  },
-];
+const queuePrimaryAttachment: AttachmentSummary = {
+  ...generatedImageAttachment,
+  id: "queue-preview-primary",
+  name: "command-search.png",
+};
+const queueAlternateAttachment: AttachmentSummary = {
+  ...generatedImageAttachment,
+  id: "queue-preview-alternate",
+  name: "message-search.png",
+  previewUrl: generatedImagePreviewAlternate,
+};
+const queuePreviewAttachments: AttachmentSummary[] = [queuePrimaryAttachment, queueAlternateAttachment];
 const supportedContextAttachments: AttachmentSummary[] = [
   {
     id: "composer-context-pdf",
@@ -283,13 +289,13 @@ const agentMessageGalleryMessages: RendererAgentMessage[] = [
       "",
       "You can also open [ConversationView.tsx](/Users/test/OpenBot/src/renderer/src/features/conversation/ConversationView.tsx), ask @Research, or inspect the attached source file below.",
       "",
-      `Attachment reference: ${serializeAttachmentReference(STORY_ATTACHMENTS[0].name, STORY_ATTACHMENTS[0].id)}.`,
+      `Attachment reference: ${serializeAttachmentReference(storyAttachment.name, storyAttachment.id)}.`,
       "",
       "The implementation follows the component source [1] and the accessibility guidance [2].",
     ].join("\n"),
     time: "10:02",
     kind: "text",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     citations: [
       {
         number: 1,
@@ -396,7 +402,7 @@ const agentMessageGalleryMessages: RendererAgentMessage[] = [
     body: "",
     time: "10:09",
     kind: "text",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     reaction: "🔥",
   },
   {
@@ -583,6 +589,8 @@ const streamingMarkdownChunks = [
 ] as const;
 
 function streamingMarkdownMessages(chunkIndex: number): RendererAgentMessage[] {
+  const body = streamingMarkdownChunks[chunkIndex];
+  if (body === undefined) throw new Error(`Streaming Markdown chunk ${chunkIndex} is missing.`);
   return [
     {
       id: "streaming-markdown-user",
@@ -594,7 +602,7 @@ function streamingMarkdownMessages(chunkIndex: number): RendererAgentMessage[] {
     {
       id: "streaming-markdown-agent",
       author: "agent",
-      body: streamingMarkdownChunks[chunkIndex],
+      body,
       time: "10:03",
       kind: "text",
       streaming: chunkIndex < streamingMarkdownChunks.length - 1,
@@ -823,11 +831,15 @@ const referenceQueue: QueueSnapshot = {
   deliveries: [
     ...queueWithItems(queueReferenceMessages.length)
       .deliveries.filter((delivery) => delivery.status === "queued")
-      .map((delivery, index) => ({
-        ...delivery,
-        text: queueReferenceMessages[index],
-        attachments: index === 2 ? [queuePreviewAttachments[0]] : index === 3 ? [queuePreviewAttachments[1]] : [],
-      })),
+      .map((delivery, index) => {
+        const text = queueReferenceMessages[index];
+        if (text === undefined) throw new Error(`Queue reference message ${index} is missing.`);
+        return {
+          ...delivery,
+          text,
+          attachments: index === 2 ? [queuePrimaryAttachment] : index === 3 ? [queueAlternateAttachment] : [],
+        };
+      }),
     runningDelivery,
   ],
 };
@@ -1239,7 +1251,7 @@ export const MixedAttachmentsInNarrowComposer: Story = {
       data-testid="narrow-composer-attachments-sample"
       style={{ width: "360px", height: "820px", overflow: "hidden" }}
     >
-      <MockedConversation args={storyArgs} initialAttachments={[...queuePreviewAttachments, STORY_ATTACHMENTS[0]]} />
+      <MockedConversation args={storyArgs} initialAttachments={[...queuePreviewAttachments, storyAttachment]} />
     </section>
   ),
 };
@@ -1790,7 +1802,7 @@ const actionMarkerMessages: RendererAgentMessage[] = [
     body: "",
     time: "22:49",
     kind: "exchange",
-    attachments: [STORY_ATTACHMENTS[0]],
+    attachments: [storyAttachment],
     exchange: {
       direction: "incoming",
       messageId: "spacing-marker-incoming",
@@ -1913,6 +1925,36 @@ const actionMarkerArgs = {
 export const ActionMarkerSpacing: Story = {
   name: "Action marker spacing",
   args: actionMarkerArgs,
+};
+
+/* The history opens and closes inside a real timeline, where the messages under
+   the marker move with it. The isolated marker story cannot show that. */
+export const ActionMarkerHistory: Story = {
+  name: "Action marker history",
+  args: {
+    ...actionMarkerArgs,
+    messages: actionMarkerMessages.map((message) =>
+      message.id === "spacing-routine-run" && message.actionMarker?.kind === "routine-run"
+        ? {
+            ...message,
+            actionMarker: {
+              ...message.actionMarker,
+              status: "succeeded",
+              previousTransitions: [
+                { status: "queued", timestamp: "2026-08-19T22:49:00.000Z" },
+                { status: "running", timestamp: "2026-08-19T22:50:00.000Z" },
+                { status: "needs-attention", timestamp: "2026-08-19T22:51:00.000Z" },
+                { status: "running", timestamp: "2026-08-19T22:52:00.000Z" },
+              ],
+            },
+          }
+        : message,
+    ),
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Show history for Daily source check" }));
+    await expect(canvas.getByRole("list", { name: "Earlier routine states" })).toBeVisible();
+  },
 };
 
 export const NarrowActionMarkerSpacing: Story = {

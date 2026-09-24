@@ -1,6 +1,6 @@
+import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { ComposerErrorBanner } from "./ComposerErrorBanner";
 
 describe("ComposerErrorBanner", () => {
   it("announces the chat-scoped error and offers dismissal", async () => {

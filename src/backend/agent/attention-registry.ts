@@ -14,6 +14,7 @@ import type {
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { PreparedBrowserSecret } from "../browser-host";
 import {
@@ -48,6 +49,8 @@ import {
 import { compactRuntimeApproval, compactRuntimeQuestion } from "./runtime-snapshot";
 import { isDynamicToolCall } from "./thread-items";
 
+const logger = createOpenBotLogger("attention-registry");
+
 interface PendingPrompt {
   client: AgentClient;
   id: RequestId;
@@ -70,6 +73,7 @@ interface PendingApproval {
 }
 
 interface PendingBrowserTakeover {
+  client: AgentClient;
   secret?: PreparedBrowserSecret;
   submitting?: boolean;
   params: DynamicToolCallParams;
@@ -218,7 +222,7 @@ export class AttentionRegistry {
             };
     pending.client.respond(pending.id, result);
     this.#prompts.delete(input.requestId);
-    this.#emit({ type: "agent-input-resolved", kind: "prompt", requestId: input.requestId, agentId: pending.agentId });
+    this.#emitInputResolved("prompt", input.requestId, pending.agentId);
     try {
       this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
     } catch (error) {
@@ -254,12 +258,7 @@ export class AttentionRegistry {
       pending.client.respond(pending.id, { decision: input.decision });
     }
     this.#approvals.delete(input.requestId);
-    this.#emit({
-      type: "agent-input-resolved",
-      kind: "approval",
-      requestId: input.requestId,
-      agentId: pending.approval.agentId,
-    });
+    this.#emitInputResolved("approval", input.requestId, pending.approval.agentId);
     this.#emitRuntimeSnapshot();
   }
 
@@ -436,7 +435,7 @@ export class AttentionRegistry {
     this.#emit({ type: "approval", approval });
   }
 
-  surfaceBrowserTakeover(request: AppServerRequest): Promise<DynamicToolResult> {
+  surfaceBrowserTakeover(client: AgentClient, request: AppServerRequest): Promise<DynamicToolResult> {
     if (!isDynamicToolCall(request.params)) return Promise.resolve(browserTakeoverError());
     const params = request.params;
     const { threadId, turnId } = params;
@@ -469,7 +468,7 @@ export class AttentionRegistry {
       tabId,
     };
     return new Promise((resolve) => {
-      const pending: PendingBrowserTakeover = { params, request: takeover, resolve };
+      const pending: PendingBrowserTakeover = { client, params, request: takeover, resolve };
       this.#takeovers.set(requestId, pending);
       // The card is only shown once the tab has actually been handed over -- references invalidated,
       // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
@@ -496,10 +495,17 @@ export class AttentionRegistry {
           this.#routines.markNeedsAttention(turnId);
           this.#emit({ type: "browser-takeover-requested", request: takeover });
         },
-        () => {
+        (error: unknown) => {
+          logger.warn("Unable to prepare browser takeover", { tool: params.tool, error: toLogValue(error) });
           if (this.#takeovers.get(requestId) !== pending) return;
           this.#takeovers.delete(requestId);
-          resolve(browserTakeoverError());
+          // Secure input refusals are fixed host messages, such as "Use takeover." The agent needs the
+          // reason to pick request_takeover instead of retrying. No secret exists before the card opens.
+          resolve(
+            params.tool === "submit_secret" && error instanceof Error
+              ? browserTakeoverError(error.message)
+              : browserTakeoverError(),
+          );
           this.#emitRuntimeSnapshot();
         },
       );
@@ -626,21 +632,23 @@ export class AttentionRegistry {
     });
   }
 
-  /** A turn ending expires its questions, drops its approvals and cancels its takeovers. */
+  /**
+   * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
+   * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
+   * the removal only from that event.
+   */
   clearForTurn(threadId: string, turnId: string): void {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      if (pendingThreadId === threadId && pendingTurnId === turnId) {
-        this.#resolvePersistedPrompt(pending, { status: "expired" });
-        this.#prompts.delete(requestId);
-      }
+      if (pendingThreadId === threadId && pendingTurnId === turnId) this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
       const pendingThreadId = getString(pending.params, "threadId") ?? getString(pending.params, "conversationId");
       const pendingTurnId = getString(pending.params, "turnId");
       if (pendingThreadId === threadId && (!pendingTurnId || pendingTurnId === turnId)) {
         this.#approvals.delete(requestId);
+        this.#emitInputResolved("approval", requestId, pending.approval.agentId);
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
@@ -650,22 +658,50 @@ export class AttentionRegistry {
     }
   }
 
+  /** Expires the prompts of one lost provider client, or of all clients when none is given. */
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
       if (client && pending.client !== client) continue;
-      this.#resolvePersistedPrompt(pending, { status: "expired" });
-      this.#prompts.delete(requestId);
+      this.#expirePrompt(requestId, pending);
     }
   }
 
-  clearBrowserTakeovers(): void {
+  /**
+   * A failed write must not stop the clear: the remaining requests would stay, and the provider
+   * paths that clear a stopped client would fail after the client is gone.
+   */
+  #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
+    this.#prompts.delete(requestId);
+    this.#emitInputResolved("prompt", requestId, pending.agentId);
+    try {
+      this.#resolvePersistedPrompt(pending, { status: "expired" });
+    } catch (error) {
+      this.#emitError("prompt_persistence_failed", error, pending.agentId);
+    }
+  }
+
+  /** Cancels the takeovers of one lost provider client, or of all clients when none is given. */
+  clearBrowserTakeovers(client?: AgentClient): void {
     for (const [requestId, pending] of this.#takeovers) {
+      if (client && pending.client !== client) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
   }
 
-  clearApprovals(): void {
-    this.#approvals.clear();
+  /**
+   * Drops the approvals of one lost provider client, or of all clients when none is given. The other
+   * clients are still running and wait for an answer, so their approvals stay.
+   */
+  clearApprovals(client?: AgentClient): void {
+    for (const [requestId, pending] of this.#approvals) {
+      if (client && pending.client !== client) continue;
+      this.#approvals.delete(requestId);
+      this.#emitInputResolved("approval", requestId, pending.approval.agentId);
+    }
+  }
+
+  #emitInputResolved(kind: "prompt" | "approval", requestId: RequestId, agentId: string): void {
+    this.#emit({ type: "agent-input-resolved", kind, requestId, agentId });
   }
 
   /** A takeover whose tab disappeared can never be answered, so the tab list closing one cancels it. */

@@ -358,6 +358,12 @@ function profileResponse(path: string, value: unknown): TeamProtocolV4BaseJsonOb
   return JSON.parse(JSON.stringify(parsed));
 }
 
+// Only a saved-profile result reaches this, and both of its decoders set `agent`.
+function profileAgent(parsed: TeamProtocolV4BaseJsonObject): TeamProtocolV4BaseJsonValue {
+  if (parsed.agent === undefined) throw new Error("Invalid agent profile.");
+  return parsed.agent;
+}
+
 function profileGeneration(path: string): boolean {
   return new URL(path, "http://openbot.invalid").pathname.endsWith("/generate");
 }
@@ -372,7 +378,7 @@ function encodeProfileResponse(path: string, value: unknown): TeamProtocolV4Base
     profileGeneration(path)
       ? parsed
       : {
-          agent: toWireAgentKeys(parsed.agent),
+          agent: toWireAgentKeys(profileAgent(parsed)),
           layout: parsed.layout,
         },
   );
@@ -384,7 +390,7 @@ function decodeProfileResponse(path: string, value: unknown): TeamProtocolV4Base
     profileGeneration(path)
       ? parsed
       : {
-          agent: toCurrentAgentKeys(parsed.agent),
+          agent: toCurrentAgentKeys(profileAgent(parsed)),
           layout: parsed.layout,
         },
   );

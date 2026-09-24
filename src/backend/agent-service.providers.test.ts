@@ -11,7 +11,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
@@ -119,7 +119,7 @@ describe.sequential("AgentService: providers", () => {
     expect(store.activeProviderSession(agent.id)?.externalSessionId).toBe(normalSession);
   });
 
-  it("resumes a channel session after the profile or the memories of the agent change", async () => {
+  it("carries a change to the profile or the memories of the agent to its channel session", async () => {
     const {
       service: agentService,
       client,
@@ -185,9 +185,18 @@ describe.sequential("AgentService: providers", () => {
     await ask("second", "Continue the shared work.", 2);
     expect(lastChannelResume()).toContain("The user prefers concise status updates.");
 
+    // Codex keeps the developer instructions a loaded session started with, so a profile edit
+    // replaces the session instead of resuming it. The old one is closed in the client.
+    const channelSessionNow = () =>
+      store.database.activeProviderSession(execution.threadId, "codex")?.externalSessionId;
+    const lastStart = (): string =>
+      JSON.stringify(client.requests.filter((request) => request.method === "thread/start").at(-1)?.params ?? "");
     await service.updateAgent({ agentId: "chief", description: "Owns the quarterly report." });
     await ask("third", "Report on the shared work.", 3);
-    expect(lastChannelResume()).toContain("Owns the quarterly report.");
+    const editedSession = channelSessionNow();
+    expect(editedSession).not.toBe(channelSession);
+    expect(client.releasedThreads).toContain(channelSession);
+    expect(lastStart()).toContain("Owns the quarterly report.");
 
     // The profile dialog saves through a second path, which holds the same standing instructions.
     const sidebar = new SidebarLayoutStore(join(root, "sidebar.json"));
@@ -208,7 +217,8 @@ describe.sequential("AgentService: providers", () => {
       sidebar,
     );
     await ask("fourth", "Review the shared work.", 4);
-    expect(lastChannelResume()).toContain("Runs the weekly review.");
+    expect(channelSessionNow()).not.toBe(editedSession);
+    expect(lastStart()).toContain("Runs the weekly review.");
   });
 
   it("keeps an agent with active channel work from being deleted", async () => {
@@ -1295,6 +1305,29 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  it("moves an agent onto the provider default when its CLI stops listing the agent's model", async () => {
+    let listed = ["gpt-6-luna", "gpt-5.6-sol"];
+    const { service: agentService, store } = await startService(root, {
+      client: (provider) => {
+        const client = new FakeAgentClient(provider);
+        if (provider === "codex") client.modelList = () => ({ data: listed.map((model) => ({ model })) });
+        return client;
+      },
+      preferredProvider: "codex",
+    });
+    service = agentService;
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "codex", model: "gpt-5.6-sol" });
+
+    listed = ["gpt-6-luna"];
+    await service.stop();
+    await service.initialize();
+
+    // The provider stays, so the agent keeps its thread; only the model it can no longer run changes.
+    await waitFor(() => service?.listAgents().find((agent) => agent.id === "chief")?.model === "gpt-6-luna");
+    expect(service.listAgents().find((agent) => agent.id === "chief")).toMatchObject({ provider: "codex" });
+  });
+
   // The catalogue is the running CLI's answer, and a removal during a turn does not restart it. The
   // models of an endpoint already removed are therefore still listed, and must not be chosen.
   it("never falls back onto an endpoint removed earlier in the same OpenCode process", async () => {
@@ -2225,6 +2258,7 @@ describe.sequential("AgentService: providers", () => {
     });
     service = agentService;
     const [draft] = await service.prepareAttachments([source]);
+    assert(draft);
 
     await service.sendMessage({
       agentId: "chief",
@@ -2308,7 +2342,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(start.params);
       if (!params) throw new Error("The fake thread request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         approvalPolicy: "on-request",
         sandbox: "danger-full-access",
         ephemeral: false,
@@ -2386,7 +2420,7 @@ describe.sequential("AgentService: providers", () => {
       const params = paramsRecord(turn.params);
       if (!params) throw new Error("The fake turn request has no parameters.");
       expect(params).toMatchObject({
-        model: "gpt-5.6-luna",
+        model: "gpt-6-luna",
         effort: "low",
         approvalPolicy: "on-request",
         sandboxPolicy: { type: "dangerFullAccess" },

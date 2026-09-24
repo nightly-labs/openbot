@@ -1,5 +1,5 @@
+import { QrCode } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { QrCode } from "../src/components/ui";
 
 const meta = {
   title: "Foundation/QrCode",

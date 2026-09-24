@@ -13,6 +13,9 @@ of something remote — which is what makes the first section below non-negotiab
   continues.
 - Never edit or delete a migration that may have shipped, including the frozen version 8 baseline.
   Append the next contiguous version and update the separate latest schema for new databases.
+  Add the new version to `openbot-database-schema-history.json`: the parity test fails and prints
+  the entry to add. A red test on a recorded version means a shipped migration changed. Change the
+  migration back; do not change its entry.
 - A migration change needs data-preservation fixtures for every affected released schema, plus
   failure, rollback, retry, downgrade, missing-version, foreign-key and integrity coverage at the
   stable database boundary.
@@ -50,7 +53,7 @@ offers, in order of preference:
 | `vi.waitFor(() => expect(...))` | A spy or a fake reaching a count, where there is no domain event to hang off. |
 | `vi.useFakeTimers()` + `vi.advanceTimersByTime(n)` | A debounce, a retry backoff, a schedule. Advancing the clock is input, not waiting. |
 
-`test-deadlines.ts` is why `waitFor` reports before vitest does: `NODE_TEST_TIMEOUT_MS` is derived
+`test-deadlines.ts` is why `waitFor` reports before vitest does: `TEST_TIMEOUT_MS` is derived
 from `HARNESS_WAIT_TIMEOUT_MS` rather than written down twice, so a stalled wait fails with the
 condition rather than with vitest's generic "test timed out". Never raise a `vi.waitFor` timeout to
 make a test pass — a longer timeout is the sleep the `no-sleep-in-tests` rule rejected, one layer
@@ -70,7 +73,7 @@ and mailbox commit succeeds. Keep deletion-outbox completion in the store, after
 
 The two that used to be larger are both worth copying. `agent-service.ts` was split into one
 controller per concern, each constructed and owned by the service; `openbot-database.ts` was split
-into nine under `database/`, leaving a ~300-line facade that had to keep its class name, instance
+into modules under `database/`, leaving a ~300-line facade that had to keep its class name, instance
 identity, constructor signature and public surface because callers reach past it into `connection`
 and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
 `readonly #` fields, a constructor that only assigns, and a doc comment saying what the class

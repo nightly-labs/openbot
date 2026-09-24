@@ -1,13 +1,14 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
-import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, BrowserWindow, dialog, powerMonitor, protocol, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, Notification, powerMonitor, protocol, screen, shell } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
+import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
@@ -32,11 +33,13 @@ import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
+import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
 import { skillIpcHandlers } from "./ipc/skill-handlers";
+import { storageIpcHandlers } from "./ipc/storage-handlers";
 import { teamIpcHandlers } from "./ipc/team-handlers";
 import { updateIpcHandlers } from "./ipc/update-handlers";
 import { voiceIpcHandlers } from "./ipc/voice-handlers";
@@ -48,7 +51,7 @@ import {
   createMainWindowHolder,
   showMainWindow,
 } from "./main-window";
-import { ensureMacApplicationPresence } from "./main-window-state";
+import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
@@ -71,6 +74,9 @@ const developmentInviteLinkOptions = {
 const developmentRemoteDebuggingPort = !app.isPackaged
   ? readDevelopmentRemoteDebuggingPort(process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT)
   : null;
+// Electron exposes FedCM without an account chooser, so every request fails with a NetworkError.
+// Sites such as Google Sign-In use FedCM when it exists and fall back to their popup when it does not.
+app.commandLine.appendSwitch("disable-features", "FedCm");
 if (developmentRemoteDebuggingPort) {
   app.commandLine.appendSwitch("remote-debugging-port", developmentRemoteDebuggingPort);
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
@@ -151,6 +157,7 @@ let isQuitting = false;
 let shutdownStarted = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
+let relaunchRequested = false;
 /**
  * The link kinds a renderer is ever told about.
  *
@@ -212,6 +219,7 @@ const {
   // An agent event cannot arrive before the services that raise it, so the fallback stands only so
   // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
+  desktopNotificationsEnabled: () => services?.notificationPreference.get().desktopNotifications ?? true,
 });
 
 // Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
@@ -306,6 +314,7 @@ function registerIpcHandlers({
   updatePreferenceFile,
   approvalAutomation,
   language,
+  notificationPreference,
   agentInitialization,
   sidebarLayout,
   host,
@@ -321,6 +330,7 @@ function registerIpcHandlers({
   cuaDriver,
   computerUsePermissionHelp,
   analytics,
+  storageUsage,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -358,6 +368,12 @@ function registerIpcHandlers({
     ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...updateIpcHandlers({ updater, updatePreferenceFile }),
+    ...notificationIpcHandlers({
+      notificationPreference,
+      translate: language.translate,
+      requestPermission: () => requestDesktopNotificationPermission(notificationPreference, language.translate),
+      openExternal: (url) => shell.openExternal(url),
+    }),
     ...teamIpcHandlers({
       host,
       remoteDesktop,
@@ -380,8 +396,30 @@ function registerIpcHandlers({
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     }),
     ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
+    ...storageIpcHandlers({
+      storage: storageUsage,
+      mailbox,
+      remoteServers,
+      getMainWindow,
+      agents: () => service.listAgents(),
+      openPath: (path) => shell.openPath(path),
+    }),
     ...agentIpcHandlers({ service, sidebarLayout, host, remoteServers, skills }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView }),
+  });
+}
+
+function requestDesktopNotificationPermission(
+  preference: ApplicationServices["notificationPreference"],
+  translate: ApplicationServices["language"]["translate"],
+): Promise<void> {
+  return requestNotificationPermission({
+    platform: process.platform,
+    preference,
+    showWelcome: () => {
+      if (!Notification.isSupported()) return;
+      showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
+    },
   });
 }
 
@@ -462,7 +500,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
     });
   const window = windowHolder.current;
   if (!window || window.isDestroyed()) return;
-  sendToRenderer(window, IPC_CHANNELS.authEvent, state);
+  sendToRenderer(window, IPC_ENDPOINTS.auth.event, state);
 }
 
 /**
@@ -482,8 +520,8 @@ function acceptDeepLink(link: DeepLink): void {
   showMainWindow(window);
   const delivered =
     link.kind === "invite"
-      ? sendToRenderer(window, IPC_CHANNELS.serversInvite, link.url)
-      : sendToRenderer(window, IPC_CHANNELS.pluginsOpenListing, link.slug);
+      ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
+      : sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
   if (delivered) pendingDeepLink = null;
 }
 
@@ -542,8 +580,23 @@ if (!hasSingleInstanceLock) {
     const deepLink = findDeepLink(argv, developmentInviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
     const window = windowHolder.current;
-    if (!window || window.isDestroyed()) return;
-    showMainWindow(window);
+    const hasMainWindow = Boolean(window && !window.isDestroyed());
+    const response = secondLaunchResponse({
+      sessionEnding: systemSessionEnding,
+      quitting: isQuitting,
+      hasMainWindow,
+      started: services !== null,
+    });
+    if (response === "present" && window) showMainWindow(window);
+    else if (response === "reopen") reopenMainWindow();
+    else if (response === "relaunch" && !relaunchRequested) {
+      relaunchRequested = true;
+      // The new instance takes this launch's link, not the one this process may have started with.
+      const isLink = (value: string) => parseDeepLink(value, developmentInviteLinkOptions) !== null;
+      const link = argv.find(isLink);
+      const args = process.argv.slice(1).filter((value) => !isLink(value));
+      app.relaunch({ args: link ? [...args, link] : args });
+    }
   });
 
   void app
@@ -641,6 +694,9 @@ if (!hasSingleInstanceLock) {
       // Before the renderer loads: the trust boundary and every protocol it fetches through have to
       // be in place before the first request can arrive.
       registerIpcHandlers(built);
+      void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
+        logger.warn("Unable to ask for notification permission:", toLogValue(error)),
+      );
       configureApplicationMenu(service, updater, language.translate);
       // One place turns a language change into every visible consequence: the menu is built again
       // because a native label cannot be changed in place, and every window is told, including the
@@ -648,7 +704,7 @@ if (!hasSingleInstanceLock) {
       language.subscribe((preference) => {
         configureApplicationMenu(service, updater, language.translate);
         for (const window of BrowserWindow.getAllWindows()) {
-          sendToRenderer(window, IPC_CHANNELS.appLanguagePreference, preference);
+          sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
         }
       });
       await dynamicIsland
@@ -694,8 +750,10 @@ if (!hasSingleInstanceLock) {
       app.on("browser-window-focus", (_event, window) => {
         if (window === windowHolder.current) {
           startDirectoryWatch();
+          remoteServers.setAppFocused(true);
         }
       });
+      app.on("browser-window-blur", () => remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null));
       const refreshMemberships = () => void directoryRefresh.refresh(true);
       remoteServers.on("directoryInvalidated", refreshMemberships);
       let stopDirectoryWatch = () => {};
@@ -719,10 +777,7 @@ if (!hasSingleInstanceLock) {
           showMainWindow(window);
           return;
         }
-        void windows
-          .ensureMainWindow()
-          .then(showMainWindow)
-          .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
+        reopenMainWindow();
       });
     })
     .catch((error) => {
@@ -752,6 +807,27 @@ app.on("before-quit", (event) => {
   void prepareForShutdown().finally(() => app.quit());
 });
 
+function reopenMainWindow(): void {
+  void windows
+    .ensureMainWindow()
+    .then(showMainWindow)
+    .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
+}
+
+/**
+ * The teardown gives up on each step after its own limit, but steps run one after another, and
+ * something outside it can still hold the quit. A process that outlives its window keeps the
+ * single-instance lock, so every later launch exits without opening anything.
+ */
+const SHUTDOWN_DEADLINE_MS = 30_000;
+
+function forceExitAfterShutdownDeadline(): void {
+  setTimeout(() => {
+    logger.error(`OpenBot did not quit within ${SHUTDOWN_DEADLINE_MS} ms and will exit now.`);
+    app.exit(0);
+  }, SHUTDOWN_DEADLINE_MS);
+}
+
 async function prepareForUpdateInstall(): Promise<void> {
   await (services?.browser.flushPersistentStorage() ?? Promise.resolve());
   await prepareForShutdown();
@@ -768,6 +844,7 @@ async function prepareForShutdown(): Promise<void> {
   if (shutdownStarted) return;
   shutdownStarted = true;
   isQuitting = true;
+  forceExitAfterShutdownDeadline();
   services?.updater.stop();
   await windows
     .flushMainWindowBounds()

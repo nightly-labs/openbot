@@ -409,7 +409,8 @@ function isV4BaseBotSummary(value: unknown): value is TeamProtocolV4BaseJsonObje
       value.provider === "grok" ||
       value.provider === "opencode") &&
     isString(value.model) &&
-    /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$/u.test(value.model) &&
+    // Brackets as in `isAgentModel`: the Claude CLI names a 1M-context model `claude-opus-5-5[1m]`.
+    /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,159}$/u.test(value.model) &&
     isV4BaseOneOf(["low", "medium", "high", "xhigh", "max"], value.reasoningEffort) &&
     (value.threadId === null || isV4BaseIdentifier(value.threadId)) &&
     isV4BaseBoundedString(value.workspacePath, 4_096) &&

@@ -1,7 +1,8 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { fireEvent, render } from "@solidjs/testing-library";
+import { freeModelsReady, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { ProviderPicker, type ProviderPickerOption } from "./ProviderPicker";
+import { ProviderPicker } from "./ProviderPicker";
 
 /*
  * The two provider rows OpenBot treats differently.
@@ -63,6 +64,14 @@ describe("ProviderPicker", () => {
     expect(onSignInProvider).toHaveBeenCalledWith("opencode");
     // Claude asks for a sign-in only while it is signed out, which `not-installed` is not.
     expect(view.queryByRole("button", { name: "Sign in to Claude" })).toBeNull();
+  });
+
+  it("reads free models as ready only once the OpenCode runtime is on disk", () => {
+    const signedOut = { ...openCode, freeModels: true, state: "sign-in-required" as const };
+    // Setup must not continue on a runtime status that has not arrived: nothing would start it.
+    expect(freeModelsReady(signedOut)).toBe(false);
+    expect(freeModelsReady({ ...signedOut, runtimeStatus: runtime({ phase: "not-downloaded" }) })).toBe(false);
+    expect(freeModelsReady({ ...signedOut, runtimeStatus: runtime({}) })).toBe(true);
   });
 
   it("opens the OpenCode key dialog from Reconnect, with no second Sign in button", () => {
@@ -128,7 +137,7 @@ describe("ProviderPicker", () => {
           onSignInProvider={vi.fn()}
           onSignInWithCodeProvider={onSignInWithCodeProvider}
         />
-      )).queryByRole("button", { name: "More ways to log in to ChatGPT" });
+      )).queryByRole("button", { name: "More actions for ChatGPT" });
 
     // Signed in is not a reason to hide it: this is the way to a second account.
     expect(menu(codex)).toBeTruthy();
@@ -149,8 +158,44 @@ describe("ProviderPicker", () => {
           onSignInProvider={vi.fn()}
           onSignInWithCodeProvider={onSignInWithCodeProvider}
         />
-      )).queryByRole("button", { name: "More ways to log in to Claude" }),
+      )).queryByRole("button", { name: "More actions for Claude" }),
     ).toBeNull();
+  });
+
+  it("offers Update in every downloaded row's actions menu, and a check where no newer version is known", async () => {
+    const onUpdateProvider = vi.fn();
+    const view = render(() => (
+      <ProviderPicker
+        value="claude"
+        options={[
+          {
+            ...claude,
+            state: "available",
+            runtimeStatus: runtime({ version: "2.1.246" }),
+            availableVersion: "2.1.250",
+          },
+          { ...openCode, state: "available", runtimeStatus: runtime({}), availableVersion: null },
+          { ...openCode, id: "grok", name: "Grok", runtimeStatus: runtime({ phase: "not-downloaded", version: null }) },
+        ]}
+        ariaLabel="AI providers"
+        allowUnavailableSelection
+        onChange={vi.fn()}
+        onUpdateProvider={onUpdateProvider}
+      />
+    ));
+    const openMenu = (name: string) =>
+      fireEvent.pointerDown(view.getByRole("button", { name: `More actions for ${name}` }), { button: 0 });
+
+    // Nothing on the computer to update yet.
+    expect(view.queryByRole("button", { name: "More actions for Grok" })).toBeNull();
+
+    await openMenu("OpenCode");
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Check for updates" }), { button: 0 });
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("opencode"));
+
+    await openMenu("Claude");
+    await fireEvent.pointerUp(await screen.findByRole("menuitem", { name: "Update to 2.1.250" }), { button: 0 });
+    await waitFor(() => expect(onUpdateProvider).toHaveBeenCalledWith("claude"));
   });
 
   it("badges the tier and connection state without doubling them", () => {

@@ -26,6 +26,7 @@ import {
 } from "@openbot/contracts/signal-protocol/ticket";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
+import { isMissingFileError } from "../backend/file-errors";
 
 interface CentralAuthEvents {
   changed: [state: CentralAuthState];
@@ -629,7 +630,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         const encrypted = Buffer.from(await readFile(this.#options.storagePath, "utf8"), "base64");
         this.#restoreStoredSession(this.#options.decrypt(encrypted));
       } catch (error) {
-        if (!isMissing(error)) {
+        if (!isMissingFileError(error)) {
           await this.#clearStoredSession();
         }
       }
@@ -849,7 +850,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       } catch (error) {
         if (!isTransientStartupError(error)) throw error;
         const delayMs = Math.min(
-          this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)],
+          this.#options.startupRetryDelaysMs[Math.min(retryIndex, this.#options.startupRetryDelaysMs.length - 1)] ?? 0,
           Math.max(0, deadline - Date.now()),
         );
         if (delayMs <= 0) throw error;
@@ -1297,10 +1298,6 @@ function decodeSessionResponse(value: unknown): SessionResponse {
     sessionToken: requiredString(record, "sessionToken"),
     user: decodeCentralAuthUser(record.user),
   };
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function errorMessage(error: unknown, fallback: string): string {

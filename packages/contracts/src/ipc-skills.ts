@@ -98,7 +98,15 @@ export interface SubmitSkillInput {
   skillId?: string;
 }
 
-export type InstalledSkillOrigin = "marketplace" | "managed" | "local";
+/**
+ * `workspace` is a skill folder in `.agents/skills`, `.claude/skills` or `.opencode/skills` of the
+ * agent workspace that OpenBot did not install. OpenBot lists it read-only and never writes to it.
+ */
+export const INSTALLED_SKILL_ORIGINS = ["marketplace", "managed", "local", "workspace"] as const;
+export type InstalledSkillOrigin = (typeof INSTALLED_SKILL_ORIGINS)[number];
+
+/** The Agent Skills specification limit for a SKILL.md `description`. */
+export const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
 
 export interface InstalledSkill {
   skillId: string;
@@ -113,6 +121,13 @@ export interface InstalledSkill {
   origin?: InstalledSkillOrigin;
   /** Missing on older hosts, Team GET payloads, and pre-description lock files. */
   description?: string;
+  /** For a `workspace` skill: its folder, relative to the agent workspace. */
+  location?: string;
+  /**
+   * For a `workspace` skill: why it does not follow the Agent Skills specification, or why
+   * the agent's provider does not read its folder. A provider can skip such a skill.
+   */
+  problem?: string;
 }
 
 export interface InstallSkillInput {
@@ -144,7 +159,49 @@ export function isSkillCategory(value: unknown): value is SkillCategory {
   return isOneOf(SKILL_CATEGORIES, value);
 }
 
-import { isOneOf } from "./runtime-values";
+/** A valid `location` or `problem` of an {@link InstalledSkill}. */
+export function isSkillNote(value: unknown): value is string {
+  return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
+}
+
+/**
+ * The installed skills a remote host lists for one agent (`GET /v1/agents/:agentId/skills`). The
+ * host is an untrusted sender: an unknown state fails the list, and an optional field that is not
+ * valid is dropped.
+ */
+export function decodeInstalledSkills(value: unknown): InstalledSkill[] {
+  if (!Array.isArray(value)) throw new Error("Invalid installed skill list.");
+  return value.map((item) => {
+    const skill = decodeRecord(item, "installed skill");
+    const state = requiredString(skill, "state");
+    if (!isOneOf(["installed", "update-available", "modified", "needs-repair"] as const, state)) {
+      throw new Error("Invalid installed skill state.");
+    }
+    const description = optionalSkillDescription(skill.description);
+    return {
+      skillId: requiredString(skill, "skillId"),
+      slug: requiredString(skill, "slug"),
+      name: requiredString(skill, "name"),
+      installedVersion: requiredNumber(skill, "installedVersion"),
+      availableVersion: requiredNumber(skill, "availableVersion"),
+      state,
+      ...(skill.enabled === false ? { enabled: false } : skill.enabled === true ? { enabled: true } : {}),
+      ...(isOneOf(INSTALLED_SKILL_ORIGINS, skill.origin) ? { origin: skill.origin } : {}),
+      ...(description ? { description } : {}),
+      ...(isSkillNote(skill.location) ? { location: skill.location } : {}),
+      ...(isSkillNote(skill.problem) ? { problem: skill.problem } : {}),
+    };
+  });
+}
+
+function optionalSkillDescription(value: unknown): string | undefined {
+  if (!isString(value)) return undefined;
+  const description = value.trim();
+  return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
+}
+
+import { decodeRecord, requiredNumber, requiredString } from "./ipc-decoding";
+import { isOneOf, isString } from "./runtime-values";
 
 export interface CreateLocalSkillInput {
   agentId: string;
@@ -158,3 +215,5 @@ export interface LocalSkillRevisionInput {
   skillId: string;
   revision?: number;
 }
+/** Installs one exact revision, so the agent gets the copy the user read. */
+export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };

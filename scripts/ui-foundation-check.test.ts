@@ -9,6 +9,9 @@
 // line for line. It is the contract tools/biome/anti-slop/fixtures holds the GritQL
 // rules to, applied to the one guard in this repository that is not a GritQL rule.
 
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkUiFoundation } from "./ui-foundation-check";
@@ -35,6 +38,7 @@ describe("ui foundation check", () => {
         // nothing about this branch of the pattern.
         "components/Icons.tsx: Kobalte/Lucide imports are allowed only in components/ui",
         "components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
+        "components/ui/features/Bad.tsx: use a components/ui control instead of a native element",
         // A sibling directory whose name starts with "ui". Skipping the design system is a
         // path-prefix comparison, so without a separator this line and the second composite
         // role below both disappear, and a components/ui-kit could hold anything.
@@ -140,4 +144,62 @@ describe("ui foundation check", () => {
       "renderer/components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
     );
   });
+});
+
+it("checks primitive adapters when the shared UI is outside the renderer", () => {
+  const report = checkUiFoundation(
+    cleanRenderer,
+    fixtureRenderer,
+    [cleanRenderer, fixtureRenderer],
+    resolve(fixtureRenderer, "components/ui"),
+  );
+  expect(report.failures).toContain(
+    "components/ui/complex.tsx: a Kobalte namespace must go through an adapter, not a direct alias",
+  );
+  const clean = checkUiFoundation(
+    cleanRenderer,
+    cleanRenderer,
+    [cleanRenderer],
+    resolve(cleanRenderer, "components/ui"),
+  );
+  expect(clean.failures).toEqual([]);
+});
+
+it("rejects desktop preload access in shared UI while allowing browser APIs and documentation", () => {
+  const workspace = mkdtempSync(resolve(tmpdir(), "ui-boundary-"));
+  try {
+    const plugin = resolve(import.meta.dirname, "../tools/ui-foundation/no-desktop-preload.grit");
+    writeFileSync(
+      resolve(workspace, "biome.json"),
+      JSON.stringify({
+        plugins: [plugin],
+        linter: { enabled: true, rules: { recommended: false } },
+        formatter: { enabled: false },
+        assist: { enabled: false },
+      }),
+    );
+    for (const [sourceRoot, file, expected] of [
+      [fixtureRenderer, "DesktopPreload.ts", 6],
+      [fixtureRenderer, "OptionalPreload.ts", 1],
+      [fixtureRenderer, "IndexedPreload.ts", 1],
+      [cleanRenderer, "BrowserGlobals.ts", 0],
+    ] as const) {
+      const target = resolve(workspace, "fixture.ts");
+      writeFileSync(target, readFileSync(resolve(sourceRoot, "components/ui", file)));
+      const result = spawnSync(
+        resolve(import.meta.dirname, "../node_modules/.bin/biome"),
+        ["check", target, `--config-path=${workspace}`, "--reporter=json"],
+        { encoding: "utf8" },
+      );
+      const report: { diagnostics: { category: string; severity: string; message: string }[] } = JSON.parse(
+        result.stdout,
+      );
+      const diagnostics = report.diagnostics.filter((item) => item.category === "plugin");
+      expect(diagnostics.filter((item) => item.message.includes("errored"))).toEqual([]);
+      expect(diagnostics).toHaveLength(expected);
+      if (expected) expect(diagnostics[0]?.severity).toBe("error");
+    }
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
 });

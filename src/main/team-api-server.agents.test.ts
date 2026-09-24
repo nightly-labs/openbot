@@ -239,6 +239,64 @@ describe("TeamApiServer agents", () => {
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps agent access on the computer that runs the agent", async () => {
+    const fixture = opencodeFixture[0];
+    if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
+    const source: AgentSummary = { ...fixture, access: "workspace" };
+    const updateAgent = vi.fn(async () => source);
+    const { start, signIn } = await createTeamApiFixture("agent-access", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      agents: createAgents({ listAgents: () => [source], updateAgent }),
+    });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      [TEAM_PROTOCOL_VERSION_HEADER]: "4",
+      [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      "Content-Type": "application/json",
+    };
+
+    const list = await fetch(`${base}/v1/agents`, { headers });
+    expect(await list.json()).toEqual([expect.not.objectContaining({ access: expect.anything() })]);
+    const update = await fetch(`${base}/v1/agents/${source.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Renamed", access: "full" }),
+    });
+    expect(update.status).toBe(200);
+    expect(updateAgent).toHaveBeenCalledWith({ agentId: source.id, name: "Renamed" });
+  });
+
+  it("hides only the agent a client's protocol cannot describe", async () => {
+    const source = opencodeFixture[0];
+    if (!isAgentSummary(source)) throw new Error("Invalid agent fixture.");
+    const plain: AgentSummary = { ...source, id: "plain", provider: "claude", model: "claude-opus-5-5" };
+    // Protocols 1-3 do not accept brackets in a model id; protocol 4 does.
+    const suffixed: AgentSummary = { ...plain, id: "suffixed", model: "claude-opus-5-5[1m]" };
+    const warn = vi.fn();
+    const { start, signIn } = await createTeamApiFixture("unrepresentable-agent", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
+      agents: createAgents({ listAgents: () => [plain, suffixed] }),
+    });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    for (const protocol of [1, 3, 4]) {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
+        [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      };
+      const list = await fetch(`${base}/v1/agents`, { headers });
+      expect(list.status).toBe(200);
+      const ids = (await list.json()).map((agent: AgentSummary) => agent.id);
+      expect(ids).toEqual(protocol === 4 ? ["plain", "suffixed"] : ["plain"]);
+      if (protocol < 4) expect((await fetch(`${base}/v1/agents/suffixed/memories`, { headers })).status).toBe(404);
+    }
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
   it("duplicates an agent through protocol v3 and places it after the source", async () => {
     const { root, start, signIn } = await createTeamApiFixture("duplicate", { configure: true });
     const sidebarLayout = new SidebarLayoutStore(join(root, "sidebar-layout.json"));

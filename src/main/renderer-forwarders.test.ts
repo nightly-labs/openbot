@@ -3,16 +3,18 @@
 import type { AgentEvent, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { BrowserWindow } from "electron";
-import { beforeEach, expect, it, vi } from "vitest";
+import { assert, beforeEach, expect, it, vi } from "vitest";
 import type { AgentNotificationContent } from "./agent-notifications";
 import { createRendererForwarders } from "./renderer-forwarders";
 
-const mocks = vi.hoisted(() => ({
-  show: vi.fn(),
-  content: vi.fn(),
-  send: vi.fn(),
-  focused: false,
-}));
+const mocks = vi.hoisted(() => {
+  const state: { clickListeners: (() => void)[]; focused: boolean; desktopNotifications: boolean } = {
+    clickListeners: [],
+    focused: false,
+    desktopNotifications: true,
+  };
+  return Object.assign(state, { show: vi.fn(), content: vi.fn(), send: vi.fn() });
+});
 vi.mock("electron", () => ({
   BrowserWindow: class {
     isDestroyed = () => false;
@@ -29,7 +31,9 @@ vi.mock("electron", () => ({
     constructor(content: AgentNotificationContent) {
       mocks.content(content);
     }
-    on = vi.fn();
+    on = (name: string, listener: () => void) => {
+      if (name === "click") mocks.clickListeners.push(listener);
+    };
     show = mocks.show;
   },
 }));
@@ -70,6 +74,8 @@ function server(id: string): ServerSummary {
     role: null,
     active: false,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
   };
 }
 function setup() {
@@ -95,38 +101,45 @@ function setup() {
     }),
     showMainWindow: vi.fn(),
     getTranslate: () => translateFor("en"),
+    desktopNotificationsEnabled: () => mocks.desktopNotifications,
   });
   return { ...forwarders, servers, request, waitForLookup: () => lookupSettled };
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.clickListeners = [];
   mocks.focused = false;
+  mocks.desktopNotifications = true;
 });
 
 it("mutes only the selected server while forwarding its live events", async () => {
   const fixture = setup();
-  fixture.servers[1].notificationsMuted = true;
+  const [, alpha] = fixture.servers;
+  assert(alpha);
+  alpha.notificationsMuted = true;
   fixture.forwardAgentEvent("alpha", event);
   expect(mocks.send).toHaveBeenCalledWith("agent:event", { serverId: "alpha", event });
   expect(mocks.show).not.toHaveBeenCalled();
   expect(fixture.request).not.toHaveBeenCalled();
   fixture.forwardAgentEvent("beta", event);
   await vi.waitFor(() => expect(mocks.show).toHaveBeenCalledOnce());
-  expect(mocks.content).toHaveBeenLastCalledWith({ title: "Remote Chief", body: "Finished working.", silent: true });
-  expect(fixture.request.mock.calls[0][0]).toBe("beta");
-  fixture.servers[1].notificationsMuted = false;
+  expect(mocks.content).toHaveBeenLastCalledWith({ title: "Remote Chief", body: "Finished working." });
+  expect(fixture.request.mock.calls[0]?.[0]).toBe("beta");
+  alpha.notificationsMuted = false;
   fixture.forwardAgentEvent("alpha", event);
   await vi.waitFor(() => expect(mocks.show).toHaveBeenCalledTimes(2));
 });
 
 it("uses the local mute preference and local agent settings", () => {
   const fixture = setup();
-  fixture.servers[0].notificationsMuted = true;
+  const [local] = fixture.servers;
+  assert(local);
+  local.notificationsMuted = true;
   fixture.forwardAgentEvent("local", event);
   expect(mocks.show).not.toHaveBeenCalled();
-  fixture.servers[0].notificationsMuted = false;
+  local.notificationsMuted = false;
   fixture.forwardAgentEvent("local", event);
-  expect(mocks.content).toHaveBeenCalledWith({ title: "Local Chief", body: "Finished working.", silent: true });
+  expect(mocks.content).toHaveBeenCalledWith({ title: "Local Chief", body: "Finished working." });
   expect(fixture.request).not.toHaveBeenCalled();
 });
 
@@ -139,8 +152,10 @@ it.each(["mute", "remove", "focus", "agent-disabled"])(
       resolve = done;
     });
     fixture.request.mockReturnValue(promise);
+    const [, alpha] = fixture.servers;
+    assert(alpha);
     fixture.forwardAgentEvent("alpha", event);
-    if (change === "mute") fixture.servers[1].notificationsMuted = true;
+    if (change === "mute") alpha.notificationsMuted = true;
     if (change === "remove") fixture.servers.splice(1, 1);
     if (change === "focus") mocks.focused = true;
     resolve([{ ...agent, notifications: change !== "agent-disabled" }]);
@@ -156,4 +171,39 @@ it("does not use local agents when the remote lookup fails", async () => {
   fixture.forwardAgentEvent("alpha", event);
   await fixture.waitForLookup();
   expect(mocks.show).not.toHaveBeenCalled();
+});
+
+it("stays quiet when desktop notifications are off or the server level rules the event out", () => {
+  const fixture = setup();
+  const [local] = fixture.servers;
+  assert(local);
+  mocks.desktopNotifications = false;
+  fixture.forwardAgentEvent("local", event);
+  mocks.desktopNotifications = true;
+  local.notificationLevel = "nothing";
+  fixture.forwardAgentEvent("local", event);
+  local.notificationLevel = "needs-me";
+  fixture.forwardAgentEvent("local", event);
+  expect(mocks.show).not.toHaveBeenCalled();
+  fixture.forwardAgentEvent("local", {
+    type: "prompt",
+    agentId: "chief",
+    threadId: "thread-chief",
+    turnId: "turn-1",
+    requestId: 1,
+    questions: [],
+  });
+  expect(mocks.content).toHaveBeenCalledWith({ title: "Local Chief", body: "Needs your input." });
+});
+
+it("opens the agent's conversation when the user clicks the notification", () => {
+  const fixture = setup();
+  fixture.forwardAgentEvent("local", event);
+  mocks.send.mockClear();
+  for (const listener of mocks.clickListeners) listener();
+  expect(mocks.send).toHaveBeenCalledWith("notifications:opened-event", {
+    serverId: "local",
+    agentId: "chief",
+    threadId: "thread-chief",
+  });
 });

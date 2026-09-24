@@ -5,8 +5,12 @@ import { createServer, type IncomingMessage } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
-import { decodeBrowserViewFrame, encodeBrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  BROWSER_VIEW_FRAME_ACK_QUERY,
+  decodeBrowserViewFrame,
+  encodeBrowserViewInput,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import type { BrowserViewportInput } from "../backend/browser-cdp";
@@ -15,6 +19,13 @@ import { BrowserViewGateway } from "./browser-view-gateway";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const TEAM_SESSION = "team-session-1";
+
+/** A client that will name the frame it has drawn. The host keeps sizes only for this socket. */
+function acknowledgingViewUrl(origin: string, streamPath: string): string {
+  const url = new URL(`${origin}${streamPath}`);
+  url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
+  return url.toString();
+}
 const closers: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
@@ -48,7 +59,9 @@ describe("the live browser view on a host", () => {
     await vi.waitFor(() => expect(send).toBeDefined());
     send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
     await vi.waitFor(() => expect(frames).toHaveLength(1));
-    expect(decodeBrowserViewFrame(frames[0])).toMatchObject({ sequence: 1, width: 1200, height: 800 });
+    const [frame] = frames;
+    assert(frame);
+    expect(decodeBrowserViewFrame(frame)).toMatchObject({ sequence: 1, width: 1200, height: 800 });
 
     socket.send(
       encodeBrowserViewInput({
@@ -65,6 +78,363 @@ describe("the live browser view on a host", () => {
     );
     // The member's pointer is a fraction of the frame they watched; the host's page is in pixels.
     await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("keeps a click on the last frame the member saw when a newer frame is dropped", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+
+    // A member who stops reading is the case the drop exists for. These fillers are the shape the
+    // member is already watching, so whether each one arrives changes nothing; they are here to put
+    // the socket over its buffer.
+    socket.pause();
+    const filler = new Uint8Array(1_500_000);
+    filler.set([0xff, 0xd8, 0xff]);
+    for (let sequence = 2; sequence <= 13; sequence += 1) {
+      send?.({ sequence, width: 1200, height: 800, image: filler });
+    }
+    // The page resized behind the backpressure. This frame is dropped, so the member never sees it.
+    send?.({ sequence: 14, width: 400, height: 300, image: filler });
+
+    socket.send(
+      encodeBrowserViewInput({
+        type: "pointer",
+        action: "down",
+        x: 0.5,
+        y: 0.25,
+        button: "left",
+        clickCount: 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      }),
+    );
+    // The point is a fraction of the frame on the member's screen, which is still the 1200x800 one.
+    // Expanding it with the dropped frame would put the click at (200, 75) on a page nobody saw.
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.resume();
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("expands a point with the frame the member named, not the newest one", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    // The page resized. This frame is on its way to the member, who is still looking at the first.
+    send?.({ sequence: 2, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(2));
+
+    socket.send(
+      encodeBrowserViewInput({
+        type: "pointer",
+        action: "down",
+        x: 0.5,
+        y: 0.25,
+        sequence: 1,
+        button: "left",
+        clickCount: 1,
+        deltaX: 0,
+        deltaY: 0,
+        modifiers: 0,
+      }),
+    );
+    // The frame the member named, not the newest one: expanding with frame 2 puts this at (200, 75).
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 600, y: 200 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("keeps a point on the frame still showing, and drops it once a newer frame is named", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    // More frames than any fixed window. The member is still looking at the first: nothing has
+    // said otherwise, so a click there is a click on that page, not one to throw away.
+    for (let sequence = 2; sequence <= 9; sequence += 1) {
+      send?.({ sequence, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await vi.waitFor(() => expect(frames).toHaveLength(9));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    // Naming frame 9 says that frame is on screen now. The next click on frame 1 is a frame the
+    // member has left, and it must not be expanded with frame 9's size either.
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 9 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, action: "up", sequence: 9 }));
+    await vi.waitFor(() =>
+      expect(dispatched).toEqual([
+        expect.objectContaining({ action: "down", x: 600, y: 200 }),
+        expect.objectContaining({ action: "down", x: 200, y: 75 }),
+        expect.objectContaining({ action: "up", x: 200, y: 75 }),
+      ]),
+    );
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("forgets frames older than the one the member has drawn, without a click", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    for (let sequence = 2; sequence <= 4; sequence += 1) {
+      send?.({ sequence, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await vi.waitFor(() => expect(frames).toHaveLength(4));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    // The member is watching frame 3 and has not touched the page. Frame 4 is still on its way.
+    socket.send(encodeBrowserViewInput({ type: "ack", sequence: 3 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 3 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 4 }));
+    await vi.waitFor(() =>
+      expect(dispatched).toEqual([
+        expect.objectContaining({ x: 200, y: 75 }),
+        expect.objectContaining({ x: 200, y: 75 }),
+      ]),
+    );
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("does not keep a frame size for a client that never acknowledges frames", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    send?.({ sequence: 1, width: 1200, height: 800, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    send?.({ sequence: 2, width: 400, height: 300, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    await vi.waitFor(() => expect(frames).toHaveLength(2));
+
+    const point = {
+      type: "pointer" as const,
+      action: "down" as const,
+      x: 0.5,
+      y: 0.25,
+      button: "left" as const,
+      clickCount: 1,
+      deltaX: 0,
+      deltaY: 0,
+      modifiers: 0,
+    };
+    // This client did not ask the host to remember frames. A named point has no size to use, and
+    // the point every released client sends still lands on the newest frame.
+    socket.send(encodeBrowserViewInput({ type: "ack", sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point, sequence: 1 }));
+    socket.send(encodeBrowserViewInput({ ...point }));
+    await vi.waitFor(() => expect(dispatched).toEqual([expect.objectContaining({ x: 200, y: 75 })]));
+    socket.close();
+    await gateway.stop();
+  });
+
+  it("closes a view whose client stops acknowledging frames", async () => {
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const frames = collect(socket);
+    const closed = new Promise((resolve) => socket.once("close", resolve));
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    // One past the host's unacknowledged-frame cap. A client that keeps up never reaches it.
+    for (let sequence = 1; sequence <= 121; sequence += 1) {
+      send?.({ sequence, width: 800, height: 600, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+    }
+    await closed;
+    expect(frames.length).toBeLessThanOrEqual(121);
+    expect(gateway.activeViewCount()).toBe(0);
+    await gateway.stop();
+  });
+
+  it("keeps the view open while drawn frames are acknowledged inside the backlog", async () => {
+    const dispatched: BrowserViewportInput[] = [];
+    let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async (_tabId, onFrame) => {
+          send = onFrame;
+          return async () => undefined;
+        },
+        dispatchViewInput: async (_tabId, input) => {
+          dispatched.push(input);
+        },
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(acknowledgingViewUrl(origin, session.streamPath), {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(send).toBeDefined());
+    let seen = 0;
+    for (let sequence = 1; sequence <= 200; sequence += 1) {
+      send?.({ sequence, width: 800, height: 600, image: new Uint8Array([0xff, 0xd8, 0xff]) });
+      if (sequence % 30 !== 0) continue;
+      // The acknowledgement has to be applied before the next burst, which is what a live
+      // socket does between frames. Sending the whole stream in one turn would close a view
+      // that is keeping up.
+      socket.send(encodeBrowserViewInput({ type: "ack", sequence }));
+      socket.send(
+        encodeBrowserViewInput({
+          type: "pointer",
+          action: "down",
+          x: 0.5,
+          y: 0.25,
+          sequence,
+          button: "left",
+          clickCount: 1,
+          deltaX: 0,
+          deltaY: 0,
+          modifiers: 0,
+        }),
+      );
+      seen += 1;
+      await vi.waitFor(() => expect(dispatched).toHaveLength(seen));
+    }
+    expect(socket.readyState).toBe(webSockets.WebSocket.OPEN);
     socket.close();
     await gateway.stop();
   });
@@ -149,6 +519,35 @@ describe("the live browser view on a host", () => {
     socket.close();
     await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
     expect(restartActivityGeneration()).toBeGreaterThan(before);
+    await gateway.stop();
+  });
+
+  it("releases a session after an abrupt stream disconnect", async () => {
+    const startView = vi.fn(async () => async () => undefined);
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView,
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+      maxSessions: 1,
+    });
+    const origin = await serve(gateway);
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    await new Promise((resolve) => socket.once("open", resolve));
+    await vi.waitFor(() => expect(startView).toHaveBeenCalledOnce());
+
+    const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+    socket.terminate();
+    await closed;
+    await vi.waitFor(() => expect(gateway.activeViewCount()).toBe(0));
+
+    expect(() =>
+      gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-2" }),
+    ).not.toThrow();
     await gateway.stop();
   });
 });

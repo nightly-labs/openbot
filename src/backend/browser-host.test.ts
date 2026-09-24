@@ -11,7 +11,7 @@ import {
   type WindowOpenHandlerResponse,
   webContents,
 } from "electron";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
 import type { BrowserContextMenuParams } from "./browser-shortcuts";
 import type { DynamicToolResult } from "./protocol";
@@ -79,14 +79,20 @@ vi.mock("electron", async () => {
       return null;
     }
     focusedFrame: { executeJavaScript: () => Promise<unknown>; isDestroyed: () => boolean } | null = null;
-    mainFrame = {
-      async executeJavaScript() {
-        return false;
-      },
-      isDestroyed() {
-        return false;
-      },
-    };
+    mainFrame = (() => {
+      const contents = this;
+      return {
+        async executeJavaScript() {
+          return false;
+        },
+        isDestroyed() {
+          return false;
+        },
+        get framesInSubtree() {
+          return contents.url ? [{ origin: new URL(contents.url).origin }] : [];
+        },
+      };
+    })();
     navigationHistory = { clear() {}, canGoBack: () => false, canGoForward: () => false };
   }
   return {
@@ -150,6 +156,7 @@ import type { BrowserScreencastFrame, BrowserScreencastOptions } from "./browser
 
 const viewFrames = vi.hoisted((): Array<(frame: BrowserScreencastFrame) => void> => []);
 const secretEntry = vi.hoisted(() => vi.fn<(secret: string) => Promise<void>>());
+const secretClear = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 
 vi.mock("./browser-cdp", () => ({
   BrowserCdpEngine: class {
@@ -157,8 +164,12 @@ vi.mock("./browser-cdp", () => ({
     destroy() {}
     invalidateReferences() {}
     async prepareSecret() {
-      return secretEntry;
+      return { enter: secretEntry, clear: secretClear };
     }
+    async evaluate() {
+      return "page value";
+    }
+    async settle() {}
     async startScreencast(_options: BrowserScreencastOptions, onFrame: (frame: BrowserScreencastFrame) => void) {
       viewFrames.push(onFrame);
       return async () => undefined;
@@ -178,6 +189,8 @@ beforeEach(async () => {
   viewFrames.length = 0;
   secretEntry.mockReset();
   secretEntry.mockResolvedValue(undefined);
+  secretClear.mockReset();
+  secretClear.mockResolvedValue(false);
   windowOpenHandlers.length = 0;
   menuTemplates.length = 0;
   clipboardWrites.length = 0;
@@ -373,31 +386,45 @@ describe("browser auth popups", () => {
     expect(host.activeTabId).toBe(opener.id);
   });
 
-  it("requires takeover for connected tabs even after the popup closes", async () => {
-    const { opener, outcome } = await popupRequest();
+  function prepareSecret(tabId: string) {
+    return host.prepareSecret({
+      namespace: "openbot_browser",
+      tool: "submit_secret",
+      threadId: "thread-a",
+      ownerAgentId: "agent-a",
+      turnId: "turn",
+      callId: "secret",
+      arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
+    });
+  }
+
+  async function connectedPopup(url: string) {
+    const { opener, outcome } = await popupRequest(url);
     const native = new WebContentsView().webContents;
     Object.defineProperty(native, "opener", { value: {} });
+    Object.assign(native, { url });
     outcome.createWindow?.({ webContents: native });
     const popup = host.listTabs().find((tab) => tab.openerTabId === opener.id);
     if (!popup) throw new Error("Missing popup.");
-    const prepare = (tabId: string) =>
-      host.prepareSecret({
-        namespace: "openbot_browser",
-        tool: "submit_secret",
-        threadId: "thread-a",
-        ownerAgentId: "agent-a",
-        turnId: "turn",
-        callId: "secret",
-        arguments: { tabId, method: "password", targets: [{ kind: "css", selector: "input" }], submission: "on_input" },
-      });
-    await expect(prepare(popup.id)).rejects.toThrow("Use takeover");
-    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
-    await host.close(popup.id);
-    await host.reload(opener.id);
-    await expect(prepare(opener.id)).rejects.toThrow("Use takeover");
+    return { opener, popup, native };
+  }
+
+  it("requires takeover while a connected tab shows the secret's site", async () => {
+    const { opener, popup } = await connectedPopup("https://accounts.example.com/auth");
+    await expect(prepareSecret(popup.id)).rejects.toThrow("Use takeover");
+    await expect(prepareSecret(opener.id)).rejects.toThrow("Use takeover");
     expect(secretEntry).not.toHaveBeenCalled();
-    const independent = await host.open("https://example.com/independent-secret", "thread-a", "agent-a");
-    const prepared = await prepare(independent.id);
+    await host.close(popup.id);
+    const prepared = await prepareSecret(opener.id);
+    prepared.cancel();
+  });
+
+  it("allows secure input in a popup from another site until a connected tab reaches its site", async () => {
+    const { opener, popup } = await connectedPopup("https://appleid.apple.com/auth");
+    const prepared = await prepareSecret(popup.id);
+    await host.loadUrl(opener.id, "https://idmsa.apple.com/start");
+    await expect(prepared.submit("password")).rejects.toThrow("Use takeover");
+    expect(secretEntry).not.toHaveBeenCalled();
     prepared.cancel();
   });
 
@@ -437,7 +464,7 @@ describe("browser auth popups", () => {
   it("explains unsupported popup types", async () => {
     await popupRequest();
     expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "other" }).action).toBe("deny");
-    expect(host.listTabs()[0].popupFailure?.message).toContain("popup type");
+    expect(host.listTabs()[0]?.popupFailure?.message).toContain("popup type");
   });
 
   it("restores safe URLs without claiming to restore live opener relationships", async () => {
@@ -463,7 +490,9 @@ describe("browser auth popups", () => {
     const handler = windowOpenHandlers.at(-1);
     expect(handler?.({ url: "https://example.com/auth" }).action).toBe("deny");
     expect(host.listTabs().at(-1)?.popupFailure?.message).toContain("tab limit");
-    await host.close(host.listTabs()[0].id);
+    const [first] = host.listTabs();
+    assert(first);
+    await host.close(first.id);
     const outcome = handler?.({ url: "https://example.com/auth" });
     expect(outcome?.action).toBe("allow");
     outcome?.createWindow?.({});
@@ -493,6 +522,7 @@ describe("browser tab capacity", () => {
       "The browser can have up to 25 open tabs.",
     );
     const tab = host.listTabs()[0];
+    assert(tab);
     await host.close(tab.id);
     await host.open("https://www.google.com", "thread-a", "agent-a");
     expect(host.listTabs()).toHaveLength(25);
@@ -537,11 +567,32 @@ describe("browser tab capacity", () => {
     await host.destroy();
     host = new BrowserHost(new BrowserWindow(), directory, statePath);
     await host.restore();
-    await vi.waitFor(() => expect(host.getDisplayState()).toEqual(before));
+    const summary = (state: typeof before) =>
+      state.tabs.map(({ id, url, ownerAgentId }) => ({ id, url, ownerAgentId }));
+    expect(summary(host.getDisplayState())).toEqual(summary(before));
     expect(host.activeTabId).toBe(before.activeTabId);
     await expect(host.open("https://www.google.com", "thread-c", "agent-c")).resolves.toMatchObject({
       ownerAgentId: "agent-c",
     });
+  });
+
+  it("loads only the active restored tab until another one is shown", async () => {
+    const tabs = ["a", "b", "c"].map((id) => ({
+      id: `tab-${id}`,
+      url: `https://example.com/${id}`,
+      ownerThreadId: null,
+      ownerAgentId: null,
+    }));
+    await writeFile(statePath, JSON.stringify({ version: 2, tabs, activeTabId: "tab-b" }));
+    await host.restore();
+    const title = (id: string) => host.listTabs().find((tab) => tab.id === id)?.title;
+    await vi.waitFor(() => expect(title("tab-b")).toBe("https://example.com/b"));
+    expect(title("tab-a")).toBe("example.com");
+    expect(title("tab-c")).toBe("example.com");
+
+    await host.activate("tab-c");
+    await vi.waitFor(() => expect(title("tab-c")).toBe("https://example.com/c"));
+    expect(title("tab-a")).toBe("example.com");
   });
 
   it("applies restored limits after resolving legacy owners", async () => {
@@ -885,6 +936,35 @@ describe("secure browser handoff", () => {
     expect(load.mock.calls[0]?.[0]).toBe(tab.url);
     expect(secretEntry).toHaveBeenCalledOnce();
     await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+  });
+
+  it("keeps a same-page sign-in step after clearing the fields and blocks evaluation until navigation", async () => {
+    const { tab, prepared, contents } = await prepare("password", 0);
+    const load = vi.spyOn(contents, "loadURL");
+    secretClear.mockResolvedValue(true);
+    const evaluate = () =>
+      host.handleDynamicTool({
+        namespace: "openbot_browser",
+        tool: "evaluate",
+        arguments: { tabId: tab.id, expression: "document.title" },
+        threadId: "thread",
+        ownerAgentId: "agent",
+        turnId: "turn",
+        callId: "evaluate",
+      });
+    vi.useFakeTimers();
+    const submitted = prepared.submit("fixture-password");
+    await vi.waitFor(() => expect(secretEntry).toHaveBeenCalledWith("fixture-password"));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(submitted).resolves.toBe("submitted");
+    expect(secretClear).toHaveBeenCalledExactlyOnceWith("fixture-password");
+    expect(load).not.toHaveBeenCalled();
+    await expect(host.startView(tab.id, () => undefined)).resolves.toBeTypeOf("function");
+    const blocked = await evaluate();
+    expect(blocked.success).toBe(false);
+    expect(JSON.stringify(blocked)).toContain("received a secret");
+    contents.emit("did-navigate", {}, "https://example.com/account");
+    expect((await evaluate()).success).toBe(true);
   });
 
   it("keeps protection when automatic navigation does not replace the document", async () => {

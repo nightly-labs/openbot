@@ -8,12 +8,12 @@ import type {
   ProviderRuntimeSnapshot,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
+import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
-import { DEFAULT_GENERAL_SETTINGS } from "../src/features/settings/app-settings";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { createMockOpenBot } from "./mock-openbot";
@@ -376,19 +376,17 @@ export const CustomProviderList: Story = {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Manage 2 endpoints" }));
     await expect(body.findByRole("button", { name: "Delete Studio Local" })).resolves.toBeTruthy();
-    // The removal asks first. Storybook has no dialog to answer, so the answer is given here.
-    const previousConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
-      await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
-      await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
-      // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
-      await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
-      await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
-    } finally {
-      window.confirm = previousConfirm;
-    }
+    // The removal asks first, in a confirmation dialog above the list.
+    await userEvent.click(body.getByRole("button", { name: "Delete House Router" }));
+    const first = await body.findByRole("alertdialog", { name: "Remove House Router?" });
+    await userEvent.click(within(first).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(body.queryByRole("button", { name: "Delete House Router" })).toBeNull());
+    await expect(body.getByRole("button", { name: "Delete Studio Local" })).toBeVisible();
+    // The last endpoint leaves the dialog on its empty state rather than closing under the hand.
+    await userEvent.click(body.getByRole("button", { name: "Delete Studio Local" }));
+    const last = await body.findByRole("alertdialog", { name: "Remove Studio Local?" });
+    await userEvent.click(within(last).getByRole("button", { name: "Remove" }));
+    await expect(body.findByText("No custom endpoints yet.")).resolves.toBeTruthy();
   },
 };
 
@@ -419,7 +417,7 @@ export const CodeSignIn: Story = {
   render: () => <SettingsModalStory initialOpen codeSignIn />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "More ways to log in to ChatGPT" }));
+    await userEvent.click(await body.findByRole("button", { name: "More actions for ChatGPT" }));
     await userEvent.click(await body.findByRole("menuitem", { name: "Log in with code" }));
     await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent("KTQ4-B62MX");
   },
@@ -438,9 +436,10 @@ export const ProviderDownloads: Story = {
 /** The durable surface: the update the toast offers is still here after the toast is gone. */
 export const ProviderUpdateAvailable: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate />,
-  play: async () => {
+  play: async ({ userEvent }) => {
     const body = within(document.body);
-    await expect(body.findByRole("button", { name: "Update Claude to 2.1.250" })).resolves.toBeEnabled();
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await expect(body.findByRole("menuitem", { name: "Update to 2.1.250" })).resolves.toBeEnabled();
   },
 };
 
@@ -448,7 +447,8 @@ export const ProviderUpdateFromSettings: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate />,
   play: async ({ userEvent }) => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole("button", { name: "Update Claude to 2.1.250" }));
+    await userEvent.click(await body.findByRole("button", { name: "More actions for Claude" }));
+    await userEvent.click(await body.findByRole("menuitem", { name: "Update to 2.1.250" }));
     await expect(body.findByText("Updating Claude")).resolves.toBeInTheDocument();
     await expect(body.findByText("Claude is up to date", undefined, { timeout: 8_000 })).resolves.toBeInTheDocument();
   },
@@ -463,6 +463,15 @@ export const Profile: Story = {
   play: async ({ userEvent }) => {
     const body = within(document.body);
     await userEvent.click(await body.findByRole("tab", { name: "Profile" }));
+  },
+};
+
+export const DynamicIsland: Story = {
+  render: () => <SettingsModalStory initialOpen />,
+  play: async ({ userEvent }) => {
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole("tab", { name: "Dynamic Island" }));
+    await expect(body.findByRole("slider", { name: "Width" })).resolves.toBeEnabled();
   },
 };
 

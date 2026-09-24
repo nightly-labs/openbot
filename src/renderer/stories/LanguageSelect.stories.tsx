@@ -1,6 +1,3 @@
-import { createSignal } from "solid-js";
-import { expect, within } from "storybook/test";
-import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
   Heading,
   Item,
@@ -10,7 +7,10 @@ import {
   ItemGroup,
   ItemTitle,
   SettingsSection,
-} from "../src/components/ui";
+} from "@openbot/ui";
+import { createSignal } from "solid-js";
+import { expect, within } from "storybook/test";
+import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { AppLanguage } from "../src/features/settings/app-languages";
 import { LanguageSelect } from "../src/features/settings/LanguageSelect";
 
@@ -57,7 +57,8 @@ export const Gallery: Story = {
   ),
   play: async ({ canvas, userEvent }) => {
     // The trigger reads its label and its value, so match the start of the name.
-    const trigger = canvas.getAllByRole("button", { name: /^Language/ })[0];
+    const [trigger] = canvas.getAllByRole("button", { name: /^Language/ });
+    if (!trigger) throw new Error("Language trigger is missing.");
     await userEvent.click(trigger);
     const body = within(document.body);
     await userEvent.click(await body.findByRole("option", { name: "日本語" }));

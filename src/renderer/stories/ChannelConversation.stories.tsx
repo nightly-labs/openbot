@@ -1,16 +1,16 @@
+import { ArrowUp, Button, Plus, X } from "@openbot/ui";
+import type { AgentMessage } from "@openbot/ui/data";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import type { JSX } from "@solidjs/web";
 import { createStore, For, Show } from "solid-js";
 import { expect, fn, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { ArrowUp, Button, Plus, X } from "../src/components/ui";
-import type { AgentMessage } from "../src/data";
-import { ChannelActivityIndicator, type ChannelWorker } from "../src/features/channels/ChannelActivityIndicator";
-import { ChannelStoppedTasks } from "../src/features/channels/ChannelStoppedTasks";
-import { ChatMessageRow } from "../src/features/conversation/ChatMessageRow";
-import { ComposerEditor } from "../src/features/conversation/ComposerEditor";
-import { MessageActions } from "../src/features/conversation/MessageRendering";
-import { UnreadMessagesDivider } from "../src/features/conversation/UnreadMessages";
-import { STORY_AGENTS } from "./fixtures";
+import { requireFixture, STORY_AGENTS } from "./fixtures";
 
 /*
  * The channel transcript, drawn from the shared row.
@@ -27,7 +27,9 @@ import { STORY_AGENTS } from "./fixtures";
  * agree.
  */
 
-const [chief, sales, research] = STORY_AGENTS;
+const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
+const sales = requireFixture(STORY_AGENTS[1], "Story agent 1");
+const research = requireFixture(STORY_AGENTS[2], "Story agent 2");
 
 interface Row {
   id: string;
@@ -159,8 +161,10 @@ export const ChannelTranscriptWithSeveralAuthors: Story = {
   play: async ({ canvas }) => {
     const chiefMessages = await canvas.findAllByRole("article", { name: `Message from ${chief.name}` });
     await expect(chiefMessages).toHaveLength(2);
-    await expect(within(chiefMessages[0]).getByText("11:12 PM")).toBeInTheDocument();
-    await expect(within(chiefMessages[1]).queryByText("11:13 PM")).not.toBeInTheDocument();
+    const [firstChiefMessage, secondChiefMessage] = chiefMessages;
+    if (!firstChiefMessage || !secondChiefMessage) throw new Error("Chief messages are missing.");
+    await expect(within(firstChiefMessage).getByText("11:12 PM")).toBeInTheDocument();
+    await expect(within(secondChiefMessage).queryByText("11:13 PM")).not.toBeInTheDocument();
     const ownMessage = await canvas.findByRole("article", { name: "Message from You" });
     await expect(within(ownMessage).getByText("12:59 PM")).toBeInTheDocument();
     // The label after the colon shifts on every turn, the way it does in the agent chat, so the

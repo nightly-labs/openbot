@@ -158,6 +158,7 @@ export async function exportDiagnostics(
       tabCount: context.browser.listTabs().length,
       activeControlCount: context.browser.getControlState().sessions.length,
     },
+    memory: readMemoryDiagnostics(),
     update: {
       phase: update.phase,
       currentVersion: update.currentVersion,
@@ -175,6 +176,30 @@ export async function exportDiagnostics(
     mode: 0o600,
   });
   return { saved: true };
+}
+
+const KB_PER_MB = 1_024;
+const BYTES_PER_MB = 1_024 * 1_024;
+
+/**
+ * Memory of the Electron processes and the main process heap, in MB. Provider CLIs are not Electron
+ * processes, so `getAppMetrics` leaves them out; each one reports as its own OS process.
+ */
+function readMemoryDiagnostics() {
+  const usage = process.memoryUsage();
+  return {
+    mainProcess: {
+      rssMb: Math.round(usage.rss / BYTES_PER_MB),
+      heapUsedMb: Math.round(usage.heapUsed / BYTES_PER_MB),
+      heapTotalMb: Math.round(usage.heapTotal / BYTES_PER_MB),
+      externalMb: Math.round(usage.external / BYTES_PER_MB),
+    },
+    processes: app.getAppMetrics().map((metric) => ({
+      type: metric.type,
+      workingSetMb: Math.round(metric.memory.workingSetSize / KB_PER_MB),
+      peakWorkingSetMb: Math.round(metric.memory.peakWorkingSetSize / KB_PER_MB),
+    })),
+  };
 }
 
 async function chooseExportDestination(

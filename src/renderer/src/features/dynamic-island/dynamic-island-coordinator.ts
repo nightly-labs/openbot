@@ -461,10 +461,17 @@ export function reconcileQueuesWithRuntimeWork(
     if (!existing) continue;
     const active = runtime[agentId]?.deliveries ?? [];
     const activeIds = new Set(active.map((delivery) => delivery.id));
+    const previous = new Map(existing.deliveries.map((delivery) => [delivery.id, delivery]));
     queues[agentId] = {
       ...existing,
       deliveries: [
-        ...active,
+        ...active.map((delivery) => {
+          const prior = previous.get(delivery.id);
+          // A runtime work item has no sender. Keep the queue's sender, or a reload reports a
+          // routine run as a user message and the sidebar mark disappears.
+          if (!prior) return delivery;
+          return { ...prior, status: delivery.status, turnId: delivery.turnId, error: delivery.error };
+        }),
         ...existing.deliveries.filter(
           (delivery) =>
             ((delivery.status !== "starting" && delivery.status !== "running") ||

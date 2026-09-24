@@ -1,3 +1,8 @@
+import type {
+  HostedSiteSummary as HostedSiteClientSummary,
+  HostedSiteFramework,
+  HostedSiteStatus,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { hmacSha256, sha256 } from "./crypto";
 import {
@@ -14,9 +19,9 @@ interface SiteRow {
   hostname: string;
   title: string;
   description: string;
-  framework: "vanilla" | "astro";
+  framework: HostedSiteFramework;
   spa_fallback: number;
-  status: "uploading" | "active" | "deleted" | "expired" | "blocked";
+  status: "uploading" | HostedSiteStatus;
   current_deployment_id: string | null;
   created_at: number;
   updated_at: number;
@@ -46,18 +51,9 @@ interface DeploymentRow {
   upload_bytes_claimed: number;
 }
 
-export interface HostedSiteSummary {
-  id: string;
-  hostname: string;
-  url: string;
-  title: string;
-  description: string;
-  framework: "vanilla" | "astro";
+/** The desktop summary, plus `uploading`: an upload session reports it for a new site. */
+export interface HostedSiteSummary extends Omit<HostedSiteClientSummary, "status"> {
   status: SiteRow["status"];
-  fileCount: number;
-  size: number;
-  expiresAt: string | null;
-  updatedAt: string;
 }
 
 export interface HostedSiteUploadSession {
@@ -282,10 +278,10 @@ export class HostedSiteService {
     }
     const [siteInsert, deploymentInsert, hostnameReservation, creationEvent] = results;
     if (
-      siteInsert.meta.changes !== 1 ||
-      deploymentInsert.meta.changes !== 1 ||
-      hostnameReservation.meta.changes !== 1 ||
-      creationEvent.meta.changes !== 1
+      batchResult(siteInsert).meta.changes !== 1 ||
+      batchResult(deploymentInsert).meta.changes !== 1 ||
+      batchResult(hostnameReservation).meta.changes !== 1 ||
+      batchResult(creationEvent).meta.changes !== 1
     ) {
       const currentUploads = await this.database
         .prepare(
@@ -545,7 +541,7 @@ export class HostedSiteService {
           );
         }
         const results = await this.database.batch(statements);
-        const deploymentIds = deploymentResultIds(results[1]);
+        const deploymentIds = deploymentResultIds(batchResult(results[1]));
         await this.publishAuthoritativeRoute(site.id);
         try {
           await this.deleteBlockMarker(site.id, site.hostname);
@@ -639,7 +635,7 @@ export class HostedSiteService {
       if (blocked) await this.bucket.delete(blockKey(site.hostname)).catch(() => undefined);
       throw error;
     }
-    if (results[0].meta.changes !== 1) {
+    if (batchResult(results[0]).meta.changes !== 1) {
       if (blocked) await this.bucket.delete(blockKey(site.hostname)).catch(() => undefined);
       const current = await this.siteById(site.id);
       if (current?.status === "deleted" || current?.status === "expired") throw inactiveSiteError(current.status);
@@ -647,7 +643,7 @@ export class HostedSiteService {
       throw new HostedSiteInputError(409, "site_not_active", "This site cannot be blocked or unblocked.");
     }
     await this.reconcileRouteAndMarker(site.id);
-    for (const deploymentId of deploymentResultIds(results[1])) {
+    for (const deploymentId of deploymentResultIds(batchResult(results[1]))) {
       await this.deleteDeployment(site.id, deploymentId);
     }
   }
@@ -749,7 +745,7 @@ export class HostedSiteService {
             )
             .bind(site.id, site.id),
         ]);
-        if (results[0].meta.changes !== 1) continue;
+        if (batchResult(results[0]).meta.changes !== 1) continue;
         expiredSites += 1;
         try {
           await this.publishAuthoritativeRoute(site.id);
@@ -889,7 +885,7 @@ export class HostedSiteService {
         )
         .bind(site.id, deployment.id, previousDeployment, site.id, userId, deployment.id),
     ]);
-    if (results[3].meta.changes !== 1) {
+    if (batchResult(results[3]).meta.changes !== 1) {
       const currentSite = await this.requireOwnedSite(userId, site.id, true);
       const currentDeployment = await this.requireDeployment(userId, deployment.id);
       const alreadyActive =
@@ -920,7 +916,7 @@ export class HostedSiteService {
     if (previousDeployment && previousDeployment !== deployment.id) {
       await this.deleteDeployment(site.id, previousDeployment);
     }
-    for (const abandonedDeploymentId of deploymentResultIds(results[4])) {
+    for (const abandonedDeploymentId of deploymentResultIds(batchResult(results[4]))) {
       await this.deleteDeployment(site.id, abandonedDeploymentId);
     }
     return summary;
@@ -1084,8 +1080,8 @@ export class HostedSiteService {
         .prepare("SELECT COUNT(*) AS count FROM site_creation_events WHERE user_id = ? AND created_at > ?")
         .bind(userId, now - 86_400_000),
     ]);
-    const hourCount = creationCount(hour.results?.[0]);
-    const dayCount = creationCount(day.results?.[0]);
+    const hourCount = creationCount(batchResult(hour).results?.[0]);
+    const dayCount = creationCount(batchResult(day).results?.[0]);
     if (hourCount >= HOSTED_SITE_LIMITS.creationsPerHour || dayCount >= HOSTED_SITE_LIMITS.creationsPerDay) {
       throw new HostedSiteInputError(
         429,
@@ -1453,6 +1449,12 @@ function isStoredManifestFile(value: unknown): value is HostedSiteFileManifest {
 
 function creationCount(value: unknown): number {
   return isDynamicRecord(value) && isNumber(value.count) ? value.count : 0;
+}
+
+// D1 returns one result for each batch statement, so a missing one is a driver fault.
+function batchResult(result: D1Result<unknown> | undefined): D1Result<unknown> {
+  if (!result) throw new Error("The database batch result is missing.");
+  return result;
 }
 
 function deploymentResultIds(result: D1Result<unknown>): string[] {

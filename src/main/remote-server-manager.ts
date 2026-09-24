@@ -30,6 +30,7 @@ import type {
   MarkDirectReadInput,
   RemoteDesktopSession,
   SendDirectMessageInput,
+  ServerNotificationLevel,
   ServerSummary,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -134,6 +135,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #getLocalHostId: () => string | null;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selectChain = Promise.resolve();
+  #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     path: string,
@@ -235,6 +237,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
+      if (code === "host_unavailable") this.#events.markHostOffline(serverId);
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
     });
@@ -255,6 +258,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   async initialize(): Promise<void> {
     await this.#store.load();
+    this.#scheduleMuteExpiry();
     if (this.#webrtcTransport) await this.#syncWebRtcHosts().catch(() => undefined);
     for (const server of this.#store.servers) {
       this.#connections.setState(server.id, "offline");
@@ -265,7 +269,30 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   list(): ServerSummary[] {
     return remoteServerSummaries(this.#store.servers, this.#store.activeServerId, (serverId) =>
       this.#connections.statusFor(serverId),
-    ).map((server) => ({ ...server, notificationsMuted: this.#store.isMuted(server.id) }));
+    ).map((server) => {
+      const mute = this.#store.muteState(server.id);
+      return {
+        ...server,
+        notificationsMuted: mute.muted,
+        notificationsMutedUntil: mute.mutedUntil,
+        notificationLevel: this.#store.notificationLevel(server.id),
+      };
+    });
+  }
+
+  /**
+   * The account service says this user's server list changed, and it reached this computer through
+   * Signal rather than through a poll. The refresh itself belongs to the caller that owns the
+   * account check, so this only says the stored list can no longer be trusted.
+   */
+  invalidateDirectory(): void {
+    this.#events.retryOfflineHosts();
+    this.emit("directoryInvalidated");
+  }
+
+  /** Without app focus, an offline host retries rarely; with focus, it retries at once and then normally. */
+  setAppFocused(focused: boolean): void {
+    this.#events.setAppFocused(focused);
   }
 
   async syncRemoteHosts(): Promise<ServerSummary[]> {
@@ -322,10 +349,34 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return operation;
   }
 
-  async setMuted(serverId: string, muted: boolean): Promise<ServerSummary[]> {
-    await this.#store.setMuted(serverId, muted);
+  // No duration mutes until the user unmutes.
+  async setMuted(serverId: string, muted: boolean, durationMs?: number): Promise<ServerSummary[]> {
+    await this.#store.setMuted(serverId, muted, durationMs === undefined ? null : Date.now() + durationMs);
+    this.#scheduleMuteExpiry();
     this.#emitChanged();
     return this.list();
+  }
+
+  async setNotificationLevel(serverId: string, level: ServerNotificationLevel): Promise<ServerSummary[]> {
+    await this.#store.setNotificationLevel(serverId, level);
+    this.#emitChanged();
+    return this.list();
+  }
+
+  // The rail shows a muted server until its timed mute ends, so the end has to reach the renderer as a
+  // change. One timer covers the earliest end; each run schedules the next one.
+  #scheduleMuteExpiry(): void {
+    if (this.#muteExpiryTimer) clearTimeout(this.#muteExpiryTimer);
+    this.#muteExpiryTimer = null;
+    const expiry = this.#store.nextMuteExpiry();
+    if (expiry === null) return;
+    // setTimeout overflows above 2^31-1 ms; a later run reschedules until the end is reached.
+    const delay = Math.min(Math.max(expiry - Date.now(), 0) + 1, 2_147_483_647);
+    this.#muteExpiryTimer = setTimeout(() => {
+      this.#scheduleMuteExpiry();
+      this.#emitChanged();
+    }, delay);
+    this.#muteExpiryTimer.unref?.();
   }
 
   async reorder(serverIds: string[]): Promise<ServerSummary[]> {

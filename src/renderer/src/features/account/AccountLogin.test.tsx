@@ -1,8 +1,8 @@
 import type { CentralAuthState } from "@openbot/contracts/ipc";
+import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
-import { AccountLogin } from "./AccountLogin";
 
 function codeSentState(overrides: Partial<Extract<CentralAuthState, { status: "code_sent" }>> = {}): CentralAuthState {
   const now = Date.now();

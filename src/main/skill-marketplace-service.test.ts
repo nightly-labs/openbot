@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { zipSync } from "fflate";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
 import { CentralAuthManager } from "./central-auth-manager";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 
@@ -123,7 +123,9 @@ describe("SkillMarketplaceService", () => {
       "This skill needs repair before it can be disabled.",
     );
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe(skillContents);
-    expect((await service.listInstalled(agent.id))[0].enabled).not.toBe(false);
+    const [installed] = await service.listInstalled(agent.id);
+    assert(installed);
+    expect(installed.enabled).not.toBe(false);
     await writeFile(agentsSkill, skillContents);
     await writeFile(claudeSkill, "Claude edits");
     const agentsReference = join(
@@ -185,7 +187,10 @@ describe("SkillMarketplaceService", () => {
     await writeFile(claudeSkill, "Unowned files after disable");
     await service.uninstall({ agentId: agent.id, skillId: "skill-1" });
     await expect(readFile(claudeSkill, "utf8")).resolves.toBe("Unowned files after disable");
-    await expect(service.listInstalled(agent.id)).resolves.toEqual([]);
+    // The files the user kept are still in a folder the provider reads, so the list shows them.
+    await expect(service.listInstalled(agent.id)).resolves.toEqual([
+      expect.objectContaining({ origin: "workspace", location: ".claude/skills/release-notes" }),
+    ]);
   });
   /*
    * A plugin listing pins the version of each skill it brings, so the install must ask for that

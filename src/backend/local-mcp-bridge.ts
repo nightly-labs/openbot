@@ -159,8 +159,8 @@ export class LocalMcpBridge {
           content.push({ type: "text", text: item.text });
           continue;
         }
-        const match = item.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
-        if (match) content.push({ type: "image", mimeType: match[1], data: match[2] });
+        const [, mimeType, data] = item.imageUrl.match(/^data:([^;]+);base64,(.+)$/s) ?? [];
+        if (mimeType !== undefined && data !== undefined) content.push({ type: "image", mimeType, data });
       }
       return {
         isError: !result.success,

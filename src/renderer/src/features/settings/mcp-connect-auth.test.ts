@@ -4,8 +4,15 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
+import {
+  applyMcpFlow,
+  type McpKeyFlow,
+  mcpFlowComplete,
+  mcpFlowError,
+} from "@openbot/ui/features/settings/mcp-connect-auth";
 import { describe, expect, it } from "vitest";
-import { applyMcpFlow, type McpKeyFlow, mcpFlowComplete } from "./mcp-connect-auth";
+import { createPluginAppConfig, MARKETPLACE_PLUGINS } from "./marketplace-plugin-catalog";
 
 const HTTP: McpServerConfig = {
   id: "",
@@ -68,5 +75,46 @@ describe("mcpFlowComplete", () => {
 
   it("is complete when the flow asks for nothing", () => {
     expect(mcpFlowComplete({ id: "oauth", kind: "link", label: "Sign in" }, {})).toBe(true);
+  });
+});
+
+describe("a link the user brings", () => {
+  const COMPOSIO: McpServerConfig = { ...HTTP, name: "composio", url: "https://composio.dev/", headers: [] };
+  const LINK: McpKeyFlow = {
+    id: "link",
+    kind: "key",
+    label: "MCP link",
+    fields: [
+      { id: "url", label: "MCP URL", url: true },
+      { id: "key", label: "API key", header: "x-api-key", optional: true },
+    ],
+  };
+  const link = "https://backend.composio.dev/v3/mcp/server-id?user_id=me";
+
+  it("connects to the typed link, with the key only when one is given", () => {
+    expect(applyMcpFlow(COMPOSIO, LINK, { url: ` ${link} ` })).toMatchObject({ url: link, headers: [] });
+    expect(applyMcpFlow(COMPOSIO, LINK, { url: link, key: "ak_1" }).headers).toEqual([
+      { key: "x-api-key", value: "ak_1" },
+    ]);
+    expect(mcpFlowComplete(LINK, { url: link })).toBe(true);
+    expect(mcpFlowComplete(LINK, { key: "ak_1" })).toBe(false);
+  });
+
+  it("refuses a link from another host or without https", () => {
+    expect(mcpFlowError(COMPOSIO, LINK, { url: link })).toBeNull();
+    for (const url of ["https://composio.dev.example.com/mcp", "http://backend.composio.dev/mcp", "not a link"]) {
+      expect(mcpFlowError(COMPOSIO, LINK, { url })).toBe("Enter an https link from composio.dev.");
+    }
+  });
+});
+
+describe("isPluginAppConfig with a link the user brings", () => {
+  const app = MARKETPLACE_PLUGINS.find((plugin) => plugin.slug === "composio")?.apps[0];
+
+  it("owns the user's Composio link, and not a server of the same name elsewhere", () => {
+    if (!app) throw new Error("The catalog has no Composio listing.");
+    const saved = { ...createPluginAppConfig(app), url: "https://backend.composio.dev/v3/mcp/server-id?user_id=me" };
+    expect(isPluginAppConfig(saved, app)).toBe(true);
+    expect(isPluginAppConfig({ ...saved, url: "https://example.com/mcp" }, app)).toBe(false);
   });
 });

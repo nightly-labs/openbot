@@ -16,7 +16,9 @@ import {
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
+import { createReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
+import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
   paragraph: Tokens.Paragraph;
@@ -213,15 +215,19 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
 }
 
 function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation: TextPresentation }) {
-  const lines: Token[][][] = [[[]]];
+  let run: Token[] = [];
+  let line: Token[][] = [run];
+  const lines: Token[][][] = [line];
   for (const token of tokens) {
-    const line = lines[lines.length - 1];
     if (token.type === "br") {
-      lines.push([[]]);
+      run = [];
+      line = [run];
+      lines.push(line);
     } else if (tokenIs(token, "codespan")) {
-      line.push([token], []);
+      run = [];
+      line.push([token], run);
     } else {
-      line[line.length - 1].push(token);
+      run.push(token);
     }
   }
   const source = (run: Token[]) => run.map((token) => token.raw).join("");
@@ -231,8 +237,8 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
         // Multiline chips must participate in flex layout, not sit inside a fixed-height native text line.
         <View key={lineOffset} className="min-w-0 flex-row flex-wrap items-center gap-y-1">
           {sourceEntries(line, source).map(({ value: run, offset }) => {
-            if (!run.length) return null;
-            const token = run[0];
+            const [token] = run;
+            if (!token) return null;
             if (tokenIs(token, "codespan")) {
               return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
             }
@@ -399,6 +405,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact = false,
   streaming = false,
   animationEnabled = true,
+  playback,
   selectable = true,
   agents = [],
 }: {
@@ -407,17 +414,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   compact?: boolean;
   streaming?: boolean;
   animationEnabled?: boolean;
+  playback?: ReplyPlayback;
   selectable?: boolean;
   agents?: readonly MobileAgent[];
 }) {
   const reducedMotion = useReducedMotion();
   const { fontScale } = useWindowDimensions();
   const tokens = useMemo(() => parseChatMarkdown(body), [body]);
+  const reveal = useMemo(() => createReplyReveal(tokens), [tokens]);
+  const visibleTokens = useReplyPlayback(reveal, playback);
   const codeColor = useThemeColor("foreground");
   return (
     <StreamRevealProvider>
       <MarkdownBlocks
-        tokens={tokens}
+        tokens={visibleTokens}
         presentation={{
           selectable,
           type: compact ? "body-sm" : "body",
@@ -425,7 +435,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           codeColor,
           agents,
           mentionOffset: 4 * fontScale,
-          animateTail: streaming && animationEnabled && !reducedMotion,
+          animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
         }}
       />
     </StreamRevealProvider>

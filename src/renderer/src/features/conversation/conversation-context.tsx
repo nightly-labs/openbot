@@ -6,6 +6,8 @@ import type {
   ConversationReadState,
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
@@ -17,8 +19,6 @@ import {
   withoutAgent,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
-import type { AgentMessage } from "../../data";
-import { errorMessage } from "../../error-message";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -39,6 +39,7 @@ import {
   promptRequestKey,
 } from "./conversation-keys";
 import { mergeConversationPage, windowedSnapshotMessages } from "./conversation-merge";
+import { conversationPort } from "./conversation-port";
 import {
   decideAgentAutoRead,
   latestIncomingConversationMessage,
@@ -48,6 +49,15 @@ import {
   retainedAutoReadState,
 } from "./conversation-read-state";
 import { useDirectMessages } from "./direct-messages-context";
+
+const LATEST_PAGE_SIZE = 50;
+
+function trimToLatestPage(conversation: ConversationState): void {
+  if (conversation.messages.length <= LATEST_PAGE_SIZE) return;
+  conversation.messages = conversation.messages.slice(-LATEST_PAGE_SIZE);
+  conversation.references = {};
+  conversation.page = { hasOlder: true, olderCursor: null };
+}
 
 interface ConversationState {
   messages: AgentMessage[];
@@ -159,8 +169,8 @@ const Conversation = createSimpleContext({
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
         conversationPageRequests.set(agentId, pageRequest);
-        void window.openbot.agent
-          .readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
+        void conversationPort()
+          .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 50 }, serverId)
           .then((page) => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
             const pageApplied = applyConversationPage(page, "replace", "latest");
@@ -339,8 +349,8 @@ const Conversation = createSimpleContext({
           applyConversationReadState(agentId, fallbackState);
         }
       };
-      void window.openbot.agent
-        .readConversationPage({ agentId, anchor: { type: "latest" }, limit: 1 }, serverId)
+      void conversationPort()
+        .agent.readConversationPage({ agentId, anchor: { type: "latest" }, limit: 1 }, serverId)
         .then((page) => {
           if (
             !scopeIsCurrent() ||
@@ -497,6 +507,9 @@ const Conversation = createSimpleContext({
           return;
         }
         conversation.messages = next;
+        // A snapshot carries the whole thread. An agent that is not open shows none of it, and
+        // opening it reads the latest page again, so only that page's worth stays in memory.
+        if (agentId !== activeAgentId()) trimToLatestPage(conversation);
       });
       const presentedRequestKey = presentedPromptResolutions()[agentId];
       const pendingPrompt = pendingPrompts()[agentId];
@@ -611,7 +624,7 @@ const Conversation = createSimpleContext({
         conversation.olderError = null;
       });
       try {
-        const page = await window.openbot.agent.readConversationPage({
+        const page = await conversationPort().agent.readConversationPage({
           agentId,
           anchor: { type: "before", cursor },
           limit: 50,
@@ -639,7 +652,7 @@ const Conversation = createSimpleContext({
     ): Promise<{ messageIds: string[]; total: number }> {
       const analytics = desktopAnalytics.scope();
       try {
-        const page = await window.openbot.agent.searchConversationMessages({ query, agentId, limit: 100 });
+        const page = await conversationPort().agent.searchConversationMessages({ query, agentId, limit: 100 });
         analytics.track("search_action", { scope: "agent", result: "succeeded", result_count: page.total });
         return { messageIds: page.results.map((result) => result.message.id), total: page.total };
       } catch (error) {
@@ -650,19 +663,14 @@ const Conversation = createSimpleContext({
 
     function pruneInactiveAgentHistory(agentId: string): void {
       const messages = conversations[agentId]?.messages;
-      if (!messages || messages.length <= 50) return;
-      updateConversation(agentId, (conversation) => {
-        if (conversation.messages.length <= 50) return;
-        conversation.messages = conversation.messages.slice(-50);
-        conversation.references = {};
-        conversation.page = { hasOlder: true, olderCursor: null };
-      });
+      if (!messages || messages.length <= LATEST_PAGE_SIZE) return;
+      updateConversation(agentId, trimToLatestPage);
     }
 
     async function loadLatestAgentMessages(agentId: string): Promise<void> {
       const request = (conversationPageRequests.get(agentId) ?? 0) + 1;
       conversationPageRequests.set(agentId, request);
-      const page = await window.openbot.agent.readConversationPage({
+      const page = await conversationPort().agent.readConversationPage({
         agentId,
         anchor: { type: "latest" },
         limit: 50,
@@ -674,7 +682,7 @@ const Conversation = createSimpleContext({
     async function loadAgentMessagePage(agentId: string, messageId: string): Promise<ConversationPage | null> {
       const request = (conversationPageRequests.get(agentId) ?? 0) + 1;
       conversationPageRequests.set(agentId, request);
-      const page = await window.openbot.agent.readConversationPage({
+      const page = await conversationPort().agent.readConversationPage({
         agentId,
         anchor: { type: "around", messageId },
         limit: 50,
@@ -730,7 +738,7 @@ const Conversation = createSimpleContext({
           attachmentDraftIds,
           ...(replyToMessageId ? { replyToMessageId } : {}),
         };
-        const receipt = await window.openbot.agent.sendMessage(input, serverId);
+        const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
         setUiErrors((current) => ({ ...current, [errorKey]: [] }));
         analytics.track("message_send", {
@@ -781,7 +789,7 @@ const Conversation = createSimpleContext({
       const operation: Promise<void> = previousOperation
         .catch(() => undefined)
         .then(async () => {
-          const state: ConversationReadState = await window.openbot.agent.markConversationRead(
+          const state: ConversationReadState = await conversationPort().agent.markConversationRead(
             {
               agentId,
               throughMessageId: boundary,

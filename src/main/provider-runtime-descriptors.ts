@@ -10,20 +10,51 @@ import {
   parseGrokVersion,
   parseOpencodeVersion,
 } from "../backend/cli";
-import { assertSafeArchive, extractArchive, rejectNonRegularFiles, sha256File } from "./provider-runtime-archive";
+import { sha256File } from "../backend/file-hash";
+import { assertSafeArchive, extractArchive, rejectNonRegularFiles } from "./provider-runtime-archive";
 
-export type RuntimeTarget = "darwin-arm64" | "linux-x64" | "win32-x64";
+export type RuntimeTarget = "darwin-arm64" | "linux-x64" | "linux-arm64" | "win32-x64";
+
+/** A hash of the download, in the algorithm its source publishes. */
+export interface ArchiveDigest {
+  algorithm: "sha256" | "sha512";
+  hex: string;
+}
+
+/**
+ * Where a version came from, which decides what vouches for its bytes.
+ *
+ * `lock` is the version this build carries in `native-runtime.lock.json`: every file has a hash the
+ * repository reviewed. `latest` is a release found upstream after the build: the download has the
+ * hash its source publishes, and the installed files have the hashes recorded when they were
+ * installed (see `INSTALL_RECORD`).
+ */
+export type RuntimeSource = "lock" | "latest";
 
 export interface RuntimeSpec {
   runtime: ManagedRuntimeId;
   version: string;
+  /** The version the package inside the download carries. Claude's is the SDK version, not the CLI's. */
+  packageVersion: string;
+  source: RuntimeSource;
   target: RuntimeTarget;
   url: string;
-  archiveSha256: string;
+  /** `null` only where the source publishes no hash: Grok's latest release is trusted on TLS alone. */
+  archiveDigest: ArchiveDigest | null;
   downloadBytes: number;
   installedBytes: number;
   executableName: string;
 }
+
+/**
+ * The file an install from an upstream release writes beside its files, naming each one's SHA-256.
+ *
+ * The lock cannot vouch for a version it has never seen, so what was verified at install time is
+ * written down and checked on every start, as the lock's hashes are for a pinned version. It guards
+ * against a damaged or replaced install, not against a writer who can change the record as well:
+ * the store is the user's, and anything that can write to it can already run as the user.
+ */
+export const INSTALL_RECORD = "openbot-install.json";
 
 /** Everything a staging step may use. `downloadSmallFile` is passed in so fetching stays private
  *  to the manager: a descriptor can ask for a checksummed LICENSE, and nothing else. */
@@ -34,7 +65,8 @@ export interface ProviderStageContext {
   /** The directory the descriptor fills, renamed into place by the manager once it verifies. */
   readonly staging: string;
   readonly lock: AgentRuntimeLock;
-  downloadSmallFile(url: string, expectedSha256: string): Promise<Uint8Array>;
+  /** `expectedSha256` is `null` for a file of an upstream release, which the lock has no hash for. */
+  downloadSmallFile(url: string, expectedSha256: string | null): Promise<Uint8Array>;
 }
 
 /**
@@ -52,12 +84,17 @@ export interface ProviderRuntimeDescriptor {
   spec(target: RuntimeTarget, lock: AgentRuntimeLock): RuntimeSpec;
   /** Fill `staging` with the installed layout: `bin/<executable>`, licences and the manifest. */
   stage(context: ProviderStageContext): Promise<void>;
-  /** Check an installed layout beyond the shared executable and `--version` checks. */
+  /** Check a pinned install against the lock, beyond the shared executable and `--version` checks. */
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Promise<void>;
   parseVersion(output: string): string;
 }
 
 const CODEX_ARCHIVE_ROOTS = ["bin", "codex-package.json", "codex-path", "codex-resources"];
+
+/** The lock's hash for a file of a pinned version; an upstream release's file has none to compare. */
+function pinnedHash(spec: RuntimeSpec, sha256: string): string | null {
+  return spec.source === "lock" ? sha256 : null;
+}
 
 /**
  * The name Bun answers `npx`-shaped arguments under. Bun decides what it is from `argv[0]`, so the
@@ -91,20 +128,22 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         runtime: "codex",
         target,
         version: lock.codex.version,
+        packageVersion: lock.codex.version,
+        source: "lock",
         url: `${lock.codex.repository}/releases/download/${encodeURIComponent(lock.codex.tag)}/${artifact.asset}`,
-        archiveSha256: artifact.assetSha256,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
         downloadBytes: artifact.downloadBytes,
         installedBytes: artifact.installedBytes,
         executableName: target === "win32-x64" ? "codex.exe" : "codex",
       };
     },
-    stage: async ({ downloadedPath, staging, lock, downloadSmallFile }) => {
+    stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
       await assertSafeArchive(downloadedPath, CODEX_ARCHIVE_ROOTS, "The Codex archive has an unexpected path.");
       await extractArchive(downloadedPath, staging);
       await rejectNonRegularFiles(staging);
       const license = await downloadSmallFile(
-        `${lock.codex.repository}/raw/${encodeURIComponent(lock.codex.tag)}/LICENSE`,
-        lock.codex.licenseSha256,
+        `${lock.codex.repository}/raw/${encodeURIComponent(codexTag(spec.version))}/LICENSE`,
+        pinnedHash(spec, lock.codex.licenseSha256),
       );
       await writeFile(join(staging, "LICENSE"), license);
     },
@@ -128,8 +167,10 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         runtime: "claude",
         target,
         version: lock.claude.version,
+        packageVersion: lock.claude.sdkVersion,
+        source: "lock",
         url: `${lock.claude.registry}/${artifact.package}/-/${artifact.asset}`,
-        archiveSha256: artifact.assetSha256,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
         downloadBytes: artifact.downloadBytes,
         installedBytes: artifact.installedBytes,
         executableName: artifact.executable,
@@ -149,7 +190,7 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         if (
           !isDynamicRecord(packageManifest) ||
           packageManifest.name !== artifact.package ||
-          packageManifest.version !== lock.claude.sdkVersion
+          packageManifest.version !== spec.packageVersion
         ) {
           throw new Error("The Claude package does not match the runtime catalog.");
         }
@@ -161,8 +202,8 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
             join(staging, "claude-package.json"),
             `${JSON.stringify({
               layoutVersion: 1,
-              version: lock.claude.version,
-              sdkVersion: lock.claude.sdkVersion,
+              version: spec.version,
+              sdkVersion: spec.packageVersion,
               target: spec.target,
               executable: `bin/${artifact.executable}`,
             })}\n`,
@@ -192,8 +233,10 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         runtime: "opencode",
         target,
         version: lock.opencode.version,
+        packageVersion: lock.opencode.version,
+        source: "lock",
         url: `${lock.opencode.registry}/${artifact.package}/-/${artifact.asset}`,
-        archiveSha256: artifact.assetSha256,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
         downloadBytes: artifact.downloadBytes,
         installedBytes: artifact.installedBytes,
         executableName: artifact.executable,
@@ -213,14 +256,14 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         if (
           !isDynamicRecord(packageManifest) ||
           packageManifest.name !== artifact.package ||
-          packageManifest.version !== lock.opencode.version
+          packageManifest.version !== spec.packageVersion
         ) {
           throw new Error("The OpenCode package does not match the runtime catalog.");
         }
         // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
         const license = await downloadSmallFile(
-          `${lock.opencode.repository}/raw/v${lock.opencode.version}/LICENSE`,
-          lock.opencode.licenseSha256,
+          `${lock.opencode.repository}/raw/v${spec.version}/LICENSE`,
+          pinnedHash(spec, lock.opencode.licenseSha256),
         );
         await mkdir(join(staging, "bin"), { recursive: true });
         await Promise.all([
@@ -230,7 +273,7 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
             join(staging, "opencode-package.json"),
             `${JSON.stringify({
               layoutVersion: 1,
-              version: lock.opencode.version,
+              version: spec.version,
               target: spec.target,
               executable: `bin/${artifact.executable}`,
             })}\n`,
@@ -261,8 +304,10 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         runtime: "grok",
         target,
         version: lock.grok.version,
+        packageVersion: lock.grok.version,
+        source: "lock",
         url: `${lock.grok.distribution}/${artifact.asset}`,
-        archiveSha256: artifact.assetSha256,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
         downloadBytes: artifact.downloadBytes,
         installedBytes: artifact.installedBytes,
         executableName: artifact.executable,
@@ -313,8 +358,10 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
         runtime: "bun",
         target,
         version: lock.bun.version,
+        packageVersion: lock.bun.version,
+        source: "lock",
         url: `${lock.bun.registry}/${artifact.package}/-/${artifact.asset}`,
-        archiveSha256: artifact.assetSha256,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
         downloadBytes: artifact.downloadBytes,
         installedBytes: artifact.installedBytes,
         executableName: artifact.executable,
@@ -383,6 +430,11 @@ export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRunt
     parseVersion: parseBunVersion,
   },
 };
+
+/** Codex tags each release `rust-v<version>`; the lock's `tag` is the same string for its version. */
+export function codexTag(version: string): string {
+  return `rust-v${version}`;
+}
 
 export function providerRuntimeDescriptor(runtime: ManagedRuntimeId): ProviderRuntimeDescriptor {
   return PROVIDER_RUNTIME_DESCRIPTORS[runtime];

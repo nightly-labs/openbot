@@ -119,7 +119,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
     readonly provider: AgentProvider,
     readonly output = provider === "codex" ? "CODEX_DONE" : provider === "grok" ? "GROK_DONE" : "CLAUDE_DONE",
     readonly autoComplete = true,
-    private accountSignedIn = true,
+    public accountSignedIn = true,
     private readonly requestDelays: Readonly<Record<string, number>> = {},
     private readonly requestHook?: (method: string, provider: AgentProvider) => Promise<void>,
   ) {
@@ -179,6 +179,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
           this.provider === "codex"
             ? [
                 "gpt-reserve",
+                "gpt-6-luna",
                 "gpt-5.6-luna",
                 "gpt-5.6-terra",
                 "gpt-5.6-sol",
@@ -192,7 +193,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
               ? [{ model: "opencode/example-model" }]
               : this.provider === "grok"
                 ? ["grok-4.5", "grok-fast"].map((model) => ({ model }))
-                : ["claude-fable-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
+                : ["claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"].map((model) => ({ model })),
       };
     }
     if (method === "model/list" && this.modelList) result = this.modelList(params);
@@ -322,6 +323,20 @@ export async function expectOpenBotToolError(
   const result = await callOpenBotTool(client, threadId, tool, args, turnId);
   expect(result.result).toBeUndefined();
   expect(result.error?.message).toContain(message);
+}
+
+/** A tool that refuses with `openBotToolFailure`: the model reads the reason, no JSON-RPC fault. */
+export async function expectOpenBotToolFailure(
+  client: FakeAgentClient,
+  threadId: string,
+  tool: string,
+  args: unknown,
+  message: string,
+): Promise<void> {
+  const result = await callOpenBotTool(client, threadId, tool, args);
+  expect(result.error).toBeUndefined();
+  expect(paramsRecord(result.result)?.success).toBe(false);
+  expect(openBotToolPayload(result.result).error).toContain(message);
 }
 
 export function notification(method: string, params: unknown): AppServerNotification {

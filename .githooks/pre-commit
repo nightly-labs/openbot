@@ -4,15 +4,56 @@ set -eu
 repository_root=$(git rev-parse --show-toplevel)
 cd "$repository_root"
 
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# Biome fixes the working-tree copy, and staging that copy again would also stage the edits the
+# author left unstaged. Only fully staged files are staged again; a partly staged file that Biome
+# changes stops the commit so the author can choose which fixes to stage.
+git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$work/staged"
+git -c core.quotePath=false diff --name-only >"$work/unstaged"
+grep -Fx -f "$work/unstaged" "$work/staged" >"$work/partly-staged" || true
+grep -Fxv -f "$work/partly-staged" "$work/staged" >"$work/fully-staged" || true
+
+hash_partly_staged() {
+  while IFS= read -r path; do
+    printf '%s %s\n' "$(git hash-object -- "$path" 2>/dev/null || echo missing)" "$path"
+  done <"$work/partly-staged"
+}
+
+hash_partly_staged >"$work/before"
 echo "Running staged format and lint checks..."
 bun run check:staged
+hash_partly_staged >"$work/after"
 
-if git diff --cached --name-only --diff-filter=ACMR | grep -q .; then
-  git diff --cached --name-only -z --diff-filter=ACMR | xargs -0 git add --
+if [ -s "$work/fully-staged" ]; then
+  tr '\n' '\0' <"$work/fully-staged" | xargs -0 git add --
 fi
 
-echo "Running UI foundation check..."
-bun run check:ui
+if ! cmp -s "$work/before" "$work/after"; then
+  echo "Biome fixed files that also have unstaged changes:" >&2
+  diff "$work/before" "$work/after" | sed -n 's/^> [^ ]* /  /p' >&2
+  echo "Stage the fixes you want to commit, then commit again." >&2
+  exit 1
+fi
 
-echo "Running type checks..."
-bun run typecheck
+staged_paths=$(git diff --cached --name-only --diff-filter=ACMRD)
+
+# Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.
+code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|json|jsonc|grit)$|(^|/)bun\.lock$'
+if printf '%s\n' "$staged_paths" | grep -Eq "$code_pattern"; then
+  echo "Running UI foundation check..."
+  bun run check:ui
+
+  echo "Running type checks..."
+  bun run typecheck
+else
+  echo "Skipping UI and type checks: no staged code, style, or configuration files."
+fi
+
+# Migrations cannot be undone on a user's computer, so a schema change runs its parity test here.
+schema_pattern='^src/backend/(openbot-database-schema|openbot-database-schema-parity\.test|channel-schema|mcp-schema)\.ts$|^src/backend/openbot-database-schema-history\.json$'
+if printf '%s\n' "$staged_paths" | grep -Eq "$schema_pattern"; then
+  echo "Running the database schema parity test..."
+  bun run test:desktop -- src/backend/openbot-database-schema-parity.test.ts
+fi

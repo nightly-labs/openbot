@@ -1,5 +1,6 @@
 import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps } from "../conversation-types";
 import { installedSkillsRequestKey } from "../installed-skills-source";
 
@@ -20,7 +21,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
   createEffect(
     () => `${deps.props.server?.id ?? "local"}\0${deps.props.server?.connectionSequence ?? 0}`,
     (source) => {
-      const [serverId, connectionSequenceText] = source.split("\0");
+      const [serverId = "", connectionSequenceText] = source.split("\0");
       const failedAttempt = failedInstalledSkillsAttempt;
       if (
         failedAttempt?.serverId === serverId &&
@@ -37,7 +38,7 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
   );
   createEffect(refreshKey, (source) => {
     const request = ++installedSkillsRequest;
-    const [serverId, agentId, support, visibility] = source.split("\0");
+    const [serverId = "", agentId, support, visibility] = source.split("\0");
     if (!agentId) {
       installedSkillsSourceId = undefined;
       failedInstalledSkillsAttempt = undefined;
@@ -57,8 +58,8 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     }
     const connectionSequence = untrack(() => deps.props.server?.connectionSequence) ?? 0;
     failedInstalledSkillsAttempt = undefined;
-    void window.openbot.agent
-      .listInstalledSkills(agentId)
+    void conversationRuntime(deps.props)
+      .agent.listInstalledSkills(agentId)
       .then((skills) => {
         if (request !== installedSkillsRequest) return;
         failedInstalledSkillsAttempt = undefined;

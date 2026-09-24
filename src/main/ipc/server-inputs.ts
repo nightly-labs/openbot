@@ -7,15 +7,20 @@ import type {
   LoginServerInput,
   MarkDirectReadInput,
   ReadDirectConversationPageInput,
+  RemoteDesktopConnectInput,
+  RemoteDesktopSelectDisplayInput,
   RemoteDesktopSetupAction,
   RemoteDesktopTestInput,
   ReorderServersInput,
   SendDirectMessageInput,
+  SetServerMutedInput,
+  SetServerNotificationLevelInput,
   SetTeamTypingInput,
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { SERVER_MUTE_DURATIONS_MS, SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
+import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -184,12 +189,12 @@ export function parseDirectTyping(value: unknown): DirectTypingInput {
   };
 }
 
-export function parseRemoteDesktopConnect(input: unknown): { serverId: string } {
+export function parseRemoteDesktopConnect(input: unknown): RemoteDesktopConnectInput {
   if (!isObject(input)) throw new Error("Remote control details are required.");
   return { serverId: requireString(input.serverId, "serverId") };
 }
 
-export function parseRemoteDesktopDisplay(input: unknown): { serverId: string; displayId: string } {
+export function parseRemoteDesktopDisplay(input: unknown): RemoteDesktopSelectDisplayInput {
   if (!isObject(input)) throw new Error("Remote display details are required.");
   return {
     serverId: requireString(input.serverId, "serverId"),
@@ -197,9 +202,22 @@ export function parseRemoteDesktopDisplay(input: unknown): { serverId: string; d
   };
 }
 
-export function parseSetServerMuted(value: unknown): { serverId: string; muted: boolean } {
+export function parseSetServerMuted(value: unknown): SetServerMutedInput {
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
-  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), muted: value.muted };
+  const serverId = requireString(value.serverId, "serverId", INPUT_LIMITS.identifier);
+  if (value.durationMs === undefined) return { serverId, muted: value.muted };
+  // Only a mute has an end, and only the menu's durations are accepted.
+  if (!value.muted || !isOneOf(SERVER_MUTE_DURATIONS_MS, value.durationMs)) {
+    throw new Error("Invalid server mute duration.");
+  }
+  return { serverId, muted: true, durationMs: value.durationMs };
+}
+
+export function parseSetServerNotificationLevel(value: unknown): SetServerNotificationLevelInput {
+  if (!isObject(value) || !isOneOf(SERVER_NOTIFICATION_LEVELS, value.level)) {
+    throw new Error("Invalid server notification level.");
+  }
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), level: value.level };
 }
 
 export function parseRemoteDesktopSetupAction(value: unknown): RemoteDesktopSetupAction {

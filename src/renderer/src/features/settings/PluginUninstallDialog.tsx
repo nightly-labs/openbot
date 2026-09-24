@@ -10,12 +10,12 @@
  * or whose skill they already removed by hand, must not promise to remove something that is not
  * there to remove - and an agent whose skills this listing never reached is not named at all.
  *
- * `AlertDialog` rather than `Dialog`: this is a destructive decision with two answers, so Escape and
+ * `ConfirmDialog` rather than `Dialog`: this is a destructive decision with two answers, so Escape and
  * a click outside cancel it, and nothing about it is dismissible while the removal is running.
  */
 
+import { ConfirmDialog, Text } from "@openbot/ui";
 import { For, Show } from "solid-js";
-import { AlertDialog, Blocks, Button, Puzzle, Text, Trash2 } from "../../components/ui";
 
 /** What an uninstall is about to take, as the page found it on this computer. */
 export interface PluginUninstallPlan {
@@ -37,77 +37,43 @@ export function PluginUninstallDialog(props: {
   onCancel: () => void;
 }) {
   return (
-    <AlertDialog.Root
+    <ConfirmDialog
       open={props.open}
-      onOpenChange={(open) => {
-        // A removal that is running is not cancellable: half of it has already happened.
-        if (!open && !props.busy) props.onCancel();
-      }}
+      initialFocus="cancel"
+      // A removal that is running is not cancellable: half of it has already happened.
+      pending={props.busy}
+      title={`Uninstall ${props.plan.pluginName}?`}
+      description={`This removes what ${props.plan.pluginName} installed on this computer. Nothing else on this host or on this agent changes.`}
+      confirmLabel="Uninstall"
+      onCancel={props.onCancel}
+      onConfirm={props.onConfirm}
     >
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay class="plugin-uninstall-backdrop">
-          <AlertDialog.Content class="plugin-uninstall-dialog">
-            <span class="plugin-uninstall-icon" aria-hidden="true">
-              <Trash2 />
-            </span>
-            <AlertDialog.Title>Uninstall {props.plan.pluginName}?</AlertDialog.Title>
-            <AlertDialog.Description>
-              This removes what {props.plan.pluginName} installed on this computer. Nothing else on this host or on this
-              agent changes.
-            </AlertDialog.Description>
+      <Show when={props.plan.appNames.length > 0}>
+        <section aria-label={`Apps to remove, ${props.plan.appNames.length}`}>
+          <Text tone="muted" variant="label-sm">
+            Apps removed from this host
+          </Text>
+          <ul>
+            <For each={props.plan.appNames}>{(name) => <li>{name}</li>}</For>
+          </ul>
+          {/* Said here rather than after the fact: a sign-in the user granted in a browser is
+              dropped with the row, and the next install asks for it again. */}
+          <Text tone="muted" variant="label-sm">
+            Their tools stop being available, and any sign-in OpenBot kept for them is forgotten.
+          </Text>
+        </section>
+      </Show>
 
-            <Show when={props.plan.appNames.length > 0}>
-              <section class="plugin-uninstall-group" aria-label={`Apps to remove, ${props.plan.appNames.length}`}>
-                <Text tone="muted" variant="label-sm">
-                  Apps removed from this host
-                </Text>
-                <ul class="plugin-uninstall-list">
-                  <For each={props.plan.appNames}>
-                    {(name) => (
-                      <li>
-                        <Puzzle aria-hidden="true" />
-                        <Text>{name}</Text>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-                {/* Said here rather than after the fact: a sign-in the user granted in a browser is
-                    dropped with the row, and the next install asks for it again. */}
-                <Text tone="muted" variant="label-sm">
-                  Their tools stop being available, and any sign-in OpenBot kept for them is forgotten.
-                </Text>
-              </section>
-            </Show>
-
-            <Show when={props.plan.skillSlugs.length > 0}>
-              <section class="plugin-uninstall-group" aria-label={`Skills to remove, ${props.plan.skillSlugs.length}`}>
-                <Text tone="muted" variant="label-sm">
-                  Skills removed from {props.plan.agentName}
-                </Text>
-                <ul class="plugin-uninstall-list">
-                  <For each={props.plan.skillSlugs}>
-                    {(slug) => (
-                      <li>
-                        <Blocks aria-hidden="true" />
-                        <Text>{slug}</Text>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </section>
-            </Show>
-
-            <div class="plugin-uninstall-actions">
-              <Button type="button" variant="outline" disabled={props.busy} onClick={props.onCancel}>
-                Cancel
-              </Button>
-              <Button type="button" variant="destructive" loading={props.busy} onClick={props.onConfirm}>
-                Uninstall
-              </Button>
-            </div>
-          </AlertDialog.Content>
-        </AlertDialog.Overlay>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
+      <Show when={props.plan.skillSlugs.length > 0}>
+        <section aria-label={`Skills to remove, ${props.plan.skillSlugs.length}`}>
+          <Text tone="muted" variant="label-sm">
+            Skills removed from {props.plan.agentName}
+          </Text>
+          <ul>
+            <For each={props.plan.skillSlugs}>{(slug) => <li>{slug}</li>}</For>
+          </ul>
+        </section>
+      </Show>
+    </ConfirmDialog>
   );
 }

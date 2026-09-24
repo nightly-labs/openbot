@@ -1,11 +1,12 @@
 import type { DirectMessage } from "@openbot/contracts/ipc";
+import { DirectConversation } from "@openbot/ui/features/conversation/DirectConversation";
 import { createEffect, createSignal } from "solid-js";
 import { expect, fireEvent, fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { DirectConversation } from "../src/features/conversation/DirectConversation";
-import { STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
+import { requireFixture, STORY_DIRECT_SNAPSHOTS, STORY_PRESENCE } from "./fixtures";
 
-const member = STORY_PRESENCE.members[1];
+const member = requireFixture(STORY_PRESENCE.members[1], "Story presence member");
+const memberSnapshot = requireFixture(STORY_DIRECT_SNAPSHOTS[member.id], "Story direct snapshot");
 const unreadDirectMessages: DirectMessage[] = [
   ...Array.from({ length: 12 }, (_, index): DirectMessage => {
     const own = index % 2 === 0;
@@ -35,7 +36,7 @@ const unreadDirectMessages: DirectMessage[] = [
 const args: Parameters<typeof DirectConversation>[0] = {
   member,
   currentMemberId: "member-self",
-  snapshot: STORY_DIRECT_SNAPSHOTS[member.id],
+  snapshot: memberSnapshot,
   loading: false,
   loadError: null,
   typing: false,
@@ -94,7 +95,7 @@ function StatefulDirectConversation(props: { args: Parameters<typeof DirectConve
  * already scrolled away from.
  */
 const directPillBaseSnapshot = {
-  ...STORY_DIRECT_SNAPSHOTS[member.id],
+  ...memberSnapshot,
   revision: 2,
   messages: unreadDirectMessages,
   readState: { unreadCount: 0, firstUnreadMessageId: null, throughSequence: 24 },
@@ -150,7 +151,7 @@ export const UnreadMessages: Story = {
   render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
   args: {
     snapshot: {
-      ...STORY_DIRECT_SNAPSHOTS[member.id],
+      ...memberSnapshot,
       revision: 2,
       messages: unreadDirectMessages,
       readState: {
@@ -166,7 +167,7 @@ export const ScrollToLatest: Story = {
   render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
   args: {
     snapshot: {
-      ...STORY_DIRECT_SNAPSHOTS[member.id],
+      ...memberSnapshot,
       revision: 2,
       messages: unreadDirectMessages,
       readState: {
@@ -249,8 +250,8 @@ export const ErrorState: Story = {
 export const MessageDates: Story = {
   args: {
     snapshot: {
-      ...STORY_DIRECT_SNAPSHOTS[member.id],
-      messages: STORY_DIRECT_SNAPSHOTS[member.id].messages.map((message, index) => {
+      ...memberSnapshot,
+      messages: memberSnapshot.messages.map((message, index) => {
         const date = new Date();
         date.setDate(date.getDate() - (index === 0 ? 1 : 0));
         return { ...message, createdAt: date.toISOString() };

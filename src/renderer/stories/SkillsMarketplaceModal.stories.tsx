@@ -1,8 +1,8 @@
 import type { AgentSummary } from "@openbot/contracts/ipc";
+import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup, untrack } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { Button, Heading, Text, Toaster, toast } from "../src/components/ui";
 import { SkillsMarketplaceModal } from "../src/features/settings/SkillsMarketplaceModal";
 import { STORY_AGENT_SUMMARIES, STORY_MARKETPLACE_PLUGINS } from "../src/preview/fixtures";
 import { createMockOpenBot } from "./mock-openbot";

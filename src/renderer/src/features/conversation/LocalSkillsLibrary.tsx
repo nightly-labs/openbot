@@ -1,9 +1,9 @@
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import { Button, Switch } from "@openbot/ui";
+import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
 import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { SkillPreview } from "../../components/SkillPreview";
-import { Button, Switch } from "../../components/ui";
-
-import { SkillGlyph } from "./SkillGlyph";
+import { skillsPort } from "../../skills-port";
 
 export function LocalSkillsLibrary(props: {
   initialSkillId?: string;
@@ -36,20 +36,23 @@ export function LocalSkillsLibrary(props: {
     () => {
       let disposed = false;
       setState((current) => ({ ...current, loading: true, error: "", selected: null }));
-      void window.openbot.skills.localList().then(
-        (skills) => {
-          if (!disposed)
-            setState((current) => ({
-              ...current,
-              skills,
-              loading: false,
-              selected: skills.find((skill) => skill.id === props.initialSkillId) ?? null,
-            }));
-        },
-        () => {
-          if (!disposed) setState((current) => ({ ...current, error: "Could not load local skills.", loading: false }));
-        },
-      );
+      void skillsPort()
+        .skills.localList()
+        .then(
+          (skills) => {
+            if (!disposed)
+              setState((current) => ({
+                ...current,
+                skills,
+                loading: false,
+                selected: skills.find((skill) => skill.id === props.initialSkillId) ?? null,
+              }));
+          },
+          () => {
+            if (!disposed)
+              setState((current) => ({ ...current, error: "Could not load local skills.", loading: false }));
+          },
+        );
       return () => {
         disposed = true;
       };
@@ -63,9 +66,9 @@ export function LocalSkillsLibrary(props: {
     setState((current) => ({ ...current, busy: true, error: "" }));
     try {
       if (!assigned && enabled) {
-        await window.openbot.skills.localInstall({ agentId, skillId: skill.id, revision: skill.version });
+        await skillsPort().skills.localInstall({ agentId, skillId: skill.id, revision: skill.version });
       } else if (assigned) {
-        await window.openbot.skills.setEnabled({ agentId, skillId: skill.id, enabled });
+        await skillsPort().skills.setEnabled({ agentId, skillId: skill.id, enabled });
       }
       if (active && props.agentId === agentId) await props.onInstalled();
     } catch (error) {
@@ -82,7 +85,7 @@ export function LocalSkillsLibrary(props: {
     const agentId = props.agentId;
     setState((current) => ({ ...current, busy: true, error: "" }));
     try {
-      await window.openbot.skills.localInstall({ agentId, skillId: skill.id, revision: skill.version });
+      await skillsPort().skills.localInstall({ agentId, skillId: skill.id, revision: skill.version });
       if (!active || props.agentId !== agentId) return;
       await props.onInstalled();
     } catch (error) {
@@ -99,7 +102,7 @@ export function LocalSkillsLibrary(props: {
     setState((current) => ({ ...current, busy: true, error: "" }));
     try {
       if (installed()?.enabled === false)
-        await window.openbot.skills.setEnabled({ agentId, skillId: skill.id, enabled: true });
+        await skillsPort().skills.setEnabled({ agentId, skillId: skill.id, enabled: true });
       if (!active || props.agentId !== agentId) return;
       await props.onInstalled();
       if (active && props.agentId === agentId && state.selected?.id === skill.id) props.onTry?.(skill);

@@ -10,7 +10,7 @@ import {
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
-import type { AgentMessage } from "../../data";
+import type { AgentMessage } from "@openbot/ui/data";
 
 /**
  * What the renderer has already asked main to mark read, per conversation. A

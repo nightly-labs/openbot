@@ -5,6 +5,102 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-09-23
+
+### Fixed
+
+- Keep an animated WebP avatar animated after upload. Before, OpenBot kept only the first frame.
+- Hide the secret code input while OpenBot sends the code. The input shows again if the code fails.
+- Wrap long text in the avatar upload control.
+
+## [0.20.0] - 2026-09-23
+
+### Added
+
+- Show the skills in an agent's workspace skill folders that OpenBot did not install, such as
+  `.agents/skills`. OpenBot does not change these folders. A skill shows a problem when its
+  `SKILL.md` is not valid, or when the agent's provider does not read its folder.
+- Show disk use and files in a Storage tab in Server Settings, a Files view in agent settings, and a
+  Files panel in the chat. An owner or an admin can delete a file and clear caches and logs.
+- Mute a server for a set time or until you turn it back on, and set its notification level: all
+  activity, only when it needs you, or nothing.
+- Send a test notification and open the system notification settings from Settings.
+- Mark an agent as Workspace only in the agent settings. The setting is not enforced yet.
+- Check for provider CLI updates from a provider's actions menu. OpenBot offers the latest upstream
+  release of Codex, Claude, OpenCode, and Grok without a new OpenBot version.
+- Add Linux arm64 builds.
+- Add a Composio listing that takes your own MCP link.
+- Show file type, size, previews, and upload progress for attachments on mobile, and show images
+  that an agent generates.
+
+### Changed
+
+- Accept a skill description of up to 1024 characters, as the Agent Skills specification allows.
+- Desktop notifications now appear. **If you turned off desktop notifications, turn them off again
+  in Settings.**
+- Show the open agent's provider in the usage chip.
+- Apply edited agent instructions to Codex and Claude sessions. The agent keeps its thread.
+- Ask for confirmation in one shared dialog everywhere.
+- Hide the query string of an MCP URL in logs, and mask MCP header and environment values in the
+  server MCP panel.
+- Send fewer requests to the account service. Without app focus, an offline host retries after 15
+  minutes.
+
+### Fixed
+
+- Make Apple and Google sign-in work in the embedded browser.
+- Open OpenBot on a second launch after a quit that did not finish on Windows.
+- Show new chat replies when reduced motion is on.
+- Center the idle emoji in the Dynamic Island.
+
+## [0.19.0] - 2026-09-23
+
+### Added
+
+- Use OpenBot in a web browser at openbot.run/app with your account and your connected hosts.
+- Set the Dynamic Island width and height in the new Dynamic Island settings tab on macOS.
+
+### Changed
+
+- Show every model a provider reports, newest first. When a provider no longer lists an agent's
+  model, the agent moves to the provider's default model and keeps its thread.
+- Use less memory: close a provider CLI after 10 idle minutes and resume its session on the next
+  message, restore only the active browser tab at startup, and keep fewer messages of closed agents
+  in memory.
+
+### Fixed
+
+- Show one notice when a Codex plan reaches its usage limit, not an extra "could not continue" error.
+
+## [0.18.0] - 2026-09-23
+
+### Added
+
+- Use OpenBot in French.
+- Open invitation (including permanent links), pairing, and plugin links directly in the mobile app.
+- See a running, waiting, blocked, or failed routine as a mark on the agent row.
+- Update a provider, or sign in with a code, from the new "More actions" menu on each provider row.
+- Start with OpenCode free models without a sign-in.
+
+### Changed
+
+- New ChatGPT agents start on GPT-6 Luna, and new Claude agents on Claude Opus 5.5. Existing
+  agents keep their model.
+- Refresh the server list on other signed-in devices when a membership changes.
+- Show the routine run history in chat as one summary per run.
+- Improve mobile reply animations and keyboard scrolling.
+
+### Fixed
+
+- Send live view clicks to the correct point of the remote page.
+- Keep Claude narration between tool calls out of the chat bubble.
+- Keep embedded browser sign-in popups and OAuth sessions working.
+- Load a remote server's agents when one agent uses a 1M-context Claude model.
+- Show why an updated OpenCode CLI stopped, instead of "ACP connection closed".
+- Stop showing a Grok tool error as a provider error.
+- Stop showing a refused routine as a provider error; the agent now gets the reason and can correct it.
+- Keep failed Codex background refreshes out of provider error messages.
+
 ## [0.17.0] - 2026-09-21
 
 ### Added

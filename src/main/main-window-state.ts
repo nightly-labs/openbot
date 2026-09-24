@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import type { Rectangle } from "electron";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 interface WindowSize {
   width: number;
@@ -36,6 +37,31 @@ export function presentMainWindow(
   window.focus();
 }
 
+export interface SecondLaunchState {
+  /** Windows is ending the session; nothing may start again. */
+  sessionEnding: boolean;
+  quitting: boolean;
+  hasMainWindow: boolean;
+  /** Startup has built the services, so a closed main window can be built again. */
+  started: boolean;
+}
+
+/**
+ * - `present`: show and focus the main window that exists.
+ * - `reopen`: build the main window again. Outside macOS, closing it destroys it.
+ * - `relaunch`: start a new instance once this one exits. The launch that asked has already exited
+ *   because this process holds the single-instance lock, so without this nothing would open.
+ * - `ignore`: startup is still building the window and will show it.
+ */
+export type SecondLaunchResponse = "present" | "reopen" | "relaunch" | "ignore";
+
+export function secondLaunchResponse(state: SecondLaunchState): SecondLaunchResponse {
+  if (state.sessionEnding) return "ignore";
+  if (state.quitting) return "relaunch";
+  if (state.hasMainWindow) return "present";
+  return state.started ? "reopen" : "ignore";
+}
+
 export async function readMainWindowBounds(path: string): Promise<Rectangle | null> {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8"));
@@ -62,22 +88,13 @@ export async function readMainWindowBounds(path: string): Promise<Rectangle | nu
       height: Math.round(parsed.height),
     };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return null;
+    if (isMissingFileError(error) || error instanceof SyntaxError) return null;
     throw error;
   }
 }
 
 export async function writeMainWindowBounds(path: string, bounds: Rectangle): Promise<void> {
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 1, ...bounds })}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, path);
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
+  await writeJsonFileAtomically(path, { version: 1, ...bounds });
 }
 
 /**
@@ -210,8 +227,4 @@ function intersectionArea(left: Rectangle, right: Rectangle): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

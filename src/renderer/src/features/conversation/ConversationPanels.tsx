@@ -1,6 +1,9 @@
-import { usePlatform } from "../../platform";
+import type { ServerSummary } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import type { AgentFilesOptions } from "../files/AgentFilesSettings";
+import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
-import { useSettings } from "../settings/settings-context";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -14,12 +17,11 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { Portal } from "@solidjs/web";
 import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
+import { conversationPort } from "./conversation-port";
 
 /** @internal Stable HMR boundary for conversation panels. */
-export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButtonElement) => void }) {
+export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLButtonElement) => void }) {
   const controller = useConversationController();
-  const platform = usePlatform();
-  const { skillsMarketplaceOpen, setSkillsMarketplaceOpen } = useSettings();
   const {
     agentReady,
     activateBrowserTab,
@@ -39,10 +41,12 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     revealSidebarFile,
     conversationPanelElement,
     filePreviewOpen,
+    filesOpen,
     openBrowserAddress,
     openExternalMessageUrl,
     openRoutineRunMessage,
     openSharedFile,
+    previewAttachment,
     openSidebarFileExternally,
     openWorkspaceFile,
     navigateBrowserTab,
@@ -66,6 +70,30 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
     updateRuntimeSettings,
   } = useConversationViewScope();
   let browserPreviewTrigger: HTMLButtonElement | undefined;
+  /** Agent settings > Files. */
+  const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
+    // The web client reaches a host through `runtime`, which has no storage methods.
+    if (props.runtime || !serverHasStorage(server)) return undefined;
+    return {
+      serverId: server.id,
+      canManage: canManageStorage(server),
+      onOpenWorkspace:
+        server.kind === "local"
+          ? () =>
+              void conversationPort()
+                .storage.openLocation({ agentId })
+                .catch((error) =>
+                  toast.error("Could not open the workspace folder", {
+                    description: errorMessage(error, "Try again."),
+                  }),
+                )
+          : undefined,
+      onPreviewFile: (file) => void previewAttachment(file),
+      onShowMessage: (messageId) => openRoutineRunMessage(messageId),
+      // The agent's chat is behind the settings, so closing them opens it.
+      onOpenConversation: () => setActiveRightPanel("none"),
+    };
+  };
   createEffect(
     () => ({ expanded: browserExpandedOpen(), suspended: props.globalOverlayOpen || props.remoteDesktopVisible }),
     ({ expanded, suspended }) => {
@@ -93,6 +121,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           return (
             <Loading>
               <FilePreviewPanel
+                allowExternalOpen={!props.runtime}
                 preview={file().preview}
                 agents={props.agents}
                 defaultWidth={() =>
@@ -114,12 +143,32 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
                 sourceUrl={attached()?.previewUrl ?? null}
                 onOpenExternally={openSidebarFileExternally}
                 onDownload={attached() ? downloadSidebarFile : undefined}
-                onReveal={attached() ? revealSidebarFile : undefined}
+                onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
                 onClose={closeSidebarFilePreview}
               />
             </Loading>
           );
         }}
+      </Show>
+
+      <Show when={filesOpen() && !props.runtime && serverHasStorage(props.server) && props.server}>
+        {(server) => (
+          <Show when={props.agent?.threadId}>
+            {(threadId) => (
+              <Loading>
+                <ChatFilesPanel
+                  serverId={server().id}
+                  conversationId={threadId()}
+                  conversationTitle={props.agent?.name ?? "this chat"}
+                  canManage={canManageStorage(server())}
+                  onClose={() => setActiveRightPanel("none")}
+                  onPreviewFile={(file) => void previewAttachment(file)}
+                  onShowMessage={(messageId) => void props.onOpenSearchMessage?.(messageId)}
+                />
+              </Loading>
+            )}
+          </Show>
+        )}
       </Show>
 
       <Show when={browserSidebarOpen() || browserExpandedOpen()}>
@@ -139,13 +188,14 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             )
           }
           onWidthChange={setBrowserPanelWidth}
+          capturePreview={props.runtime ? null : undefined}
           onOpenTab={(tabId, trigger) => {
             browserPreviewTrigger = trigger;
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
             setActiveRightPanel("browser-expanded");
           }}
-          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-          onNewTab={() => void openBrowserAddress("https://www.google.com", true)}
+          onCloseTab={props.runtime ? undefined : (tabId) => void closeBrowserTab(tabId)}
+          onNewTab={props.runtime ? undefined : () => void openBrowserAddress("https://www.google.com", true)}
           onCollapse={hideBrowserPanel}
         />
       </Show>
@@ -155,7 +205,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
           <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
           <BrowserPanel
             open={browserExpandedOpen()}
-            macWindowControls={platform.appInfo()?.platform === "darwin"}
+            macWindowControls={props.platform === "darwin"}
             tabs={browserTabs()}
             activeTab={activeBrowserTab()}
             activeControl={activeBrowserControl()}
@@ -164,19 +214,23 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
             controllerForTab={browserControllerForTab}
             onAddressChange={setBrowserAddress}
             onAddressEditingChange={setBrowserAddressEditing}
-            onOpenAddress={(address) => void openBrowserAddress(address, address !== undefined)}
-            onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
-            onReload={(tabId) => void reloadBrowserTab(tabId)}
+            onOpenAddress={
+              props.runtime ? undefined : (address) => void openBrowserAddress(address, address !== undefined)
+            }
+            onNavigate={props.runtime ? undefined : (tabId, direction) => void navigateBrowserTab(tabId, direction)}
+            onReload={props.runtime ? undefined : (tabId) => void reloadBrowserTab(tabId)}
             onActivateTab={activateBrowserTab}
             onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+            canCloseTabs={!props.runtime}
             onSurface={setBrowserSurfaceElement}
             liveViewTabId={
               props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")
                 ? (activeBrowserTab()?.id ?? null)
                 : null
             }
+            liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
             onBack={() => setActiveRightPanel("browser")}
-            onEnterPip={showBrowserPip}
+            onEnterPip={props.runtime ? () => undefined : showBrowserPip}
           />
         </Portal>
       </Show>
@@ -185,10 +239,12 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
-              skillsMarketplaceOpen={skillsMarketplaceOpen()}
-              onAddFromMarketplace={props.server?.kind === "local" ? () => setSkillsMarketplaceOpen(true) : undefined}
-              skillsMode={props.server?.kind === "local" ? "mutable" : "readonly"}
+              remoteClient={Boolean(props.runtime)}
+              skillsMarketplaceOpen={props.skillsMarketplaceOpen}
+              onAddFromMarketplace={props.server?.kind === "local" ? props.onOpenMarketplace : undefined}
+              skillsMode={props.runtime ? "hidden" : props.server?.kind === "local" ? "mutable" : "readonly"}
               tablesVisible={props.server?.kind === "local"}
+              accessEditable={props.server?.kind === "local"}
               agents={props.agents}
               onCreateSkill={
                 props.server?.kind === "local" &&
@@ -253,6 +309,7 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
               }
               onRoutineSelectionRequestHandled={handleRoutineSettingsRequest}
               onOpenRoutineRun={props.onOpenSearchMessage ? openRoutineRunMessage : undefined}
+              files={agentFiles(props.server, agent().id)}
             />
           </Loading>
         )}
@@ -262,7 +319,8 @@ export function ConversationPanels(panelProps: { onOpenUsage: (trigger: HTMLButt
 }
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
-const BrowserPanel = lazy(() => import("./BrowserPanel"));
+const BrowserPanel = lazy(() => import("@openbot/ui/features/browser/BrowserPanel"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
+const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));
 
 const BrowserPreviewSidebar = lazy(() => import("./BrowserPreviewSidebar"));

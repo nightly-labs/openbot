@@ -16,6 +16,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
 } from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -49,6 +50,7 @@ import {
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
+import { rawDataBytes } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -459,9 +461,11 @@ export class TeamWebRtcHostPeer {
                     ? channelRequestForMethod
                     : isMcpRoute(input.path)
                       ? mcpRequestForMethod
-                      : peerCapabilities.has("opencode")
-                        ? decodeTeamProtocolV4WebRtcHttpRequest
-                        : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                      : isStorageRoute(input.path)
+                        ? storageRequestForMethod
+                        : peerCapabilities.has("opencode")
+                          ? decodeTeamProtocolV4WebRtcHttpRequest
+                          : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
                     preserveSemanticTags,
                     agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
                   }),
@@ -500,9 +504,11 @@ export class TeamWebRtcHostPeer {
         ? channelResponseForMethod
         : isMcpRoute(input.path)
           ? mcpResponseForMethod
-          : peerCapabilities.has("opencode")
-            ? encodeTeamProtocolV4WebRtcHttpResponse
-            : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+          : isStorageRoute(input.path)
+            ? storageResponseForMethod
+            : peerCapabilities.has("opencode")
+              ? encodeTeamProtocolV4WebRtcHttpResponse
+              : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
         preserveSemanticTags,
       }),
     };
@@ -746,12 +752,6 @@ export class TeamWebRtcHostPeer {
   }
 }
 
-function rawDataBytes(data: Ws.RawData): Uint8Array {
-  if (Array.isArray(data)) return new Uint8Array(Buffer.concat(data));
-  if (data instanceof ArrayBuffer) return new Uint8Array(data.slice(0));
-  return new Uint8Array(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
-}
-
 interface HttpRequestPayload {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
@@ -810,4 +810,10 @@ function mcpRequestForMethod(_method: string, path: string, value: unknown) {
 }
 function mcpResponseForMethod(_method: string, path: string, status: number, value: unknown) {
   return mcpResponse(path, status, value);
+}
+function storageRequestForMethod(_method: string, path: string, value: unknown) {
+  return storageRequest(path, value);
+}
+function storageResponseForMethod(_method: string, path: string, status: number, value: unknown) {
+  return storageResponse(path, status, value);
 }

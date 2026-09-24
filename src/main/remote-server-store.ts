@@ -13,16 +13,17 @@
 // roll the selection back when the write fails. That is why `persist` is public. Do not add a second
 // exception -- a mutation whose write is somebody else's job is the hazard this module exists to end.
 
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import type { TeamRole } from "@openbot/contracts/ipc";
+import { readFile } from "node:fs/promises";
+import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import {
   emptyStoredRemoteServers,
   readStoredRemoteServers,
   type StoredRemoteServer,
   type StoredRemoteServers,
+  type StoredServerNotifications,
   serializeStoredRemoteServers,
 } from "./remote-server-stored-shape";
 
@@ -280,42 +281,104 @@ export class RemoteServerStore implements RemoteServerDirectory {
     await this.persist();
   }
 
-  isMuted(serverId: string): boolean {
-    return this.#state.mutedServerIds.includes(serverId);
+  // A timed mute that has ended reads as unmuted. Its entry stays until the next write for the server
+  // replaces it; nothing needs a timer to clean it up.
+  muteState(serverId: string, now = Date.now()): { muted: boolean; mutedUntil: number | null } {
+    if (this.#state.mutedServerIds.includes(serverId)) return { muted: true, mutedUntil: null };
+    const mutedUntil = this.#state.serverNotifications[serverId]?.mutedUntil;
+    return mutedUntil !== undefined && mutedUntil > now
+      ? { muted: true, mutedUntil }
+      : { muted: false, mutedUntil: null };
   }
 
-  async setMuted(serverId: string, muted: boolean): Promise<void> {
+  isMuted(serverId: string, now = Date.now()): boolean {
+    return this.muteState(serverId, now).muted;
+  }
+
+  notificationLevel(serverId: string): ServerNotificationLevel {
+    return this.#state.serverNotifications[serverId]?.level ?? "all";
+  }
+
+  // The earliest timed mute still running, so the caller can tell the renderer when it ends.
+  nextMuteExpiry(now = Date.now()): number | null {
+    const ends = Object.values(this.#state.serverNotifications)
+      .map((entry) => entry.mutedUntil)
+      .filter((mutedUntil): mutedUntil is number => mutedUntil !== undefined && mutedUntil > now);
+    return ends.length ? Math.min(...ends) : null;
+  }
+
+  // `until` null mutes until the user unmutes; a time mutes until then. Both kinds are cleared first,
+  // so a server never carries a permanent and a timed mute at once.
+  async setMuted(serverId: string, muted: boolean, until: number | null = null): Promise<void> {
+    await this.#writeNotifications(serverId, (state) => {
+      const mutedServerIds = state.mutedServerIds.filter((id) => id !== serverId);
+      if (muted && until === null) mutedServerIds.push(serverId);
+      const { mutedUntil: _previous, ...entry } = state.serverNotifications[serverId] ?? {};
+      return {
+        mutedServerIds,
+        serverNotifications: withServerEntry(
+          state.serverNotifications,
+          serverId,
+          muted && until !== null ? { ...entry, mutedUntil: until } : entry,
+        ),
+      };
+    });
+  }
+
+  async setNotificationLevel(serverId: string, level: ServerNotificationLevel): Promise<void> {
+    await this.#writeNotifications(serverId, (state) => {
+      const { level: _previous, ...entry } = state.serverNotifications[serverId] ?? {};
+      return {
+        mutedServerIds: state.mutedServerIds,
+        serverNotifications: withServerEntry(
+          state.serverNotifications,
+          serverId,
+          level === "all" ? entry : { ...entry, level },
+        ),
+      };
+    });
+  }
+
+  async #writeNotifications(
+    serverId: string,
+    change: (state: StoredRemoteServers) => Pick<StoredRemoteServers, "mutedServerIds" | "serverNotifications">,
+  ): Promise<void> {
     const operation = this.#writeChain.then(async () => {
       if (serverId !== LOCAL_SERVER_ID && !this.has(serverId)) throw new Error("Remote server not found.");
-      const mutedServerIds = this.#state.mutedServerIds.filter((id) => id !== serverId);
-      if (muted) mutedServerIds.push(serverId);
-      await this.#writeSnapshot({ ...structuredClone(this.#state), mutedServerIds });
-      this.#state.mutedServerIds = mutedServerIds;
+      const next = change(this.#state);
+      await this.#writeSnapshot({ ...structuredClone(this.#state), ...next });
+      this.#state.mutedServerIds = next.mutedServerIds;
+      this.#state.serverNotifications = next.serverNotifications;
     });
     this.#writeChain = operation.catch(() => undefined);
     await operation;
   }
 
-  // Capture server state now, but use the mute preference committed by preceding writes.
+  // Capture server state now, but use the notification preferences committed by preceding writes.
   async persist(): Promise<void> {
     const snapshot = structuredClone(this.#state);
     const operation = this.#writeChain.then(() =>
-      this.#writeSnapshot({ ...snapshot, mutedServerIds: [...this.#state.mutedServerIds] }),
+      this.#writeSnapshot({
+        ...snapshot,
+        mutedServerIds: [...this.#state.mutedServerIds],
+        serverNotifications: structuredClone(this.#state.serverNotifications),
+      }),
     );
     this.#writeChain = operation.catch(() => undefined);
     await operation;
   }
 
   async #writeSnapshot(snapshot: StoredRemoteServers): Promise<void> {
-    const temporary = `${this.#path}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, `${JSON.stringify(serializeStoredRemoteServers(snapshot))}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      });
-      await rename(temporary, this.#path);
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    await writeJsonFileAtomically(this.#path, serializeStoredRemoteServers(snapshot));
   }
+}
+
+// An empty entry is removed, so a server back on its defaults leaves nothing in the file.
+function withServerEntry(
+  entries: Record<string, StoredServerNotifications>,
+  serverId: string,
+  entry: StoredServerNotifications,
+): Record<string, StoredServerNotifications> {
+  const { [serverId]: _previous, ...rest } = entries;
+  return entry.level === undefined && entry.mutedUntil === undefined ? rest : { ...rest, [serverId]: entry };
 }

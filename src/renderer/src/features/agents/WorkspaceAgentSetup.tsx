@@ -1,4 +1,5 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useProviders } from "../../providers";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
@@ -7,7 +8,6 @@ import { useServers } from "../servers/servers-context";
 import { useAgentActions } from "./agent-actions";
 import { resolveCreationModel } from "./agent-creation-model";
 import { useAgents } from "./agents-context";
-import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "./FirstAgentSetup";
 
 /**
  * The create-an-agent form, which takes over the conversation pane instead of

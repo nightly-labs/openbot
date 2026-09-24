@@ -2,7 +2,9 @@
 
 The UI stack sits on prerelease channels your training data does not cover: `solid-js@2.0.0-rc.0`
 with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
-here), plus patched `lucide-solid` and `solid-sonner`. Do not trust your memory of these APIs —
+here), plus patched `lucide-solid` and `solid-sonner`. `@solidjs/signals` is patched to dispose the
+children of a memo run that a list-row removal interrupts. `src/renderer/src/solid-disposal.test.ts`
+guards the patch, so keep the test when you upgrade Solid. Do not trust your memory of these APIs —
 check `package.json` for what is actually installed, and load the reference that matches the work:
 
 - `node_modules/solid-js/CHEATSHEET.md` — the source of truth for core Solid APIs. Read it before
@@ -23,9 +25,9 @@ skills for the component patterns, not the imports.
   together. `bun run dev:api` is for API-only debugging.
 - `bun run storybook` verifies isolated components. CI builds it; do not run `build-storybook`.
 - `bun run check:ui` is the design-system guard for this directory: shared primitives over native
-  controls, Kobalte and Lucide only inside `components/ui`, and palette tokens instead of colour,
-  size, radius and transition literals. It reads the whole renderer in 60 ms, so run it on any
-  change here rather than waiting for CI — its budgets only ever go down. All of them sit at zero
+  controls, Kobalte and Lucide only inside `@openbot/ui`, and palette tokens instead of colour,
+  size, radius and transition literals. The pre-commit hook runs it on each commit that stages
+  code, so do not run it by hand — its budgets only ever go down. All of them sit at zero
   except the `data-testid` hook count, frozen at the five already in the tree;
   [check design notes](../../docs/development-checks.md#lint-and-ui-rules) say why that one is a
   ratchet instead of a ban.
@@ -37,11 +39,13 @@ skills for the component patterns, not the imports.
 
 ## Where a file goes
 
-A domain lives in one directory: `src/renderer/src/features/<domain>/`, flat except for `stores/`.
+App-specific domains live in `src/renderer/src/features/<domain>/`, flat except for `stores/`.
+Shared feature components live in `packages/ui/src/features/<domain>/`; see
+[shared UI instructions](../../packages/ui/AGENTS.md). Import them from `@openbot/ui` package
+subpaths. Keep application contexts, persistence, and platform adapters in the renderer.
 Its context, its DOM-free logic, its pane, its components, its tests and its stylesheet are
 siblings, so "fix the pin ordering" is answerable by opening one path. There is no barrel —
-`components/ui/index.ts` is still the only one — and every import stays relative, which is what
-makes `tsc` an exhaustive check after a move.
+`packages/ui/src/index.ts` is still the only one — and feature-local imports stay relative. Import shared primitives from `@openbot/ui`.
 
 ```
 features/<domain>/
@@ -49,6 +53,7 @@ features/<domain>/
   <domain>-scope.ts      the view-side composer, where one exists
   <Domain>*.tsx          entry component and rendered regions, PascalCase
   <domain>-*.ts          DOM-free logic, kebab-case
+  <domain>-port.ts       the bridge calls this domain makes
   <domain>.css           the stylesheet partial, @import-ed from styles.css in cascade order
   stores/                one create*Store per concern, plus *-actions.ts command bundles
 ```
@@ -59,14 +64,15 @@ are the same filename on case-insensitive APFS. That breaks the `Check` job on `
 while every ubuntu job stays green, so the suffix is uniform rather than applied where a collision
 happens to exist today.
 
-**Outside a feature:** `components/ui` (the shared patched-Kobalte layer), the app shell and its
+**Outside a feature:** `@openbot/ui` (the shared patched-Kobalte layer), the app shell and its
 wiring (`App.tsx`, `AppView.tsx`, `app-providers.tsx`, `app-bootstrap.tsx`, `WorkspaceShell.tsx`,
 `WorkspaceOverlays.tsx`, `lazy-views.ts`), the cross-domain modules every feature reads and none
-owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`, `data.ts`,
+owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`,
 `simple-context.tsx`, `scope-lifetime.ts`), `preview/` — whose mocks are the second implementation
-of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets
-(`primitives.css`, `base.css`, `transitions.css`, `action-menu.css`, `sliding-tabs.css`) —
-plus `app-shell.css`, which ends in a theme layer that assigns the palette across every domain
+of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets in `styles/`
+(`base.css`, `transitions.css`, `otp-input.css`; `action-menu.css` and `sliding-tabs.css` are now in
+`packages/ui/src/styles/`) —
+plus `styles/app-shell.css`, which ends in a theme layer that assigns the palette across every domain
 at once and cannot be split until that layer is lifted out; its header says so. Stories stay in
 `src/renderer/stories/`, where the test rules relax.
 
@@ -80,9 +86,9 @@ domains stays flat rather than being imported sideways out of one of them.
 **Prefer one `createStore` per concern over a row of `createSignal` calls.** Fields that change
 together are one record — a saved-and-draft form pair, a `data`/`loaded`/`loading`/`error` quad, a
 phase plus the numbers only one phase uses, several `Record`s keyed by the same `agentId`. Declare the
-shape up front, so replacing one field re-renders only what read that field; `FirstAgentSetup.tsx` is
-the form version. Keep the setter private behind named mutations where the store *is* a module's or
-a hook's exported surface, as `app-stored-values.ts` and `createAsyncPanel.ts` do. Inside a
+shape up front, so replacing one field re-renders only what read that field;
+`packages/ui/src/features/agents/FirstAgentSetup.tsx` is the form version. Keep the setter private
+behind named mutations where the store *is* a module's or a hook's exported surface, as `app-stored-values.ts` and `createAsyncPanel.ts` do. Inside a
 component, write the field where it changes — `setPanels((state) => { state.x = value; })` at the
 call site, as `SettingsModal.tsx` does — and let a named mutation there earn its name: more than one
 field, a guard or a side effect, or enough call sites that the name deduplicates something. A
@@ -99,7 +105,7 @@ reference is the reactive unit: write a collection held in a signal by copying
 ## Component reuse
 
 Search for an existing component, hook, style, utility or story first, and prefer reuse, composition
-or a small extension. The shared layer is `src/renderer/src/components/ui` over patched Kobalte:
+or a small extension. The shared layer is `packages/ui/src` over patched Kobalte:
 extend a primitive there rather than copying one into a feature, and update its story when it gains
 a visual or interactive state. Build from scratch only after the search comes up empty, and keep it
 reusable. The [Zaidan catalog](https://zaidan.carere.dev/docs/components) is a source of reference

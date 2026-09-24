@@ -9,6 +9,7 @@
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
+    "./conversation-order": "./src/conversation-order.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
     "./ipc": "./src/ipc.ts",
@@ -39,10 +40,12 @@
     "./team-protocol/v4-webrtc-adapter": "./src/team-protocol/v4-webrtc-adapter.ts",
     "./validation": "./src/validation.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
-    "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts"
+    "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",
+    "./team-protocol/storage-v1": "./src/team-protocol/storage-v1.ts",
+    "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts src"
   },
   "dependencies": {

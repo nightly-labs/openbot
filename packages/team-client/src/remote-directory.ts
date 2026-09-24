@@ -1,5 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createInviteUrl, parseInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -30,11 +30,12 @@ export interface RemoteTeamInvite {
   expiresAt: number;
   usedAt: number | null;
   revokedAt: number | null;
+  permanent: boolean;
+  useCount: number;
 }
 
 export interface RemoteTeamBootstrap {
   sessionId: string;
-  expiresAt: number;
   signalUrl: string;
   ticket: string;
 }
@@ -45,6 +46,7 @@ export interface RemoteInvitePreview {
   role: "admin" | "member";
   expiresAt: number;
   emailBound: boolean;
+  permanent: boolean;
   devicePublicKey: string | null;
 }
 
@@ -72,21 +74,23 @@ export class RemoteDirectoryError extends Error {
 
 export class RemoteTeamDirectoryClient {
   readonly #apiUrl: string;
-  readonly #token: string;
+  readonly #authentication: { kind: "bearer"; token: string } | { kind: "browser" };
   readonly #fetch: TeamClientFetch;
   readonly #hostKeys: RemoteHostKeyStore;
   readonly #pairedHost: MobileConnectHostBinding | undefined;
   #pinTail: Promise<void> = Promise.resolve();
 
-  constructor(input: {
-    apiUrl: string;
-    token: string;
-    fetch: TeamClientFetch;
-    hostKeys?: RemoteHostKeyStore;
-    pairedHost?: MobileConnectHostBinding;
-  }) {
+  constructor(
+    input: {
+      apiUrl: string;
+      fetch: TeamClientFetch;
+      hostKeys?: RemoteHostKeyStore;
+      pairedHost?: MobileConnectHostBinding;
+    } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
+  ) {
     this.#apiUrl = input.apiUrl;
-    this.#token = input.token;
+    if (!input.authentication && !input.token) throw new Error("Account authentication is required.");
+    this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
     const keys = new Map<string, string>();
@@ -155,9 +159,10 @@ export class RemoteTeamDirectoryClient {
 
   async createInvite(
     host: { hostId: string; devicePublicKey: string },
-    input: { role: "admin" | "member"; email?: string },
+    input: { role: "admin" | "member"; email?: string; permanent?: boolean },
   ): Promise<{ inviteId: string; inviteUrl: string; expiresAt: number }> {
-    // Validate the URL before creating a one-use invitation.
+    if (input.permanent && input.email) throw new Error("Permanent invitations cannot be sent by email.");
+    // Validate the URL before creating an invitation.
     const payload = {
       apiUrl: new URL(this.#apiUrl).toString(),
       serverId: host.hostId,
@@ -218,7 +223,25 @@ export class RemoteTeamDirectoryClient {
     // Keep the identity pin: leaving a team must not silently trust a substituted key on rejoin.
   }
 
-  async createBootstrap(hostId: string, clientPublicKey: string): Promise<RemoteTeamBootstrap> {
+  async createBootstrap(
+    hostId: string,
+    clientPublicKey: string,
+    existingSessionId: string | null = null,
+  ): Promise<RemoteTeamBootstrap> {
+    if (existingSessionId) {
+      try {
+        const ticket = decodeRemoteSessionTicket(
+          await this.#request(`/v2/remote/sessions/${encodeURIComponent(existingSessionId)}/ticket`, {
+            method: "POST",
+            body: { clientPublicKey },
+          }),
+        );
+        return { sessionId: existingSessionId, signalUrl: ticket.signalUrl, ticket: ticket.ticket };
+      } catch (error) {
+        // Only an ended session is replaced. Another failure keeps it, so a retry does not leave it active.
+        if (!(error instanceof RemoteDirectoryError) || (error.status !== 403 && error.status !== 404)) throw error;
+      }
+    }
     const session = decodeRemoteSession(
       await this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } }),
     );
@@ -231,7 +254,6 @@ export class RemoteTeamDirectoryClient {
       );
       return {
         sessionId: session.sessionId,
-        expiresAt: session.expiresAt,
         signalUrl: ticket.signalUrl,
         ticket: ticket.ticket,
       };
@@ -249,7 +271,14 @@ export class RemoteTeamDirectoryClient {
 
   async previewInvite(inviteUrl: string): Promise<RemoteInvitePreview> {
     const invite = parseInviteUrl(inviteUrl);
-    if (new URL(invite.apiUrl).origin !== new URL(this.#apiUrl).origin) {
+    const inviteOrigin = new URL(invite.apiUrl).origin;
+    const origin = new URL(this.#apiUrl).origin;
+    // These production origins serve the same account Worker. Requests still use this client's origin.
+    const publicWebsiteInvite =
+      this.#authentication.kind === "browser" &&
+      origin === "https://openbot.run" &&
+      inviteOrigin === "https://api.openbot.run";
+    if (inviteOrigin !== origin && !publicWebsiteInvite) {
       throw new Error("This invitation belongs to another OpenBot service.");
     }
     const value = await this.#request("/v2/remote/invites/preview", {
@@ -311,13 +340,21 @@ export class RemoteTeamDirectoryClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await this.#fetch(new URL(path, this.#apiUrl), {
+      const browser = this.#authentication.kind === "browser";
+      const response = await this.#fetch(new URL(browser ? `/api/browser${path}` : path, this.#apiUrl), {
+        ...(browser ? { credentials: "same-origin" as const } : {}),
         method: options.method ?? "GET",
         headers: {
-          ...(options.authenticated === false ? {} : { Authorization: `Bearer ${this.#token}` }),
-          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(this.#authentication.kind === "bearer" && options.authenticated !== false
+            ? { Authorization: `Bearer ${this.#authentication.token}` }
+            : {}),
+          ...(browser
+            ? { "X-OpenBot-Browser": "1", "Content-Type": "application/json" }
+            : options.body
+              ? { "Content-Type": "application/json" }
+              : {}),
         },
-        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+        ...(options.body || (browser && options.method === "POST") ? { body: JSON.stringify(options.body ?? {}) } : {}),
         signal: controller.signal,
       });
       const value = await response.json().catch(() => null);
@@ -347,6 +384,7 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
     role: value.role,
     expiresAt: value.expiresAt,
     emailBound: value.emailBound,
+    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
     devicePublicKey: value.devicePublicKey,
   };
 }
@@ -396,6 +434,9 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
     expiresAt: value.expiresAt,
     usedAt: value.usedAt,
     revokedAt: value.revokedAt,
+    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
+    useCount:
+      isNumber(value.useCount) && Number.isSafeInteger(value.useCount) && value.useCount >= 0 ? value.useCount : 0,
   };
 }
 

@@ -4,12 +4,12 @@ import type {
   DynamicIslandPresentation,
   DynamicIslandPromptItem,
 } from "@openbot/contracts/ipc";
+import type { DynamicIslandViewState } from "@openbot/ui";
+import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import type { DynamicIslandViewState } from "../src/components/ui";
-import { OpenBotDynamicIsland } from "../src/features/dynamic-island/OpenBotDynamicIsland";
 import { DynamicIslandDisplayComparison } from "./DynamicIslandDisplayComparison";
 import { STORY_AGENTS } from "./fixtures";
 
@@ -25,7 +25,7 @@ interface DynamicIslandDemoProps {
   onAction: (action: DynamicIslandAction) => void;
 }
 
-const AGENT_IDENTITIES = STORY_AGENTS.slice(0, 3).map(toIslandAgent);
+const AGENT_IDENTITIES = storyIslandAgents();
 const SCENARIOS: Scenario[] = ["idle", "working", "chat", "question", "approval", "takeover", "failed"];
 
 function DynamicIslandDemo(props: DynamicIslandDemoProps): JSX.Element {
@@ -248,6 +248,12 @@ function questionFixture(variant: QuestionVariant): DynamicIslandPromptItem {
       },
     ],
   };
+}
+
+function storyIslandAgents(): [DynamicIslandAgentIdentity, DynamicIslandAgentIdentity, DynamicIslandAgentIdentity] {
+  const [first, second, third] = STORY_AGENTS;
+  if (!first || !second || !third) throw new Error("The story fixtures need three agents.");
+  return [toIslandAgent(first), toIslandAgent(second), toIslandAgent(third)];
 }
 
 function toIslandAgent(agent: (typeof STORY_AGENTS)[number]): DynamicIslandAgentIdentity {

@@ -1,0 +1,70 @@
+.settings-panel,
+.browser-panel,
+.remote-desktop-workspace {
+  background: var(--openbot-bg-canvas);
+}
+
+.composer-reply-preview {
+  border-color: var(--openbot-border);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.message-reaction-pill {
+  border-color: var(--openbot-border);
+  background: transparent;
+  color: var(--openbot-text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .message-reaction-pill:not(.message-reaction-pill-readonly):hover {
+    background: var(--openbot-hover);
+  }
+}
+
+.composer,
+.direct-composer {
+  background: var(--openbot-bg-surface);
+}
+
+.direct-composer > button:hover:not(:disabled) {
+  background: var(--openbot-accent-hover);
+}
+
+.remote-desktop-stage,
+.remote-desktop-viewer {
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-secondary);
+}
+
+.remote-desktop-header {
+  background: var(--openbot-bg-sidebar);
+}
+
+.remote-desktop-button[aria-expanded="true"] {
+  background: var(--openbot-accent-soft);
+  color: var(--openbot-accent-hover);
+}
+
+.voice-button:active,
+.voice-button-active:active {
+  transform: scale(0.97);
+}
+
+.provider-model-search {
+  flex-shrink: 0;
+  margin-bottom: var(--openbot-space-2);
+}
+
+.provider-model-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.provider-model-group {
+  padding: var(--openbot-space-3) var(--openbot-space-2) var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 500;
+}

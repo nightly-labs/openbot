@@ -7,8 +7,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  dynamicIslandCompactHeight,
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
@@ -19,6 +20,8 @@ const logger = createOpenBotLogger("dynamic-island-window");
 
 export const DYNAMIC_ISLAND_WINDOW_SIZE = { width: 614, height: 380 } as const;
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT = 50;
+// Room below the compact island for its hover growth and hit band, which the window must not clip.
+const DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM = 18;
 // Leaving interaction starts a collapse the renderer animates for roughly 600ms: the panel fades,
 // then the shell springs back down to the notch. The window is the only thing clipping it, so
 // dropping to the compact height on the same tick guillotines the still-tall island - the lower
@@ -112,7 +115,7 @@ export class DynamicIslandWindowController {
     if (isDeepStrictEqual(this.#presentation, presentation)) return;
     this.#presentation = presentation;
     for (const window of this.#windows.values()) {
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPresentation, presentation);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, presentation);
     }
   }
 
@@ -127,7 +130,7 @@ export class DynamicIslandWindowController {
     const display = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
     const bounds = display ? dynamicIslandWindowBounds(display) : undefined;
     this.#cancelCollapse(displayId);
-    if (interactive && bounds) window.setBounds(dynamicIslandInteractiveWindowBounds(bounds, true), false);
+    if (interactive && bounds) window.setBounds(bounds, false);
     // On macOS, focusability also allows the panel to become a main window in AltTab.
     // Keep it non-focusable; mouse interaction does not require keyboard focus.
     window.setIgnoreMouseEvents(!interactive, { forward: true });
@@ -142,9 +145,21 @@ export class DynamicIslandWindowController {
         // rather than replaying the rectangle captured when the pointer left.
         const current = this.#options.getDisplays().find((candidate) => candidate.id === displayId);
         if (!current) return;
-        window.setBounds(dynamicIslandInteractiveWindowBounds(dynamicIslandWindowBounds(current), false), false);
+        window.setBounds(this.#windowBounds(current, dynamicIslandWindowBounds(current), false), false);
       }, DYNAMIC_ISLAND_COLLAPSE_SETTLE_MS),
     );
+  }
+
+  #windowBounds(display: Pick<Display, "bounds" | "internal">, bounds: Rectangle, interactive: boolean): Rectangle {
+    if (interactive) return bounds;
+    const compactHeight = dynamicIslandCompactHeight(
+      notchSizeForDisplay(display)?.height,
+      this.#preference.heightPercent,
+    );
+    return {
+      ...bounds,
+      height: Math.max(DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT, compactHeight + DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM),
+    };
   }
 
   #cancelCollapse(displayId: number): void {
@@ -161,7 +176,7 @@ export class DynamicIslandWindowController {
       if (existing) return existing;
       const pending = this.#ensureMainWindow().then(async (window) => {
         await this.#options.performCriticalAction(action);
-        sendToRenderer(window, IPC_CHANNELS.dynamicIslandAction, action);
+        sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action);
       });
       this.#criticalActions.set(key, pending);
       try {
@@ -173,7 +188,7 @@ export class DynamicIslandWindowController {
     }
     const window = await this.#ensureMainWindow();
     this.#options.presentMainWindow(window);
-    if (action.type !== "open-app" && !sendToRenderer(window, IPC_CHANNELS.dynamicIslandAction, action)) {
+    if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
       throw new Error("The OpenBot window is temporarily unavailable.");
     }
   }
@@ -218,14 +233,15 @@ export class DynamicIslandWindowController {
       const current = this.#windows.get(display.id);
       if (current && !current.isDestroyed()) {
         current.setBounds(
-          dynamicIslandInteractiveWindowBounds(
+          this.#windowBounds(
+            display,
             bounds,
             this.#interactiveDisplays.has(display.id) || this.#collapseTimers.has(display.id),
           ),
           false,
         );
         if (notchSizeChanged(this.#notchSizes.get(display.id), notchSize)) {
-          if (sendToRenderer(current, IPC_CHANNELS.dynamicIslandGeometry, notchSize ?? null)) {
+          if (sendToRenderer(current, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
             this.#rememberNotchSize(display.id, notchSize);
           }
         }
@@ -244,7 +260,7 @@ export class DynamicIslandWindowController {
   }
 
   private async createDisplayWindow(display: Display, bounds: Rectangle): Promise<void> {
-    const window = this.#options.createWindow(dynamicIslandInteractiveWindowBounds(bounds, false), display);
+    const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
     window.excludedFromShownWindowsMenu = true;
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
@@ -260,10 +276,10 @@ export class DynamicIslandWindowController {
     window.webContents.on("did-finish-load", () => {
       if (this.#windows.get(display.id) !== window || window.isDestroyed()) return;
       const currentDisplay = this.#options.getDisplays().find((candidate) => candidate.id === display.id) ?? display;
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPresentation, this.#presentation);
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPreference, this.#preference);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, this.#presentation);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
       const notchSize = notchSizeForDisplay(currentDisplay);
-      if (sendToRenderer(window, IPC_CHANNELS.dynamicIslandGeometry, notchSize ?? null)) {
+      if (sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.geometry, notchSize ?? null)) {
         this.#rememberNotchSize(display.id, notchSize);
       }
     });
@@ -297,7 +313,7 @@ export class DynamicIslandWindowController {
 
   private publishPreference(): void {
     for (const window of this.#windows.values()) {
-      sendToRenderer(window, IPC_CHANNELS.dynamicIslandPreference, this.#preference);
+      sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.preference, this.#preference);
     }
   }
 
@@ -355,10 +371,6 @@ export function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rec
     y: display.bounds.y,
     ...DYNAMIC_ISLAND_WINDOW_SIZE,
   };
-}
-
-function dynamicIslandInteractiveWindowBounds(bounds: Rectangle, interactive: boolean): Rectangle {
-  return interactive ? bounds : { ...bounds, height: DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT };
 }
 
 /**

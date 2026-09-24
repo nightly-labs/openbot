@@ -259,7 +259,7 @@ function QueuedEditAttachments({
   onPreparingChange?: (preparing: boolean) => void;
 }) {
   const muted = useThemeColor("muted");
-  const attachments = useChatAttachments(queue.attachments, queue.changeAttachments);
+  const attachments = useChatAttachments(queue.attachments, queue.changeAttachments, queue.attachmentSupport);
   const busy = queue.busy || attachments.preparing || Boolean(queue.edit?.pendingSave);
   useEffect(() => {
     onPreparingChange?.(attachments.preparing);

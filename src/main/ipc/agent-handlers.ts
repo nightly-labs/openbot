@@ -25,7 +25,6 @@ import { decodeAgentAnalyticsFromHost, decodeHostAnalyticsFromHost } from "../re
 // Every one of these routes to the local service or to a remote server by the
 // `serverId` in the request.
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   DuplicateAgentResult,
   SendMessageInput,
@@ -51,11 +50,14 @@ import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
+  agentRequest,
+  agentScope,
   parseAcknowledgeFailedTurn,
-  parseAgentRequest,
+  parseAgentId,
   parseApprovalResponse,
   parseBrowserTakeoverResponse,
   parseCancelQueuedMessage,
+  parseChannelId,
   parseCreateAgent,
   parseInterrupt,
   parseMarkConversationRead,
@@ -75,7 +77,6 @@ import {
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
-import { requireString } from "./validation";
 
 export interface AgentIpcDependencies {
   service: AgentService;
@@ -94,15 +95,15 @@ export function agentIpcHandlers({
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   return {
     agent: {
-      getStatus: payloadHandler(parseAgentRequest, (parsed) => {
+      getStatus: payloadHandler(agentScope, (parsed) => {
         return routeToServer(parsed.serverId, {
           local: () => service.getStatus(),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
         });
       }),
-      getHostAnalytics: payloadHandler(parseAgentRequest, (parsed) => {
-        const input = parseHostAnalyticsInput(parsed.payload);
+      getHostAnalytics: payloadHandler(agentRequest(parseHostAnalyticsInput), (parsed) => {
+        const input = parsed.payload;
         return routeToServer(parsed.serverId, {
           local: () => service.getHostAnalytics(input),
           remote: (serverId) =>
@@ -113,8 +114,8 @@ export function agentIpcHandlers({
               : null,
         });
       }),
-      getAnalytics: payloadHandler(parseAgentRequest, (parsed) => {
-        const input = parseAgentAnalyticsInput(parsed.payload);
+      getAnalytics: payloadHandler(agentRequest(parseAgentAnalyticsInput), (parsed) => {
+        const input = parsed.payload;
         return routeToServer(parsed.serverId, {
           local: () => service.getAnalytics(input),
           remote: (serverId) =>
@@ -127,8 +128,8 @@ export function agentIpcHandlers({
               : null,
         });
       }),
-      getUsage: payloadHandler(parseAgentRequest, (parsed) => {
-        const agentId = parseOptionalAgentId(parsed.payload);
+      getUsage: payloadHandler(agentRequest(parseOptionalAgentId), (parsed) => {
+        const agentId = parsed.payload;
         return routeToServer(parsed.serverId, {
           local: () => service.getUsage(agentId),
           remote: (serverId) =>
@@ -139,20 +140,20 @@ export function agentIpcHandlers({
               : remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost),
         });
       }),
-      listModels: payloadHandler(parseAgentRequest, (parsed) => {
+      listModels: payloadHandler(agentScope, (parsed) => {
         return routeToServer(parsed.serverId, {
           local: () => service.listModels(),
           remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, decodeAgentModelOptions),
         });
       }),
-      list: payloadHandler(parseAgentRequest, (parsed) => {
+      list: payloadHandler(agentScope, (parsed) => {
         return routeToServer(parsed.serverId, {
           local: () => service.listAgents(),
           remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
         });
       }),
-      listInstalledSkills: payloadHandler(parseAgentRequest, (scoped) => {
-        const agentId = requireString(scoped.payload, "agentId", INPUT_LIMITS.identifier);
+      listInstalledSkills: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        const agentId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => skills.listInstalledForChatTags(agentId),
           // A server too old to know the endpoint would answer 404, so ask its advertised capabilities first.
@@ -165,7 +166,7 @@ export function agentIpcHandlers({
               : Promise.resolve([]),
         });
       }),
-      listChannels: payloadHandler(parseAgentRequest, (scoped) =>
+      listChannels: payloadHandler(agentScope, (scoped) =>
         routeToServer(scoped.serverId, {
           // The reader here is the host user of this computer, so messages they wrote before they
           // signed in are their own.
@@ -173,24 +174,24 @@ export function agentIpcHandlers({
           remote: (serverId) => remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries),
         }),
       ),
-      readChannel: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseChannelRead(scoped.payload);
+      readChannel: payloadHandler(agentRequest(parseChannelRead), (scoped) => {
+        const input = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.channels.store.page(input.channelId, input.beforeSequence),
           remote: (serverId) =>
             remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
         });
       }),
-      channelCommand: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseChannelCommand(scoped.payload);
+      channelCommand: payloadHandler(agentRequest(parseChannelCommand), (scoped) => {
+        const input = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.channels.command(input, host.channelActor()),
           remote: (serverId) =>
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
         });
       }),
-      deleteChannel: payloadHandler(parseAgentRequest, (scoped) => {
-        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+      deleteChannel: payloadHandler(agentRequest(parseChannelId), (scoped) => {
+        const channelId = scoped.payload;
         return routeToServer<void>(scoped.serverId, {
           local: () => service.deleteChannel(channelId),
           remote: async (serverId) => {
@@ -203,26 +204,29 @@ export function agentIpcHandlers({
           },
         });
       }),
-      getSidebarLayout: payloadHandler(parseAgentRequest, (parsed): Promise<SidebarLayoutSnapshot> => {
+      getSidebarLayout: payloadHandler(agentScope, (parsed): Promise<SidebarLayoutSnapshot> => {
         return routeToServer(parsed.serverId, {
           local: () => sidebarLayout.getSnapshot(),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.state, decodeSidebarLayoutSnapshot),
         });
       }),
-      mutateSidebarLayout: payloadHandler(parseAgentRequest, (scoped): Promise<SidebarLayoutSnapshot> => {
-        const action = parseSidebarLayoutAction(scoped.payload);
-        return routeToServer(scoped.serverId, {
-          local: () => sidebarLayout.mutate(action, service.sidebarChatIds()),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
-              method: "POST",
-              body: action,
-            }),
-        });
-      }),
-      generateProfile: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseGenerateAgentProfile(scoped.payload);
+      mutateSidebarLayout: payloadHandler(
+        agentRequest(parseSidebarLayoutAction),
+        (scoped): Promise<SidebarLayoutSnapshot> => {
+          const action = scoped.payload;
+          return routeToServer(scoped.serverId, {
+            local: () => sidebarLayout.mutate(action, service.sidebarChatIds()),
+            remote: (serverId) =>
+              remoteServers.request(serverId, TEAM_API_ROUTES.sidebarLayout.actions, decodeSidebarLayoutSnapshot, {
+                method: "POST",
+                body: action,
+              }),
+          });
+        },
+      ),
+      generateProfile: payloadHandler(agentRequest(parseGenerateAgentProfile), (scoped) => {
+        const input = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.generateProfile(input, sidebarLayout.getSnapshot().sections),
           remote: (serverId) =>
@@ -233,8 +237,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      saveProfile: payloadHandler(parseAgentRequest, (scoped) => {
-        const input = parseSaveAgentProfile(scoped.payload);
+      saveProfile: payloadHandler(agentRequest(parseSaveAgentProfile), (scoped) => {
+        const input = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.saveProfile(input, sidebarLayout),
           remote: (serverId) =>
@@ -244,8 +248,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      create: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCreateAgent(scoped.payload);
+      create: payloadHandler(agentRequest(parseCreateAgent), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createAgent(parsed),
           remote: (serverId) =>
@@ -255,37 +259,37 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      duplicate: payloadHandler(parseAgentRequest, (scoped): Promise<DuplicateAgentResult> => {
-        const agentId = requireString(scoped.payload, "agentId", INPUT_LIMITS.identifier);
+      duplicate: payloadHandler(agentRequest(parseAgentId), (scoped): Promise<DuplicateAgentResult> => {
+        const agentId = scoped.payload;
         return routeDuplicateAgent(service, sidebarLayout, remoteServers, scoped.serverId, agentId);
       }),
-      update: payloadHandler(parseAgentRequest, (scoped) => {
-        return routeUpdateAgent(service, remoteServers, scoped.serverId, parseUpdateAgent(scoped.payload));
+      update: payloadHandler(agentRequest(parseUpdateAgent), (scoped) => {
+        return routeUpdateAgent(service, remoteServers, scoped.serverId, scoped.payload);
       }),
-      setAvatar: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseSetAgentAvatar(scoped.payload);
+      setAvatar: payloadHandler(agentRequest(parseSetAgentAvatar), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.setAvatar(parsed.agentId, parsed.image),
           remote: (serverId) => remoteServers.setAgentAvatar(parsed.agentId, parsed.image, serverId),
         });
       }),
-      delete: payloadHandler(parseAgentRequest, (scoped) => {
-        const agentId = requireString(scoped.payload, "agentId");
+      delete: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        const agentId = scoped.payload;
         return routeDeleteAgent(service, sidebarLayout, remoteServers, scoped.serverId, agentId);
       }),
-      readConversation: payloadHandler(parseAgentRequest, (scoped) => {
-        return routeReadConversation(host, remoteServers, scoped.serverId, requireString(scoped.payload, "agentId"));
+      readConversation: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        return routeReadConversation(host, remoteServers, scoped.serverId, scoped.payload);
       }),
-      readConversationPage: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseReadConversationPage(scoped.payload);
+      readConversationPage: payloadHandler(agentRequest(parseReadConversationPage), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => host.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit),
           remote: (serverId) =>
             remoteServers.readAgentConversationPage(parsed.agentId, parsed.anchor, parsed.limit, serverId),
         });
       }),
-      searchConversationMessages: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseSearchConversationMessages(scoped.payload);
+      searchConversationMessages: payloadHandler(agentRequest(parseSearchConversationMessages), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => host.searchAgentConversationMessages(parsed.query, parsed.agentId, parsed.cursor, parsed.limit),
           remote: (serverId) =>
@@ -298,24 +302,24 @@ export function agentIpcHandlers({
             ),
         });
       }),
-      listConversationReads: payloadHandler(parseAgentRequest, (parsed) => {
+      listConversationReads: payloadHandler(agentScope, (parsed) => {
         return routeToServer(parsed.serverId, {
           local: () => host.listAgentConversationReads(),
           remote: (serverId) => remoteServers.listAgentConversationReads(serverId),
         });
       }),
-      markConversationRead: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseMarkConversationRead(scoped.payload);
+      markConversationRead: payloadHandler(agentRequest(parseMarkConversationRead), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => host.markAgentConversationRead(parsed),
           remote: (serverId) => remoteServers.markAgentConversationRead(parsed, serverId),
         });
       }),
-      sendMessage: payloadHandler(parseAgentRequest, (scoped) => {
-        return routeSendMessage(service, remoteServers, scoped.serverId, parseSendMessage(scoped.payload));
+      sendMessage: payloadHandler(agentRequest(parseSendMessage), (scoped) => {
+        return routeSendMessage(service, remoteServers, scoped.serverId, scoped.payload);
       }),
-      setMessageReaction: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseMessageReaction(scoped.payload);
+      setMessageReaction: payloadHandler(agentRequest(parseMessageReaction), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.setMessageReaction(parsed),
           remote: (serverId) =>
@@ -325,11 +329,11 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      listQueue: payloadHandler(parseAgentRequest, (scoped) => {
-        return routeListQueue(service, remoteServers, scoped.serverId, requireString(scoped.payload, "agentId"));
+      listQueue: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        return routeListQueue(service, remoteServers, scoped.serverId, scoped.payload);
       }),
-      acknowledgeFailedTurn: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseAcknowledgeFailedTurn(scoped.payload);
+      acknowledgeFailedTurn: payloadHandler(agentRequest(parseAcknowledgeFailedTurn), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.acknowledgeFailedTurn(parsed.agentId, parsed.turnId),
           remote: (serverId) =>
@@ -339,8 +343,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      cancelQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCancelQueuedMessage(scoped.payload);
+      cancelQueuedMessage: payloadHandler(agentRequest(parseCancelQueuedMessage), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.cancelQueuedMessage(parsed.agentId, parsed.deliveryId),
           remote: (serverId) =>
@@ -350,8 +354,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      steerQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseSteerQueuedMessage(scoped.payload);
+      steerQueuedMessage: payloadHandler(agentRequest(parseSteerQueuedMessage), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.steerQueuedMessage(parsed),
           remote: (serverId) =>
@@ -361,8 +365,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      editQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
-        const { agentId, ...input } = parseQueueEdit(scoped.payload);
+      editQueuedMessage: payloadHandler(agentRequest(parseQueueEdit), (scoped) => {
+        const { agentId, ...input } = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.editQueuedMessage(agentId, input),
           remote: (serverId) =>
@@ -372,8 +376,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      updateQueuedMessage: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseUpdateQueuedMessage(scoped.payload);
+      updateQueuedMessage: payloadHandler(agentRequest(parseUpdateQueuedMessage), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.updateQueuedMessage(parsed),
           remote: (serverId) =>
@@ -388,8 +392,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      reorderQueue: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseReorderQueue(scoped.payload);
+      reorderQueue: payloadHandler(agentRequest(parseReorderQueue), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.reorderQueue(parsed),
           remote: (serverId) =>
@@ -399,8 +403,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      interrupt: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseInterrupt(scoped.payload);
+      interrupt: payloadHandler(agentRequest(parseInterrupt), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.interrupt(parsed.agentId, parsed.turnId),
           remote: (serverId) =>
@@ -410,8 +414,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      respondToPrompt: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parsePromptResponse(scoped.payload);
+      respondToPrompt: payloadHandler(agentRequest(parsePromptResponse), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.respondToPrompt(parsed),
           remote: (serverId) =>
@@ -421,8 +425,8 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      respondToApproval: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseApprovalResponse(scoped.payload);
+      respondToApproval: payloadHandler(agentRequest(parseApprovalResponse), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.respondToApproval(parsed),
           remote: (serverId) =>
@@ -432,16 +436,16 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      respondToBrowserSecret: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseBrowserSecretResponse(scoped.payload);
+      respondToBrowserSecret: payloadHandler(agentRequest(parseBrowserSecretResponse), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.respondToBrowserSecret(parsed),
           remote: (serverId) =>
             remoteServers.request(serverId, BROWSER_SECRET_RESPONSE_PATH, decodeVoid, { method: "POST", body: parsed }),
         });
       }),
-      respondToBrowserTakeover: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseBrowserTakeoverResponse(scoped.payload);
+      respondToBrowserTakeover: payloadHandler(agentRequest(parseBrowserTakeoverResponse), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.respondToBrowserTakeover(parsed),
           remote: (serverId) =>
@@ -463,11 +467,16 @@ function routeUpdateAgent(
 ) {
   return routeToServer(serverId, {
     local: () => service.updateAgent(input),
-    remote: (target) =>
-      remoteServers.request(target, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+    remote: (target) => {
+      // The Team API does not carry access, and a team member must not be able to widen it.
+      if (input.access !== undefined) {
+        throw new Error("Agent access can only be changed on the computer that runs the agent.");
+      }
+      return remoteServers.request(target, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
         method: "PATCH",
         body: input,
-      }),
+      });
+    },
   });
 }
 

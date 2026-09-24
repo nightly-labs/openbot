@@ -29,6 +29,7 @@ export type ChannelRequest = <T>(
   body: TeamProtocolV2Json | undefined,
   serverId: string,
   upload?: RemoteFileUpload,
+  onUploadProgress?: (fraction: number) => void,
 ) => Promise<T>;
 export interface ChannelState {
   channels: ChannelSummary[];
@@ -155,7 +156,7 @@ export class MobileChannelStore {
           const current = entry.state.pages.get(channelId);
           if (current) {
             const messages = current.messages.slice(-50);
-            pages.set(channelId, { ...current, messages, olderCursor: messages[0].sequence });
+            pages.set(channelId, { ...current, messages, olderCursor: messages[0]?.sequence ?? current.olderCursor });
           }
           this.publish(entry, { pages });
         }
@@ -442,7 +443,7 @@ export class MobileChannelStore {
   async deleteRoutine(serverId: string, channelId: string, routineId: string) {
     await this.request("POST", CHANNEL_ROUTES.routineDelete, () => undefined, { channelId, routineId }, serverId);
   }
-  async upload(serverId: string, input: RemoteFileUpload) {
+  async upload(serverId: string, input: RemoteFileUpload, onProgress?: (fraction: number) => void) {
     const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
     return this.request(
       "POST",
@@ -454,6 +455,7 @@ export class MobileChannelStore {
       undefined,
       serverId,
       input,
+      onProgress,
     );
   }
   async discard(serverId: string, attachmentId: string) {

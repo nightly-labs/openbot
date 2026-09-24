@@ -64,6 +64,7 @@ export default defineConfig({
             "packages/logging/**/*.test.ts",
             "packages/user-errors/**/*.test.ts",
             "packages/team-client/**/*.test.ts",
+            "packages/ui/**/*.test.ts",
             "apps/mobile/src/**/*.test.ts",
           ],
           exclude: [...configDefaults.exclude, "**/*.dom.test.ts"],
@@ -88,7 +89,7 @@ export default defineConfig({
           // The `*.dom.test.ts` half of the include mirrors the node project's exclude of the same
           // pattern, so a DOM test lands here wherever it lives: a page script the main process
           // injects needs a document as much as a renderer module does.
-          include: ["src/renderer/**/*.test.tsx", "**/*.dom.test.ts"],
+          include: ["src/renderer/**/*.test.tsx", "packages/ui/**/*.test.tsx", "**/*.dom.test.ts"],
           setupFiles: ["./src/renderer/src/setupTests.ts"],
         },
       },

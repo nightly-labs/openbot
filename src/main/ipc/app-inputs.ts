@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentProviderId,
+  DeleteHostedSiteInput,
   DynamicIslandAction,
   DynamicIslandPreference,
   DynamicIslandPresentation,
@@ -10,17 +11,20 @@ import type {
   MacPermissionId,
   MarketplaceAgentQuery,
   MarketplaceSkillQuery,
+  NotificationPreference,
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   SetAppLanguagePreferenceInput,
   SetApprovalAutomationInput,
+  SetDynamicIslandInteractiveInput,
   SetEnabledSkillInput,
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
   UpdatePreference,
+  VerifyEmailCodeInput,
 } from "@openbot/contracts/ipc";
 import {
   isAgentModel,
@@ -80,6 +84,13 @@ export function parseUpdatePreference(input: unknown): UpdatePreference {
   return { autoDownload: input.autoDownload };
 }
 
+export function parseNotificationPreference(input: unknown): NotificationPreference {
+  if (!isDynamicRecord(input) || !isBoolean(input.desktopNotifications)) {
+    throw new Error("Notification preference is required.");
+  }
+  return { desktopNotifications: input.desktopNotifications };
+}
+
 export function parseDynamicIslandPreference(input: unknown): DynamicIslandPreference {
   if (!isDynamicIslandPreference(input)) {
     throw new Error("Dynamic Island preference is required.");
@@ -87,7 +98,7 @@ export function parseDynamicIslandPreference(input: unknown): DynamicIslandPrefe
   return input;
 }
 
-export function parseDynamicIslandInteractive(input: unknown): { interactive: boolean } {
+export function parseDynamicIslandInteractive(input: unknown): SetDynamicIslandInteractiveInput {
   if (!isDynamicIslandInteractive(input)) {
     throw new Error("Dynamic Island interaction state is required.");
   }
@@ -126,7 +137,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
   return input;
 }
 
-export function parseEmailCodeVerification(input: unknown): { challengeId: string; code: string } {
+export function parseEmailCodeVerification(input: unknown): VerifyEmailCodeInput {
   if (!isObject(input)) throw new Error("Sign-in code details are required.");
   return {
     challengeId: requireString(input.challengeId, "challengeId", INPUT_LIMITS.identifier),
@@ -236,9 +247,9 @@ export function parseReplaceHostedSite(input: unknown): ReplaceHostedSiteInput {
   };
 }
 
-export function parseDeleteHostedSite(input: unknown): string {
+export function parseDeleteHostedSite(input: unknown): DeleteHostedSiteInput {
   if (!isObject(input)) throw new Error("Invalid site deletion.");
-  return requireString(input.siteId, "siteId", INPUT_LIMITS.identifier);
+  return { siteId: requireString(input.siteId, "siteId", INPUT_LIMITS.identifier) };
 }
 
 export function parseSubmitMarketplaceAgent(input: unknown): SubmitMarketplaceAgentInput {

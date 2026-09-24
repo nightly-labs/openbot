@@ -128,7 +128,8 @@ jobs:
 
   surfaces:
     # `desktop:typecheck` covers only the desktop projects, so without this job
-    # `apps/mobile`, `apps/site-router`, `packages/team-client` and `remote/api`
+    # `apps/mobile`, `apps/site-router`, `packages/team-client`, `remote/api`,
+    # `packages/logging`, `packages/user-errors` and `packages/i18n`
     # first break at release time rather than on the pull request that broke
     # them. Mobile's typecheck generates `expo-env.d.ts` and the uniwind
     # declarations first - both are gitignored, so a fresh checkout cannot
@@ -162,6 +163,9 @@ jobs:
 
       - name: Typecheck remote API
         run: bun run typecheck:remote
+
+      - name: Typecheck logging, user errors and i18n
+        run: bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n
 
       - name: Validate the remote Compose files
         run: bun run remote:check:compose
@@ -383,7 +387,7 @@ jobs:
             https://openbot.run/.well-known/apple-app-site-association)"
           test "$association_status" = "200"
           tr -d '\r' < "$verification_dir/association.headers" | grep -Eiq '^content-type: application/json'
-          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]}]' \
+          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join"]}]' \
             "$verification_dir/association.json" >/dev/null
           curl --fail --silent --show-error --retry 5 --retry-all-errors https://api.openbot.run/health/live >/dev/null
           curl --fail --silent --show-error --retry 5 --retry-all-errors https://api.openbot.run/health/ready >/dev/null

@@ -47,6 +47,8 @@ export interface CpuReport {
 export interface ProcessTableRow {
   pid: number;
   ppid: number;
+  // Resident set size in kilobytes, as `ps -o rss=` prints it.
+  rssKb: number;
   cpuSeconds: number;
   command: string;
 }
@@ -118,24 +120,28 @@ function isElectronExecutable(command: string): boolean {
   return executable.endsWith("/electron") || executable === "electron";
 }
 
-const PROCESS_TABLE_ROW = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/;
+const PROCESS_TABLE_ROW = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/;
+
+/** The `ps` arguments whose output `parseProcessTable` reads. */
+export const PROCESS_TABLE_PS_ARGS = ["-o", "pid=,ppid=,rss=,cputime=,command=", "-ax"] as const;
 
 /**
- * Rows from `ps -o pid=,ppid=,cputime=,command= -ax`. A row whose time field
- * does not parse is dropped rather than guessed at.
+ * Rows from `ps -o pid=,ppid=,rss=,cputime=,command= -ax`. A row whose time
+ * field does not parse is dropped rather than guessed at.
  */
 export function parseProcessTable(stdout: string): ProcessTableRow[] {
   const rows: ProcessTableRow[] = [];
   for (const line of stdout.split("\n")) {
     const match = PROCESS_TABLE_ROW.exec(line);
     if (!match) continue;
-    const cpuSeconds = parseProcessTime(match[3] ?? "");
+    const cpuSeconds = parseProcessTime(match[4] ?? "");
     if (cpuSeconds === null) continue;
     rows.push({
       pid: Number(match[1]),
       ppid: Number(match[2]),
+      rssKb: Number(match[3]),
       cpuSeconds,
-      command: match[4] ?? "",
+      command: match[5] ?? "",
     });
   }
   return rows;
@@ -272,4 +278,95 @@ export function parseCpuReport(value: unknown): CpuReport | null {
     parsed.push({ type: process.type, cpuPercent: process.cpuPercent, processes: process.processes });
   }
   return { label, durationMs, samples, processes: parsed, totalCpuPercent };
+}
+
+// Memory, for `dev:automation memory`. Unlike CPU, resident memory is a level,
+// not a counter, so one `ps` reading is a complete answer and no interval is
+// needed.
+
+export type MemoryProcessKind = ChromiumProcessType | "provider" | "dev-tooling";
+
+// The provider command-line tools the app starts, by executable name. Each one
+// can hold hundreds of megabytes, and with `other` they would hide in the noise.
+const PROVIDER_EXECUTABLES: ReadonlySet<string> = new Set(["claude", "codex", "grok", "opencode", "cua-driver"]);
+// What `bun run dev` adds around the app. A packaged build has none of it, so
+// it is reported apart from the app total rather than inside it.
+const DEV_TOOLING =
+  /(?:^|[/\s])(?:vite|electron-vite|esbuild|workerd|wrangler|dotenvx)(?:\s|$)|dev-services\.ts|bun --watch/;
+
+export function classifyMemoryProcess(command: string): MemoryProcessKind {
+  const executable = command.trim().split(/\s+/)[0] ?? "";
+  const name = executable.slice(executable.lastIndexOf("/") + 1).toLowerCase();
+  if (PROVIDER_EXECUTABLES.has(name)) return "provider";
+  const chromium = classifyChromiumProcess(command);
+  if (chromium !== "other") return chromium;
+  return DEV_TOOLING.test(command) ? "dev-tooling" : "other";
+}
+
+export interface MemoryProcess {
+  pid: number;
+  kind: MemoryProcessKind;
+  rssMb: number;
+  // The executable name only: a full command line can carry a path or a token.
+  name: string;
+}
+
+export interface MemoryBucket {
+  kind: MemoryProcessKind;
+  rssMb: number;
+  processes: number;
+}
+
+export interface MemoryReport {
+  label: string;
+  // Everything except dev tooling: what a packaged build would hold.
+  appRssMb: number;
+  devToolingRssMb: number;
+  buckets: MemoryBucket[];
+  processes: MemoryProcess[];
+}
+
+const MEMORY_KINDS: readonly MemoryProcessKind[] = [...REPORTED_TYPES, "provider", "dev-tooling"];
+
+/**
+ * One memory report from the rows `collectDescendants` returned.
+ *
+ * A child of a provider counts as provider too: the MCP servers a provider
+ * starts live and die with it, so they are part of what releasing it saves.
+ */
+export function summarizeMemory(rows: ProcessTableRow[], label: string): MemoryReport {
+  const byPid = new Map(rows.map((row) => [row.pid, row]));
+  const kinds = new Map<number, MemoryProcessKind>();
+  const kindOf = (row: ProcessTableRow): MemoryProcessKind => {
+    const known = kinds.get(row.pid);
+    if (known) return known;
+    const own = classifyMemoryProcess(row.command);
+    const parent = byPid.get(row.ppid);
+    const kind =
+      own !== "provider" && parent && parent.pid !== row.pid && kindOf(parent) === "provider" ? "provider" : own;
+    kinds.set(row.pid, kind);
+    return kind;
+  };
+  const processes = rows
+    .map((row) => {
+      const executable = row.command.trim().split(/\s+/)[0] ?? "";
+      return {
+        pid: row.pid,
+        kind: kindOf(row),
+        rssMb: round(row.rssKb / 1_024),
+        name: executable.slice(executable.lastIndexOf("/") + 1),
+      };
+    })
+    .sort((left, right) => right.rssMb - left.rssMb);
+  const buckets = MEMORY_KINDS.map((kind) => {
+    const members = processes.filter((process) => process.kind === kind);
+    return {
+      kind,
+      rssMb: round(members.reduce((total, process) => total + process.rssMb, 0)),
+      processes: members.length,
+    };
+  }).filter((bucket) => bucket.processes > 0);
+  const devToolingRssMb = buckets.find((bucket) => bucket.kind === "dev-tooling")?.rssMb ?? 0;
+  const totalRssMb = buckets.reduce((total, bucket) => total + bucket.rssMb, 0);
+  return { label, appRssMb: round(totalRssMb - devToolingRssMb), devToolingRssMb, buckets, processes };
 }

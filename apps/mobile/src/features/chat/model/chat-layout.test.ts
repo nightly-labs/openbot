@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   CHAT_HISTORY_BATCH,
   type ChatLayout,
@@ -50,22 +50,27 @@ describe("chat positioning", () => {
 });
 
 describe("streaming reveal work", () => {
-  it("bounds active nodes, exposes an oversized backlog, and releases the next work on completion", () => {
+  it("bounds active nodes and keeps revealing words even when completion callbacks are delayed", () => {
     vi.useFakeTimers();
     const pool = createStreamRevealPool();
     const skipped: number[] = [];
     const active = new Map<number, () => void>();
-    for (let id = 0; id < 20; id++) pool.add({ start: (done) => active.set(id, done), skip: () => skipped.push(id) });
-    vi.runOnlyPendingTimers();
-    vi.runOnlyPendingTimers();
+    for (let id = 0; id < 20; id++)
+      pool.add({
+        start: (done) => active.set(id, done),
+        skip: () => {
+          skipped.push(id);
+          active.delete(id);
+        },
+      });
+    for (let tick = 0; tick < 4; tick += 1) vi.runOnlyPendingTimers();
     expect({ skipped, active: [...active.keys()] }).toEqual({
       skipped: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
       active: [10, 11, 12, 13],
     });
-    active.get(10)?.();
-    active.delete(10);
     vi.runOnlyPendingTimers();
     expect([...active.keys()]).toEqual([11, 12, 13, 14]);
+    expect(skipped).toContain(10);
     pool.clear();
   });
   it("does not run queued work after it is removed or its conversation is closed", () => {
@@ -87,7 +92,9 @@ it("bounds the reveal tail and retains all text when words finish or the stream 
     size: 14,
     text: body,
   });
-  const completed = body.slice(0, window.words[window.words.length - 1].end);
+  const lastWord = window.words[window.words.length - 1];
+  assert(lastWord);
+  const completed = body.slice(0, lastWord.end);
   expect([
     streamRevealWindow(body, completed, true),
     streamRevealWindow("replacement", body, true),
@@ -121,8 +128,9 @@ describe("chat history window", () => {
     let start = chatHistoryStart(messages, 48, empty);
     const revealed = messages.slice(start);
     while (start > 0) {
-      const firstId = messages[Math.max(0, start - CHAT_HISTORY_BATCH)].id;
-      const next = chatHistoryStart(messages, 48, { firstId, headId: "0" });
+      const first = messages[Math.max(0, start - CHAT_HISTORY_BATCH)];
+      assert(first);
+      const next = chatHistoryStart(messages, 48, { firstId: first.id, headId: "0" });
       revealed.unshift(...messages.slice(next, start));
       start = next;
     }

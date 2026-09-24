@@ -18,7 +18,8 @@ import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentClient } from "./agent-client";
+import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
+import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
 import {
@@ -68,6 +69,7 @@ const CONFIG_MODELS = [
 ];
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
+let sessionCount = 0;
 const configOptions = () => [
   {
     id: "model",
@@ -97,6 +99,11 @@ process.stdout.on("error", (error) => {
 });
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
+  // A CLI that fails at start: it reads the request, says why on stderr, and exits unanswered.
+  if (process.env.OPENBOT_FAKE_ACP_CRASH) {
+    process.stderr.write("Error: " + process.env.OPENBOT_FAKE_ACP_CRASH + NL);
+    process.exit(3);
+  }
   buffer += chunk;
   let index = buffer.indexOf(NL);
   while (index >= 0) {
@@ -109,13 +116,23 @@ process.stdin.on("data", (chunk) => {
 function handle(message) {
   if (typeof message.id === "undefined") return;
   if (message.method === "initialize") {
-    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1" ? { loadSession: true } : {};
+    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
+      ? { loadSession: true, sessionCapabilities: { close: {} } }
+      : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
+        ? { loadSession: true }
+        : {};
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
     return;
   }
   if (message.method === "session/load") {
     const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
     if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    write({ jsonrpc: "2.0", id: message.id, result: {} });
+    return;
+  }
+  if (message.method === "session/close") {
+    const closeLog = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG;
+    if (closeLog) fs.appendFileSync(closeLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -161,7 +178,8 @@ function handle(message) {
       jsonrpc: "2.0",
       id: message.id,
       result: {
-        sessionId: "session-1",
+        // An agent that closes sessions is asked for several, and each needs its own id.
+        sessionId: process.env.OPENBOT_FAKE_ACP_CLOSE_LOG ? "session-" + ++sessionCount : "session-1",
         models: { availableModels: ids.map((modelId) => ({ modelId, name: modelId })), currentModelId: ids[0] },
       },
     });
@@ -420,6 +438,23 @@ describe("OpenCode ACP environment", () => {
     await expect(client.request("initialize", {}, decodeRecordResponse)).rejects.toThrow(
       "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
     );
+  });
+
+  it("reports why OpenCode stopped instead of a closed connection", async () => {
+    const fake = await createFakeOpencodeAgent("managed");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CRASH", "config key OPENCODE_API_KEY=sk-live-secret is invalid");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    // The SDK rejects with "ACP connection closed" as soon as stdout ends. That phrase was all a user
+    // saw when an update's CLI failed to start, so the exit and the CLI's own reason replace it.
+    const failure = client.request("initialize", {}, decodeRecordResponse);
+    await expect(failure).rejects.toBeInstanceOf(AgentProcessExitError);
+    await expect(failure).rejects.toThrow("OpenCode stopped before it answered (exit code 3).");
+    const error = await failure.catch((reason: unknown) => reason);
+    if (!(error instanceof AgentProcessExitError)) throw error;
+    const reported = error.withDetail((text) => text).message;
+    expect(reported).toMatch(/^OpenCode stopped before it answered \(exit code 3\)\. Error: config key /u);
+    expect(reported).not.toContain("sk-live-secret");
   });
 
   it("refuses the prompt when the endpoint was removed while the turn was prepared", async () => {
@@ -700,6 +735,77 @@ describe("OpenCode ACP session loading", () => {
     ]);
 
     expect(await fake.readLoadedSessions()).toHaveLength(1);
+  });
+
+  it("closes the longest idle session over the limit and loads it again for its next turn", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const closeLog = join(fake.directory, "closed-sessions.ndjson");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CLOSE_LOG", closeLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    let completed = 0;
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed += 1;
+    });
+    const threadIds: string[] = [];
+    // The model catalog probe opens and closes a session of its own.
+    const closedSessions = async () =>
+      (await readFile(closeLog, "utf8").catch(() => ""))
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line).sessionId)
+        .filter((sessionId) => threadIds.includes(sessionId));
+    const input = [{ type: "inputText", text: "Keep working" }];
+    for (let index = 0; index <= ACP_IDLE_SESSION_LIMIT; index += 1) {
+      const thread = await client.request(
+        "thread/start",
+        { cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+        decodeRecordResponse,
+      );
+      const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
+      if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
+      threadIds.push(threadId);
+    }
+    for (const [index, threadId] of threadIds.entries()) {
+      await client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: `turn-${index}`, input },
+        decodeRecordResponse,
+      );
+      await vi.waitFor(() => expect(completed).toBe(index + 1));
+    }
+
+    // Each open session holds its own set of the user's MCP servers until the agent closes it.
+    await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
+    await client.request(
+      "turn/start",
+      { threadId: threadIds[0], clientUserMessageId: "turn-again", input },
+      decodeRecordResponse,
+    );
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: threadIds[0], cwd: fake.directory }]);
+  });
+
+  it("counts a session loaded only for a read toward the idle limit", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const closeLog = join(fake.directory, "closed-sessions.ndjson");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CLOSE_LOG", closeLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const threadIds = Array.from({ length: ACP_IDLE_SESSION_LIMIT + 1 }, (_, index) => `ses_stored_${index}`);
+    const closedSessions = async () =>
+      (await readFile(closeLog, "utf8").catch(() => ""))
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line).sessionId)
+        .filter((sessionId) => threadIds.includes(sessionId));
+
+    // What boot recovery does after a restart: it reads every stored session, and each read loads one.
+    for (const threadId of threadIds) {
+      await client.request("thread/read", { threadId, cwd: fake.directory, includeTurns: true }, decodeThreadResponse);
+    }
+
+    // Each open session holds its own set of the user's MCP servers until the agent closes it.
+    await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
   });
 
   it("reports a session an agent cannot load as missing instead of asking for it", async () => {

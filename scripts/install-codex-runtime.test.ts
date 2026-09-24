@@ -20,6 +20,7 @@ describe.runIf(process.platform !== "win32")("bundled Codex installer", () => {
   it.each([
     ["darwin-arm64", "aarch64-apple-darwin", "mac/arm64"],
     ["linux-x64", "x86_64-unknown-linux-musl", "linux/x64"],
+    ["linux-arm64", "aarch64-unknown-linux-musl", "linux/arm64"],
   ] as const)(
     "installs a verified %s package into %s and reuses the current runtime",
     async (target, manifestTarget, directory) => {

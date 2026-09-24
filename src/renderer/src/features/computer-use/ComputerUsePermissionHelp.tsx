@@ -1,7 +1,8 @@
 import { type ComputerUsePermissionApp, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import { Button, FolderOpen, GripVertical, Monitor, MousePointer2 } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
-import { Button, FolderOpen, GripVertical, Monitor, MousePointer2 } from "../../components/ui";
-import { errorMessage } from "../../error-message";
+import { computerUsePort } from "./computer-use-port";
 
 /**
  * What the user has to do in the pane that just opened, and whether it worked.
@@ -38,7 +39,6 @@ export function permissionFromQuery(search: string): MacPermissionId {
 }
 
 export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; sunshine?: boolean }) {
-  const desktopApi = window.openbot;
   const permission = props.permission;
   const help = PERMISSION_HELP[permission];
   const PermissionIcon = help.icon;
@@ -50,7 +50,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   let reading = false;
 
   function close(): void {
-    void desktopApi.closeComputerUsePermissionHelp();
+    void computerUsePort().closeComputerUsePermissionHelp();
   }
 
   // Computer Use can poll its driver. Sunshine checks start the runtime when it is idle,
@@ -60,11 +60,11 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
     reading = true;
     try {
       if (props.sunshine) {
-        const state = await desktopApi.remoteDesktop.checkSetup(LOCAL_SERVER_ID);
+        const state = await computerUsePort().remoteDesktop.checkSetup(LOCAL_SERVER_ID);
         if (!disposed)
           setGranted(state[permission === "screen-recording" ? "screenRecording" : "accessibility"] === "allowed");
       } else {
-        const state = await desktopApi.getComputerUseState();
+        const state = await computerUsePort().getComputerUseState();
         if (!disposed) setGranted(state.permissions.some((entry) => entry.id === permission && entry.granted));
       }
     } catch {
@@ -78,7 +78,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
 
   async function readApp(): Promise<void> {
     try {
-      const next = await desktopApi.getComputerUsePermissionApp();
+      const next = await computerUsePort().getComputerUsePermissionApp();
       if (!disposed) setApp(next);
     } catch {
       // No card. The steps still name the application, and the list still accepts a bundle dropped
@@ -89,7 +89,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   async function reveal(): Promise<void> {
     setError(null);
     try {
-      await desktopApi.revealComputerUsePermissionApp();
+      await computerUsePort().revealComputerUsePermissionApp();
     } catch (cause) {
       setError(errorMessage(cause, "The application could not be shown in Finder."));
     }
@@ -142,7 +142,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
               event.preventDefault();
               setDragging(true);
               setError(null);
-              void desktopApi
+              void computerUsePort()
                 .startComputerUsePermissionAppDrag()
                 .catch((cause) => setError(errorMessage(cause, "The application could not be dragged.")))
                 .finally(() => setDragging(false));

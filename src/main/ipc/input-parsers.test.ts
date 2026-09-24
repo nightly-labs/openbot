@@ -4,14 +4,18 @@ import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  agentRequest,
+  agentScope,
   parseAcknowledgeFailedTurn,
   parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
+  parseAttachmentId,
   parseBrowserTakeoverResponse,
   parseCancelQueuedMessage,
+  parseChannelId,
   parseChooseAttachments,
   parseCreateAgent,
   parseCreateAgentMemory,
@@ -40,7 +44,9 @@ import {
 } from "./agent-inputs";
 import {
   parseAnalyticsPreference,
+  parseAppLanguagePreference,
   parseApprovalAutomation,
+  parseDeleteHostedSite,
   parseDynamicIslandAction,
   parseDynamicIslandInteractive,
   parseDynamicIslandPreference,
@@ -67,12 +73,18 @@ import {
   parseMarkDirectRead,
   parseReorderServers,
   parseSetServerMuted,
+  parseSetServerNotificationLevel,
   parseUpdateTeamMember,
 } from "./server-inputs";
 import { nullishPayload, optionalPayload, requireString } from "./validation";
 import { parseVoiceTranscription } from "./voice-inputs";
 
 describe("app IPC input parsing", () => {
+  it("accepts only shipped app languages", () => {
+    expect(parseAppLanguagePreference({ language: "fr" })).toEqual({ language: "fr" });
+    expect(() => parseAppLanguagePreference({ language: "kl" })).toThrowError("Language preference is required.");
+  });
+
   it("validates creator photo consent and agent categories without changing legacy submissions", () => {
     expect(parseSubmitMarketplaceAgent({ agentId: "agent-1" })).toEqual({ agentId: "agent-1" });
     expect(parseSubmitMarketplaceAgent({ agentId: "agent-1", category: "research", showCreatorAvatar: false })).toEqual(
@@ -176,6 +188,16 @@ describe("app IPC input parsing", () => {
     expect(() => parseAgentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("agentId is too long.");
   });
 
+  it("validates channel and attachment identifiers and hosted site deletion", () => {
+    expect(parseChannelId("general")).toBe("general");
+    expect(() => parseChannelId(42)).toThrowError("channelId is required.");
+    expect(() => parseChannelId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("channelId is too long.");
+    expect(parseAttachmentId("attachment-1")).toBe("attachment-1");
+    expect(() => parseAttachmentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("attachmentId is too long.");
+    expect(parseDeleteHostedSite({ siteId: "site-1" })).toEqual({ siteId: "site-1" });
+    expect(() => parseDeleteHostedSite({})).toThrowError("siteId is required.");
+  });
+
   it("keeps setup and permission error messages", () => {
     expect(() => parseSetup(null)).toThrowError("Setup input is required.");
     expect(() => parseSetup({ preferredProvider: "other", preferredModel: null })).toThrowError("Unknown provider.");
@@ -232,16 +254,40 @@ describe("app IPC input parsing", () => {
         hapticsEnabled: false,
         idleVisible: false,
         additionalDisplaysEnabled: true,
+        widthPercent: 85,
+        heightPercent: 110,
       }),
     ).toEqual({
       enabled: true,
       hapticsEnabled: false,
       idleVisible: false,
       additionalDisplaysEnabled: true,
+      widthPercent: 85,
+      heightPercent: 110,
     });
     expect(() => parseDynamicIslandPreference({ enabled: true })).toThrowError(
       "Dynamic Island preference is required.",
     );
+    expect(() =>
+      parseDynamicIslandPreference({
+        enabled: true,
+        hapticsEnabled: true,
+        idleVisible: true,
+        additionalDisplaysEnabled: true,
+        widthPercent: 20,
+        heightPercent: 100,
+      }),
+    ).toThrowError("Dynamic Island preference is required.");
+    expect(() =>
+      parseDynamicIslandPreference({
+        enabled: true,
+        hapticsEnabled: true,
+        idleVisible: true,
+        additionalDisplaysEnabled: true,
+        widthPercent: 72,
+        heightPercent: 100,
+      }),
+    ).toThrowError("Dynamic Island preference is required.");
     expect(parseDynamicIslandInteractive({ interactive: false })).toEqual({ interactive: false });
     expect(parseDynamicIslandPresentation(presentation)).toEqual(presentation);
     const takeoverPresentation = {
@@ -614,6 +660,11 @@ describe("agent IPC input parsing", () => {
     expect(() => parseUpdateAgent({ agentId: "bot-1", notifications: "yes" })).toThrowError(
       "Invalid notifications value.",
     );
+    expect(parseUpdateAgent({ agentId: "bot-1", access: "workspace" })).toEqual({
+      agentId: "bot-1",
+      access: "workspace",
+    });
+    expect(() => parseUpdateAgent({ agentId: "bot-1", access: "read-only" })).toThrowError("Invalid agent access.");
     expect(() => parseImportAttachments({ paths: [""], data: [] })).toThrowError("Invalid attachment path.");
     expect(() => parseChooseAttachments({ filter: "documents" })).toThrowError("Invalid attachment picker filter.");
     expect(() => parseOpenAttachment({ attachmentId: "attachment-1", action: "delete" })).toThrowError(
@@ -666,6 +717,24 @@ describe("agent IPC input parsing", () => {
     expect(() => parseBrowserTakeoverResponse({ requestId: "takeover-1", decision: "maybe" })).toThrowError(
       "Invalid browser takeover response.",
     );
+  });
+});
+
+describe("agent request envelope", () => {
+  it("checks the server scope before the inner decoder sees the payload", () => {
+    const decode = vi.fn((value: unknown) => requireString(value, "Table name"));
+
+    expect(() => agentRequest(decode)({ payload: "notes" })).toThrowError("serverId is required.");
+    expect(decode).not.toHaveBeenCalled();
+    expect(() => agentRequest(decode)({ serverId: "local", payload: 7 })).toThrowError("Table name is required.");
+    expect(agentRequest(decode)({ serverId: "local", payload: "notes" })).toEqual({
+      serverId: "local",
+      payload: "notes",
+    });
+  });
+
+  it("drops the payload of a request that carries only a scope", () => {
+    expect(agentScope({ serverId: "local", payload: { stray: true } })).toEqual({ serverId: "local", payload: null });
   });
 });
 
@@ -962,14 +1031,31 @@ describe("custom provider input parsing", () => {
 it("validates the server mute request", () => {
   expect(parseSetServerMuted({ serverId: "local", muted: true })).toEqual({ serverId: "local", muted: true });
   expect(parseSetServerMuted({ serverId: "remote", muted: false })).toEqual({ serverId: "remote", muted: false });
+  expect(parseSetServerMuted({ serverId: "remote", muted: true, durationMs: 3_600_000 })).toEqual({
+    serverId: "remote",
+    muted: true,
+    durationMs: 3_600_000,
+  });
   for (const input of [
     null,
     {},
     { serverId: "local", muted: "true" },
     { serverId: "", muted: true },
     { serverId: 1, muted: true },
+    { serverId: "local", muted: true, durationMs: 1000 },
+    { serverId: "local", muted: false, durationMs: 3_600_000 },
   ]) {
     expect(() => parseSetServerMuted(input)).toThrow();
+  }
+});
+
+it("validates the server notification level request", () => {
+  expect(parseSetServerNotificationLevel({ serverId: "local", level: "needs-me" })).toEqual({
+    serverId: "local",
+    level: "needs-me",
+  });
+  for (const input of [null, { serverId: "local" }, { serverId: "local", level: "mentions" }, { level: "all" }]) {
+    expect(() => parseSetServerNotificationLevel(input)).toThrow();
   }
 });
 

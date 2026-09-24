@@ -1,7 +1,7 @@
 import type { HostedSiteSummary, HostedSitesDesktopApi } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { errorMessage } from "../../../error-message";
 
 interface HostedSitesStoreProps {
   open: boolean;
@@ -12,11 +12,21 @@ interface HostedSitesPanel {
   busy: boolean;
   error: string | null;
   sites: HostedSiteSummary[];
+  /** The site the confirmation dialog asks about. */
+  pendingDelete: HostedSiteSummary | null;
+  /** A failed deletion, shown in the confirmation dialog so the user can try again or cancel. */
+  deleteError: string | null;
 }
 
 /** The Hosted sites tab: the published site list, its reload loop and the delete confirmation. */
 export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isActive: () => boolean) {
-  const [hosting, setHosting] = createStore<HostedSitesPanel>({ busy: false, error: null, sites: [] });
+  const [hosting, setHosting] = createStore<HostedSitesPanel>({
+    busy: false,
+    error: null,
+    sites: [],
+    pendingDelete: null,
+    deleteError: null,
+  });
   let reloadRequested = false;
   let loadPromise: Promise<void> | null = null;
 
@@ -59,17 +69,36 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
     },
   );
 
-  async function deleteSite(site: HostedSiteSummary): Promise<void> {
+  function requestDelete(site: HostedSiteSummary): void {
     if (!props.hostedSitesApi || hosting.busy) return;
-    if (!window.confirm(`Delete ${site.hostname}? This address will immediately return 410 Gone.`)) return;
+    setHosting((state) => {
+      state.pendingDelete = site;
+      state.deleteError = null;
+    });
+  }
+
+  function cancelDelete(): void {
+    if (hosting.busy) return;
+    setHosting((state) => {
+      state.pendingDelete = null;
+      state.deleteError = null;
+    });
+  }
+
+  /** Deletes the site the dialog asks about. A failed deletion keeps the dialog open with the error. */
+  async function confirmDelete(): Promise<void> {
+    const site = hosting.pendingDelete;
+    if (!props.hostedSitesApi || !site || hosting.busy) return;
     const analytics = desktopAnalytics.scope();
+    const siteId = site.id;
     setHosting((state) => {
       state.busy = true;
       state.error = null;
+      state.deleteError = null;
     });
     try {
       try {
-        await props.hostedSitesApi.delete({ siteId: site.id });
+        await props.hostedSitesApi.delete({ siteId });
       } catch (error) {
         analytics.track("hosted_site_action", {
           action: "delete",
@@ -78,7 +107,7 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
           failure_code: "delete_failed",
         });
         setHosting((state) => {
-          state.error = errorMessage(error, "Could not delete the site.");
+          state.deleteError = errorMessage(error, "Could not delete the site.");
         });
         return;
       }
@@ -86,6 +115,9 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
         action: "delete",
         entry_point: "settings",
         result: "succeeded",
+      });
+      setHosting((state) => {
+        state.pendingDelete = null;
       });
       await load();
     } catch (error) {
@@ -99,7 +131,7 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
     }
   }
 
-  return { deleteSite, load, state: hosting };
+  return { requestDelete, cancelDelete, confirmDelete, load, state: hosting };
 }
 
 export type SettingsHostedSitesStore = ReturnType<typeof createSettingsHostedSitesStore>;

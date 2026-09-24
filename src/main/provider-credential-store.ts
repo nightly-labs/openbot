@@ -1,9 +1,9 @@
 // The optional API keys a provider CLI needs, encrypted at rest by the operating system.
 
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile, rm } from "node:fs/promises";
 import type { AgentProviderId, ProviderApiKeyStatus } from "@openbot/contracts/ipc";
 import { z } from "zod";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
 /**
  * One envelope holding every provider's key, each encrypted on its own.
@@ -134,11 +134,8 @@ export class ProviderCredentialStore {
     for (const [provider, key] of keys) {
       credentials[provider] = this.#cipher.encrypt(key).toString("base64");
     }
-    await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
-    const temporaryPath = `${this.#path}.tmp`;
     // Write then rename, so a crash in the middle leaves the previous envelope readable rather
     // than a truncated one: a half-written key locks the user out of a paid account.
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 1, credentials })}\n`, { mode: 0o600 });
-    await rename(temporaryPath, this.#path);
+    await writeJsonFileAtomically(this.#path, { version: 1, credentials }, { createDirectory: true });
   }
 }

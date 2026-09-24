@@ -9,9 +9,14 @@ import { Button } from "../ui/button";
 export function JoinPage() {
   const [openUrl, setOpenUrl] = createSignal("");
   const [downloadUrl, setDownloadUrl] = createSignal<string>(OPENBOT_DOWNLOAD_LINKS.macos);
+  const [mobile, setMobile] = createSignal(false);
   const [invalid, setInvalid] = createSignal(false);
 
   onSettled(() => {
+    setMobile(
+      /android|iphone|ipad|ipod/iu.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1),
+    );
     const platform = detectDownloadPlatform(globalThis.navigator) === "windows" ? "windows" : "macos";
     let validInvite = true;
     try {
@@ -44,8 +49,7 @@ export function JoinPage() {
         <p class="join-card-eyebrow">Private invitation</p>
         <h1 id="join-title">Connect to an OpenBot host</h1>
         <p class="join-card-copy">
-          Open this one-time invitation in OpenBot. The app will verify the host and ask for confirmation before it
-          connects.
+          Open this invitation in OpenBot. The app will verify the host and ask for confirmation before it connects.
         </p>
 
         <Show
@@ -71,13 +75,23 @@ export function JoinPage() {
                 </Button>
               )}
             </Show>
-            <Button href={downloadUrl()} variant="secondary" size="lg" icon="download">
-              Download OpenBot
-            </Button>
+            <Show when={!mobile()}>
+              <Button href={downloadUrl()} variant="secondary" size="lg" icon="download">
+                Download OpenBot
+              </Button>
+            </Show>
           </div>
         </Show>
 
-        <p class="join-card-note">Do not forward this link. It can be used only once and expires after 24 hours.</p>
+        <Show when={mobile()}>
+          <p class="join-card-note">
+            If OpenBot is installed, tap Open OpenBot. You can also paste this link into Add server in the app.
+          </p>
+        </Show>
+        <p class="join-card-note">
+          This link grants access to a host. Share it only with people you want to invite. OpenBot shows its expiry
+          before you join.
+        </p>
       </section>
     </main>
   );

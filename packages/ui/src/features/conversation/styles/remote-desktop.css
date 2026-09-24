@@ -1,0 +1,222 @@
+.conversation-panel.browser-panel-active {
+  padding-right: var(--browser-panel-width, 380px);
+}
+
+.remote-desktop-workspace {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity var(--openbot-duration-fast) cubic-bezier(0.2, 0, 0, 1),
+    visibility 0s linear var(--openbot-duration-fast);
+}
+
+.remote-desktop-workspace-visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.remote-desktop-workspace:focus {
+  outline: none;
+}
+
+.remote-desktop-header {
+  display: flex;
+  height: 38px;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  border-bottom: 1px solid var(--openbot-border);
+  padding: 0 8px 0 0;
+  background: var(--openbot-bg-sidebar);
+}
+
+.remote-desktop-workspace-darwin .remote-desktop-header {
+  padding-left: 84px;
+}
+
+.remote-desktop-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.remote-desktop-display-controls {
+  min-width: 0;
+  display: flex;
+  flex: 0 1 168px;
+  align-items: center;
+}
+
+.remote-desktop-back-button,
+.remote-desktop-disconnect-button {
+  flex: 0 0 auto;
+}
+
+.remote-desktop-disconnect-button {
+  color: var(--openbot-text-muted);
+}
+
+.remote-desktop-disconnect-button:hover:not(:disabled),
+.remote-desktop-disconnect-button:focus-visible:not(:disabled) {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+}
+
+.remote-desktop-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--openbot-accent);
+}
+
+.remote-desktop-viewer,
+.remote-desktop-viewer > div {
+  width: 100%;
+  height: 100%;
+}
+
+.remote-desktop-viewer {
+  overflow: hidden;
+  display: block;
+  object-fit: contain;
+}
+
+.remote-desktop-display-select {
+  width: min(168px, 22vw);
+  min-width: 112px;
+  flex: 0 1 168px;
+  font-size: var(--openbot-text-sm);
+}
+
+.remote-desktop-display-select-content {
+  z-index: calc(var(--openbot-layer-toast) + 1);
+}
+
+.remote-desktop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--openbot-bg-overlay);
+  padding: 24px;
+  text-align: center;
+}
+
+.remote-desktop-overlay strong {
+  max-width: 330px;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: 600;
+}
+
+.remote-desktop-connecting-avatar {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 5px;
+  filter: drop-shadow(0 8px 18px var(--openbot-accent-soft));
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+  will-change: opacity, transform;
+}
+
+@starting-style {
+  .remote-desktop-connecting-avatar {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+}
+
+.remote-desktop-overlay > span:not(.ui-spinner):not(.remote-desktop-empty-mark) {
+  max-width: 330px;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+.remote-desktop-empty-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 5px;
+  place-items: center;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-hover);
+  color: var(--openbot-text-muted);
+}
+
+.remote-desktop-empty-mark svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.remote-desktop-overlay > button {
+  height: 34px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: 600;
+}
+
+.remote-desktop-overlay > button:hover {
+  background: var(--openbot-border-strong);
+}
+
+.remote-desktop-overlay > button {
+  min-width: 92px;
+  margin-top: 5px;
+  padding: 0 13px;
+}
+
+.remote-desktop-button {
+  position: relative;
+}
+
+.remote-desktop-button[aria-expanded="true"] {
+  background: var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+.remote-desktop-button-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--openbot-bg-sidebar);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
+}

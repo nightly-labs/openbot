@@ -31,9 +31,9 @@ import type {
   TeamSessionSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "../data";
+import type { AgentProfile } from "@openbot/ui/data";
+import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
-import type { MarketplacePluginDetail } from "../features/settings/marketplace-plugins";
 
 export const STORY_NOW = "2026-08-19T10:00:00.000Z";
 
@@ -47,6 +47,7 @@ export const STORY_AGENT_SUMMARIES: AgentSummary[] = [
     notifications: true,
     model: "gpt-5.6-luna",
     reasoningEffort: "medium",
+    access: "full",
     threadId: "thread-chief",
     workspacePath: "/mock/OpenBot/Agents/chief",
     preview: "I pulled together the latest project notes and next steps.",
@@ -64,6 +65,7 @@ export const STORY_AGENT_SUMMARIES: AgentSummary[] = [
     notifications: true,
     model: "claude-sonnet-5",
     reasoningEffort: "high",
+    access: "full",
     threadId: "thread-research",
     workspacePath: "/mock/OpenBot/Agents/research",
     preview: "Three useful sources are ready for your review.",
@@ -81,6 +83,7 @@ export const STORY_AGENT_SUMMARIES: AgentSummary[] = [
     notifications: true,
     model: "gpt-5.6-terra",
     reasoningEffort: "medium",
+    access: "workspace",
     threadId: "thread-sales",
     workspacePath: "/mock/OpenBot/Agents/sales",
     preview: "The follow-up draft is ready to send.",
@@ -100,6 +103,7 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   notifications: agent.notifications,
   model: agent.model,
   reasoningEffort: agent.reasoningEffort,
+  access: agent.access,
   threadId: agent.threadId,
   workspacePath: agent.workspacePath,
   avatarSeed: agent.avatarSeed,
@@ -108,6 +112,15 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   time: index === 0 ? "10:00" : index === 1 ? "Yesterday" : "Mon",
   preview: agent.preview,
 }));
+
+/** Returns a fixture item that a story reads by index. A missing item means a fixture edit broke the story. */
+export function requireFixture<T>(value: T | undefined, name: string): T {
+  if (value === undefined) throw new Error(`${name} is missing from the story fixtures.`);
+  return value;
+}
+
+/** The agent that single-agent stories show. */
+export const STORY_AGENT: AgentProfile = requireFixture(STORY_AGENTS[0], "Story agent");
 
 export const STORY_SHARED_TABLES: SharedTable[] = [
   { name: "citations", ownerAgentId: "research", rowCount: null },
@@ -119,6 +132,14 @@ export const STORY_SHARED_TABLES: SharedTable[] = [
 ];
 
 export const STORY_MODELS: AgentModelOption[] = [
+  {
+    provider: "codex",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
+    description: "Fast and efficient for everyday agent work.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
   {
     provider: "codex",
     id: "gpt-5.6-luna",
@@ -142,6 +163,14 @@ export const STORY_MODELS: AgentModelOption[] = [
     description: "Most capable for complex, long-running work.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
+  },
+  {
+    provider: "claude",
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description: "Most capable Claude model for complex work.",
+    defaultReasoningEffort: "high",
+    supportedReasoningEfforts: ["low", "medium", "high"],
   },
   {
     provider: "claude",
@@ -374,23 +403,23 @@ export const STORY_PRESENCE: TeamPresenceSnapshot = {
   ],
 };
 
-export const STORY_DIRECT_THREADS: DirectThreadSummary[] = [
-  {
+const STORY_DIRECT_ALICE_THREAD: DirectThreadSummary = {
+  threadId: "direct-alice",
+  otherMemberId: "member-alice",
+  lastMessage: {
+    id: "direct-message-alice",
     threadId: "direct-alice",
-    otherMemberId: "member-alice",
-    lastMessage: {
-      id: "direct-message-alice",
-      threadId: "direct-alice",
-      senderMemberId: "member-alice",
-      recipientMemberId: "member-self",
-      text: "The launch notes look good — can you review the last section?",
-      createdAt: "2026-08-19T09:30:00.000Z",
-      sequence: 2,
-    },
-    unreadCount: 2,
-    updatedAt: "2026-08-19T09:30:00.000Z",
+    senderMemberId: "member-alice",
+    recipientMemberId: "member-self",
+    text: "The launch notes look good — can you review the last section?",
+    createdAt: "2026-08-19T09:30:00.000Z",
+    sequence: 2,
   },
-];
+  unreadCount: 2,
+  updatedAt: "2026-08-19T09:30:00.000Z",
+};
+
+export const STORY_DIRECT_THREADS: DirectThreadSummary[] = [STORY_DIRECT_ALICE_THREAD];
 
 export const STORY_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapshot> = {
   "member-alice": {
@@ -412,7 +441,7 @@ export const STORY_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapshot> 
         createdAt: "2026-08-19T09:21:00.000Z",
         sequence: 1,
       },
-      STORY_DIRECT_THREADS[0].lastMessage,
+      STORY_DIRECT_ALICE_THREAD.lastMessage,
     ],
   },
 };
@@ -423,6 +452,8 @@ export const STORY_SERVERS: ServerSummary[] = [
     name: "Local",
     logoUrl: null,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "local",
     state: "online",
     apiUrl: null,
@@ -435,6 +466,8 @@ export const STORY_SERVERS: ServerSummary[] = [
     name: "OpenBot team",
     logoUrl: null,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "remote",
     state: "online",
     apiUrl: "https://team.example.com",

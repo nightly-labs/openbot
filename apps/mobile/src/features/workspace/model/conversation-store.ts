@@ -227,6 +227,7 @@ export class MobileConversationStore {
           });
         } else {
           const message = messages[index];
+          if (!message) throw new Error("The streamed message is missing.");
           messages[index] = { ...message, text: message.text + text, status: "streaming" };
         }
       }

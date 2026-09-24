@@ -1616,6 +1616,27 @@ textarea {
   line-height: 12px;
 }
 
+.agent-row-agent-status-routine {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-secondary);
+}
+
+.agent-row-agent-status-routine svg {
+  width: 10px;
+  height: 10px;
+}
+
+.agent-row-agent-status-routine-needs-attention {
+  color: var(--openbot-warning);
+}
+
+.agent-row-agent-status-routine-failed {
+  color: var(--openbot-danger);
+}
+
 .agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1641,68 +1662,6 @@ textarea {
   }
 }
 
-/* The approval confirmation shares this modal's shape; only the copy inside it differs. */
-.agent-delete-backdrop,
-.approval-confirm-backdrop {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  animation: agent-backdrop-in var(--openbot-duration-normal) ease-out;
-}
-
-.agent-delete-dialog,
-.approval-confirm-dialog {
-  display: flex;
-  width: min(390px, calc(100vw - 40px));
-  flex-direction: column;
-  align-items: center;
-  background: var(--openbot-bg-control);
-  padding: 26px 26px 20px;
-  text-align: center;
-  animation: agent-dialog-in var(--openbot-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.agent-delete-dialog h2,
-.approval-confirm-dialog h2 {
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-2xl);
-  line-height: var(--openbot-leading-2xl);
-  font-weight: var(--openbot-weight-semibold);
-  letter-spacing: var(--openbot-tracking-tight);
-}
-
-.agent-delete-dialog > p,
-.approval-confirm-dialog > p {
-  max-width: 310px;
-  margin: 8px 0 0;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 19px;
-}
-
-.agent-delete-dialog .agent-delete-error {
-  width: 100%;
-  margin-top: 14px;
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-danger-soft);
-  padding: 8px 10px;
-  color: var(--openbot-danger);
-}
-
-.sidebar-section-delete-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  margin-bottom: 15px;
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-danger-soft);
-  color: var(--openbot-danger);
-}
-
 .agent-context-submenu-chevron {
   margin-left: auto;
   color: var(--openbot-text-muted);
@@ -1713,68 +1672,10 @@ textarea {
   overflow-y: auto;
 }
 
-.agent-delete-actions,
-.approval-confirm-actions {
-  display: grid;
-  width: 100%;
-  margin-top: 22px;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-}
-
-.agent-delete-actions button,
-.approval-confirm-actions button {
-  height: 38px;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-hover);
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-md);
-  font-weight: 500;
-  transition:
-    background var(--openbot-duration-hover) ease,
-    opacity var(--openbot-duration-hover) ease;
-}
-
-.agent-delete-actions button:hover {
-  background: var(--openbot-border);
-}
-
-.agent-delete-actions button:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.agent-delete-actions .agent-delete-confirm {
-  border-color: var(--openbot-danger);
-  background: var(--openbot-danger);
-  color: var(--openbot-text-primary);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .agent-delete-actions .agent-delete-confirm:hover:not(:disabled):not([data-disabled]) {
-    background: var(--openbot-danger-hover);
-    color: var(--openbot-text-primary);
-  }
-}
-
 @keyframes agent-context-in {
   from {
     opacity: 0;
     transform: scale(0.96) translateY(-3px);
-  }
-}
-
-@keyframes agent-backdrop-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes agent-dialog-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(5px);
   }
 }
 
@@ -2028,6 +1929,8 @@ textarea {
 .avatar-image-upload strong,
 .avatar-image-upload small {
   display: block;
+  white-space: normal;
+  text-wrap: pretty;
 }
 
 .avatar-image-upload strong {
@@ -2167,6 +2070,25 @@ textarea {
   grid-template-columns:
     fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - 5px))
     minmax(var(--agent-role-badge-collapsed-width), 1fr);
+}
+
+.agent-row-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.agent-row-access {
+  display: inline-flex;
+  flex: none;
+  color: var(--openbot-text-muted);
+}
+
+.agent-row-access svg {
+  width: 12px;
+  height: 12px;
 }
 
 .agent-row-title strong,
@@ -3191,7 +3113,6 @@ textarea {
   color: var(--openbot-text-primary);
 }
 
-.agent-settings-model,
 .agent-settings-notifications,
 .provider-model-panel,
 .provider-model-rail,
@@ -3207,11 +3128,6 @@ textarea {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-secondary);
 }
-.agent-delete-dialog {
-  border-color: var(--openbot-border-strong);
-  background: var(--openbot-bg-surface);
-}
-
 .server-rail-muted {
   position: absolute;
   right: 0;
@@ -3219,4 +3135,20 @@ textarea {
   color: var(--openbot-text-secondary);
   background: var(--openbot-bg-sidebar);
   border-radius: var(--openbot-radius-sm);
+}
+
+/* A server menu item with a second line, such as "Muted until 14:30", like Discord's. */
+.ui-action-menu:not([data-menu-layout="grid"]) .server-rail-menu-detail-item {
+  height: auto;
+}
+
+.server-rail-menu-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.server-rail-menu-detail {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }

@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { updatesPort } from "./updates-port";
 
 /**
  * The updater, as the renderer sees it: one status main pushes, and one button
@@ -18,11 +19,11 @@ const Updates = createSimpleContext({
     const [status, setStatus] = createSignal<UpdateStatus>(FALLBACK_UPDATE_STATUS);
 
     onSettled(() => {
-      const unsubscribe = window.openbot.update.onEvent((next) => {
+      const unsubscribe = updatesPort().update.onEvent((next) => {
         flush(() => setStatus(next));
       });
-      void window.openbot.update
-        .getStatus()
+      void updatesPort()
+        .update.getStatus()
         .then(setStatus)
         .catch(() => undefined);
       return unsubscribe;
@@ -43,7 +44,7 @@ const Updates = createSimpleContext({
       const phase = current.phase;
       if (phase === "ready") {
         try {
-          await window.openbot.update.install();
+          await updatesPort().update.install();
           analytics.track("update_action", { action: "install", result: "succeeded", phase: "installing" });
         } catch (error) {
           analytics.track("update_action", {
@@ -60,8 +61,7 @@ const Updates = createSimpleContext({
           ? ("download" as const)
           : ("check" as const);
       try {
-        const next =
-          action === "download" ? await window.openbot.update.download() : await window.openbot.update.check();
+        const next = action === "download" ? await updatesPort().update.download() : await updatesPort().update.check();
         setStatus(next);
         const succeeded =
           action === "download"

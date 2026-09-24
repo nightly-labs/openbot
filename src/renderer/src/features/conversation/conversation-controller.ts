@@ -5,8 +5,8 @@ import type {
   BrowserBounds,
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
+import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { AgentActivityLabel } from "./AgentActivity";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendPluginPrompt,
@@ -28,8 +28,8 @@ function readBrowserPipBounds(): BrowserBounds | null {
   const values = (window.localStorage.getItem(BROWSER_PIP_STORAGE_KEY) ?? "")
     .split(",")
     .map((value) => Number.parseFloat(value));
-  const [x, y, width, height] = values;
-  return values.length === 4 && values.every(Number.isFinite) ? { x, y, width, height } : null;
+  const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = values;
+  return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
 }
 
 interface ConversationResources {
@@ -93,8 +93,8 @@ interface ConversationResources {
  * Every signal here is keyed by `serverId:agentId` (`composerDraftKey`) or carries
  * its server in the value, which is what makes the shared lifetime safe.
  */
-export function createStableConversationState(props: Pick<ConversationProps, "onTypingChange">) {
-  const restoredEdit = readStoredQueueEdit();
+export function createStableConversationState(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {
+  const restoredEdit = persistDrafts ? readStoredQueueEdit() : null;
   const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>(
     restoredEdit ? { [composerDraftKey(restoredEdit)]: restoredEdit.draft } : {},
   );
@@ -131,7 +131,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
         : null;
     },
     (edit) => {
-      if (!edit) return;
+      if (!edit || !persistDrafts) return;
       const persist = () => {
         // Read fresh state: a pending Save set after this effect ran must not be
         // overwritten by the previous snapshot without it.
@@ -310,7 +310,7 @@ export function createServerConversationState() {
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
-  const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-5.6-luna");
+  const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
   const [browserAddress, setBrowserAddress] = createSignal("https://www.google.com");
   const [browserAddressEditing, setBrowserAddressEditing] = createSignal(false);
@@ -381,6 +381,6 @@ export function createServerConversationState() {
  * `Conversation.stories.tsx` and the HMR test have no scope boundary to split
  * across, and `ConversationView` reads one flat object either way.
  */
-export function createConversationController(props: Pick<ConversationProps, "onTypingChange">) {
-  return { ...createStableConversationState(props), ...createServerConversationState() };
+export function createConversationController(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {
+  return { ...createStableConversationState(props, persistDrafts), ...createServerConversationState() };
 }

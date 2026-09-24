@@ -10,6 +10,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEd25519Identity, signEd25519 } from "./ed25519";
 import {
@@ -17,6 +18,7 @@ import {
   createRemoteTeamPeer,
   type RemoteTeamCommand,
   type RemoteTeamConnectionUpdate,
+  type RemoteUploadProgress,
 } from "./remote-peer";
 import { createRemoteConnectionRecovery } from "./remote-recovery";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
@@ -39,6 +41,24 @@ const channelFixture = {
 };
 
 describe("browser remote peer recovery", () => {
+  it("delivers browser-view frames only while the host connection is authenticated", async () => {
+    const received = deferred();
+    const onHostStreamData = vi.fn(() => {
+      received.resolve();
+    });
+    const network = await setupNetwork({ onHostStreamData });
+    await expect(network.runtime.sendHostStreamData("frame")).rejects.toThrow("offline");
+    await network.connect();
+    const channel = network.connection().channel("openbot.remote-desktop.signal.v1");
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    for (const frame of encodeTeamWebRtcPayload(bytes, 64 * 1024)) channel.receive(frame);
+    await received.promise;
+    expect(onHostStreamData).toHaveBeenCalledWith(bytes);
+    await network.runtime.dispose();
+    for (const frame of encodeTeamWebRtcPayload(bytes, 64 * 1024)) channel.receive(frame);
+    expect(onHostStreamData).toHaveBeenCalledOnce();
+    await expect(network.runtime.sendHostStreamData("frame")).rejects.toThrow("offline");
+  });
   it.each<{ path: string; method: string; body: TeamProtocolV2Json; response: TeamProtocolV2Json }>([
     {
       path: CHANNEL_ROUTES.list,
@@ -75,6 +95,38 @@ describe("browser remote peer recovery", () => {
     const network = await setupNetwork({ responseBody: response });
     await network.connect();
     const result = await network.runtime.execute({ id: "channel-request", type: "request", method, path, body });
+    expect(result).toMatchObject({ ok: true, status: 200, body: response });
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await network.runtime.dispose();
+  });
+  it.each<{ path: string; body: TeamProtocolV2Json; response: TeamProtocolV2Json }>([
+    {
+      path: STORAGE_ROUTES.usage,
+      body: { scope: "agent", agentId: "agent-one" },
+      response: {
+        scope: "agent",
+        agentId: "agent-one",
+        conversationId: null,
+        scannedAt: "2026-09-14T00:00:00Z",
+        freeBytes: null,
+        breakdown: [{ category: "attachments", bytes: 12, removable: false }],
+        agents: [],
+        conversations: [],
+        files: [],
+        truncated: false,
+      },
+    },
+    { path: STORAGE_ROUTES.deleteFile, body: { fileId: "file-one" }, response: {} },
+  ])("uses the optional storage codec for $path without disconnecting", async ({ path, body, response }) => {
+    const network = await setupNetwork({ responseBody: response });
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "storage-request",
+      type: "request",
+      method: "POST",
+      path,
+      body,
+    });
     expect(result).toMatchObject({ ok: true, status: 200, body: response });
     expect(network.updates.at(-1)).toMatchObject({ state: "online" });
     await network.runtime.dispose();
@@ -209,6 +261,8 @@ describe("browser remote peer recovery", () => {
       if (payload === undefined) return;
       if (typeof payload !== "string") {
         chunks.push(...decodeTeamProtocolV2FileChunk(payload).bytes);
+        // Queued is not sent: the chunk still waits in the channel's buffer.
+        channel.bufferedAmount = payload.byteLength;
         return;
       }
       const frame = decodeTeamProtocolV2FileControlFrame(payload);
@@ -226,9 +280,14 @@ describe("browser remote peer recovery", () => {
         body: null,
         upload: { name: "photo.png", mimeType: "image/png", base64: btoa("hello") },
       });
-      expect({ result, bytes: chunks }).toEqual({
+      expect({ result, bytes: chunks, progress: network.uploadProgress }).toEqual({
         result: { commandId: "upload", ok: true, status: 200, body: summary },
         bytes: [...new TextEncoder().encode("hello")],
+        // Nothing counts as sent while it waits in the buffer; the host's answer completes it.
+        progress: [
+          { commandId: "upload", sent: 0, total: 5 },
+          { commandId: "upload", sent: 5, total: 5 },
+        ],
       });
     } finally {
       await network.runtime.dispose();
@@ -325,6 +384,28 @@ describe("browser remote peer recovery", () => {
       await vi.waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(1));
       const result = await network.runtime.execute({
         id: "after-profile",
+        type: "request",
+        method: "GET",
+        path: "/v1/agents",
+        body: {},
+      });
+      expect(result).toMatchObject({ ok: true, status: 200, body: [] });
+    } finally {
+      await network.runtime.dispose();
+    }
+  });
+
+  it("re-reads the server list when Signal says the account joined one on another device", async () => {
+    const refreshServers = vi.fn(async () => {
+      throw new Error("Account API offline");
+    });
+    const network = await setupNetwork({ onAccountServersChanged: refreshServers });
+    await network.connect();
+    try {
+      network.socket().receive({ type: "account-servers-changed", version: 1 });
+      await vi.waitFor(() => expect(refreshServers).toHaveBeenCalledTimes(1));
+      const result = await network.runtime.execute({
+        id: "after-servers",
         type: "request",
         method: "GET",
         path: "/v1/agents",
@@ -627,7 +708,7 @@ describe("browser remote peer recovery", () => {
     await network.runtime.dispose();
   });
 
-  it("ends an unrecoverable RTC session after the resume grace period", async () => {
+  it("keeps an unrecoverable RTC session for the next attempt and ends it on disconnect", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const endSession = vi.fn(async () => {});
     const network = await setupNetwork({ endSession });
@@ -640,9 +721,44 @@ describe("browser remote peer recovery", () => {
     const reconnect = network.connect();
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(reconnect).resolves.toMatchObject({ ok: false });
-    expect(endSession).toHaveBeenCalledTimes(1);
+    // Each recovery attempt would otherwise create and end a session on the account Worker.
+    expect(endSession).not.toHaveBeenCalled();
     await expect(network.connect()).resolves.toMatchObject({ ok: true });
     expect(network.bootstraps()).toBe(2);
+    expect(network.keptSessions).toEqual([null, "session-1"]);
+    await network.runtime.execute({ id: "disconnect", type: "disconnect" });
+    expect(endSession).toHaveBeenCalledWith("session-1");
+    await network.runtime.dispose();
+  });
+
+  it("keeps the session when the account API cannot issue a ticket", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const endSession = vi.fn(async () => {});
+    let accountUnavailable = false;
+    let failedBootstraps = 0;
+    const network = await setupNetwork({
+      endSession,
+      beforeBootstrap: async () => {
+        if (!accountUnavailable) return;
+        failedBootstraps += 1;
+        throw new Error("The account API is unavailable.");
+      },
+    });
+    await network.connect();
+    network.runtime.setActive(false);
+    network.connection().drop("disconnected");
+    await vi.advanceTimersByTimeAsync(60_000);
+    network.runtime.setActive(true);
+    const reconnect = network.connect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(reconnect).resolves.toMatchObject({ ok: false });
+    accountUnavailable = true;
+    await expect(network.connect()).resolves.toMatchObject({ ok: false });
+    expect(failedBootstraps).toBe(1);
+    accountUnavailable = false;
+    await expect(network.connect()).resolves.toMatchObject({ ok: true });
+    expect(network.keptSessions).toEqual([null, "session-1"]);
+    expect(endSession).not.toHaveBeenCalled();
     await network.runtime.dispose();
   });
 
@@ -798,8 +914,10 @@ function deferred() {
 
 async function setupNetwork(
   options: {
+    onHostStreamData?: (data: string | ArrayBuffer) => void;
     onTeamEvent?: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => Promise<void>;
     onAccountProfileChanged?: () => Promise<void>;
+    onAccountServersChanged?: () => Promise<void>;
     endSession?: () => Promise<void>;
     beforeBootstrap?: (hostId: string) => Promise<void>;
     beforeAnswer?: () => Promise<void>;
@@ -812,7 +930,10 @@ async function setupNetwork(
   const sockets: TestSocket[] = [];
   const connections: TestConnection[] = [];
   const updates: RemoteTeamConnectionUpdate[] = [];
+  const uploadProgress: RemoteUploadProgress[] = [];
   let bootstrapCount = 0;
+  const keptSessions: (string | null)[] = [];
+  let currentSessionId = "";
   let currentHostId = "host";
   const slowRequest = deferred();
   const callbacks = { onOffline: () => {}, onReset: () => {} };
@@ -892,7 +1013,7 @@ async function setupNetwork(
         const hostNonce = "h".repeat(43);
         const transcript = teamProtocolV2AuthenticationTranscript({
           hostId: currentHostId,
-          sessionId: `session-${bootstrapCount}`,
+          sessionId: currentSessionId,
           ticket: frame.ticket,
           clientPublicKey: frame.clientPublicKey,
           clientNonce,
@@ -987,19 +1108,25 @@ async function setupNetwork(
   vi.stubGlobal("RTCPeerConnection", TestConnection);
   const runtime = createRemoteTeamPeer({
     current: {
-      getBootstrap: async (hostId) => {
+      getBootstrap: async (hostId, _clientPublicKey, existingSessionId) => {
         await options.beforeBootstrap?.(hostId);
         currentHostId = hostId;
         bootstrapCount += 1;
+        keptSessions.push(existingSessionId);
+        currentSessionId = existingSessionId ?? `session-${bootstrapCount}`;
         return {
-          sessionId: `session-${bootstrapCount}`,
-          expiresAt: Date.now() + 60_000,
+          sessionId: currentSessionId,
           signalUrl: "wss://signal",
           ticket: "ticket",
         };
       },
       endSession: options.endSession ?? (async () => {}),
+      onUploadProgress: async (progress) => {
+        uploadProgress.push(progress);
+      },
       onAccountProfileChanged: options.onAccountProfileChanged,
+      onAccountServersChanged: options.onAccountServersChanged,
+      onHostStreamData: options.onHostStreamData,
       onTeamEvent: options.onTeamEvent ?? (async () => {}),
       onConnectionUpdate: async (update) => {
         updates.push(update);
@@ -1014,9 +1141,11 @@ async function setupNetwork(
     sockets,
     connections,
     updates,
+    uploadProgress,
     connection,
     socket,
     bootstraps: () => bootstrapCount,
+    keptSessions,
     connect: (hostId = "host") =>
       runtime.execute({
         id: `connect-${bootstrapCount}`,

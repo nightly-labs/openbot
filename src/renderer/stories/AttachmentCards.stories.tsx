@@ -1,6 +1,6 @@
+import { AttachmentCards, AttachmentDownloadAll } from "@openbot/ui/features/conversation/AttachmentCards";
 import { expect, fn, userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { AttachmentCards, AttachmentDownloadAll } from "../src/features/conversation/AttachmentCards";
 import { STORY_ATTACHMENTS } from "./fixtures";
 
 const compactFile = {
@@ -100,9 +100,11 @@ export const NarrowLongNames: Story = {
       await expect(bounds.width).toBe(40);
       await expect(bounds.height).toBe(40);
     }
-    await expect(
-      canvas.getByText(longNamedFiles[0].name).closest(".message-attachment")?.getBoundingClientRect().width,
-    ).toBe(220);
+    const [longFile] = longNamedFiles;
+    if (!longFile) throw new Error("Long-named file fixtures are empty.");
+    await expect(canvas.getByText(longFile.name).closest(".message-attachment")?.getBoundingClientRect().width).toBe(
+      220,
+    );
   },
 };
 
@@ -120,7 +122,9 @@ export const WithDownloadAll: Story = {
   ),
   play: async ({ canvas }) => {
     const download = canvas.getByRole("button", { name: "Download all as ZIP" });
-    const firstCard = canvas.getByRole("button", { name: `Preview ${STORY_ATTACHMENTS[0].name}` });
+    const [firstAttachment] = STORY_ATTACHMENTS;
+    if (!firstAttachment) throw new Error("Story attachment fixtures are empty.");
+    const firstCard = canvas.getByRole("button", { name: `Preview ${firstAttachment.name}` });
     const downloadBounds = download.getBoundingClientRect();
     const cardBounds = firstCard.getBoundingClientRect();
 

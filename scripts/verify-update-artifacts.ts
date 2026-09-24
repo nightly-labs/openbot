@@ -10,13 +10,18 @@ const logger = createOpenBotLogger("verify-update-artifacts");
 
 const MIB = 1024 * 1024;
 const platform = process.argv[2];
-if (platform !== "linux" && platform !== "macos" && platform !== "windows") {
-  throw new Error("Usage: bun scripts/verify-update-artifacts.ts <linux|macos|windows>");
+if (platform !== "linux" && platform !== "linux-arm64" && platform !== "macos" && platform !== "windows") {
+  throw new Error("Usage: bun scripts/verify-update-artifacts.ts <linux|linux-arm64|macos|windows>");
 }
 
-/** The artifact electron-updater downloads, and the manifest that names it, for each platform. */
+/**
+ * The artifact electron-updater downloads, and the manifest that names it, for each platform.
+ * electron-updater on Linux arm64 reads `latest-linux-arm64.yml`, so each Linux architecture has its
+ * own manifest and its own unpacked directory.
+ */
 const UPDATE_ARTIFACTS = {
   linux: { extension: ".AppImage", manifest: "latest-linux.yml" },
+  "linux-arm64": { extension: ".AppImage", manifest: "latest-linux-arm64.yml" },
   macos: { extension: ".zip", manifest: "latest-mac.yml" },
   windows: { extension: ".exe", manifest: "latest.yml" },
 } as const;
@@ -24,20 +29,21 @@ const UPDATE_ARTIFACTS = {
 const distRoot = resolve("dist");
 const artifactExtension = UPDATE_ARTIFACTS[platform].extension;
 const manifestPath = join(distRoot, UPDATE_ARTIFACTS[platform].manifest);
-const artifacts = (await readdir(distRoot)).filter((name) => name.endsWith(artifactExtension));
-if (artifacts.length !== 1) throw new Error(`Expected one ${artifactExtension} update artifact.`);
+const [artifact, ...extraArtifacts] = (await readdir(distRoot)).filter((name) => name.endsWith(artifactExtension));
+if (artifact === undefined || extraArtifacts.length > 0)
+  throw new Error(`Expected one ${artifactExtension} update artifact.`);
 
-const artifactPath = join(distRoot, artifacts[0]);
+const artifactPath = join(distRoot, artifact);
 await verifyMaximumSize(artifactPath, 700 * MIB);
 if (platform === "macos") {
-  const dmgs = (await readdir(distRoot)).filter((name) => name.endsWith(".dmg"));
-  if (dmgs.length !== 1) throw new Error("Expected one DMG artifact.");
-  await verifyMaximumSize(join(distRoot, dmgs[0]), 750 * MIB);
+  const [dmg, ...extraDmgs] = (await readdir(distRoot)).filter((name) => name.endsWith(".dmg"));
+  if (dmg === undefined || extraDmgs.length > 0) throw new Error("Expected one DMG artifact.");
+  await verifyMaximumSize(join(distRoot, dmg), 750 * MIB);
 }
 const embeddedBlockMapBytes = await verifyManifest(manifestPath, artifactPath);
 // An AppImage carries its block map inside the file, so the size the manifest records is what proves
 // a differential update is possible. The other targets write the block map beside the artifact.
-if (platform === "linux") {
+if (platform === "linux" || platform === "linux-arm64") {
   if (embeddedBlockMapBytes === null) {
     throw new Error(`The manifest records no embedded block map for ${basename(artifactPath)}.`);
   }
@@ -48,7 +54,7 @@ if (platform === "linux") {
 const resourcesRoot =
   platform === "macos"
     ? join(distRoot, "mac-arm64", "OpenBot.app", "Contents", "Resources")
-    : join(distRoot, platform === "linux" ? "linux-unpacked" : "win-unpacked", "resources");
+    : join(distRoot, platform === "windows" ? "win-unpacked" : `${platform}-unpacked`, "resources");
 if (existsSync(join(resourcesRoot, "whisper", "model"))) {
   throw new Error("The packaged application contains the on-demand Whisper model.");
 }

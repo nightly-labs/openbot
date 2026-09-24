@@ -1,8 +1,8 @@
 // Signing in to a provider, storing the optional provider API keys, and downloading the CLI
 // runtimes the providers need.
 
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
-import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import type { SetProviderApiKeyInput } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
@@ -61,6 +61,7 @@ export function providerIpcHandlers({
       getStatus: handler(() => providerRuntimes.getStatus()),
       download: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.download(parsed)),
       cancel: payloadHandler(parseManagedProviderId, (parsed) => providerRuntimes.cancel(parsed)),
+      checkForUpdates: handler(() => providerRuntimes.checkForUpdates()),
     },
   };
 }
@@ -71,7 +72,7 @@ export function providerIpcHandlers({
  * Exported for the test that holds it to its limits: this is the one place a renderer-supplied
  * secret enters the main process, and each rule here decides what `safeStorage` is asked to keep.
  */
-export function parseProviderApiKeyInput(value: unknown): { provider: AgentProviderId; key: string } {
+export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput {
   if (!isDynamicRecord(value)) throw new Error("A provider key is required.");
   const provider = parseProviderId(value.provider);
   if (!isString(value.key) || !value.key.trim()) throw new Error("A provider key is required.");
@@ -79,7 +80,7 @@ export function parseProviderApiKeyInput(value: unknown): { provider: AgentProvi
   return { provider, key: value.key.trim() };
 }
 
-function parseManagedProviderId(value: unknown) {
+function parseManagedProviderId(value: unknown): ManagedProviderId {
   const provider = parseProviderId(value);
   if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
   return provider;

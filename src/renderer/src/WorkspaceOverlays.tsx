@@ -1,19 +1,23 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
+import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
+import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
-import type { ProviderKeyApi } from "./features/settings/OpenCodeKeyDialog";
+import { providerKeyApi } from "./features/settings/provider-key-api";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import {
@@ -32,19 +36,6 @@ import { useProviders } from "./providers";
 interface AccountProps {
   account: () => CentralAuthUser;
 }
-
-/**
- * The four calls the OpenCode key dialog makes, bound once.
- *
- * It is a narrow object rather than `window.openbot` itself so the dialog's props say exactly what
- * it reaches for, and so a test hands it four functions instead of the whole bridge.
- */
-const providerKeyApi: ProviderKeyApi = {
-  getProviderApiKeyState: (provider) => window.openbot.getProviderApiKeyState(provider),
-  setProviderApiKey: (input) => window.openbot.setProviderApiKey(input),
-  clearProviderApiKey: (provider) => window.openbot.clearProviderApiKey(provider),
-  openExternal: (destination) => window.openbot.openExternal(destination),
-};
 
 /**
  * Everything the workspace raises over itself: modals, dialogs and the two
@@ -204,7 +195,10 @@ function JoinServer(props: AccountProps) {
  */
 function ServerSettings() {
   const platform = usePlatform();
-  const { hostStatus, setServerMuted } = useServers();
+  const { hostStatus, setServerMuted, setServerNotificationLevel } = useServers();
+  const { selectAgent, selectGlobalSearchMessage } = useNavigation();
+  const { selectServer } = useServerSelection();
+  const { setPendingAgentSelection } = useServerSwitch();
   const { toolRuntimeStatuses } = useProviders();
   const {
     serverSettingsTarget,
@@ -239,6 +233,31 @@ function ServerSettings() {
   const canUseMcp = (server: ServerSummary) =>
     server.kind === "local" || (serverSupportsCapability(server, MCP_SERVERS_CAPABILITY) && server.role !== "member");
 
+  /** A remote host without `storage-v1` has no Storage section at all. */
+  const storageOptions = (server: ServerSummary): ServerStorageOptions | undefined => {
+    if (!serverHasStorage(server)) return undefined;
+    // The workspace belongs to the selected server. For another server, the switch comes first and
+    // the agent is published for the scope it lands in; a message there opens as its agent's chat.
+    const openOnServer = (agentId: string, open: () => void) => {
+      setServerSettingsOpen(false);
+      if (server.active) return open();
+      void selectServer(server.id).then((selected) => {
+        if (selected) setPendingAgentSelection(agentId);
+      });
+    };
+    return {
+      hostName:
+        server.kind === "local"
+          ? platform.appInfo()?.platform === "darwin"
+            ? "This Mac"
+            : "This computer"
+          : server.name,
+      canManage: canManageStorage(server),
+      onOpenAgent: (agentId) => openOnServer(agentId, () => selectAgent(agentId)),
+      onShowMessage: (agentId, messageId) => openOnServer(agentId, () => selectGlobalSearchMessage(agentId, messageId)),
+    };
+  };
+
   return (
     <Show when={serverSettingsTarget()}>
       {(server) => (
@@ -258,11 +277,12 @@ function ServerSettings() {
             onSaveIdentity={saveServerIdentity}
             onSetPublished={setServerPublished}
             onSetMuted={(muted) => setServerMuted(server().id, muted)}
+            onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
             onCreateInvite={createServerInvite}
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
-            onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
+            onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
             // Only for this computer: the runtime a remote host starts its own servers with is that
@@ -275,6 +295,7 @@ function ServerSettings() {
             onRemoveMcpServer={removeMcpServer}
             onSetMcpServerEnabled={setMcpServerEnabled}
             onTestMcpServer={testMcpServer}
+            storage={storageOptions(server())}
           />
         </Loading>
       )}
@@ -300,6 +321,8 @@ function AppSettings(props: AccountProps) {
     updateGeneralSettings,
     appSettingsRestoreTarget,
     turboModePending,
+    sendTestNotification,
+    openNotificationSettings,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -356,8 +379,10 @@ function AppSettings(props: AccountProps) {
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         codeLogin={localProviderDownloads() ? codeLogin : undefined}
-        hostedSitesApi={window.openbot.hostedSites}
+        hostedSitesApi={appPort().hostedSites}
         turboModePending={turboModePending()}
+        onTestNotification={sendTestNotification}
+        onOpenNotificationSettings={openNotificationSettings}
         restoreFocusTarget={appSettingsRestoreTarget()}
       />
     </Loading>

@@ -1,10 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MemoryEntry } from "@openbot/contracts/ipc";
+import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { Button, Dialog, IconButton, Plus, Textarea, Trash2, X } from "../../components/ui";
-import { errorMessage } from "../../error-message";
 import type { MemoriesPort } from "./memories-port";
 
 interface AgentMemoriesModalProps {
@@ -377,40 +377,22 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
         </Dialog.Portal>
       </Dialog.Root>
 
-      <Dialog.Root
+      <ConfirmDialog
         open={clearConfirmation()}
-        onOpenChange={(open) => {
-          if (!open && savingId() !== "clear") cancelConfirmation();
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay class="agent-memory-confirm-overlay" />
-          <Dialog.Content class="agent-memory-confirm-dialog">
-            <div class="agent-memory-confirm-content">
-              <Dialog.Title>Clear all memories?</Dialog.Title>
-              <Dialog.Description>
-                OpenBot will permanently remove all {memories().length} saved memories for {props.port.ownerLabel}.
-                Original messages will stay in the conversation history.
-              </Dialog.Description>
-              <Show when={error()}>
-                {(message) => (
-                  <p class="agent-memory-error" role="alert">
-                    {message()}
-                  </p>
-                )}
-              </Show>
-              <div class="agent-memory-confirm-actions">
-                <Button variant="ghost" disabled={savingId() === "clear"} onClick={cancelConfirmation}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" loading={savingId() === "clear"} onClick={() => void clearMemories()}>
-                  Clear all memories
-                </Button>
-              </div>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onCancel={cancelConfirmation}
+        onConfirm={clearMemories}
+        title="Clear all memories?"
+        description={
+          <>
+            OpenBot will permanently remove all {memories().length} saved memories for {props.port.ownerLabel}. Original
+            messages will stay in the conversation history.
+          </>
+        }
+        confirmLabel="Clear all memories"
+        pending={savingId() === "clear"}
+        error={error()}
+        initialFocus="cancel"
+      />
     </>
   );
 }

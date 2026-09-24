@@ -92,8 +92,8 @@ function declaredClasses(source: string): Set<string> {
     // A prelude ends at its block. `;` and `}` end a declaration or a block instead, so
     // whatever was collecting is a value or the tail of a rule and never a selector.
     if (char === "{") {
-      for (const match of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
-        names.add(match[1]);
+      for (const [, name] of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
+        if (name !== undefined) names.add(name);
       }
       start = index + 1;
     } else if (char === "}" || char === ";") {
@@ -107,14 +107,18 @@ export function checkUiFoundation(
   rendererRoot: string,
   labelRoot: string,
   reachableRoots: readonly string[] = [rendererRoot],
+  uiRoot = resolve(rendererRoot, "components/ui"),
 ): UiFoundationReport {
-  const uiRoot = resolve(rendererRoot, "components/ui");
+  const sourceFiles = [...new Set([...filesUnder(rendererRoot), ...filesUnder(uiRoot)])];
   // Compared with a separator appended, or components/ui-kit and components/uiLegacy read
   // as being inside the design system and every check below skips them silently.
-  const insideUi = (path: string): boolean => path.startsWith(`${uiRoot}${sep}`);
+  const insideUi = (path: string): boolean =>
+    path.startsWith(`${uiRoot}${sep}`) &&
+    !path.startsWith(`${uiRoot}${sep}features${sep}`) &&
+    !path.startsWith(`${uiRoot}${sep}components${sep}`);
   const failures: string[] = [];
 
-  for (const file of filesUnder(rendererRoot).filter((path) => /\.(?:ts|tsx)$/.test(path))) {
+  for (const file of sourceFiles.filter((path) => /\.(?:ts|tsx)$/.test(path))) {
     if (insideUi(file) || /\.test\.tsx?$/u.test(file)) continue;
     const source = readFileSync(file, "utf8");
     const label = relative(labelRoot, file);
@@ -150,7 +154,7 @@ export function checkUiFoundation(
   // hand-roll a role; a test hook is not, so this one has no exempt directory. Scoping it
   // to the same join as that scan would leave components/ui free to grow hooks silently,
   // which is the exact shape of the two blindnesses this file's history records.
-  const testHookSource = filesUnder(rendererRoot)
+  const testHookSource = sourceFiles
     .filter((path) => /\.tsx?$/u.test(path))
     .filter((path) => !/\.test\.tsx?$/u.test(path))
     .map((path) => readFileSync(path, "utf8"))
@@ -167,7 +171,7 @@ export function checkUiFoundation(
   // used to walk `components/` alone, which stopped seeing a component the moment
   // it moved into `features/` - the budget stayed at zero by going blind, not by
   // being met.
-  const componentSource = filesUnder(rendererRoot)
+  const componentSource = sourceFiles
     .filter((path) => path.endsWith(".tsx") && !insideUi(path))
     .filter((path) => !path.endsWith(".test.tsx"))
     .map((path) => readFileSync(path, "utf8"))
@@ -186,7 +190,7 @@ export function checkUiFoundation(
   // to the components it dresses would have left the budget the same silent way.
   // The whole renderer tree is the scope, so a new stylesheet is covered by
   // existing there rather than by being listed.
-  const styleSheets = filesUnder(rendererRoot).filter((path) => path.endsWith(".css"));
+  const styleSheets = sourceFiles.filter((path) => path.endsWith(".css"));
   const legacyStyles = styleSheets.map((path) => readFileSync(path, "utf8")).join("\n");
 
   // CSS is the one renderer surface no compiler reads, so a rule outlives the markup it
@@ -201,7 +205,7 @@ export function checkUiFoundation(
     const source = readFileSync(path, "utf8");
     for (const word of source.matchAll(/[a-zA-Z][a-zA-Z0-9_-]*/gu)) named.add(word[0]);
     for (const region of classRegions(source)) {
-      for (const prefix of region.matchAll(CLASS_FAMILY_PREFIX)) families.push(prefix[1]);
+      for (const [, prefix] of region.matchAll(CLASS_FAMILY_PREFIX)) if (prefix !== undefined) families.push(prefix);
     }
   }
   for (const path of styleSheets) {
@@ -249,10 +253,12 @@ export function checkUiFoundation(
 if (import.meta.main) {
   const logger = createOpenBotLogger("ui-foundation-check");
   const projectRoot = fileURLToPath(new URL("..", import.meta.url));
-  const { failures, manualCompositeCount } = checkUiFoundation(resolve(projectRoot, "src/renderer/src"), projectRoot, [
-    resolve(projectRoot, "src"),
-    resolve(projectRoot, "apps"),
-  ]);
+  const { failures, manualCompositeCount } = checkUiFoundation(
+    resolve(projectRoot, "src/renderer/src"),
+    projectRoot,
+    [resolve(projectRoot, "src"), resolve(projectRoot, "apps"), resolve(projectRoot, "packages/ui/src")],
+    resolve(projectRoot, "packages/ui/src"),
+  );
 
   if (failures.length > 0) {
     logger.error(`UI foundation check failed:\n- ${failures.join("\n- ")}`);

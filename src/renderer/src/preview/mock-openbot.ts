@@ -122,6 +122,7 @@ import {
 import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockChannels } from "./mock-channels";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
+import { createMockStorage } from "./mock-storage";
 
 type Listener<T> = (value: T) => void;
 
@@ -221,6 +222,12 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function storyReleaseNotesSkill(): MarketplaceSkillDetail {
+  const skill = STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"];
+  if (!skill) throw new Error("The release notes skill fixture is missing.");
+  return skill;
+}
+
 export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBotControls {
   const appInfo = clone(options.appInfo ?? STORY_APP_INFO);
   const defaultAuthState: CentralAuthState = {
@@ -315,7 +322,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const localSkills = clone(
     options.localSkills ?? [
       {
-        ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+        ...storyReleaseNotesSkill(),
         id: "local-skill-11111111-1111-4111-8111-111111111111",
         name: "Weekly summary",
         slug: "weekly-summary",
@@ -537,6 +544,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       notifications: input.notifications ?? true,
       model: input.model ?? "gpt-5.6-luna",
       reasoningEffort: input.reasoningEffort ?? "medium",
+      access: input.access ?? "full",
       threadId: input.threadId ?? `thread-${id}`,
       workspacePath: input.workspacePath ?? `/mock/OpenBot/Agents/${id}`,
       preview: input.preview ?? "No messages yet",
@@ -687,6 +695,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     }),
     providerRuntimes: {
       getStatus: async () => clone(runtimeSnapshot),
+      // The preview has no upstream to ask: every offer it makes is already in the snapshot.
+      checkForUpdates: async () => clone(runtimeSnapshot),
       download: async (provider) => {
         if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
         const installed = runtimeSnapshot.providers[provider];
@@ -835,7 +845,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       localCreate: async ({ agentId, sourcePath }) => {
         const name = sourcePath.split("/").at(-1) || "New skill";
         const skill = {
-          ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+          ...storyReleaseNotesSkill(),
           id: `local-skill-${crypto.randomUUID()}`,
           name,
           slug: name,
@@ -1879,14 +1889,29 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => updateListeners.delete(listener);
       },
     },
+    notifications: {
+      getPreference: async () => ({ desktopNotifications: true }),
+      setPreference: async (input) => ({ ...input }),
+      test: async () => undefined,
+      openSettings: async () => undefined,
+      onOpened: () => () => undefined,
+    },
     maintenance: {
       exportData: async () => ({ saved: true }),
       exportDiagnostics: async () => ({ saved: true }),
     },
     servers: {
-      setMuted: async ({ serverId, muted }) => {
+      setMuted: async ({ serverId, muted, durationMs }) => {
         if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
-        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationsMuted: muted } : server));
+        const notificationsMutedUntil = muted && durationMs !== undefined ? Date.now() + durationMs : null;
+        servers = servers.map((server) =>
+          server.id === serverId ? { ...server, notificationsMuted: muted, notificationsMutedUntil } : server,
+        );
+        return clone(servers);
+      },
+      setNotificationLevel: async ({ serverId, level }) => {
+        if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+        servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));
         return clone(servers);
       },
       list: async () => clone(servers),
@@ -1912,6 +1937,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           name: "Joined workspace",
           logoUrl: null,
           notificationsMuted: false,
+          notificationsMutedUntil: null,
+          notificationLevel: "all",
           kind: "remote",
           state: "online",
           apiUrl: input.inviteUrl,
@@ -2150,6 +2177,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return () => hostListeners.delete(listener);
       },
     },
+    storage: createMockStorage(),
     remoteDesktop: {
       checkSetup: async () => ({
         platform: "darwin",

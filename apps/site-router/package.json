@@ -10,7 +10,7 @@
     "cf:typegen": "wrangler types",
     "deploy": "wrangler deploy --keep-vars",
     "dev": "wrangler dev",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
   "devDependencies": {

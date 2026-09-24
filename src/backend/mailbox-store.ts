@@ -115,6 +115,19 @@ interface EnqueueInput {
   idempotencyKey?: string;
 }
 
+/** A file a chat message carries or an agent made, as the Storage view lists it. */
+export interface MailboxStoredFile {
+  attachment: AttachmentSummary;
+  path: string;
+  source: "attachment" | "generated";
+  /** The mailbox message that carries an attachment. Null for a generated file. */
+  messageId: string | null;
+  /** The agent that sent the message or made the file, else the first recipient. */
+  agentId: string | null;
+  /** Null for a generated file: its record has no time. */
+  createdAt: string | null;
+}
+
 export interface DeliveryContext {
   delivery: QueueDelivery;
   managedAttachments: Array<AttachmentSummary & { path: string }>;
@@ -204,6 +217,7 @@ export class MailboxStore {
     const index = this.#state.drafts.findIndex((draft) => draft.id === id);
     if (index < 0) return;
     const [draft] = this.#state.drafts.splice(index, 1);
+    if (!draft) return;
     try {
       await this.#persist("attachment-draft.discarded");
     } catch (error) {
@@ -1232,11 +1246,78 @@ export class MailboxStore {
     if (draft) return this.#files.resolveDraft(draft);
     for (const message of this.#state.messages) {
       const attachment = message.attachments.find((candidate) => candidate.id === id);
-      if (attachment) return this.#files.resolveTransfer(attachment);
+      if (attachment) return attachment.deletedAt ? null : this.#files.resolveTransfer(attachment);
     }
     const generated = this.#state.generatedAttachments.find((candidate) => candidate.id === id);
-    if (generated) return this.#files.resolveTransfer(generated);
+    if (generated) return generated.deletedAt ? null : this.#files.resolveTransfer(generated);
     return null;
+  }
+
+  /** Every sent and generated file that the user has not deleted, from the in-memory state. */
+  listStoredFiles(): MailboxStoredFile[] {
+    const firstRecipient = new Map<string, string>();
+    for (const delivery of this.#state.deliveries)
+      if (!firstRecipient.has(delivery.messageId)) firstRecipient.set(delivery.messageId, delivery.recipientAgentId);
+    const files: MailboxStoredFile[] = [];
+    for (const message of this.#state.messages) {
+      const agentId =
+        message.sender.kind === "agent" ? message.sender.agentId : (firstRecipient.get(message.id) ?? null);
+      for (const attachment of message.attachments) {
+        if (attachment.deletedAt) continue;
+        files.push({
+          attachment: toAttachmentSummary(attachment),
+          path: attachment.path,
+          source: "attachment",
+          messageId: message.id,
+          agentId,
+          createdAt: message.createdAt,
+        });
+      }
+    }
+    for (const attachment of this.#state.generatedAttachments) {
+      if (attachment.deletedAt) continue;
+      files.push({
+        attachment: toAttachmentSummary(attachment),
+        path: attachment.path,
+        source: "generated",
+        messageId: null,
+        agentId: attachment.ownerAgentId ?? null,
+        createdAt: null,
+      });
+    }
+    return files;
+  }
+
+  /**
+   * Deletes one sent or generated file from the disk and keeps its record with a `deletedAt`
+   * marker, so the chat still shows where the file was. A file that is already gone gets only the
+   * marker. The file is removed through the deletion outbox, and only when it resolves inside the
+   * Transfers folder and no other record that is not deleted uses the same path.
+   */
+  async deleteStoredFile(fileId: string): Promise<void> {
+    const records = [
+      ...this.#state.messages.flatMap((message) => message.attachments),
+      ...this.#state.generatedAttachments,
+    ];
+    const targets = records.filter((record) => record.id === fileId && !record.deletedAt);
+    if (targets.length === 0) throw new Error("The file does not exist or is already deleted.");
+    const previous = structuredClone(this.#state);
+    const deletedAt = new Date().toISOString();
+    for (const target of targets) target.deletedAt = deletedAt;
+    const inUse = new Set(records.filter((record) => !record.deletedAt).map((record) => record.path));
+    const deletions: string[] = [];
+    for (const path of new Set(targets.map((target) => target.path))) {
+      if (inUse.has(path)) continue;
+      const managed = await this.#files.managedTransferFile(path);
+      if (managed) deletions.push(managed);
+    }
+    try {
+      this.#persist("mailbox.file-deleted", `mailbox:file-deleted:${randomUUID()}`, deletions);
+    } catch (error) {
+      this.#state = previous;
+      throw error;
+    }
+    await this.#drainFileDeletionOutbox();
   }
 
   async verifyDeliveryAttachments(deliveryId: string): Promise<void> {
@@ -1324,11 +1405,13 @@ export class MailboxStore {
     const files: ExportedAttachmentFile[] = [];
     for (const [index, message] of this.#state.messages.entries()) {
       for (const attachment of message.attachments) {
+        if (attachment.deletedAt) continue;
         const file = await this.#files.exportAttachment(attachment, { id: message.id, index });
         if (file) files.push(file);
       }
     }
     for (const attachment of this.#state.generatedAttachments) {
+      if (attachment.deletedAt) continue;
       const file = await this.#files.exportAttachment(attachment);
       if (file) files.push(file);
     }
@@ -1577,7 +1660,8 @@ function isStoredAttachment(value: unknown): value is StoredAttachment {
       value.previewKind === "none") &&
     (isString(value.previewUrl) || value.previewUrl === undefined) &&
     isString(value.path) &&
-    isString(value.sha256)
+    isString(value.sha256) &&
+    (value.deletedAt === undefined || isString(value.deletedAt))
   );
 }
 

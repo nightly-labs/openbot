@@ -1,0 +1,50 @@
+diff --git a/dist/dev.js b/dist/dev.js
+index 8caa96ee12d73dc68c5949836e0e9e2e0bace05e..bb2074fe74278b61b76a392198029fa49fe08142 100644
+--- a/dist/dev.js
++++ b/dist/dev.js
+@@ -1344,6 +1344,13 @@ function dispose(node) {
+   disposeChildren(node, true);
+ }
+ function disposeChildren(node, self = false, zombie) {
++  // OpenBot patch: a full disposal must also dispose the zombie children and
++  // cleanups that a recompute in this flush parked for its commit. A disposed
++  // node never commits, so they would stay queued in zombieQueue and keep
++  // their DOM alive (keyed list rows removed in the flush their memos re-ran).
++  if (self && !zombie && (node._pendingFirstChild !== null || node._pendingDisposal !== null) && !(node._flags & REACTIVE_DISPOSED)) {
++    disposeChildren(node, false, true);
++  }
+   const flags = node._flags;
+   if (flags & REACTIVE_DISPOSED) return;
+   if (self) {
+diff --git a/dist/node.cjs b/dist/node.cjs
+index 81dcaae8129503a096dbe7e8263231e95b6348de..a3065109586d74c7768a9ece463f2ffdadb51900 100644
+--- a/dist/node.cjs
++++ b/dist/node.cjs
+@@ -1238,6 +1238,11 @@ function dispose(e) {
+ }
+ 
+ function disposeChildren(e, t = false, n) {
++    // OpenBot patch: a full disposal must also dispose the zombie children and
++    // cleanups that a recompute in this flush parked for its commit. A disposed
++    // node never commits, so they would stay queued in zombieQueue and keep
++    // their DOM alive (keyed list rows removed in the flush their memos re-ran).
++    if (t && !n && (e.Me !== null || e.$e !== null) && !(e.D & REACTIVE_DISPOSED)) disposeChildren(e, false, true);
+     const r = e.D;
+     if (r & REACTIVE_DISPOSED) return;
+     if (t) {
+diff --git a/dist/prod/core/owner.js b/dist/prod/core/owner.js
+index 8a4f2fbc554e4e72f8f78a6b18e00b59d1421ed8..f775b2788ba19d6c7da725b7d244af412b99f91e 100644
+--- a/dist/prod/core/owner.js
++++ b/dist/prod/core/owner.js
+@@ -45,6 +45,11 @@ function dispose(e) {
+ }
+ 
+ function disposeChildren(e, n = false, t) {
++    // OpenBot patch: a full disposal must also dispose the zombie children and
++    // cleanups that a recompute in this flush parked for its commit. A disposed
++    // node never commits, so they would stay queued in zombieQueue and keep
++    // their DOM alive (keyed list rows removed in the flush their memos re-ran).
++    if (n && !t && (e.We !== null || e.Qe !== null) && !(e.se & REACTIVE_DISPOSED)) disposeChildren(e, false, true);
+     const i = e.se;
+     if (i & REACTIVE_DISPOSED) return;
+     if (n) {

@@ -7,11 +7,12 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { errorMessage } from "../../error-message";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "./servers-context";
+import { serverAdminPort, serversPort } from "./servers-port";
 
 /**
  * The settings dialog for one server: its identity, whether it is published,
@@ -60,7 +61,7 @@ const ServerSettings = createSimpleContext({
       ({ open, id }) => {
         if (!open || !id) return;
         let previous = "";
-        return window.openbot.servers.onPresence((presence) => {
+        return serversPort().servers.onPresence((presence) => {
           // Typing updates must not read the account API again. Membership and
           // online changes are enough to refresh an accepted invitation.
           const signature = JSON.stringify(
@@ -85,7 +86,7 @@ const ServerSettings = createSimpleContext({
         let identityError: string | null = null;
         if (server.kind === "remote") {
           try {
-            const refreshed = await window.openbot.servers.refreshIdentity(serverId);
+            const refreshed = await serversPort().servers.refreshIdentity(serverId);
             setServers((current) => current.map((item) => (item.id === serverId ? refreshed : item)));
             server = refreshed;
           } catch (error) {
@@ -95,18 +96,11 @@ const ServerSettings = createSimpleContext({
         const canManage =
           server.kind === "local" ? hostStatus().configured : server.role === "admin" || server.role === "owner";
         const canUseNetwork = server.kind === "local" || server.state === "online";
+        const admin = serverAdminPort(server);
         const [presence, members, invites] = await Promise.all([
-          server.kind === "local" ? window.openbot.host.getPresence() : window.openbot.servers.getPresenceFor(serverId),
-          canManage && canUseNetwork
-            ? server.kind === "local"
-              ? window.openbot.host.listMembers()
-              : window.openbot.servers.listMembers(serverId)
-            : Promise.resolve(null),
-          canManage && canUseNetwork
-            ? server.kind === "local"
-              ? window.openbot.host.listInvites()
-              : window.openbot.servers.listInvites(serverId)
-            : Promise.resolve([]),
+          admin.getPresence(),
+          canManage && canUseNetwork ? admin.listMembers() : Promise.resolve(null),
+          canManage && canUseNetwork ? admin.listInvites() : Promise.resolve([]),
         ]);
         if (request !== serverSettingsRequest || serverSettingsTargetId() !== serverId) return;
         const presenceById = new Map(presence.members.map((member) => [member.id, member]));
@@ -149,8 +143,8 @@ const ServerSettings = createSimpleContext({
       let operationSucceeded = false;
       try {
         const status = hostStatus().configured
-          ? await window.openbot.host.updateIdentity(input)
-          : await window.openbot.host.configure(input);
+          ? await serversPort().host.updateIdentity(input)
+          : await serversPort().host.configure(input);
         analytics.track("team_action", {
           action: "identity_saved",
           result: "succeeded",
@@ -158,7 +152,7 @@ const ServerSettings = createSimpleContext({
         });
         operationSucceeded = true;
         setHostStatus(status);
-        setServers(await window.openbot.servers.list());
+        setServers(await serversPort().servers.list());
         await refreshServerSettings(server.id);
       } catch (error) {
         if (!operationSucceeded) {
@@ -180,7 +174,7 @@ const ServerSettings = createSimpleContext({
      * that carries the answer is the host's own.
      */
     async function recheckScreenRecording(): Promise<void> {
-      setHostStatus(await window.openbot.host.recheckScreenRecording());
+      setHostStatus(await serversPort().host.recheckScreenRecording());
     }
 
     async function setServerPublished(published: boolean): Promise<void> {
@@ -190,12 +184,12 @@ const ServerSettings = createSimpleContext({
       const action = published ? ("published" as const) : ("unpublished" as const);
       let operationSucceeded = false;
       try {
-        const status = published ? await window.openbot.host.start() : await window.openbot.host.stop();
+        const status = published ? await serversPort().host.start() : await serversPort().host.stop();
         if (published && status.phase !== "online") throw new Error("publish_failed");
         analytics.track("team_action", { action, result: "succeeded", server_kind: "local" });
         operationSucceeded = true;
         setHostStatus(status);
-        setServers(await window.openbot.servers.list());
+        setServers(await serversPort().servers.list());
         await refreshServerSettings(server.id);
       } catch (error) {
         if (!operationSucceeded) {
@@ -220,10 +214,7 @@ const ServerSettings = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
-        const invite =
-          server.kind === "local"
-            ? await window.openbot.host.createInvite(input)
-            : await window.openbot.servers.createInvite(server.id, input);
+        const invite = await serverAdminPort(server).createInvite(input);
         analytics.track("team_action", {
           action: "invite_created",
           result: "succeeded",
@@ -255,8 +246,7 @@ const ServerSettings = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
-        if (server.kind === "local") await window.openbot.host.updateMember(input);
-        else await window.openbot.servers.updateMember(server.id, input);
+        await serverAdminPort(server).updateMember(input);
         analytics.track("team_action", { action: "member_updated", result: "succeeded", server_kind: server.kind });
         operationSucceeded = true;
         await refreshServerSettings(server.id);
@@ -279,8 +269,7 @@ const ServerSettings = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
-        if (server.kind === "local") await window.openbot.host.removeMember(memberId);
-        else await window.openbot.servers.removeMember(server.id, memberId);
+        await serverAdminPort(server).removeMember(memberId);
         analytics.track("team_action", { action: "member_removed", result: "succeeded", server_kind: server.kind });
         operationSucceeded = true;
         await refreshServerSettings(server.id);
@@ -303,8 +292,7 @@ const ServerSettings = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
-        if (server.kind === "local") await window.openbot.host.revokeInvite(inviteId);
-        else await window.openbot.servers.revokeInvite(server.id, inviteId);
+        await serverAdminPort(server).revokeInvite(inviteId);
         analytics.track("team_action", { action: "invite_revoked", result: "succeeded", server_kind: server.kind });
         operationSucceeded = true;
         await refreshServerSettings(server.id);
@@ -334,7 +322,7 @@ const ServerSettings = createSimpleContext({
       const request = ++serverSettingsMcpRequest;
       const current = (): boolean => request === serverSettingsMcpRequest && serverSettingsTargetId() === server.id;
       try {
-        const configs = await window.openbot.agent.listMcpServers(server.id);
+        const configs = await serversPort().agent.listMcpServers(server.id);
         if (!current()) return;
         setServerSettingsMcp(configs);
         setServerSettingsMcpError(null);
@@ -355,7 +343,7 @@ const ServerSettings = createSimpleContext({
       const server = serverSettingsTarget();
       if (!server) throw new Error("This server is not available.");
       const analytics = desktopAnalytics.scope();
-      const result = await window.openbot.agent.testMcpServer({ config }, server.id);
+      const result = await serversPort().agent.testMcpServer({ config }, server.id);
       analytics.track("team_action", {
         action: "mcp_server_tested",
         result: result.error ? "failed" : "succeeded",
@@ -367,19 +355,19 @@ const ServerSettings = createSimpleContext({
 
     async function saveMcpServer(config: McpServerConfig): Promise<void> {
       await runMcpMutation("mcp_server_saved", "mcp_server_save_failed", (serverId) =>
-        window.openbot.agent.saveMcpServer({ config }, serverId),
+        serversPort().agent.saveMcpServer({ config }, serverId),
       );
     }
 
     async function removeMcpServer(mcpServerId: string): Promise<void> {
       await runMcpMutation("mcp_server_removed", "mcp_server_remove_failed", (serverId) =>
-        window.openbot.agent.removeMcpServer({ mcpServerId }, serverId),
+        serversPort().agent.removeMcpServer({ mcpServerId }, serverId),
       );
     }
 
     async function setMcpServerEnabled(mcpServerId: string, enabled: boolean): Promise<void> {
       await runMcpMutation("mcp_server_toggled", "mcp_server_toggle_failed", (serverId) =>
-        window.openbot.agent.setMcpServerEnabled({ mcpServerId, enabled }, serverId),
+        serversPort().agent.setMcpServerEnabled({ mcpServerId, enabled }, serverId),
       );
     }
 

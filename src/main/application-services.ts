@@ -40,7 +40,7 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
@@ -50,6 +50,7 @@ import { BrowserHost } from "../backend/browser-host";
 import { MailboxStore } from "../backend/mailbox-store";
 import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
+import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
@@ -100,6 +101,7 @@ import {
 import { ManagedSkillService } from "./managed-skill-service";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { NotificationPreferenceStore } from "./notification-preference-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
@@ -140,6 +142,7 @@ const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
 const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
+const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const DYNAMIC_ISLAND_PREFERENCE_FILE = "openbot-dynamic-island-preference-v1.json";
 const BROWSER_STATE_FILE = "openbot-browser-state-v1.json";
 const SIDEBAR_LAYOUT_FILE = "openbot-sidebar-layout-v1.json";
@@ -219,6 +222,7 @@ export interface ApplicationServices {
   /** Reached by the entry point for one thing only: handing a returning grant to its sign-in. */
   mcpOAuth: McpOAuth;
   mailbox: MailboxStore;
+  storageUsage: StorageUsageService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
   browserView: BrowserViewClient;
@@ -231,6 +235,7 @@ export interface ApplicationServices {
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
   language: LanguageService;
+  notificationPreference: NotificationPreferenceStore;
   agentInitialization: AgentInitializationGate;
   sidebarLayout: SidebarLayoutStore;
   host: HostService;
@@ -416,7 +421,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserPictureInPictureEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.pictureInPictureEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserPictureInPicture, "picture in picture", () => browserPictureInPicture.destroy());
@@ -433,6 +438,10 @@ export async function createApplicationServices({
     systemLocale: app.getLocale(),
   });
   await language.load();
+  const notificationPreference = new NotificationPreferenceStore(
+    join(app.getPath("userData"), NOTIFICATION_PREFERENCE_FILE),
+  );
+  await notificationPreference.load();
   const updatePreference = await readUpdatePreference(updatePreferenceFile);
   const approvalAutomationFile = join(app.getPath("userData"), APPROVAL_AUTOMATION_FILE);
   const approvalAutomation = new ApprovalAutomation({
@@ -761,9 +770,9 @@ export async function createApplicationServices({
 
   /*
    * The runtime manager decides which provider has an update waiting, by comparing against the
-   * pinned lock. It knows the copies it downloaded itself; a CLI the user installed is only ever
-   * reported in the agent status, so it is passed on from here. Its update offer installs the
-   * pinned managed copy and leaves the system installation untouched.
+   * latest upstream release. It knows the copies it downloaded itself; a CLI the user installed is
+   * only ever reported in the agent status, so it is passed on from here. Its update offer installs
+   * a managed copy and leaves the system installation untouched.
    */
   const trackSystemCliVersions = (status: AgentStatus): void => {
     for (const provider of status.providers ?? []) {
@@ -776,12 +785,38 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
+  // After the status forward, so the offer a check finds reaches the renderer.
+  providerRuntimes.startUpdateChecks();
   // A tool runtime that becomes ready changes what the MCP servers resolve to, for every
   // provider: sessions that dropped their stdio servers before it finished downloading are
   // marked for refresh, and the deferred mechanism spends the mark before each agent's next
   // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) service.refreshAllAgentRuntimes();
+  });
+  const userData = app.getPath("userData");
+  const storageSources = {
+    roots: {
+      database: store.database.path,
+      downloads: store.downloadsRoot,
+      caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
+        join(userData, name),
+      ),
+      logs: [join(userData, "logs", "remote"), join(userData, "logs", "update")],
+      runtimes: providerRuntimeRoot({
+        appData: app.getPath("appData"),
+        userDataOverride: app.commandLine.getSwitchValue("user-data-dir"),
+      }),
+      data: userData,
+    },
+    database: () => store.database.connection,
+    mailbox,
+    agents: () => service.listAgents(),
+  };
+  const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
+  // A deleted or renamed agent changes every scope, so no surface keeps its old answer.
+  service.on("event", (event) => {
+    if (event.type === "agents-changed") storageUsage.invalidate();
   });
   const skills = new SkillMarketplaceService(
     centralAuth,
@@ -827,6 +862,8 @@ export async function createApplicationServices({
     channels: service.channels,
     // Present, so the host advertises `mcp-servers-v1`. The routes are admin-only.
     mcpServers: service,
+    // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
+    storage: storageUsage,
     // The host's Team API routes share the IPC handlers' runtime preparation: a first server
     // saved, enabled, or tested remotely must start and await the managed download like a local one.
     mcpToolRuntimePreparation: {
@@ -976,6 +1013,11 @@ export async function createApplicationServices({
       }),
     },
   );
+  // A server joined or revoked on another device of this account. Signal carries it to every socket
+  // the account holds, so the phone's join reaches this computer in the second it happens rather
+  // than at the next account check. The refresh itself belongs to the entry point, which owns the
+  // account check and its coalescing; this only forwards the notice to it.
+  teamWebRtcBridge.on("accountServersChanged", () => remoteServers.invalidateDirectory());
   teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => remoteServers.stop());
   await remoteServers.initialize();
   criticalActionTargets = { agents: service, remoteServers };
@@ -997,7 +1039,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
@@ -1124,6 +1166,7 @@ export async function createApplicationServices({
     providerCredentials,
     mcpOAuth,
     mailbox,
+    storageUsage,
     browser,
     browserPictureInPicture,
     browserView,
@@ -1133,6 +1176,7 @@ export async function createApplicationServices({
     updatePreferenceFile,
     approvalAutomation,
     language,
+    notificationPreference,
     agentInitialization,
     hostUpdateCoordinator,
     describeRestartReadiness,

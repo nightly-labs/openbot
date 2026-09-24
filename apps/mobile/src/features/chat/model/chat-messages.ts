@@ -1,3 +1,4 @@
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
@@ -5,8 +6,8 @@ import type {
   ChannelRoutingConversationEvent,
   ConversationMessage,
   ConversationQuestionPrompt,
+  ImageGenerationInfo,
 } from "@openbot/contracts/ipc";
-
 import { channelRoutingConversationEvent } from "@openbot/contracts/ipc";
 
 export type ChatMessage =
@@ -31,8 +32,11 @@ export type ChatMessage =
       superseded?: boolean;
       body: string;
       streaming: boolean;
+      status?: ConversationMessage["status"];
       replyToMessageId?: string | null;
       attachments?: AttachmentSummary[];
+      /** An image the agent is generating or generated. Its first attachment is the image. */
+      imageGeneration?: ImageGenerationInfo;
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
 
@@ -79,7 +83,7 @@ const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
-  for (const message of orderConversationMessages([...messages])) {
+  for (const message of sortConversationMessages([...messages])) {
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
@@ -91,7 +95,12 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
       result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
       continue;
     }
-    if ((!message.text.trim() && !message.attachments?.length) || message.author === "system") continue;
+    // A generation has no text or attachment until its image arrives, and it still needs its placeholder.
+    if (
+      (!message.text.trim() && !message.attachments?.length && !message.imageGeneration) ||
+      message.author === "system"
+    )
+      continue;
     if (message.author === "assistant" && message.itemType === "commentary") {
       const key = message.turnId ?? message.id;
       let thinking = thinkingByTurn.get(key);
@@ -110,7 +119,9 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
           author: message.author === "user" ? "user" : "agent",
           body: message.exchange ? "" : message.text,
           streaming: message.status === "streaming",
+          status: message.status,
           attachments: message.attachments,
+          imageGeneration: message.imageGeneration,
           replyToMessageId: message.replyToMessageId,
         };
         projectedBubbles.set(message, bubble);
@@ -125,7 +136,8 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
   return messages.findLast(
     (message) =>
       Boolean(message.questionPrompt) ||
-      (message.author !== "system" && (message.text.trim().length > 0 || Boolean(message.attachments?.length))),
+      (message.author !== "system" &&
+        (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
   );
 }
 
@@ -179,15 +191,23 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
     superseded: entry.superseded,
     body: entry.message.text,
     streaming: entry.message.status === "streaming",
+    status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,
     attachments: entry.message.attachments,
+    imageGeneration: entry.message.imageGeneration,
   };
 }
 
 /** Keep channel authors explicit: another human member is not the current user. */
 export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
   return messages
-    .filter((entry) => entry.message.questionPrompt || entry.message.text.trim() || entry.message.attachments?.length)
+    .filter(
+      (entry) =>
+        entry.message.questionPrompt ||
+        entry.message.imageGeneration ||
+        entry.message.text.trim() ||
+        entry.message.attachments?.length,
+    )
     .map((entry) => {
       const self = entry.author.kind === "member" && entry.author.id === memberId;
       const cached = projectedChannelMessages.get(entry);
@@ -201,52 +221,4 @@ export function projectChannelMessages(messages: ChannelMessage[], memberId: str
 /** The host accepted a send, but its transcript still needs a successful read. */
 export interface ChatHistoryReceipt {
   refreshHistory: () => Promise<void>;
-}
-
-/** Host order for one chat window. Keep in sync with the backend sorter. */
-export function orderConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
-  const originalIndexes = new Map(messages.map((message, index) => [message, index]));
-  const groupKeys = new Map<ConversationMessage, string>();
-  const groups = new Map<string, { startedAt: number; firstIndex: number }>();
-  for (const [index, message] of messages.entries()) {
-    const groupKey = message.turnId ? `turn:${message.turnId}` : `message:${index}`;
-    const createdAt = messageTime(message);
-    groupKeys.set(message, groupKey);
-    const group = groups.get(groupKey);
-    if (group) {
-      group.startedAt = Math.min(group.startedAt, createdAt);
-      group.firstIndex = Math.min(group.firstIndex, index);
-    } else {
-      groups.set(groupKey, { startedAt: createdAt, firstIndex: index });
-    }
-  }
-  messages.sort((left, right) => {
-    const leftGroup = groups.get(groupKeys.get(left) ?? "");
-    const rightGroup = groups.get(groupKeys.get(right) ?? "");
-    if (leftGroup && rightGroup && leftGroup !== rightGroup) {
-      if (leftGroup.startedAt !== rightGroup.startedAt) return leftGroup.startedAt - rightGroup.startedAt;
-      if (leftGroup.firstIndex !== rightGroup.firstIndex) return leftGroup.firstIndex - rightGroup.firstIndex;
-    }
-    if (left.turnId && left.turnId === right.turnId) {
-      const rankDifference = turnMessageRank(left) - turnMessageRank(right);
-      if (rankDifference !== 0) return rankDifference;
-    }
-    const timeDifference = messageTime(left) - messageTime(right);
-    if (timeDifference !== 0) return timeDifference;
-    return (originalIndexes.get(left) ?? 0) - (originalIndexes.get(right) ?? 0);
-  });
-  return messages;
-}
-
-function messageTime(message: ConversationMessage): number {
-  const timestamp = Date.parse(message.createdAt);
-  return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
-}
-
-function turnMessageRank(message: ConversationMessage): 0 | 1 | 2 | 3 {
-  if (message.exchange?.direction === "incoming" || message.author === "user") return 0;
-  if (message.author === "assistant" && message.itemType === "commentary") return 1;
-  if (message.exchange?.direction === "outgoing") return 2;
-  if (message.author === "assistant") return 3;
-  return 2;
 }

@@ -197,6 +197,8 @@ const LANDING_PREVIEW_SERVERS: ServerSummary[] = [
     name: "Local",
     logoUrl: developmentLogoUrl,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "local",
     state: "online",
     apiUrl: null,
@@ -209,6 +211,8 @@ const LANDING_PREVIEW_SERVERS: ServerSummary[] = [
     name: "OpenBot team",
     logoUrl: productionLogoUrl,
     notificationsMuted: false,
+    notificationsMutedUntil: null,
+    notificationLevel: "all",
     kind: "remote",
     state: "online",
     apiUrl: "https://team.example.com",
@@ -339,13 +343,17 @@ const LANDING_PREVIEW_DIRECT_SNAPSHOTS: Record<string, DirectConversationSnapsho
 };
 
 const LANDING_PREVIEW_DIRECT_THREADS: DirectThreadSummary[] = Object.values(LANDING_PREVIEW_DIRECT_SNAPSHOTS).map(
-  (snapshot) => ({
-    threadId: snapshot.threadId,
-    otherMemberId: snapshot.otherMemberId,
-    lastMessage: snapshot.messages[snapshot.messages.length - 1],
-    unreadCount: snapshot.readState?.unreadCount ?? 0,
-    updatedAt: snapshot.messages[snapshot.messages.length - 1].createdAt,
-  }),
+  (snapshot) => {
+    const lastMessage = snapshot.messages.at(-1);
+    if (!lastMessage) throw new Error(`Landing direct thread ${snapshot.threadId} has no messages.`);
+    return {
+      threadId: snapshot.threadId,
+      otherMemberId: snapshot.otherMemberId,
+      lastMessage,
+      unreadCount: snapshot.readState?.unreadCount ?? 0,
+      updatedAt: lastMessage.createdAt,
+    };
+  },
 );
 
 const LANDING_PREVIEW_EMAIL = "norbertbodziony@gmail.com";

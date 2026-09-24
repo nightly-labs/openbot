@@ -3,8 +3,10 @@ import { onCleanup } from "solid-js";
 import { expect, fireEvent, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
+
+const storyAgent = STORY_AGENT;
 
 const chiefMemories: AgentMemory[] = [
   {
@@ -60,11 +62,11 @@ function AgentMemoriesStory(props: { memories: AgentMemory[] }) {
     <main class="agent-memories-story-stage">
       <AgentSettingsPanel
         onOpenUsage={fn()}
-        agent={STORY_AGENTS[0]}
+        agent={storyAgent}
         runtimeSettings={{
-          provider: STORY_AGENTS[0].provider,
-          model: STORY_AGENTS[0].model,
-          reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+          provider: storyAgent.provider,
+          model: storyAgent.model,
+          reasoningEffort: storyAgent.reasoningEffort,
         }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -91,11 +93,11 @@ const meta = {
   title: "Settings/Agent Memories",
   component: AgentSettingsPanel,
   args: {
-    agent: STORY_AGENTS[0],
+    agent: storyAgent,
     runtimeSettings: {
-      provider: STORY_AGENTS[0].provider,
-      model: STORY_AGENTS[0].model,
-      reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+      provider: storyAgent.provider,
+      model: storyAgent.model,
+      reasoningEffort: storyAgent.reasoningEffort,
     },
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,
@@ -163,7 +165,9 @@ export const DeleteAction: Story = {
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(await canvas.findByRole("button", { name: /Memories/ }));
     const body = within(document.body);
-    await userEvent.click((await body.findAllByRole("button", { name: "Delete memory" }))[0]);
+    const [deleteButton] = await body.findAllByRole("button", { name: "Delete memory" });
+    if (!deleteButton) throw new Error("The first memory has no delete button.");
+    await userEvent.click(deleteButton);
     await waitFor(() =>
       expect(body.queryByText("The user prefers short progress updates with the result first.")).toBeNull(),
     );
@@ -177,7 +181,7 @@ export const ClearConfirmation: Story = {
     await userEvent.click(await canvas.findByRole("button", { name: /Memories/ }));
     const body = within(document.body);
     await userEvent.click(await body.findByRole("button", { name: "Clear all memories" }));
-    await expect(await body.findByRole("dialog", { name: "Clear all memories?" })).toBeVisible();
+    await expect(await body.findByRole("alertdialog", { name: "Clear all memories?" })).toBeVisible();
     await expect(document.querySelector(".agent-memories-modal")).toBeVisible();
   },
 };

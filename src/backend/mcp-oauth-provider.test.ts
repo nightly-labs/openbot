@@ -809,7 +809,7 @@ describe("signing in to an http MCP server", () => {
     // A thread start, not a test the user pressed: no browser opens and the tools are simply absent.
     expect(await testMcpServer(config(server.url), 10_000)).toEqual({
       toolCount: 0,
-      error: "The server answered 401.",
+      error: "The server answered 401. Check the API key or other credentials.",
     });
   });
 

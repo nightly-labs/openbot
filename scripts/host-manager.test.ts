@@ -306,7 +306,7 @@ describe("privileged host update lifecycle", () => {
     for (const [runningUid, missingUid] of [
       [uid, otherUid],
       [otherUid, uid],
-    ]) {
+    ] as const) {
       const open = vi.fn(async () => undefined);
       const operations = {
         runningTenants: async () => [{ uid: runningUid, pid: 100 }],

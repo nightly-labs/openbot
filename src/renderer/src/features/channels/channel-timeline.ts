@@ -10,8 +10,8 @@
 
 import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEvent, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
-import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "../../data";
-import type { ChatMessageAuthor } from "../conversation/ChatMessageRow";
+import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
+import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
 import { withinGroupingWindow } from "../conversation/chat-grouping";
 
@@ -151,6 +151,7 @@ export function firstUnreadChannelMessageId(entries: ChannelTimelineEntry[], unr
   let remaining = unreadCount;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
+    if (!entry) continue;
     // The count from the channel list leaves out activity rows, so the walk back leaves them out.
     if (entry.author.kind === "you" || entry.message.actionMarker) continue;
     remaining -= 1;

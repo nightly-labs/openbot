@@ -17,6 +17,11 @@ and was omitted. It now has `typecheck:mobile`; the old name remains an alias fo
 `@openbot/brand`, `@openbot/contracts`, and `@openbot/team-client`. Its Expo and Uniwind generation
 writes ignored files before TypeScript runs.
 
+Each `typecheck` script starts TypeScript through `node_modules/typescript/bin/tsc`, not a bare
+`tsc`. `storybook-solidjs-vite` installs typescript@6 as `@typescript/old`, and bun links that
+package's `tsc` into `node_modules/.bin` in place of the TypeScript 7 one. A bare `tsc` therefore
+checks with TypeScript 6 without a warning; `scripts/dependency-catalog.test.ts` rejects one.
+
 Signal had a similar gap: `remote:check` was its only entry point and also required Compose
 validation. `typecheck:remote` and `test:remote` now run in CI. `remote:check:compose` validates both
 Compose files with the Docker CLI; it does not need a daemon. `remote:check` remains the combined
@@ -31,6 +36,22 @@ The Signal Dockerfile installs from a pruned checkout with one manifest copy per
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
 cover the workspace dependency graph; keep that check when changing workspace dependencies.
 
+The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
+`bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
+`bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
+lint, desktop typecheck and build) takes about a minute, and each other typecheck takes a few
+seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
+`openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
+
+`check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
+those files again. It stages again only the files that have no unstaged changes; otherwise the commit
+would also take the author's unstaged edits. When Biome changes a file that is only partly staged,
+the hook stops the commit and names the file. `scripts/pre-commit-hook.test.ts` covers the three cases.
+
+One project typecheck, such as `typecheck:node` or `typecheck:renderer`, takes under 10 seconds and
+less than 1.5 GB of memory. The load that the check rules prevent comes from the aggregate command,
+which starts all projects at the same time.
+
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:
 
@@ -38,12 +59,14 @@ Its main jobs are:
 | --- | --- | --- |
 | Check | `ubuntu-latest` | `bun run check:desktop:static` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
-| Tests | `ubuntu-latest` | `bun run test:desktop`, `bun run test:sites`, `bun run test:remote` |
-| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run remote:check:compose` |
+| Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
+| Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
+| Tests (remote) | `ubuntu-latest` | `bun run test:remote` |
+| Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n`, `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
 
-All six gate Cloudflare production deployment on `main`. Surfaces was previously missing from
+All of these jobs gate Cloudflare production deployment on `main`. Surfaces was previously missing from
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
@@ -150,6 +173,11 @@ because a rule that matches nothing passes without enforcing anything. One rule 
 The UI fixtures have two trees. `renderer` breaks every check beside valid examples.
 `renderer-clean` breaks none. Both are needed: a check that reports once per file can falsely reject
 a valid example without changing the failure count in the first tree.
+
+The shared UI Biome override also runs `tools/ui-foundation/no-desktop-preload.grit`.
+It rejects direct `window.openbot` and `globalThis.openbot` access, including optional and
+literal indexed forms. Browser APIs, comments, and string documentation remain valid.
+Its positive and negative fixtures run in `scripts/ui-foundation-check.test.ts`.
 
 ### Removed rules and their limits
 

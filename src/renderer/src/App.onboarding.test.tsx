@@ -173,7 +173,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Refresh providers" }));
     expect(screen.getByRole("button", { name: "Checking providers" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^Install / })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
 
     expect(finishRefresh).toBeTypeOf("function");
     finishRefresh?.({

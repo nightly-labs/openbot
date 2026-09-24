@@ -1,3 +1,14 @@
+import type { EventEndpoint, Untyped } from "@openbot/contracts/ipc";
+
+// A typed event takes its payload, or nothing when the payload is `undefined`. An event whose group is not
+// typed yet takes anything, as every event did before endpoints had types. The payload comes from the
+// endpoint alone: `NoInfer` keeps a wider argument from widening it.
+type EventArgs<Payload> = [Payload] extends [Untyped]
+  ? unknown[]
+  : [Payload] extends [undefined]
+    ? []
+    : [payload: Payload];
+
 export interface RendererIpcWindow {
   isDestroyed(): boolean;
   webContents: {
@@ -11,10 +22,10 @@ export interface RendererIpcWindow {
   };
 }
 
-export function sendToRenderer(
+export function sendToRenderer<Payload>(
   window: RendererIpcWindow | null | undefined,
-  channel: string,
-  ...args: unknown[]
+  endpoint: EventEndpoint<string, Payload>,
+  ...args: EventArgs<NoInfer<Payload>>
 ): boolean {
   if (!window || window.isDestroyed()) return false;
 
@@ -23,7 +34,7 @@ export function sendToRenderer(
     if (contents.isDestroyed() || contents.isLoadingMainFrame()) return false;
     const frame = contents.mainFrame;
     if (frame.isDestroyed() || frame.detached) return false;
-    contents.send(channel, ...args);
+    contents.send(endpoint.channel, ...args);
     return true;
   } catch (error) {
     if (isUnavailableRendererError(error)) return false;

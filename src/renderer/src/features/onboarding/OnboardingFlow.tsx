@@ -11,16 +11,18 @@ import {
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { ArrowUp, Button, Plus, toast } from "@openbot/ui";
+import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { freeModelsReady, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { errorMessage } from "@openbot/ui/error-message";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { ProviderCodeLoginDialog } from "../../components/ProviderCodeLoginDialog";
-import { ProviderPicker, type ProviderPickerOption } from "../../components/ProviderPicker";
+import { ProviderPicker } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
-import { ArrowUp, Button, Plus } from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import { CustomProviderDialog } from "../custom-providers/CustomProviderDialog";
-import { CustomProviderListDialog } from "../custom-providers/CustomProviderListDialog";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
@@ -30,11 +32,19 @@ export interface OnboardingFlowProps {
   platform: DesktopPlatform;
   refreshingProviders?: boolean;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  /** The newer runtime main offers per provider; the row's actions menu offers it as in Settings. */
+  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
+  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  /**
+   * Saves the optional OpenCode Go key. OpenCode runs free models without it, so its Connect row
+   * button opens the key dialog rather than gating the step.
+   */
+  providerKeys?: ProviderKeyApi;
   /**
    * The sign-in finished on another device. First run is where it is needed most: the browser this
    * computer opens is the part of the hand-off that is most likely to be missing or wrong here.
@@ -63,6 +73,14 @@ type StepDirection = "forward" | "back";
 const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> = AGENT_PROVIDER_DESCRIPTORS.map(
   (descriptor) => ({ id: descriptor.id, name: descriptor.displayName, description: descriptor.onboardingDescription }),
 );
+
+/**
+ * Whether setup can continue with this provider. A signed-in provider can; so can a downloaded
+ * provider that runs free models, because it has no sign-in to wait for.
+ */
+function providerReady(option: ProviderPickerOption): boolean {
+  return option.state === "available" || freeModelsReady(option);
+}
 
 const ONBOARDING_AVATAR_HUES: readonly AvatarHue[] = [0, 30, 55, 100, 150, 185, 215, 245, 280, 320];
 
@@ -104,6 +122,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const [customModel, setCustomModel] = createSignal<AgentModelId | null>(null);
   const [providerSelectedByUser, setProviderSelectedByUser] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
   const [error, setError] = createSignal("");
   const [providerErrors, setProviderErrors] = createSignal<Partial<Record<AgentProviderId, string>>>({});
   const visibleError = createMemo(
@@ -128,6 +147,11 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
         email: status?.email,
         connectionState: status?.connectionState,
         checkError: status?.checkError,
+        availableVersion: props.providerAvailableVersions?.[provider.id] ?? null,
+        freeModels: provider.id === "opencode",
+        // For a user with no account anywhere, this row is the way forward, and among four rows it
+        // reads like any other; the note points it out.
+        callout: provider.id === "opencode" ? { title: "Try it free", detail: "No sign-in needed" } : null,
         runtimeStatus:
           runtime?.phase === "not-downloaded" && (status?.state === "available" || status?.state === "sign-in-required")
             ? { ...runtime, phase: "ready", version: status.version }
@@ -197,7 +221,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const selectedProviderConnected = createMemo(() => {
     const selected = selectedProvider();
     return Boolean(
-      selected && providerOptions().some((provider) => provider.id === selected && provider.state === "available"),
+      selected && providerOptions().some((provider) => provider.id === selected && providerReady(provider)),
     );
   });
   const nextReasonId = createUniqueId();
@@ -236,9 +260,12 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     }),
     ({ options, selected, selectedByUser }) => {
       if (selectedByUser && selected && options.some((provider) => provider.id === selected)) return;
-      if (selected && options.some((provider) => provider.id === selected && provider.state === "available")) return;
-      const available = options.find((provider) => provider.state === "available");
-      setSelectedProvider(available?.id ?? null);
+      if (selected && options.some((provider) => provider.id === selected && providerReady(provider))) return;
+      // A signed-in provider comes first; free models are the way in when none is.
+      const ready =
+        options.find((provider) => provider.state === "available") ??
+        options.find((provider) => providerReady(provider));
+      setSelectedProvider(ready?.id ?? null);
     },
   );
 
@@ -310,6 +337,15 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     }
   }
 
+  /** OpenCode signs in with a pasted key, so its row opens the key dialog; the rest open a guide. */
+  function signInProvider(provider: AgentProviderId): void {
+    if (provider === "opencode" && props.providerKeys) {
+      setOpenCodeKeyOpen(true);
+      return;
+    }
+    void openProviderGuide(provider, props.onSignInProvider, "sign-in");
+  }
+
   async function connectProvider(provider: AgentProviderId): Promise<void> {
     if (!props.onConnectProvider || props.refreshingProviders) return;
     setError("");
@@ -376,12 +412,35 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     setStep(nextStep);
   }
 
+  /**
+   * The main button while the selected provider is not connected. It stays pressable: a disabled
+   * `Next` beside rows of "Ready" badges read as a broken screen (issue #643). It connects the
+   * provider when a connection can start now, and the toast says what happens or what is missing.
+   */
+  function connectSelectedProvider(): void {
+    const option = providerOptions().find((candidate) => candidate.id === selectedProvider());
+    const runtimePhase = option?.runtimeStatus?.phase ?? "ready";
+    const canConnect =
+      option &&
+      props.onConnectProvider &&
+      !props.refreshingProviders &&
+      runtimePhase === "ready" &&
+      option.connectionState !== "connecting";
+    if (!canConnect) {
+      toast.info(nextBlockedReason());
+      return;
+    }
+    toast.info(`Connecting ${option.name}. Finish the sign-in if a browser window opens.`);
+    void connectProvider(option.id);
+  }
+
   function nextStep(): void {
     if (!selectedProviderConnected()) {
-      setError(nextBlockedReason());
+      connectSelectedProvider();
       return;
     }
     if (step() === "meet") {
+      startFreeProvider();
       moveTo("computer", "forward");
       return;
     }
@@ -390,6 +449,17 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       return;
     }
     void finish();
+  }
+
+  /**
+   * Starts a free provider the user continued with before it was started. It needs no sign-in, so
+   * the connection only asks the CLI for its models, and the next steps give it time to answer.
+   */
+  function startFreeProvider(): void {
+    const option = providerOptions().find((candidate) => candidate.id === selectedProvider());
+    if (option?.freeModels && option.state !== "available" && option.connectionState !== "connecting") {
+      void connectProvider(option.id);
+    }
   }
 
   function previousStep(): void {
@@ -501,12 +571,9 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         ? (provider) => openProviderGuide(provider, props.onInstallProvider, "install")
                         : undefined
                     }
-                    onSignInProvider={
-                      props.onSignInProvider
-                        ? (provider) => openProviderGuide(provider, props.onSignInProvider, "sign-in")
-                        : undefined
-                    }
+                    onSignInProvider={props.onSignInProvider || props.providerKeys ? signInProvider : undefined}
                     onSignInWithCodeProvider={props.codeLogin?.start}
+                    onUpdateProvider={props.onUpdateProvider}
                     menuMount={screenElement()}
                     onRefreshProviders={!lazyProviderMode() && props.onRefreshProviders ? refreshProviders : undefined}
                     onAddCustomProvider={props.onAddCustomProvider ? host.openForm : undefined}
@@ -537,6 +604,15 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       onDelete={(provider) => void host.remove(provider)}
                       onClose={host.closeList}
                     />
+                  </Show>
+                  <Show when={openCodeKeyOpen() && props.providerKeys}>
+                    {(api) => (
+                      <OpenCodeKeyDialog
+                        api={api()}
+                        onClose={() => setOpenCodeKeyOpen(false)}
+                        onReconnect={props.onConnectProvider ? () => connectProvider("opencode") : undefined}
+                      />
+                    )}
                   </Show>
                   {/* Sits beside the picker it was started from, so the code covers the row rather
                     than a step the user has not reached. */}
@@ -692,13 +768,13 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
             type="button"
             variant="default"
             class="onboarding-next"
-            disabled={saving() || !selectedProviderConnected()}
+            disabled={saving()}
             aria-describedby={nextBlockedReason() ? nextReasonId : undefined}
             loading={saving()}
             loadingLabel="Opening OpenBot…"
             onClick={nextStep}
           >
-            {step() === "jobs" ? "Open OpenBot" : "Next"}
+            {!selectedProviderConnected() ? "Connect" : step() === "jobs" ? "Open OpenBot" : "Next"}
           </Button>
           {/* Named by the button above, so the reason is read out with it rather than hunted for. */}
           <Show when={nextBlockedReason()}>

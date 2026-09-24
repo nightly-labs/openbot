@@ -5,6 +5,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   type AgentEvent,
+  type AgentSummary,
   AnalyticsInputError,
   type DirectConversationPage,
   type DirectConversationPageAnchor,
@@ -28,12 +29,14 @@ import {
   CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
   MCP_SERVERS_CAPABILITY,
+  STORAGE_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
 import { isMcpRoute, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
+import { isStorageRoute, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -59,7 +62,7 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
-import { hiddenProviderAgentIds, legacyProviderView } from "./team-api/provider-visibility";
+import { hiddenAgentView, hiddenProviderAgentIds, legacyProviderView } from "./team-api/provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./team-api/request-context";
 import {
   bearerToken,
@@ -79,6 +82,7 @@ import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
 import { routeMcpServers } from "./team-api/route-mcp";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
+import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { TeamStoreError } from "./team-store";
 
@@ -154,6 +158,7 @@ export class TeamApiServer {
   #agentListener: ((event: AgentEvent) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #localTypingAgentId: string | null = null;
+  readonly #reportedUnrepresentableAgents = new Set<string>();
   #nextRateLimitSweepAt = 0;
 
   constructor(options: TeamApiOptions) {
@@ -506,8 +511,15 @@ export class TeamApiServer {
         return this.#json(response, 401, { error: "Authentication required." });
       }
       const context = this.#requestContext(request, response, url, token, authenticated);
-      if (context.protocol < 4) {
-        const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents());
+      const agents = this.#options.agents.listAgents();
+      const hidden = context.protocol < 4 ? hiddenProviderAgentIds(agents) : new Set<string>();
+      for (const id of this.#unrepresentableAgentIds(
+        agents.filter((agent) => !hidden.has(agent.id)),
+        context.protocol,
+        context.capabilities,
+      ))
+        hidden.add(id);
+      if (context.protocol < 4 || hidden.size > 0) {
         const responseRoute = this.#responseRoutes.get(response);
         if (responseRoute) responseRoute.hiddenAgentIds = hidden;
         const agentId = url.pathname.match(/^\/v1\/agents\/([^/]+)/u)?.[1];
@@ -539,6 +551,7 @@ export class TeamApiServer {
         "handled"
       )
         return;
+      if ((await routeStorage(context, this.#options.storage)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -656,8 +669,16 @@ export class TeamApiServer {
     const filteredConversationPayloads = new Map<string, string>();
 
     for (const [client, connection] of this.#eventClients) {
-      const encodeEvent = (event: AgentEvent, options = {}) =>
-        this.#encodeProviderEvent(event, connection.capabilities, options);
+      // An event this client's protocol cannot describe is skipped for this client only. Thrown
+      // out of the loop, it would stop the event for every client after this one.
+      const encodeEvent = (event: AgentEvent, options = {}) => {
+        try {
+          return this.#encodeProviderEvent(event, connection.capabilities, options);
+        } catch (error) {
+          (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
+          return null;
+        }
+      };
       const encodingOptions = { preserveSemanticTags: supportsTeamSemanticTags(connection.capabilities) };
       const supportsRuntimeSnapshots = connection.capabilities.has("agent-runtime-snapshots");
       const requiredCapability = eventCapability(event);
@@ -1051,19 +1072,58 @@ export class TeamApiServer {
     // the headers already sent that throw could neither answer the caller nor end the request: it
     // surfaced as a hung socket and an `ERR_HTTP_HEADERS_SENT` rejection out of `#handle`'s own
     // error path. Encoding first lets that failure become the 500 the caller can read.
-    const visibleValue = status < 400 && route.hiddenAgentIds ? legacyProviderView(value, route.hiddenAgentIds) : value;
+    const visibleValue =
+      status < 400 && route.hiddenAgentIds
+        ? (route.protocol < 4 ? legacyProviderView : hiddenAgentView)(value, route.hiddenAgentIds)
+        : value;
     const body = isChannelRoute(route.path)
       ? JSON.stringify(channelResponse(route.path, status, visibleValue))
       : isMcpRoute(route.path)
         ? JSON.stringify(mcpResponse(route.path, status, visibleValue))
-        : route.protocol === TEAM_PROTOCOL_V4
-          ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-          : route.protocol === TEAM_PROTOCOL_V3
-            ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-            : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
+        : isStorageRoute(route.path)
+          ? JSON.stringify(storageResponse(route.path, status, visibleValue))
+          : route.protocol === TEAM_PROTOCOL_V4
+            ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+            : route.protocol === TEAM_PROTOCOL_V3
+              ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
+              : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
+  }
+
+  /**
+   * Agents the negotiated protocol cannot describe, such as a model id a frozen codec does not
+   * accept. They are hidden like a provider an old client does not know: one such agent must not
+   * turn the whole agent list into a 500, because a remote client then cannot load the server.
+   */
+  #unrepresentableAgentIds(
+    agents: readonly AgentSummary[],
+    protocol: number,
+    capabilities: ReadonlySet<string>,
+  ): Set<string> {
+    const encode =
+      protocol === TEAM_PROTOCOL_V4
+        ? encodeTeamProtocolV4CurrentHttpResponse
+        : protocol === TEAM_PROTOCOL_V3
+          ? encodeTeamProtocolV3CurrentHttpResponse
+          : encodeTeamProtocolV1CurrentHttpResponse;
+    const options = { preserveSemanticTags: supportsTeamSemanticTags(capabilities) };
+    const hidden = new Set<string>();
+    for (const agent of agents) {
+      try {
+        encode("GET", TEAM_API_ROUTES.agents.all, 200, [agent], options);
+      } catch {
+        hidden.add(agent.id);
+        const key = `${protocol}:${agent.id}`;
+        if (this.#reportedUnrepresentableAgents.has(key)) continue;
+        this.#reportedUnrepresentableAgents.add(key);
+        (this.#options.logger ?? logger).warn(
+          `Team API protocol ${protocol} cannot describe agent ${agent.id}; it is hidden from these clients.`,
+        );
+      }
+    }
+    return hidden;
   }
 
   #protocolSupport(): TeamProtocolSupportV1 {
@@ -1078,6 +1138,7 @@ export class TeamApiServer {
         if (capability === "remote-desktop-setup")
           return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+        if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         return true;
       }),
     };

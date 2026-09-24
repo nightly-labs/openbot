@@ -1,5 +1,4 @@
 import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
-import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import {
   Alert,
   AlertActions,
@@ -24,8 +23,10 @@ import {
   SettingsSection,
   Skeleton,
   TriangleAlert,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
+} from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
+import { computerUsePort } from "./computer-use-port";
 
 export interface ComputerUseSetupProps {
   /**
@@ -56,7 +57,6 @@ const PERMISSION_DETAILS: Record<MacPermissionId, { title: string; description: 
 };
 
 export function ComputerUseSetup(props: ComputerUseSetupProps) {
-  const desktopApi = window.openbot;
   const [state, setState] = createSignal<ComputerUseState | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [busyPermission, setBusyPermission] = createSignal<MacPermissionId | null>(null);
@@ -70,7 +70,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     setLoading(true);
     setError(null);
     try {
-      const next = await desktopApi.getComputerUseState();
+      const next = await computerUsePort().getComputerUseState();
       if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not check Computer Use."));
@@ -84,7 +84,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     setBusyPermission(permission);
     setError(null);
     try {
-      const next = await desktopApi.openComputerUsePermissionPane(permission);
+      const next = await computerUsePort().openComputerUsePermissionPane(permission);
       if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not open System Settings."));

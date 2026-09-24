@@ -122,8 +122,7 @@ silently at the next turn, which is the failure this plan exists to remove, so
 the limit is stated in the panel instead.
 
 The upgrade is user-visible and has no opt-out: a server declared outside OpenBot
-stops reaching agents. `CHANGELOG.md` says so, and `takeMcpConfigDoorNotice`
-raises it once per computer, never to a user who is still in onboarding.
+stops reaching agents. `CHANGELOG.md` says so.
 
 ## Stage 4 - Native MCP OAuth, and delete `mcp-remote` (DONE)
 

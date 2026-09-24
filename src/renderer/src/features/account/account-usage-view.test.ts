@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   accountUsageProviderRows,
   accountUsageRowLabel,
@@ -6,7 +5,8 @@ import {
   usageRemainingPercent,
   usageTone,
   usageWindowLabel,
-} from "./account-usage-view";
+} from "@openbot/ui/features/account/account-usage-view";
+import { assert, describe, expect, it } from "vitest";
 
 describe("account usage view", () => {
   it("keeps one named row per provider and warns from the tightest window", () => {
@@ -44,7 +44,37 @@ describe("account usage view", () => {
       tone: "neutral",
     });
     expect(accountUsageSummary(rows)).toMatchObject({ provider: "claude", remainingPercent: 0 });
-    expect(accountUsageRowLabel(rows[0])).toContain("Claude, 0% left");
+    const [claudeRow] = rows;
+    assert(claudeRow);
+    expect(accountUsageRowLabel(claudeRow)).toContain("Claude, 0% left");
+  });
+
+  it("summarizes only the active agent's provider", () => {
+    const rows = accountUsageProviderRows(
+      {
+        limits: [
+          {
+            id: "grok",
+            primary: null,
+            secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: null },
+          },
+          {
+            id: "codex",
+            primary: null,
+            secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: null },
+          },
+        ],
+      },
+      [
+        { id: "claude", state: "available" },
+        { id: "codex", state: "available" },
+        { id: "grok", state: "available" },
+      ],
+    );
+    expect(accountUsageSummary(rows, "codex")).toMatchObject({ provider: "codex", remainingPercent: 60 });
+    expect(accountUsageSummary(rows, "claude")).toMatchObject({ provider: "claude", remainingPercent: null });
+    expect(accountUsageSummary(rows, "opencode")).toBeNull();
+    expect(accountUsageSummary(rows, null)).toMatchObject({ provider: "grok", remainingPercent: 0 });
   });
 
   it("keeps connected providers visible when they have not reported a limit yet", () => {

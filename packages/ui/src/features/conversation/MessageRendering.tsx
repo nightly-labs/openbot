@@ -1,0 +1,537 @@
+import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
+import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { type BubbleVariant, Button, DropdownMenu } from "@openbot/ui";
+import { prefersReducedMotion } from "@openbot/ui/utils";
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import type { AgentMessage, AgentProfile } from "../../data";
+import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
+import { CodeBlock } from "./CodeBlock";
+import { ComparisonTable } from "./ComparisonTable";
+import { CheckIcon, CopyIcon, MoreIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
+import { createSmoothHeightResize } from "./createSmoothHeightResize";
+import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
+import { messageFileReferences } from "./FileReference";
+import { ImageGeneration } from "./ImageGeneration";
+import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
+import { RichMessageText } from "./RichMessageText";
+import { parseSelectionInstruction } from "./SelectionActions";
+
+export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
+  if (message.author === "you") return "secondary";
+  if (message.imageGeneration || (!message.body.trim() && message.attachments?.length)) return "ghost";
+  const contentBlocks = messageContentBlocks(message.body, message.streaming === true);
+  if (contentBlocks.some((block) => block.type === "table" || block.type === "comparison-table")) return "muted";
+  return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
+}
+
+const STREAMING_TEXT_GAP_FALLBACK_MS = 60;
+const STREAMING_WORD_WITH_SEPARATOR = /^(?:\s*(?:(?:#{1,6}|[-+*>]|\d+[.)])\s+)?\S+\s+)/u;
+
+function nextStreamingText(current: string, target: string, streaming: boolean): string {
+  if (!target.startsWith(current)) return target;
+  const remaining = target.slice(current.length);
+  if (!remaining) return current;
+  const nextWord = remaining.match(STREAMING_WORD_WITH_SEPARATOR)?.[0];
+  if (nextWord) return current + nextWord;
+  return streaming ? current : target;
+}
+
+function streamingTextDurationMs(property = "--stream-gap", fallback = STREAMING_TEXT_GAP_FALLBACK_MS): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(property).trim();
+  if (!value) return fallback;
+  const amount = Number.parseFloat(value);
+  if (!Number.isFinite(amount)) return fallback;
+  return value.endsWith("s") && !value.endsWith("ms") ? amount * 1000 : amount;
+}
+
+function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
+  const initialMessage = untrack(message);
+  const animateInitialText =
+    initialMessage.author === "agent" && (animate ?? initialMessage.animate) === true && !prefersReducedMotion();
+  let targetBody = initialMessage.body;
+  let targetStreaming = initialMessage.author === "agent" && initialMessage.streaming === true;
+  const [body, setBody] = createSignal(animateInitialText ? "" : initialMessage.body);
+  const [animateTail, setAnimateTail] = createSignal(false);
+  const [smoothHeight, setSmoothHeight] = createSignal(targetStreaming || animateInitialText);
+  let smoothingActive = targetStreaming || animateInitialText;
+  let revealTimer: number | undefined;
+  let smoothHeightTimer: number | undefined;
+
+  const clearRevealTimer = () => {
+    if (revealTimer === undefined) return;
+    window.clearTimeout(revealTimer);
+    revealTimer = undefined;
+  };
+  const keepHeightSmoothingActive = () => {
+    if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
+    smoothHeightTimer = undefined;
+    setSmoothHeight(true);
+  };
+  const settleHeightSmoothing = () => {
+    if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
+    smoothHeightTimer = window.setTimeout(
+      () => {
+        smoothHeightTimer = undefined;
+        setSmoothHeight(false);
+        setAnimateTail(false);
+      },
+      Math.max(streamingTextDurationMs() * 2, streamingTextDurationMs("--stream-fade", 350)),
+    );
+  };
+  const scheduleReveal = () => {
+    if (revealTimer !== undefined) return;
+    revealTimer = window.setTimeout(() => {
+      revealTimer = undefined;
+      const current = untrack(body);
+      const next = nextStreamingText(current, targetBody, targetStreaming);
+      if (next === current) return;
+      setAnimateTail(true);
+      setBody(next);
+      if (next !== targetBody) {
+        scheduleReveal();
+      } else if (!targetStreaming) {
+        smoothingActive = false;
+        settleHeightSmoothing();
+      }
+    }, streamingTextDurationMs());
+  };
+
+  createEffect(
+    () => ({
+      body: message().body,
+      streaming: message().author === "agent" && message().streaming === true,
+    }),
+    ({ body: nextBody, streaming }) => {
+      targetBody = nextBody;
+      targetStreaming = streaming;
+      if (streaming) {
+        smoothingActive = true;
+        keepHeightSmoothingActive();
+      }
+      const current = untrack(body);
+      if (prefersReducedMotion() || !nextBody.startsWith(current) || (!streaming && !smoothingActive)) {
+        clearRevealTimer();
+        setAnimateTail(false);
+        setBody(nextBody);
+        smoothingActive = false;
+        settleHeightSmoothing();
+        return;
+      }
+      if (current !== nextBody) {
+        scheduleReveal();
+      } else if (!streaming) {
+        smoothingActive = false;
+        settleHeightSmoothing();
+      }
+    },
+  );
+  onCleanup(() => {
+    clearRevealTimer();
+    if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
+  });
+  const revealing = createMemo(() => message().streaming === true || body() !== message().body);
+  return { animateTail, body, smoothHeight, revealing };
+}
+
+const comparisonTableContent = (block: MessageContentBlock) => (block.type === "comparison-table" ? block : undefined);
+const dataTableContent = (block: MessageContentBlock) => (block.type === "table" ? block : undefined);
+const codeContent = (block: MessageContentBlock) => (block.type === "code" ? block : undefined);
+const textContent = (block: MessageContentBlock) => (block.type === "text" ? block : undefined);
+
+export function MessageBody(props: {
+  animate?: boolean;
+  message: AgentMessage;
+  referencedMessage?: AgentMessage;
+  /** Who wrote the quoted message. A chat with several authors has to name the one it quotes. */
+  referencedAuthorName?: string;
+  agents: AgentProfile[];
+  skills?: InstalledSkill[];
+  onSelectAgent: (agentId: string) => void;
+  onOpenLink: (url: string) => void;
+  onPreview: (attachment: AttachmentSummary) => void;
+  onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
+  onOpenSharedFile?: (path: string) => void;
+  onOpenWorkspaceFile?: (path: string) => void;
+  onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
+  onDownload?: (attachment: AttachmentSummary) => void;
+}) {
+  const streamingBody = createStreamingBody(
+    () => props.message,
+    untrack(() => props.animate),
+  );
+  const streamedBody = streamingBody.body;
+  const selectionInstruction = createMemo(() =>
+    props.message.author === "you" && props.message.replyToMessageId
+      ? parseSelectionInstruction(props.message.body)
+      : null,
+  );
+  const standaloneAttachments = createMemo(() => {
+    const referencedIds = new Set(
+      messageFileReferences(props.message.body, props.message.attachments ?? [])
+        .filter((reference) => reference.kind === "attachment")
+        .map((reference) => reference.attachment.id),
+    );
+    const generatedAttachmentId = props.message.imageGeneration ? props.message.attachments?.[0]?.id : undefined;
+    return (props.message.attachments ?? []).filter(
+      (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
+    );
+  });
+  const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
+  const standaloneImageAttachments = createMemo(() =>
+    props.message.author === "agent"
+      ? standaloneAttachments().filter((attachment) => attachment.previewKind === "image")
+      : [],
+  );
+  const standaloneFileAttachments = createMemo(() =>
+    props.message.author === "agent"
+      ? standaloneAttachments().filter((attachment) => attachment.previewKind !== "image")
+      : standaloneAttachments(),
+  );
+  const contentBlocks = createMemo<MessageContentBlock[]>((previous) =>
+    reuseUnchangedBlocks(
+      previous ?? [],
+      props.message.author === "agent"
+        ? messageContentBlocks(streamedBody(), streamingBody.revealing())
+        : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
+    ),
+  );
+  const lastTextBlockIndex = createMemo(() => {
+    const blocks = contentBlocks();
+    for (let index = blocks.length - 1; index >= 0; index -= 1) {
+      if (blocks[index]?.type === "text") return index;
+    }
+    return -1;
+  });
+  let messageContentResize: HTMLDivElement | undefined;
+  let messageContent: HTMLDivElement | undefined;
+  createSmoothHeightResize({
+    container: () => messageContentResize,
+    content: () => messageContent,
+    enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
+  });
+  const renderMarkdownInline = (body: string) => (
+    <MarkdownInlineText
+      body={body}
+      agents={props.agents}
+      skills={props.skills}
+      attachments={props.message.attachments}
+      citations={props.message.citations}
+      onSelectAgent={props.onSelectAgent}
+      onOpenLink={props.onOpenLink}
+      onOpenAttachment={(attachment) =>
+        !canPreviewAttachment(attachment) ? props.onAttachmentAction(attachment, "open") : props.onPreview(attachment)
+      }
+      onOpenSharedFile={props.onOpenSharedFile}
+      onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+    />
+  );
+
+  return (
+    <>
+      {/*
+       * The generic delivery labels - Queued, Cancelled, Failed, Stopped - were taken off the
+       * bubble on purpose. This one stays, because an error bubble carries no other sign of what
+       * the user did: without it, "Provider is offline." reads as a sentence the agent said.
+       */}
+      <Show when={props.message.kind === "error" && props.message.status}>
+        {(status) => <p class="message-error-label">{status()}</p>}
+      </Show>
+      <Show when={props.referencedMessage}>
+        {(referenced) => (
+          <div class="message-reply-context">
+            <span>{referenced().author === "you" ? "You" : (props.referencedAuthorName ?? "Agent")}</span>
+            <p>
+              <RichMessageText
+                body={referenced().body || "Attachment"}
+                agents={props.agents}
+                skills={props.skills}
+                attachments={referenced().attachments}
+                citations={referenced().citations}
+                onSelectAgent={props.onSelectAgent}
+                onOpenLink={props.onOpenLink}
+                onOpenAttachment={(attachment) =>
+                  !canPreviewAttachment(attachment)
+                    ? props.onAttachmentAction(attachment, "open")
+                    : props.onPreview(attachment)
+                }
+                onOpenSharedFile={props.onOpenSharedFile}
+                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                showCitationFooter={false}
+              />
+            </p>
+          </div>
+        )}
+      </Show>
+      <div class="message-content-resize" ref={(element) => (messageContentResize = element)}>
+        <div class="message-content-blocks" ref={(element) => (messageContent = element)}>
+          <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
+            {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
+            <For each={contentBlocks()} keyed={false}>
+              {(block, index) => (
+                <Switch>
+                  <Match when={comparisonTableContent(block())}>
+                    {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                  </Match>
+                  <Match when={dataTableContent(block())}>
+                    {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                  </Match>
+                  <Match when={codeContent(block())}>
+                    {(code) => (
+                      <CodeBlock
+                        block={code()}
+                        streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                      />
+                    )}
+                  </Match>
+                  <Match when={textContent(block())}>
+                    {(text) => {
+                      if (props.message.author === "agent") {
+                        return (
+                          <div
+                            class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                            data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                          >
+                            <MarkdownMessageText
+                              body={text().text}
+                              agents={props.agents}
+                              skills={props.skills}
+                              attachments={props.message.attachments}
+                              citations={props.message.citations}
+                              onSelectAgent={props.onSelectAgent}
+                              onOpenLink={props.onOpenLink}
+                              onOpenAttachment={(attachment) =>
+                                !canPreviewAttachment(attachment)
+                                  ? props.onAttachmentAction(attachment, "open")
+                                  : props.onPreview(attachment)
+                              }
+                              onOpenSharedFile={props.onOpenSharedFile}
+                              onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                              showCitationFooter={index === lastTextBlockIndex()}
+                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                              streamingTail={streamingBody.animateTail() && index === lastTextBlockIndex()}
+                            />
+                          </div>
+                        );
+                      }
+                      return (
+                        <p
+                          class="message-copy"
+                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                        >
+                          <RichMessageText
+                            body={text().text}
+                            agents={props.agents}
+                            skills={props.skills}
+                            attachments={props.message.attachments}
+                            citations={props.message.citations}
+                            onSelectAgent={props.onSelectAgent}
+                            onOpenLink={props.onOpenLink}
+                            onOpenAttachment={(attachment) =>
+                              !canPreviewAttachment(attachment)
+                                ? props.onAttachmentAction(attachment, "open")
+                                : props.onPreview(attachment)
+                            }
+                            onOpenSharedFile={props.onOpenSharedFile}
+                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                          />
+                        </p>
+                      );
+                    }}
+                  </Match>
+                </Switch>
+              )}
+            </For>
+            <Show when={selectionInstruction()}>
+              {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
+            </Show>
+          </Show>
+        </div>
+      </div>
+      <Show when={props.message.imageGeneration}>
+        {(imageGeneration) => (
+          <ImageGeneration
+            status={imageGenerationStatus(props.message.streaming, props.message.status)}
+            prompt={imageGeneration().prompt}
+            resolution={imageGeneration().resolution}
+            aspectRatio={imageGeneration().aspectRatio}
+            attachment={props.message.attachments?.[0]}
+            error={imageGeneration().error}
+            onPreview={props.onPreview}
+            onDownload={props.onDownload}
+          />
+        )}
+      </Show>
+      <Show when={standaloneImageAttachments().length > 0}>
+        <div class="message-image-attachments">
+          <For each={standaloneImageAttachments()}>
+            {(attachment) => (
+              <ImageGeneration
+                presentation="attachment"
+                status="completed"
+                prompt={attachment.name}
+                aspectRatio="square"
+                attachment={attachment}
+                onPreview={props.onPreview}
+                onDownload={props.onDownload}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
+      <Show when={standaloneFileAttachments().length > 0}>
+        <div class="message-attachments-group">
+          <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
+            <AttachmentDownloadAll
+              count={props.message.attachments?.length ?? 0}
+              pending={downloadingAttachments()}
+              onDownload={() => {
+                if (downloadingAttachments()) return;
+                setDownloadingAttachments(true);
+                void props
+                  .onDownloadAttachments?.(props.message.attachments ?? [])
+                  .finally(() => setDownloadingAttachments(false));
+              }}
+            />
+          </Show>
+          <AttachmentCards
+            attachments={standaloneFileAttachments()}
+            onPreview={props.onPreview}
+            onAction={props.onAttachmentAction}
+          />
+        </div>
+      </Show>
+    </>
+  );
+}
+
+function imageGenerationStatus(
+  streaming: boolean | undefined,
+  status: string | undefined,
+): "generating" | "completed" | "failed" | "interrupted" {
+  if (streaming || status === "streaming") return "generating";
+  if (status === "Failed" || status === "failed") return "failed";
+  if (status === "Stopped" || status === "interrupted") return "interrupted";
+  return "completed";
+}
+
+export function MessageActions(props: {
+  message: AgentMessage;
+  /** Names the toolbar for a screen reader. A channel has more authors than "Agent". */
+  authorName?: string;
+  /**
+   * Whether the reaction button stands in the toolbar. A channel message has no owner to hold a
+   * reaction yet, so the chats share one toolbar and the channel leaves that button out.
+   */
+  reactions?: boolean;
+  pickerOpen: boolean;
+  moreOpen: boolean;
+  expandedEmoji: boolean;
+  copied: boolean;
+  onTogglePicker: () => void;
+  onToggleMore: () => void;
+  onExpandEmoji: () => void;
+  onReact: (emoji: MessageReaction | null) => void;
+  onReply?: () => void;
+  onCopy: () => void;
+}) {
+  return (
+    <div
+      class={["message-actions", { "message-actions-open": props.pickerOpen || props.moreOpen }]}
+      role="toolbar"
+      aria-label={`${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message actions`}
+    >
+      <Show when={props.reactions !== false}>
+        <div class="message-action-popover-anchor">
+          <DropdownMenu.Root
+            open={props.pickerOpen}
+            onOpenChange={props.onTogglePicker}
+            placement={props.message.author === "you" ? "top-end" : "top-start"}
+            gutter={6}
+            modal={false}
+          >
+            <DropdownMenu.Trigger class="message-action-button" aria-label="Add reaction">
+              <ReactionIcon />
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content
+              class="reaction-picker"
+              data-menu-layout="grid"
+              aria-label="Choose a reaction"
+              aria-hidden={props.pickerOpen ? undefined : "true"}
+            >
+              <div class="reaction-picker-row">
+                <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
+                  <For each={MESSAGE_REACTIONS}>
+                    {(emoji) => (
+                      <DropdownMenu.RadioItem
+                        value={emoji}
+                        aria-label={`React with ${emoji}`}
+                        onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
+                      >
+                        {emoji}
+                      </DropdownMenu.RadioItem>
+                    )}
+                  </For>
+                </DropdownMenu.RadioGroup>
+                <DropdownMenu.Item
+                  class="reaction-more-button"
+                  aria-label="More emoji"
+                  closeOnSelect={false}
+                  onSelect={props.onExpandEmoji}
+                >
+                  <PlusIcon />
+                </DropdownMenu.Item>
+              </div>
+              <Show when={props.expandedEmoji}>
+                <div class="reaction-picker-row reaction-picker-more">
+                  <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
+                    <For each={MORE_MESSAGE_REACTIONS}>
+                      {(emoji) => (
+                        <DropdownMenu.RadioItem
+                          value={emoji}
+                          aria-label={`React with ${emoji}`}
+                          onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
+                        >
+                          {emoji}
+                        </DropdownMenu.RadioItem>
+                      )}
+                    </For>
+                  </DropdownMenu.RadioGroup>
+                </div>
+              </Show>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
+      </Show>
+      <Show when={props.onReply}>
+        <Button
+          variant="ghost"
+          type="button"
+          class="message-action-button"
+          aria-label={`Reply to ${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message`}
+          onClick={props.onReply}
+        >
+          <ReplyIcon />
+        </Button>
+      </Show>
+      <div class="message-action-popover-anchor">
+        <DropdownMenu.Root
+          open={props.moreOpen}
+          onOpenChange={props.onToggleMore}
+          placement="top-end"
+          gutter={6}
+          modal={false}
+        >
+          <DropdownMenu.Trigger class="message-action-button" aria-label="More message actions">
+            <MoreIcon />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="message-more-menu" aria-hidden={props.moreOpen ? undefined : "true"}>
+            <DropdownMenu.Item onSelect={props.onCopy}>
+              {props.copied ? <CheckIcon /> : <CopyIcon />}
+              <span>{props.copied ? "Copied" : "Copy"}</span>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      </div>
+    </div>
+  );
+}

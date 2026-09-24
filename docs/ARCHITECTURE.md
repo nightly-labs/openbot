@@ -1,18 +1,20 @@
 # OpenBot architecture
 
-OpenBot is a Bun workspace with a desktop application, a mobile application, two Cloudflare Workers,
+OpenBot is a Bun workspace with desktop, browser, and mobile applications, two Cloudflare Workers,
 a self-hosted Signal service, and shared packages.
 
 ## Workspace map
 
 ```text
 apps/
-  auth-api/          Cloudflare Worker for public web, accounts, memberships, and connection tickets
+  auth-api/          Public web and /app browser entry, accounts, memberships, and connection tickets
   mobile/            Expo React Native client for remote team hosts
   site-router/       Cloudflare Worker that serves published sites from private R2 storage
 packages/
+  ui/                Shared SolidJS controls and primitive styles for desktop, web, and Storybook
   brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
+  i18n/              Message catalogs and the translate function for desktop and shared UI
   logging/           ts-log Logger interface plus the redacting console/file implementation
   team-client/       Shared team connection, recovery, and WebRTC framing code
   user-errors/       Shared user-facing error messages for desktop and mobile
@@ -25,6 +27,8 @@ src/
   preload/           Narrow typed bridge from Electron main to the renderer
   renderer/          SolidJS user interface
 scripts/             Development, smoke, release, and package verification entry points
+tools/               Biome GritQL rules, the UI foundation check, and the vitest sequencer
+.agents/skills/      Task instructions for coding agents, such as release and smoke checks
 ```
 
 The desktop application stays at the repository root. Its package metadata is also the release
@@ -47,7 +51,41 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
 - Electron main validates untrusted IPC input before it calls a service.
 - Provider code cannot write UI state. It sends events to `AgentService`, which writes SQLite
   projections before the main process sends changes to the renderer.
-- The auth API cannot import desktop implementation files.
+- The auth API server cannot import desktop implementation files. Browser-only route composition
+  can import renderer UI through the explicit preview and web aliases. These entry points do not
+  load Electron, preload, setup, or updater providers.
+
+## Browser client
+
+`apps/auth-api` serves `/app`. Its lazy route mounts the interactive client after browser startup.
+`src/renderer/src/features/web-client` owns the browser composition and its typed
+`WebWorkspaceRuntime` interface. It mounts the existing account login, server rail, sidebar,
+account dock, and full conversation view. `ConversationRuntime` routes host actions through
+the browser connection; its desktop default is the preload API. There is no separate web dashboard.
+Small screens switch between the same conversation and workspace components. The shared browser
+panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
+accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
+API. The web Storybook runtime uses
+`preview/mock-openbot.ts` through `preview/mock-web-runtime.ts`.
+
+The browser runtime uses `packages/team-client` for the directory, authenticated WebRTC peer,
+Signal recovery, file transfers, and browser-view streams. The stream codec lives in contracts;
+the old main-process import re-exports that codec without changing its wire format. Account
+requests use a closed list of `/api/browser/*` operations. They cannot carry chat requests.
+Browser tickets and session termination require the same account-session hash that created the
+remote session. Existing bearer-token endpoints retain their behavior.
+
+Browser sign-in, account reads, and connection tickets are always available. No host or D1
+migration is needed. See [web client delivery](web-client.md) for the seven review scopes, local
+commands, and release checks.
+
+Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
+cookie holds the account credential. Local storage holds account-scoped trusted host public keys
+and the shared file panel's width, not chat content. A Web Lock permits one live tab per account
+and host because the existing control plane reuses that credential's logical host session.
+Host switches discard the prior host's chat state. Temporary connection loss keeps drafts;
+uncertain sends require an explicit user check before another send. BroadcastChannel, account
+checks on focus, and signed session invalidation clear access when a session ends.
 
 MP3 and MOV attachments use the existing file attachment contract with no inline preview. Import
 copies and hashes the original bytes under the shared attachment limits; it does not run media
@@ -112,10 +150,12 @@ agent tool results expose `openerTabId` while that relationship is live. Indepen
 tabs survive parent closure; dependent popups close with the parent. Closing a popup returns to its
 opener. Saved popup URLs omit OAuth callback credentials. Popup state is not restored as a live
 JavaScript relationship after an app restart.
-Secure input cards are unavailable in both sides of a native opener connection; those tabs require
-human takeover for passwords and codes. This restriction lasts for the tab lifetime, including after
-popup closure or navigation, because connected pages can retain document references. Independent
-tabs remain eligible for secure input. Account selection without secret entry remains automated.
+Connected pages in a native opener group can retain references to each other's documents, including
+a document that received a secret. The browser blocks that access between sites, so a secure input
+card is available in a connected tab only when no frame in another live connected tab has the
+secret's site. The host checks this when the card opens and again before the fill; otherwise the tab
+requires human takeover. The site check uses the last two host labels, which can refuse two sites
+under one public suffix but cannot allow one site. Independent tabs remain eligible for secure input. Account selection without secret entry remains automated.
 Agents use `list_tabs` after sign-in actions and inspect the new tab before continuing. Secure input
 and takeover still handle passwords, codes, CAPTCHA, and passkeys. Blocked requests produce a
 reason without including authentication URLs or request data.
@@ -244,10 +284,26 @@ would refuse.
 
 ## Provider CLI updates
 
-The runtime manager downloads and verifies the CLI version pinned by OpenBot. The provider runtime
-holds new turns while it installs and activates that managed executable. It keeps the previous client
-until the candidate is ready; activation failure removes the rejected artifact and preserves the old
-runtime. Download status stays `finishing` until activation succeeds.
+The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
+every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
+`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, and `x.ai/cli/stable`
+for Grok. The version in `native-runtime.lock.json` is what a first install uses before a check has
+answered, and Bun, which is a tool runtime and not a provider, stays on it.
+
+Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
+Codex and npm `dist.integrity` for Claude and OpenCode. x.ai publishes no hash, so a Grok release
+is trusted on TLS alone. An upstream install writes `openbot-install.json` with the SHA-256 of each
+file it installed, and every start verifies that record and the binary's `--version` before the
+install is used. The newest version in the store that verifies is the one that runs.
+
+`provider-runtime-blocklist.json` on `main` names versions no installation may offer. It stops a
+broken upstream release without an OpenBot release. It suppresses an offer only: it does not remove
+a version a user already installed. A list that cannot be read blocks nothing.
+
+The provider runtime holds new turns while it installs and activates that managed executable. It
+keeps the previous client until the candidate is ready; activation failure removes the rejected
+artifact and preserves the old runtime, so a release that does not start leaves the last working CLI
+in use. Download status stays `finishing` until activation succeeds.
 
 CLI resolution prefers an explicit `OPENBOT_*_PATH`, then the installed managed copy, then an
 automatically discovered system CLI. Updates never run the system CLI's updater. An explicit path
@@ -256,7 +312,7 @@ suppresses managed update offers. Startup uses the same selection and reads the 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
 per renderer port and per `--isolated` worktree, so a store inside `userData` started empty in each
-one, fell back to the user's own CLI, and offered and downloaded the pinned copy again. An explicit
+one, fell back to the user's own CLI, and offered and downloaded the managed copy again. An explicit
 `--user-data-dir` still keeps its own store, so automation and packaged smoke checks stay
 self-contained. Partial downloads stay in the profile: two instances appending to one `.partial`
 would interleave their bytes.
@@ -266,7 +322,7 @@ released build sweeps every `.installing-` directory it finds when it starts, wh
 whoever is filling it, so this build stages under `.staging-` and keeps the older prefix only to
 collect what those builds abandon.
 
-Installing a pinned version is idempotent, so a commit that finds the destination occupied verifies
+Installing a version is idempotent, so a commit that finds the destination occupied verifies
 it and adopts it instead of replacing it, and only a destination that fails verification is moved
 aside. That replacement is claimed first, with a lock directory beside the staging ones. The claim
 is built away from the path, with the name of its owner already inside it, and moved onto the path
@@ -306,6 +362,64 @@ one it falls back to until the pinned one arrives -- and collection keeps anythi
 month, so a version another instance or another
 worktree's pin still runs is not removed; a collection that fails, as it does on Windows for an open
 binary, never stops startup.
+
+### Managed provider updates
+
+The main process offers the version that the section above selects. The lock pins each provider
+for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
+that it is not supported instead of offering a download. An older managed installation is display
+metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
+preload decoder. Cancellation and failure preserve the previous installation and its update offer.
+
+Settings starts the shared renderer runtime store. The store announces each provider that gains an
+offer as one notification, from an effect over both the runtime snapshot and the agent status,
+because the two arrive separately and either one can complete an offer. An explicit update opens
+the same notification; revisioned snapshots move it through progress, failure, retry, and
+completion. Only the crossing into "update available" is announced, so a dismissed notification
+stays dismissed until the offer changes. Closing the notification does not cancel the download,
+and later reports do not reopen it. A refusal that reaches neither the download nor the report it
+makes - an update started while a workspace on another computer is open - is put on that same
+notification with a Retry, because the user pressed a button and the outcome belongs on screen.
+Fresh provider downloads retain their existing flow. These actions apply only to the local desktop
+host.
+
+A CLI the user installed themselves is not managed, but it still gets the update offer.
+Each provider status row reports `cliSource`, and main passes the version of a `system` row to
+`ProviderRuntimeManager.setSystemVersion`, which compares it against the offered version exactly as
+it compares a managed installation. The row and the notification therefore use the one update offer,
+the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
+runs behind it, whoever owns the CLI: the download installs the managed copy and
+`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
+which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
+on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
+names the binary to run and the managed copy is not it. The owner comes from the last resolution of
+the binary, not from the client that runs it, so a provider that is signed out still reports its own
+install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
+in one error that goes to the provider row and to the caller - and on, through the Team API, to the
+team's connected clients.
+
+Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
+other one, while the agent status beside it describes whichever server is open. The store therefore
+takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
+the same rule the provider row and the picker already follow. A server switch rebuilds that store,
+so the version a user closed the notification on is kept by the notification module, which outlives
+the switch: the offer is raised again on the way back only if the user never closed it.
+
+Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
+provider that has one, `#connect` connects one whose client is gone, and both skip
+`onProvidersReady` for the replacement, because
+that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
+running through the replacement, so a live turn would be recorded as `interrupted` - which
+`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
+the replacement held back.
+
+The update replaces the binary under a running client. A provider that has an agent in a turn -
+a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
+`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
+command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
+scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
+delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
+failure as well as after a success.
 
 ## Agent communication policy
 
@@ -358,8 +472,11 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
    either survives a switch it should not or dies in one it should not, and no list of setters can
    fix it. A context reaches another one with `use*()` only downwards, in the nesting order of
    `app-providers.tsx`, or through a provider prop; a command that writes to several domains lives
-   in a leaf context or a bridge component mounted under all of them. `window.openbot.*` is not a
-   dependency. Cycles are rejected by `noImportCycles`, so an upward edge must be `import type`.
+   in a leaf context or a bridge component mounted under all of them. Views, contexts and stores
+   do not read `window.openbot`. They call a `<domain>-port.ts` module, which lists the bridge calls
+   its domain makes, or a narrow API object that a caller can replace (`conversation-runtime.ts`,
+   `provider-key-api.ts`). Cycles are rejected by `noImportCycles`, so an upward edge must be
+   `import type`.
    Prefer one store per concern inside a context over a signal per field: a row of parallel signals
    is what lets a screen be loading, loaded, and errored at once.
 8. Read those contexts from the smallest component that needs them. A pane calls the `use*()` of the
@@ -502,6 +619,23 @@ the native/DOM bridge limits each file to 10 MB and cancels transfers when its c
 The optional `conversation-unread` capability adds a separate `POST /v1/agents/:id/conversation/unread`
 operation. Ordinary read acknowledgements remain monotonic; explicit unread resets persist in the
 host's SQLite and emit the same invalidation. Older hosts disable only this optional action.
+Mobile external links enter through Expo Router's `+native-intent` and the links feature.
+Invitation and Mobile Connect tokens stay in a bounded memory store; navigation carries only a
+local request ID. Invitations wait through sign-in and show a verified host preview before an
+explicit join. Mobile Connect links require confirmation and cannot replace a signed-in account.
+The one exception is development builds: `bun run dev:mobile` opens the link with `simctl openurl`,
+and a `__DEV__` build redeems it without confirmation only when its account service is a loopback
+or private-network `http:` origin. Release builds always use the confirmed flow.
+Plugin links open their validated public page in the in-app browser. Unsupported links show a
+safe fallback. Permanent invitation metadata comes from the shared Team client; revocation stops
+new joins without removing existing members.
+iOS associates only `https://openbot.run/join` with `run.openbot.mobile`. Changes to associated
+domains require a new native app build and deployment of the website association file. Android
+continues to open HTTPS invitations in the browser, whose button opens `openbot://join`. Enabling
+verified Android App Links requires the release app-signing certificate's SHA-256 fingerprint,
+`/.well-known/assetlinks.json`, and a matching verified `/join` intent filter. No certificate
+fingerprint is stored in this repository yet.
+
 Mobile Settings uses one native form sheet with stable detents and a nested Expo Router stack.
 Inner pages push within the sheet and use native back navigation; standalone forms remain
 fit-to-content sheets. Both reuse SheetScrollView. General, Profile, Connections and About use HeroUI typography and shared
@@ -523,7 +657,13 @@ account-to-Signal outbox before returning. Worker `waitUntil` delivers notificat
 profile-save response path, with a five-second timeout per request and outbox retries. Signal forwards the optional frame only to authenticated sockets for that
 user; the frame contains no profile or credential. Desktop and mobile fetch the profile through
 the account API on notification, cold launch, and every 15 minutes while active.
-Desktop window focus does not trigger an automatic account or directory check.
+Membership writes enqueue an `account-servers-changed` invalidation the same way, addressed to the
+account rather than to a host: accepting an invitation, changing a membership, and registering a
+host this account did not have all queue one for the member whose server list changed. Republishing
+an existing host rotates its credential without changing a list, and queues nothing. Signal forwards it to every authenticated socket that account
+holds, and the frame names no server. That is how a server joined on one device reaches the other
+devices of the same account. Desktop window focus does not trigger an automatic account or directory
+check; a device holding no Signal socket finds the change at its next 15-minute check.
 Mobile uses one shared lifecycle subscription and a refresh controller per account endpoint.
 A foreground return checks absolute freshness: successful account and directory responses stay fresh
 for 15 minutes, and background time counts toward that deadline. Failed mobile checks retry after
@@ -599,9 +739,10 @@ Protocol support has no fixed time or release limit. Removal is an exceptional a
 
 ## Required verification
 
-Run the narrowest relevant test, then `bun run lint` and `bun run typecheck`; both are cheap enough
-to run whole, and CI owns the minutes-long suites. See [AGENTS.md, Checks](../AGENTS.md#checks)
-for the division of labour and what each CI job covers.
+Run the narrowest relevant test and lint the changed files. The pre-commit hook runs `check:ui` and
+`bun run typecheck`, and CI runs the remaining checks. See [AGENTS.md, Checks](../AGENTS.md#checks)
+for the local rules, and [check design notes](development-checks.md#check-coverage) for what each CI
+job covers.
 
 The Storybook CI job builds all stories with `OPENBOT_STORYBOOK_CHECK=true`. This skips Solid's
 automatic prop documentation analysis. The job checks compilation and does not publish its output.
@@ -621,7 +762,7 @@ Changes to packaging, native modules, or Electron security also require the appl
 Windows package verification commands. Live provider and team smoke tests use isolated temporary
 data and are manual because they can require local credentials.
 
-### Prompt-driven agent profiles
+## Prompt-driven agent profiles
 
 Users create and edit agent profiles by asking an agent in the normal desktop or mobile
 conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
@@ -729,76 +870,6 @@ Use them to compare click counts, not as a shared visit-to-click funnel breakdow
 The invitation-page funnel is separate: `join_page_action` with `action=view` followed by
 `action=download` or `action=open_app`.
 
-### Managed provider updates
-
-The main process offers provider versions pinned in `native-runtime.lock.json`. Each provider is
-pinned for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
-that it is not supported instead of offering a download. An older managed installation is display
-metadata until the pinned runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
-preload decoder. Cancellation and failure preserve the previous installation and its update offer.
-
-Settings starts the shared renderer runtime store. The store announces each provider that gains an
-offer as one notification, from an effect over both the runtime snapshot and the agent status,
-because the two arrive separately and either one can complete an offer. An explicit update opens
-the same notification; revisioned snapshots move it through progress, failure, retry, and
-completion. Only the crossing into "update available" is announced, so a dismissed notification
-stays dismissed until the offer changes. Closing the notification does not cancel the download,
-and later reports do not reopen it. A refusal that reaches neither the download nor the report it
-makes - an update started while a workspace on another computer is open - is put on that same
-notification with a Retry, because the user pressed a button and the outcome belongs on screen.
-Fresh provider downloads retain their existing flow. These actions apply only to the local desktop
-host.
-
-A CLI the user installed themselves is not managed, but it is still compared against the lock.
-Each provider status row reports `cliSource`, and main passes the version of a `system` row to
-`ProviderRuntimeManager.setSystemVersion`, which compares it against the pinned version exactly as
-it compares a managed installation. The row and the notification therefore use the one update offer,
-the one Update button, and one entry point in the runtime store, `startProviderUpdate`. One path
-runs behind it, whoever owns the CLI: the download installs the pinned managed copy and
-`updateProviderCli` activates it, and CLI resolution then prefers that copy to the system install,
-which is left where it is. OpenBot never runs the CLI's own updater, so no version it offers depends
-on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
-names the binary to run and the managed copy is not it. The owner comes from the last resolution of
-the binary, not from the client that runs it, so a provider that is signed out still reports its own
-install rather than reading as the managed copy. A failure keeps the reason the CLI gave, redacted,
-in one error that goes to the provider row and to the caller - and on, through the Team API, to the
-team's connected clients.
-
-Every runtime the store reaches is on this computer: `window.openbot.providerRuntimes` addresses no
-other one, while the agent status beside it describes whichever server is open. The store therefore
-takes `isLocalServer`, and a workspace on another computer announces no offer and starts no update -
-the same rule the provider row and the picker already follow. A server switch rebuilds that store,
-so the version a user closed the notification on is kept by the notification module, which outlives
-the switch: the offer is raised again on the way back only if the user never closed it.
-
-Replacing the CLI is not a start, on either path: `#activateProviderClient` swaps the client of a
-provider that has one, `#connect` connects one whose client is gone, and both skip
-`onProvidersReady` for the replacement, because
-that hook is restart recovery: it settles every unresolved delivery, and the other providers keep
-running through the replacement, so a live turn would be recorded as `interrupted` - which
-`MailboxStore.markTerminal` then refuses to correct. `onProviderResumed` schedules the deliveries
-the replacement held back. The refusal record is written through one queue, because two providers
-can finish an update at once and the older snapshot must not be renamed over the newer one.
-
-The update replaces the binary under a running client. A provider that has an agent in a turn -
-a delivery on its way to one, which holds no turn id yet, or a context compaction, whose
-`turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore refuses the
-command and tells the user to wait. No turn may start on that provider until the new client is ready: the drain
-scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
-delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
-failure as well as after a success.
-
-That updater decides for itself what the newest version is, and its release channel can name an
-older one than the lock: `grok update` can report success and leave the CLI where it was. The IPC
-handler therefore reports the version before and after the run to
-`ProviderRuntimeManager.noteSystemCliUpdate`. An update that finishes on the version it started on
-is the updater's answer: the manager records that pair of versions in `cli-update-refusals.json`
-beside the managed runtimes, and drops the offer from `availableVersion`, so the row and the
-notification stop offering an update that cannot happen. The record is kept against both the
-installed and the pinned version, so a new pinned version is a new offer, and so is a CLI the user
-moves by other means. The runtime store keeps the same answer in memory for the run that produced
-it, only to settle the notification before the next snapshot arrives.
-
 ## Agent usage analytics
 
 `AgentUsage` owns local numeric usage records, cumulative counter checkpoints, and activity counts.
@@ -826,7 +897,6 @@ come from SDK model usage; unknown or managed pricing is not treated as a list-p
 Unknown models, missing cache data, and unresolvable context or cache-write pricing stay unpriced.
 Tool and media fees are outside the estimate. Stored estimates retain their price basis.
 
-
 ### Host-wide Usage
 
 Desktop opens Usage from the server context menu. It keeps the previous workspace mounted and
@@ -849,7 +919,39 @@ The desktop chart adapts Zaidan's chart and interactive area composition. The pi
 `solid-recharts` dependency has a Solid 2 compatibility patch and uses the application's single
 Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact accessible values.
 
-### OpenCode and ACP
+## Storage and files
+
+Three surfaces show what a host keeps on disk: Server Settings > Storage (scope `host`), Agent
+settings > Files (scope `agent`) and the chat Files panel (scope `conversation`). They share
+`src/renderer/src/features/files/storage-usage.ts`, which names the server explicitly, because Server
+Settings can be open for a server that is not the selected one.
+
+`src/backend/storage-usage.ts` owns the scan and has no Electron imports. Sent and generated files
+come from the mailbox state in memory, with their chat from paged read-only queries in
+`database/storage-usage-queries.ts`; a file's status comes from `stat`, not from
+`resolveAttachment`, which hashes the file. Workspaces, shared files, downloads, caches, logs and
+runtimes are measured by a bounded walk: `lstat`, no symlinks followed, a stop at 100,000 entries,
+and a yield between pages, because `DatabaseSync` and the walk run on the main thread. A result is
+cached for 60 seconds per scope, a scan in progress is shared, and a delete, clear or agent delete
+drops the cache. Lists stop at `STORAGE_LIMITS` and set `truncated`; the breakdown still counts
+every byte.
+
+A delete does not change the schema. `MailboxStore.deleteStoredFile` sets `deletedAt` on the stored
+attachment, persists, and queues the file path, not the transfer folder, in the file-deletion outbox.
+It keeps a path that another live record uses, and it deletes only a real path under the Transfers
+folder. `resolveAttachment` then returns null, so a file card shows "File not found" and a generated image
+shows its unavailable state. An older app ignores the field. Clear removes the remote-server caches and the `logs/remote` and
+`logs/update` files; it does not enter `logs/remote/transfers`. Runtimes are read-only.
+
+`storage:*` IPC reaches the local service or a joined server. The optional `storage-v1` capability
+exposes `POST /v1/storage/usage`, `/v1/storage/delete-file` and `/v1/storage/clear` with the frozen
+codec in `team-protocol/storage-v1.ts`. The host advertises it only when its storage service
+exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
+renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
+download files travel only as category totals. A host without the capability reads as null, and the
+surface asks for an update; a change is refused before any request.
+
+## OpenCode and ACP
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
@@ -900,7 +1002,7 @@ sidebar references, and runtime events before encoding an older client's respons
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
 
-### Desktop server notifications
+## Desktop server notifications
 
 Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a
 mute change before publishing it. These preferences survive restart, re-login, and host-list
@@ -993,6 +1095,47 @@ memory and routine editors share their controls with agent settings and use chan
 Channel settings have no provider or model controls because each member retains its own runtime.
 No account API, Signal, IPC contract, or database migration changes are required for mobile channels.
 
+## Skill folders and MCP configuration
+
+A skill follows the [Agent Skills specification](https://agentskills.io/specification): a folder
+`<name>/` with a `SKILL.md` file. The YAML frontmatter has `name`, which is the folder name, and a
+`description` of 1 to 1024 characters. Each provider CLI finds skills in its own folders:
+
+| Folder | Written by | Read by |
+| --- | --- | --- |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode |
+| `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
+| `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
+| `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
+| `~/.claude/skills/` | the user | Claude Code, OpenCode |
+| `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
+
+OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
+`.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and
+does not make links. `.openbot/skills-lock.json` in the workspace records the file hashes, and
+`.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
+marker.
+
+`src/main/skill-folder-discovery.ts` lists all other skills in the three workspace folders as
+`workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
+they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
+skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a
+folder that the agent's provider does not read. An agent keeps its workspace when its provider
+changes, so a skill in `.agents/skills` stops working after a change to Claude Code. A skill with a
+problem is not offered as a chat tag.
+
+OpenBot does not list the home-directory folders. They hold the host user's skills, which are the
+same for every agent, and each provider CLI changes its home-folder rules without notice.
+
+MCP servers do not use folders. `projection_mcp_servers` in SQLite is the source of truth for the
+whole computer. No shared MCP file format exists: Claude Code reads `.mcp.json` and
+`~/.claude.json`, Codex reads `config.toml`, OpenCode reads `opencode.json`, and Cursor and Gemini
+CLI read their own folders. OpenBot writes none of these files. It gives the servers to each
+provider when the session starts. Claude starts with `strictMcpConfig`, so it ignores `.mcp.json`
+and its user settings (see `plans/003-mcp-works-on-a-clean-machine.md`). The panel masks header and
+environment values, `src/backend/mcp-redaction.ts` removes them from logs, and OAuth tokens are in
+`safeStorage`.
+
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
@@ -1001,7 +1144,7 @@ The shared package validator handles local and marketplace bundles. The existing
 
 The backend local skill tools derive the agent from the calling provider session. Main-process IPC validates local library inputs independently of sender validation. The renderer reads local previews through that bridge. The released Team API adapters are unchanged; local creation and revision are not exposed as remote operations.
 
-### Mobile chat queue
+## Mobile chat queue
 
 Mobile reads the host queue, applies `queue-changed` snapshots, and refreshes active queue
 queries on `queue-invalidated` events. Both events cancel earlier reads before they update the cache. It does not
@@ -1036,7 +1179,6 @@ a file in the share sheet. The thumbnail reads the attachment through the query 
 so a file already read in a message is not fetched again. The editor changes the text, removes the
 files the message already has, and adds new ones.
 
-
 ## Plugin distribution
 
 A plugin is one developer's bundle: an MCP server, shown as an app, the skills that drive it, and the listing text. The catalog of available plugins is a static file set that the Account Worker serves from `openbot.run` without an account, and the main process keeps a copy in the user-data directory rather than in SQLite, because a remote catalog is a cache and not the source of truth. An install saves the app as a host-global MCP server and installs the pinned skills into the chosen agent. A share link at `openbot.run/plugins/<slug>` opens a public page, and `openbot://plugins/<slug>` opens the listing in the app; neither one installs anything.
@@ -1068,7 +1210,7 @@ grace. This counter contains no user data and is never sent to the host. Health 
 readiness remain false until agent initialization succeeds.
 See [multi-tenant hosting](multi-tenant-hosting.md) for installation, permissions, and acceptance.
 
-### Remote desktop permission checks and live tests
+## Remote desktop permission checks and live tests
 
 `RemoteScreenGateway` owns setup checks and live-test session ownership. The optional
 `remote-desktop-setup` Team API capability uses separate v4 adapter routes; released codecs remain unchanged.
@@ -1086,7 +1228,7 @@ Local tests use a temporary HTTP listener bound to `127.0.0.1`, without publishi
 
 A local video-only test can run without native diagnostics. Its viewer iframe is inert and excluded from keyboard focus; it does not start a native input test or report input success. Local loopback test cookies use HttpOnly, Secure and SameSite=None so the embedded viewer works across the app origin.
 
-### Secure browser authentication
+## Secure browser authentication
 
 `openbot_browser.submit_secret` uses the existing attention/takeover lifecycle with optional public
 secret-request metadata. The attention registry creates a fresh request ID and owns the pending
@@ -1100,8 +1242,47 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then loads the current URL with GET to replace the document without replaying
-a form POST. Failure retains protection and falls back to takeover. A new document releases it and
+waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
+document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
+opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
+URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+
+## Shared UI package
+
+`@openbot/ui` owns the existing SolidJS primitives and their primitive stylesheet. Desktop,
+web, and Storybook import this workspace directly. It has no dependency on the renderer,
+Electron, account sessions, or host connections. Import `@openbot/ui/styles.css` after brand
+tokens and include the package source in Tailwind scanning. App-specific styles remain in
+the application. The desktop TypeScript project includes the package source for CI checks.
+
+The package also owns prop-driven feature UI: the complete sidebar and its scoped interaction
+stores, account login and dock, server rail and invitation dialog, message rendering, composer
+editor, attachment cards, preview renderers, agent setup, and reusable settings panels. Feature
+exports use explicit subpaths such as `@openbot/ui/features/sidebar/Sidebar`. Shared display
+models live at `@openbot/ui/data`. Source files are moved, not copied or re-exported from the
+renderer. Tests remain in the renderer test harness and import the package directly.
+
+The browser panel and live canvas also live in this package. Their typed `BrowserViewRuntime`
+is required; the renderer supplies the desktop preload adapter or the web host adapter.
+Shared sidebar activity and avatar mood functions use caller-supplied state. The conversation
+stylesheet is exported as `@openbot/ui/features/conversation/conversation.css`; applications
+import it in the same cascade position as the former renderer stylesheet. This file is an ordered
+manifest of component styles in `features/conversation/styles/`. Preserve import order: later
+surface and responsive rules override earlier component rules.
+
+`AgentSettingsPanel` owns the form draft, ordered save queue, avatar editor, and model controls.
+Its renderer adapter owns persisted width and native memories, routines, skills, and tables,
+which it supplies as content slots. `ConversationHeader` owns the header controls; its renderer
+adapter owns context reads, capabilities, translations, and action error handling. Both shared
+components receive typed props and callbacks. The shared-package Biome override rejects
+application imports and direct desktop preload access. Boundary fixtures run with the focused
+`scripts/ui-foundation-check.test.ts` test.
+
+Desktop sidebar persistence stays in `sidebar-pins-storage.ts` and `sidebar-sections-storage.ts`.
+The main conversation controller, application contexts, and platform adapters stay in the
+renderer. Further extraction requires explicit runtime inputs for those dependencies. React
+Native uses brand tokens and contracts, not these DOM components.

@@ -8,6 +8,29 @@ export interface DynamicIslandPreference {
   hapticsEnabled: boolean;
   idleVisible: boolean;
   additionalDisplaysEnabled: boolean;
+  /** The compact island width, as a percent of its default width. The physical notch never shrinks. */
+  widthPercent: number;
+  /** The compact island height, as a percent of its default height. It never gets lower than a notch. */
+  heightPercent: number;
+}
+
+/** Limits keep the island large enough to find and to click, whatever the stored value says. */
+export const DYNAMIC_ISLAND_SIZE_LIMITS = {
+  widthPercent: { min: 70, max: 130, step: 5 },
+  heightPercent: { min: 75, max: 125, step: 5 },
+} as const;
+
+/** The compact height where a display has no notch to match. */
+export const DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT = 32;
+
+/**
+ * Returns the compact island height in display points. The main process sizes the window from it
+ * and the renderer draws with it, so the island and its hit area stay the same size. A notch is
+ * hardware: the island can grow below it but never gets shorter than it.
+ */
+export function dynamicIslandCompactHeight(notchHeight: number | undefined, heightPercent: number): number {
+  const scaled = Math.round(((notchHeight ?? DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT) * heightPercent) / 100);
+  return notchHeight === undefined ? scaled : Math.max(notchHeight, scaled);
 }
 
 export type SetDynamicIslandPreferenceInput = DynamicIslandPreference;
@@ -17,6 +40,8 @@ export const DEFAULT_DYNAMIC_ISLAND_PREFERENCE = {
   hapticsEnabled: true,
   idleVisible: true,
   additionalDisplaysEnabled: true,
+  widthPercent: 100,
+  heightPercent: 100,
 } as const satisfies DynamicIslandPreference;
 
 export interface DynamicIslandAgentIdentity {
@@ -146,7 +171,22 @@ export function isDynamicIslandPreference(value: unknown): value is DynamicIslan
     isBoolean(value.enabled) &&
     isBoolean(value.hapticsEnabled) &&
     isBoolean(value.idleVisible) &&
-    isBoolean(value.additionalDisplaysEnabled)
+    isBoolean(value.additionalDisplaysEnabled) &&
+    isDynamicIslandSizePercent(value.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent) &&
+    isDynamicIslandSizePercent(value.heightPercent, DYNAMIC_ISLAND_SIZE_LIMITS.heightPercent)
+  );
+}
+
+export function isDynamicIslandSizePercent(
+  value: unknown,
+  limits: { min: number; max: number; step: number },
+): value is number {
+  return (
+    isNumber(value) &&
+    Number.isInteger(value) &&
+    value >= limits.min &&
+    value <= limits.max &&
+    (value - limits.min) % limits.step === 0
   );
 }
 

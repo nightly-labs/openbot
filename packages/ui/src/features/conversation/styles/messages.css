@@ -1,0 +1,1278 @@
+.message-entry {
+  max-width: none;
+}
+
+.message-entry > .ui-message-content {
+  max-width: 100%;
+}
+
+/* Keep the face beside the bubble, independent of the author name and footer height. */
+.message-entry-with-author {
+  display: grid;
+  grid-template-columns: calc(var(--openbot-space-6) + var(--openbot-space-1)) minmax(0, 1fr);
+  column-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-1);
+}
+
+.message-entry-with-author > .ui-message-content {
+  display: contents;
+}
+
+.message-entry-with-author .message-shell {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.message-entry-with-author .ui-message-footer {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.message-author-avatar {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: end;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+.message-author-avatar .agent-avatar {
+  --agent-avatar-optical-offset: -3px;
+
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}
+
+.message-author-avatar-button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.message-author-avatar-button:hover:not(:disabled):not([data-disabled]) {
+  background: transparent;
+}
+
+/*
+ * The empty column under a face. A message that continues a run of messages by one author draws no
+ * face, and without this spacer its bubble would step left, off the line the run started on. A chat
+ * with one agent draws no faces at all, so it never asks for the column.
+ */
+.message-author-gutter {
+  width: 28px;
+  flex: 0 0 28px;
+}
+
+.message-author-name {
+  grid-column: 2;
+  grid-row: 1;
+  padding-inline: var(--openbot-space-3);
+  color: var(--message-author-color, var(--openbot-text-muted));
+  font-weight: var(--openbot-weight-regular);
+}
+
+.message-author-name-button {
+  height: auto;
+  min-width: 0;
+  margin-inline: calc(var(--openbot-space-1-5) * -1);
+  padding: 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-md);
+  color: inherit;
+  font: inherit;
+  white-space: normal;
+  text-align: start;
+}
+
+.message-author-name-button:hover:not(:disabled):not([data-disabled]),
+.message-author-name-button:focus-visible {
+  background: var(--openbot-hover);
+  color: inherit;
+}
+
+/*
+ * The keyframes alone hide a new row, so a row whose animation is off (reduced motion, which
+ * Windows reports while its animation effects are off) still shows.
+ */
+.message-entry-animated {
+  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.message-entry-agent {
+  width: 100%;
+}
+
+.message-shell {
+  --message-actions-inline-size: 76px;
+
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+}
+
+.message-entry-user .message-shell {
+  justify-content: flex-end;
+}
+
+.message-actions {
+  position: relative;
+  z-index: 4;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1px);
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.message-entry-user .message-actions {
+  order: -1;
+}
+
+.message-time {
+  padding-inline: var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.message-author-name > .message-time {
+  padding-inline: 0;
+}
+
+.message-entry:hover .message-actions,
+.message-entry:focus-within .message-actions,
+.message-actions-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.message-entry:hover .message-time,
+.message-entry:focus-within .message-time,
+.message-entry:has(.message-actions-open) .message-time {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .message-actions,
+  .message-time {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.message-action-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  transition:
+    background var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease;
+}
+
+.message-action-button:hover,
+.message-action-button:focus-visible,
+.message-action-button[aria-expanded="true"] {
+  background: var(--openbot-border);
+  color: var(--openbot-text-secondary);
+  outline: none;
+}
+
+.message-action-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* No stroke-width: every icon in this row is hand-drawn on a 20-unit grid and carries
+   * its own scaled weight from .ui-glyph-20. Setting it here outranks that class and
+   * paints them a fifth heavier than the grid they were drawn for. */
+}
+
+.message-action-button svg circle:not(:first-child),
+.message-action-button svg:has(circle:nth-child(3)) circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.message-action-popover-anchor {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.reaction-picker-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1px;
+}
+
+.reaction-picker-options {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1px;
+}
+
+.reaction-picker-more {
+  margin-top: 3px;
+  border-top: 1px solid var(--openbot-border);
+  padding-top: 4px;
+}
+
+.reaction-picker-more .reaction-picker-options {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.reaction-picker-more .reaction-picker-options [role="menuitemradio"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.reaction-picker-row :is([role="menuitem"], [role="menuitemradio"]) {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-xl);
+  line-height: 1;
+  transition:
+    background var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-hover) ease;
+}
+
+.reaction-picker-row :is([role="menuitem"], [role="menuitemradio"]):hover,
+.reaction-picker-row :is([role="menuitem"], [role="menuitemradio"]):focus-visible,
+.reaction-picker-row :is([role="menuitem"], [role="menuitemradio"])[data-highlighted],
+.reaction-picker-row [role="menuitemradio"][aria-checked="true"] {
+  background: var(--openbot-border);
+  outline: none;
+  transform: scale(1.08);
+}
+
+.reaction-picker-row .reaction-more-button {
+  color: var(--openbot-text-muted);
+}
+
+.reaction-more-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.message-reaction-pill {
+  display: flex;
+  min-width: 0;
+  height: var(--openbot-icon-lg);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: var(--openbot-text-lg);
+  line-height: 1;
+  transition: background var(--openbot-duration-hover) ease;
+}
+
+.message-entry:has(.message-reaction-anchor) > .ui-message-content {
+  padding-bottom: var(--openbot-space-3);
+}
+
+.message-reaction-anchor .message-reaction-pill {
+  gap: 2px;
+  margin: 0;
+  border-radius: inherit;
+}
+
+.ui-bubble-reactions.message-reaction-anchor {
+  padding: 2px 6px;
+}
+
+.ui-bubble-reactions.message-reaction-anchor:has(> .message-reaction-pill:only-child) {
+  width: var(--openbot-control-xs);
+  padding-inline: 2px;
+}
+
+.ui-bubble-reactions.message-reaction-anchor:has(> .message-reaction-pill:only-child) > .message-reaction-pill {
+  width: var(--openbot-icon-lg);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.message-reaction-anchor .ui-bubble-reaction-overflow {
+  padding-right: 6px;
+}
+
+.message-reaction-pill:hover {
+  background: var(--openbot-hover);
+}
+
+.message-reaction-pill-readonly:hover {
+  background: transparent;
+}
+
+.message-reaction-anchor:has(.message-reaction-pill:focus-visible) {
+  box-shadow:
+    0 0 0 3px var(--openbot-bg-canvas),
+    0 0 0 5px var(--openbot-border-focus);
+}
+
+.message-reaction-pill:focus-visible {
+  outline: none;
+}
+
+.chat-action-entry-animated {
+  width: 100%;
+  animation: message-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.agent-activity-slot[data-reserved="true"] {
+  min-height: 44px;
+}
+
+.agent-activity-entry {
+  width: 100%;
+  display: grid;
+  grid-template-rows: 1fr;
+  pointer-events: none;
+  transition: grid-template-rows var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+@starting-style {
+  .agent-activity-entry {
+    grid-template-rows: 0fr;
+  }
+}
+
+.agent-activity-entry[data-state="exiting"] {
+  grid-template-rows: 0fr;
+}
+
+.agent-activity-content {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 4px 0 8px 8px;
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+  transition:
+    opacity var(--openbot-duration-overlay) var(--openbot-ease-out),
+    filter var(--openbot-duration-overlay) var(--openbot-ease-out),
+    transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+  will-change: opacity, filter, transform;
+}
+
+@starting-style {
+  .agent-activity-content {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(4px);
+  }
+}
+
+.agent-activity-entry[data-state="exiting"] .agent-activity-content {
+  opacity: 0;
+  filter: blur(2px);
+  transform: translateY(2px);
+}
+
+.agent-activity-avatar {
+  --agent-avatar-optical-offset: -2px;
+
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  align-self: center;
+  transform: translateY(0) scale(1);
+  transition: transform var(--openbot-duration-overlay) var(--openbot-ease-out);
+  will-change: transform;
+}
+
+@starting-style {
+  .agent-activity-avatar {
+    transform: translateY(3px) scale(0.96);
+  }
+}
+
+.agent-activity-entry[data-state="exiting"] .agent-activity-avatar {
+  transform: translateY(0) scale(0.98);
+}
+
+.agent-activity-label {
+  display: -webkit-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--openbot-text-primary) 0%,
+    var(--openbot-text-primary) 30%,
+    var(--openbot-text-muted) 45%,
+    var(--openbot-text-muted) 55%,
+    var(--openbot-text-primary) 70%,
+    var(--openbot-text-primary) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  font-size: var(--openbot-text-sm);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+.chat-action-marker {
+  width: min(var(--openbot-chat-marker-width), calc(100% - var(--openbot-space-6)));
+  min-height: var(--openbot-chat-marker-height);
+  justify-content: center;
+  margin: 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  letter-spacing: var(--openbot-tracking-normal);
+  text-align: center;
+}
+
+.chat-action-marker-content {
+  max-width: 100%;
+  gap: var(--openbot-space-1);
+}
+
+.chat-action-marker-summary {
+  /* The reveal's own timings. They sit above the `--openbot-duration-*` scale,
+     which tops out at an overlay fade: this is a panel of rows that has to read
+     as unrolling, and the palette has no token for that. */
+  --chat-action-history-open: 340ms;
+  /* The shared eases are quint curves: `--openbot-ease-in-out` holds the panel
+     almost still for 50ms and then moves 25px in two frames, which reads as a
+     lurch in everything below it. This one spreads the distance evenly and
+     settles, so the messages under the marker travel at one speed. */
+  --chat-action-history-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /* The close is shorter than the open: leaving needs no reading time, and a
+     long collapse holds the messages below in motion for no reason. */
+  --chat-action-history-close: 200ms;
+  /* The close curve decelerates from the first frame. The open's ease holds the
+     panel almost still for the first 20ms, which reads as a click the panel did
+     not answer, and then drops the box fast. */
+  --chat-action-history-close-ease: cubic-bezier(0.32, 0.08, 0.24, 1);
+  /* The rows have to stay faintly visible until the box is nearly shut. A
+     shorter fade empties the panel at the halfway point and leaves blank space
+     closing on its own. */
+  --chat-action-history-lift: 170ms;
+  /* How much of the box's bottom edge dissolves while it closes. One row's
+     worth, so the edge takes a row out at a time. */
+  --chat-action-history-fade: 22px;
+  --chat-action-history-entry: 260ms;
+  /* Each state waits this much longer than the one above it. */
+  --chat-action-history-stagger: 60ms;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ui-button.chat-action-history-toggle {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+}
+
+.chat-action-history-toggle svg {
+  transition: transform var(--chat-action-history-close) var(--openbot-ease-out);
+}
+
+.chat-action-history-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* The panel is a single grid track, so `0fr` to `1fr` animates the list's real
+   height with no measured pixel value - the same technique as `.t-acc` in
+   transitions.css. The height has to move for the row below to follow it; a
+   paint-only reveal leaves the space behind and drops it in one step at the end.
+   A `from` or `to` alone leaves the other end on the element's own style, so
+   these rules stay the single source of the resting state. */
+.chat-action-history-panel {
+  display: grid;
+  width: 100%;
+  grid-template-rows: 1fr;
+}
+
+.chat-action-history-panel[data-state="open"] {
+  animation: chat-action-history-open var(--chat-action-history-open) var(--chat-action-history-ease);
+}
+
+/* The close runs the same track backwards and holds `0fr` until the panel leaves
+   the tree, so the messages below travel the whole distance under one curve
+   instead of standing still and then closing the gap in a single step. */
+.chat-action-history-panel[data-state="closed"] {
+  animation: chat-action-history-close var(--chat-action-history-close) var(--chat-action-history-close-ease) forwards;
+}
+
+@keyframes chat-action-history-open {
+  from {
+    grid-template-rows: 0fr;
+  }
+}
+
+@keyframes chat-action-history-close {
+  to {
+    grid-template-rows: 0fr;
+  }
+}
+
+/* On the way in the box grows under rows that are still fading up, so its edge
+   never cuts anything solid. */
+.chat-action-history-panel[data-state="open"] .chat-action-history {
+  animation: chat-action-history-settle var(--chat-action-history-open) var(--openbot-ease-out);
+}
+
+/* The rows fade out just before the box finishes closing, so the clip edge never
+   cuts through anything solid and the panel is never an empty box shrinking on
+   its own. The panel leaves the tree on the collapse's end, not on this one's. */
+.chat-action-history-panel[data-state="closed"] .chat-action-history {
+  animation: chat-action-history-lift var(--chat-action-history-lift) var(--openbot-ease-out) forwards;
+}
+
+/* No fade on the way in: the rows already carry their own, and stacking a second
+   one over them washes the whole panel out. */
+@keyframes chat-action-history-settle {
+  from {
+    transform: translateY(-25%);
+  }
+}
+
+/* The lift stays small on the way out: the collapsing box already carries the
+   rows upward, and a longer travel makes them outrun it and arrive early. */
+@keyframes chat-action-history-lift {
+  to {
+    transform: translateY(-8%);
+    opacity: 0;
+  }
+}
+
+/* `min-height: 0` lets the track win over the list's content height, and the
+   clip keeps the rows inside the shrinking box. */
+.chat-action-history-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The closing box passes its edge over rows that are still readable and cuts
+   them through the middle of the glyphs. The mask softens that edge, so a row
+   dissolves as the edge reaches it instead of being sliced. Below the fade
+   distance the whole list is inside the gradient and leaves on its own. The way
+   in needs none of this: there the box grows ahead of rows that are still
+   arriving. */
+.chat-action-history-panel[data-state="closed"] .chat-action-history-clip {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--chat-action-history-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--chat-action-history-fade)),
+    transparent
+  );
+}
+
+.chat-action-history {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  gap: var(--openbot-space-1);
+  margin: var(--openbot-space-1) 0 0;
+  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  border-inline-start: 1px solid var(--openbot-border-grouped);
+  list-style: none;
+  text-align: left;
+}
+
+.chat-action-history-entry {
+  display: grid;
+  grid-template-columns: var(--openbot-icon-xs) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+}
+
+/* `backwards` holds the entry hidden through its delay, so a late state never
+   shows at full strength before its turn. The exit leaves the rows alone: the
+   list fades as one piece. */
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry {
+  animation: chat-action-history-entry-in var(--chat-action-history-entry) var(--openbot-ease-out) backwards;
+}
+
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(2) {
+  animation-delay: var(--chat-action-history-stagger);
+}
+
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(3) {
+  animation-delay: calc(var(--chat-action-history-stagger) * 2);
+}
+
+/* The stagger stops growing here: a long run should not open in slow motion. */
+.chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(n + 4) {
+  animation-delay: calc(var(--chat-action-history-stagger) * 3);
+}
+
+@keyframes chat-action-history-entry-in {
+  from {
+    transform: translateX(calc(var(--openbot-space-1) * -1));
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+.chat-action-history-entry time {
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.chat-action-history-icon,
+.chat-action-history-icon svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.chat-action-history-status-completed .chat-action-history-icon {
+  color: var(--openbot-success);
+}
+
+.chat-action-history-status-failed .chat-action-history-icon,
+.chat-action-history-status-interrupted .chat-action-history-icon,
+.chat-action-history-status-cancelled .chat-action-history-icon {
+  color: var(--openbot-danger);
+}
+
+.chat-action-history-status-needs-attention .chat-action-history-icon {
+  color: var(--openbot-warning);
+}
+
+.chat-action-history-status-in-progress .chat-action-history-icon {
+  color: var(--openbot-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-action-history-panel,
+  .chat-action-history,
+  .chat-action-history-entry {
+    animation: none;
+  }
+
+  .chat-action-history-toggle svg {
+    transition: none;
+  }
+}
+
+.chat-action-marker-label,
+.chat-action-marker-time {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.chat-action-marker-time {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.chat-action-target {
+  box-sizing: border-box;
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(280px, 100%);
+  height: auto;
+  min-height: var(--openbot-chat-marker-height);
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  padding: 0 var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+  font: inherit;
+  line-height: inherit;
+  outline: none;
+  text-align: left;
+  white-space: nowrap;
+  transition:
+    background-color var(--openbot-duration-hover) var(--openbot-ease-out),
+    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out),
+    color var(--openbot-duration-hover) var(--openbot-ease-out),
+    scale var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+button.chat-action-target:hover,
+.chat-action-agent-menu-trigger:hover,
+.chat-action-agent-menu-trigger[aria-expanded="true"] {
+  background: var(--openbot-bg-control-hover);
+  box-shadow: 0 0 0 1px var(--openbot-border-strong);
+  color: var(--openbot-text-primary);
+}
+
+button.chat-action-target:focus-visible,
+.chat-action-agent-menu-trigger:focus-visible {
+  background: var(--openbot-bg-control-hover);
+  box-shadow: var(--openbot-focus-ring);
+  color: var(--openbot-text-primary);
+}
+
+button.chat-action-target:active,
+.chat-action-agent-menu-trigger:active {
+  background: var(--openbot-bg-control-active);
+  scale: 0.96;
+}
+
+.chat-action-target-unavailable {
+  color: var(--openbot-text-muted);
+}
+
+/* Markers without a target pill keep the same optical label-to-time rhythm. */
+.chat-action-marker-unavailable .chat-action-marker-label {
+  padding-inline-end: var(--openbot-space-1-5);
+}
+
+.chat-action-target-name,
+.chat-action-target > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-action-target .ui-marker-icon,
+.chat-action-target .ui-marker-icon svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  flex: 0 0 var(--openbot-icon-xs);
+}
+
+.chat-action-target .ui-marker-icon {
+  translate: 0 -0.5px;
+}
+
+.chat-action-agent-avatar {
+  --agent-avatar-optical-offset: -2px;
+
+  position: relative;
+  width: var(--openbot-chat-marker-avatar);
+  height: var(--openbot-chat-marker-avatar);
+  flex: 0 0 var(--openbot-chat-marker-avatar);
+  border: 0;
+  background: transparent;
+  translate: 0 -0.5px;
+}
+
+.chat-action-marker-agent-message .chat-action-target {
+  --chat-action-agent-color: var(--openbot-accent);
+}
+
+.chat-action-marker-agent-message button.chat-action-target:hover,
+.chat-action-marker-agent-message .chat-action-agent-menu-trigger:hover,
+.chat-action-marker-agent-message .chat-action-agent-menu-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--chat-action-agent-color) 16%, transparent);
+  box-shadow: none;
+  color: var(--chat-action-agent-color);
+}
+
+.chat-action-marker-agent-message button.chat-action-target:focus-visible,
+.chat-action-marker-agent-message .chat-action-agent-menu-trigger:focus-visible {
+  background: color-mix(in srgb, var(--chat-action-agent-color) 16%, transparent);
+  box-shadow: var(--openbot-focus-ring);
+  color: var(--chat-action-agent-color);
+}
+
+.chat-action-marker-agent-message button.chat-action-target:active,
+.chat-action-marker-agent-message .chat-action-agent-menu-trigger:active {
+  background: color-mix(in srgb, var(--chat-action-agent-color) 34%, transparent);
+  color: var(--openbot-text-primary);
+}
+
+.chat-action-target-status-in-progress .ui-marker-icon {
+  color: var(--openbot-accent);
+}
+
+.chat-action-target-status-completed .ui-marker-icon {
+  color: var(--openbot-success);
+}
+
+.chat-action-target-status-failed .ui-marker-icon,
+.chat-action-target-status-cancelled .ui-marker-icon,
+.chat-action-target-status-interrupted .ui-marker-icon {
+  color: var(--openbot-danger);
+}
+
+.chat-action-target-status-needs-attention .ui-marker-icon {
+  color: var(--openbot-warning);
+}
+
+.chat-action-target-status-in-progress .ui-marker-icon svg {
+  animation: ui-spin 1s linear infinite;
+}
+
+.chat-action-avatar-stack {
+  display: inline-flex;
+  min-width: 0;
+  height: var(--openbot-chat-marker-avatar);
+  align-items: center;
+}
+
+.chat-action-avatar-stack .chat-action-agent-avatar + .chat-action-agent-avatar {
+  margin-left: -6px;
+}
+
+/* The shared .ui-action-menu item rule outranks a single class, so the grid template and the
+ * truncation below have to be compounded to reach the row. */
+.ui-action-menu.chat-action-agent-menu {
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--openbot-space-4)));
+}
+
+.ui-action-menu.chat-action-agent-menu .chat-action-agent-menu-item[role="menuitem"] {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: var(--openbot-space-2);
+}
+
+.chat-action-agent-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-action-agent-menu-item .chat-action-agent-avatar {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+
+.chat-action-agent-menu-status {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.chat-action-attachments {
+  width: min(560px, 92%);
+  margin: var(--openbot-space-2) auto 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-action-target-status-in-progress .ui-marker-icon svg {
+    animation: none;
+  }
+}
+
+.message-entry .ui-bubble {
+  letter-spacing: -0.15px;
+}
+
+.message-entry-agent .ui-bubble {
+  max-width: min(720px, calc(100% - var(--message-actions-inline-size) - 5px));
+}
+
+.message-entry-agent .ui-bubble:has(.choice-card) {
+  width: min(500px, calc(100% - var(--message-actions-inline-size) - 5px));
+  max-width: min(500px, calc(100% - var(--message-actions-inline-size) - 5px));
+}
+
+.message-entry-agent .ui-bubble:has(.image-generation) {
+  width: min(420px, calc(100% - var(--message-actions-inline-size) - 5px));
+  max-width: min(420px, calc(100% - var(--message-actions-inline-size) - 5px));
+}
+
+.message-entry-agent
+  .ui-bubble-variant-ghost:has(:is(.choice-card, .image-generation, .message-code-block, .message-data-table-scroll))
+  > .ui-bubble-content {
+  width: 100%;
+}
+
+.image-generation {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  gap: 14px;
+}
+
+.message-image-attachments {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.image-generation-stage {
+  position: relative;
+  width: min(100%, 420px);
+  overflow: hidden;
+  aspect-ratio: var(--image-generation-ratio);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  isolation: isolate;
+}
+
+.image-generation-canvas,
+.image-generation-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.image-generation-canvas {
+  overflow: hidden;
+  background: var(--openbot-bg-control);
+  opacity: 1;
+  transition: opacity var(--openbot-duration-overlay) ease;
+}
+
+.image-generation-canvas-failed {
+  display: grid;
+  place-items: center;
+}
+
+.image-generation-ready .image-generation-canvas {
+  opacity: 0;
+}
+
+/* The canvas above rests at `opacity: 0` once the image arrives, but the glow
+ * inside it keeps two infinite keyframes on `mask-size` and `mask-position`,
+ * and the compositor can take neither. One finished image in the history
+ * therefore costs a style recalculation and a repaint every frame for as long
+ * as the conversation is open. A profile of an idle window measured 60 style
+ * recalculations a second with no script running at all. The reduced-motion
+ * block at the end of this file already stops these keyframes for the same
+ * element, so this only makes the finished state agree with it. */
+.image-generation-ready .image-generation-glow {
+  animation: none;
+}
+
+.image-generation-dots {
+  position: absolute;
+  inset: 2px;
+  background-image: radial-gradient(circle, var(--openbot-text-muted) 0.7px, transparent 1.3px);
+  background-repeat: space;
+  background-size: 11px 11px;
+  opacity: 0.22;
+}
+
+.image-generation-failure-mark {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 2px solid var(--openbot-danger);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-danger-soft);
+  box-shadow: 0 0 0 5px var(--openbot-danger-soft);
+  color: var(--openbot-danger);
+}
+
+/* Was a 40px U+00D7 sized off a type token, which is why the scale carried a step no
+ * copy in the app used. */
+.image-generation-failure-mark > svg {
+  width: var(--openbot-control-xl);
+  height: var(--openbot-control-xl);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.image-generation-glow {
+  position: absolute;
+  inset: 2px;
+  background-image: radial-gradient(circle, var(--openbot-text-primary) 1.1px, transparent 1.6px);
+  background-repeat: space;
+  background-size: 11px 11px;
+  -webkit-mask-image:
+    radial-gradient(ellipse at center, var(--openbot-text-primary) 0%, transparent 60%),
+    radial-gradient(ellipse at center, var(--openbot-text-primary) 0%, transparent 62%);
+  mask-image:
+    radial-gradient(ellipse at center, var(--openbot-text-primary) 0%, transparent 60%),
+    radial-gradient(ellipse at center, var(--openbot-text-primary) 0%, transparent 62%);
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-size:
+    72% 62%,
+    52% 52%;
+  mask-size:
+    72% 62%,
+    52% 52%;
+  -webkit-mask-position:
+    16% 20%,
+    30% 32%;
+  mask-position:
+    16% 20%,
+    30% 32%;
+  animation:
+    image-generation-morph 4.2s cubic-bezier(0.35, 1.55, 0.65, 1) infinite,
+    image-generation-breathe 1.9s cubic-bezier(0.66, 0, 0.34, 1) infinite;
+}
+
+.image-generation-resolution {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  padding: 2px 7px;
+  color: var(--openbot-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.image-generation-meta {
+  display: flex;
+  width: min(100%, 420px);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+.image-generation-label {
+  background: linear-gradient(
+    90deg,
+    var(--openbot-text-primary) 0%,
+    var(--openbot-text-primary) 30%,
+    var(--openbot-text-muted) 45%,
+    var(--openbot-text-muted) 55%,
+    var(--openbot-text-primary) 70%,
+    var(--openbot-text-primary) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  font-size: var(--openbot-text-lg);
+  font-weight: 550;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* The shimmer says "still working", so it stops once the image has arrived or
+   failed. Left unscoped it also ran on "Image generation failed" and on plain
+   attached images, and it animates `background-position` under
+   `background-clip: text` - a main-thread text repaint per frame that no
+   compositor can take - once per image message, for the life of the thread. */
+.image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label {
+  animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+.image-generation-prompt {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-generation-error {
+  max-width: 100%;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+}
+
+.image-generation-preview {
+  display: block;
+  border: 0;
+  background: var(--openbot-bg-control);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+  transition: opacity var(--openbot-duration-overlay) ease;
+}
+
+.image-generation-preview-visible {
+  opacity: 1;
+}
+
+.image-generation-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-generation-preview:focus-visible,
+.image-generation-hover-download:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.image-generation-hover-download {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-glass);
+  padding: 5px 10px;
+  color: var(--openbot-text-primary);
+  cursor: pointer;
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  font-size: var(--openbot-text-sm);
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    background-color var(--openbot-duration-hover) ease,
+    color var(--openbot-duration-hover) ease,
+    border-color var(--openbot-duration-hover) ease,
+    opacity var(--openbot-duration-hover) ease,
+    transform var(--openbot-duration-hover) ease;
+}
+
+.image-generation-download-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.image-generation-stage:hover .image-generation-hover-download,
+.image-generation-stage:focus-within .image-generation-hover-download {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.image-generation-hover-download:hover {
+  border-color: var(--openbot-border-focus);
+  background: var(--openbot-bg-glass);
+  color: var(--openbot-text-primary);
+}
+
+@keyframes image-generation-morph {
+  0% {
+    -webkit-mask-size:
+      52% 46%,
+      40% 40%;
+    mask-size:
+      52% 46%,
+      40% 40%;
+    -webkit-mask-position:
+      16% 20%,
+      30% 32%;
+    mask-position:
+      16% 20%,
+      30% 32%;
+  }
+  25% {
+    -webkit-mask-size:
+      46% 58%,
+      44% 38%;
+    mask-size:
+      46% 58%,
+      44% 38%;
+    -webkit-mask-position:
+      84% 16%,
+      66% 30%;
+    mask-position:
+      84% 16%,
+      66% 30%;
+  }
+  50% {
+    -webkit-mask-size:
+      60% 44%,
+      38% 46%;
+    mask-size:
+      60% 44%,
+      38% 46%;
+    -webkit-mask-position:
+      82% 84%,
+      62% 68%;
+    mask-position:
+      82% 84%,
+      62% 68%;
+  }
+  75% {
+    -webkit-mask-size:
+      48% 54%,
+      46% 40%;
+    mask-size:
+      48% 54%,
+      46% 40%;
+    -webkit-mask-position:
+      14% 82%,
+      34% 66%;
+    mask-position:
+      14% 82%,
+      34% 66%;
+  }
+  100% {
+    -webkit-mask-size:
+      52% 46%,
+      40% 40%;
+    mask-size:
+      52% 46%,
+      40% 40%;
+    -webkit-mask-position:
+      16% 20%,
+      30% 32%;
+    mask-position:
+      16% 20%,
+      30% 32%;
+  }
+}
+
+@keyframes image-generation-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes image-generation-shine {
+  0%,
+  18% {
+    background-position: 100% 0;
+  }
+  82%,
+  100% {
+    background-position: 0% 0;
+  }
+}

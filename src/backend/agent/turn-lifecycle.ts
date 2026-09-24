@@ -15,6 +15,7 @@ import {
   decodeAccountLoginCompletedResult,
   getRecord,
   getString,
+  isRecord,
   type ThreadItem,
 } from "../protocol";
 import type { AgentMemories } from "./agent-memories";
@@ -278,9 +279,15 @@ export class TurnLifecycle {
         // name used to stand in for it, which put the bare word "error" in front of the user as if
         // it were the report. An empty text lets the renderer's own sentence take its place; the
         // `code` still carries the method for the log.
-        const message = getString(params, "message") ?? "";
+        // Codex nests the report as `{ error: { message, codexErrorInfo }, willRetry }`; the other
+        // clients send a flat `message`. Reading only the flat field turned every Codex failure,
+        // an exhausted plan included, into the renderer's generic sentence under the usage notice.
+        const error = getRecord(params, "error");
+        const message = getString(params, "message") ?? getString(error, "message") ?? "";
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
-        if (isUsageLimitDiagnostic(message)) {
+        // Codex retries on its own and reports the final failure again without `willRetry`.
+        if (isRecord(params) && params.willRetry === true) return;
+        if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
           this.#providers.refreshUsageAfterLimit(source);
           return;
         }

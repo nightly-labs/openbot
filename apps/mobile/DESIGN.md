@@ -77,8 +77,10 @@ Multi-page flows such as Settings stay inside ONE sheet. Register the outer `set
 Its `settings/_layout.tsx` owns a native `Stack`; detail routes use `presentation: "card"`,
 `headerBackButtonDisplayMode: "minimal"` and the same transparent header styling. `router.push`
 opens an inner page and `router.back` returns to the previous page without dismissing the sheet.
-Include secondary flows such as joining a server in this stack. Do not register each settings page
-as another modal. Use `initialRouteName: "index"` so direct entry into a detail page has a back route.
+Do not register each settings page as another modal. Use `initialRouteName: "index"` so direct
+entry into a detail page has a back route. `add-server` follows the same shape: its outer route is
+the sheet, `add-server/_layout.tsx` owns the stack, and the invitation scanner is the inner `scan`
+page rather than a full-screen modal over the sheet.
 
 All sheets require a stable viewport. Use fixed detents for standalone forms and nested
 navigators; do not use `fitToContents` or measure content to set the sheet height. Preserve the active
@@ -156,7 +158,8 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
 overlapping smooth masks. Each mask becomes transparent before the physical view edge.
-The material follows the system theme and has no additional solid color overlay. Render it
+The material follows the system theme. In dark mode a masked `bg-sheet` layer at 70% opacity
+covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
@@ -167,7 +170,7 @@ maps them to utilities. Do not copy these hex values into components.
 
 | Role | Utility | Light | Dark |
 | --- | --- | --- | --- |
-| Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
+| Sheet background | `bg-sheet` | `#fcfcfc` | `#141414` |
 | Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
 | Supporting text | `text-grouped-secondary` | `#69696e` | `#96969b` |
 | Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |

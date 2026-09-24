@@ -6,10 +6,11 @@
  * server accepts; anything else is refused, so a refusal is a state the dialog reached.
  */
 
+import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
+import type { McpKeyFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { McpKeyDialog } from "../src/features/settings/McpKeyDialog";
-import type { McpKeyFlow } from "../src/features/settings/mcp-connect-auth";
+import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
   AAVE,
   CONNECT_GLOBALS,
@@ -64,11 +65,16 @@ const POSTGRES = {
 /** A server that asks for nothing still comes through a connect step, so a dead one is found now. */
 const NOTHING_ASKED: McpKeyFlow = { id: "none", kind: "key", label: "Connect", fields: [] };
 
-/** One token, the key a server issues beside its sign-in, two values over a command, and none. */
+/** The user's own link, which replaces the listing's address, with a key only some servers need. */
+const COMPOSIO = MARKETPLACE_PLUGINS.find((plugin) => plugin.slug === "composio")?.apps[0];
+if (!COMPOSIO) throw new Error("The catalog must carry the Composio plugin with an app.");
+
+/** One token, the key a server issues beside its sign-in, two values over a command, a link, and none. */
 const SERVERS = {
   figma: () => ({ subject: subjectFor(FIGMA), flow: keyFlowFor(FIGMA) }),
   linear: () => ({ subject: subjectFor(LINEAR), flow: keyFlowFor(LINEAR) }),
   postgres: () => POSTGRES,
+  composio: () => ({ subject: subjectFor(COMPOSIO), flow: keyFlowFor(COMPOSIO) }),
   aave: () => ({ subject: subjectFor(AAVE), flow: NOTHING_ASKED }),
 };
 

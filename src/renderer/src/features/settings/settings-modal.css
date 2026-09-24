@@ -291,6 +291,43 @@
 
 .settings-modal-card > .ui-switch-field,
 .settings-modal-card > .ui-item,
+.settings-dynamic-island-size > .ui-slider-field,
+.settings-dynamic-island-preview {
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.settings-dynamic-island-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-3);
+}
+
+.settings-dynamic-island-preview-display {
+  min-width: 0;
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+}
+
+/* The top edge of a screen: the island hangs from it as it does from the real menu bar. The strip
+   clips the island, so a width past the strip shows as cut off rather than as a wider card. */
+.settings-dynamic-island-preview-bar {
+  height: 64px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+}
+
+.settings-dynamic-island-preview-caption {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-align: center;
+}
+
 .settings-modal-row {
   min-height: 64px;
 }
@@ -510,6 +547,22 @@
 .provider-picker-embedded .provider-picker-install,
 .provider-picker-embedded .provider-picker-custom-count {
   margin-right: 0;
+}
+
+/* Row actions keep the onboarding colours: Download and Update stay light and only Connect takes
+   the accent, so the modal's accent primary button does not repaint them. */
+.settings-modal .ui-button-variant-default.provider-picker-install:not(.provider-picker-connect) {
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-modal
+    .ui-button-variant-default.provider-picker-install:not(.provider-picker-connect):hover:not(:disabled):not(
+      [data-disabled]
+    ) {
+    background: color-mix(in srgb, var(--openbot-surface-light) 82%, transparent);
+  }
 }
 
 .provider-picker-embedded .provider-picker-option:hover:not(.provider-picker-option-unavailable),

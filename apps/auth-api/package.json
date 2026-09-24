@@ -17,7 +17,7 @@
     "cf:typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply openbot-auth --local",
     "db:migrate:remote": "wrangler d1 migrations apply openbot-auth --remote",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
     "test": "bun run --parallel test:server test:client",
     "test:server": "vitest run --config vitest.config.ts",
     "test:client": "vitest run --config vitest.client.config.ts"
@@ -37,7 +37,8 @@
     "fflate": "catalog:",
     "jose": "catalog:",
     "solid-js": "2.0.0-rc.0",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "@openbot/ui": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.52.1",

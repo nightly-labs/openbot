@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "run.openbot.mobile",
+      "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Allow OpenBot to connect to your desktop during local development.",
         "NSAppTransportSecurity": {
@@ -44,7 +45,7 @@
         "expo-camera",
         {
           "cameraPermission": "Allow OpenBot to use your camera to scan QR codes.",
-          "microphonePermission": false,
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
@@ -54,7 +55,15 @@
         {
           "photosPermission": "Allow OpenBot to access the photos you choose to share.",
           "cameraPermission": "Allow OpenBot to use your camera to add photos.",
-          "microphonePermission": false
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow OpenBot to access the photos you choose to share.",
+          "savePhotosPermission": "Allow OpenBot to save images you download from a chat to your photo library.",
+          "granularPermissions": ["photo"]
         }
       ],
       [
@@ -70,12 +79,22 @@
         {
           "android": {
             "usesCleartextTraffic": true
+          },
+          "ios": {
+            "enableSceneSupport": true
           }
         }
       ],
       "expo-sharing",
       "expo-font",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
+          "speechRecognitionPermission": "Allow OpenBot to turn your speech into message text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

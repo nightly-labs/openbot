@@ -6,6 +6,11 @@
     "lib": ["ES2023", "WebWorker"],
     "types": ["@cloudflare/workers-types"],
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "incremental": true,
     "skipLibCheck": true

@@ -62,18 +62,18 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     throw new Error("Could not read the saved edit attachments.");
   const snapshot = { agentId: value.delivery.recipientAgentId, deliveries: [value.delivery] };
   if (!isQueueSnapshot(snapshot)) throw new Error("Could not read the saved queue edit.");
+  const [delivery] = snapshot.deliveries;
+  if (!delivery) throw new Error("Could not read the saved queue edit.");
   const pendingSave = value.pendingSave === undefined ? undefined : decodeQueueEditRequest(value.pendingSave);
   if (
     pendingSave &&
-    (pendingSave.action !== "save" ||
-      pendingSave.editId !== value.editId ||
-      pendingSave.deliveryId !== snapshot.deliveries[0].id)
+    (pendingSave.action !== "save" || pendingSave.editId !== value.editId || pendingSave.deliveryId !== delivery.id)
   )
     throw new Error("Could not read the pending queue save.");
   return {
     editId: value.editId,
     initialized: value.initialized,
-    delivery: snapshot.deliveries[0],
+    delivery,
     text: value.text,
     keepAttachmentIds: value.keepAttachmentIds,
     addedAttachments,

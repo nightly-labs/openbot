@@ -154,7 +154,7 @@ export class BrowserCdpEngine {
     origin: string,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
-  ): Promise<(secret: string) => Promise<void>> {
+  ): Promise<{ enter: (secret: string) => Promise<void>; clear: (secret: string) => Promise<boolean> }> {
     const generation = this.#navigationGeneration;
     const fingerprint = `function() { return JSON.stringify([this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method]); }`;
     const nodes = await this.#lease(async (send) => {
@@ -182,7 +182,7 @@ export class BrowserCdpEngine {
       return { inputs, button, fingerprints };
     });
     if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
-    return async (secret) => {
+    const enter = async (secret: string) => {
       try {
         await this.#lease(async (send) => {
           if (generation !== this.#navigationGeneration) throw new Error("Authentication page changed.");
@@ -249,6 +249,30 @@ export class BrowserCdpEngine {
         throw new Error("Secure authentication could not be completed. Take over to check the page.");
       }
     };
+    /**
+     * Empties the filled fields, attached or detached, and reports whether the document is now free
+     * of the value: every field is empty and no title, URL, text, value or attribute contains it.
+     */
+    const clear = (secret: string) =>
+      this.#lease(async (send) => {
+        for (const node of nodes.inputs) {
+          const cleared = await this.#callOnNode(
+            send,
+            node.backendNodeId,
+            `function() { this.value = ''; return this.value === ''; }`,
+            [],
+          ).catch(() => false);
+          if (cleared !== true) return false;
+        }
+        const scan = await send("Runtime.callFunctionOn", {
+          executionContextId: await automationContextId(send),
+          functionDeclaration: SECRET_SCAN_FUNCTION,
+          arguments: [{ value: secret }],
+          returnByValue: true,
+        });
+        return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
+      }).catch(() => false);
+    return { enter, clear };
   }
   #retainDebugger = false;
   #ownsDebugger = false;
@@ -578,7 +602,8 @@ export class BrowserCdpEngine {
       const desiredIndices = Array.isArray(plan.desiredIndices) ? plan.desiredIndices.filter(isNumber) : [];
       if (plan.multiple) desiredIndices.sort((left, right) => left - right);
       const enabledIndices = Array.isArray(plan.enabledIndices) ? plan.enabledIndices.filter(isNumber) : [];
-      if (desiredIndices.length === 0 || desiredIndices.some((index) => !enabledIndices.includes(index))) {
+      const [firstDesiredIndex] = desiredIndices;
+      if (firstDesiredIndex === undefined || desiredIndices.some((index) => !enabledIndices.includes(index))) {
         throw new Error("Select target returned an invalid option plan.");
       }
       assertBeforeDeadline(deadline);
@@ -592,11 +617,11 @@ export class BrowserCdpEngine {
           throw new Error("Select target returned an invalid keyboard navigation plan.");
         }
         const selectedIndex = plan.selectedIndex;
-        const targetRank = enabledIndices.indexOf(desiredIndices[0]);
-        if (desiredIndices[0] !== selectedIndex && cycleIndices.length > 0) {
+        const targetRank = enabledIndices.indexOf(firstDesiredIndex);
+        if (firstDesiredIndex !== selectedIndex && cycleIndices.length > 0) {
           const firstCycleRank = cycleIndices.findIndex((index) => index > selectedIndex);
           const startCycleRank = firstCycleRank < 0 ? 0 : firstCycleRank;
-          const targetCycleRank = cycleIndices.indexOf(desiredIndices[0]);
+          const targetCycleRank = cycleIndices.indexOf(firstDesiredIndex);
           if (targetCycleRank < 0) {
             throw new Error("Select target returned an invalid typeahead navigation plan.");
           }
@@ -613,7 +638,7 @@ export class BrowserCdpEngine {
           for (let index = 0; index < steps; index++) {
             await dispatchTextKey(send, initial, resolved.sessionId);
           }
-        } else if (desiredIndices[0] !== selectedIndex) {
+        } else if (firstDesiredIndex !== selectedIndex) {
           await dispatchShortcut(send, "Home", resolved.sessionId);
           for (let index = 0; index < targetRank; index++) {
             await dispatchShortcut(send, "ArrowDown", resolved.sessionId);
@@ -621,11 +646,11 @@ export class BrowserCdpEngine {
         }
       } else {
         const additiveModifiers = process.platform === "darwin" ? ["Meta"] : ["Control"];
-        for (let index = 0; index < desiredIndices.length; index++) {
+        for (const [index, desiredIndex] of desiredIndices.entries()) {
           const optionNodeId = await this.#optionBackendNodeId(
             send,
             resolved.backendNodeId,
-            desiredIndices[index],
+            desiredIndex,
             resolved.sessionId,
           );
           const point = await this.#elementPoint(send, optionNodeId, false, resolved.sessionId);
@@ -1384,7 +1409,8 @@ export class BrowserCdpEngine {
     if (navigationGeneration !== this.#navigationGeneration) {
       throw new Error("Page navigated during semantic target collection. Take a fresh snapshot.");
     }
-    if (candidates.length === 0) throw new Error(`No element matches ${describeTarget(target)}.`);
+    const [found] = candidates;
+    if (!found) throw new Error(`No element matches ${describeTarget(target)}.`);
     if (candidates.length > 1) {
       const sample = candidates
         .slice(0, 5)
@@ -1396,8 +1422,8 @@ export class BrowserCdpEngine {
       throw new Error(`Target is ambiguous (at least 2 matches). Candidates: ${sample}`);
     }
     return {
-      backendNodeId: candidates[0].backendNodeId,
-      sessionId: candidates[0].sessionId,
+      backendNodeId: found.backendNodeId,
+      sessionId: found.sessionId,
       x: 0,
       y: 0,
     };
@@ -1476,8 +1502,9 @@ export class BrowserCdpEngine {
     const viewport = recordValue(metrics.cssLayoutViewport);
     const viewportWidth = numberValue(viewport?.clientWidth);
     const viewportHeight = numberValue(viewport?.clientHeight);
-    const xs = [quad[0], quad[2], quad[4], quad[6]];
-    const ys = [quad[1], quad[3], quad[5], quad[7]];
+    const corners = quad.slice(0, 8);
+    const xs = corners.filter((_, index) => index % 2 === 0);
+    const ys = corners.filter((_, index) => index % 2 === 1);
     const left = Math.max(0, Math.min(...xs));
     const right = Math.min(viewportWidth - 1, Math.max(...xs));
     const top = Math.max(0, Math.min(...ys));
@@ -1487,14 +1514,15 @@ export class BrowserCdpEngine {
     }
     const insetX = Math.min(4, Math.max(0, (right - left) / 4));
     const insetY = Math.min(4, Math.max(0, (bottom - top) / 4));
+    const center = { x: (left + right) / 2, y: (top + bottom) / 2 };
+    if (!hitTest) return { ...center, sessionId };
     const points = uniquePoints([
-      { x: (left + right) / 2, y: (top + bottom) / 2 },
+      center,
       { x: left + insetX, y: top + insetY },
       { x: right - insetX, y: top + insetY },
       { x: left + insetX, y: bottom - insetY },
       { x: right - insetX, y: bottom - insetY },
     ]);
-    if (!hitTest) return { ...points[0], sessionId };
     let blockerId = 0;
     for (const point of points) {
       const hit = await send(
@@ -2380,7 +2408,11 @@ function fallbackRole(node: CdpResult): string {
 function nodeAttributes(value: unknown): Record<string, string> {
   const raw = Array.isArray(value) ? value.filter(isString) : [];
   const result: Record<string, string> = {};
-  for (let index = 0; index + 1 < raw.length; index += 2) result[raw[index].toLowerCase()] = raw[index + 1];
+  for (let index = 0; index + 1 < raw.length; index += 2) {
+    const name = raw[index];
+    const attribute = raw[index + 1];
+    if (name !== undefined && attribute !== undefined) result[name.toLowerCase()] = attribute;
+  }
   return result;
 }
 
@@ -2751,6 +2783,27 @@ async function waitForDomQuietAcrossTargets(
     throw new Error("DOM did not become quiet.");
   }
 }
+
+/** Runs in the automation world. Returns true when the document shows the value anywhere a snapshot reads. */
+const SECRET_SCAN_FUNCTION = `function(secret) {
+  const found = (value) => typeof value === 'string' && value.includes(secret);
+  if (found(document.title) || found(location.href)) return true;
+  const walk = (root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (found(node.data)) return true;
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if ('value' in node && found(String(node.value))) return true;
+      for (const attribute of node.attributes) if (found(attribute.value)) return true;
+      if (node.shadowRoot && walk(node.shadowRoot)) return true;
+    }
+    return false;
+  };
+  return walk(document);
+}`;
 
 async function automationContextId(send: SendCommand, sessionId?: string): Promise<number> {
   const tree = await send("Page.getFrameTree", {}, sessionId);

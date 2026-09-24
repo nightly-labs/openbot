@@ -5,15 +5,17 @@ import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
 import { defineConfig, type Plugin } from "vite";
 import { contentImages } from "./content-images";
 import { developmentNetworkRequestAllowed } from "./dev-network-access";
-import { rendererPreviewAlias } from "./renderer-preview-alias";
+import { rendererPreviewAlias, rendererWebAlias } from "./renderer-preview-alias";
 import { readLocalRuntimeVars } from "./src/server/runtime-env";
 
 export default defineConfig(({ command }) => {
   const localRuntimeVars = command === "serve" ? readLocalRuntimeVars(process.env) : {};
   return {
     resolve: {
+      dedupe: ["solid-js", "@solidjs/web", "@solidjs/signals"],
       alias: {
         "@openbot/renderer-preview": rendererPreviewAlias,
+        "@openbot/renderer-web": rendererWebAlias,
       },
     },
     build: {

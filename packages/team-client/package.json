@@ -10,11 +10,14 @@
     "./remote-peer": "./src/remote-peer.ts",
     "./remote-recovery": "./src/remote-recovery.ts",
     "./request-id": "./src/request-id.ts",
+    "./runtime-attention": "./src/runtime-attention.ts",
     "./webrtc-framing": "./src/webrtc-framing.ts",
-    "./workspace-preferences": "./src/workspace-preferences.ts"
+    "./workspace-preferences": "./src/workspace-preferences.ts",
+    "./browser-view": "./src/browser-view.ts",
+    "./team-api-requests": "./src/team-api-requests.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@noble/ed25519": "3.1.0",

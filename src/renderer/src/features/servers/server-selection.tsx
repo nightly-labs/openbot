@@ -1,4 +1,5 @@
-import type { AgentProviderId, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentProviderId, AgentSummary, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
+import { onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useAgents } from "../agents/agents-context";
@@ -9,6 +10,7 @@ import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useSettings } from "../settings/settings-context";
 import { useServerSwitch } from "./server-switch";
 import { useServers } from "./servers-context";
+import { activeServerId, serversPort } from "./servers-port";
 
 /**
  * Switching the active server, and the two ways a new one arrives: joining from
@@ -64,12 +66,14 @@ const ServerSelection = createSimpleContext({
           setDirectTyping(false);
           await disconnectRemoteDesktopWorkspace(false);
           if (!selectionIsCurrent()) return false;
-          await window.openbot.browser.setVisible({ visible: false }).catch(() => undefined);
+          await serversPort()
+            .browser.setVisible({ visible: false })
+            .catch(() => undefined);
           if (!selectionIsCurrent()) return false;
         }
         let nextServers: ServerSummary[];
         try {
-          nextServers = await window.openbot.servers.select(serverId);
+          nextServers = await serversPort().servers.select(serverId);
           if (!selectionIsCurrent()) return false;
           const authoritativeServerId = nextServers.find((server) => server.active)?.id;
           if (authoritativeServerId !== serverId) {
@@ -93,7 +97,9 @@ const ServerSelection = createSimpleContext({
             });
           }
           if (recoverAuthoritativeServer) {
-            const authoritativeServers = await window.openbot.servers.list().catch(() => null);
+            const authoritativeServers = await serversPort()
+              .servers.list()
+              .catch(() => null);
             if (!selectionIsCurrent()) return false;
             const authoritativeServerId = authoritativeServers?.find((server) => server.active)?.id;
             if (authoritativeServerId && authoritativeServerId !== previousServerId) {
@@ -118,16 +124,26 @@ const ServerSelection = createSimpleContext({
       setSkillsMarketplaceOpen(false);
     }
 
+    async function openNotifiedAgent(event: NotificationOpenedEvent): Promise<void> {
+      const onServer = servers().find((server) => server.active)?.id === event.serverId;
+      if (!onServer && !(await selectServer(event.serverId, false))) return;
+      // Published for the same reason as the marketplace agent above.
+      setPendingAgentSelection(event.agentId);
+    }
+
+    onSettled(() =>
+      serversPort().notifications.onOpened((event) => {
+        void openNotifiedAgent(event).catch(() => undefined);
+      }),
+    );
+
     async function joinServer(input: { inviteUrl: string }): Promise<void> {
       const analytics = desktopAnalytics.scope();
       const entryPoint = pendingInviteUrl() ? "invite_deep_link" : "in_app";
       try {
-        await window.openbot.servers.join(input);
+        await serversPort().servers.join(input);
         setPendingInviteUrl("");
-        await selectServer(
-          window.openbot ? ((await window.openbot.servers.list()).find((item) => item.active)?.id ?? "local") : "local",
-          false,
-        );
+        await selectServer(await activeServerId(), false);
         analytics.track("team_action", { action: "server_joined", result: "succeeded", entry_point: entryPoint });
       } catch (error) {
         analytics.track("team_action", {

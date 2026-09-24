@@ -6,6 +6,7 @@ import { dirname, join, parse, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { serializeAttachmentReference } from "@openbot/contracts/attachment-references";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type {
   AgentModelId,
   AgentProviderId,
@@ -39,7 +40,7 @@ import { ChannelMemoryStore } from "../src/backend/channel-memory-store";
 import { ChannelRoutineStore } from "../src/backend/channel-routine-store";
 import { ChannelStore } from "../src/backend/channel-store";
 import { resolveOpencodeCli } from "../src/backend/cli";
-import { sortConversationMessages } from "../src/backend/conversation-snapshots";
+import { isMissingFileError } from "../src/backend/file-errors";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName, readDevelopmentInstanceId } from "../src/main/development-profile";
@@ -47,6 +48,7 @@ import { ProviderRuntimeManager, providerRuntimeRoot } from "../src/main/provide
 import { writeSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
 import { resolveDevelopmentAppDataRoot } from "./development-state-paths";
+import { NO_SCALE, parseSeedScale, type SeedScale, seedScale } from "./seed-dev-scale";
 
 export const DEVELOPMENT_SEED_MANIFEST_FILE = "openbot-dev-seed-v1.json";
 
@@ -207,6 +209,8 @@ export interface DevelopmentSeedOptions {
    * which is what makes it an option: a test pins the answer instead of asking the machine.
    */
   agentModel?: SeededAgentModel;
+  /** Generated agents, histories, channels and images on top of the showcase, for benchmarks. */
+  scale?: SeedScale;
 }
 
 export interface DevelopmentSeedSummary {
@@ -296,12 +300,18 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
 
   const profileActive = await isDevelopmentProfileActive(targetProfile);
   const agentModel = options.agentModel ?? (await seededAgentModel(appDataRoot));
+  const scale = options.scale ?? NO_SCALE;
   const summary: DevelopmentSeedSummary = {
     targetProfile,
     dryRun: options.dryRun ?? false,
     profileActive,
     agentModel: agentModel.model,
     ...SEED_SUMMARY,
+    agents: SEED_SUMMARY.agents + scale.agents,
+    conversations: SEED_SUMMARY.conversations + scale.agents,
+    attachments: SEED_SUMMARY.attachments + scale.attachments,
+    channels: SEED_SUMMARY.channels + scale.channels,
+    channelMessages: SEED_SUMMARY.channelMessages + scale.channels * scale.channelMessages,
   };
   if (options.dryRun) return summary;
   if (options.ifMissing && (await pathExists(targetProfile))) return summary;
@@ -313,7 +323,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
   const stagingProfile = await mkdtemp(join(appDataRoot, ".openbot-dev-seed-"));
   const newTransferDirectories: string[] = [];
   try {
-    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories, agentModel);
+    await buildSeedProfile(stagingProfile, homeDirectory, newTransferDirectories, agentModel, scale);
     if (await isDevelopmentProfileActive(targetProfile)) {
       throw new Error("Quit the OpenBot dev app before you seed its local state.");
     }
@@ -336,7 +346,7 @@ export async function isDevelopmentProfileActive(profilePath: string): Promise<b
     const lock = await lstat(lockPath);
     if (!lock.isSymbolicLink()) return true;
   } catch (error) {
-    if (isMissing(error)) return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
 
@@ -366,6 +376,7 @@ async function buildSeedProfile(
   homeDirectory: string,
   transferDirectories: string[],
   agentModel: SeededAgentModel,
+  scale: SeedScale,
 ): Promise<void> {
   const agentStore = new AgentStore(profilePath, homeDirectory);
   await agentStore.initialize();
@@ -381,6 +392,15 @@ async function buildSeedProfile(
     await seedAgentExchanges(mailbox);
     await seedConversations(agentStore, mailbox, agents, attachments, clock);
     await seedChannels(agentStore, mailbox, agents, clock, transferDirectories);
+    await seedScale({
+      agentStore,
+      mailbox,
+      scale,
+      agentModel,
+      channelMembers: ["chief", "research", "builder"],
+      now: clock.now.getTime(),
+      transferDirectories,
+    });
     await seedTeam(profilePath, agentStore, clock);
     // No model beside the provider, and the built-in provider: a seeded profile records no choice
     // of the developer's, which is what lets the app apply its own development default to an agent
@@ -1426,7 +1446,7 @@ async function readSeedTransferDirectories(profilePath: string): Promise<string[
     if (!parsed.success) return [];
     return parsed.data.transferDirectories.filter((entry) => GENERATED_DIRECTORY_PATTERN.test(entry));
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return [];
+    if (isMissingFileError(error) || error instanceof SyntaxError) return [];
     throw error;
   }
 }
@@ -1513,13 +1533,9 @@ async function pathExists(path: string): Promise<boolean> {
     await lstat(path);
     return true;
   } catch (error) {
-    if (isMissing(error)) return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function errorMessage(error: unknown): string {
@@ -1534,9 +1550,11 @@ function isMainModule(): boolean {
 async function main(): Promise<void> {
   const dryRun = process.argv.slice(2).includes("--dry-run");
   const ifMissing = process.argv.slice(2).includes("--if-missing");
+  const scaleFlag = process.argv.slice(2).find((argument) => argument.startsWith("--scale="));
   const summary = await seedDevelopmentState({
     dryRun,
     ifMissing,
+    scale: scaleFlag === undefined ? undefined : parseSeedScale(scaleFlag.slice("--scale=".length)),
     instanceId: readDevelopmentInstanceId(process.env.OPENBOT_DEV_INSTANCE_ID),
   });
   logger.info(dryRun ? "OpenBot development seed dry run:" : "OpenBot development state seeded:");

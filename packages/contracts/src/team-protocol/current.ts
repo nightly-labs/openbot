@@ -1,8 +1,9 @@
 import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
+import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
-import { TEAM_BROWSER_VIEW_CAPABILITY } from "./browser-view-v1";
+import { TEAM_BROWSER_VIEW_CAPABILITY, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY } from "./browser-view-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
@@ -21,8 +22,10 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export {
   CHANNEL_DELETE_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  STORAGE_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
@@ -32,6 +35,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_QUEUE_EDIT_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
   "agent-profile-generation",
   "agent-analytics",
   "host-analytics",
@@ -45,6 +49,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   "channel-chats-v1",
   CHANNEL_DELETE_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  STORAGE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

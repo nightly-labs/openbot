@@ -1,12 +1,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
-import { desktopAnalytics } from "../../analytics";
-import { createScrollFades } from "../../components/createScrollFades";
-import { SkillPreview } from "../../components/SkillPreview";
 import {
   Button,
   ChevronRight,
+  ConfirmDialog,
   Dialog,
   DropdownMenu,
   Ellipsis,
@@ -16,11 +13,16 @@ import {
   Switch,
   Trash2,
   X,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
+} from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { errorMessage } from "@openbot/ui/error-message";
+import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
+import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibraryToolbar";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
+import { SkillPreview } from "../../components/SkillPreview";
+import { skillsPort } from "../../skills-port";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
-import { SkillGlyph } from "./SkillGlyph";
-import { SkillLibraryToolbar } from "./SkillLibraryToolbar";
 
 export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
 
@@ -64,7 +66,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   let confirmationTrigger: HTMLButtonElement | undefined;
   const skillsMode = () => props.skillsMode ?? "mutable";
   const mutable = () => skillsMode() === "mutable";
-  const assignmentCount = createMemo(() => skills().length);
+  const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
   const selectedSkill = createMemo(() => {
@@ -86,12 +88,12 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     try {
       const next = userAssignedSkills(
         skillsMode() === "readonly"
-          ? await window.openbot.agent.listInstalledSkills(agentId)
-          : await window.openbot.skills.listInstalled(agentId),
+          ? await skillsPort().agent.listInstalledSkills(agentId)
+          : await skillsPort().skills.listInstalled(agentId),
       );
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
-      props.onCountChange(next.length);
+      props.onCountChange(assignedSkillCount(next));
       const targetId = props.selectionRequest?.skillId;
       if (showLoading && targetId) {
         const target = next.find((skill) => skill.skillId === targetId);
@@ -124,8 +126,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   async function loadCatalog(): Promise<void> {
     try {
       const [marketplace, local] = await Promise.allSettled([
-        window.openbot.skills.list({ limit: 50 }),
-        mutable() ? window.openbot.skills.localList() : Promise.resolve([]),
+        skillsPort().skills.list({ limit: 50 }),
+        mutable() ? skillsPort().skills.localList() : Promise.resolve([]),
       ]);
       const page = {
         skills: [
@@ -156,14 +158,14 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetail(null);
     setDetailLoading(true);
     setError(null);
-    if (!mutable() && skill.skillId.startsWith("local-skill-")) {
+    if (isFolderSkill(skill) || (!mutable() && skill.skillId.startsWith("local-skill-"))) {
       setDetailLoading(false);
       return;
     }
     try {
       const next = skill.skillId.startsWith("local-skill-")
-        ? await window.openbot.skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
-        : await window.openbot.skills.get(skill.skillId);
+        ? await skillsPort().skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
+        : await skillsPort().skills.get(skill.skillId);
       if (request === detailRequest) setDetail(next);
     } catch (caught) {
       if (request === detailRequest) setError(errorMessage(caught, "Could not load skill details."));
@@ -192,7 +194,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
+      await skillsPort().skills.setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
       analytics.track("marketplace_action", { entity: "skill", action, result: "succeeded" });
       operationSucceeded = true;
       await loadSkills(false);
@@ -219,7 +221,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.uninstall({
+      await skillsPort().skills.uninstall({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(removeModified ? { removeModified: true } : {}),
@@ -250,7 +252,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await window.openbot.skills.install({
+      await skillsPort().skills.install({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(replaceModified ? { replaceModified: true } : {}),
@@ -276,14 +278,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     }
   }
 
-  function runConfirmed(): void {
+  function runConfirmed(): Promise<void> | undefined {
     const request = confirm();
     if (!request) return;
-    if (request.kind === "remove") {
-      void uninstall(request.skill, request.skill.state === "modified");
-      return;
-    }
-    void install(request.skill, request.skill.state === "modified");
+    if (request.kind === "remove") return uninstall(request.skill, request.skill.state === "modified");
+    return install(request.skill, request.skill.state === "modified");
   }
 
   function cancelConfirm(): void {
@@ -325,7 +324,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
               <div class="agent-memories-header-actions">
                 <Show when={selectedSkill()}>
                   {(skill) => (
-                    <Show when={mutable()}>
+                    <Show when={mutable() && !isFolderSkill(skill())}>
                       <SkillMoreMenu
                         skill={skill()}
                         disabled={savingId() === skill().skillId}
@@ -472,11 +471,13 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                                 <strong>{skill().name}</strong>
                                               </div>
                                               <small>
-                                                {catalog()[skill().skillId]?.description ?? skillMeta(skill())}
+                                                {isFolderSkill(skill())
+                                                  ? (skill().problem ?? skill().description ?? skill().location)
+                                                  : (catalog()[skill().skillId]?.description ?? skillMeta(skill()))}
                                               </small>
                                             </div>
                                           </Button>
-                                          <Show when={mutable()}>
+                                          <Show when={mutable() && !isFolderSkill(skill())}>
                                             <Show when={skill().state === "update-available"}>
                                               <Button
                                                 size="sm"
@@ -528,6 +529,17 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                   data-page-id="2"
                                   onScroll={scrollFades.measure}
                                 >
+                                  <Show when={isFolderSkill(skill())}>
+                                    <Show when={skill().problem}>
+                                      {(problem) => <p class="agent-memory-error">{problem()}</p>}
+                                    </Show>
+                                    <Show when={skill().description}>
+                                      {(description) => <p class="agent-memory-state">{description()}</p>}
+                                    </Show>
+                                    <p class="agent-memory-state">
+                                      OpenBot did not install this skill. Edit or remove it in {skill().location}.
+                                    </p>
+                                  </Show>
                                   <Show when={!mutable() && skill().skillId.startsWith("local-skill-")}>
                                     <p class="agent-memory-state" role="status">
                                       This local skill is stored on the host. Open its details on that computer.
@@ -594,41 +606,18 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
         </Dialog.Portal>
       </Dialog.Root>
 
-      <Dialog.Root
+      <ConfirmDialog
         open={confirm() !== null}
-        onOpenChange={(open) => {
-          if (!open) cancelConfirm();
-        }}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay class="agent-memory-confirm-overlay" />
-          <Dialog.Content class="agent-memory-confirm-dialog">
-            <div class="agent-memory-confirm-content">
-              <Dialog.Title>{confirmTitle(confirm())}</Dialog.Title>
-              <Dialog.Description>{confirmBody(confirm())}</Dialog.Description>
-              <Show when={error()}>
-                {(message) => (
-                  <p class="agent-memory-error" role="alert">
-                    {message()}
-                  </p>
-                )}
-              </Show>
-              <div class="agent-memory-confirm-actions">
-                <Button variant="ghost" disabled={savingId() !== null} onClick={cancelConfirm}>
-                  Cancel
-                </Button>
-                <Button
-                  variant={confirm()?.kind === "remove" ? "destructive" : "default"}
-                  loading={savingId() !== null}
-                  onClick={runConfirmed}
-                >
-                  {confirmConfirm(confirm())}
-                </Button>
-              </div>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        onCancel={cancelConfirm}
+        onConfirm={runConfirmed}
+        title={confirmTitle(confirm())}
+        description={confirmBody(confirm())}
+        tone={confirm()?.kind === "replace" ? "default" : "destructive"}
+        confirmLabel={confirmConfirm(confirm())}
+        pending={savingId() !== null}
+        error={error()}
+        initialFocus="cancel"
+      />
     </>
   );
 }
@@ -675,15 +664,25 @@ function isBuiltInSkill(skill: InstalledSkill): boolean {
   );
 }
 
+/** A skill in a skill folder that OpenBot lists but does not manage. */
+function isFolderSkill(skill: InstalledSkill): boolean {
+  return skill.origin === "workspace";
+}
+
 function isEnabled(skill: InstalledSkill): boolean {
   return skill.enabled !== false;
 }
 
-export function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
+function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
   return skills
     .filter((skill) => !isBuiltInSkill(skill))
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** A skill in a folder OpenBot did not write is not an assignment, so it does not count toward the cap. */
+export function assignedSkillCount(skills: InstalledSkill[]): number {
+  return skills.filter((skill) => !isBuiltInSkill(skill) && !isFolderSkill(skill)).length;
 }
 
 function skillMeta(skill: InstalledSkill): string {

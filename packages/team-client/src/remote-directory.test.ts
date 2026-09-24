@@ -1,4 +1,4 @@
-import { createInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -29,6 +29,49 @@ const PREVIEW = {
 const ACCEPTED = { hostId: HOST_ID, membershipId: "membership-1", role: "member" };
 
 describe("RemoteTeamDirectoryClient", () => {
+  it("uses same-origin browser cookies and CSRF headers without a bearer token", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ hosts: [] }));
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: "https://openbot.run",
+      authentication: { kind: "browser" },
+      fetch,
+    });
+    await client.listHosts();
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/hosts/"),
+      expect.objectContaining({
+        credentials: "same-origin",
+        headers: { "X-OpenBot-Browser": "1", "Content-Type": "application/json" },
+      }),
+    );
+    fetch.mockResolvedValue(Response.json({ ended: true }));
+    await client.endSession("session");
+    expect(fetch).toHaveBeenLastCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/sessions/session/end"),
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    );
+  });
+  it("accepts production account invitations on the public web origin without sending credentials to the API origin", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(PREVIEW));
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: "https://openbot.run",
+      authentication: { kind: "browser" },
+      fetch,
+    });
+    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
+    expect(fetch).toHaveBeenCalledWith(
+      new URL("https://openbot.run/api/browser/v2/remote/invites/preview"),
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+    const foreign = createInviteUrl({
+      apiUrl: "https://studio-mac-k7m4q2pz-host.openbot.run/",
+      serverId: HOST_ID,
+      fingerprint: HOST_FINGERPRINT,
+      token: "t".repeat(32),
+    });
+    await expect(client.previewInvite(foreign)).rejects.toThrow("another OpenBot service");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("removes a revoked paired desktop while keeping the other memberships available", async () => {
     const remote = {
       hostId: "other",
@@ -194,6 +237,54 @@ describe("RemoteTeamDirectoryClient", () => {
       "/v2/remote/sessions/session-1/ticket",
       "/v2/remote/sessions/session-1/end",
     ]);
+  });
+
+  it("asks only for a ticket on a kept session and replaces it only when it ended", async () => {
+    const paths: string[] = [];
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "mobile-session",
+      fetch: async (input) => {
+        const path = new URL(input.toString()).pathname;
+        paths.push(path);
+        if (path === "/v2/remote/sessions/") {
+          return Response.json(
+            { sessionId: "session-2", hostId: HOST_ID, expiresAt: Date.now() + 60_000 },
+            { status: 201 },
+          );
+        }
+        if (path === "/v2/remote/sessions/ended/ticket") {
+          return Response.json({ error: "The remote session is not active." }, { status: 403 });
+        }
+        if (path === "/v2/remote/sessions/unreachable/ticket") {
+          return Response.json({ error: "Try again." }, { status: 503 });
+        }
+        return Response.json({
+          signalUrl: "wss://signal.example.test/v1/signal",
+          ticket: "remote-ticket",
+          expiresAt: Date.now() + 60_000,
+        });
+      },
+    });
+
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "session-1")).resolves.toMatchObject({
+      sessionId: "session-1",
+    });
+    expect(paths).toEqual(["/v2/remote/sessions/session-1/ticket"]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "ended")).resolves.toMatchObject({
+      sessionId: "session-2",
+    });
+    expect(paths).toEqual([
+      "/v2/remote/sessions/ended/ticket",
+      "/v2/remote/sessions/",
+      "/v2/remote/sessions/session-2/ticket",
+    ]);
+
+    paths.length = 0;
+    await expect(client.createBootstrap(HOST_ID, "client-public-key", "unreachable")).rejects.toThrow("Try again.");
+    expect(paths).toEqual(["/v2/remote/sessions/unreachable/ticket"]);
   });
 
   it("accepts an unencrypted Signal URL only on a private development network", async () => {
@@ -388,6 +479,61 @@ describe("mobile member management", () => {
     });
   });
 
+  it("creates, lists, previews, reuses and revokes permanent invitations", async () => {
+    const requests: Array<{ path: string; method: string; body: unknown }> = [];
+    let revoked = false;
+    const invite = {
+      inviteId: "permanent-1",
+      email: null,
+      role: "member",
+      expiresAt: PERMANENT_INVITE_EXPIRES_AT_MS,
+      usedAt: null,
+      revokedAt: null,
+      permanent: true,
+      useCount: 2,
+    };
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "session",
+      fetch: async (url, init) => {
+        const path = new URL(url.toString()).pathname;
+        const method = init?.method ?? "GET";
+        requests.push({ path, method, body: typeof init?.body === "string" ? JSON.parse(init.body) : null });
+        if (method === "DELETE") {
+          revoked = true;
+          return Response.json({ ok: true });
+        }
+        if (path.endsWith("/preview"))
+          return revoked
+            ? Response.json({ error: "Invitation revoked." }, { status: 404 })
+            : Response.json({ ...PREVIEW, expiresAt: invite.expiresAt, permanent: true });
+        if (path.endsWith("/accept")) return Response.json(ACCEPTED);
+        return Response.json(method === "POST" ? { ...invite, token: "t".repeat(32) } : { invites: [invite] });
+      },
+    });
+    const created = await client.createInvite(
+      { hostId: HOST_ID, devicePublicKey: HOST_KEY },
+      { role: "member", permanent: true },
+    );
+    expect(created.inviteUrl).toBe(INVITE);
+    expect(requests[0]?.body).toEqual({ role: "member", permanent: true });
+    await expect(client.listInvites(HOST_ID)).resolves.toEqual([invite]);
+    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ permanent: true });
+    await expect(client.acceptInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
+    await expect(client.acceptInvite(INVITE)).resolves.toMatchObject({ hostId: HOST_ID });
+    await client.revokeInvite(invite.inviteId);
+    await expect(client.acceptInvite(INVITE)).rejects.toThrow("Invitation revoked.");
+  });
+
+  it("recognizes a never-expiring invitation from an older projection", async () => {
+    const client = new RemoteTeamDirectoryClient({
+      apiUrl: API_URL,
+      token: "session",
+      fetch: async () => Response.json({ ...PREVIEW, expiresAt: PERMANENT_INVITE_EXPIRES_AT_MS }),
+    });
+    await expect(client.previewInvite(INVITE)).resolves.toMatchObject({ permanent: true });
+  });
+
   it("sends the created email invitation through the delivery endpoint", async () => {
     const requests: Array<{ path: string; body: unknown }> = [];
     const client = new RemoteTeamDirectoryClient({
@@ -463,7 +609,7 @@ describe("mobile member management", () => {
           : Response.json(url.toString().endsWith("members/") ? { members: [member] } : { invites: [invite] }),
     });
     const result = [await client.listMembers(HOST_ID), await client.listInvites(HOST_ID)];
-    expect(result).toEqual([[member], [invite]]);
+    expect(result).toEqual([[member], [{ ...invite, permanent: false, useCount: 0 }]]);
     denied = true;
     await expect(client.updateMember(HOST_ID, "member-1", "admin")).rejects.toMatchObject({ status: 403 });
   });

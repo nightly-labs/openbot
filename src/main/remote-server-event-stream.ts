@@ -45,6 +45,10 @@ import type { RemoteServerDirectory, StoredRemoteServerView } from "./remote-ser
 const REMOTE_EVENT_RECONNECT_BASE_MS = 1_000;
 const REMOTE_EVENT_RECONNECT_MAX_MS = 60_000;
 const REMOTE_EVENT_RECONNECT_JITTER = 0.2;
+// Signal said the host is not connected. The account directory keeps hosts that went away for good,
+// so a one-minute retry ran all day against them. This wait applies only while no app window has
+// focus: while the user looks at the app, the normal retry stays, and focus retries at once.
+const REMOTE_HOST_OFFLINE_RETRY_MS = 15 * 60_000;
 const REMOTE_EVENT_HEALTHY_MS = 30_000;
 const REMOTE_EVENT_PAYLOAD_LIMIT = 1024 * 1024;
 const REMOTE_EVENT_INITIAL_BUFFER_LIMIT = 1_000;
@@ -118,6 +122,9 @@ export class RemoteEventStream {
   readonly #reconnectAttempts = new Map<string, number>();
   readonly #transportAttempts = new Set<string>();
   readonly #authenticationPaused = new Set<string>();
+  /** When Signal last reported each host offline. */
+  readonly #offlineHosts = new Map<string, number>();
+  #appFocused = true;
   #enabled = false;
 
   constructor(options: RemoteEventStreamOptions) {
@@ -151,6 +158,7 @@ export class RemoteEventStream {
     for (const timer of this.#reconnectTimers.values()) clearTimeout(timer);
     this.#reconnectTimers.clear();
     this.#reconnectAttempts.clear();
+    this.#offlineHosts.clear();
     this.#transportAttempts.clear();
     this.#authenticationPaused.clear();
   }
@@ -192,6 +200,37 @@ export class RemoteEventStream {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     this.#reconnectTimers.delete(serverId);
     this.#reconnectAttempts.delete(serverId);
+    this.#offlineHosts.delete(serverId);
+  }
+
+  /** Without app focus, the next retry for this host waits the long offline delay, also over a shorter one already set. */
+  markHostOffline(serverId: string): void {
+    this.#offlineHosts.set(serverId, Date.now());
+    if (this.#appFocused) return;
+    const reconnectTimer = this.#reconnectTimers.get(serverId);
+    if (!reconnectTimer) return;
+    clearTimeout(reconnectTimer);
+    this.#reconnectTimers.delete(serverId);
+    this.scheduleReconnect(serverId);
+  }
+
+  /** Focus makes an offline host retry at once and then keep the normal retry. */
+  setAppFocused(focused: boolean): void {
+    this.#appFocused = focused;
+    if (focused) this.retryOfflineHosts();
+  }
+
+  /** Retries each offline host once, unless Signal reported it offline within the last minute. */
+  retryOfflineHosts(): void {
+    const now = Date.now();
+    for (const [serverId, markedAt] of this.#offlineHosts) {
+      if (now - markedAt < REMOTE_EVENT_RECONNECT_MAX_MS) continue;
+      this.#offlineHosts.delete(serverId);
+      const reconnectTimer = this.#reconnectTimers.get(serverId);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      this.#reconnectTimers.delete(serverId);
+      this.ensure(serverId);
+    }
   }
 
   // Whether this server's retries are suspended. The manager asks before it records a WebRTC
@@ -226,6 +265,7 @@ export class RemoteEventStream {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     this.#reconnectTimers.delete(serverId);
     this.#reconnectAttempts.delete(serverId);
+    this.#offlineHosts.delete(serverId);
     this.#authenticationPaused.delete(serverId);
     this.#sockets.delete(serverId);
   }
@@ -275,13 +315,14 @@ export class RemoteEventStream {
     if (this.#authenticationPaused.has(serverId)) return;
     const attempt = (this.#reconnectAttempts.get(serverId) ?? 0) + 1;
     this.#reconnectAttempts.set(serverId, attempt);
-    const exponentialDelay = Math.min(
-      REMOTE_EVENT_RECONNECT_MAX_MS,
-      REMOTE_EVENT_RECONNECT_BASE_MS * 2 ** (attempt - 1),
-    );
+    const hostOffline = !this.#appFocused && this.#offlineHosts.has(serverId);
+    const maximumDelay = hostOffline ? REMOTE_HOST_OFFLINE_RETRY_MS : REMOTE_EVENT_RECONNECT_MAX_MS;
+    const exponentialDelay = hostOffline
+      ? REMOTE_HOST_OFFLINE_RETRY_MS
+      : Math.min(REMOTE_EVENT_RECONNECT_MAX_MS, REMOTE_EVENT_RECONNECT_BASE_MS * 2 ** (attempt - 1));
     const jitter = exponentialDelay * REMOTE_EVENT_RECONNECT_JITTER * (Math.random() * 2 - 1);
     const delay = Math.min(
-      REMOTE_EVENT_RECONNECT_MAX_MS,
+      maximumDelay,
       Math.max(REMOTE_EVENT_RECONNECT_BASE_MS, Math.round(exponentialDelay + jitter)),
     );
     const timer = setTimeout(() => {

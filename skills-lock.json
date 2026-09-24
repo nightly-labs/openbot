@@ -13,12 +13,6 @@
       "skillPath": ".agents/skills/react-to-solid/SKILL.md",
       "computedHash": "e31cb37cf08619045127c1b98e4662dee8b12a2ef056dafbf76553ace827c06b"
     },
-    "shadcn-to-zaidan": {
-      "source": "carere/zaidan",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/shadcn-to-zaidan/SKILL.md",
-      "computedHash": "c4cfa0eb4037a95cd419c41f7e0a32f014643c04df1aacb1b6c00ac864133b6a"
-    },
     "zaidan": {
       "source": "carere/zaidan",
       "sourceType": "github",

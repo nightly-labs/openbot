@@ -1,7 +1,8 @@
 import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createMemo, createSignal } from "solid-js";
-import { errorMessage } from "../../../error-message";
 import { attachmentFilePreview } from "../attachment-preview";
+import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps, ConversationTarget, RightPanelMode, SidebarFilePreview } from "../conversation-types";
 
 export interface RoutineSettingsRequest {
@@ -45,6 +46,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     return agentId ? (deps.rightPanels()[agentId] ?? "none") : "none";
   });
   const settingsOpen = () => activeRightPanel() === "settings";
+  const filesOpen = () => activeRightPanel() === "files";
   const filePreviewOpen = () =>
     activeRightPanel() === "file-preview" && deps.sidebarFilePreview()?.ownerAgentId === deps.props.agent?.id;
 
@@ -55,6 +57,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
+  }
+
+  function toggleFilesPanel(): void {
+    setActiveRightPanel(filesOpen() ? "none" : "files");
   }
 
   function openRoutineSettings(routine: { routineId: string; name: string }): void {
@@ -97,7 +103,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function hideBrowserPanel() {
     setActiveRightPanel("none");
-    if (deps.props.browserEnabled !== false) void window.openbot.browser.setVisible({ visible: false });
+    if (deps.props.browserEnabled !== false)
+      void conversationRuntime(deps.props).browser.setVisible({ visible: false });
   }
 
   /**
@@ -112,7 +119,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
     try {
-      const preview = await attachmentFilePreview(attachment);
+      const preview = await (deps.props.runtime?.previewAttachment?.(attachment) ?? attachmentFilePreview(attachment));
       if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
       deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "attachment", attachment }, preview });
       setActiveRightPanel("file-preview", ownerAgentId);
@@ -126,7 +133,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = deps.props.agent?.id;
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     try {
-      await window.openbot.agent.downloadAttachments({
+      await conversationRuntime(deps.props).agent.downloadAttachments({
         attachments: attachments.map(({ id, name }) => ({ id, name })),
       });
     } catch (error) {
@@ -137,8 +144,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
     const agentId = deps.props.agent?.id;
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
-    void window.openbot.agent
-      .openAttachment({ attachmentId: attachment.id, action })
+    void conversationRuntime(deps.props)
+      .agent.openAttachment({ attachmentId: attachment.id, action })
       .catch((error) =>
         deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again."), target),
       );
@@ -151,17 +158,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
-    void window.openbot.agent.previewSharedFile({ path }).then(
-      (preview) => {
-        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
-        deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "shared", path }, preview });
-        setActiveRightPanel("file-preview", ownerAgentId);
-      },
-      (error) => {
-        if (generation !== deps.currentFilePreviewGeneration()) return;
-        deps.setComposerError(filePreviewError(error, path), target);
-      },
-    );
+    void conversationRuntime(deps.props)
+      .agent.previewSharedFile({ path })
+      .then(
+        (preview) => {
+          if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== ownerAgentId) return;
+          deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "shared", path }, preview });
+          setActiveRightPanel("file-preview", ownerAgentId);
+        },
+        (error) => {
+          if (generation !== deps.currentFilePreviewGeneration()) return;
+          deps.setComposerError(filePreviewError(error, path), target);
+        },
+      );
   }
 
   function openWorkspaceFile(path: string) {
@@ -171,17 +180,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const target = { agentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
-    void window.openbot.agent.previewWorkspaceFile({ agentId, path }).then(
-      (preview) => {
-        if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
-        deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path }, preview });
-        setActiveRightPanel("file-preview", agentId);
-      },
-      (error) => {
-        if (generation !== deps.currentFilePreviewGeneration()) return;
-        deps.setComposerError(filePreviewError(error, path), target);
-      },
-    );
+    void conversationRuntime(deps.props)
+      .agent.previewWorkspaceFile({ agentId, path })
+      .then(
+        (preview) => {
+          if (generation !== deps.currentFilePreviewGeneration() || deps.props.agent?.id !== agentId) return;
+          deps.setSidebarFilePreview({ ownerAgentId: agentId, source: { kind: "workspace", path }, preview });
+          setActiveRightPanel("file-preview", agentId);
+        },
+        (error) => {
+          if (generation !== deps.currentFilePreviewGeneration()) return;
+          deps.setComposerError(filePreviewError(error, path), target);
+        },
+      );
   }
 
   function openSidebarFileExternally() {
@@ -191,10 +202,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const source = file.source;
     const request =
       source.kind === "attachment"
-        ? window.openbot.agent.openAttachment({ attachmentId: source.attachment.id, action: "open" })
+        ? conversationRuntime(deps.props).agent.openAttachment({ attachmentId: source.attachment.id, action: "open" })
         : source.kind === "shared"
-          ? window.openbot.agent.openSharedFile({ path: source.path })
-          : window.openbot.agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path });
+          ? conversationRuntime(deps.props).agent.openSharedFile({ path: source.path })
+          : conversationRuntime(deps.props).agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path });
     void request.catch((error) =>
       deps.setComposerError(errorMessage(error, "Could not open this file. Try again."), target),
     );
@@ -224,6 +235,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
+    filesOpen,
+    toggleFilesPanel,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,

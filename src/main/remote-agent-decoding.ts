@@ -1,4 +1,4 @@
-import { decodeAgentAnalytics, decodeHostAnalytics } from "@openbot/contracts/ipc";
+import { decodeAgentAnalytics, decodeHostAnalytics, decodeInstalledSkills } from "@openbot/contracts/ipc";
 // Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
 // See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
 
@@ -28,14 +28,8 @@ import {
   isRoutineRun,
   isSidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
-import {
-  decodeRecord,
-  guardedDecoder,
-  guardedListDecoder,
-  requiredNumber,
-  requiredString,
-} from "@openbot/contracts/ipc-decoding";
-import { isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
+import { isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");
@@ -139,32 +133,7 @@ export function decodeAgentSummaries(value: unknown): AgentSummary[] {
 }
 
 export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] {
-  if (!Array.isArray(value)) throw new Error("Invalid installed skill list.");
-  return value.map((item) => {
-    const skill = decodeRecord(item, "installed skill");
-    const state = requiredString(skill, "state");
-    if (!isOneOf(["installed", "update-available", "modified", "needs-repair"] as const, state)) {
-      throw new Error("Invalid installed skill state.");
-    }
-    const description = optionalSkillDescription(skill.description);
-    return {
-      skillId: requiredString(skill, "skillId"),
-      slug: requiredString(skill, "slug"),
-      name: requiredString(skill, "name"),
-      installedVersion: requiredNumber(skill, "installedVersion"),
-      availableVersion: requiredNumber(skill, "availableVersion"),
-      state,
-      ...(skill.enabled === false ? { enabled: false } : skill.enabled === true ? { enabled: true } : {}),
-      ...(skill.origin === "managed" || skill.origin === "marketplace" ? { origin: skill.origin } : {}),
-      ...(description ? { description } : {}),
-    };
-  });
-}
-
-function optionalSkillDescription(value: unknown): string | undefined {
-  if (!isString(value)) return undefined;
-  const description = value.trim();
-  return description && description.length <= 500 ? description : undefined;
+  return decodeInstalledSkills(value);
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

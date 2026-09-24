@@ -9,6 +9,7 @@ import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-conte
 import { useServers } from "./features/servers/servers-context";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
+import { turnsPort } from "./turns-port";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
@@ -56,7 +57,7 @@ const Turns = createSimpleContext({
   init: () => {
     const { activeServerId } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
-    const { activeAgent, activeAgentId, agentStatus, appendUiError } = useAgents();
+    const { activeAgent, activeAgentId, agentList, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
 
     // The layer-2 seed: what this server was doing the last time it was open.
@@ -91,8 +92,8 @@ const Turns = createSimpleContext({
       const request = (routineSnapshotRequests.get(key) ?? 0) + 1;
       routineSnapshotRequests.set(key, request);
       setRoutineIdsByConversation((current) => ({ ...current, [key]: undefined }));
-      void window.openbot.agent
-        .listRoutines(agentId)
+      void turnsPort()
+        .agent.listRoutines(agentId)
         .then((routines) => {
           if (routineSnapshotRequests.get(key) !== request) return;
           setRoutineIdsByConversation((current) => ({ ...current, [key]: routines.map((routine) => routine.id) }));
@@ -107,21 +108,48 @@ const Turns = createSimpleContext({
       },
     );
 
+    function loadQueue(agentId: string, serverId: string): void {
+      const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+      queueSnapshotRequests.set(agentId, queueRequest);
+      void turnsPort()
+        .agent.listQueue(agentId)
+        .then((queue) => {
+          if (!scopeIsCurrent() || queueSnapshotRequests.get(agentId) !== queueRequest) return;
+          setQueues((current) => ({ ...current, [agentId]: queue }));
+        })
+        .catch((error) => {
+          if (scopeIsCurrent()) appendUiError(agentId, error, "Queue load failed", serverId);
+        });
+    }
+
     createEffect(
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
       ({ agentId, serverId }) => {
-        if (!agentId) return;
-        const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
-        queueSnapshotRequests.set(agentId, queueRequest);
-        void window.openbot.agent
-          .listQueue(agentId)
-          .then((queue) => {
-            if (!scopeIsCurrent() || queueSnapshotRequests.get(agentId) !== queueRequest) return;
-            setQueues((current) => ({ ...current, [agentId]: queue }));
-          })
-          .catch((error) => {
-            if (scopeIsCurrent()) appendUiError(agentId, error, "Queue load failed", serverId);
-          });
+        if (agentId) loadQueue(agentId, serverId);
+      },
+    );
+
+    // The active-agent load above misses everyone else. A routine mark needs each agent's real
+    // queue sender, which a runtime snapshot does not carry.
+    createEffect(
+      () => ({
+        agentIds: agentList()
+          .map((agent) => agent.id)
+          .join("\0"),
+        agentPhase: agentStatus().phase,
+        serverId: activeServerId(),
+      }),
+      (next, previous) => {
+        if (
+          previous &&
+          next.agentIds === previous.agentIds &&
+          next.agentPhase === previous.agentPhase &&
+          next.serverId === previous.serverId
+        ) {
+          return;
+        }
+        if (!next.agentIds) return;
+        for (const agentId of next.agentIds.split("\0")) loadQueue(agentId, next.serverId);
       },
     );
 
@@ -144,7 +172,7 @@ const Turns = createSimpleContext({
         [agentId]: promptRequestKey(prompt.turnId, prompt.requestId) ?? undefined,
       }));
       try {
-        await window.openbot.agent.respondToPrompt({
+        await turnsPort().agent.respondToPrompt({
           requestId: prompt.requestId,
           answers,
         });
@@ -177,7 +205,7 @@ const Turns = createSimpleContext({
       if (!approval || String(approval.requestId) !== String(requestId)) return false;
       const analytics = desktopAnalytics.scope();
       try {
-        await window.openbot.agent.respondToApproval({
+        await turnsPort().agent.respondToApproval({
           requestId: approval.requestId,
           decision,
         });
@@ -209,7 +237,7 @@ const Turns = createSimpleContext({
       if (!agent || event?.type !== "browser-takeover-requested") return false;
       const serverId = activeServerId();
       try {
-        await window.openbot.agent.respondToBrowserTakeover({ requestId: event.request.requestId, decision });
+        await turnsPort().agent.respondToBrowserTakeover({ requestId: event.request.requestId, decision });
         setPendingPrompts((current) => ({ ...current, [agent.id]: undefined }));
         return true;
       } catch (error) {
@@ -223,8 +251,8 @@ const Turns = createSimpleContext({
       if (!agent) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
-      void window.openbot.agent
-        .cancelQueuedMessage({ agentId: agent.id, deliveryId })
+      void turnsPort()
+        .agent.cancelQueuedMessage({ agentId: agent.id, deliveryId })
         .then(() => analytics.track("queue_action", { action: "cancel", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "cancel", result: "failed", failure_code: "cancel_failed" });
@@ -238,8 +266,8 @@ const Turns = createSimpleContext({
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
-      void window.openbot.agent
-        .steerQueuedMessage({ agentId: agent.id, deliveryId, expectedTurnId: turnId })
+      void turnsPort()
+        .agent.steerQueuedMessage({ agentId: agent.id, deliveryId, expectedTurnId: turnId })
         .then(() => analytics.track("queue_action", { action: "steer", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
@@ -266,7 +294,7 @@ const Turns = createSimpleContext({
           keepAttachmentIds,
           attachmentDraftIds,
         };
-        await window.openbot.agent.updateQueuedMessage(input, serverId);
+        await turnsPort().agent.updateQueuedMessage(input, serverId);
         analytics.track("queue_action", { action: "edit", result: "succeeded" });
         return true;
       } catch (error) {
@@ -281,8 +309,8 @@ const Turns = createSimpleContext({
       if (!agent) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
-      void window.openbot.agent
-        .reorderQueue({ agentId: agent.id, deliveryIds })
+      void turnsPort()
+        .agent.reorderQueue({ agentId: agent.id, deliveryIds })
         .then(() => analytics.track("queue_action", { action: "reorder", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "reorder", result: "failed", failure_code: "reorder_failed" });
@@ -296,8 +324,8 @@ const Turns = createSimpleContext({
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
-      void window.openbot.agent
-        .interrupt({ agentId: agent.id, turnId })
+      void turnsPort()
+        .agent.interrupt({ agentId: agent.id, turnId })
         .then(() => analytics.track("queue_action", { action: "interrupt", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", {

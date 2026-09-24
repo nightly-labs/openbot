@@ -11,7 +11,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
 
@@ -20,7 +20,7 @@ const NATIVE_TOKENS = "packages/brand/src/tokens-native.css";
 
 // How each palette is spelled at an import site. Everything else here asserts what
 // the shared file contains; this is what ties a surface to it.
-const IMPORT_OF: Readonly<Record<string, string>> = {
+const IMPORT_OF: Readonly<Record<typeof SHARED_TOKENS | typeof NATIVE_TOKENS, string>> = {
   [SHARED_TOKENS]: '@import "@openbot/brand/tokens.css";',
   [NATIVE_TOKENS]: '@import "@openbot/brand/tokens-native.css";',
 };
@@ -162,7 +162,8 @@ function readRootTokens(path: string): Map<string, string> {
         prelude = "";
       } else if (blocks.at(-1) === ":root") {
         const declaration = /^\s*(--openbot-[a-z0-9-]+):\s*(.+);\s*$/u.exec(part);
-        if (declaration) tokens.set(declaration[1], declaration[2]);
+        const [, name, value] = declaration ?? [];
+        if (name && value) tokens.set(name, value);
         prelude = part;
       } else {
         prelude = part;
@@ -208,10 +209,11 @@ function stylesheetImports(path: string): readonly string[] {
   const imports: string[] = [];
   for (const match of read(path).matchAll(/import\s+"([^"]+)"/gu)) {
     const specifier = match[1];
+    assert(specifier !== undefined);
     if (specifier.startsWith(".")) imports.push(join(dirname(path), specifier));
     else {
       const packaged = /^@openbot\/brand\/(.+\.css)$/u.exec(specifier);
-      if (packaged) imports.push(`packages/brand/src/${packaged[1]}`);
+      if (packaged?.[1]) imports.push(`packages/brand/src/${packaged[1]}`);
     }
   }
   return imports;
@@ -231,14 +233,14 @@ function readVariantTokens(path: string, theme: string): Map<string, string> {
 
   const tokens = new Map<string, string>();
   for (const line of source.slice(start, end).split("\n")) {
-    const declaration = /^\s*(--openbot-[a-z0-9-]+):\s*(.+);\s*$/u.exec(line);
-    if (declaration) tokens.set(declaration[1], declaration[2]);
+    const [, name, value] = /^\s*(--openbot-[a-z0-9-]+):\s*(.+);\s*$/u.exec(line) ?? [];
+    if (name && value) tokens.set(name, value);
   }
   return tokens;
 }
 
 function readDeclaredTokens(path: string): readonly string[] {
-  return [...read(path).matchAll(/^\s*(--openbot-[a-z0-9-]+):/gmu)].map((match) => match[1]);
+  return [...read(path).matchAll(/^\s*(--openbot-[a-z0-9-]+):/gmu)].flatMap(([, name]) => (name ? [name] : []));
 }
 
 // var(--openbot-x) in CSS and JSX, plus uniwind's useCSSVariable("--openbot-x"),
@@ -247,7 +249,9 @@ function readReferencedTokens(paths: readonly string[]): readonly (readonly [str
   const references: (readonly [string, string])[] = [];
   for (const path of paths) {
     for (const match of read(path).matchAll(/(?:var\(|useCSSVariable\(")\s*(--openbot-[a-z0-9-]+)/gu)) {
-      references.push([match[1], path]);
+      const [, name] = match;
+      assert(name !== undefined);
+      references.push([name, path]);
     }
   }
   return references;

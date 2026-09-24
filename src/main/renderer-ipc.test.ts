@@ -1,7 +1,10 @@
 // @vitest-environment node
 
+import { IPC_ENDPOINTS, type VoiceModelStatus } from "@openbot/contracts/ipc";
 import { describe, expect, it, vi } from "vitest";
 import { type RendererIpcWindow, sendToRenderer } from "./renderer-ipc";
+
+const READY: VoiceModelStatus = { phase: "ready", progress: null, message: null };
 
 function rendererWindow(
   overrides: {
@@ -34,8 +37,8 @@ describe("renderer IPC", () => {
   it("sends to a live renderer frame", () => {
     const window = rendererWindow();
 
-    expect(sendToRenderer(window, "status", { ready: true })).toBe(true);
-    expect(window.webContents.send).toHaveBeenCalledWith("status", { ready: true });
+    expect(sendToRenderer(window, IPC_ENDPOINTS.voice.modelStatus, READY)).toBe(true);
+    expect(window.webContents.send).toHaveBeenCalledWith(IPC_ENDPOINTS.voice.modelStatus.channel, READY);
   });
 
   it.each([
@@ -47,7 +50,7 @@ describe("renderer IPC", () => {
   ])("does not send during a %s", (_name, overrides) => {
     const window = rendererWindow(overrides);
 
-    expect(sendToRenderer(window, "status")).toBe(false);
+    expect(sendToRenderer(window, IPC_ENDPOINTS.app.openSettings)).toBe(false);
     expect(window.webContents.send).not.toHaveBeenCalled();
   });
 
@@ -56,12 +59,12 @@ describe("renderer IPC", () => {
     Object.assign(new Error("write EPIPE"), { code: "EPIPE" }),
     new Error("Render frame was disposed before WebFrameMain could be accessed"),
   ])("contains an unavailable-renderer race without crashing the main process", (error) => {
-    expect(sendToRenderer(rendererWindow({ sendError: error }), "status")).toBe(false);
+    expect(sendToRenderer(rendererWindow({ sendError: error }), IPC_ENDPOINTS.app.openSettings)).toBe(false);
   });
 
   it("does not hide unrelated IPC errors", () => {
     const error = new Error("An object could not be cloned");
 
-    expect(() => sendToRenderer(rendererWindow({ sendError: error }), "status")).toThrow(error);
+    expect(() => sendToRenderer(rendererWindow({ sendError: error }), IPC_ENDPOINTS.app.openSettings)).toThrow(error);
   });
 });

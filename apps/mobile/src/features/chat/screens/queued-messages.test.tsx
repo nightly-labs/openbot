@@ -2,7 +2,7 @@ import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { fireEvent, screen } from "@testing-library/dom";
 import { act, type PropsWithChildren, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, assert, expect, it, vi } from "vitest";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import type { QueuedUpload } from "../context/queued-messages-context";
 import { QueuedMessageActionsScreen } from "./queued-message-actions-screen";
@@ -229,6 +229,7 @@ function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueContr
     serverId: "host",
     attachments: [],
     changeAttachments: async () => {},
+    attachmentSupport: () => ({ eml: true, media: true }),
     queued,
     deliveries: queued,
     edit: null,
@@ -312,7 +313,9 @@ it("allows confirmed deletion while another device is editing", async () => {
   expect(screen.getByRole("button", { name: "Steer" }).hasAttribute("disabled")).toBe(true);
   act(() => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
   expect(native.context.queue?.remove).not.toHaveBeenCalled();
-  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  const [alertCall] = native.alert.mock.calls;
+  assert(alertCall);
+  const buttons: { text: string; onPress?: () => void }[] = alertCall[2];
   act(() => buttons.find((button) => button.text === "Delete")?.onPress?.());
   expect(native.context.queue?.remove).toHaveBeenCalledWith(edited);
   await act(async () => {});
@@ -381,7 +384,9 @@ it("confirms before it deletes a queued message", async () => {
   mount(() => <QueuedMessageActionsScreen />);
   act(() => fireEvent.click(screen.getByRole("button", { name: "Delete" })));
   expect(queue.remove).not.toHaveBeenCalled();
-  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  const [alertCall] = native.alert.mock.calls;
+  assert(alertCall);
+  const buttons: { text: string; onPress?: () => void }[] = alertCall[2];
   act(() => buttons.find((button) => button.text === "Delete")?.onPress?.());
   expect(queue.remove).toHaveBeenCalledWith(first);
   await act(async () => {});
@@ -461,7 +466,9 @@ it("asks before it leaves an edited message, then releases the host hold", async
 
   act(() => native.guard.callback?.({ data: { action: "pop" } }));
   expect(queue.cancelEdit).not.toHaveBeenCalled();
-  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  const [alertCall] = native.alert.mock.calls;
+  assert(alertCall);
+  const buttons: { text: string; onPress?: () => void }[] = alertCall[2];
   act(() => buttons.find((button) => button.text === "Discard")?.onPress?.());
   expect(queue.cancelEdit).toHaveBeenCalled();
   await act(async () => {});
@@ -569,7 +576,9 @@ it("asks before it leaves a message the host still holds", async () => {
   act(() => native.guard.callback?.({ data: { action: "pop" } }));
   await act(async () => {});
   expect(native.dispatch).not.toHaveBeenCalled();
-  const buttons: { text: string; onPress?: () => void }[] = native.alert.mock.calls[0][2];
+  const [alertCall] = native.alert.mock.calls;
+  assert(alertCall);
+  const buttons: { text: string; onPress?: () => void }[] = alertCall[2];
   act(() => buttons.find((button) => button.text === "Leave anyway")?.onPress?.());
   await act(async () => {});
   expect(native.dispatch).toHaveBeenCalledWith("pop");

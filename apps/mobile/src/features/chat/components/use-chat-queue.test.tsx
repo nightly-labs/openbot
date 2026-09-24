@@ -19,6 +19,7 @@ const boundary = vi.hoisted(() => ({
   uploadAttachment: vi.fn(),
   discardAttachment: vi.fn(),
   canEditQueue: () => true,
+  attachmentSupport: () => ({ eml: true, media: true }),
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => boundary.storage.get(key) ?? null,
@@ -161,7 +162,7 @@ it("keeps edit identity and text on navigation and never releases a hold on unmo
   await act(async () => {
     await restored.state().begin(delivery);
   });
-  expect(boundary.editQueue.mock.calls[1][2]).toEqual({
+  expect(boundary.editQueue.mock.calls[1]?.[2]).toEqual({
     action: "begin",
     deliveryId: delivery.id,
     editId: "edit-phone-1",

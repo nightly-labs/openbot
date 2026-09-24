@@ -8,7 +8,6 @@ import {
   type RemoteDesktopTestStatus,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
-import { createStore, For, onSettled, Show } from "solid-js";
 import {
   Alert,
   AlertContent,
@@ -22,10 +21,12 @@ import {
   ItemGroup,
   ItemTitle,
   Text,
-} from "../../components/ui";
-import { errorMessage } from "../../error-message";
-import { RemoteDesktopWorkspace } from "../remote-desktop/RemoteDesktopWorkspace";
+} from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { RemoteDesktopWorkspace } from "@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace";
+import { createStore, For, onSettled, Show } from "solid-js";
 import { serverSupportsCapability } from "./server-capabilities";
+import { serversPort } from "./servers-port";
 
 const CHECKS = [
   ["screenRecording", "Screen Recording"],
@@ -85,7 +86,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
       if (!preserveError) draft.error = null;
     });
     try {
-      const result = await window.openbot.remoteDesktop.checkSetup(props.server.id);
+      const result = await serversPort().remoteDesktop.checkSetup(props.server.id);
       if (!disposed)
         setState((draft) => {
           Object.assign(draft, { result });
@@ -114,7 +115,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     });
     try {
       returnFromSettings = action !== "reveal";
-      await window.openbot.remoteDesktop.openSetup(action);
+      await serversPort().remoteDesktop.openSetup(action);
     } catch (error) {
       setState((draft) => {
         Object.assign(draft, { error: errorMessage(error, "Could not open macOS setup.") });
@@ -130,9 +131,9 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     // Disconnect also removes a host panel when a stop request cannot reach the host.
     try {
       if (!state.videoOnly)
-        await window.openbot.remoteDesktop.test({ serverId: session.serverId, sessionId: session.id, action: "stop" });
+        await serversPort().remoteDesktop.test({ serverId: session.serverId, sessionId: session.id, action: "stop" });
     } finally {
-      await window.openbot.remoteDesktop.disconnect(session.id);
+      await serversPort().remoteDesktop.disconnect(session.id);
     }
   }
 
@@ -172,10 +173,10 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
       });
     });
     try {
-      const sessions = await window.openbot.remoteDesktop.list();
+      const sessions = await serversPort().remoteDesktop.list();
       if (sessions.some((session) => session.serverId === props.server.id))
         throw new Error("End this computer's remote desktop session before you start a test.");
-      const connection = await window.openbot.remoteDesktop.connect({ serverId: props.server.id });
+      const connection = await serversPort().remoteDesktop.connect({ serverId: props.server.id });
       if (connection.status !== "connected") throw new Error(connection.message);
       ownedSession = connection.session;
       if (disposed) {
@@ -185,7 +186,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
       }
       const test = state.videoOnly
         ? null
-        : await window.openbot.remoteDesktop.test({
+        : await serversPort().remoteDesktop.test({
             serverId: props.server.id,
             sessionId: connection.session.id,
             action: "start",
@@ -217,7 +218,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     if (!session || polling || state.videoOnly) return;
     polling = true;
     try {
-      const test = await window.openbot.remoteDesktop.test({
+      const test = await serversPort().remoteDesktop.test({
         serverId: props.server.id,
         sessionId: session.id,
         action: "status",

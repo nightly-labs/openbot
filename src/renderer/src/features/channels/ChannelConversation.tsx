@@ -6,6 +6,40 @@ import {
   type DraftAttachment,
   type FilePreview,
 } from "@openbot/contracts/ipc";
+import { ArrowUp, Button, Plus, X } from "@openbot/ui";
+import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
+import {
+  SettingsPanel,
+  SettingsPanelContent,
+  SettingsPanelHeader,
+  settingsPanelMaxWidth,
+} from "@openbot/ui/components/SettingsPanel";
+import type { AgentMessage } from "@openbot/ui/data";
+import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
+import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
+import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import {
+  calculateChatScrollMargin,
+  createChatVirtualizer,
+} from "@openbot/ui/features/conversation/createChatVirtualizer";
+import { ScrollToLatestButton, scrollToLatestMessage } from "@openbot/ui/features/conversation/MessageNavigation";
+import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import {
+  anchorNewMessages,
+  countableTimelineMessage,
+  type NewMessageTally,
+  tallyNewMessages,
+} from "@openbot/ui/features/conversation/new-message-tally";
+import {
+  scrollToUnreadBoundary,
+  UnreadMessagesBanner,
+  UnreadMessagesDivider,
+  unreadMessagesDividerIsVisible,
+} from "@openbot/ui/features/conversation/UnreadMessages";
 import {
   createEffect,
   createMemo,
@@ -18,16 +52,8 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
-import {
-  createSettingsPanelWidth,
-  SettingsPanel,
-  SettingsPanelContent,
-  SettingsPanelHeader,
-  settingsPanelMaxWidth,
-} from "../../components/SettingsPanel";
-import { ArrowUp, Button, Plus, X } from "../../components/ui";
-import type { AgentMessage } from "../../data";
+import { appPort } from "../../app-port";
+import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
@@ -36,35 +62,14 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
-import { ChatActionMarker } from "../conversation/ChatActionMarker";
-import { ChatMessageRow } from "../conversation/ChatMessageRow";
-import { ComposerEditor, expandComposerMentions } from "../conversation/ComposerEditor";
-import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
-import { calculateChatScrollMargin, createChatVirtualizer } from "../conversation/createChatVirtualizer";
-import { ScrollToLatestButton, scrollToLatestMessage } from "../conversation/MessageNavigation";
-import { MessageActions } from "../conversation/MessageRendering";
 import { channelMemoriesPort } from "../conversation/memories-port";
-import {
-  anchorNewMessages,
-  countableTimelineMessage,
-  type NewMessageTally,
-  tallyNewMessages,
-} from "../conversation/new-message-tally";
 import { channelRoutinesPort } from "../conversation/routines-port";
-import {
-  scrollToUnreadBoundary,
-  UnreadMessagesBanner,
-  UnreadMessagesDivider,
-  unreadMessagesDividerIsVisible,
-} from "../conversation/UnreadMessages";
 import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
-import { ChannelActivityIndicator, type ChannelWorker } from "./ChannelActivityIndicator";
-import { ChannelAvatar } from "./ChannelAvatar";
 import { ChannelEditor } from "./ChannelEditor";
-import { ChannelStoppedTasks } from "./ChannelStoppedTasks";
 import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
 import { useChannels } from "./channels-context";
+import { channelsPort } from "./channels-port";
 
 const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
@@ -191,7 +196,7 @@ export function ChannelConversation() {
   const [filePreview, setFilePreview] = createSignal<ChannelFilePreview | null>(null);
   const previewChannelAttachment = async (attachment: AttachmentSummary) => {
     if (!canPreviewAttachment(attachment)) {
-      void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
+      void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
       return;
     }
     channels.closeEditor();
@@ -201,7 +206,7 @@ export function ChannelConversation() {
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
-    void channels.perform(() => window.openbot.agent.openAttachment({ attachmentId: attachment.id, action }));
+    void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
   // The preview belongs to the channel it was opened from, and the settings panel takes the slot back.
   createEffect(
@@ -622,12 +627,12 @@ export function ChannelConversation() {
                               selectAgent(id);
                             }}
                             onOpenLink={(url) => {
-                              void window.openbot.openUrl(url);
+                              void appPort().openUrl(url);
                             }}
                             onPreview={(attachment) => void previewChannelAttachment(attachment)}
                             onDownloadAttachments={async (attachments) => {
                               await channels.perform(() =>
-                                window.openbot.agent.downloadAttachments({
+                                channelsPort().agent.downloadAttachments({
                                   attachments: attachments.map(({ id, name }) => ({ id, name })),
                                 }),
                               );
@@ -672,7 +677,7 @@ export function ChannelConversation() {
                                     page().channel.archived
                                       ? Promise.resolve(false)
                                       : channels.perform(() =>
-                                          window.openbot.agent.respondToPrompt({
+                                          channelsPort().agent.respondToPrompt({
                                             requestId: prompt().requestId,
                                             answers,
                                           }),
@@ -707,7 +712,7 @@ export function ChannelConversation() {
                         approval={approval()}
                         onApprove={() =>
                           channels.perform(() =>
-                            window.openbot.agent.respondToApproval({
+                            channelsPort().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "accept",
                             }),
@@ -715,7 +720,7 @@ export function ChannelConversation() {
                         }
                         onReject={() =>
                           channels.perform(() =>
-                            window.openbot.agent.respondToApproval({
+                            channelsPort().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "decline",
                             }),
@@ -747,7 +752,7 @@ export function ChannelConversation() {
                           previewStatus="idle"
                           onComplete={() =>
                             channels.perform(() =>
-                              window.openbot.agent.respondToBrowserTakeover({
+                              channelsPort().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "complete",
                               }),
@@ -755,12 +760,18 @@ export function ChannelConversation() {
                           }
                           onCancel={() =>
                             channels.perform(() =>
-                              window.openbot.agent.respondToBrowserTakeover({
+                              channelsPort().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "cancel",
                               }),
                             )
                           }
+                          browserSecret={{
+                            loadPreview: channelsPort().browser.capturePreview,
+                            onRespond: async (input) => {
+                              await channels.perform(() => channelsPort().agent.respondToBrowserSecret(input));
+                            },
+                          }}
                         />
                       )}
                     </Show>
@@ -865,7 +876,7 @@ export function ChannelConversation() {
                       onClick={() =>
                         void channels.perform(async () => {
                           const selectedId = channels.state.selectedId;
-                          const attachments = await window.openbot.agent.chooseAttachments({ filter: "all" });
+                          const attachments = await channelsPort().agent.chooseAttachments({ filter: "all" });
                           if (selectedId === channels.state.selectedId)
                             setComposer((state) => {
                               state.attachments = [...state.attachments, ...attachments];
@@ -900,7 +911,7 @@ export function ChannelConversation() {
                     maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
                     onWidthChange={setPanelWidth}
                     onOpenLink={(url) => {
-                      void window.openbot.openUrl(url);
+                      void appPort().openUrl(url);
                     }}
                     /* A channel transcript has no agent workspace of its own, so a path in a
                        previewed file cannot be resolved here. Only attachments open in this slot. */
@@ -917,6 +928,7 @@ export function ChannelConversation() {
             </Show>
             <Show when={!page().channel.archived && channels.state.editing === "settings"}>
               <SettingsPanel
+                onResizeEnd={saveSettingsPanelWidth}
                 id="channel-side-panel"
                 label="Channel panel"
                 width={panelWidth()}

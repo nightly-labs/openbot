@@ -1,6 +1,7 @@
 import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { expect, it, vi } from "vitest";
+import { assert, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { desktopAnalytics } from "./analytics";
 import {
@@ -14,8 +15,7 @@ import {
   testServer,
   trackAnalytics,
 } from "./app-test-harness";
-import { toast } from "./components/ui";
-import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins";
+import { SIDEBAR_PINS_STORAGE_KEY } from "./features/sidebar/sidebar-pins-storage";
 
 describe("OpenBot connected desktop shell", () => {
   it("opens the marketplace from skill settings and returns to skills", async () => {
@@ -27,7 +27,11 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
     await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
-    await fireEvent.click((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]);
+    const [addFromMarketplace] = await screen.findAllByRole("button", { name: "Add from marketplace" });
+    assert(addFromMarketplace);
+    // The button stays disabled until the agent's skills load.
+    await waitFor(() => expect(addFromMarketplace).toBeEnabled());
+    await fireEvent.click(addFromMarketplace);
     expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
     expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();
@@ -295,7 +299,8 @@ describe("OpenBot connected desktop shell", () => {
     });
 
     render(() => <App />);
-    const usageButton = await screen.findByRole("button", { name: "Usage, Claude 0% left" });
+    // The active agent runs on ChatGPT, so a spent Claude quota stays out of the chip.
+    const usageButton = await screen.findByRole("button", { name: "Usage, ChatGPT 85% left" });
     await fireEvent.click(usageButton);
     const usageDialog = screen.getByRole("dialog", { name: "Usage" });
     expect(within(usageDialog).getByRole("listitem", { name: /Claude, 0% left/ })).toBeInTheDocument();
@@ -312,7 +317,7 @@ describe("OpenBot connected desktop shell", () => {
       .mockResolvedValueOnce({
         limits: [
           {
-            id: "claude",
+            id: "codex",
             primary: null,
             secondary: { usedPercent: 82, windowDurationMins: 10_080, resetsAt: null },
           },
@@ -327,20 +332,20 @@ describe("OpenBot connected desktop shell", () => {
       usage: {
         limits: [
           {
-            id: "claude",
+            id: "codex",
             primary: null,
             secondary: { usedPercent: 82, windowDurationMins: 10_080, resetsAt: null },
           },
         ],
       },
     });
-    expect(await screen.findByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Usage, ChatGPT 18% left" })).toBeInTheDocument();
     expect(window.openbot.agent.getUsage).toHaveBeenCalledTimes(1);
 
     resolveInitialUsage({
       limits: [
         {
-          id: "codex",
+          id: "claude",
           primary: null,
           secondary: { usedPercent: 41, windowDurationMins: 10_080, resetsAt: null },
         },
@@ -349,7 +354,7 @@ describe("OpenBot connected desktop shell", () => {
     await initialUsageRequest;
     await Promise.resolve();
 
-    expect(screen.getByRole("button", { name: "Usage, Claude 18% left" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usage, ChatGPT 18% left" })).toBeInTheDocument();
   });
 
   it("replaces an in-flight usage request after usage is invalidated", async () => {
@@ -408,6 +413,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(await screen.findByRole("switch", { name: "Share product analytics" }));
     await waitFor(() => expect(window.openbot.setAnalyticsPreference).toHaveBeenCalledWith({ enabled: false }));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "Dynamic Island" }));
     const notchSwitch = await screen.findByRole("switch", { name: "Show status in the MacBook notch" });
     expect(notchSwitch).toBeChecked();
     await fireEvent.click(notchSwitch);
@@ -417,6 +423,8 @@ describe("OpenBot connected desktop shell", () => {
         hapticsEnabled: true,
         idleVisible: true,
         additionalDisplaysEnabled: true,
+        widthPercent: 100,
+        heightPercent: 100,
       }),
     );
     expect(notchSwitch).not.toBeChecked();
@@ -433,13 +441,13 @@ describe("OpenBot connected desktop shell", () => {
     // The trigger reads its label and its value, so match the start of the name. It also opens on
     // pointer down rather than on click, so a plain click never reaches the list.
     await fireEvent.pointerDown(screen.getByRole("button", { name: /^Language/ }), { pointerType: "mouse", button: 0 });
-    await fireEvent.click(await screen.findByRole("option", { name: "日本語" }));
-    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "ja" }));
+    await fireEvent.click(await screen.findByRole("option", { name: "Français" }));
+    await waitFor(() => expect(window.openbot.setAppLanguagePreference).toHaveBeenCalledWith({ language: "fr" }));
     // The screen is written in the chosen language at once, with no restart: the tab the user is
-    // looking at is the same tab, now named in Japanese.
-    await screen.findByRole("tab", { name: "一般" });
+    // looking at is the same tab, now named in French.
+    await screen.findByRole("tab", { name: "Général" });
     // The document says which language it is in, so a screen reader speaks it with the right voice.
-    expect(document.documentElement.lang).toBe("ja");
+    expect(document.documentElement.lang).toBe("fr");
   });
 
   it("does not open desktop analytics when the saved preference is disabled", async () => {
@@ -643,10 +651,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.click(trigger);
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     expect(within(picker).getByText("0.144.1 (Codex CLI)")).toBeInTheDocument();
-    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna, default" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(within(picker).getByRole("option", { name: "GPT-5.6 Luna" })).toHaveAttribute("aria-selected", "true");
 
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     expect(window.openbot.agent.updateAgent).not.toHaveBeenCalled();
@@ -754,7 +759,7 @@ describe("OpenBot connected desktop shell", () => {
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
-    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5, default" }));
+    await fireEvent.click(within(picker).getByRole("option", { name: "Claude Sonnet 5" }));
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledOnce();
 
     await fireEvent.keyDown(picker, { key: "Escape" });

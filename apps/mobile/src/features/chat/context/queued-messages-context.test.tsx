@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, assert, expect, it } from "vitest";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import { QueuedMessagesProvider, usePublishedQueuedChat, useQueuedChat } from "./queued-messages-context";
 
@@ -11,12 +11,15 @@ afterEach(() => {
 
 function controller(chatId: string): ChatQueueController {
   const [serverId, agentId] = chatId.split(":");
+  assert(serverId);
+  assert(agentId);
   return {
     chatId,
     agentId,
     serverId,
     attachments: [],
     changeAttachments: async () => {},
+    attachmentSupport: () => ({ eml: true, media: true }),
     queued: [],
     deliveries: [],
     edit: null,

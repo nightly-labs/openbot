@@ -9,7 +9,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { createWorkspacePreferences } from "@openbot/team-client";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { projectChannelMessages } from "../../chat/model/chat-messages";
 import { reconcileChannelPins } from "../../workspace/model/agent-pins";
 import { channelRecipient, toggleChannelMember } from "./channel-draft";
@@ -74,6 +74,7 @@ describe("mobile channels", () => {
   it("preserves empty channel forms and expires superseded prompts", () => {
     const history = page(1, 1);
     const message = history.messages[0];
+    assert(message);
     message.message.text = "";
     message.message.questionPrompt = {
       requestId: "question-one",
@@ -137,11 +138,13 @@ describe("mobile channels", () => {
     );
     await store.refresh("host-one");
     const messages = store.get("host-one").pages.get(channel.id)?.messages;
-    expect(messages?.[0].message.questionPrompt?.resolution).toEqual({
+    expect(messages?.[0]?.message.questionPrompt?.resolution).toEqual({
       status: "answered",
       responses: { secret: { status: "answered" } },
     });
-    expect(messages?.[1].message.questionPrompt?.resolution).toBeNull();
+    const unanswered = messages?.[1];
+    assert(unanswered);
+    expect(unanswered.message.questionPrompt?.resolution).toBeNull();
     expect(JSON.stringify(messages)).not.toContain("private-value");
     await expect(
       store.respondToPrompt("host-one", channel.id, "agent-two", {
@@ -155,6 +158,7 @@ describe("mobile channels", () => {
   it("keeps a rejected prompt answer available for retry and supports cancellation", async () => {
     const history = page(1, 1);
     const message = history.messages[0];
+    assert(message);
     message.author = { kind: "agent", id: "agent-two", name: "Research" };
     message.message.questionPrompt = {
       requestId: "question-one",
@@ -176,9 +180,11 @@ describe("mobile channels", () => {
     await store.refresh("host-one");
     const input = { requestId: "question-one", answers: {} };
     await expect(store.respondToPrompt("host-one", channel.id, "agent-two", input)).rejects.toThrow("Offline");
-    expect(store.get("host-one").pages.get(channel.id)?.messages[0].message.questionPrompt?.resolution).toBeNull();
+    const pending = store.get("host-one").pages.get(channel.id)?.messages[0];
+    assert(pending);
+    expect(pending.message.questionPrompt?.resolution).toBeNull();
     await store.respondToPrompt("host-one", channel.id, "agent-two", input);
-    expect(store.get("host-one").pages.get(channel.id)?.messages[0].message.questionPrompt?.resolution).toEqual({
+    expect(store.get("host-one").pages.get(channel.id)?.messages[0]?.message.questionPrompt?.resolution).toEqual({
       status: "cancelled",
     });
     release();
@@ -372,7 +378,9 @@ describe("mobile channels", () => {
   it("keeps unchanged bubbles during streaming and projects authors for the current member", () => {
     const current = page(1, 2);
     const update = page(1, 2);
-    update.messages[1].message.text = "Updated";
+    const updated = update.messages[1];
+    assert(updated);
+    updated.message.text = "Updated";
     const merged = mergeLatestChannelPage(current, update);
     expect(merged.messages[0]).toBe(current.messages[0]);
     const before = projectChannelMessages(current.messages, "user-one");
@@ -640,13 +648,18 @@ describe("channel data in the shared chat", () => {
 
   it("keeps other members, agents, and coordinator messages distinct from the reader", () => {
     const messages = page(1, 4).messages;
-    messages[0].author = { kind: "member", id: "membership-current", name: "Me" };
-    messages[1].author = { kind: "member", id: "membership-other", name: "Other member" };
-    messages[2].author = { kind: "agent", id: "agent-one", name: "Travel" };
-    messages[2].message.status = "streaming";
-    messages[2].message.replyToMessageId = messages[0].id;
-    messages[2].superseded = true;
-    messages[3].author = { kind: "coordinator", id: "coordinator", name: "Coordinator" };
+    const [mine, other, agent, coordinator] = messages;
+    assert(mine);
+    assert(other);
+    assert(agent);
+    assert(coordinator);
+    mine.author = { kind: "member", id: "membership-current", name: "Me" };
+    other.author = { kind: "member", id: "membership-other", name: "Other member" };
+    agent.author = { kind: "agent", id: "agent-one", name: "Travel" };
+    agent.message.status = "streaming";
+    agent.message.replyToMessageId = mine.id;
+    agent.superseded = true;
+    coordinator.author = { kind: "coordinator", id: "coordinator", name: "Coordinator" };
     const projected = projectChannelMessages(messages, "membership-current");
     expect(projected).toEqual(
       messages.map((entry, index) => ({
@@ -657,6 +670,7 @@ describe("channel data in the shared chat", () => {
         superseded: entry.superseded,
         body: entry.message.text,
         streaming: index === 2,
+        status: index === 2 ? "streaming" : "completed",
         replyToMessageId: entry.message.replyToMessageId,
         attachments: entry.message.attachments,
       })),
@@ -709,6 +723,49 @@ describe("channel data in the shared chat", () => {
     }
     sender.dispose();
     expect(discard).toHaveBeenCalledTimes(fail ? 1 : 0);
+  });
+
+  it("reports each finished upload and stops before the next file when cancelled, reusing finished uploads", async () => {
+    const { store } = fixture(async () => [channel]);
+    const summary = {
+      name: "note.txt",
+      mimeType: "text/plain",
+      size: 1,
+      kind: "file" as const,
+      previewKind: "none" as const,
+      previewUrl: null,
+    };
+    const upload = vi
+      .spyOn(store, "upload")
+      .mockResolvedValueOnce({ ...summary, id: "upload-one" })
+      .mockResolvedValueOnce({ ...summary, id: "upload-two" });
+    const command = vi.spyOn(store, "command").mockResolvedValue(channel);
+    vi.spyOn(store, "discard").mockResolvedValue(undefined);
+    const sender = new ChannelSend(store, "host-one", channel.id, () => "send-one");
+    const file = { id: "file-one", name: "note.txt", mimeType: "text/plain", size: 1, base64: "eA==" };
+    const files = [file, { ...file, id: "file-two" }];
+    const progress: number[] = [];
+    let cancelled = false;
+    await expect(
+      sender.send("Files", files, null, channel.members, {
+        cancelled: () => cancelled,
+        progress: (completed) => {
+          progress.push(completed);
+          if (completed === 1) cancelled = true;
+        },
+      }),
+    ).rejects.toThrow("Attachment upload cancelled.");
+    expect(progress).toEqual([0, 1]);
+    expect(upload).toHaveBeenCalledOnce();
+    expect(command).not.toHaveBeenCalled();
+    cancelled = false;
+    await sender.send("Files", files, null, channel.members, { cancelled: () => cancelled, progress: () => {} });
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(command).toHaveBeenCalledWith(
+      "host-one",
+      expect.objectContaining({ attachmentDraftIds: ["upload-one", "upload-two"] }),
+      { waitForRefresh: true },
+    );
   });
 
   it("retries an uncertain delivery with the same uploads and operation ID", async () => {
@@ -813,10 +870,12 @@ describe("channel data in the shared chat", () => {
 it("uses assignment markers only for host routing receipts and preserves commentary", () => {
   const entries = page(1, 3).messages;
   const receipt = entries[0];
+  assert(receipt);
   receipt.author = { kind: "agent", id: "agent-one", name: "Travel" };
   receipt.taskId = "task-one";
   receipt.message = { ...receipt.message, author: "system", text: "Assigned to Builder." };
   const comment = entries[1];
+  assert(comment);
   comment.author = receipt.author;
   comment.message = {
     ...comment.message,
@@ -825,7 +884,9 @@ it("uses assignment markers only for host routing receipts and preserves comment
     turnId: "turn-one",
     text: "Checking the routes",
   };
-  entries[2].message.text = "Assigned to Builder.";
+  const routed = entries[2];
+  assert(routed);
+  routed.message.text = "Assigned to Builder.";
   expect(projectChannelMessages(entries, null)).toEqual([
     { id: receipt.id, kind: "channel-routing", event: { action: "assigned", agentId: null, agentName: "Builder" } },
     { id: comment.id, kind: "thinking", turnId: "turn-one", steps: [{ id: comment.id, text: "Checking the routes" }] },
@@ -835,6 +896,7 @@ it("uses assignment markers only for host routing receipts and preserves comment
 
 it.each(["assigned", "continued"] as const)("projects typed %s receipts by agent ID, independent of text", (action) => {
   const entry = page(1, 1).messages[0];
+  assert(entry);
   entry.message = {
     ...entry.message,
     author: "system",
@@ -852,14 +914,15 @@ it.each(["assigned", "continued"] as const)("projects typed %s receipts by agent
     ...entry,
     message: { ...entry.message, text: "Assigned to Builder.", itemType: "channel-routing-event:invalid:agent-two" },
   };
-  expect(projectChannelMessages([malformed], null)[0].kind).toBe("message");
-  expect(projectChannelMessages([{ ...entry, message: { ...entry.message, author: "assistant" } }], null)[0].kind).toBe(
-    "message",
-  );
+  expect(projectChannelMessages([malformed], null)[0]?.kind).toBe("message");
+  expect(
+    projectChannelMessages([{ ...entry, message: { ...entry.message, author: "assistant" } }], null)[0]?.kind,
+  ).toBe("message");
 });
 
 it("keeps old continuation receipts as activity without inventing an agent ID", () => {
   const entry = page(1, 1).messages[0];
+  assert(entry);
   entry.author = { kind: "agent", id: "agent-one", name: "Lead" };
   entry.taskId = "task-one";
   entry.message = { ...entry.message, author: "system", text: "Continuing existing work with Builder." };
@@ -889,9 +952,11 @@ it("shows each active channel task and clears activity when work pauses or finis
     error: null,
   };
   const entries = page(1, 1).messages;
-  entries[0].taskId = task.id;
-  entries[0].author = { kind: "agent", id: "agent-one", name: "Travel" };
-  entries[0].message = { ...entries[0].message, turnId: "channel-turn", itemType: "commentary" };
+  const entry = entries[0];
+  assert(entry);
+  entry.taskId = task.id;
+  entry.author = { kind: "agent", id: "agent-one", name: "Travel" };
+  entry.message = { ...entry.message, turnId: "channel-turn", itemType: "commentary" };
   const queued = { ...task, id: "task-two", ownerAgentId: "agent-two", state: "queued" as const };
   expect(channelTaskActivities([task, queued], entries, "chief")).toEqual([
     { agentId: "agent-one", turnId: "channel-turn", phase: "working", detail: "Working on it…" },
@@ -910,11 +975,13 @@ it("shows each active channel task and clears activity when work pauses or finis
   expect(channelTaskActivities([routing], [], "chief")).toEqual([
     { agentId: "chief", turnId: null, phase: "working", detail: "Working on it…" },
   ]);
-  expect(channelTaskActivities([{ ...routing, state: "waiting" }], [], "chief")[0].agentId).toBe("chief");
+  expect(channelTaskActivities([{ ...routing, state: "waiting" }], [], "chief")[0]?.agentId).toBe("chief");
   expect(channelTaskActivities([{ ...routing, state: "paused" }], [], "chief")).toEqual([]);
   expect(channelTaskActivities([routing], [], null)).toEqual([]);
-  entries[0].message.status = "streaming";
-  expect(channelTaskActivities([], entries, "chief")[0].agentId).toBe("agent-one");
-  entries[0].superseded = true;
-  expect(channelTaskActivities([task], entries, "chief")[0].turnId).toBeNull();
+  entry.message.status = "streaming";
+  expect(channelTaskActivities([], entries, "chief")[0]?.agentId).toBe("agent-one");
+  entry.superseded = true;
+  const [superseded] = channelTaskActivities([task], entries, "chief");
+  assert(superseded);
+  expect(superseded.turnId).toBeNull();
 });

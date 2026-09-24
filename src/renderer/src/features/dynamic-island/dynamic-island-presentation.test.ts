@@ -4,8 +4,8 @@ import {
   type DynamicIslandPresentation,
   isDynamicIslandPresentation,
 } from "@openbot/contracts/ipc";
+import type { AgentProfile } from "@openbot/ui/data";
 import { describe, expect, it } from "vitest";
-import type { AgentProfile } from "../../data";
 import {
   createDynamicIslandPresentation,
   type DynamicIslandPresentationInput,

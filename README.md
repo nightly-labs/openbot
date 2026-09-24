@@ -37,7 +37,7 @@ visited pages use the network, and installed plugins may connect to their own se
 ## Install
 
 OpenBot supports macOS 13 or newer on Apple Silicon, Windows 10 or newer on x64 systems, and x64
-Linux as an AppImage.
+or arm64 Linux as an AppImage.
 
 ### macOS
 
@@ -51,8 +51,8 @@ Linux as an AppImage.
 
 ### Linux
 
-1. Download the latest `OpenBot-*-x86_64.AppImage` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
-2. Make it executable with `chmod +x OpenBot-*-x86_64.AppImage`, then run it.
+1. Download the latest `OpenBot-*-x86_64.AppImage` (or `OpenBot-*-arm64.AppImage` on arm64) from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
+2. Make it executable with `chmod +x OpenBot-*.AppImage`, then run it.
 
 On Ubuntu 23.10 or newer and on Debian 13, unprivileged user namespaces are restricted by AppArmor
 and OpenBot exits during launch until you install an AppArmor profile:
@@ -80,8 +80,10 @@ Voice prompts and remote desktop are not available on Linux.
 
 OpenBot can download a supported provider runtime when you select `Download` in onboarding,
 Settings, agent setup, or the model picker. OpenBot prefers its managed CLI. Explicit `OPENBOT_*_PATH` overrides take precedence; a compatible
-system CLI is used when no managed copy is available. Updates install OpenBot’s pinned runtime
-without changing the user’s system CLI.
+system CLI is used when no managed copy is available. OpenBot checks for a newer provider CLI
+release at startup and every hour, and `Check for updates` in a provider's actions menu checks at
+once. Updates install the latest upstream release without changing the user’s system CLI; the
+version in `native-runtime.lock.json` is only the first-install fallback.
 
 You can also install a CLI yourself.
 
@@ -152,6 +154,10 @@ bun run dev
 `codex:doctor` checks the CLI version, App Server handshake, and ChatGPT login without starting a
 model turn. `bun run cua-driver:doctor` reports the Computer Use driver separately.
 
+In a new git worktree, run `bun run dev:bootstrap`. It copies the files that `.worktreeinclude`
+lists from the main checkout when they are missing, installs dependencies, migrates the local API,
+and seeds the isolated profile. Set it as the worktree setup command of your agent harness.
+
 To reset only the local development state, quit the dev app and test client, then run
 `bun run dev:reset`.
 The command deletes the app and test-client development profiles plus the legacy host profile,
@@ -202,12 +208,19 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 
 ## Commands
 
+The browser client is served at `/app` by the public web app. For local development, run
+`bun run dev:api --isolated` and open `/app` on the API URL printed by the supervisor. Use
+`bun run dev --isolated` when a desktop host is also needed.
+Use `bun run storybook` and **Web → Workspace → Connected** for shared UI test data.
+See [web client delivery](docs/web-client.md) for the release gate and focused checks.
+
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
+| `bun run dev:mobile` | Start or reuse this worktree's `bun run dev` stack, build and launch the iOS simulator app, and pair them without a QR scan. The desktop issues a Mobile Connect ticket over CDP, and `simctl openurl` opens the link in the development build, which accepts only loopback or private-network account services. Other arguments go to `bun mobile:ios`. `--pair-only` pairs an app that already runs; `--simulator=<udid>` chooses one of several booted simulators. It stops when the Metro port is already in use, because another worktree's Metro would serve the same app id; pass `--port=<n>` then. |
 | `bun run mobile:ios:build:local` | Build a production iOS `.ipa` locally for upload with Transporter. See [TestFlight setup](apps/mobile/README.md#local-testflight-build). |
 | `bun run mobile:ios:release:testflight` | Start the GitHub Actions iOS build from `main` and upload to TestFlight. Requires authenticated GitHub CLI. See [iOS release setup](apps/mobile/README.md#github-actions-testflight-release). |
 | `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
@@ -224,7 +237,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run remote:update` | Update Signal, then drain and update the single coturn instance. |
 | `bun run dev:all` | Start the Auth API, Signal service, and single local Electron instance. |
 | `bun run dev:test-client` | Start the Auth API, Signal service, local instance, and an isolated second client for team testing. |
-| `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. |
+| `bun run dev:seed` | Replace only the app development profile with durable showcase data. `--if-missing` keeps an existing profile, which is how `bun run dev` seeds a first start. `--scale=agents:N,messages:M,channels:C,channelMessages:K,attachments:A` adds generated agents, chat history, channel history and large images to the showcase data, for memory and CPU measurements. |
 | `bun run dev:reset` | Delete the local app, test-client, and legacy host development state. |
 | `bun run dev:status` | Print, as JSON, every dev stack and dev app instance live on this machine: services, ports, pids, which of them belong to this worktree, and which are orphaned - a supervisor that is gone with its children still holding the ports. Each recorded process carries the state a stop command acts on: `live`, `gone` with `groupLive` for a survivor of a dead leader, and `unverified` for a pid this machine cannot date. |
 | `bun run dev:verify` | Print a stable JSON verification plan for this worktree: `ready`/`reasons` for safe checks, setup state, changed files and affected surfaces, nearby tests, runtime state, `qa.required`/`qa.ready`/`qa.reasons`, the renderer QA loop, safe `runnableCommands`, and all suggested `commands`. Add `--run` to execute only the safe non-mutating checks in the plan. Renderer QA follows `snapshot → action with --wait-for → snapshot → screenshot` when appearance matters. |
@@ -234,9 +247,11 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run build-storybook` | Build static Storybook. CI sets `OPENBOT_STORYBOOK_CHECK=true` to skip automatic prop documentation during its build check. |
 | `bun run dev:automation` | Drive the running dev app over CDP: `instances`, `pages`, `snapshot`, `screenshot`, `click`/`type` by accessible role. `--page=<target-id\|url-substring>` aims at any window, including embedded browser views; `--wait-for=<role>,<name>` settles on an accessible target instead of polling; mutations need `--allow-mutations` and a named instance (this worktree's record, `--instance=<id>` or `--port=`). |
 | `bun run dev:cpu` | Measure idle CPU on the running dev app, per process kind and per page. `--duration=<ms>` (default 60000), `--interval=<ms>` (default 5000), `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/cpu/`, and refused if it would leave that directory or pass through a symbolic link) and `--compare=<file>` for a before/after delta. Read-only. Take a baseline before a change and a second run after it: only the difference between two runs on the same machine is a result, because a dev build carries the Vite server and the source maps as well. |
+| `bun run dev:memory` | Measure the running dev app's memory once: resident memory per process kind (main, renderer, GPU, provider CLIs and their MCP servers), with the dev tooling kept out of the app total, plus JS heap and DOM counters per page. `--label=<name>`, `--out=<name>.json` (always under `.openbot-build/dev-automation/memory/`) and `--heap-snapshot=<target-id\|url-substring>` to also write a V8 heap snapshot of one page to that directory. Read-only. |
+| `bun run dev:bench` | Run repeatable RAM and CPU scenarios on the built app (`bun run build` first). Each run seeds a bench profile of its own, starts the built app, samples the process tree every second (resident memory, macOS physical footprint and CPU per process kind, provider memory per CLI) with the main-process and page heaps, drives the scenario, and reads a settled state after garbage collection. `--scenario=<id\|prefix\|all>` (required; without it the command lists the scenarios), `--runs=<n>` (default 3; the report shows the median and range), `--label=<name>`, `--compare=<report.json>` and `--cpu-profile` (records the app window's JavaScript for 15 s after the first run settles, as a `.cpuprofile` for DevTools). Reports go to `.openbot-build/dev-automation/bench/`. Turn scenarios (`s5` to `s9`) use the real claude, opencode and grok CLIs and spend model quota. It never touches a dev instance or your own profile, and `bun run dev:stop` stops an app a failed run left behind. |
 | `bun run check` | Run Biome, both typechecks, offline tests, the browser smoke test, and the production build. |
-| `bun run typecheck` | Check all 11 projects in parallel with a separate incremental cache for each project in this worktree. |
-| `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `components/ui`, palette tokens instead of colour, size, radius and transition literals. Reads the whole renderer in 60 ms. |
+| `bun run typecheck` | Check all 12 projects in parallel with a separate incremental cache for each project in this worktree. |
+| `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `@openbot/ui`, palette tokens instead of colour, size, radius and transition literals. Checks renderer and shared UI source. |
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
@@ -249,11 +264,13 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
 | `bun run package:win:verify` | Build and verify the Windows x64 application on Windows. |
 | `bun run package:linux` | Build an unpacked local Linux x64 application on Linux. |
+| `bun run package:linux:arm64` | Build an unpacked local Linux arm64 application on arm64 Linux. |
 | `bun run package:linux:verify` | Build and verify the Linux x64 application on Linux. Run it under `xvfb-run -a` without a display. |
 | `bun run release:preflight` | Verify version, Git state, and GitHub release secrets before tagging. |
 | `bun run dist:mac` | Build unsigned local ARM64 DMG and ZIP update artifacts. |
 | `bun run dist:win` | Build an unsigned Windows x64 NSIS installer on Windows. |
 | `bun run dist:linux` | Build an unsigned Linux x64 AppImage on Linux. |
+| `bun run dist:linux:arm64` | Build an unsigned Linux arm64 AppImage on arm64 Linux. |
 | `bun run release:patch` | Create the next patch version commit and tag. |
 | `bun run test:filesystem` | **Online/manual:** run real full-access Codex and Claude filesystem turns across private and shared workspaces. |
 | `bun run test:imagegen` | **Online/manual:** run a real full-access image-generation turn. |
@@ -421,8 +438,8 @@ described above.
 
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 release, an unsigned Windows x64 release, and an unsigned Linux x64
-AppImage in GitHub Actions.
+signed and notarized macOS ARM64 release, an unsigned Windows x64 release, and unsigned Linux x64
+and arm64 AppImages in GitHub Actions.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account
 popover. Release signing secrets and the complete procedure are documented in
 [docs/RELEASING.md](docs/RELEASING.md).
@@ -451,6 +468,8 @@ respective products and services.
 For one native Standard user per tenant, install the normal OpenBot DMG and the optional
 `OpenBot-Host-<VERSION>-arm64.pkg` from the same release. The Host package provides
 `sudo openbot-host setup --create-user client-acme --create-user client-bravo` and
-`sudo openbot-host verify`. No Git checkout, Bun, or compilation is required on the host.
+`sudo openbot-host verify`. `sudo openbot-host status [--json]` and `sudo openbot-host watch`
+show the update phase, the staged version, and each tenant's work state. No Git checkout, Bun,
+or compilation is required on the host.
 Normal desktop users need only the DMG. See the [host deployment guide](docs/multi-tenant-hosting.md)
 for existing-user enrollment, password handling, package upgrades, and required target-host checks.

@@ -1,5 +1,4 @@
 import { type AgentSummary, analyticsRange, type HostAnalytics, type HostAnalyticsInput } from "@openbot/contracts/ipc";
-import { createEffect, createStore, onSettled, Show } from "solid-js";
 import {
   ArrowLeft,
   Button,
@@ -10,8 +9,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui";
-import { AgentUsageReport } from "./AgentUsageReport";
+} from "@openbot/ui";
+import { AgentUsageReport } from "@openbot/ui/features/usage/AgentUsageReport";
 import {
   type UsageAgentLabel,
   type UsageMetric,
@@ -19,7 +18,9 @@ import {
   usageMetrics,
   usagePeriodDays,
   usagePeriods,
-} from "./usage-format";
+} from "@openbot/ui/features/usage/usage-format";
+import { createEffect, createStore, onSettled, Show } from "solid-js";
+import { usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
   agentId?: string;
@@ -68,8 +69,8 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     try {
       const [result, agents] = await Promise.all([
         // Electron cannot clone the Solid store proxy across the context bridge.
-        window.openbot.agent.getHostAnalytics({ ...range }, serverId),
-        window.openbot.agent.listAgents(serverId),
+        usagePort().agent.getHostAnalytics({ ...range }, serverId),
+        usagePort().agent.listAgents(serverId),
       ]);
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
@@ -108,7 +109,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     },
   );
   onSettled(() => {
-    const unsubscribe = window.openbot.agent.onScopedEvent(({ serverId, event }) => {
+    const unsubscribe = usagePort().agent.onScopedEvent(({ serverId, event }) => {
       if (
         serverId === props.serverId &&
         event.type === "turn-completed" &&
@@ -116,7 +117,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       )
         void load(state.range, true);
     });
-    const reconnect = window.openbot.servers.onEvent((servers) => {
+    const reconnect = usagePort().servers.onEvent((servers) => {
       if (servers.some((server) => server.id === props.serverId && server.state === "online"))
         void load(state.range, true);
     });
