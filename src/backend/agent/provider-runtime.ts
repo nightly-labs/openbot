@@ -205,8 +205,8 @@ export interface ProviderHooks {
   /**
    * Runs when the runtime stops a client it used for a reason other than an exit: an idle release,
    * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
-   * skips such a client, and it can never answer its pending prompts and approvals. It runs after
-   * the stop, so a request the process sent while it stopped is cleared too.
+   * skips such a client, and it can never answer its pending prompts, approvals and browser
+   * takeovers. It runs after the stop, so a request the process sent while it stopped is cleared too.
    */
   onClientStopped(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
@@ -1116,6 +1116,9 @@ export class ProviderRuntime implements ProviderPort {
       activeClients.map(async ([provider, client]) => {
         try {
           const account = await client.request("account/read", { refreshToken: true }, decodeAccountReadResult, 5_000);
+          // A sign-in can finish while the read waits and put a new client in place. The activation
+          // stopped this one and set the status, so this answer describes nothing the app still uses.
+          if (this.#clients.get(provider) !== client) return;
           if (account.account) {
             requireProviderDriver(provider).validateAccount(account.account);
             this.#accounts.set(provider, account.account);
@@ -1136,6 +1139,7 @@ export class ProviderRuntime implements ProviderPort {
           await client.stop().catch(() => undefined);
           this.#hooks.onClientStopped(client);
         } catch {
+          if (this.#clients.get(provider) !== client) return;
           // Keep a working client when an explicit account refresh is temporarily unavailable.
           const label = provider === "codex" ? "ChatGPT" : providerLabel(provider);
           this.#setStatus({
