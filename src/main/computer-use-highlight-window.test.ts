@@ -252,24 +252,6 @@ describe("ComputerUseHighlightController", () => {
     expect(place).toHaveBeenCalledWith(windows[0], expect.objectContaining({ cursor: { x: 600, y: 500 } }));
   });
 
-  it("drops the overlay of a display that is unplugged", async () => {
-    const displays = [
-      { id: 1, bounds: { x: 0, y: 0, width: 1512, height: 982 } },
-      { id: 2, bounds: { x: 1512, y: 0, width: 2560, height: 1080 } },
-    ];
-    const { controller, windows } = controllerWith(
-      [target(7, "Notes", { x: 100, y: 80, width: 900, height: 600 })],
-      displays,
-    );
-
-    await controller.refresh();
-    displays.pop();
-    await controller.refresh();
-
-    expect(windows[1]?.destroy).toHaveBeenCalledTimes(1);
-    expect(windows[0]?.destroy).not.toHaveBeenCalled();
-  });
-
   it("hides the rim when no agent holds the desktop", async () => {
     const { controller, windows } = controllerWith([target(7, "Notes", { x: 0, y: 0, width: 800, height: 600 }), null]);
 

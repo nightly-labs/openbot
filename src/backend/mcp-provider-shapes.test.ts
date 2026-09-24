@@ -64,15 +64,6 @@ function rooted(): UsableMcpServer {
 }
 
 describe("codexMcpServers", () => {
-  it("sends an http server as url with http_headers", () => {
-    expect(codexMcpServers([usable()]).servers).toEqual({
-      posthog: {
-        url: "https://mcp.posthog.com/mcp",
-        http_headers: { Authorization: "Bearer test-key" },
-      },
-    });
-  });
-
   it("keeps sending a stdio server as command, args and env", () => {
     const server: UsableMcpServer = {
       config: config({

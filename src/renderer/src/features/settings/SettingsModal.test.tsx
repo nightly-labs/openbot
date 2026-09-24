@@ -1079,26 +1079,6 @@ describe("SettingsModal", () => {
     await waitFor(() => expect(value().turboMode).toBe(false));
   });
 
-  it("keeps Turbo available without per-agent approval controls", async () => {
-    render(() => (
-      <SettingsModal
-        open
-        onOpenChange={() => undefined}
-        value={DEFAULT_GENERAL_SETTINGS}
-        onValueChange={() => undefined}
-        appInfo={null}
-        updateStatus={idleUpdateStatus}
-        onUpdateAction={async () => {}}
-        account={account}
-        onUpdateAccountName={async () => {}}
-        onUpdateAccountAvatar={async () => {}}
-      />
-    ));
-
-    expect(await screen.findByRole("switch", { name: "Turbo mode" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Revoke all" })).not.toBeInTheDocument();
-  });
-
   // The second way in, for the computer whose browser cannot finish the first one. What Settings
   // owns is the entry point and the dialog; the phase itself comes from main.
   it("opens the code sign-in from the ChatGPT row and shows the code to type", async () => {

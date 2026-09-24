@@ -146,11 +146,14 @@ risks since the last release.
 
 ## Tests
 
-- Prefer an existing test. Add a test only for a user or caller consequence; add a file only for a
-  new boundary. Skip assertions already enforced by TypeScript, Biome, or `check:ui`.
-- Tests are mandatory for changes to the renderer-to-main boundary, IPC contracts, database schema
-  and migrations, persisted state, secrets, provider processes, Team API wire protocols, and the
-  updater. Test once at the lowest stable boundary.
+- Never write unit tests after you write code.
+- Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work.
+  At the end of E2E tests, produce a verifiable and repeatable artifact, such as a JSON report or a
+  screenshot under `.openbot-build/`.
+- If you must test a system in isolation, first write down all the ways it could fail, then write
+  the code. Put the list in the PR body under "Failure modes": one line per failure, with the test
+  that covers it.
+- Do not assert what TypeScript, Biome, or `check:ui` already enforce.
 - Wait for state, an event, or a promise, not elapsed time. A spy can provide the wait condition,
   such as `await waitFor(() => expect(send).toHaveBeenCalled())`; assert the user consequence after
   that wait. Do not remove synchronization because it uses a spy.

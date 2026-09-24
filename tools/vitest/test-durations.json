@@ -92,7 +92,6 @@
   "scripts/dev-automation/instance-registry.test.ts": 0.01,
   "scripts/dev-automation/port-allocation.test.ts": 0.31,
   "scripts/dev-automation/stack-registry.test.ts": 0.11,
-  "scripts/dev-automation/tools-exact.test.ts": 0.0,
   "scripts/dev-services.test.ts": 0.01,
   "scripts/dev-stack.test.ts": 0.0,
   "scripts/dev-verify.test.ts": 0.24,
@@ -335,7 +334,6 @@
   "src/renderer/src/features/updates/update-status.test.ts": 0.0,
   "src/renderer/src/features/usage/AgentUsagePanel.test.tsx": 1.06,
   "src/renderer/src/preview/OpenBotPlayground.test.tsx": 0.01,
-  "src/renderer/src/preview/mock-sidebar-layout.test.ts": 0.0,
   "src/renderer/src/queue-reconciliation.test.ts": 0.01,
   "src/renderer/src/simple-context.test.tsx": 0.03
 }

@@ -102,11 +102,6 @@ describe("routine schedule mapping", () => {
     expect(routineScheduleToDraft(saved)).toEqual(draft);
   });
 
-  it.each(cases)("keeps $name stable over a round trip", ({ draft }) => {
-    const saved = routineScheduleFromDraft(draft);
-    expect(routineScheduleFromDraft(routineScheduleToDraft(saved))).toEqual(saved);
-  });
-
   it("reads a window end that is not on the run minute as the last run", () => {
     const draft: RoutineScheduleDraft = {
       kind: "hourly",

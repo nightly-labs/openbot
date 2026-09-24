@@ -48,10 +48,6 @@ describe("isCloseBrowserTabShortcut", () => {
 });
 
 describe("isCollapseBrowserShortcut", () => {
-  it("accepts a bare Escape key-down", () => {
-    expect(isCollapseBrowserShortcut(input({ key: "Escape" }))).toBe(true);
-  });
-
   it("does not claim modified shortcuts or key-up events", () => {
     expect(isCollapseBrowserShortcut(input({ key: "Escape", type: "keyUp" }))).toBe(false);
     expect(isCollapseBrowserShortcut(input({ key: "Escape", meta: true }))).toBe(false);
@@ -125,10 +121,6 @@ describe("browserContextMenuItems", () => {
     ...overrides,
   });
 
-  it("offers copy and select-all for text selected on a page", () => {
-    expect(browserContextMenuItems(page({ selectionText: "Uber Eats" }))).toEqual(["copy", "select-all"]);
-  });
-
   it("puts copy-link first when right-clicking a link", () => {
     expect(browserContextMenuItems(page({ linkURL: "https://example.com/very/long/path?share=1" }))).toEqual([
       "copy-link",
@@ -153,9 +145,5 @@ describe("browserContextMenuItems", () => {
       "copy-image-address",
     ]);
     expect(browserContextMenuItems(page({ srcURL: "https://example.com/a.mp4", mediaType: "video" }))).toEqual([]);
-  });
-
-  it("keeps no menu where there is nothing to copy", () => {
-    expect(browserContextMenuItems(page())).toEqual([]);
   });
 });

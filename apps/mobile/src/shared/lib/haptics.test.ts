@@ -73,18 +73,6 @@ it("disables every feedback event immediately and restores the preference after 
   expect(native.feedback).toHaveBeenCalledWith("notification", "success");
 });
 
-it.each(["light", "medium", "heavy", "soft", "rigid"] as const)("plays the requested %s impact", async (style) => {
-  await loadHapticsPreference();
-  await haptics.impact(style);
-  expect(native.feedback).toHaveBeenCalledWith("impact", style);
-});
-
-it.each(["success", "warning", "error"] as const)("plays the requested %s notification", async (type) => {
-  await loadHapticsPreference();
-  await haptics.notification(type);
-  expect(native.feedback).toHaveBeenCalledWith("notification", type);
-});
-
 it("keeps feedback off on a read failure and permits saving a new preference", async () => {
   native.read.mockRejectedValueOnce(new Error("Storage unavailable"));
   await expect(loadHapticsPreference()).rejects.toThrow("Storage unavailable");

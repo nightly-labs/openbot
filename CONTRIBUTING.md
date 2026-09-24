@@ -40,7 +40,7 @@ Type-only imports (`import type`) are erased by the compiler and stay allowed in
 ## Pull requests
 
 1. Create a branch from `main`.
-2. Add or update tests for behavior changes and reproduced bugs.
+2. Test behavior changes and reproduced bugs as [AGENTS.md, Tests](AGENTS.md#tests) describes.
 3. Run `bun run check`. Coding agents do not: see [AGENTS.md, Checks](AGENTS.md#checks).
 4. Describe user-visible changes, risks, and manual verification in the pull request.
 

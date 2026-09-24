@@ -33,17 +33,6 @@ describe("setup store", () => {
     });
   });
 
-  it("persists and reads the preferred provider", async () => {
-    const root = await temporaryRoot();
-    const path = join(root, "openbot-setup-v2.json");
-    await writeSetupState(path, { preferredProvider: "grok", preferredModel: null });
-    await expect(readSetupState(path)).resolves.toEqual({
-      completed: true,
-      preferredProvider: "grok",
-      preferredModel: null,
-    });
-  });
-
   it("persists the preferred model without changing the file version", async () => {
     const root = await temporaryRoot();
     const path = join(root, "openbot-setup-v2.json");

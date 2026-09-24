@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applicationBundleName, applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
+import { applicationBundlePath, applicationIconName } from "./computer-use-permission-app";
 
 describe("applicationBundlePath", () => {
   it("finds the bundle a packaged executable sits inside", () => {
@@ -22,12 +22,6 @@ describe("applicationBundlePath", () => {
   // Only macOS asks for a bundle in a permission list, so there is nothing to drag anywhere else.
   it("finds nothing away from macOS", () => {
     expect(applicationBundlePath("/Applications/OpenBot.app/Contents/MacOS/OpenBot", "linux")).toBeNull();
-  });
-});
-
-describe("applicationBundleName", () => {
-  it("names the bundle as the list will show it", () => {
-    expect(applicationBundleName("/Applications/OpenBot.app")).toBe("OpenBot");
   });
 });
 

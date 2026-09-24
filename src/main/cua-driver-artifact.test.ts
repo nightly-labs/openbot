@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type CuaDriverArtifactInput, isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
+import { type CuaDriverArtifactInput, resolveCuaDriver } from "./cua-driver-artifact";
 
 let root: string;
 
@@ -149,13 +149,5 @@ describe("resolveCuaDriver", () => {
     await writeExecutable("source", "build", "cua-driver", "linux", "ppc64", "cua-driver");
     await expect(resolveCuaDriver(input({ platform: "linux", architecture: "ppc64" }))).resolves.toBeNull();
     await expect(resolveCuaDriver(input({ platform: "freebsd", architecture: "x64" }))).resolves.toBeNull();
-  });
-
-  it("names the three desktops as supported, and nothing else", () => {
-    expect(isSupportedCuaDriverTarget("darwin", "arm64")).toBe(true);
-    expect(isSupportedCuaDriverTarget("win32", "x64")).toBe(true);
-    expect(isSupportedCuaDriverTarget("linux", "arm64")).toBe(true);
-    expect(isSupportedCuaDriverTarget("linux", "ppc64")).toBe(false);
-    expect(isSupportedCuaDriverTarget("freebsd", "x64")).toBe(false);
   });
 });

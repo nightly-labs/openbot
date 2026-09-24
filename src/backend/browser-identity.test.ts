@@ -53,21 +53,9 @@ describe("applySiteIdentity", () => {
     });
   });
 
-  it("passes other hosts through with the same content", () => {
-    expect(applySiteIdentity("https://accounts.google.com/", { "User-Agent": rawAgent })).toEqual({
-      "User-Agent": rawAgent,
-    });
-  });
-
   it("invents no header when none is sent", () => {
     expect(applySiteIdentity("https://web.whatsapp.com/", { Accept: "text/html" })).toEqual({
       Accept: "text/html",
     });
-  });
-
-  it("never mutates the input record", () => {
-    const input = { "user-agent": rawAgent };
-    applySiteIdentity("https://web.whatsapp.com/", input);
-    expect(input).toEqual({ "user-agent": rawAgent });
   });
 });

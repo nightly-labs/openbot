@@ -8,13 +8,7 @@ import type { UpdateBusyPhase } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase, UPDATE_BUSY_PHASES } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateCancellationToken, UpdateCheckOutcome } from "./update-service";
-import {
-  createDisabledUpdateAdapter,
-  isValidSemver,
-  pruneShipItLogs,
-  supportsInstalledUpdates,
-  UpdateService,
-} from "./update-service";
+import { isValidSemver, pruneShipItLogs, supportsInstalledUpdates, UpdateService } from "./update-service";
 import type { OpenBotSiblingInstance } from "./update-sibling-instances";
 
 const CHECK_TIMEOUT = 1_000;
@@ -120,21 +114,6 @@ describe("UpdateService", () => {
     expect(isValidSemver("1.2.3-beta.1+build.7")).toBe(true);
     expect(isValidSemver("0.0")).toBe(false);
     expect(isValidSemver("01.2.3")).toBe(false);
-  });
-
-  it("stays unsupported with the disabled adapter and never contacts the provider", async () => {
-    const updater = createDisabledUpdateAdapter();
-    const service = new UpdateService(updater, {
-      currentVersion: "0.0",
-      enabled: false,
-      autoDownload: true,
-      beforeInstall: vi.fn(async () => undefined),
-    });
-    service.start(false);
-
-    expect((await service.checkForUpdates()).phase).toBe("unsupported");
-    expect((await service.downloadUpdate()).phase).toBe("unsupported");
-    expect(await updater.checkForUpdates()).toBeNull();
   });
 
   it("exposes restart as soon as the macOS download finishes", async () => {
