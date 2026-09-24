@@ -328,3 +328,9 @@ label.agent-import-row:has(input:disabled) {
   height: var(--openbot-icon-xs);
   stroke-width: var(--openbot-icon-stroke);
 }
+
+/* The review is inside Server settings, on the dialog layer. The shared tooltip layer is below it,
+   and Kobalte gives the positioner the content's z-index, so this one takes the step above. */
+.agent-import-name-tooltip.ui-tooltip {
+  z-index: calc(var(--openbot-layer-dialog) + 1);
+}

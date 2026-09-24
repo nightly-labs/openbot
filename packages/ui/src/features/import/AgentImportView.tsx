@@ -355,7 +355,7 @@ function NameExistsHint(props: { name: string }) {
         <Info aria-hidden="true" />
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content class="ui-tooltip">{text()}</Tooltip.Content>
+        <Tooltip.Content class="ui-tooltip agent-import-name-tooltip">{text()}</Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
   );
