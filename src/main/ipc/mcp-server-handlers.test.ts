@@ -6,7 +6,7 @@
 
 import {
   decodeMcpTestResult,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type McpServerConfig,
   type McpTestResult,
@@ -107,7 +107,7 @@ function setup(options: { ensureToolRuntimesReady?: () => Promise<void> }): {
       toolRuntimes: () => NO_MCP_TOOL_RUNTIMES,
     }).mcpServers,
   );
-  const listener = registrations.get(IPC_CHANNELS.serversTestMcpServer);
+  const listener = registrations.get(IPC_ENDPOINTS.mcpServers.test.channel);
   if (!listener) throw new Error("The MCP test handler was not registered.");
   return {
     ensureToolRuntimesReady,

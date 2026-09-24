@@ -6,22 +6,22 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 
 ## Adding an endpoint
 
-1. Add the wire value to `packages/contracts/src/ipc-channels.ts`.
-2. Add it to a group in `packages/contracts/src/ipc-endpoints.ts`, as `request<Payload, Result>()(...)`
-   or `event<Payload>()(...)`. All endpoints are typed except `browser.sendLiveViewInput`: the
-   renderer sends `BrowserLiveViewInput` and main decodes the different wire `BrowserViewInput`. Do
-   not add another `untypedRequest(...)`.
-3. Declare the `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` (or
+1. Add the endpoint to a group in `packages/contracts/src/ipc-endpoints.ts`, as
+   `request<Payload, Result>()("group:wire-name")` or `event<Payload>()("group:wire-name")`. All
+   endpoints are typed except `browser.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
+   and main decodes the different wire `BrowserViewInput`. Do not add another `untypedRequest(...)`.
+2. Declare the `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` (or
    `Subscribe<...>` for an event).
-4. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
+3. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
    change and the key to add.
-5. Add the handler here, the call in `src/preload/index.ts` (`invokeRequest(channel, decode, input)`,
-   or `invokeAgent` for a server-scoped payload), and the method in
+4. Add the handler here, the call in `src/preload/index.ts`
+   (`invokeRequest(IPC_ENDPOINTS.group.name, decode, input)`, `invokeAgent` for a server-scoped
+   payload, or `subscribe` for an event), and the method in
    `src/renderer/src/preview/mock-openbot.ts`. The decoder for the result or event comes from a
    preload decoding module, such as `src/preload/team-decoding.ts`, or is `decodeVoid`.
 
-Step 4 is the point. Every step but steps 3 and 5 in the preload announces itself. A hand-written
-signature in step 3 compiles, so review must check that it uses `Invoke`. The preload is what
+Step 3 is the point. Every step but steps 2 and 4 in the preload announces itself. A hand-written
+signature in step 2 compiles, so review must check that it uses `Invoke`. The preload is what
 `src/main/ipc-channel-coverage.test.ts` reads.
 
 A group is the unit one registrar covers in full, which is why a wire prefix can span several: the

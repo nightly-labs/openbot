@@ -10,7 +10,7 @@
 //
 // Three links have no type to carry them, and they are what is left here:
 //
-//   - the preload invokes and subscribes by channel, and its API object is shaped for the
+//   - the preload invokes and subscribes by endpoint, and its API object is shaped for the
 //     renderer rather than for IPC_ENDPOINTS, so nothing pairs a method with an endpoint;
 //   - an event is sent from wherever it happens, by any number of call sites, so "every event
 //     channel has a sender" is a property of the source and not of a type;
@@ -20,15 +20,17 @@
 // Verification is static because neither side can be imported: src/main/index.ts calls
 // app.setPath, app.enableSandbox and protocol.registerSchemesAsPrivileged at module scope and
 // does not export its registrations, and src/preload/index.ts calls contextBridge.exposeInMainWorld
-// at module scope and exports nothing. Reading the sources is safe here because a channel name is
-// never written as a literal on either side - every reference goes through IPC_CHANNELS. Two tests
-// below keep that true rather than assumed: one reads the channel argument of every known call and
-// rejects anything but a direct IPC_CHANNELS reference, so a string or a variable cannot slip an
-// endpoint past the scan, and one rejects an IPC_CHANNELS reference no known call reads.
+// at module scope and exports nothing. The decoders it imports live beside it in src/preload, so the
+// scan reads that whole directory. Reading the sources is safe here because a channel name is
+// never written as a literal on either side - every call names an endpoint of IPC_ENDPOINTS. Two
+// tests below keep that true rather than assumed: one reads the endpoint argument of every known
+// call and rejects anything but a direct `IPC_ENDPOINTS.group.name` reference, so a string or a
+// variable cannot slip an endpoint past the scan, and one rejects an endpoint reference no known
+// call reads.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { IPC_CHANNELS, IPC_ENDPOINTS, type IpcEndpoint, type IpcEndpointGroup } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, type IpcEndpoint, type IpcEndpointGroup } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
@@ -38,14 +40,8 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 // the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
 const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgent", "invokeAgentForServer"];
-const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once"];
+const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen", "subscribe"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
-
-// IPC_ENDPOINTS says which kind each channel is; the scans below produce IPC_CHANNELS keys, so
-// the wire values come back through this to compare against them.
-const channelKeys = new Map(
-  Object.entries(IPC_CHANNELS).map(([key, value]): readonly [string, string] => [value, key]),
-);
 
 const requestChannels = channelsOfKind("request");
 const eventChannels = channelsOfKind("event");
@@ -61,13 +57,22 @@ const CHANNEL_ARGUMENT_POSITION: ReadonlyMap<string, number> = new Map(
   ),
 );
 
-const CHANNEL_REFERENCE = /^IPC_CHANNELS\.([A-Za-z0-9_]+)$/;
+// Main uses these two names for servers and stores that have nothing to do with IPC, so only the
+// preload scan reads them as channel calls.
+const PRELOAD_ONLY_CALLEES = ["listen", "subscribe"];
+
+// An endpoint as `group.name`. Only the one untyped endpoint reads `.channel` at its call site,
+// because it goes to ipcRenderer.invoke directly.
+const ENDPOINT_REFERENCE = /^IPC_ENDPOINTS\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)(?:\.channel)?$/;
 
 const sources = new Map<string, string>();
 
 const mainSources = sourceFilesUnder("src/main");
-const PRELOAD_MODULE = "src/preload/index.ts";
-const preloadSources = [PRELOAD_MODULE];
+
+// The hidden WebRTC window has a preload of its own. It takes one MessagePort that main hands over
+// with webContents.postMessage, which is not an IPC endpoint, so the scan leaves it out.
+const WEBRTC_PRELOAD_MODULE = "src/preload/team-webrtc.ts";
+const preloadSources = sourceFilesUnder("src/preload").filter((file) => file !== WEBRTC_PRELOAD_MODULE);
 
 // The one module allowed to touch ipcMain, because it is the sender check.
 const TRUSTED_IPC_MODULE = "src/main/trusted-ipc.ts";
@@ -106,14 +111,19 @@ function decodeWrittenFromMain(value: unknown): Written | null {
 }
 `;
 
-// The preload's invoke helpers take the channel as a parameter and pass it on,
-// so the forwarding call names a variable by design. Their own call sites carry
-// the IPC_CHANNELS reference and are what the scan checks, which is why the
-// helpers are listed as callees above.
-const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = ["src/preload/index.ts: ipcRenderer.invoke(channel)"];
+// The preload's invoke and subscribe helpers take the endpoint as a parameter and
+// pass it on, so the forwarding call names a variable by design. Their own call
+// sites carry the IPC_ENDPOINTS reference and are what the scan checks, which is
+// why the helpers are listed as callees above.
+const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = [
+  "src/preload/index.ts: ipcRenderer.invoke(endpoint.channel)",
+  "src/preload/index.ts: ipcRenderer.on(endpoint.channel)",
+  "src/preload/index.ts: ipcRenderer.removeListener(endpoint.channel)",
+  "src/preload/index.ts: listen(endpoint)",
+];
 
-const mainCalls = collectCalls(mainSources);
-const preloadCalls = collectCalls(preloadSources);
+const mainCalls = collectCalls(mainSources, PRELOAD_ONLY_CALLEES);
+const preloadCalls = collectCalls(preloadSources, []);
 
 const sent = channelsCalledBy(mainCalls, MAIN_SEND_CALLEES);
 const invoked = channelsCalledBy(preloadCalls, PRELOAD_INVOKE_CALLEES);
@@ -122,14 +132,14 @@ const unsubscribed = channelsCalledBy(preloadCalls, PRELOAD_UNSUBSCRIBE_CALLEES)
 
 describe("IPC channel coverage", () => {
   // Every assertion below is only as complete as the scan, so these two run
-  // first. This one reads each known call's channel argument and demands a
-  // direct IPC_CHANNELS reference: a string names a channel the contract never
+  // first. This one reads each known call's endpoint argument and demands a
+  // direct IPC_ENDPOINTS reference: a string names a channel the contract never
   // declared, and a variable hides the wire endpoint from the scan entirely.
   // Either way the call would contribute nothing to the sets compared below
   // while sitting on the trust boundary, so it fails here instead.
-  it("names every channel through a direct IPC_CHANNELS reference", () => {
+  it("names every endpoint through a direct IPC_ENDPOINTS reference", () => {
     const opaque = [...mainCalls, ...preloadCalls]
-      .filter((call) => !CHANNEL_REFERENCE.test(call.argument))
+      .filter((call) => !ENDPOINT_REFERENCE.test(call.argument))
       .map((call) => `${call.file}: ${call.callee}(${call.argument})`)
       .filter((site) => !FORWARDED_CHANNEL_ARGUMENTS.includes(site))
       .sort();
@@ -137,10 +147,10 @@ describe("IPC channel coverage", () => {
     expect(opaque).toEqual([]);
   });
 
-  // The other half: a reference the scan does not read as a channel argument.
-  // A new helper wrapping IPC_CHANNELS, or a reference sitting in a handler
+  // The other half: a reference the scan does not read as an endpoint argument.
+  // A new helper wrapping an endpoint, or a reference sitting in a handler
   // body, would otherwise quietly shrink the compared sets rather than fail.
-  it("reads every IPC_CHANNELS reference as the channel argument of a known call", () => {
+  it("reads every endpoint reference as the endpoint argument of a known call", () => {
     const stray = [...strayReferences(mainSources, mainCalls), ...strayReferences(preloadSources, preloadCalls)];
 
     expect(stray).toEqual([]);
@@ -163,11 +173,10 @@ describe("IPC channel coverage", () => {
   });
 
   // ipcMain.handle throws on a second registration for the same channel, and `registerIpcGroups`
-  // walks every group, so one channel named by two groups - or twice inside one - crashes the app
-  // on every launch. The type-level coverage assertion in packages/contracts compares sets and so
-  // says nothing about it; this does. It reads the manifest rather than the sources, because after
-  // the migration the manifest is the only place a registration is named.
-  it("declares each channel in exactly one endpoint group", () => {
+  // walks every group, so one wire value named by two endpoints - in two groups or inside one -
+  // crashes the app on every launch. No type says the wire values differ; this does. It reads the
+  // manifest rather than the sources, because the manifest is the only place a channel is named.
+  it("gives every endpoint its own wire value", () => {
     const declarations = new Map<string, string[]>();
     for (const [group, endpoints] of Object.entries<IpcEndpointGroup>(IPC_ENDPOINTS)) {
       for (const [name, endpoint] of Object.entries<IpcEndpoint>(endpoints)) {
@@ -178,23 +187,6 @@ describe("IPC channel coverage", () => {
     const shared = [...declarations]
       .filter(([, sites]) => sites.length > 1)
       .map(([channel, sites]) => `${channel}: ${sites.join(", ")}`)
-      .sort();
-
-    expect(shared).toEqual([]);
-  });
-
-  // Everything above compares IPC_CHANNELS keys, but Electron sees the values.
-  // Two keys carrying one wire string satisfy the exactly-once assertion, since
-  // the keys differ, and still register two handlers for the same channel.
-  it("gives every declared channel its own wire value", () => {
-    const wireValues = new Map<string, string[]>();
-    for (const [key, value] of Object.entries(IPC_CHANNELS)) {
-      wireValues.set(value, [...(wireValues.get(value) ?? []), key]);
-    }
-
-    const shared = [...wireValues]
-      .filter(([, keys]) => keys.length > 1)
-      .map(([value, keys]) => `${value}: ${keys.join(", ")}`)
       .sort();
 
     expect(shared).toEqual([]);
@@ -219,8 +211,8 @@ describe("IPC channel coverage", () => {
 
   // The wrappers take a `string` channel, because ipcMain does. That is the last way a privileged
   // handler can exist outside IPC_ENDPOINTS: `handleTrusted("undeclared:channel", …)` compiles, gets
-  // the sender check, and belongs to no group, so neither the coverage assertion in
-  // packages/contracts nor anything above notices it. Keeping the call site in one module is what
+  // the sender check, and belongs to no group, so neither the types in packages/contracts nor
+  // anything above notices it. Keeping the call site in one module is what
   // closes it - `registerIpcGroup` and `registerIpcGroups` are both handed a group name and read the
   // channel out of the manifest, so a channel the manifest does not declare has no way in.
   it("calls the trusted wrappers only from the endpoint binder", () => {
@@ -240,7 +232,7 @@ describe("IPC channel coverage", () => {
   // Exempting the wrapper module is what makes the assertion above possible, and
   // the exemption is only safe while everything it exempts is a wrapper. Two ways
   // it stops being one: a registration with a channel of its own, which is an
-  // endpoint outside IPC_CHANNELS entirely, and a registration that runs the
+  // endpoint outside IPC_ENDPOINTS entirely, and a registration that runs the
   // handler without the sender check, which is the trust boundary itself. Both
   // are properties rather than a count of calls, so a third wrapper that has them
   // stays green.
@@ -274,7 +266,8 @@ describe("IPC channel coverage", () => {
   // This catches the predicate-shaped recurrence, which is the shape that
   // actually diverged. A rule inlined into a decodeX body is still invisible here.
   it("declares no type predicate of its own in the preload", () => {
-    const declared = [...readSource(PRELOAD_MODULE).matchAll(/^function (\w+)\([^)]*\):\s*[\w.<>[\]|" ]+ is /gm)]
+    const declared = preloadSources
+      .flatMap((file) => [...readSource(file).matchAll(/^(?:export )?function (\w+)\([^)]*\):\s*[\w.<>[\]|" ]+ is /gm)])
       .map((match) => match[1])
       .sort();
 
@@ -344,17 +337,15 @@ function sourceFilesUnder(directory: string): readonly string[] {
   return files;
 }
 
-// Every channel of one kind, as the IPC_CHANNELS key the source scans produce.
+// Every endpoint of one kind, as the `group.name` the source scans produce.
 function channelsOfKind(kind: IpcEndpoint["kind"]): readonly string[] {
-  const keys = new Set<string>();
-  for (const group of Object.values<IpcEndpointGroup>(IPC_ENDPOINTS)) {
-    for (const endpoint of Object.values<IpcEndpoint>(group)) {
-      if (endpoint.kind !== kind) continue;
-      const key = channelKeys.get(endpoint.channel);
-      if (key !== undefined) keys.add(key);
+  const ids: string[] = [];
+  for (const [group, endpoints] of Object.entries<IpcEndpointGroup>(IPC_ENDPOINTS)) {
+    for (const [name, endpoint] of Object.entries<IpcEndpoint>(endpoints)) {
+      if (endpoint.kind === kind) ids.push(`${group}.${name}`);
     }
   }
-  return [...keys].sort();
+  return ids.sort();
 }
 
 // Every decoder declared with the given suffix, the suffix removed so the two
@@ -404,16 +395,17 @@ function readSource(file: string): string {
 }
 
 // Reads each known call forwards from its own name to the argument in the
-// channel position, rather than walking back from an IPC_CHANNELS reference to
+// channel position, rather than walking back from an IPC_ENDPOINTS reference to
 // whatever call appears to enclose it. Only the forward direction sees a call
 // whose channel is a variable or a string, and those are the calls that would
 // otherwise leave the trust boundary unscanned. A `function` keyword before the
 // name marks a declaration of the helper rather than a call to it.
-function collectCalls(files: readonly string[]): readonly ChannelCall[] {
+function collectCalls(files: readonly string[], skipped: readonly string[]): readonly ChannelCall[] {
   const calls: ChannelCall[] = [];
   for (const file of files) {
     const source = readSource(file);
     for (const [callee, position] of CHANNEL_ARGUMENT_POSITION) {
+      if (skipped.includes(callee)) continue;
       const pattern = new RegExp(`(?<![A-Za-z0-9_$.])${callee.replaceAll(".", "\\.")}\\s*\\(`, "g");
       for (const match of source.matchAll(pattern)) {
         if (/\bfunction\s*$/.test(source.slice(Math.max(0, match.index - 20), match.index))) continue;
@@ -470,7 +462,8 @@ function callArguments(source: string, start: number): string {
 }
 
 function channelOf(call: ChannelCall): string | null {
-  return CHANNEL_REFERENCE.exec(call.argument)?.[1] ?? null;
+  const match = ENDPOINT_REFERENCE.exec(call.argument);
+  return match ? `${match[1]}.${match[2]}` : null;
 }
 
 function channelsCalledBy(calls: readonly ChannelCall[], callees: readonly string[]): readonly string[] {
@@ -483,14 +476,15 @@ function channelsCalledBy(calls: readonly ChannelCall[], callees: readonly strin
   return [...channels].sort();
 }
 
-// Every IPC_CHANNELS reference that does not sit inside a channel argument the
-// scan read.
+// Every `IPC_ENDPOINTS.group.name` reference that does not sit inside an endpoint
+// argument the scan read. The bare manifest, which the binder walks, is not an
+// endpoint reference.
 function strayReferences(files: readonly string[], calls: readonly ChannelCall[]): readonly string[] {
   const stray: string[] = [];
   for (const file of files) {
     const source = readSource(file);
     const spans = calls.filter((call) => call.file === file);
-    for (const match of source.matchAll(/IPC_CHANNELS\.([A-Za-z0-9_]+)/g)) {
+    for (const match of source.matchAll(/IPC_ENDPOINTS\.[A-Za-z0-9_]+\.[A-Za-z0-9_]+/g)) {
       const read = spans.some((span) => span.start <= match.index && match.index < span.end);
       if (!read) stray.push(`${file}: ${match[0]}`);
     }

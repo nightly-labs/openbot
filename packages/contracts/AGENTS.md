@@ -21,29 +21,19 @@ mock — so the cost of a change is paid by code you cannot edit.
   update-direction tests, and clear UI text.
 - Malformed known payloads fail closed as `protocol_error`. Unknown optional events are ignored.
 
-## One channel list, one manifest, two mirrors
+## One channel list, two mirrors
 
-`src/ipc-channels.ts` declares every wire value. `src/ipc-endpoints.ts` gives that flat list its
-structure: which group each channel belongs to, and whether it is a **request** the renderer invokes
-or an **event** the main process sends. Nothing else in the repository decides those two facts.
-
-A type-level assertion at the bottom of `ipc-endpoints.ts` holds the two files together. Add a
-channel to `IPC_CHANNELS` and leave it out of every group and the `IpcEndpoints` declaration fails
-with the channel in the diagnostic:
-
-```
-error TS2344: Type '{ channelsMissingFromEveryGroup: "app:brand-new-thing"; }'
-  does not satisfy the constraint 'true'.
-```
-
-It costs nothing at runtime. There is no generator, no committed output and no check to remember to
-run — the typecheck in the pre-commit hook and in CI already runs it.
+`src/ipc-endpoints.ts` declares every endpoint in `IPC_ENDPOINTS`: its wire value, its group,
+and whether it is a **request** the renderer invokes or an **event** the main process sends.
+Nothing else in the repository decides those facts. Main and the preload pass the endpoint object,
+such as `IPC_ENDPOINTS.auth.event`, and read `.channel` from it; they do not write a wire value.
+`ipc-channel-coverage.test.ts` fails when two endpoints share one wire value.
 
 Two files still mirror the list by hand, and they are not enforced the same way.
 
 | Mirror | What it is | What holds it |
 | --- | --- | --- |
-| `src/preload/index.ts` | the `invoke` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
+| `src/preload/index.ts` | the `invokeRequest` and `subscribe` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
 | `src/renderer/src/preview/mock-openbot.ts` | the second implementation Storybook and the preview run against | `tsc`, against `OpenBotDesktopApi` |
 
 The main process is no longer one of them. `registerIpcGroups` in `src/main/ipc/define-ipc-group.ts`
@@ -61,8 +51,8 @@ untyped endpoint.
 
 The preload is still the link no type pairs with an endpoint. Its API object is nested and renamed, so
 a channel it never invokes is dead trust-boundary surface that compiles.
-`ipc-channel-coverage.test.ts` reads its source and asserts it invokes exactly the request endpoints
-and subscribes to exactly the event ones.
+`ipc-channel-coverage.test.ts` reads the preload sources and asserts they invoke exactly the request
+endpoints and subscribe to exactly the event ones.
 
 The mock needs no test. Both it and the preload bridge are annotated `: OpenBotDesktopApi`, so a
 missing method is `TS2741` and a method the interface never declared is `TS2353` — the type checker
@@ -72,6 +62,6 @@ the *behaviour*: `mock-openbot.ts` is a product surface, not a test double, and 
 and every Storybook story exercise. A method that satisfies the type by returning an empty array is a
 story that silently shows nothing.
 
-Adding a channel means `ipc-channels.ts`, `ipc-endpoints.ts`, its registrar, the preload and the mock
-in the same change. You do not have to remember that list: add the channel, and
+Adding a channel means `ipc-endpoints.ts`, its registrar, the preload and the mock in the same
+change. You do not have to remember that list: add the channel, and
 `bun run typecheck:node` and `bun run typecheck:renderer` name every step but the preload.

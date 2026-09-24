@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { expect, it, vi } from "vitest";
 import { parseAgentRequest } from "../main/ipc/agent-inputs";
 import { requireString } from "../main/ipc/validation";
@@ -25,7 +25,7 @@ it("passes the channel identifier through the preload and main-process decoder",
   if (!bridge.api.current) throw new Error("The preload API was not exposed.");
   const deleted: string[] = [];
   bridge.invoke.mockImplementation(async (channel: string, request: unknown) => {
-    if (channel !== IPC_CHANNELS.agentDeleteChannel) throw new Error("Unexpected IPC channel.");
+    if (channel !== IPC_ENDPOINTS.agent.deleteChannel.channel) throw new Error("Unexpected IPC channel.");
     const scoped = parseAgentRequest(request);
     deleted.push(requireString(scoped.payload, "channelId"));
   });
