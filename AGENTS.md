@@ -146,7 +146,9 @@ risks since the last release.
 
 ## Tests
 
-- Never write unit tests after you write code.
+- Keep tests minimal. Do not add a regression test by default. Add a test only when a bug can lose
+  user data, break a released protocol, weaken the trust boundary, or leak a secret, or when the
+  same bug came back.
 - Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work.
   At the end of E2E tests, produce a verifiable and repeatable artifact, such as a JSON report or a
   screenshot under `.openbot-build/`.
