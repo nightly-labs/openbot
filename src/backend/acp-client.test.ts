@@ -18,6 +18,7 @@ import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
@@ -68,6 +69,7 @@ const CONFIG_MODELS = [
 ];
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
+let sessionCount = 0;
 const configOptions = () => [
   {
     id: "model",
@@ -114,13 +116,23 @@ process.stdin.on("data", (chunk) => {
 function handle(message) {
   if (typeof message.id === "undefined") return;
   if (message.method === "initialize") {
-    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1" ? { loadSession: true } : {};
+    const agentCapabilities = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
+      ? { loadSession: true, sessionCapabilities: { close: {} } }
+      : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
+        ? { loadSession: true }
+        : {};
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
     return;
   }
   if (message.method === "session/load") {
     const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
     if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    write({ jsonrpc: "2.0", id: message.id, result: {} });
+    return;
+  }
+  if (message.method === "session/close") {
+    const closeLog = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG;
+    if (closeLog) fs.appendFileSync(closeLog, JSON.stringify(message.params) + NL);
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -166,7 +178,8 @@ function handle(message) {
       jsonrpc: "2.0",
       id: message.id,
       result: {
-        sessionId: "session-1",
+        // An agent that closes sessions is asked for several, and each needs its own id.
+        sessionId: process.env.OPENBOT_FAKE_ACP_CLOSE_LOG ? "session-" + ++sessionCount : "session-1",
         models: { availableModels: ids.map((modelId) => ({ modelId, name: modelId })), currentModelId: ids[0] },
       },
     });
@@ -722,6 +735,77 @@ describe("OpenCode ACP session loading", () => {
     ]);
 
     expect(await fake.readLoadedSessions()).toHaveLength(1);
+  });
+
+  it("closes the longest idle session over the limit and loads it again for its next turn", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const closeLog = join(fake.directory, "closed-sessions.ndjson");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CLOSE_LOG", closeLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    let completed = 0;
+    client.on("notification", (notification) => {
+      if (notification.method === "turn/completed") completed += 1;
+    });
+    const threadIds: string[] = [];
+    // The model catalog probe opens and closes a session of its own.
+    const closedSessions = async () =>
+      (await readFile(closeLog, "utf8").catch(() => ""))
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line).sessionId)
+        .filter((sessionId) => threadIds.includes(sessionId));
+    const input = [{ type: "inputText", text: "Keep working" }];
+    for (let index = 0; index <= ACP_IDLE_SESSION_LIMIT; index += 1) {
+      const thread = await client.request(
+        "thread/start",
+        { cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
+        decodeRecordResponse,
+      );
+      const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
+      if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
+      threadIds.push(threadId);
+    }
+    for (const [index, threadId] of threadIds.entries()) {
+      await client.request(
+        "turn/start",
+        { threadId, clientUserMessageId: `turn-${index}`, input },
+        decodeRecordResponse,
+      );
+      await vi.waitFor(() => expect(completed).toBe(index + 1));
+    }
+
+    // Each open session holds its own set of the user's MCP servers until the agent closes it.
+    await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
+    await client.request(
+      "turn/start",
+      { threadId: threadIds[0], clientUserMessageId: "turn-again", input },
+      decodeRecordResponse,
+    );
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: threadIds[0], cwd: fake.directory }]);
+  });
+
+  it("counts a session loaded only for a read toward the idle limit", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const closeLog = join(fake.directory, "closed-sessions.ndjson");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CLOSE_LOG", closeLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const threadIds = Array.from({ length: ACP_IDLE_SESSION_LIMIT + 1 }, (_, index) => `ses_stored_${index}`);
+    const closedSessions = async () =>
+      (await readFile(closeLog, "utf8").catch(() => ""))
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line).sessionId)
+        .filter((sessionId) => threadIds.includes(sessionId));
+
+    // What boot recovery does after a restart: it reads every stored session, and each read loads one.
+    for (const threadId of threadIds) {
+      await client.request("thread/read", { threadId, cwd: fake.directory, includeTurns: true }, decodeThreadResponse);
+    }
+
+    // Each open session holds its own set of the user's MCP servers until the agent closes it.
+    await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
   });
 
   it("reports a session an agent cannot load as missing instead of asking for it", async () => {

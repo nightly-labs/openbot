@@ -17,6 +17,7 @@ import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { buildContentSecurityPolicy } from "./content-security-policy";
+import { fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
 import type { TeamStore } from "./team-store";
@@ -62,15 +63,13 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const id = url.pathname.split("/").filter(Boolean).at(-1);
       const attachment = id ? await mailbox.resolveAttachment(id) : null;
       if (!attachment) return new Response("Not found", { status: 404 });
-      return new Response(await readFile(attachment.path), {
-        headers: {
-          "Content-Type": attachment.mimeType,
-          "Cache-Control": "no-store",
-          "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-          Vary: "Origin",
-          "X-Content-Type-Options": "nosniff",
-          "Content-Disposition": "inline",
-        },
+      return await fileResponse(attachment.path, {
+        "Content-Type": attachment.mimeType,
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
+        Vary: "Origin",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": "inline",
       });
     } catch {
       return new Response("Not found", { status: 404 });
@@ -106,12 +105,10 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       if (!avatar || avatar.version !== url.searchParams.get("v")) {
         return new Response("Not found", { status: 404 });
       }
-      return new Response(await readFile(avatar.path), {
-        headers: {
-          "Content-Type": avatar.mimeType,
-          "Cache-Control": "private, max-age=31536000, immutable",
-          "X-Content-Type-Options": "nosniff",
-        },
+      return await fileResponse(avatar.path, {
+        "Content-Type": avatar.mimeType,
+        "Cache-Control": "private, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
       });
     } catch {
       return new Response("Not found", { status: 404 });
@@ -152,12 +149,10 @@ export function configureServerLogoProtocols({ teamStore, remoteServers }: Serve
       if (url.hostname !== LOCAL_SERVER_ID || !logo || logo.version !== url.searchParams.get("v")) {
         return new Response("Not found", { status: 404 });
       }
-      return new Response(await readFile(logo.path), {
-        headers: {
-          "Content-Type": logo.mimeType,
-          "Cache-Control": "private, max-age=31536000, immutable",
-          "X-Content-Type-Options": "nosniff",
-        },
+      return await fileResponse(logo.path, {
+        "Content-Type": logo.mimeType,
+        "Cache-Control": "private, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
       });
     } catch {
       return new Response("Not found", { status: 404 });

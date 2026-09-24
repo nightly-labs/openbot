@@ -2,8 +2,10 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
   type AgentSummary,
-  type BrowserTakeoverRequest,
+  assertStorageUsageScope,
   type CreateAgentInput,
+  decodeInstalledSkills,
+  decodeStorageUsage,
   isAgentMemory,
   isAgentModel,
   isAgentModelOption,
@@ -15,6 +17,7 @@ import {
   isRoutine,
   isSidebarLayoutSnapshot,
   type SidebarLayoutSnapshot,
+  STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -24,8 +27,10 @@ import {
   TEAM_CONVERSATION_UNREAD_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
+  TEAM_SEMANTIC_TAGS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -41,6 +46,7 @@ import {
   readAgentAnalytics,
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -51,7 +57,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
-import { useQueryClient } from "@tanstack/react-query";
+import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
@@ -76,7 +82,7 @@ import {
   type ServerConnectionHandle,
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
-import { type MobileAgentActivities, reduceAgentActivity } from "@/features/workspace/model/agent-activity";
+import { reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import {
   canToggleAgentPin,
   reconcileAgentPins,
@@ -85,6 +91,7 @@ import {
 } from "@/features/workspace/model/agent-pins";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
+import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import { applyMobileQueueEvent } from "@/features/workspace/model/queue-cache";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
@@ -117,6 +124,7 @@ type RemoteAgent = Pick<
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
 > &
   Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl">>;
+const NO_IDS: string[] = [];
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
@@ -189,7 +197,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [],
   );
   useEffect(() => () => conversationStore.dispose(), [conversationStore]);
-  const [activityByServer, setActivityByServer] = useState<Record<string, MobileAgentActivities>>({});
+  const [liveState] = useState(() => new LiveWorkspaceStore());
   const preferenceStore = useMemo(
     () =>
       createWorkspacePreferences(session.apiUrl, session.user.id, {
@@ -202,13 +210,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [preferences, setPreferences] = useState<Record<string, RemoteWorkspacePreferences>>({});
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
-  const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? [];
-  const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? [];
-  const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? [];
-  const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? [];
+  const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? NO_IDS;
+  const pinnedAgentIds = (activeServerId ? preferences[activeServerId]?.pinned : null) ?? NO_IDS;
+  const hiddenChannelIds = (activeServerId ? preferences[activeServerId]?.hiddenChannels : null) ?? NO_IDS;
+  const pinnedChannelIds = (activeServerId ? preferences[activeServerId]?.pinnedChannels : null) ?? NO_IDS;
   const readWrites = useRef(new Map<string, Promise<void>>());
-  const [browserRequests, setBrowserRequests] = useState<Record<string, BrowserTakeoverRequest[]>>({});
-  const [unreadAgentIds, setUnreadAgentIds] = useState<string[]>([]);
 
   const installHosts = useCallback(
     (hosts: RemoteTeamHost[]) => {
@@ -233,8 +239,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         );
         setAgents((current) => current.filter((agent) => available.has(agent.serverId)));
         for (const id of removedAgentIds) conversationStore.remove(id);
-        setUnreadAgentIds((current) => current.filter((id) => !removedAgentIds.has(id)));
-        setActivityByServer((current) =>
+        liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedAgentIds.has(id)));
+        liveState.update("activityByServer", (current) =>
           Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))),
         );
       }
@@ -260,7 +266,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       });
       setActiveServerId((current) => (hosts.some((host) => host.hostId === current) ? current : null));
     },
-    [session.host?.hostId, session.apiUrl, session.user.id, sessionScope, queryClient, readRefresh, conversationStore],
+    [
+      liveState,
+      session.host?.hostId,
+      session.apiUrl,
+      session.user.id,
+      sessionScope,
+      queryClient,
+      readRefresh,
+      conversationStore,
+    ],
   );
 
   const directoryRefresh = useMemo(
@@ -349,17 +364,30 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, summaries: RemoteAgent[]) => {
       try {
         const saved = reconcileAgentPins(preferenceStore, serverId, summaries);
-        setPreferences((current) => ({ ...current, [serverId]: saved }));
+        // agents-changed arrives for each delivered message. Keep unchanged preferences and agents,
+        // so the workspace context does not notify every consumer for each message.
+        setPreferences((current) => {
+          const next = replaceEqualDeep(current[serverId], saved);
+          return next === current[serverId] ? current : { ...current, [serverId]: next };
+        });
       } catch {
         Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
       }
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
-      setAgents((current) => [
-        ...current.filter((agent) => agent.serverId !== serverId),
-        ...summaries.map((agent) => projectAgent(serverId, agent)),
-      ]);
+      setAgents((current) => {
+        const previous = new Map(
+          current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
+        );
+        const next = [
+          ...current.filter((agent) => agent.serverId !== serverId),
+          ...summaries.map((agent) => replaceEqualDeep(previous.get(agent.id), projectAgent(serverId, agent))),
+        ];
+        return next.length === current.length && next.every((agent, index) => agent === current[index])
+          ? current
+          : next;
+      });
     },
     [preferenceStore],
   );
@@ -408,7 +436,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await readRefresh.refresh(
         serverId,
         () => client.request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads),
-        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        (reads) => liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads)),
         () => context.isCurrent() && !removedServers.current.has(serverId),
       );
       if (!context.isCurrent()) return;
@@ -433,7 +461,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       context.stage = "connection";
     },
-    [replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore, applySidebarLayout],
+    [liveState, replaceServerAgents, preferenceStore, readRefresh, conversationStore, channelStore, applySidebarLayout],
   );
 
   const registerConnection = useCallback((hostId: string, handle: ServerConnectionHandle | null) => {
@@ -500,30 +528,30 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       await readRefresh.refresh(
         serverId,
         () => request("GET", TEAM_API_ROUTES.agents.conversationReads, decodeConversationReads, undefined, serverId),
-        (reads) => setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads)),
+        (reads) => liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads)),
         () => !removedServers.current.has(serverId),
       );
     },
-    [request, readRefresh],
+    [liveState, request, readRefresh],
   );
 
   const handleTeamEvent = useCallback(
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (removedServers.current.has(serverId)) return;
       if (event.type === "runtime-snapshot") {
-        setBrowserRequests((current) => ({
-          ...current,
-          [serverId]: event.snapshot.attentionComplete
-            ? event.snapshot.pendingBrowserTakeovers
-            : [
-                ...(current[serverId] ?? []).filter(
-                  (item) => !event.snapshot.pendingBrowserTakeovers.some((next) => next.requestId === item.requestId),
-                ),
-                ...event.snapshot.pendingBrowserTakeovers,
-              ],
-        }));
+        liveState.update("browserRequests", (current) => {
+          const next = replaceEqualDeep(
+            current[serverId],
+            reconcilePendingRequests(
+              current[serverId] ?? [],
+              event.snapshot.pendingBrowserTakeovers,
+              event.snapshot.attentionComplete,
+            ),
+          );
+          return next === current[serverId] ? current : { ...current, [serverId]: next };
+        });
       } else if (event.type === "browser-takeover-requested") {
-        setBrowserRequests((current) => ({
+        liveState.update("browserRequests", (current) => ({
           ...current,
           [serverId]: [
             ...(current[serverId] ?? []).filter((item) => item.requestId !== event.request.requestId),
@@ -531,7 +559,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ],
         }));
       } else if (event.type === "browser-takeover-resolved") {
-        setBrowserRequests((current) => ({
+        liveState.update("browserRequests", (current) => ({
           ...current,
           [serverId]: (current[serverId] ?? []).filter((item) => item.requestId !== event.requestId),
         }));
@@ -586,7 +614,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         event.type !== "conversation" ||
         event.snapshot.revision >= (conversationStore.get(event.snapshot.agentId)?.revision ?? 0)
       ) {
-        setActivityByServer((current) => {
+        liveState.update("activityByServer", (current) => {
           const previous = current[serverId] ?? {};
           const next = reduceAgentActivity(previous, event);
           return next === previous ? current : { ...current, [serverId]: next };
@@ -617,7 +645,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const readState = event.page.readState;
         if (readState) {
           readRefresh.invalidate(serverId);
-          setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }));
+          liveState.update("unreadAgentIds", (current) =>
+            mergeRemoteUnreadIds(current, { [event.page.agentId]: readState }),
+          );
         } else void refreshConversationReads(serverId).catch(() => undefined);
         if (conversationStore.get(event.page.agentId)) conversationStore.applyPage(event.page);
       } else if (event.type === "conversation-invalidated" || event.type === "turn-completed") {
@@ -630,6 +660,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
     },
     [
+      liveState,
       channelStore,
       applySidebarLayout,
       loadConversation,
@@ -657,7 +688,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (!activeServerId) return;
       const isCurrentRead = readRefresh.invalidate(activeServerId);
       const generation = loadGeneration.current;
-      setUnreadAgentIds((current) =>
+      liveState.update("unreadAgentIds", (current) =>
         visibleMessageId === null ? [...new Set([...current, agentId])] : current.filter((id) => id !== agentId),
       );
       const write = (readWrites.current.get(agentId) ?? Promise.resolve())
@@ -680,7 +711,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
           if (generation === loadGeneration.current && isCurrentRead()) {
             readRefresh.invalidate(activeServerId);
-            setUnreadAgentIds((current) => mergeRemoteUnreadIds(current, reads));
+            liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
           }
         })
         .catch(() => {
@@ -692,7 +723,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (readWrites.current.get(agentId) === write) readWrites.current.delete(agentId);
       });
     },
-    [request, refreshConversationReads, loadConversation, activeServerId, readRefresh, conversationStore],
+    [liveState, request, refreshConversationReads, loadConversation, activeServerId, readRefresh, conversationStore],
   );
 
   const updatePreferences = useCallback(
@@ -745,10 +776,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, true))),
       unhideChannel: (id, serverId) =>
         Boolean(updatePreferences(serverId, (current) => setChannelHidden(current, id, false))),
-      unreadAgentIds,
       conversationStore,
-      activityByServer,
-      browserRequests,
+      liveState,
       respondToBrowserTakeover: (serverId, input) => respondToBrowserTakeover(teamApi(serverId), input),
       respondToBrowserSecret: (serverId, input) => respondToBrowserSecret(teamApi(serverId), input),
       selectServer: (id) => {
@@ -775,14 +804,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setServers((current) => current.filter((candidate) => candidate.id !== serverId));
         setSidebarByServer((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== serverId)));
         setAgents((current) => current.filter((agent) => agent.serverId !== serverId));
-        setActivityByServer((current) => {
+        liveState.update("activityByServer", (current) => {
           const next = { ...current };
           delete next[serverId];
           return next;
         });
         for (const id of removedIds) conversationStore.remove(id);
         updatePreferences(serverId, () => ({ hidden: [], pinned: [] }));
-        setUnreadAgentIds((current) => current.filter((id) => !removedIds.has(id)));
+        liveState.update("unreadAgentIds", (current) => current.filter((id) => !removedIds.has(id)));
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();
@@ -945,6 +974,24 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverCapabilities.current.get(serverId) ?? [],
           input,
         );
+      },
+      // A host too old to know the route answers 404, so ask its advertised capabilities first.
+      loadAgentSkills: async (agentId, serverId) =>
+        serverCapabilities.current.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
+          ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
+          : null,
+      loadAgentStorage: async (agentId, serverId, force = false) => {
+        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
+        const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
+        return assertStorageUsageScope(
+          await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
+          input,
+        );
+      },
+      deleteStoredFile: async (fileId, serverId) => {
+        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY))
+          throw new Error("This host does not support file management. Update OpenBot on the host.");
+        await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
@@ -1208,9 +1255,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     sidebarByServer,
     applySidebarLayout,
     channelStore,
-    browserRequests,
     activeServerId,
-    activityByServer,
     agents,
     conversationStore,
     directory,
@@ -1234,7 +1279,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     session.user.id,
     sessionScope,
     queryClient,
-    unreadAgentIds,
+    liveState,
     preferences,
     updatePreferences,
   ]);

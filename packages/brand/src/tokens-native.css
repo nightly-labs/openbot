@@ -21,6 +21,8 @@
 :root {
   @variant light {
     --openbot-bg-canvas: #f5f5f7;
+    --openbot-bg-native-canvas: #f5f5f7;
+    --openbot-bg-native-sidebar: #ffffff;
     --openbot-bg-sidebar: #ffffff;
     --openbot-bg-surface: #ffffff;
     --openbot-bg-surface-raised: #f0f0f3;
@@ -69,6 +71,8 @@
   @variant dark {
     /* biome-ignore lint/suspicious/noDuplicateCustomProperties: Theme variants intentionally share semantic token names. */
     --openbot-bg-canvas: #1a1a1a;
+    --openbot-bg-native-canvas: #141414;
+    --openbot-bg-native-sidebar: #141414;
     --openbot-bg-sidebar: #1a1a1a;
     --openbot-bg-surface: #212121;
     --openbot-bg-surface-raised: #242424;
@@ -96,13 +100,13 @@
     --openbot-success-text: #31cf76;
     --openbot-warning-text: #ff9412;
     --openbot-danger-text: #ff6069;
-    --openbot-drawer-scrim: #202020;
+    --openbot-drawer-scrim: #000000;
     --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
     --openbot-shadow-card: 0 0 0 transparent;
     --openbot-shadow-overlay: 0 12px 32px rgba(0, 0, 0, 0.48);
     --openbot-tracking-tight: -0.1px;
     --openbot-tracking-wide: 0.02em;
-    --openbot-bg-sheet: #121212;
+    --openbot-bg-sheet: #141414;
     --openbot-bg-grouped: #212121;
     --openbot-text-grouped-secondary: #96969b;
     --openbot-border-grouped: #333335;

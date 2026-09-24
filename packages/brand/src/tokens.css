@@ -14,8 +14,11 @@
 
 :root {
   --openbot-provider-current: currentcolor;
+  /* Main screen canvas and drawer, used by the native app. */
+  --openbot-bg-native-canvas: #141414;
+  --openbot-bg-native-sidebar: #141414;
   /* Grouped sheet surfaces, used by the native app. */
-  --openbot-bg-sheet: #121212;
+  --openbot-bg-sheet: #141414;
   --openbot-bg-grouped: #212121;
   --openbot-text-grouped-secondary: #96969b;
   --openbot-border-grouped: #333335;
@@ -71,7 +74,7 @@
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
-  --openbot-drawer-scrim: #202020;
+  --openbot-drawer-scrim: #000000;
   --openbot-scroll-edge-overlay: rgba(0, 0, 0, 0.72);
   --openbot-queue-surface: var(--openbot-bg-surface);
   --openbot-queue-border: var(--openbot-border-strong);

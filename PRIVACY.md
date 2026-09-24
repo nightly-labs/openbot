@@ -202,6 +202,13 @@ Other attachments are downloaded when you choose Open or save. The phone creates
 the system share sheet and removes it when that sheet closes. The app you select can keep its own copy.
 Cloudflare account storage does not receive these files.
 
+Mobile dictation uses the phone's speech recognition only after you press the microphone. It asks
+for on-device recognition. On iOS, this applies when the phone supports it for your language. On
+Android, it applies when the language model is installed. Otherwise, or when on-device recognition
+fails before it recognizes any speech, the phone's recognition service, Apple or Google, receives the
+audio. The recognized text goes into the message field and is sent
+only when you send the message. OpenBot does not store or send the audio.
+
 ## Email delivery and infrastructure providers
 
 OpenBot sends sign-in and team invitation messages through the configured SMTP provider. The

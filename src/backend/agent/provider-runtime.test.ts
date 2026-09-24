@@ -28,7 +28,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS } from "./provider-runtime";
+import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS, PROVIDER_UNASSIGNED_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -884,7 +884,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
   });
 
-  it("keeps the active ChatGPT client until reconnect succeeds", async () => {
+  it("keeps the active ChatGPT client until reconnect succeeds, then expires its requests", async () => {
     const { store, mailbox } = stores(root);
     const codexClients: FakeAgentClient[] = [];
     service = createTestService({
@@ -892,13 +892,26 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       mailbox,
       preferredProvider: "codex",
       clientFactory: (provider) => {
-        const client = new FakeAgentClient(provider, "DONE", true, provider !== "codex" || codexClients.length === 0);
+        const client = new FakeAgentClient(provider, "DONE", false, provider !== "codex" || codexClients.length === 0);
         if (provider === "codex") codexClients.push(client);
         return client;
       },
     });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
     await service.initialize();
     const activeClient = codexClients[0];
+    await service.sendMessage({ agentId: "chief", text: "Ask before the reconnect" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    if (!activeClient || !threadId || !turnId) throw new Error("The Codex turn did not start.");
+    activeClient.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "replaced-client-approval",
+      params: { threadId, turnId, command: ["git", "status"], cwd: root, reason: "Inspect the worktree." },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
 
     await service.connectProvider("codex", async () => undefined);
     expect(service.getStatus().providers).toContainEqual(
@@ -920,6 +933,12 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     );
     expect(activeClient?.running).toBe(false);
     expect(codexClients[2]?.running).toBe(true);
+    expect(events).toContainEqual({
+      type: "agent-input-resolved",
+      kind: "approval",
+      requestId: "replaced-client-approval",
+      agentId: "chief",
+    });
   });
 
   it.each(["codex", "claude"] as const)(
@@ -989,6 +1008,51 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
       expect.objectContaining({ id: "claude", state: "available", version: "2.1.263", cliSource: "managed" }),
     );
     expect(clients[0]?.running).toBe(false);
+    expect(clients[1]?.running).toBe(true);
+  });
+
+  it("keeps the updated CLI's client when an account refresh hears back from the replaced one", async () => {
+    const system = await createUpdatableFakeClaude(root, "2.1.250");
+    process.env.OPENBOT_CLAUDE_PATH = system.executable;
+    const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
+    let heldClient: FakeAgentClient | null = null;
+    let releaseRead: () => void = () => undefined;
+    const heldRead = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "claude",
+      clientFactory: (provider) => {
+        const client: FakeAgentClient = new FakeAgentClient(provider, undefined, true, true, {}, async (method) => {
+          if (method === "account/read" && client === heldClient) await heldRead;
+        });
+        if (provider === "claude") clients.push(client);
+        return client;
+      },
+    });
+    await service.initialize();
+    const replaced = clients[0];
+    if (!replaced) throw new Error("Claude did not start.");
+    const readsBefore = replaced.requests.filter((request) => request.method === "account/read").length;
+    heldClient = replaced;
+    const refresh = service.refreshProviders();
+    await waitFor(() => replaced.requests.filter((request) => request.method === "account/read").length > readsBefore);
+
+    const managed = await createFakeClaude(root);
+    await writeFile(managed, (await readFile(managed, "utf8")).replaceAll("2.1.246", "2.1.263"));
+    process.env.OPENBOT_CLAUDE_PATH = join(root, "missing-claude");
+    await service.updateProviderCli("claude", async () => managed);
+    replaced.accountSignedIn = false;
+    releaseRead();
+    const status = await refresh;
+
+    expect(status.providers).toContainEqual(
+      expect.objectContaining({ id: "claude", state: "available", version: "2.1.263", checkError: null }),
+    );
+    expect(clients).toHaveLength(2);
     expect(clients[1]?.running).toBe(true);
   });
 
@@ -2042,6 +2106,21 @@ describe.sequential("ProviderRuntime: idle release", () => {
     const resumed = first.requests.slice(firstRequests).find((request) => request.method === "thread/resume");
     expect(getString(resumed?.params, "threadId")).toBe(session);
     expect(afterRelease()).not.toContain("thread/start");
+  });
+
+  it("stops a provider no agent is set to well before one an agent uses", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const started = await startService(root, { provider: "codex", output: "DONE" });
+    service = started.service;
+    expect((await started.store.getOrCreate("chief")).provider).toBe("codex");
+    const opencode = started.clientFor("opencode");
+    expect(opencode?.running).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_UNASSIGNED_RELEASE_MS + 2 * 60_000);
+    await waitFor(() => opencode?.running === false);
+    expect(started.client.running).toBe(true);
+    expect(service.getStatus().providers?.find((row) => row.id === "opencode")?.state).toBe("available");
   });
 
   it("keeps a provider process that is running a turn", async () => {

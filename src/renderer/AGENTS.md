@@ -2,7 +2,9 @@
 
 The UI stack sits on prerelease channels your training data does not cover: `solid-js@2.0.0-rc.0`
 with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
-here), plus patched `lucide-solid` and `solid-sonner`. Do not trust your memory of these APIs —
+here), plus patched `lucide-solid` and `solid-sonner`. `@solidjs/signals` is patched to dispose the
+children of a memo run that a list-row removal interrupts. `src/renderer/src/solid-disposal.test.ts`
+guards the patch, so keep the test when you upgrade Solid. Do not trust your memory of these APIs —
 check `package.json` for what is actually installed, and load the reference that matches the work:
 
 - `node_modules/solid-js/CHEATSHEET.md` — the source of truth for core Solid APIs. Read it before

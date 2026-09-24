@@ -5,6 +5,7 @@ import { createContext, type PropsWithChildren, useCallback, useContext, useEffe
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
+  Extrapolation,
   interpolate,
   ReduceMotion,
   useAnimatedStyle,
@@ -26,6 +27,8 @@ interface AppDrawerContextValue {
 
 const AppDrawerContext = createContext<AppDrawerContextValue | null>(null);
 const DRAWER_SURFACE_MIN_RADIUS = 34;
+// The surface reaches its full corner radius after this part of the opening motion.
+const DRAWER_SURFACE_ROUNDING_PROGRESS = 0.15;
 const DRAWER_SPRING = {
   dampingRatio: 0.8,
   duration: 300,
@@ -79,10 +82,18 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     drawerProgress.set(0);
   }, [drawerProgress, session]);
 
+  // Rows attach their swipe to this gesture, so it must stay the same object. A new gesture on each
+  // navigation or drawer change would rebuild the swipe of every row.
+  const openingEnabled = useSharedValue(false);
+  useEffect(() => {
+    openingEnabled.set(!drawerOpen && pathname === "/connected");
+  }, [drawerOpen, openingEnabled, pathname]);
   const openingGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!drawerOpen && pathname === "/connected")
+        .onTouchesDown((_event, manager) => {
+          if (!openingEnabled.get()) manager.fail();
+        })
         .activeOffsetX(12)
         .failOffsetX(-10)
         .failOffsetY([-10, 10])
@@ -103,7 +114,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
             ),
           );
         }),
-    [commitDrawerState, drawerOpen, drawerProgress, drawerWidth, pathname],
+    [commitDrawerState, drawerProgress, drawerWidth, openingEnabled],
   );
 
   const closingGesture = useMemo(
@@ -134,6 +145,12 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   );
 
   const surfaceStyle = useAnimatedStyle(() => ({
+    borderRadius: interpolate(
+      drawerProgress.get(),
+      [0, DRAWER_SURFACE_ROUNDING_PROGRESS],
+      [0, surfaceCornerRadius],
+      Extrapolation.CLAMP,
+    ),
     transform: [{ translateX: drawerProgress.get() * drawerWidth }],
   }));
   const drawerStyle = useAnimatedStyle(() => ({
@@ -141,7 +158,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     transform: [{ translateX: interpolate(drawerProgress.get(), [0, 1], [-24, 0]) }],
   }));
   const scrimStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(drawerProgress.get(), [0, 1], [0, 0.3]),
+    opacity: interpolate(drawerProgress.get(), [0, 1], [0, 0.5]),
   }));
   const blurStyle = useAnimatedStyle(() => ({
     opacity: drawerProgress.get(),
@@ -207,7 +224,6 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
               style={[
                 {
                   borderCurve: "continuous",
-                  borderRadius: surfaceCornerRadius,
                   boxShadow: "-12px 0 32px rgba(0, 0, 0, 0.28)",
                 },
                 surfaceStyle,

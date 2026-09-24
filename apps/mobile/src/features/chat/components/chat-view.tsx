@@ -26,6 +26,7 @@ import { type ChatBubbleMessage, useMessageActions } from "@/features/chat/conte
 import { usePublishedQueuedChat } from "@/features/chat/context/queued-messages-context";
 import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "@/features/chat/model/chat-messages";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
+import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -118,7 +119,8 @@ export function ChatView({
   needsAction = false,
   notice,
 }: ChatViewProps) {
-  const { browserRequests, respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport } = useMobileWorkspace();
+  const { respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport } = useMobileWorkspace();
+  const browserRequests = useBrowserRequests(target.serverId);
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
@@ -551,7 +553,7 @@ export function ChatView({
               ) : null}
               <ConnectionStatus server={server} />
               {serverOnline && appActive && isFocused && !readOnly
-                ? (browserRequests[target.serverId] ?? [])
+                ? browserRequests
                     .filter((request) =>
                       target.kind === "agent"
                         ? request.agentId === target.id

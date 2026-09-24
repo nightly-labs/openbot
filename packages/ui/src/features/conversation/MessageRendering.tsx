@@ -2,14 +2,14 @@ import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbo
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { type BubbleVariant, Button, DropdownMenu } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
 import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { ComparisonTable } from "./ComparisonTable";
 import { CheckIcon, CopyIcon, MoreIcon, PlusIcon, ReactionIcon, ReplyIcon } from "./ConversationIcons";
 import { createSmoothHeightResize } from "./createSmoothHeightResize";
-import { DataTable, type MessageContentBlock, messageContentBlocks } from "./DataTable";
+import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
 import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
@@ -133,6 +133,11 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   return { animateTail, body, smoothHeight, revealing };
 }
 
+const comparisonTableContent = (block: MessageContentBlock) => (block.type === "comparison-table" ? block : undefined);
+const dataTableContent = (block: MessageContentBlock) => (block.type === "table" ? block : undefined);
+const codeContent = (block: MessageContentBlock) => (block.type === "code" ? block : undefined);
+const textContent = (block: MessageContentBlock) => (block.type === "text" ? block : undefined);
+
 export function MessageBody(props: {
   animate?: boolean;
   message: AgentMessage;
@@ -182,10 +187,13 @@ export function MessageBody(props: {
       ? standaloneAttachments().filter((attachment) => attachment.previewKind !== "image")
       : standaloneAttachments(),
   );
-  const contentBlocks = createMemo<MessageContentBlock[]>(() =>
-    props.message.author === "agent"
-      ? messageContentBlocks(streamedBody(), streamingBody.revealing())
-      : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
+  const contentBlocks = createMemo<MessageContentBlock[]>((previous) =>
+    reuseUnchangedBlocks(
+      previous ?? [],
+      props.message.author === "agent"
+        ? messageContentBlocks(streamedBody(), streamingBody.revealing())
+        : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
+    ),
   );
   const lastTextBlockIndex = createMemo(() => {
     const blocks = contentBlocks();
@@ -257,72 +265,81 @@ export function MessageBody(props: {
       <div class="message-content-resize" ref={(element) => (messageContentResize = element)}>
         <div class="message-content-blocks" ref={(element) => (messageContent = element)}>
           <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
-            <For each={contentBlocks()}>
-              {(block, index) => {
-                if (block.type === "comparison-table") {
-                  return <ComparisonTable table={block} renderCell={renderMarkdownInline} />;
-                }
-                if (block.type === "table") return <DataTable table={block} renderCell={renderMarkdownInline} />;
-                if (block.type === "code") {
-                  return (
-                    <CodeBlock
-                      block={block}
-                      streaming={streamingBody.revealing() && index() === contentBlocks().length - 1}
-                    />
-                  );
-                }
-                if (props.message.author === "agent") {
-                  return (
-                    <div
-                      class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
-                      data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                    >
-                      <MarkdownMessageText
-                        body={block.text}
-                        agents={props.agents}
-                        skills={props.skills}
-                        attachments={props.message.attachments}
-                        citations={props.message.citations}
-                        onSelectAgent={props.onSelectAgent}
-                        onOpenLink={props.onOpenLink}
-                        onOpenAttachment={(attachment) =>
-                          !canPreviewAttachment(attachment)
-                            ? props.onAttachmentAction(attachment, "open")
-                            : props.onPreview(attachment)
-                        }
-                        onOpenSharedFile={props.onOpenSharedFile}
-                        onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                        showCitationFooter={index() === lastTextBlockIndex()}
-                        streaming={streamingBody.revealing() && index() === contentBlocks().length - 1}
-                        streamingTail={streamingBody.animateTail() && index() === lastTextBlockIndex()}
+            {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
+            <For each={contentBlocks()} keyed={false}>
+              {(block, index) => (
+                <Switch>
+                  <Match when={comparisonTableContent(block())}>
+                    {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                  </Match>
+                  <Match when={dataTableContent(block())}>
+                    {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                  </Match>
+                  <Match when={codeContent(block())}>
+                    {(code) => (
+                      <CodeBlock
+                        block={code()}
+                        streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
                       />
-                    </div>
-                  );
-                }
-                return (
-                  <p
-                    class="message-copy"
-                    data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                  >
-                    <RichMessageText
-                      body={block.text}
-                      agents={props.agents}
-                      skills={props.skills}
-                      attachments={props.message.attachments}
-                      citations={props.message.citations}
-                      onSelectAgent={props.onSelectAgent}
-                      onOpenLink={props.onOpenLink}
-                      onOpenAttachment={(attachment) =>
-                        !canPreviewAttachment(attachment)
-                          ? props.onAttachmentAction(attachment, "open")
-                          : props.onPreview(attachment)
+                    )}
+                  </Match>
+                  <Match when={textContent(block())}>
+                    {(text) => {
+                      if (props.message.author === "agent") {
+                        return (
+                          <div
+                            class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                            data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                          >
+                            <MarkdownMessageText
+                              body={text().text}
+                              agents={props.agents}
+                              skills={props.skills}
+                              attachments={props.message.attachments}
+                              citations={props.message.citations}
+                              onSelectAgent={props.onSelectAgent}
+                              onOpenLink={props.onOpenLink}
+                              onOpenAttachment={(attachment) =>
+                                !canPreviewAttachment(attachment)
+                                  ? props.onAttachmentAction(attachment, "open")
+                                  : props.onPreview(attachment)
+                              }
+                              onOpenSharedFile={props.onOpenSharedFile}
+                              onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                              showCitationFooter={index === lastTextBlockIndex()}
+                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                              streamingTail={streamingBody.animateTail() && index === lastTextBlockIndex()}
+                            />
+                          </div>
+                        );
                       }
-                      onOpenSharedFile={props.onOpenSharedFile}
-                      onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                    />
-                  </p>
-                );
-              }}
+                      return (
+                        <p
+                          class="message-copy"
+                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                        >
+                          <RichMessageText
+                            body={text().text}
+                            agents={props.agents}
+                            skills={props.skills}
+                            attachments={props.message.attachments}
+                            citations={props.message.citations}
+                            onSelectAgent={props.onSelectAgent}
+                            onOpenLink={props.onOpenLink}
+                            onOpenAttachment={(attachment) =>
+                              !canPreviewAttachment(attachment)
+                                ? props.onAttachmentAction(attachment, "open")
+                                : props.onPreview(attachment)
+                            }
+                            onOpenSharedFile={props.onOpenSharedFile}
+                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                          />
+                        </p>
+                      );
+                    }}
+                  </Match>
+                </Switch>
+              )}
             </For>
             <Show when={selectionInstruction()}>
               {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}

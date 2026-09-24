@@ -12,6 +12,7 @@ import {
   notification,
   protocolMessages,
   startAgentTestFixture,
+  startService,
   stopAgentTestFixture,
   stores,
   waitFor,
@@ -101,6 +102,40 @@ describe.sequential("AgentService: restart", () => {
       ]),
     });
     expect((await store.getOrCreate("chief")).threadId).toBe(threadId);
+  });
+
+  it("keeps a turn that started before provider startup finished", async () => {
+    const { store, mailbox } = stores(root);
+    let releaseModels = () => {};
+    const modelsListed = new Promise<void>((resolve) => {
+      releaseModels = resolve;
+    });
+    const client = new FakeAgentClient("codex", "CODEX_DONE", false, true, {}, async (method) => {
+      if (method === "model/list") await modelsListed;
+    });
+    service = createTestService({ store, mailbox, clientFactory: () => client });
+    // Chat is ready once the CLIs answer; model discovery and the recovery pass run after that.
+    const initialized = service.initialize();
+    await waitFor(() => service?.getStatus().phase === "ready");
+    await service.sendMessage({ agentId: "chief", text: "Start before startup finished" });
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+
+    releaseModels();
+    await initialized;
+
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("running");
+    expect((await service.readConversation("chief")).activeTurnId).not.toBeNull();
+  });
+
+  it("settles the running delivery of a provider that exited", async () => {
+    const { service: agentService, client } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await service.sendMessage({ agentId: "chief", text: "Work that the crash cuts short" });
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+
+    client.emit("exit", new Error("Codex exited."));
+
+    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
   });
 
   it("expires a persisted question prompt after restart", async () => {
