@@ -8,6 +8,7 @@ import {
   routineRunConversationEvent,
   skillConversationEvent,
 } from "@openbot/contracts/ipc";
+import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
   AgentDeliveryMarkerStatus,
   AgentMessage,
@@ -18,7 +19,6 @@ import type {
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
-import { cleanAgentMessageText } from "./features/agents/agent-message-text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
 export function toAgentProfile(stored: AgentSummary): AgentProfile {

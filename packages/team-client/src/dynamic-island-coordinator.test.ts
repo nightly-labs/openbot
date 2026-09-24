@@ -1,11 +1,27 @@
 import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary, QueueDelivery } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { DynamicIslandCoordinator, reconcileQueuesWithRuntimeWork } from "./dynamic-island-coordinator";
-import type { DynamicIslandPresentationInput } from "./dynamic-island-presentation";
+import type { DynamicIslandPresentationInput, DynamicIslandText } from "./dynamic-island-presentation";
+
+/** The caller redacts in production; these fixtures hold no secrets. */
+const text: DynamicIslandText = {
+  taskWorking: "Working on your request",
+  questionHeader: "Question from your agent",
+  questionText: "Open OpenBot to answer this question.",
+  optionFallback: (number) => `Option ${number}`,
+  takeoverTitle: "Browser step needs you",
+  takeoverDetail: "Complete the sign-in, verification, or consent in the browser.",
+  failureTitle: "Task failed",
+  failureDetail: "The task stopped before it could finish. Open the conversation to try again.",
+  approvalCommand: "Command needs review",
+  approvalFileChange: "File changes need review",
+  approvalPermissions: "Permissions need review",
+  errorMessage: (error, fallback) => (typeof error === "string" && error) || fallback,
+};
 
 describe("DynamicIslandCoordinator", () => {
   it("retains progress for the active turn and clears it when the turn completes", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(
       scoped("remote", { type: "turn-started", agentId: "research", threadId: "thread-1", turnId: "turn-1" }),
@@ -40,7 +56,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("selects the highest-priority notification across hosts and applies remote resolutions", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "local", [agent("chief", "Chief")]);
     seedAgents(coordinator, "remote-a", [agent("research", "Research")]);
     seedAgents(coordinator, "remote-b", [agent("sales", "Sales")]);
@@ -83,7 +99,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("keeps simultaneous requests from different agents and advances after each answer", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "local", [agent("chief", "Chief"), agent("research", "Research")]);
     coordinator.applyEvent(scoped("local", prompt("chief", "question-chief")), "local");
     coordinator.applyEvent(scoped("local", prompt("research", "question-research")), "local");
@@ -110,7 +126,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("removes only the matching failure after it is opened", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "local", [agent("chief", "Chief")]);
     coordinator.applyEvent(
       scoped("local", {
@@ -141,7 +157,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("tracks working and unread updates from an inactive host", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(scoped("remote", conversation("research", 0, [])), "local");
     coordinator.applyEvent(
@@ -190,7 +206,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("removes a citation marker split across Dynamic Island deltas", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(scoped("remote", conversation("research", 0, [])), "local");
     coordinator.applyEvent(
@@ -240,7 +256,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("does not count or display non-reply items from a full conversation", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(scoped("remote", conversation("research", 0, [])), "local");
     coordinator.applyEvent(
@@ -274,7 +290,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("waits for a full conversation before classifying a new delta message", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(scoped("remote", conversation("research", 0, [])), "local");
     coordinator.applyEvent(
@@ -310,7 +326,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("seeds an inactive host snapshot without counting historical replies as new", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     const historical = conversation("research", 1, [
       { id: "historical", text: "Historical reply", createdAt: "2026-08-29T09:00:00.000Z" },
@@ -348,7 +364,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("counts a buffered live legacy snapshot after the same baseline", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     const reply = conversation("research", 1, [
       { id: "live-reply", text: "Fresh reply", createdAt: "2026-08-29T10:00:00.000Z" },
@@ -365,7 +381,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("counts a buffered live legacy reply when its baseline could not be loaded", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     const reply = conversation("research", 1, [
       { id: "live-reply", text: "Fresh reply", createdAt: "2026-08-29T10:00:00.000Z" },
@@ -381,7 +397,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("counts only replies after the runtime snapshot message when full history arrives", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     const remoteAgent = agent("research", "Research");
     coordinator.applyEvent(
       scoped("remote", runtimeSnapshot({ agents: [remoteAgent], latestMessages: [runtimeMessage("anchor")] })),
@@ -408,7 +424,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("keeps working ahead of an unread message across hosts", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote-working", [agent("builder", "Builder")]);
     seedAgents(coordinator, "remote-message", [agent("research", "Research")]);
     coordinator.applyEvent(
@@ -451,7 +467,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("replaces the active server snapshot without deleting pending state from another host", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "remote", [agent("research", "Research")]);
     coordinator.applyEvent(scoped("remote", prompt("research", "remote-question")), "local");
     coordinator.replaceServer(emptyInput("local", [agent("chief", "Chief")]));
@@ -464,7 +480,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("counts failures hidden behind a takeover on another host", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     seedAgents(coordinator, "takeover", [agent("browser", "Browser"), agent("failed", "Failed")]);
     seedAgents(coordinator, "question", [agent("research", "Research")]);
     coordinator.applyEvent(
@@ -499,7 +515,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("atomically repairs stale remote state after reconnect", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     const remoteAgent = agent("research", "Research");
     seedAgents(coordinator, "remote", [remoteAgent]);
     coordinator.applyEvent(scoped("remote", prompt("research", "stale-question")), "local");
@@ -567,7 +583,7 @@ describe("DynamicIslandCoordinator", () => {
   });
 
   it("shows a completed reply after reconnecting during its turn", () => {
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(() => text);
     const remoteAgent = agent("research", "Research");
     coordinator.applyEvent(
       scoped(
@@ -613,6 +629,28 @@ describe("DynamicIslandCoordinator", () => {
       unreadCount: 1,
       message: { messageId: "reply-current" },
     });
+  });
+
+  it("shows the unread replies the host reports to a client that counts no arrivals", () => {
+    const coordinator = new DynamicIslandCoordinator(() => text);
+    coordinator.applyEvent(
+      scoped(
+        "phone",
+        runtimeSnapshot({ agents: [agent("research", "Research")], latestMessages: [runtimeMessage("reply-1")] }),
+      ),
+      "phone",
+    );
+    expect(coordinator.presentation(["phone"]).mode).toBe("idle");
+
+    coordinator.replaceUnreadReplies("phone", { research: 1 });
+    expect(coordinator.presentation(["phone"])).toMatchObject({
+      mode: "message",
+      unreadCount: 1,
+      message: { messageId: "reply-1", text: "reply-1" },
+    });
+
+    coordinator.replaceUnreadReplies("phone", {});
+    expect(coordinator.presentation(["phone"]).mode).toBe("idle");
   });
 });
 

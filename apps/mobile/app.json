@@ -94,6 +94,13 @@
           "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
           "speechRecognitionPermission": "Allow OpenBot to turn your speech into message text."
         }
+      ],
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "run.openbot.mobile.ExpoWidgetsTarget",
+          "groupIdentifier": "group.run.openbot.mobile"
+        }
       ]
     ],
     "experiments": {

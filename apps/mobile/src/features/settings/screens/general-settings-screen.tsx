@@ -15,9 +15,11 @@ import {
   useDictationLanguage,
 } from "@/features/settings/model/dictation-language";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
+import { saveLiveActivitiesPreference, useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { saveAgentColorMessages, useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
+import { isIOS } from "@/shared/lib/platform";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { useText } from "@/shared/lib/text";
 
@@ -110,6 +112,40 @@ function DictationSection({ dark }: { dark: boolean }) {
       >
         <Typography.Paragraph>{t("mobile.settings.dictation.language")}</Typography.Paragraph>
       </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** Live Activities exist only on iOS. iOS Settings can also turn them off for the app. */
+function LiveActivitiesSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const preference = useLiveActivitiesPreference();
+  const [error, setError] = useState<string | null>(null);
+  function save(enabled: boolean) {
+    setError(null);
+    void saveLiveActivitiesPreference(enabled).catch(() => setError(t("mobile.settings.saveFailed")));
+  }
+  if (!isIOS) return null;
+  return (
+    <SettingsSection
+      title={t("mobile.settings.liveActivities.title")}
+      footer={error ?? t("mobile.settings.liveActivities.footer")}
+    >
+      <SettingsRow>
+        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme={dark ? "dark" : "light"}>
+          <Switch
+            value={preference.enabled}
+            disabled={!preference.ready || preference.saving}
+            label={t("mobile.settings.liveActivities.toggle")}
+            onValueChange={save}
+          />
+        </Host>
+      </SettingsRow>
+      {error ? (
+        <SettingsRow disabled={preference.saving} disclosure={false} onPress={() => save(preference.enabled)}>
+          <Typography.Paragraph>{t("mobile.settings.liveActivities.retry")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
     </SettingsSection>
   );
 }
@@ -226,6 +262,7 @@ export function GeneralSettingsScreen() {
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      <LiveActivitiesSection dark={theme === "dark"} />
       <SettingsSection
         title={t("mobile.settings.privacy.title")}
         footer={analyticsError ?? t("mobile.settings.privacy.footer")}

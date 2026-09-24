@@ -6,12 +6,13 @@ import type {
   QueueSnapshot,
   ScopedAgentEvent,
 } from "@openbot/contracts/ipc";
-import { cleanAgentMessageText } from "../agents/agent-message-text";
+import { cleanAgentMessageText } from "./agent-message-text";
 import {
   countDynamicIslandAttention,
   createDynamicIslandPresentation,
   type DynamicIslandMessageSource,
   type DynamicIslandPresentationInput,
+  type DynamicIslandText,
   selectDynamicIslandPresentation,
 } from "./dynamic-island-presentation";
 
@@ -28,6 +29,12 @@ type ServerRuntime = DynamicIslandPresentationInput & {
 
 export class DynamicIslandCoordinator {
   readonly #servers = new Map<string, ServerRuntime>();
+  readonly #text: () => DynamicIslandText;
+
+  /** `text` is read for each presentation, so the island follows a change of language. */
+  constructor(text: () => DynamicIslandText) {
+    this.#text = text;
+  }
 
   serverState(
     serverId: string,
@@ -102,6 +109,18 @@ export class DynamicIslandCoordinator {
       rawMessageBodies,
       receivedRuntimeSnapshot: previous?.receivedRuntimeSnapshot ?? false,
     });
+  }
+
+  /**
+   * Sets one server's unread replies from the host read state. Mobile uses it instead of counting
+   * arrivals, so a chat read on any device clears the island.
+   */
+  replaceUnreadReplies(serverId: string, unreadReplies: Record<string, number>): void {
+    const runtime = this.#runtime(serverId);
+    runtime.unreadReplies = { ...unreadReplies };
+    runtime.unreadMessageIds = Object.fromEntries(
+      Object.entries(runtime.unreadMessageIds ?? {}).filter(([agentId]) => (unreadReplies[agentId] ?? 0) > 0),
+    );
   }
 
   retainServers(serverIds: readonly string[]): void {
@@ -258,11 +277,12 @@ export class DynamicIslandCoordinator {
   }
 
   presentation(serverOrder: readonly string[]): DynamicIslandPresentation {
+    const text = this.#text();
     let attentionCount = 0;
     const ordered = serverOrder.flatMap((serverId) => {
       const runtime = this.#servers.get(serverId);
-      if (runtime) attentionCount += countDynamicIslandAttention(runtime);
-      return runtime ? [createDynamicIslandPresentation(runtime)] : [];
+      if (runtime) attentionCount += countDynamicIslandAttention(runtime, text);
+      return runtime ? [createDynamicIslandPresentation(runtime, text)] : [];
     });
     return selectDynamicIslandPresentation(ordered, attentionCount);
   }

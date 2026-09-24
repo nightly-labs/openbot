@@ -16,7 +16,10 @@
     "./browser-view": "./src/browser-view.ts",
     "./team-api-requests": "./src/team-api-requests.ts",
     "./team-admin-requests": "./src/team-admin-requests.ts",
-    "./marketplace-catalog": "./src/marketplace-catalog.ts"
+    "./marketplace-catalog": "./src/marketplace-catalog.ts",
+    "./agent-message-text": "./src/agent-message-text.ts",
+    "./dynamic-island-coordinator": "./src/dynamic-island-coordinator.ts",
+    "./dynamic-island-presentation": "./src/dynamic-island-presentation.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"

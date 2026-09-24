@@ -11,7 +11,6 @@ import type {
   DynamicIslandTakeoverItem,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
-import { currentText } from "@openbot/ui/text";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
@@ -20,6 +19,26 @@ type AttentionCandidate =
   | { mode: "takeover"; item: DynamicIslandTakeoverItem }
   | { mode: "question"; item: DynamicIslandPromptItem }
   | { mode: "failed"; item: DynamicIslandFailureItem };
+
+/**
+ * The island text in the interface language. Each app builds it from its own catalog, so
+ * `team-client` stays free of UI, catalogs, and application state.
+ */
+export interface DynamicIslandText {
+  taskWorking: string;
+  questionHeader: string;
+  questionText: string;
+  optionFallback: (number: number) => string;
+  takeoverTitle: string;
+  takeoverDetail: string;
+  failureTitle: string;
+  failureDetail: string;
+  approvalCommand: string;
+  approvalFileChange: string;
+  approvalPermissions: string;
+  /** `userErrorMessage` in the interface language. `fallback` is already translated. */
+  errorMessage: (error: unknown, fallback: string) => string;
+}
 
 export interface DynamicIslandPresentationInput {
   serverId: string;
@@ -34,7 +53,7 @@ export interface DynamicIslandPresentationInput {
   failedTurns: Record<string, string | undefined>;
 }
 
-interface DynamicIslandAgentSource {
+export interface DynamicIslandAgentSource {
   id: string;
   name: string;
   avatarSeed: string;
@@ -67,15 +86,18 @@ export function selectDynamicIslandPresentation(
   return { ...selected, remainingCount: Math.max(0, attentionCount - 1) };
 }
 
-export function countDynamicIslandAttention(input: DynamicIslandPresentationInput): number {
+export function countDynamicIslandAttention(input: DynamicIslandPresentationInput, text: DynamicIslandText): number {
   const visibleAgents = input.agents.filter((agent) => agent.notifications);
-  return collectAttention(input, new Map(visibleAgents.map((agent) => [agent.id, agent]))).length;
+  return collectAttention(input, new Map(visibleAgents.map((agent) => [agent.id, agent])), text).length;
 }
 
-export function createDynamicIslandPresentation(input: DynamicIslandPresentationInput): DynamicIslandPresentation {
+export function createDynamicIslandPresentation(
+  input: DynamicIslandPresentationInput,
+  text: DynamicIslandText,
+): DynamicIslandPresentation {
   const visibleAgents = input.agents.filter((agent) => agent.notifications);
   const agentsById = new Map(visibleAgents.map((agent) => [agent.id, agent]));
-  const attentionItems = collectAttention(input, agentsById).sort(
+  const attentionItems = collectAttention(input, agentsById, text).sort(
     (left, right) => presentationPriority(left.mode) - presentationPriority(right.mode),
   );
   const attention = attentionItems[0];
@@ -102,7 +124,7 @@ export function createDynamicIslandPresentation(input: DynamicIslandPresentation
   const working = visibleAgents
     .filter((agent) => isAgentWorking(agent.id, input))
     .slice(0, 3)
-    .map((agent) => ({ agent: agentIdentity(agent), task: currentTask(agent.id, input.queues) }));
+    .map((agent) => ({ agent: agentIdentity(agent), task: currentTask(agent.id, input.queues, text) }));
   if (working.length > 0) return { serverId: input.serverId, mode: "working", working };
 
   const message = latestUnreadMessage(input, visibleAgents);
@@ -142,8 +164,8 @@ function isAgentWorking(agentId: string, input: DynamicIslandPresentationInput):
   return Boolean(input.activeTurns[agentId]) || Boolean(runningDelivery(input.queues[agentId]));
 }
 
-function currentTask(agentId: string, queues: Record<string, QueueSnapshot>): string {
-  return truncate(runningDelivery(queues[agentId])?.text.trim() || currentText().t("island.task.working"), 240);
+function currentTask(agentId: string, queues: Record<string, QueueSnapshot>, text: DynamicIslandText): string {
+  return truncate(runningDelivery(queues[agentId])?.text.trim() || text.taskWorking, 240);
 }
 
 function runningDelivery(snapshot: QueueSnapshot | undefined) {
@@ -153,6 +175,7 @@ function runningDelivery(snapshot: QueueSnapshot | undefined) {
 function collectAttention(
   input: DynamicIslandPresentationInput,
   agentsById: Map<string, DynamicIslandAgentSource>,
+  text: DynamicIslandText,
 ): AttentionCandidate[] {
   const items: AttentionCandidate[] = [];
   for (const [agentId, approval] of Object.entries(input.pendingApprovals)) {
@@ -163,7 +186,7 @@ function collectAttention(
       item: {
         requestId: approval.requestId,
         agent: agentIdentity(agent),
-        title: approvalTitle(approval),
+        title: approvalTitle(approval, text),
         detail: truncateNullable(approval.reason ?? approval.command),
         truncated:
           ("truncated" in approval && approval.truncated === true) ||
@@ -201,14 +224,14 @@ function collectAttention(
     const agent = agentsById.get(agentId);
     if (!agent || !event) continue;
     if (event.type === "prompt") {
-      const questions = normalizeQuestions(event.questions);
+      const questions = normalizeQuestions(event.questions, text);
       const question = questions[0];
       items.push({
         mode: "question",
         item: {
           requestId: event.requestId,
           agent: agentIdentity(agent),
-          title: truncate(question?.header || currentText().t("island.question.defaultHeader"), 180),
+          title: truncate(question?.header || text.questionHeader, 180),
           detail: truncateNullable(question?.question),
           questions,
         },
@@ -220,8 +243,8 @@ function collectAttention(
       item: {
         requestId: event.request.requestId,
         agent: agentIdentity(agent),
-        title: currentText().t("island.takeover.title"),
-        detail: currentText().t("island.takeover.detail"),
+        title: text.takeoverTitle,
+        detail: text.takeoverDetail,
       },
     });
   }
@@ -236,29 +259,27 @@ function collectAttention(
       item: {
         turnId,
         agent: agentIdentity(agent),
-        title: currentText().t("island.failure.title"),
-        detail: failureDetail(delivery?.error),
+        title: text.failureTitle,
+        detail: failureDetail(delivery?.error, text),
       },
     });
   }
   return items;
 }
 
-function failureDetail(error: string | null | undefined): string {
-  const text = currentText();
-  return truncate(text.errorMessage(error, text.t("island.failure.detail")), 600);
+function failureDetail(error: string | null | undefined, text: DynamicIslandText): string {
+  return truncate(text.errorMessage(error, text.failureDetail), 600);
 }
 
 function truncate(value: string, length: number): string {
   return value.slice(0, length);
 }
 
-function normalizeQuestions(questions: PromptEvent["questions"]): DynamicIslandQuestionItem[] {
-  const { t } = currentText();
+function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIslandText): DynamicIslandQuestionItem[] {
   return questions.slice(0, INPUT_LIMITS.promptQuestions).map((question, questionIndex) => ({
     id: normalizeTechnical(question.id, `question-${questionIndex + 1}`, INPUT_LIMITS.identifier),
-    header: normalizeRequired(question.header, t("island.question.defaultHeader"), INPUT_LIMITS.promptHeader),
-    question: normalizeRequired(question.question, t("island.question.defaultText"), INPUT_LIMITS.promptQuestion),
+    header: normalizeRequired(question.header, text.questionHeader, INPUT_LIMITS.promptHeader),
+    question: normalizeRequired(question.question, text.questionText, INPUT_LIMITS.promptQuestion),
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
@@ -267,7 +288,7 @@ function normalizeQuestions(questions: PromptEvent["questions"]): DynamicIslandQ
         const label = normalizeTechnical(option.label, fallback, INPUT_LIMITS.promptOptionLabel);
         const displayLabel = normalizeRequired(
           option.label,
-          t("island.question.optionFallback", { number: optionIndex + 1 }),
+          text.optionFallback(optionIndex + 1),
           INPUT_LIMITS.promptOptionLabel,
         );
         return {
@@ -291,11 +312,10 @@ function truncateNullable(value: string | null | undefined): string | null {
   return truncate(value, 600);
 }
 
-function approvalTitle(approval: AgentApproval) {
-  const { t } = currentText();
-  if (approval.kind === "command") return t("island.approval.title.command");
-  if (approval.kind === "file-change") return t("island.approval.title.fileChange");
-  return t("island.approval.title.permissions");
+function approvalTitle(approval: AgentApproval, text: DynamicIslandText) {
+  if (approval.kind === "command") return text.approvalCommand;
+  if (approval.kind === "file-change") return text.approvalFileChange;
+  return text.approvalPermissions;
 }
 
 function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {

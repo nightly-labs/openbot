@@ -50,6 +50,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.feedback.footer": "Touch feedback for actions in the app on this device.",
   "mobile.settings.feedback.haptics": "Haptics",
   "mobile.settings.feedback.retry": "Retry saving haptics setting",
+  "mobile.settings.liveActivities.title": "Live Activities",
+  "mobile.settings.liveActivities.footer":
+    "Shows agent work, messages, questions, and approvals on the Lock Screen and in the Dynamic Island while OpenBot runs.",
+  "mobile.settings.liveActivities.toggle": "Show agent activity",
+  "mobile.settings.liveActivities.retry": "Retry saving Live Activities setting",
   "mobile.settings.privacy.title": "Privacy",
   "mobile.settings.privacy.footer":
     "Share feature use and connection results from this phone. Message contents and files are not sent.",

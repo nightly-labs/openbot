@@ -11,7 +11,12 @@ describe("live workspace state", () => {
     expect(listener).not.toHaveBeenCalled();
     store.update("unreadAgentIds", () => ["agent"]);
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(store.get()).toEqual({ activityByServer: {}, unreadAgentIds: ["agent"], browserRequests: {} });
+    expect(store.get()).toEqual({
+      activityByServer: {},
+      unreadAgentIds: ["agent"],
+      unreadCounts: {},
+      browserRequests: {},
+    });
     expect(store.get().browserRequests).toBe(requests);
   });
 });

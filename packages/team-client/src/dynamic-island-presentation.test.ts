@@ -4,36 +4,45 @@ import {
   type DynamicIslandPresentation,
   isDynamicIslandPresentation,
 } from "@openbot/contracts/ipc";
-import type { AgentProfile } from "@openbot/ui/data";
 import { describe, expect, it } from "vitest";
 import {
   createDynamicIslandPresentation,
+  type DynamicIslandAgentSource,
   type DynamicIslandPresentationInput,
+  type DynamicIslandText,
   selectDynamicIslandPresentation,
 } from "./dynamic-island-presentation";
 
-const agent: AgentProfile = {
+/** The caller redacts in production; these fixtures hold no secrets. */
+const text: DynamicIslandText = {
+  taskWorking: "Working on your request",
+  questionHeader: "Question from your agent",
+  questionText: "Open OpenBot to answer this question.",
+  optionFallback: (number) => `Option ${number}`,
+  takeoverTitle: "Browser step needs you",
+  takeoverDetail: "Complete the sign-in, verification, or consent in the browser.",
+  failureTitle: "Task failed",
+  failureDetail: "The task stopped before it could finish. Open the conversation to try again.",
+  approvalCommand: "Command needs review",
+  approvalFileChange: "File changes need review",
+  approvalPermissions: "Permissions need review",
+  errorMessage: (error, fallback) => (typeof error === "string" && error) || fallback,
+};
+
+const agent: DynamicIslandAgentSource = {
   id: "chief",
   name: "Chief",
-  title: "Coordinator",
-  description: "Coordinates work",
   notifications: true,
-  provider: "codex",
-  model: "gpt-5",
-  reasoningEffort: "medium",
-  threadId: "thread-1",
   avatarSeed: "chief",
   avatarHue: 215,
   avatarUrl: null,
-  time: "now",
   preview: "Ready",
 };
 
-const research: AgentProfile = {
+const research: DynamicIslandAgentSource = {
   ...agent,
   id: "research",
   name: "Research",
-  threadId: "thread-2",
   avatarSeed: "research",
   avatarHue: 150,
 };
@@ -132,7 +141,7 @@ describe("createDynamicIslandPresentation", () => {
     input.unreadReplies.chief = 1;
     input.liveMessages.chief = [{ id: "long-message", author: "agent", body: "m".repeat(2_000), time: "" }];
 
-    const message = createDynamicIslandPresentation(input);
+    const message = createDynamicIslandPresentation(input, text);
     expect(isDynamicIslandPresentation(message)).toBe(true);
 
     input.unreadReplies = {};
@@ -150,7 +159,7 @@ describe("createDynamicIslandPresentation", () => {
       permissions: null,
     };
 
-    expect(isDynamicIslandPresentation(createDynamicIslandPresentation(input))).toBe(true);
+    expect(isDynamicIslandPresentation(createDynamicIslandPresentation(input, text))).toBe(true);
 
     input.pendingApprovals = {};
     input.pendingPrompts.chief = {
@@ -164,7 +173,7 @@ describe("createDynamicIslandPresentation", () => {
       ],
     };
 
-    expect(isDynamicIslandPresentation(createDynamicIslandPresentation(input))).toBe(true);
+    expect(isDynamicIslandPresentation(createDynamicIslandPresentation(input, text))).toBe(true);
   });
 
   it("normalizes malformed and oversized prompt display fields before publication", () => {
@@ -187,7 +196,7 @@ describe("createDynamicIslandPresentation", () => {
       })),
     };
 
-    const presentation = createDynamicIslandPresentation(input);
+    const presentation = createDynamicIslandPresentation(input, text);
 
     expect(isDynamicIslandPresentation(presentation)).toBe(true);
     expect(presentation.mode).toBe("question");
@@ -223,7 +232,7 @@ describe("createDynamicIslandPresentation", () => {
       questions: [{ id: "visible", header: "Visible", question: "Visible?", isSecret: false, options: null }],
     };
 
-    const question = createDynamicIslandPresentation(input);
+    const question = createDynamicIslandPresentation(input, text);
     expect(question).toMatchObject({ mode: "question", remainingCount: 0, item: { requestId: "visible-question" } });
 
     input.pendingPrompts = {};
@@ -234,7 +243,7 @@ describe("createDynamicIslandPresentation", () => {
       research: [{ id: "visible-message", author: "agent", body: "Visible", time: "2026-08-29T09:00:00Z" }],
     };
 
-    expect(createDynamicIslandPresentation(input)).toMatchObject({
+    expect(createDynamicIslandPresentation(input, text)).toMatchObject({
       mode: "message",
       unreadCount: 1,
       message: { messageId: "visible-message", agent: { id: "research" } },
@@ -266,7 +275,7 @@ describe("createDynamicIslandPresentation", () => {
       ],
     };
 
-    expect(createDynamicIslandPresentation(input)).toMatchObject({
+    expect(createDynamicIslandPresentation(input, text)).toMatchObject({
       mode: "message",
       unreadCount: 2,
       message: { messageId: "newer", agent: { id: "research" } },
@@ -282,7 +291,7 @@ describe("createDynamicIslandPresentation", () => {
     input.unreadReplies = { chief: 1, research: 1 };
     input.unreadMessageIds = { chief: "older-preview", research: "newer-preview" };
 
-    expect(createDynamicIslandPresentation(input)).toMatchObject({
+    expect(createDynamicIslandPresentation(input, text)).toMatchObject({
       mode: "message",
       message: { messageId: "newer-preview", agent: { id: "research" } },
     });
@@ -290,7 +299,7 @@ describe("createDynamicIslandPresentation", () => {
 
   it("maps a question and returns to idle", () => {
     const input = state();
-    expect(createDynamicIslandPresentation(input).mode).toBe("idle");
+    expect(createDynamicIslandPresentation(input, text).mode).toBe("idle");
     input.pendingPrompts.chief = {
       type: "prompt",
       requestId: "prompt-1",
@@ -299,7 +308,7 @@ describe("createDynamicIslandPresentation", () => {
       turnId: "turn-1",
       questions: [{ id: "q1", header: "Choose a source", question: "Which source?", isSecret: false, options: null }],
     };
-    const presentation = createDynamicIslandPresentation(input);
+    const presentation = createDynamicIslandPresentation(input, text);
     expect(presentation.mode).toBe("question");
     if (presentation.mode !== "question") throw new Error("Expected a question presentation.");
     expect(presentation.item).toMatchObject({
@@ -336,7 +345,7 @@ describe("createDynamicIslandPresentation", () => {
       ],
     };
 
-    const presentation = createDynamicIslandPresentation(input);
+    const presentation = createDynamicIslandPresentation(input, text);
 
     expect(presentation).toMatchObject({
       mode: "question",
@@ -366,7 +375,7 @@ describe("createDynamicIslandPresentation", () => {
       permissions: null,
     };
     input.pendingApprovals.chief = approval;
-    const presentation = createDynamicIslandPresentation(input);
+    const presentation = createDynamicIslandPresentation(input, text);
     expect(presentation.mode).toBe("approval");
     if (presentation.mode !== "approval") throw new Error("Expected an approval presentation.");
     expect(presentation.remainingCount).toBe(0);
@@ -377,7 +386,10 @@ describe("createDynamicIslandPresentation", () => {
     });
 
     approval.command = "x".repeat(601);
-    expect(createDynamicIslandPresentation(input)).toMatchObject({ mode: "approval", item: { truncated: true } });
+    expect(createDynamicIslandPresentation(input, text)).toMatchObject({
+      mode: "approval",
+      item: { truncated: true },
+    });
   });
 
   it("maps a browser takeover presentation", () => {
@@ -394,7 +406,7 @@ describe("createDynamicIslandPresentation", () => {
       },
     };
 
-    const takeover = createDynamicIslandPresentation(input);
+    const takeover = createDynamicIslandPresentation(input, text);
     expect(takeover.mode).toBe("takeover");
     if (takeover.mode !== "takeover") throw new Error("Expected a takeover presentation.");
     expect(takeover.item).toMatchObject({
@@ -428,7 +440,7 @@ describe("createDynamicIslandPresentation", () => {
       ],
     };
 
-    const presentation = createDynamicIslandPresentation(input);
+    const presentation = createDynamicIslandPresentation(input, text);
 
     expect(presentation.mode).toBe("failed");
     if (presentation.mode !== "failed") throw new Error("Expected a failure presentation.");

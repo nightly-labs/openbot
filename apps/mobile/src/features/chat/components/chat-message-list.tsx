@@ -41,8 +41,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
