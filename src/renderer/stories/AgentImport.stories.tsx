@@ -3,7 +3,7 @@ import { Blocks, Download, HardDrive, Monitor, Settings, Tabs, UsersRound } from
 import { AgentImportView } from "@openbot/ui/features/import/AgentImportView";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSignal } from "solid-js";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL, AGENT_IMPORT_WARNINGS } from "./agent-import-fixtures";
 import { FILES_NOW } from "./files-fixtures";
@@ -56,23 +56,13 @@ function Stage(props: { args: ViewArgs; narrow?: boolean }) {
 export const Intro: Story = {
   name: "Import: Steps",
   render: () => <Stage args={viewArgs()} />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Open the export agent" })).toBeVisible();
-    await expect(canvas.getByRole("button", { name: /^Choose export file/u })).toBeEnabled();
-  },
 };
 
 export const SetUpYourself: Story = {
   name: "Import: Set up the skill yourself",
   render: () => {
     const [setup, setSetup] = createSignal<ViewArgs["setup"]>("agent");
-    const onSaveExportSkill = fn();
-    return <Stage args={viewArgs({ setup: setup(), onSetupChange: setSetup, onSaveExportSkill })} />;
-  },
-  play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("tab", { name: "Set it up yourself" }));
-    await expect(canvas.getByRole("button", { name: "Copy" })).toBeEnabled();
-    await expect(canvas.getByRole("button", { name: /^Save file/u })).toBeVisible();
+    return <Stage args={viewArgs({ setup: setup(), onSetupChange: setSetup })} />;
   },
 };
 
@@ -94,21 +84,7 @@ export const OpenFailed: Story = {
 
 export const Review: Story = {
   name: "Import: Review",
-  render: () => {
-    const onImport = fn();
-    return <Stage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW, onImport })} />;
-  },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Import 3 agents and 2 channels" })).toBeEnabled();
-    await userEvent.click(canvas.getByRole("checkbox", { name: "Import Sales Outbound" }));
-    await userEvent.click(canvas.getByRole("checkbox", { name: "Import Research" }));
-    await expect(canvas.getByText("1 of 3 selected")).toBeVisible();
-    // A channel keeps the members that stay selected, and needs one of them.
-    await expect(canvas.getByRole("checkbox", { name: "Import Pipeline review" })).toBeDisabled();
-    await expect(canvas.getByText("Select at least one of its agents to import it.")).toBeVisible();
-    await expect(canvas.getByText("Imports without Research, Sales Outbound.")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Import 1 agent and 1 channel" })).toBeEnabled();
-  },
+  render: () => <Stage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW })} />,
 };
 
 export const ReviewWithWarnings: Story = {
@@ -131,9 +107,6 @@ export const Importing: Story = {
 export const Done: Story = {
   name: "Import: Done",
   render: () => <Stage args={viewArgs({ phase: "done", result: RESULT })} />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: `Open ${STORY_AGENT_SUMMARIES[0]?.name}` })).toBeVisible();
-  },
 };
 
 export const PartlyDone: Story = {
@@ -206,10 +179,6 @@ function ServerSettingsStage(props: { args: ViewArgs }) {
 export const InServerSettings: Story = {
   name: "Import: Server settings",
   render: () => <ServerSettingsStage args={viewArgs()} />,
-  play: async () => {
-    const dialog = await within(document.body).findByRole("dialog", { name: "Import" });
-    await expect(within(dialog).getByRole("tab", { name: "Import" })).toHaveAttribute("aria-selected", "true");
-  },
 };
 
 export const ReviewInServerSettings: Story = {

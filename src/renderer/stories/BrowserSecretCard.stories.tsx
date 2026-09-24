@@ -1,6 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
 import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
-import { userEvent, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import browserTakeoverPreviewUrl from "./assets/browser-takeover-preview.svg";
 
@@ -60,13 +59,6 @@ export const Narrow: Story = {
   ),
 };
 
-export const PartiallyFilled: Story = {
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.type(canvas.getByLabelText("6-digit code"), "123");
-  },
-};
-
 export const TwelveDigitsNarrow: Story = {
   args: { request: { ...request, secret: { method: "otp", origin: "https://accounts.example.com", digits: 12 } } },
   render: Narrow.render,
@@ -82,18 +74,8 @@ export const PreviewUnavailable: Story = {
 
 export const SubmittingPassword: Story = {
   args: { ...Password.args, onRespond: () => new Promise<void>(() => {}) },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.type(canvas.getByLabelText("Password"), "example-password");
-    await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
-  },
 };
 
 export const SubmittingCode: Story = {
   args: { onRespond: () => new Promise<void>(() => {}) },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await userEvent.type(canvas.getByLabelText("6-digit code"), "123456");
-    await userEvent.click(canvas.getByRole("button", { name: "Submit" }));
-  },
 };

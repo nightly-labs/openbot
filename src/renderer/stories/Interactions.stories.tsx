@@ -21,7 +21,7 @@ import {
   Trash2,
 } from "@openbot/ui";
 import { createSignal } from "solid-js";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
@@ -59,21 +59,6 @@ export const DialogFocus: Story = {
       </Dialog.Root>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    const trigger = canvas.getByRole("button", { name: "Open dialog" });
-    await userEvent.click(trigger);
-    const body = within(document.body);
-    const dialog = await body.findByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await userEvent.keyboard("{Tab}");
-    const activeElement = document.activeElement;
-    await expect(activeElement).toBeInstanceOf(HTMLElement);
-    if (activeElement instanceof HTMLElement) await expect(dialog).toContainElement(activeElement);
-    await userEvent.keyboard("{Escape}");
-    await expect(body.queryByRole("dialog")).not.toBeInTheDocument();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    await expect(trigger).toHaveFocus();
-  },
 };
 
 export const AlertDialogConfirmation: Story = {
@@ -108,16 +93,6 @@ export const AlertDialogConfirmation: Story = {
       </AlertDialog.Root>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    const trigger = canvas.getByRole("button", { name: "Delete agent" });
-    await userEvent.click(trigger);
-    const body = within(document.body);
-    await expect(await body.findByRole("alertdialog")).toBeVisible();
-    await userEvent.click(body.getByRole("button", { name: "Cancel" }));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    await expect(body.queryByRole("alertdialog")).not.toBeInTheDocument();
-    await expect(trigger).toHaveFocus();
-  },
 };
 
 export const MenuPopoverTooltip: Story = {
@@ -185,66 +160,6 @@ export const MenuPopoverTooltip: Story = {
       </div>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    const body = within(document.body);
-    const menuTrigger = canvas.getByRole("button", { name: "Agent actions" });
-    await userEvent.click(menuTrigger);
-    const menu = await body.findByRole("menu");
-    const [firstItem] = within(menu).getAllByRole("menuitem");
-    if (!firstItem) throw new Error("Agent actions menu has no items.");
-    const menuStyle = getComputedStyle(menu);
-    const firstItemStyle = getComputedStyle(firstItem);
-    await expect(menu).toBeVisible();
-    await expect(menu).toHaveClass("ui-action-menu");
-    await expect(menu.getBoundingClientRect().width).toBe(160);
-    await expect(menuStyle.padding).toBe("4px");
-    await expect(menuStyle.borderRadius).toBe("8px");
-    await expect(firstItem.getBoundingClientRect().height).toBe(32);
-    await expect(firstItemStyle.padding).toBe("6px 8px");
-    await expect(firstItemStyle.gap).toBe("8px");
-    await expect(firstItemStyle.borderRadius).toBe("6px");
-    await expect(firstItemStyle.fontSize).toBe("14px");
-    await expect(firstItemStyle.lineHeight).toBe("20px");
-    await expect(firstItemStyle.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-    await expect(firstItem.querySelector("svg")?.getBoundingClientRect().width).toBe(16);
-    await expect(body.getByRole("menuitem", { name: "Duplicate" })).toHaveAttribute("data-disabled");
-    const deleteItem = body.getByRole("menuitem", { name: "Delete" });
-    const deleteIcon = deleteItem.querySelector("svg");
-    const menuSeparator = within(menu).getByRole("separator");
-    const subtleDividerColor = getComputedStyle(document.documentElement)
-      .getPropertyValue("--openbot-shadow-ring")
-      .trim();
-    await expect(deleteItem).toHaveClass("ui-action-menu-danger");
-    await expect(getComputedStyle(deleteItem).color).not.toBe(firstItemStyle.color);
-    await expect(getComputedStyle(menuSeparator).backgroundColor).toBe(subtleDividerColor);
-    await expect(getComputedStyle(menuSeparator).margin).toBe("4px 0px");
-    if (!(deleteIcon instanceof SVGElement)) throw new Error("Delete icon was not found.");
-    await expect(getComputedStyle(deleteIcon).color).toBe(getComputedStyle(deleteItem).color);
-    await userEvent.keyboard("{ArrowDown}{End}");
-    await expect(body.getByRole("menuitem", { name: "Delete" })).toHaveAttribute("data-highlighted");
-    await userEvent.keyboard("{Escape}");
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    await expect(menuTrigger).toHaveFocus();
-
-    const tooltipTrigger = canvas.getByRole("button", { name: "Hover or focus" });
-    tooltipTrigger.focus();
-    await expect(await body.findByRole("tooltip")).toBeVisible();
-    await userEvent.keyboard("{Escape}");
-    await expect(body.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    const popoverTrigger = canvas.getByRole("button", { name: "Show details" });
-    await userEvent.click(popoverTrigger);
-    await expect(await body.findByRole("dialog", { name: "Agent details" })).toBeVisible();
-    await userEvent.click(body.getByRole("button", { name: "Close" }));
-    await expect(body.queryByRole("dialog", { name: "Agent details" })).not.toBeInTheDocument();
-
-    const contextTrigger = canvas.getByText("Right-click for actions");
-    await userEvent.pointer({ keys: "[MouseRight]", target: contextTrigger });
-    await expect(await body.findByRole("menu")).toHaveClass("ui-action-menu");
-    await userEvent.keyboard("{Home}");
-    await expect(body.getByRole("menuitem", { name: "Open" })).toHaveAttribute("data-highlighted");
-    await userEvent.keyboard("{Escape}");
-  },
 };
 
 export const TabsAndRadioGroup: Story = {
@@ -300,18 +215,6 @@ export const TabsAndRadioGroup: Story = {
       </main>
     );
   },
-  play: async ({ canvas, userEvent }) => {
-    const models = canvas.getByRole("tab", { name: "Models" });
-    models.focus();
-    await userEvent.keyboard("{End}");
-    await expect(canvas.getByRole("tab", { name: "Permissions" })).toHaveFocus();
-    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Permission settings");
-
-    const general = canvas.getByRole("radio", { name: "General" });
-    general.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    await expect(canvas.getByRole("radio", { name: "Research" })).toBeChecked();
-  },
 };
 
 export const SlidingSelectionTabs: Story = {
@@ -334,17 +237,6 @@ export const SlidingSelectionTabs: Story = {
       </SlidingTabs.Root>
     </main>
   ),
-  play: async ({ canvasElement, userEvent }) => {
-    const canvas = within(canvasElement);
-    const plan = canvas.getByRole("tab", { name: "Plan" });
-    const debug = canvas.getByRole("tab", { name: "Debug" });
-    await expect(plan).toHaveAttribute("aria-selected", "true");
-    await userEvent.click(debug);
-    await expect(debug).toHaveAttribute("aria-selected", "true");
-    debug.focus();
-    await userEvent.keyboard("{ArrowRight}");
-    await expect(canvas.getByRole("tab", { name: "Ask" })).toHaveAttribute("aria-selected", "true");
-  },
 };
 
 const pickerOptions = ["GPT-5", "Claude Sonnet", "Gemini Pro"];
@@ -409,18 +301,4 @@ export const Pickers: Story = {
       </div>
     </main>
   ),
-  play: async ({ canvas, userEvent }) => {
-    const select = canvas.getByRole("button", { name: /Model/ });
-    select.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    const body = within(document.body);
-    await expect((await body.findAllByRole("listbox")).at(-1)).toBeVisible();
-    await userEvent.keyboard("{End}{Enter}");
-    await expect(select).toHaveTextContent("Gemini Pro");
-
-    const combobox = canvas.getByRole("combobox", { name: "Search model" });
-    await userEvent.click(combobox);
-    await userEvent.type(combobox, "Claude");
-    await expect(combobox).toHaveValue("Claude");
-  },
 };

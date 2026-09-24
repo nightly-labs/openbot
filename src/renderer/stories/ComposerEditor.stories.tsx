@@ -3,7 +3,7 @@ import { serializeChatTagReference } from "@openbot/contracts/chat-tag-reference
 import type { DraftAttachment, InstalledSkill } from "@openbot/contracts/ipc";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { createSignal } from "solid-js";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS, STORY_MCP_SERVERS } from "./fixtures";
 
@@ -104,20 +104,6 @@ const longDescriptionSkill: InstalledSkill = {
     "Collects the timeline, the alerts and the chat around an incident, then writes the review the team reads the next morning, with the contributing causes, the repair work and the owner of each follow-up item.",
 };
 
-/** Writes a picker trigger into the contenteditable and puts the caret after it. */
-function typePickerTrigger(editor: HTMLElement, trigger: string): void {
-  editor.textContent = trigger;
-  const textNode = editor.firstChild;
-  if (!textNode) throw new Error("Composer editor did not create a text node");
-  const selectionRange = document.createRange();
-  selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
-  selectionRange.collapse(true);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(selectionRange);
-  editor.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 /**
  * The picker grows out of the top edge of the composer, so a picker story keeps empty room above
  * the composer. A compact composer holds the editor in the middle grid column, and the picker
@@ -179,21 +165,6 @@ export const Disabled: Story = {
 
 export const MentionPicker: Story = {
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    typePickerTrigger(editor, "@");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert mention" });
-    await expect(picker).toBeInTheDocument();
-    const research = within(document.body).getByRole("option", { name: "Research Agent" });
-    const sales = within(document.body).getByRole("option", { name: "Sales Outbound Agent" });
-    await expect(research).toHaveClass("mention-picker-option-active");
-    await userEvent.keyboard("{ArrowDown}");
-    await expect(sales).toHaveClass("mention-picker-option-active");
-    await userEvent.keyboard("{Enter}");
-    await expect(editor.querySelector('[data-mention-id="sales"]')).not.toBeNull();
-    await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
-  },
 };
 
 export const SkillPicker: Story = {
@@ -201,18 +172,6 @@ export const SkillPicker: Story = {
     skills: installedSkills,
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
-    await expect(picker).toBeInTheDocument();
-    await expect(within(document.body).getByRole("option", { name: /^Release Notes/ })).toBeInTheDocument();
-    await userEvent.keyboard("{Enter}");
-    await expect(editor.querySelector('[data-skill-id="skill-release-notes"]')).not.toBeNull();
-    await expect(editor).toHaveTextContent("Release Notes");
-    await expect(storyArgs.onSubmit).not.toHaveBeenCalled();
-  },
 };
 
 export const McpServerPicker: Story = {
@@ -221,15 +180,6 @@ export const McpServerPicker: Story = {
     mcpServers: STORY_MCP_SERVERS,
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
-  play: async ({ canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    typePickerTrigger(editor, "$Lin");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
-    await expect(within(picker).getByRole("option", { name: /^Linear MCP server/ })).toBeInTheDocument();
-    await userEvent.keyboard("{Enter}");
-    await expect(editor.querySelector('[data-mcp-id="mcp-linear"]')).not.toBeNull();
-  },
 };
 
 export const SkillPickerLongDescription: Story = {
@@ -237,13 +187,6 @@ export const SkillPickerLongDescription: Story = {
     skills: [longDescriptionSkill, ...installedSkills],
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
-  play: async ({ canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
-    await expect(within(picker).getByRole("option", { name: /^Incident Review/ })).toBeInTheDocument();
-  },
 };
 
 export const CompactComposerPicker: Story = {
@@ -251,13 +194,6 @@ export const CompactComposerPicker: Story = {
     skills: installedSkills,
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "360px", compact: true }),
-  play: async ({ canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    typePickerTrigger(editor, "$");
-    const picker = await within(document.body).findByRole("listbox", { name: "Insert skill or MCP server" });
-    await expect(within(picker).getByRole("option", { name: /^Site Hosting/ })).toBeInTheDocument();
-  },
 };
 
 export const FileReferencePicker: Story = {
@@ -266,46 +202,6 @@ export const FileReferencePicker: Story = {
     onOpenAttachment: fn(),
   },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const editor = canvas.getByRole("textbox", { name: "Message Chief" });
-    await userEvent.click(editor);
-    editor.textContent = "@start";
-    const textNode = editor.firstChild;
-    if (!textNode) throw new Error("Composer editor did not create a text node");
-    const selectionRange = document.createRange();
-    selectionRange.setStart(textNode, textNode.textContent?.length ?? 0);
-    selectionRange.collapse(true);
-    const selection = {
-      anchorNode: textNode,
-      anchorOffset: textNode.textContent?.length ?? 0,
-      rangeCount: 1,
-      getRangeAt: () => selectionRange,
-      removeAllRanges: () => undefined,
-      addRange: () => undefined,
-      // biome-ignore lint/nursery/noUnsafeTypeAssertion: Storybook needs a minimal Selection double for contenteditable caret placement.
-    } as unknown as Selection;
-    const originalGetSelection = window.getSelection;
-    Object.defineProperty(window, "getSelection", {
-      configurable: true,
-      value: () => selection,
-    });
-    try {
-      editor.dispatchEvent(new Event("input", { bubbles: true }));
-      const picker = await within(document.body).findByRole("listbox", { name: "Insert mention" });
-      await expect(within(picker).getByRole("option", { name: "start-types.d.ts File" })).toBeInTheDocument();
-      await userEvent.keyboard("{Enter}");
-      const chip = editor.querySelector<HTMLElement>('[data-attachment-reference-id="draft-start-types"]');
-      if (!chip) throw new Error("Composer editor did not insert the file reference");
-      await expect(editor).toHaveTextContent("start-types.d.ts");
-      await userEvent.click(chip);
-      await expect(storyArgs.onOpenAttachment).toHaveBeenCalledWith(referencedFiles[0]);
-    } finally {
-      Object.defineProperty(window, "getSelection", {
-        configurable: true,
-        value: originalGetSelection,
-      });
-    }
-  },
 };
 
 export const WithFileReferences: Story = {
@@ -335,21 +231,4 @@ export const LongFileReference: Story = {
       </div>
     </div>
   ),
-  play: async ({ args: storyArgs, canvas, userEvent }) => {
-    const token = canvas.getByRole("button", {
-      name: `Open attached file ${longReferencedFile.name}`,
-    });
-    const label = token.querySelector<HTMLElement>(".inline-file-reference-name");
-    if (!label) throw new Error("The composer file reference label is missing");
-    await expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
-
-    token.focus();
-    await expect(within(document.body).findByRole("tooltip")).resolves.toHaveTextContent(longReferencedFile.name);
-    await userEvent.keyboard("{Escape}");
-    await expect(within(document.body).queryByRole("tooltip")).not.toBeInTheDocument();
-    await userEvent.keyboard("{Enter}");
-    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledTimes(1);
-    await userEvent.keyboard(" ");
-    await expect(storyArgs.onOpenAttachment).toHaveBeenCalledTimes(2);
-  },
 };

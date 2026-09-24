@@ -104,21 +104,6 @@ describe("approval automation store", () => {
     expect(automation.turboEnabled()).toBe(false);
   });
 
-  it("round trips a grant", async () => {
-    const root = await temporaryRoot();
-    const path = join(root, "automation.json");
-    await writeApprovalAutomation(path, {
-      turbo: true,
-      defaultAutoApprove: false,
-      autoApproveOverrides: { "agent-1": true },
-    });
-    await expect(readApprovalAutomation(path, [])).resolves.toEqual({
-      turbo: true,
-      defaultAutoApprove: false,
-      autoApproveOverrides: { "agent-1": true },
-    });
-  });
-
   it("leaves no temporary file behind", async () => {
     const root = await temporaryRoot();
     await writeApprovalAutomation(join(root, "automation.json"), {

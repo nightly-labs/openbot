@@ -10,7 +10,6 @@ import {
   OPENCODE_PROFILE_CONFIG,
   type OpenCodeProviderOptions,
   openCodeConfigEnv,
-  openCodeSignInMessage,
 } from "./opencode-config";
 
 function provider(overrides: Partial<CustomProviderConfig> = {}): CustomProviderConfig {
@@ -89,14 +88,6 @@ describe("mergeOpenCodeConfig", () => {
     expect(config?.permission).toEqual({ "*": "deny" });
     expect(config?.provider?.permission).toBeDefined();
   });
-
-  it("returns the base alone when there are no providers", () => {
-    expect(mergeOpenCodeConfig(OPENCODE_PROFILE_CONFIG, [])).toEqual({ permission: { "*": "deny" } });
-  });
-
-  it("returns null when there is nothing at all to say", () => {
-    expect(mergeOpenCodeConfig({}, [])).toBeNull();
-  });
 });
 
 describe("openCodeConfigEnv", () => {
@@ -121,19 +112,5 @@ describe("openCodeConfigEnv", () => {
     expect(openCodeConfigEnv({}, source)).toEqual({});
     providers.push(provider());
     expect(openCodeConfigEnv({}, source)[OPENCODE_CONFIG_ENV]).toContain("studio-local");
-  });
-});
-
-describe("openCodeSignInMessage", () => {
-  it("sends a plain OpenCode user to the Go key", () => {
-    expect(openCodeSignInMessage(0)).toContain("OpenCode Go key");
-  });
-
-  it("names the endpoint first when a custom provider is configured", () => {
-    const message = openCodeSignInMessage(1);
-    expect(message).toContain("base URL");
-    expect(message).toContain("API key");
-    // The Go key is still offered, but as the alternative rather than the instruction.
-    expect(message.indexOf("base URL")).toBeLessThan(message.indexOf("OpenCode Go key"));
   });
 });

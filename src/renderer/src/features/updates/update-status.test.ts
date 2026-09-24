@@ -30,23 +30,6 @@ describe("presentUpdateStatus", () => {
     expect(presentation.busy).toBe(busy);
   });
 
-  it("never leaves a phase waiting on preparation", () => {
-    const phases: UpdateStatus["phase"][] = [
-      "idle",
-      "checking",
-      "available",
-      "downloading",
-      "ready",
-      "installing",
-      "up-to-date",
-      "error",
-      "unsupported",
-    ];
-    for (const phase of phases) {
-      expect(presentUpdateStatus(status({ phase })).actionLabel).not.toMatch(/preparing/iu);
-    }
-  });
-
   it.each([
     // A download is retryable in place. An install is not: shutdown preparation has already run, so
     // the message asks for a relaunch and the action falls back to checking rather than inviting a

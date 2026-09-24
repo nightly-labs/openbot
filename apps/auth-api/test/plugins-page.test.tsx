@@ -120,15 +120,6 @@ describe("plugin page", () => {
     }
   });
 
-  /* The one way off this page that is not the app or the site header, and the only navigable thing
-     the article layout added. */
-  it("leads back to the whole catalog", () => {
-    const plugin = firstPlugin();
-    renderPage(() => <PluginPage plugin={plugin} />);
-
-    expect(screen.getByRole("link", { name: "All plugins" })).toHaveAttribute("href", "/plugins");
-  });
-
   it("opens the listing in the app with a link built from the slug", () => {
     const plugin = firstPlugin();
     renderPage(() => <PluginPage plugin={plugin} />);

@@ -6,7 +6,7 @@ import {
 } from "@openbot/ui/features/conversation/RoutineScheduleCard";
 import { ROUTINE_WORKDAYS, type RoutineScheduleDraft } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import { createSignal } from "solid-js";
-import { expect, fn, waitFor, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
@@ -67,13 +67,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Created: Story = {
-  play: async ({ args, canvas, userEvent }) => {
-    await expect(canvas.getByRole("article", { name: "Morning brief" })).toHaveTextContent("Created routine");
-    await userEvent.click(canvas.getByRole("button", { name: "Open routine Morning brief" }));
-    await expect(args.onOpenRoutine).toHaveBeenCalled();
-  },
-};
+export const Created: Story = {};
 
 export const UpdatedEditing: Story = {
   args: {
@@ -81,14 +75,6 @@ export const UpdatedEditing: Story = {
     routineName: "Weekly planning",
     schedule: { kind: "weekly", weekday: 5, time: "16:00" },
     nextRunLabel: "Fri, Sep 25 at 4:00 PM",
-  },
-  play: async ({ args, canvas, canvasElement, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Days: Fri" }));
-    const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(await body.findByRole("radio", { name: "Thursday" }));
-    await waitFor(() => expect(args.onChange).toHaveBeenCalled());
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(canvas.getByRole("button", { name: "Days: Thu" })).toHaveFocus());
   },
 };
 
@@ -99,11 +85,6 @@ export const Saved: Story = { args: { action: "updated", state: "saved" } };
 /** A later card changed this routine. This one keeps the old schedule as a record only. */
 export const Superseded: Story = {
   args: { state: "superseded", nextRunLabel: undefined, onShowLatest: fn() },
-  play: async ({ args, canvas, userEvent }) => {
-    await expect(canvas.getByRole("button", { name: /^Frequency/ })).toBeDisabled();
-    await userEvent.click(canvas.getByRole("button", { name: "Show latest" }));
-    await expect(args.onShowLatest).toHaveBeenCalledOnce();
-  },
 };
 
 /** The routine runs in a zone that is not the viewer's, for example a teammate's computer. */
@@ -111,17 +92,10 @@ export const OtherTimeZone: Story = { args: { timeZoneLabel: "Warsaw time" } };
 
 export const SaveError: Story = {
   args: { action: "updated", state: "error", errorText: "Could not save the schedule. Try again." },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("alert")).toHaveTextContent("Could not save the schedule. Try again.");
-  },
 };
 
 export const Deleted: Story = {
   args: { state: "deleted", nextRunLabel: undefined },
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: /^Frequency/ })).toBeDisabled();
-    await expect(canvas.queryByRole("button", { name: /Open routine/ })).not.toBeInTheDocument();
-  },
 };
 
 export const ReadOnly: Story = {

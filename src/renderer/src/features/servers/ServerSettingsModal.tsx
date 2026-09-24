@@ -1173,7 +1173,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </label>
           }
         >
-          <ItemGroup class="settings-modal-card server-settings-members-list" data-testid="server-members-list">
+          <ItemGroup class="settings-modal-card server-settings-members-list">
             <Show
               when={filteredMembers().length > 0}
               fallback={

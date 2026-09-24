@@ -297,13 +297,6 @@ describe("NorbiAI reviewer selection", () => {
     );
   });
 
-  it("pins the cap to gpt-6-astra at low", () => {
-    expect(job.env.CAPPED_MODEL).toBe("gpt-6-astra");
-    expect(job.env.CAPPED_MODEL_EFFORT).toBe("low");
-    // Capping a model that never reads the effort would cap nothing.
-    expect(job.env.EFFORT_MODELS?.split(" ")).toContain(job.env.CAPPED_MODEL);
-  });
-
   // The effort only reaches gpt-6-astra: a chatgpt-web slug carries its own level. The list
   // is what that model accepts, less `max` and `ultra`, which are withheld on purpose — so
   // the assertion is exact rather than a subset check, and putting one back has to be a

@@ -3,7 +3,7 @@ import {
   type AccountUsageProviderRow,
   accountUsageProviderRows,
 } from "@openbot/ui/features/account/account-usage-view";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const mixedRows = accountUsageProviderRows({
@@ -57,16 +57,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const ConnectedProviders: Story = {
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "Usage" })).toBeInTheDocument();
-    await expect(canvas.getByText("ChatGPT")).toBeInTheDocument();
-    await expect(canvas.getByText("Claude")).toBeInTheDocument();
-    await expect(canvas.getByText("Grok")).toBeInTheDocument();
-    await expect(canvas.getByText("0% left")).toBeInTheDocument();
-  },
-};
+export const ConnectedProviders: Story = {};
 
 export const OneProvider: Story = {
   args: { rows: oneProviderRows },

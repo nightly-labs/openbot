@@ -9,7 +9,7 @@ import {
 } from "@openbot/ui/components/SettingsPanel";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { onCleanup } from "solid-js";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { saveSettingsPanelWidth } from "../src/components/settings-panel-width";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
@@ -139,10 +139,6 @@ type Story = StoryObj<typeof meta>;
 
 export const ChannelSettings: Story = {
   render: () => <ChannelPanelStory title="Channel settings" body={() => <ChannelPanelBody />} />,
-  play: async ({ canvas }) => {
-    await expect(await canvas.findByRole("heading", { level: 2, name: "Channel settings" })).toBeInTheDocument();
-    await expect(await canvas.findByRole("button", { name: /^Memories\s*0 saved$/ })).toBeInTheDocument();
-  },
 };
 
 export const ChannelSettingsWithoutMembers: Story = {

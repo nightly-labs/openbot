@@ -25,16 +25,6 @@ describe("attachment file whitelist", () => {
     expect(isSupportedAttachmentName("no-extension")).toBe(false);
   });
 
-  it("accepts EML as a single attachment", () => {
-    expect(isSupportedAttachmentName("message.eml")).toBe(true);
-    expect(ATTACHMENT_FILE_ACCEPT).toContain(".eml");
-  });
-
-  it.each(["recording.MP3", "Screen Recording.mov"])("accepts %s in the picker", (name) => {
-    expect(isSupportedAttachmentName(name)).toBe(true);
-    expect(ATTACHMENT_FILE_ACCEPT).toContain(`.${name.split(".").at(-1)?.toLowerCase()}`);
-  });
-
   it("offers media only when the selected host supports it, without hiding other files", () => {
     const legacy = supportedAttachmentExtensions({ eml: false, media: false });
     expect(legacy).not.toContain("mp3");

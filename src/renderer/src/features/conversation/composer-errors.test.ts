@@ -96,24 +96,6 @@ describe("chat-scoped composer errors", () => {
     view.dispose();
   });
 
-  it("dismissed errors do not reappear on reconnect unless a new error occurs", () => {
-    const first = setup(chatA.agentId);
-    first.store.setComposerErrorForTarget(chatA, "Stale failure");
-    expect(first.composerErrors()[keyA]).toBe("Stale failure");
-    first.store.clearChatErrors(chatA);
-    expect(first.composerErrors()[keyA]).toBeUndefined();
-    first.dispose();
-
-    // Reconnect rebuilds the view from stable keyed state with the dismissed
-    // entry gone: nothing reappears.
-    const second = setup(chatA.agentId, { composer: {}, conversation: {} });
-    expect(second.store.currentChatError()).toBeNull();
-
-    second.store.setComposerErrorForTarget(chatA, "New failure after reconnect");
-    expect(second.composerErrors()[keyA]).toBe("New failure after reconnect");
-    second.dispose();
-  });
-
   it("prefers the transient composer error but keeps the conversation error", () => {
     const view = setup(chatA.agentId, {
       composer: { [keyA]: "Composer failure" },

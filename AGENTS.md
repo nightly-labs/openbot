@@ -146,20 +146,27 @@ risks since the last release.
 
 ## Tests
 
-- Prefer an existing test. Add a test only for a user or caller consequence; add a file only for a
-  new boundary. Skip assertions already enforced by TypeScript, Biome, or `check:ui`.
-- Tests are mandatory for changes to the renderer-to-main boundary, IPC contracts, database schema
-  and migrations, persisted state, secrets, provider processes, Team API wire protocols, and the
-  updater. Test once at the lowest stable boundary.
+- Keep tests minimal. Do not add a regression test by default. Add a test only when a bug can lose
+  user data, break a released protocol, weaken the trust boundary, or leak a secret, or when the
+  same bug came back.
+- A database migration always needs tests: data-preservation fixtures for every affected released
+  schema, plus the failure and rollback cases that [src/backend/AGENTS.md](src/backend/AGENTS.md)
+  lists.
+- Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work.
+  At the end of E2E tests, produce a verifiable and repeatable artifact, such as a JSON report or a
+  screenshot under `.openbot-build/`.
+- If you must test a system in isolation, first write down all the ways it could fail, then write
+  the code. Put the list in the PR body under "Failure modes": one line per failure, with the test
+  that covers it.
+- Do not assert what TypeScript, Biome, or `check:ui` already enforce.
 - Wait for state, an event, or a promise, not elapsed time. A spy can provide the wait condition,
   such as `await waitFor(() => expect(send).toHaveBeenCalled())`; assert the user consequence after
   that wait. Do not remove synchronization because it uses a spy.
 - Assert behavior and data. Query accessible roles and names; use `toHaveFocus()` for focus.
   Do not assert markup, classes, layout, animation timing, or snapshots. Use exact text only for
   product contracts, error/security messages, serialized output, or localization keys.
-- Use Storybook for visual details. Do not add test IDs to avoid missing accessibility.
-  Story play functions can use them; renderer `data-testid` use must stay within the existing
-  `check:ui` budget of five. A new hook must replace an existing one.
+- Use Storybook for visual details only. Do not add story `play` functions: CI does not run them.
+  Do not add `data-testid` hooks; `check:ui` allows none.
 - `*.test.ts` uses Node; `*.test.tsx` uses JSX and jsdom; `*.dom.test.ts` uses DOM without a
   component. Keep pure logic in Node tests.
 

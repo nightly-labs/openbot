@@ -1,7 +1,7 @@
 import { Bubble, BubbleContent, type BubbleVariant } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import { MessageBody } from "@openbot/ui/features/conversation/MessageRendering";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS, STORY_ATTACHMENTS } from "./fixtures";
 
@@ -74,10 +74,6 @@ export const AuthError: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} width="420px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("Sign in required")).toBeInTheDocument();
-    await expect(canvas.queryByText(/AppServerError|chatgpt\.com/u)).not.toBeInTheDocument();
-  },
 };
 
 export const WithReplyContext: Story = {
@@ -139,11 +135,6 @@ export const Markdown: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} width="460px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("heading", { level: 2, name: "Recommendation" })).toBeInTheDocument();
-    await expect(canvas.getByText("Kobalte").tagName).toBe("STRONG");
-    await expect(canvas.getByRole("checkbox", { name: "Tested" })).toBeChecked();
-  },
 };
 
 export const WorkspaceFileLinks: Story = {
@@ -165,23 +156,6 @@ export const WorkspaceFileLinks: Story = {
     onOpenWorkspaceFile: fn(),
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} width="620px" />,
-  play: async ({ args: storyArgs, canvas }) => {
-    const pageLink = canvas.getByRole("button", { name: "Open workspace file page.tsx" });
-    const cssLink = canvas.getByRole("button", { name: "Open workspace file globals.css" });
-    const htmlLink = canvas.getByRole("button", { name: "Open workspace file lutra-brand-board.html" });
-    await expect(pageLink).toHaveTextContent("page.tsx");
-    await expect(cssLink).toHaveTextContent("globals.css");
-    await expect(htmlLink).toHaveTextContent("otwórz tablicę Lutra w HTML");
-    await expect(canvas.queryByText(/\/Users\/test\/OpenBot/u)).not.toBeInTheDocument();
-    await expect(canvas.queryByText(/\(<|>\)/u)).not.toBeInTheDocument();
-    pageLink.click();
-    htmlLink.click();
-    await expect(storyArgs.onOpenWorkspaceFile).toHaveBeenNthCalledWith(
-      1,
-      "/Users/test/OpenBot/Agents/builder/app/page.tsx",
-    );
-    await expect(storyArgs.onOpenWorkspaceFile).toHaveBeenNthCalledWith(2, "lutra-brand-board.html");
-  },
 };
 
 export const CodeBlock: Story = {
@@ -206,15 +180,6 @@ export const CodeBlock: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("The helper is ready:")).toBeInTheDocument();
-    await expect(canvas.getByRole("region", { name: "TypeScript code block" })).toBeInTheDocument();
-    await expect(canvas.getByText("churn.ts")).toBeInTheDocument();
-    const copyButton = canvas.getByRole("button", { name: "Copy code" });
-    await expect(copyButton.querySelectorAll("svg")).toHaveLength(2);
-    await expect(copyButton.querySelector('.message-code-copy-icons > span[data-visible="true"]')).toBeInTheDocument();
-    await expect(canvas.queryByText("```ts churn.ts")).not.toBeInTheDocument();
-  },
 };
 
 export const StreamingCodeBlock: Story = {
@@ -233,12 +198,6 @@ export const StreamingCodeBlock: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("region", { name: "TypeScript code block" })).toBeInTheDocument();
-    await expect(canvas.getByText("AgentCard.tsx")).toBeInTheDocument();
-    const region = canvas.getByRole("region", { name: "TypeScript code block" });
-    await expect(region.querySelector(".message-code-caret")).toBeInTheDocument();
-  },
 };
 
 export const DataTable: Story = {
@@ -258,11 +217,6 @@ export const DataTable: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("table")).toBeInTheDocument();
-    await expect(canvas.getAllByRole("columnheader")).toHaveLength(3);
-    await expect(canvas.queryByText("| --- | --- | ---: |")).not.toBeInTheDocument();
-  },
 };
 
 export const DataTableNarrow: Story = {
@@ -281,12 +235,6 @@ export const DataTableNarrow: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="320px" />,
-  play: async ({ canvas }) => {
-    const region = canvas.getByRole("region", { name: "Data table" });
-    await expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
-    const longFixture = canvas.getByText("Newcastle–Bournemouth");
-    await expect(getComputedStyle(longFixture).textOverflow).toBe("clip");
-  },
 };
 
 export const ComparisonTable: Story = {
@@ -307,12 +255,6 @@ export const ComparisonTable: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("region", { name: "Comparison table" })).toBeInTheDocument();
-    await expect(canvas.getAllByRole("columnheader")).toHaveLength(3);
-    await expect(canvas.getAllByText("✓")).toHaveLength(6);
-    await expect(canvas.getAllByText("—")).toHaveLength(2);
-  },
 };
 
 export const ComparisonTableNarrow: Story = {
@@ -332,10 +274,6 @@ export const ComparisonTableNarrow: Story = {
     },
   },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="320px" />,
-  play: async ({ canvas }) => {
-    const region = canvas.getByRole("region", { name: "Comparison table" });
-    await expect(region.scrollWidth).toBeGreaterThan(region.clientWidth);
-  },
 };
 
 export const CompletedAnswerReveal: Story = {

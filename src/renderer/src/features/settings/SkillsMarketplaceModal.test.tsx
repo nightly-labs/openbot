@@ -737,27 +737,6 @@ describe("SkillsMarketplaceModal", () => {
     expect(screen.getByRole("button", { name: "View Standup Digest details" })).toBeInTheDocument();
   });
 
-  it("uses category and card skeletons while discover listings load", async () => {
-    let resolvePage!: (page: MarketplaceSkillPage) => void;
-    const pendingPage = new Promise<MarketplaceSkillPage>((resolve) => {
-      resolvePage = resolve;
-    });
-    window.openbot.skills.list = vi.fn(() => pendingPage);
-
-    renderMarketplace({
-      open: true,
-      agents: [{ id: "writer", name: "Writer" }],
-      activeAgentId: "writer",
-      onOpenChange: () => undefined,
-    });
-    openSkillsTab();
-
-    expect(await screen.findByRole("status", { name: "Loading skills" })).toBeInTheDocument();
-
-    resolvePage({ skills: [], nextCursor: null });
-    await waitFor(() => expect(screen.queryByRole("status", { name: "Loading skills" })).not.toBeInTheDocument());
-  });
-
   it("offers an update when a newer detail version arrives after the installed list was loaded", async () => {
     const installed: InstalledSkill[] = [
       {
@@ -793,35 +772,6 @@ describe("SkillsMarketplaceModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Marketplace" }));
     fireEvent.click(await screen.findByRole("button", { name: "View Release Notes details" }));
     expect(await screen.findByRole("button", { name: "Update skill" })).toBeEnabled();
-  });
-
-  it("announces detail loading with its own live region", async () => {
-    // SkillsMarketplaceModal.tsx:1445 is a second status region named
-    // "Loading skill"; the listing skeleton at :1409 is "Loading skills" and
-    // is covered separately, so detail loading needs its own assertion.
-    const loadedDetail = await window.openbot.skills.get("release-notes");
-    let resolveDetail!: (detail: typeof loadedDetail) => void;
-    window.openbot.skills.get = vi.fn(
-      () =>
-        new Promise<typeof loadedDetail>((resolve) => {
-          resolveDetail = resolve;
-        }),
-    );
-
-    renderMarketplace({
-      open: true,
-      agents: [{ id: "writer", name: "Writer" }],
-      activeAgentId: "writer",
-      onOpenChange: () => undefined,
-    });
-    openSkillsTab();
-    const listing = await screen.findByRole("button", { name: "View Release Notes details" });
-    listing.click();
-
-    expect(await screen.findByRole("status", { name: "Loading skill" })).toBeInTheDocument();
-
-    resolveDetail(loadedDetail);
-    await screen.findByRole("region", { name: "Release Notes details" });
   });
 
   it.each(["skills", "agents"] as const)("includes the account photo when submitting %s", async (kind) => {

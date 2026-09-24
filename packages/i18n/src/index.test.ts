@@ -32,10 +32,6 @@ describe("translateFor", () => {
     expect(translateFor("fr")("provider.endpointCount", { count: 1 })).toBe("1 point de terminaison");
     expect(translateFor("fr")("provider.endpointCount", { count: 2 })).toBe("2 points de terminaison");
   });
-
-  it("fills a placeholder", () => {
-    expect(translateFor("en")("startup.failedBody", { message: "Disk is full" })).toContain("Disk is full");
-  });
 });
 
 describe("createTranslate", () => {

@@ -38,21 +38,4 @@ describe("ComposerErrorBanner", () => {
     await fireEvent.keyDown(screen.getByRole("alert"), { key: "Escape" });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
-
-  it("does not confuse one chat's banner for another", () => {
-    const onDismiss = vi.fn();
-    const { unmount } = render(() => (
-      <ComposerErrorBanner message="Chat A failure" conversationKey="local:agent-a" onDismiss={onDismiss} />
-    ));
-    expect(screen.getByRole("alert")).toHaveAttribute("data-conversation-key", "local:agent-a");
-    unmount();
-
-    render(() => (
-      <ComposerErrorBanner message="Chat B failure" conversationKey="local:agent-b" onDismiss={onDismiss} />
-    ));
-    const banner = screen.getByRole("alert");
-    expect(banner).toHaveAttribute("data-conversation-key", "local:agent-b");
-    expect(banner).toHaveTextContent("Chat B failure");
-    expect(banner).not.toHaveTextContent("Chat A failure");
-  });
 });

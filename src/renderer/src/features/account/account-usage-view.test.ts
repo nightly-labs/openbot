@@ -2,9 +2,6 @@ import {
   accountUsageProviderRows,
   accountUsageRowLabel,
   accountUsageSummary,
-  usageRemainingPercent,
-  usageTone,
-  usageWindowLabel,
 } from "@openbot/ui/features/account/account-usage-view";
 import { assert, describe, expect, it } from "vitest";
 
@@ -98,17 +95,5 @@ describe("account usage view", () => {
     expect(rows.map((row) => row.provider)).toEqual(["claude", "codex", "grok"]);
     expect(rows[0]).toMatchObject({ name: "Claude", remainingPercent: null });
     expect(rows[2]).toMatchObject({ name: "Grok", remainingPercent: null });
-  });
-
-  it("labels common windows and remaining quota", () => {
-    expect(usageRemainingPercent(41)).toBe(59);
-    expect(usageTone(59)).toBe("neutral");
-    expect(usageTone(29)).toBe("warning");
-    expect(usageTone(9)).toBe("critical");
-    expect(usageWindowLabel(10_080)).toBe("Weekly");
-    expect(usageWindowLabel(43_200)).toBe("Monthly");
-    expect(usageWindowLabel(300)).toBe("5-hour");
-    expect(usageWindowLabel(1_440)).toBe("Daily");
-    expect(usageWindowLabel(null)).toBe("Limit");
   });
 });

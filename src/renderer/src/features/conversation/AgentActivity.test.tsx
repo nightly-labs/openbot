@@ -20,21 +20,6 @@ function withAvatar(index: number, avatarUrl: string | null): AgentProfile {
 }
 
 describe("AgentActivityIndicator", () => {
-  it("shows the agent's custom avatar while it works", async () => {
-    const agent = withAvatar(0, "openbot-avatar://agent/chief?v=image-1");
-    const { container } = render(() => <AgentActivityIndicator agent={agent} label="Working on it…" />);
-
-    await screen.findByRole("status");
-    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "image");
-  });
-
-  it("keeps the generated avatar when the agent has no custom image", async () => {
-    const { container } = render(() => <AgentActivityIndicator agent={withAvatar(0, null)} label="Working on it…" />);
-
-    await screen.findByRole("status");
-    expect(drawnAvatar(container)).toHaveAttribute("data-avatar", "generated");
-  });
-
   it("follows the agent it is given, including an avatar that is removed", async () => {
     const [agent, setAgent] = createSignal(withAvatar(0, "openbot-avatar://agent/chief?v=image-1"));
     const { container } = render(() => <AgentActivityIndicator agent={agent()} label="Working on it…" />);

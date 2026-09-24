@@ -233,12 +233,6 @@ describe("computeSidebarAgentStates", () => {
     expect(older.chief).toEqual({ kind: "unread", count: 1 });
   });
 
-  it("keeps a user turn on the working mark", () => {
-    const states = computeSidebarAgentStates(input({ queues: { chief: queue("chief", "running") } }));
-
-    expect(states.chief).toEqual({ kind: "working" });
-  });
-
   it("lets an unread reply replace a finished routine", () => {
     const states = computeSidebarAgentStates(
       input({

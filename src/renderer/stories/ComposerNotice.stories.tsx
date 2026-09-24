@@ -1,6 +1,6 @@
 import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import type { JSX } from "@solidjs/web";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
@@ -34,13 +34,6 @@ export const SignInRequired: Story = {
       <ComposerSignInNotice {...args} />
     </ComposerStack>
   ),
-  play: async ({ args, canvas, userEvent }) => {
-    const signIn = canvas.getByRole("button", { name: "Sign in to ChatGPT" });
-    await expect(canvas.getByText("Sign in required")).toBeInTheDocument();
-    await expect(canvas.getByText("Sign in to ChatGPT to send messages.")).toBeInTheDocument();
-    await userEvent.click(signIn);
-    await expect(args.onSignIn).toHaveBeenCalledWith("codex");
-  },
 };
 
 export const ClaudeSignInRequired: Story = {
@@ -50,9 +43,6 @@ export const ClaudeSignInRequired: Story = {
       <ComposerSignInNotice {...args} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("Sign in to Claude to send messages.")).toBeInTheDocument();
-  },
 };
 
 /** The provider already reports `connecting`, so the action cannot be pressed a second time. */
@@ -63,31 +53,6 @@ export const SigningIn: Story = {
       <ComposerSignInNotice {...args} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Sign in to ChatGPT" })).toBeDisabled();
-  },
-};
-
-/**
- * The gap between the press and the provider reporting `connecting`: the button holds its own
- * pending state so a slow main process never looks like an unpressed button.
- */
-export const StartingSignIn: Story = {
-  args: {
-    onSignIn: fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 60_000));
-    }),
-  },
-  render: (args) => (
-    <ComposerStack>
-      <ComposerSignInNotice {...args} />
-    </ComposerStack>
-  ),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Sign in to ChatGPT" }));
-    await expect(await canvas.findByRole("button", { name: "Sign in to ChatGPT" })).toBeDisabled();
-    await expect(canvas.getByText("Signing in…")).toBeInTheDocument();
-  },
 };
 
 /**
@@ -100,11 +65,6 @@ export const UsageLimitReached: Story = {
       <ComposerUsageLimitNotice provider="codex" resetsAt={USAGE_RESETS_AT} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText("Usage limit reached")).toBeInTheDocument();
-    await expect(canvas.getByText(/You used all of your ChatGPT limit\. It resets /u)).toBeInTheDocument();
-    await expect(canvas.queryByRole("button")).not.toBeInTheDocument();
-  },
 };
 
 /** Some providers report a spent window with no reset time, so the card names the way out instead. */
@@ -114,9 +74,4 @@ export const UsageLimitWithoutReset: Story = {
       <ComposerUsageLimitNotice provider="claude" resetsAt={null} />
     </ComposerStack>
   ),
-  play: async ({ canvas }) => {
-    await expect(
-      canvas.getByText("You used all of your Claude limit. Select a different model to continue."),
-    ).toBeInTheDocument();
-  },
 };

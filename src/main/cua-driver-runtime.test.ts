@@ -100,19 +100,6 @@ describe("CuaDriverRuntime", () => {
     expect(spawned[0]?.options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
-  it("leaves the cursor to OpenBot on every display", async () => {
-    class ActingTap extends CuaDriverActionTap {
-      override lastPointer() {
-        return { tool: "click", x: 600, y: 500, at: 0 };
-      }
-    }
-    const { driver, spawned } = await runtime({ actionTap: new ActingTap() });
-    await driver.start();
-
-    expect(spawned[0]?.args).toContain("--no-overlay");
-    expect(driver.lastPointer(60_000)).toEqual({ tool: "click", x: 600, y: 500, at: 0 });
-  });
-
   it("makes neither call the driver makes to its own vendor, because OpenBot ships the driver and pins it", async () => {
     // Set in the inherited environment, which the daemon spawn copies first. OpenBot ships the
     // driver, so the analytics and the release check stay off whatever a process it inherits from
@@ -442,19 +429,6 @@ describe("CuaDriverRuntime", () => {
     expect(ungranted.driver.mcpServerForProviders()).toBeNull();
 
     await granted.driver.stop();
-  });
-
-  it("reports both grants as ready, and a missing one as setup still required", async () => {
-    const granted = await runtime();
-    await expect(granted.driver.state()).resolves.toMatchObject({ status: "ready" });
-
-    const partial = await runtime({
-      readPermissions: async () => [
-        { id: "screen-recording", granted: true },
-        { id: "accessibility", granted: false },
-      ],
-    });
-    await expect(partial.driver.state()).resolves.toMatchObject({ status: "permissions-required" });
   });
 
   // Windows names a pipe in a kernel namespace rather than a path on disk, so nothing is created,

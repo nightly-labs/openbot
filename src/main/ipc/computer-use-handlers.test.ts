@@ -26,7 +26,6 @@ const READY: ComputerUseState = {
 function bind(options: { show?: (permission: MacPermissionId) => Promise<void> } = {}) {
   const opened: string[] = [];
   const shown: MacPermissionId[] = [];
-  const close = vi.fn();
   const startDrag = vi.fn(async (sender: { id: number }) => {
     if (sender.id !== 7) throw new Error("The Computer Use drag must start in the help window.");
   });
@@ -37,7 +36,7 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
       shown.push(permission);
       await options.show?.(permission);
     },
-    close,
+    close: vi.fn(),
     permissionApp,
     startDrag,
     reveal,
@@ -51,7 +50,7 @@ function bind(options: { show?: (permission: MacPermissionId) => Promise<void> }
     permissionHelp,
   });
   for (const [name, register] of Object.entries(endpoints)) register(name);
-  return { opened, shown, close, startDrag, reveal, permissionApp };
+  return { opened, shown, startDrag, reveal, permissionApp };
 }
 
 describe("the Computer Use endpoints", () => {
@@ -87,14 +86,6 @@ describe("the Computer Use endpoints", () => {
     expect(() => bound.get("openPermissionPane")?.(APP_FRAME, "camera")).toThrow(/Unknown macOS permission/u);
     expect(opened).toEqual([]);
     expect(shown).toEqual([]);
-  });
-
-  it("takes the steps away when the renderer is done with them", async () => {
-    const { close } = bind();
-
-    await bound.get("closePermissionHelp")?.(APP_FRAME, undefined);
-
-    expect(close).toHaveBeenCalledTimes(1);
   });
 
   // The card the user drags carries the bundle macOS holds responsible, which in a development

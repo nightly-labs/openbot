@@ -32,14 +32,6 @@ describe("update preference store", () => {
     await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: true });
   });
 
-  it("persists an opt-out atomically without leaving temporary files", async () => {
-    const root = await temporaryRoot();
-    const path = join(root, "update.json");
-    await expect(writeUpdatePreference(path, false)).resolves.toEqual({ autoDownload: false });
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: false });
-    expect((await readdir(root)).filter((entry) => entry.endsWith(".tmp"))).toEqual([]);
-  });
-
   it("persists the last of several overlapping writes", async () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");

@@ -1,5 +1,5 @@
 import { AttachmentCards, AttachmentDownloadAll } from "@openbot/ui/features/conversation/AttachmentCards";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_ATTACHMENTS } from "./fixtures";
 
@@ -50,31 +50,6 @@ export const Files: Story = {};
 export const SingleCompactFile: Story = {
   name: "Single compact file",
   args: { attachments: [compactFile] },
-  play: async ({ canvas }) => {
-    const preview = canvas.getByRole("button", { name: `Preview ${compactFile.name}` });
-    const open = canvas.getByRole("button", { name: `Open ${compactFile.name}` });
-    const visual = preview.querySelector<HTMLElement>(".attachment-file-visual");
-    const copy = preview.querySelector<HTMLElement>(".attachment-file-copy");
-    if (!visual || !copy) throw new Error("The attachment preview content is incomplete");
-
-    const previewBounds = preview.getBoundingClientRect();
-    const visualBounds = visual.getBoundingClientRect();
-    const copyBounds = copy.getBoundingClientRect();
-    const openBounds = open.getBoundingClientRect();
-    await expect(getComputedStyle(preview).justifyContent).toBe("flex-start");
-    await expect(previewBounds.height).toBe(40);
-    await expect(visual).toHaveAttribute("data-file-tone", "markup");
-    await expect(visualBounds.left).toBe(previewBounds.left);
-    await expect(copyBounds.left).toBeGreaterThan(visualBounds.right);
-    await expect(openBounds.left).toBeGreaterThan(previewBounds.right);
-    await expect(openBounds.width).toBe(40);
-    await expect(openBounds.height).toBe(40);
-
-    open.focus();
-    await expect(within(document.body).findByRole("tooltip")).resolves.toHaveTextContent("Open file");
-    await userEvent.keyboard("{Escape}");
-    await expect(within(document.body).queryByRole("tooltip")).not.toBeInTheDocument();
-  },
 };
 
 export const NarrowLongNames: Story = {
@@ -85,27 +60,6 @@ export const NarrowLongNames: Story = {
       <AttachmentCards {...storyArgs} />
     </div>
   ),
-  play: async ({ canvas }) => {
-    const cards = canvas.getAllByRole("button", { name: /^(Preview|Open) /u });
-    const names = canvas.getAllByText(/customer-import|quarterly-operating/u);
-    const openButtons = canvas.getAllByRole("button", { name: /^Open /u });
-
-    await expect(cards).toHaveLength(4);
-    await expect(openButtons).toHaveLength(2);
-    for (const name of names) {
-      await expect(name.scrollWidth).toBeGreaterThan(name.clientWidth);
-    }
-    for (const open of openButtons) {
-      const bounds = open.getBoundingClientRect();
-      await expect(bounds.width).toBe(40);
-      await expect(bounds.height).toBe(40);
-    }
-    const [longFile] = longNamedFiles;
-    if (!longFile) throw new Error("Long-named file fixtures are empty.");
-    await expect(canvas.getByText(longFile.name).closest(".message-attachment")?.getBoundingClientRect().width).toBe(
-      220,
-    );
-  },
 };
 
 export const Empty: Story = {
@@ -120,17 +74,6 @@ export const WithDownloadAll: Story = {
       <AttachmentCards {...storyArgs} />
     </div>
   ),
-  play: async ({ canvas }) => {
-    const download = canvas.getByRole("button", { name: "Download all as ZIP" });
-    const [firstAttachment] = STORY_ATTACHMENTS;
-    if (!firstAttachment) throw new Error("Story attachment fixtures are empty.");
-    const firstCard = canvas.getByRole("button", { name: `Preview ${firstAttachment.name}` });
-    const downloadBounds = download.getBoundingClientRect();
-    const cardBounds = firstCard.getBoundingClientRect();
-
-    await expect(downloadBounds.bottom).toBeLessThanOrEqual(cardBounds.top);
-    await expect(downloadBounds.width).toBeLessThan(cardBounds.width);
-  },
 };
 
 export const DownloadingZip: Story = {
@@ -141,7 +84,4 @@ export const DownloadingZip: Story = {
       <AttachmentCards {...storyArgs} />
     </div>
   ),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: "Downloading ZIP…" })).toBeDisabled();
-  },
 };

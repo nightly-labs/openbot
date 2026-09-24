@@ -27,12 +27,13 @@ Report a finding when the diff:
 - Mocks the unit under test, or stubs so much of the collaborator graph that the assertion can only
   observe the mocks. *Exception:* `electron`, `electron-updater`, and `node:` built-ins have no
   injectable seam and are exempt by policy.
+- Adds a unit test that no line of the PR body's "Failure modes" section names. `AGENTS.md` asks
+  for that list before an isolated test; a test without one is a test written after the code.
 - Adds a new test *file* for a boundary an existing file already covers, or tests the same behaviour
-  at both the component and the application level. `AGENTS.md` requires the lowest stable boundary,
-  once.
+  at both the component and the application level. `AGENTS.md` asks for one test, preferably E2E.
 
-Do not report a missing test unless you can name the concrete regression it would catch, and do not
-ask for coverage of a mandatory boundary that the diff already covers elsewhere. A thin test at one
-of the seams `AGENTS.md` makes mandatory — the renderer-to-main trust boundary, the IPC contract,
-schema and migrations, persisted state, secrets, the provider process boundary, the Team API wire
-protocol, the updater — is not a finding for being thin.
+Do not report a missing test unless you can name the concrete regression it would catch, and that
+regression can lose user data, break a released protocol, weaken the trust boundary, or leak a
+secret. `AGENTS.md` does not ask for a regression test by default. A database migration is the
+exception: it always needs tests, and `contracts-and-migrations.md` lists them. A thin test at one of those
+seams is not a finding for being thin.

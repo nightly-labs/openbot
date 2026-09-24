@@ -1,7 +1,7 @@
 import type { CentralAuthState } from "@openbot/contracts/ipc";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { createSignal } from "solid-js";
-import { expect, fn } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const signedOut: CentralAuthState = { status: "signed_out" };
@@ -91,45 +91,8 @@ export const Interactive: Story = {
   },
 };
 
-export const HappyPath: Story = {
-  render: (storyArgs) => {
-    const [state, setState] = createSignal(storyArgs.state);
-    return (
-      <AccountLogin
-        {...storyArgs}
-        state={state()}
-        onRequestEmailCode={async (email) => {
-          setState(codeSentState({ email }));
-        }}
-        onVerifyEmailCode={async () => {
-          setState({
-            status: "signed_in",
-            user: { id: "story-user", email: "person@example.com", name: null, avatarUrl: null },
-          });
-        }}
-      />
-    );
-  },
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.type(canvas.getByLabelText("Email"), "Person@Example.com");
-    await userEvent.click(canvas.getByRole("button", { name: "Send sign-in code" }));
-    await expect(canvas.getByRole("heading", { name: "Check your inbox" })).toBeInTheDocument();
-    await expect(canvas.getByText(/person@example.com/)).toBeInTheDocument();
-    await userEvent.type(canvas.getByRole("textbox", { name: "One-time code" }), "ABCDEFGH");
-    await expect(canvas.getByText("Verified. Opening OpenBot…")).toBeInTheDocument();
-  },
-};
-
 export const SendingCode: Story = {
   args: { state: { status: "signing_in" } },
-};
-
-export const InvalidEmail: Story = {
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.type(canvas.getByLabelText("Email"), "not-an-email");
-    await userEvent.click(canvas.getByRole("button", { name: "Send sign-in code" }));
-    await expect(canvas.getByRole("alert")).toHaveTextContent("Enter a valid email address.");
-  },
 };
 
 export const CodeSent: Story = {

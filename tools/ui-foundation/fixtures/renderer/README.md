@@ -26,3 +26,6 @@ reachable and quietly retire the branch.
 Adding a check to the script means adding the file that trips it here, beside the neighbour it must
 ignore. If the check reports once per file rather than once per occurrence, that neighbour cannot live
 here — the violation would account for the failure either way — so it goes in `../renderer-clean`.
+
+`stories/Play.stories.tsx` is input for `no-story-play.grit`, not for `ui-foundation-check.ts`. Each
+line that the rule must reject ends in `// flag`.

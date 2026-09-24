@@ -13,20 +13,6 @@ describe("OpenBotPlayground", () => {
     vi.useRealTimers();
   });
 
-  it("returns host-wide usage and filters agent usage by provider", async () => {
-    const mock = createMockOpenBot();
-
-    await expect(mock.api.agent.getUsage()).resolves.toMatchObject({
-      limits: [{ id: "codex" }, { id: "claude" }, { id: "grok" }],
-    });
-    await expect(mock.api.agent.getUsage("chief")).resolves.toMatchObject({
-      limits: [{ id: "codex", secondary: { usedPercent: 41 } }],
-    });
-    await expect(mock.api.agent.getUsage("research")).resolves.toMatchObject({
-      limits: [{ id: "claude" }],
-    });
-  });
-
   it("reports ready and accepts a same-origin start message only from its parent", async () => {
     vi.useFakeTimers();
     const frames = new Map<number, FrameRequestCallback>();

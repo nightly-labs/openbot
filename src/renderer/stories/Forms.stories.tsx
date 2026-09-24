@@ -1,6 +1,5 @@
 import { Button, Field, Heading, Input, NativeSelect, Textarea } from "@openbot/ui";
 import { createSignal } from "solid-js";
-import { expect } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const meta = {
@@ -62,13 +61,5 @@ export const ControlledTyping: Story = {
         </Field>
       </main>
     );
-  },
-  play: async ({ canvas, userEvent }) => {
-    const name = canvas.getByRole("textbox", { name: "Agent name" });
-    const description = canvas.getByRole("textbox", { name: "Description" });
-    await userEvent.type(name, "Fast typing stays intact");
-    await userEvent.type(description, "Every character remains editable.");
-    await expect(name).toHaveValue("Fast typing stays intact");
-    await expect(description).toHaveValue("Every character remains editable.");
   },
 };

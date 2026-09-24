@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   configureMobileConnectDevelopmentNetwork,
-  configureSiteHostingDevelopmentEnvironment,
   createDevelopmentServiceSpec,
   createDevStackRecord,
   developmentEnvironmentForTarget,
@@ -10,22 +9,11 @@ import {
   parseDevelopmentTarget,
   projectRoot,
   selectMobileConnectLanAddress,
-  servicesForTarget,
   signalOwnedProcess,
   stopOwnedProcesses,
 } from "./dev-services";
 
 describe("development service runner", () => {
-  it("runs the normal API and app in a stable order", () => {
-    expect(servicesForTarget("all")).toEqual(["api", "remote", "app"]);
-    expect(servicesForTarget("app")).toEqual(["api", "remote", "app"]);
-  });
-
-  it("starts a complete isolated two-client harness on demand", () => {
-    expect(servicesForTarget("test-client")).toEqual(["api", "remote", "app", "test-client"]);
-    expect(servicesForTarget("api")).toEqual(["api"]);
-  });
-
   it("seeds the app profile the start is about to create", () => {
     const missing = () => false;
     const specs = (environment: NodeJS.ProcessEnv) => [
@@ -59,12 +47,6 @@ describe("development service runner", () => {
   it("provisions the technical remote member only for the test-client harness", () => {
     expect(developmentEnvironmentForTarget("app", {}).OPENBOT_DEV_TEST_CLIENT_ENABLED).toBe("0");
     expect(developmentEnvironmentForTarget("test-client", {}).OPENBOT_DEV_TEST_CLIENT_ENABLED).toBe("1");
-  });
-
-  it("builds the API command without a shell command string", () => {
-    const spec = createDevelopmentServiceSpec("api", {});
-    expect(spec.executable).toBe(process.execPath);
-    expect(spec.args).toEqual(["run", "--cwd", `${projectRoot}/apps/auth-api`, "dev"]);
   });
 
   it("builds the local Signal command with the Auth API development keys", () => {
@@ -117,18 +99,6 @@ describe("development service runner", () => {
       expect(spec.env.ELECTRON_EXTRA_LAUNCH_ARGS).toBeUndefined();
     }
     expect(environment.ELECTRON_RUN_AS_NODE).toBe("1");
-  });
-
-  it("enables hosted sites in the development environment", () => {
-    const environment: NodeJS.ProcessEnv = {};
-
-    configureSiteHostingDevelopmentEnvironment(environment, 3_100);
-
-    expect(environment).toEqual({
-      SITE_PUBLISH_ENABLED: "true",
-      SITE_COOKIE_ISOLATION_READY: "true",
-      SITE_LOCAL_ORIGIN: "http://openbot.localhost:3100",
-    });
   });
 
   it("advertises the preferred private LAN address for Mobile Connect development", () => {

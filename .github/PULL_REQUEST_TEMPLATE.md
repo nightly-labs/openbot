@@ -9,6 +9,12 @@
 - [ ] Relevant manual smoke test completed, or not applicable
 - [ ] No credentials, private data, generated output, or real user files are included
 
+## Failure modes
+
+<!-- Remove this section unless the PR adds or changes a unit test. Write the list before the code: one line per way the system can fail, with the test that covers it. -->
+
+- 
+
 ## Risk and security impact
 
 <!-- Note changes to permissions, IPC, filesystem access, persistence, browser behavior, or network access. Write "None" when not applicable. -->

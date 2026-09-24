@@ -12,7 +12,7 @@
 import { Toaster, toast } from "@openbot/ui";
 import { ProviderCodeLoginDialog, type ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { createSignal, onCleanup } from "solid-js";
-import { expect, fn, within } from "storybook/test";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 const USER_CODE = "KTQ4-B62MX";
@@ -51,16 +51,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** The code is on screen and the provider has not answered. The whole reason the flow exists. */
-export const Waiting: Story = {
-  // The dialog is a portal, so every query starts at the body rather than the story root.
-  play: async ({ userEvent, args }) => {
-    const body = within(document.body);
-    // The code is reachable as characters, not as the word a screen reader would make of it.
-    await expect(await body.findByLabelText("Login code K T Q 4 - B 6 2 M X")).toHaveTextContent(USER_CODE);
-    await userEvent.click(body.getByRole("button", { name: VERIFICATION_URL }));
-    await expect(args.onOpenVerificationUrl).toHaveBeenCalledWith(VERIFICATION_URL);
-  },
-};
+export const Waiting: Story = {};
 
 /**
  * A provider that puts the code in the link itself. Scanning this QR opens a page that needs no

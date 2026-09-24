@@ -1,6 +1,5 @@
 import { OtpInput, type OtpInputStatus } from "@openbot/ui/features/account/OtpInput";
 import { fireEvent, render, screen, within } from "@solidjs/testing-library";
-import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 
 function renderOtp(options: { value?: string; status?: OtpInputStatus } = {}) {
@@ -92,24 +91,6 @@ describe("OtpInput", () => {
     await fireEvent.keyDown(input, { key: "End" });
     await fireEvent.keyDown(input, { key: "Backspace" });
     expect(slots()[7]?.textContent).toBe("");
-  });
-
-  it("resets its fixed slots when the controlled value is cleared", async () => {
-    const onComplete = vi.fn();
-    render(() => {
-      const [value, setValue] = createSignal("ABCDEFGH");
-      return (
-        <>
-          <OtpInput value={value()} onChange={setValue} onComplete={onComplete} />
-          <button type="button" onClick={() => setValue("")}>
-            Reset
-          </button>
-        </>
-      );
-    });
-
-    await fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    expect(screen.getByRole("textbox", { name: "One-time code" })).toHaveValue("");
   });
 
   it("announces the incorrect code and the verified result", () => {
