@@ -898,7 +898,7 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     );
   });
 
-  it("reports each prompt and approval that a turn end clears", async () => {
+  it("reports each prompt and approval that a turn end clears, even when a write fails", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
     service = createTestService({
@@ -941,6 +941,9 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     await waitFor(() => events.some((event) => event.type === "approval"));
 
     // A compaction turn ends the same way but sends no `turn-completed`, so a client relies on these events.
+    const persistenceFailure = vi.spyOn(store.database, "persistConversation").mockImplementationOnce(() => {
+      throw new Error("Database write failed.");
+    });
     client.emit(
       "notification",
       notification("turn/completed", { threadId, turn: { id: turnId, status: "completed" } }),
@@ -952,7 +955,12 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
       ["prompt", "turn-end-prompt"],
       ["approval", "turn-end-approval"],
     ]);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "error", code: "prompt_persistence_failed", agentId: "chief" }),
+    );
+    persistenceFailure.mockRestore();
   });
+
   it("answers every one of a granted agent's approvals without surfacing them", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);
