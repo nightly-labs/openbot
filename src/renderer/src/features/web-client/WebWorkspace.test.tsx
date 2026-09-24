@@ -463,6 +463,45 @@ describe("web workspace state", () => {
     });
     await waitFor(() => expect(workspace.state.approvals).toEqual([otherTurn.approval, otherAgent.approval]));
   });
+  it("keeps approvals that a partial runtime snapshot leaves out", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    const approval = (requestId: string) => ({
+      requestId,
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-one",
+      kind: "command" as const,
+      command: "pwd",
+      cwd: null,
+      reason: "Check",
+      grantRoot: null,
+      permissions: null,
+      truncated: false,
+    });
+    const snapshot = (attentionComplete: boolean, pendingApprovals: ReturnType<typeof approval>[]) => ({
+      type: "runtime-snapshot" as const,
+      snapshot: {
+        agents: [],
+        activeTurns: [],
+        work: [],
+        latestMessages: [],
+        attentionComplete,
+        pendingPrompts: [],
+        pendingApprovals,
+        pendingBrowserTakeovers: [],
+        failedTurns: [],
+      },
+    });
+    app.events().event("host", { type: "approval", approval: approval("left-out") });
+    app.events().event("host", snapshot(false, [approval("listed")]));
+    await waitFor(() =>
+      expect(workspace.state.approvals.map((item) => item.requestId)).toEqual(["left-out", "listed"]),
+    );
+
+    app.events().event("host", snapshot(true, []));
+    await waitFor(() => expect(workspace.state.approvals).toEqual([]));
+  });
   it("does not create a workspace when the account has no hosts", async () => {
     const app = harness({ listHosts: vi.fn().mockResolvedValue([]) });
     await waitFor(() => expect(app.workspace().state.hostsLoaded).toBe(true));
