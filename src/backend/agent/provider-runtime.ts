@@ -205,7 +205,8 @@ export interface ProviderHooks {
   /**
    * Runs when the runtime stops a client it used for a reason other than an exit: an idle release,
    * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
-   * skips such a client, and it can never answer its pending prompts and approvals.
+   * skips such a client, and it can never answer its pending prompts and approvals. It runs after
+   * the stop, so a request the process sent while it stopped is cleared too.
    */
   onClientStopped(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
@@ -627,9 +628,9 @@ export class ProviderRuntime implements ProviderPort {
       this.#clients.delete(provider);
       this.#released.add(provider);
       this.#conversation.unloadClientThreads(client);
-      this.#hooks.onClientStopped(client);
       logger.info("Stopped an idle provider CLI.", { provider });
       await client.stop().catch(() => undefined);
+      this.#hooks.onClientStopped(client);
     }
   }
 
@@ -1132,8 +1133,8 @@ export class ProviderRuntime implements ProviderPort {
           this.#clients.delete(provider);
           this.#cli.delete(provider);
           this.#accounts.delete(provider);
-          this.#hooks.onClientStopped(client);
           await client.stop().catch(() => undefined);
+          this.#hooks.onClientStopped(client);
         } catch {
           // Keep a working client when an explicit account refresh is temporarily unavailable.
           const label = provider === "codex" ? "ChatGPT" : providerLabel(provider);
@@ -1299,8 +1300,8 @@ export class ProviderRuntime implements ProviderPort {
         }
 
         if (previousClient && previousClient !== client) {
-          this.#hooks.onClientStopped(previousClient);
           await previousClient.stop().catch(() => undefined);
+          this.#hooks.onClientStopped(previousClient);
         }
         if (provider === "codex") void this.#refreshUsage(client).catch(() => undefined);
         if (notifyReady) await this.#hooks.onProvidersReady();
