@@ -9,7 +9,7 @@ renderer-to-main trust boundary. [Main-process rules](../main/AGENTS.md#trust-bo
   `*-decoding.ts` file for their domain, not in `index.ts`. Keep the preload `FromMain` decoders
   apart from the main `FromHost` decoders. They protect different boundaries.
 - Invoke through `invokeRequest`, `invokeAgent` or `invokeAgentForServer`. Subscribe through
-  `subscribe(channel, decode, listener)`; use `listen` only when the event has no payload or the
+  `subscribe(endpoint, decode, listener)`; use `listen` only when the event has no payload or the
   handler checks the raw value itself. Do not call `ipcRenderer.on` directly.
 - Invoke only request endpoints from `IPC_ENDPOINTS`, and subscribe only to event endpoints.
   `src/main/ipc-channel-coverage.test.ts` reads these sources and fails on an unused or extra channel.

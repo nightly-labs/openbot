@@ -4,7 +4,7 @@
 // `storage-v1` reads as null, so the surface asks for an update, and refuses a change before any
 // request. The handlers register through the trusted binder, so Electron is mocked.
 
-import { IPC_CHANNELS, LOCAL_SERVER_ID, type StorageUsage } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, LOCAL_SERVER_ID, type StorageUsage } from "@openbot/contracts/ipc";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { describe, expect, it, vi } from "vitest";
 import type { ResponseDecoder } from "../remote-host-decoding";
@@ -86,19 +86,23 @@ describe("storageIpcHandlers", () => {
   it("reads the local host from the service and a remote host over storage-v1", async () => {
     const local = setup({ capable: false });
     await expect(
-      local.call(IPC_CHANNELS.storageGetUsage, LOCAL_SERVER_ID, { scope: "agent", agentId: "chief" }),
+      local.call(IPC_ENDPOINTS.storage.getUsage.channel, LOCAL_SERVER_ID, { scope: "agent", agentId: "chief" }),
     ).resolves.toEqual(usageFor("chief"));
     expect(local.storage.usage).toHaveBeenCalledWith({ scope: "agent", agentId: "chief" });
 
     // An older host: nothing is requested, and the surface reads null.
     await expect(
-      local.call(IPC_CHANNELS.storageGetUsage, "remote-1", { scope: "agent", agentId: "chief" }),
+      local.call(IPC_ENDPOINTS.storage.getUsage.channel, "remote-1", { scope: "agent", agentId: "chief" }),
     ).resolves.toBeNull();
     expect(local.requests).toEqual([]);
 
     const remote = setup({ capable: true, answer: usageFor("chief") });
     await expect(
-      remote.call(IPC_CHANNELS.storageGetUsage, "remote-1", { scope: "agent", agentId: "chief", force: true }),
+      remote.call(IPC_ENDPOINTS.storage.getUsage.channel, "remote-1", {
+        scope: "agent",
+        agentId: "chief",
+        force: true,
+      }),
     ).resolves.toEqual(usageFor("chief"));
     expect(remote.requests).toEqual([
       {
@@ -109,39 +113,41 @@ describe("storageIpcHandlers", () => {
     ]);
     // A host that answers for another agent would show that agent's files in this panel.
     await expect(
-      remote.call(IPC_CHANNELS.storageGetUsage, "remote-1", { scope: "agent", agentId: "writer" }),
+      remote.call(IPC_ENDPOINTS.storage.getUsage.channel, "remote-1", { scope: "agent", agentId: "writer" }),
     ).rejects.toThrow("Storage response does not match the request.");
   });
 
   it("refuses a remote change without the capability and posts it with one", async () => {
     const old = setup({ capable: false });
-    await expect(old.call(IPC_CHANNELS.storageDeleteFile, "remote-1", { fileId: "sent" })).rejects.toThrow(
+    await expect(old.call(IPC_ENDPOINTS.storage.deleteFile.channel, "remote-1", { fileId: "sent" })).rejects.toThrow(
       "Storage is not supported by this server.",
     );
     expect(old.requests).toEqual([]);
 
     const remote = setup({ capable: true });
-    await remote.call(IPC_CHANNELS.storageDeleteFile, "remote-1", { fileId: "sent" });
-    await remote.call(IPC_CHANNELS.storageClear, "remote-1", { category: "caches" });
+    await remote.call(IPC_ENDPOINTS.storage.deleteFile.channel, "remote-1", { fileId: "sent" });
+    await remote.call(IPC_ENDPOINTS.storage.clear.channel, "remote-1", { category: "caches" });
     expect(remote.requests.map((request) => [request.path, request.init?.body])).toEqual([
       [STORAGE_ROUTES.deleteFile, { fileId: "sent" }],
       [STORAGE_ROUTES.clear, { category: "caches" }],
     ]);
-    await expect(remote.call(IPC_CHANNELS.storageClear, "remote-1", { category: "workspaces" })).rejects.toThrow();
+    await expect(
+      remote.call(IPC_ENDPOINTS.storage.clear.channel, "remote-1", { category: "workspaces" }),
+    ).rejects.toThrow();
 
-    await remote.call(IPC_CHANNELS.storageDeleteFile, LOCAL_SERVER_ID, { fileId: "sent" });
+    await remote.call(IPC_ENDPOINTS.storage.deleteFile.channel, LOCAL_SERVER_ID, { fileId: "sent" });
     expect(remote.storage.deleteFile).toHaveBeenCalledWith("sent");
   });
 
   it("opens a stored file as an attachment and an agent's workspace on this computer", async () => {
     const local = setup({ capable: false });
-    await local.call(IPC_CHANNELS.storageOpenFile, LOCAL_SERVER_ID, { fileId: "sent", action: "reveal" });
+    await local.call(IPC_ENDPOINTS.storage.openFile.channel, LOCAL_SERVER_ID, { fileId: "sent", action: "reveal" });
     expect(local.mailbox.resolveAttachment).toHaveBeenCalledWith("sent");
     expect(showItemInFolder).toHaveBeenCalledWith("/transfers/report.pdf");
 
-    await local.invoke(IPC_CHANNELS.storageOpenLocation, { agentId: "chief" });
+    await local.invoke(IPC_ENDPOINTS.storage.openLocation.channel, { agentId: "chief" });
     expect(local.openPath).toHaveBeenCalledWith("/workspaces/chief");
-    await expect(local.invoke(IPC_CHANNELS.storageOpenLocation, { agentId: "gone" })).rejects.toThrow(
+    await expect(local.invoke(IPC_ENDPOINTS.storage.openLocation.channel, { agentId: "gone" })).rejects.toThrow(
       "The agent does not exist.",
     );
   });

@@ -17,7 +17,7 @@
 import {
   type AgentEvent,
   type BrowserDisplayState,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
@@ -67,7 +67,7 @@ export function createRendererForwarders({
     if (!window || window.isDestroyed()) return;
     sendToRenderer(
       window,
-      IPC_CHANNELS.agentEvent,
+      IPC_ENDPOINTS.agent.event,
       bufferedLive ? { serverId, event, bufferedLive } : { serverId, event },
     );
     void notifyAgentEvent(serverId, event).catch(() => undefined);
@@ -104,7 +104,7 @@ export function createRendererForwarders({
       const current = getMainWindow();
       if (!current || current.isDestroyed()) return;
       showMainWindow(current);
-      sendToRenderer(current, IPC_CHANNELS.notificationsOpenedEvent, {
+      sendToRenderer(current, IPC_ENDPOINTS.notifications.openedEvent, {
         serverId,
         agentId: content.agentId,
         threadId: content.threadId,
@@ -115,49 +115,53 @@ export function createRendererForwarders({
 
   function forwardBrowserDisplayState(state: BrowserDisplayState): void {
     for (const window of BrowserWindow.getAllWindows()) {
-      sendToRenderer(window, IPC_CHANNELS.browserDisplayStateEvent, state);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.displayStateEvent, state);
     }
   }
 
   function forwardUpdateStatus(status: import("@openbot/contracts/ipc").UpdateStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.updateEvent, status);
+    sendToRenderer(window, IPC_ENDPOINTS.update.event, status);
   }
 
   function forwardVoiceModelStatus(status: VoiceModelStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.voiceModelStatus, status);
+    sendToRenderer(window, IPC_ENDPOINTS.voice.modelStatus, status);
   }
 
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.providerRuntimesEvent, snapshot);
+    sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
 
   function forwardHostStatus(status: import("@openbot/contracts/ipc").HostStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.hostEvent, status);
+    sendToRenderer(window, IPC_ENDPOINTS.host.event, status);
     const remoteServers = getRemoteServerManager();
     if (remoteServers) {
-      sendToRenderer(window, IPC_CHANNELS.serversEvent, withLocalHostSummary(remoteServers.list(), status));
+      sendToRenderer(window, IPC_ENDPOINTS.servers.event, withLocalHostSummary(remoteServers.list(), status));
     }
   }
 
   function forwardRemoteDesktopSessions(sessions: import("@openbot/contracts/ipc").RemoteDesktopSession[]): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.remoteDesktopEvent, sessions);
+    sendToRenderer(window, IPC_ENDPOINTS.remoteDesktop.event, sessions);
   }
 
   function forwardServers(servers: import("@openbot/contracts/ipc").ServerSummary[]): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
     const host = getHostService();
-    sendToRenderer(window, IPC_CHANNELS.serversEvent, host ? withLocalHostSummary(servers, host.getStatus()) : servers);
+    sendToRenderer(
+      window,
+      IPC_ENDPOINTS.servers.event,
+      host ? withLocalHostSummary(servers, host.getStatus()) : servers,
+    );
   }
 
   function forwardTeamPresence(
@@ -166,7 +170,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.serversPresence, { serverId, snapshot });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.presence, { serverId, snapshot });
   }
 
   function forwardDirectMessage(
@@ -175,7 +179,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.serversDirectMessage, { serverId, event });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.directMessage, { serverId, event });
   }
 
   function forwardDirectTyping(
@@ -184,7 +188,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_CHANNELS.serversDirectTyping, { serverId, event });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.directTyping, { serverId, event });
   }
 
   return {

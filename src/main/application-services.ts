@@ -40,7 +40,7 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
@@ -421,7 +421,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserPictureInPictureEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.pictureInPictureEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserPictureInPicture, "picture in picture", () => browserPictureInPicture.destroy());
@@ -1039,7 +1039,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
