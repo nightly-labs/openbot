@@ -19,6 +19,7 @@ export const AGENT_IMPORT_PREVIEW: AgentImportPreview = {
       memoryCount: 14,
       fileCount: 48,
       fileBytes: Math.round(12.4 * MB),
+      nameExists: false,
     },
     {
       key: "inbox",
@@ -31,6 +32,7 @@ export const AGENT_IMPORT_PREVIEW: AgentImportPreview = {
       memoryCount: 6,
       fileCount: 0,
       fileBytes: 0,
+      nameExists: false,
     },
     {
       key: "sales",
@@ -43,6 +45,7 @@ export const AGENT_IMPORT_PREVIEW: AgentImportPreview = {
       memoryCount: 3,
       fileCount: 8,
       fileBytes: Math.round(0.4 * MB),
+      nameExists: true,
     },
   ],
   warnings: [],
@@ -50,7 +53,6 @@ export const AGENT_IMPORT_PREVIEW: AgentImportPreview = {
 
 export const AGENT_IMPORT_WARNINGS = [
   "Research: routine “Hourly price check” is skipped because its name, text, or schedule is invalid.",
-  "Sales Outbound: an agent with this name already exists. The import adds a second one.",
 ];
 
 /** The start of the export skill, as `agentImport.readSkill` answers it. */

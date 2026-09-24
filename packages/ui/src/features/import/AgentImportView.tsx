@@ -9,7 +9,9 @@ import {
   ExternalLink,
   File,
   FolderOpen,
+  Info,
   SlidingTabs,
+  Tooltip,
   TriangleAlert,
   Upload,
 } from "@openbot/ui";
@@ -48,6 +50,8 @@ export interface AgentImportViewProps {
   onChoose: () => void;
   onImport: (keys: string[]) => void;
   onCancel: () => void;
+  /** Done on the result: the import is over, so the settings it ran in close. */
+  onDone: () => void;
   onOpenAgent: (agentId: string) => void;
 }
 
@@ -62,7 +66,7 @@ export function AgentImportView(props: AgentImportViewProps) {
       aria-busy={props.phase === "reading" || props.phase === "importing" ? "true" : undefined}
     >
       <Show when={props.phase === "done" && props.result}>
-        {(result) => <ImportResult result={result()} onOpenAgent={props.onOpenAgent} onDone={props.onCancel} />}
+        {(result) => <ImportResult result={result()} onOpenAgent={props.onOpenAgent} onDone={props.onDone} />}
       </Show>
       {/* Keyed, so a newly chosen export starts with every agent selected again. */}
       <Show when={props.phase !== "idle" && props.phase !== "done" && props.preview} keyed>
@@ -306,7 +310,12 @@ function ImportReview(props: {
                   />
                   <AgentAvatar seed={agent.key} url={agent.avatarUrl} class="storage-row-avatar" />
                   <span class="storage-row-copy">
-                    <span class="storage-row-title">{agent.name}</span>
+                    <span class="agent-import-row-title">
+                      <span class="storage-row-title">{agent.name}</span>
+                      <Show when={agent.nameExists}>
+                        <NameExistsHint name={agent.name} />
+                      </Show>
+                    </span>
                     <span class="storage-row-meta">{contentsLabel(agent)}</span>
                   </span>
                   <Show when={agent.fileBytes > 0}>
@@ -334,6 +343,21 @@ function ImportReview(props: {
         </Button>
       </div>
     </>
+  );
+}
+
+/** A second agent with a name already on this server is allowed; the hint says so before import. */
+function NameExistsHint(props: { name: string }) {
+  const text = () => `An agent named ${props.name} already exists. The import adds another one.`;
+  return (
+    <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
+      <Tooltip.Trigger as="span" tabindex={0} class="agent-import-name-hint" aria-label={text()}>
+        <Info aria-hidden="true" />
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="ui-tooltip">{text()}</Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

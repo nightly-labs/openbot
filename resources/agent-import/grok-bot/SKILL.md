@@ -43,10 +43,12 @@ file when the manifest is invalid, so follow the format below exactly.
 
 5. **Build the folder** (see Format) and write `openbot-import.json` last.
 
-6. **Check it** with the checklist below. Then zip the folder contents and save the file as
-   `~/Downloads/openbot-export-<YYYY-MM-DD>.zip`.
+6. **Check it** with the checklist below. Then zip the folder contents into
+   `~/Downloads/.openbot-export-<YYYY-MM-DD>.zip.part`. When the zip is complete, rename it to
+   `~/Downloads/openbot-export-<YYYY-MM-DD>.zip`. The rename replaces an older export with the
+   same name in one step, so OpenBot never reads a half-written file.
 
-7. **Tell the user** the path, the number of agents, and anything you left out. Tell them to open
+7. **Tell the user**, only after the rename, the path, the number of agents, and anything you left out. Tell them to open
    OpenBot, go to **Server settings → Import**, and choose the file.
 
 ## Format

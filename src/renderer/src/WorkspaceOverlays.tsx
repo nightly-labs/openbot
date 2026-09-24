@@ -301,7 +301,10 @@ function ServerSettings() {
             // Agents import into this computer only; a remote host has no Import section.
             agentImport={
               server().kind === "local"
-                ? { onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)) }
+                ? {
+                    onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)),
+                    onClose: () => setServerSettingsOpen(false),
+                  }
                 : undefined
             }
           />

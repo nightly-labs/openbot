@@ -302,3 +302,29 @@ label.agent-import-row:has(input:disabled) {
   justify-content: flex-end;
   gap: var(--openbot-space-2);
 }
+
+/* The name and, for a name already on this server, the hint that the import adds another one. */
+.agent-import-row-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.agent-import-name-hint {
+  display: inline-flex;
+  flex: none;
+  color: var(--openbot-text-muted);
+  border-radius: var(--openbot-radius-sm);
+}
+
+.agent-import-name-hint:hover,
+.agent-import-name-hint:focus-visible {
+  color: var(--openbot-text-secondary);
+}
+
+.agent-import-name-hint svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  stroke-width: var(--openbot-icon-stroke);
+}

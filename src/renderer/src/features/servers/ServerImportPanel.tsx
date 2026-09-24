@@ -21,6 +21,8 @@ function readSetup(): AgentImportSetup {
 
 export interface ServerImportOptions {
   onOpenAgent: (agentId: string) => void;
+  /** Closes the settings the panel is in. */
+  onClose: () => void;
 }
 
 interface ImportState {
@@ -126,6 +128,10 @@ export function ServerImportPanel(props: ServerImportOptions) {
       onChoose={() => void choose()}
       onImport={(keys) => void apply(keys)}
       onCancel={reset}
+      onDone={() => {
+        reset();
+        props.onClose();
+      }}
       onOpenAgent={props.onOpenAgent}
     />
   );

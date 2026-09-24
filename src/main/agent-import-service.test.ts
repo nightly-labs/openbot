@@ -1,7 +1,12 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentSummary, AvatarImageInput, CreateRoutineInput } from "@openbot/contracts/ipc";
+import {
+  type AgentSummary,
+  type AvatarImageInput,
+  type CreateRoutineInput,
+  decodeAgentImportPreview,
+} from "@openbot/contracts/ipc";
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { AgentImportService } from "./agent-import-service";
@@ -174,6 +179,27 @@ describe("AgentImportService", () => {
     expect(await readdir(join(workspace, ".openbot/import-skills"))).toEqual([]);
   });
 
+  it("marks an agent whose name is already on the server, without a warning", async () => {
+    const first = await service.stage(
+      await exportFile({ "openbot-import.json": manifest([manifestAgent("research")]) }, "b.zip"),
+    );
+    expect(first.agents[0]?.nameExists).toBe(false);
+    await service.apply({ token: first.token, keys: ["research"] });
+
+    const again = await service.stage(
+      await exportFile(
+        { "openbot-import.json": manifest([manifestAgent("research"), manifestAgent("sales")]) },
+        "c.zip",
+      ),
+    );
+    // What the renderer reads: the preload decodes the preview before the review shows it.
+    expect(decodeAgentImportPreview(again)?.agents.map((agent) => [agent.key, agent.nameExists])).toEqual([
+      ["research", true],
+      ["sales", false],
+    ]);
+    expect(again.warnings).toEqual([]);
+  });
+
   it("publishes a skill that an earlier import added as a new revision", async () => {
     const files = {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
@@ -239,6 +265,11 @@ describe("AgentImportService", () => {
       "outside.zip",
     );
     await expect(service.stage(outside)).rejects.toThrow('Agent "a" has an invalid files path.');
+    // Grok Bot still writing the file: the zip ends before its directory.
+    const whole = zipSync({ "openbot-import.json": manifest([manifestAgent("a")]) });
+    const partial = join(root, "partial.zip");
+    await writeFile(partial, whole.subarray(0, Math.floor(whole.length / 2)));
+    await expect(service.stage(partial)).rejects.toThrow("If Grok Bot is still saving it, wait and choose it again.");
     const missing = await exportFile({ "notes.txt": encode("x") }, "missing.zip");
     await expect(service.stage(missing)).rejects.toThrow("must contain openbot-import.json");
   });

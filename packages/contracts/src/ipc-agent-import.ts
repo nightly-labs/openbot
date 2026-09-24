@@ -9,7 +9,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentSummary, isAgentSummary } from "./ipc-agents";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
-import { isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export const AGENT_IMPORT_LIMITS = {
   archiveBytes: 500 * 1024 * 1024,
@@ -33,6 +33,8 @@ export interface AgentImportPreviewAgent {
   memoryCount: number;
   fileCount: number;
   fileBytes: number;
+  /** An agent on this server already has this name. The import adds another one beside it. */
+  nameExists: boolean;
 }
 
 export interface AgentImportPreview {
@@ -109,7 +111,8 @@ function decodePreviewAgent(value: unknown): AgentImportPreviewAgent {
     !isBoundedString(agent.name, INPUT_LIMITS.agentName) ||
     !isBoundedString(agent.title, INPUT_LIMITS.agentTitle) ||
     !isBoundedString(agent.description, INPUT_LIMITS.agentDescription) ||
-    (agent.avatarUrl !== null && !(isString(agent.avatarUrl) && agent.avatarUrl.startsWith("data:image/")))
+    (agent.avatarUrl !== null && !(isString(agent.avatarUrl) && agent.avatarUrl.startsWith("data:image/"))) ||
+    !isBoolean(agent.nameExists)
   )
     invalid("imported agent");
   return {
@@ -123,6 +126,7 @@ function decodePreviewAgent(value: unknown): AgentImportPreviewAgent {
     memoryCount: count(agent.memoryCount, "imported agent"),
     fileCount: count(agent.fileCount, "imported agent"),
     fileBytes: count(agent.fileBytes, "imported agent"),
+    nameExists: agent.nameExists,
   };
 }
 

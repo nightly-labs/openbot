@@ -99,8 +99,6 @@ export class AgentImportService {
         if (image) avatars.set(agent.key, image);
         else warnings.push(`${agent.name}: the avatar is skipped because it is not a PNG, JPEG, or WebP under 512 KB.`);
       }
-      if (existing.has(agent.name.toLowerCase()))
-        warnings.push(`${agent.name}: an agent with this name already exists. The import adds a second one.`);
     }
 
     const token = randomUUID();
@@ -123,6 +121,7 @@ export class AgentImportService {
           memoryCount: agent.memories.length,
           fileCount: files.length,
           fileBytes: files.reduce((total, [, entry]) => total + entry.size, 0),
+          nameExists: existing.has(agent.name.toLowerCase()),
         };
       }),
       warnings: bounded(warnings),
@@ -271,7 +270,8 @@ function listEntries(bytes: Uint8Array): Map<string, StagedEntry> {
           ? `The export contains an unsafe file: ${error.entry}`
           : `The export must expand to under 500 MB and ${AGENT_IMPORT_LIMITS.files} files.`,
       );
-    throw new Error("The selected file is not a valid .zip.");
+    // A zip that Grok Bot is still writing has no central directory yet, so it reads as invalid.
+    throw new Error("The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.");
   }
   if (!entries.size) throw new Error("The export is empty.");
   return entries;

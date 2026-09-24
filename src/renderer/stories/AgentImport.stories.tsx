@@ -30,6 +30,7 @@ const viewArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs => ({
   onChoose: fn(),
   onImport: fn(),
   onCancel: fn(),
+  onDone: fn(),
   onOpenAgent: fn(),
   ...overrides,
 });
