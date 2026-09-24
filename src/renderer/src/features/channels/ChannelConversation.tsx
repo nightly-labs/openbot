@@ -164,6 +164,7 @@ export function ChannelConversation() {
     reply: string | null;
     attachments: DraftAttachment[];
   }>({ text: "", reply: null, attachments: [] });
+  const [copyError, setCopyError] = createSignal<string | null>(null);
   createEffect(
     () => channels.state.selectedId,
     () => {
@@ -222,7 +223,6 @@ export function ChannelConversation() {
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = createSignal<string | null>(null);
-  const [copyError, setCopyError] = createSignal<string | null>(null);
   const [newMessageCount, setNewMessageCount] = createSignal(0);
   let stickToLatest = true;
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
