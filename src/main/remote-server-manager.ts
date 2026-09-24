@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { basename } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
@@ -1013,7 +1014,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const response = await this.#client.fetch(server, url);
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
-      name: contentDispositionFileName(response.headers.get("content-disposition"), "shared-file"),
+      name: contentDispositionFileName(response.headers.get("content-disposition"), basename(sharedPath)),
     };
   }
 
@@ -1030,7 +1031,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const response = await this.#client.fetch(server, url);
     return {
       bytes: new Uint8Array(await response.arrayBuffer()),
-      name: contentDispositionFileName(response.headers.get("content-disposition"), "workspace-file"),
+      name: contentDispositionFileName(response.headers.get("content-disposition"), basename(workspacePath)),
     };
   }
 

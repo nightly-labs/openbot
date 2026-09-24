@@ -364,11 +364,6 @@ const server = createServer((request, response) => {
     </script>`);
 });
 
-void main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
-  app.exit(1);
-});
-
 const SCENARIOS = [
   "background",
   "controls",
@@ -379,6 +374,11 @@ const SCENARIOS = [
   "secret-handoff",
   "popups",
 ];
+
+void main().catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`);
+  app.exit(1);
+});
 
 async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);

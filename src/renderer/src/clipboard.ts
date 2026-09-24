@@ -1,11 +1,16 @@
 /**
- * Writes text to the clipboard. A window without the async clipboard, or one that refuses it, uses
- * a hidden text area and the copy command. Throws when both fail.
+ * Writes text to the clipboard. When the async clipboard is missing or refuses the write, such as
+ * when the document has no focus, a hidden text area and the copy command are used. Throws when
+ * both fail.
  */
 export async function writeClipboardText(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // The copy command below is the fallback.
   }
   const input = document.createElement("textarea");
   input.value = text;

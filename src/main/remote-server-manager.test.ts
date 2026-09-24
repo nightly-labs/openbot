@@ -701,7 +701,7 @@ describe("remote server order", () => {
       // A name that is not valid percent-encoding does not fail a download that has its bytes.
       await expect(manager.downloadWorkspaceFile("chief", "app/page.tsx", serverId)).resolves.toEqual({
         bytes,
-        name: "workspace-file",
+        name: "page.tsx",
       });
       expect(fetchMock).toHaveBeenCalledTimes(2);
       manager.stop();
