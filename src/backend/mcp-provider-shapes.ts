@@ -5,7 +5,7 @@ import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import { type AgentProviderId, isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
-import { loginShellCommand } from "./cli";
+import { runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
 
 const execFileAsync = promisify(execFile);
@@ -332,12 +332,7 @@ async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<s
     // The assignment goes inside the command, not into the shell's environment: a login shell reads
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
-    const shell = loginShellCommand();
-    const { stdout } = await execFileAsync(
-      shell.command,
-      [...shell.args, `${search}command -v -- ${shellWord(trimmed)}`],
-      { timeout: 5_000, maxBuffer: 64 * 1024 },
-    );
+    const stdout = await runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`);
     return stdout.trim() || null;
   } catch {
     return null;
@@ -360,11 +355,7 @@ export function loginShellPath(): Promise<string | null> {
 async function readLoginShellPath(): Promise<string | null> {
   if (process.platform === "win32") return null;
   try {
-    const shell = loginShellCommand();
-    const { stdout } = await execFileAsync(shell.command, [...shell.args, 'printf %s "$PATH"'], {
-      timeout: 5_000,
-      maxBuffer: 64 * 1024,
-    });
+    const stdout = await runInLoginShell('printf %s "$PATH"');
     // `printf` writes no newline, so the value is the last line whatever the user's profile printed
     // before it.
     return stdout.split(/\r?\n/u).pop()?.trim() || null;
