@@ -1320,8 +1320,8 @@ function dynamicContent(value: unknown): CallToolResult["content"] {
     return [{ type: "text" as const, text: value.text }];
   }
   if (value.type === "inputImage" && isString(value.imageUrl)) {
-    const match = value.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
-    if (match) return [{ type: "image" as const, mimeType: match[1], data: match[2] }];
+    const [, mimeType, data] = value.imageUrl.match(/^data:([^;]+);base64,(.+)$/s) ?? [];
+    if (mimeType !== undefined && data !== undefined) return [{ type: "image" as const, mimeType, data }];
   }
   return [];
 }

@@ -23,7 +23,14 @@ export class ProfileCreationRecovery {
     for (const entry of await readdir(this.root, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const [agentId, operationId, suffix, extra] = entry.name.split(".");
-      if (suffix !== "pending" || extra !== undefined || !isGeneratedAgentId(agentId) || !isUuidV4(operationId))
+      if (
+        agentId === undefined ||
+        operationId === undefined ||
+        suffix !== "pending" ||
+        extra !== undefined ||
+        !isGeneratedAgentId(agentId) ||
+        !isUuidV4(operationId)
+      )
         continue;
       const receipt = database.commandResult(`agent-profile:${operationId}`);
       const exists = database.listAgents().some((agent) => agent.id === agentId);

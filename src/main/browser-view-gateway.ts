@@ -22,6 +22,7 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
 import type { BrowserHost } from "../backend/browser-host";
+import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -264,15 +265,4 @@ export class BrowserViewGateway {
     client?.close(1000, reason.slice(0, 120));
     await stopView?.().catch(() => undefined);
   }
-}
-
-function rawDataSize(data: Ws.RawData): number {
-  if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.byteLength, 0);
-  return data.byteLength;
-}
-
-function rawDataText(data: Ws.RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
 }

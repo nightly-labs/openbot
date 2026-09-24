@@ -3,8 +3,10 @@ import { onCleanup } from "solid-js";
 import { expect, fn, waitFor, within } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel";
-import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_SHARED_TABLES } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_SHARED_TABLES } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
+
+const storyAgent = STORY_AGENT;
 
 function SharedTablesStory(props: { tables: SharedTable[] }) {
   const previousApi = window.openbot;
@@ -20,12 +22,12 @@ function SharedTablesStory(props: { tables: SharedTable[] }) {
     <main class="agent-memories-story-stage">
       <AgentSettingsPanel
         onOpenUsage={fn()}
-        agent={STORY_AGENTS[0]}
+        agent={storyAgent}
         agents={STORY_AGENTS}
         runtimeSettings={{
-          provider: STORY_AGENTS[0].provider,
-          model: STORY_AGENTS[0].model,
-          reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+          provider: storyAgent.provider,
+          model: storyAgent.model,
+          reasoningEffort: storyAgent.reasoningEffort,
         }}
         agentStatus={STORY_AGENT_STATUS}
         modelOptions={STORY_MODELS}
@@ -49,11 +51,11 @@ const meta = {
   title: "Settings/Tables",
   component: AgentSettingsPanel,
   args: {
-    agent: STORY_AGENTS[0],
+    agent: storyAgent,
     runtimeSettings: {
-      provider: STORY_AGENTS[0].provider,
-      model: STORY_AGENTS[0].model,
-      reasoningEffort: STORY_AGENTS[0].reasoningEffort,
+      provider: storyAgent.provider,
+      model: storyAgent.model,
+      reasoningEffort: storyAgent.reasoningEffort,
     },
     agentStatus: STORY_AGENT_STATUS,
     modelOptions: STORY_MODELS,
@@ -85,7 +87,7 @@ export const OpenModal: Story = {
     const body = within(document.body);
     await expect(await body.findByRole("dialog", { name: "Tables" })).toBeVisible();
     await expect(body.getByText("people")).toBeVisible();
-    await expect(body.getByText(`214 records · Kept by ${STORY_AGENTS[0].name}`)).toBeVisible();
+    await expect(body.getByText(`214 records · Kept by ${storyAgent.name}`)).toBeVisible();
     await expect(body.getByText(/not counted · Made outside OpenBot/)).toBeVisible();
   },
 };

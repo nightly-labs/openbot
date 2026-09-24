@@ -21,7 +21,7 @@ import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
-import { parseAgentRequest } from "./agent-inputs";
+import { agentRequest } from "./agent-inputs";
 import { type OpenAttachmentDependencies, openAttachmentForServer } from "./attachment-handlers";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
@@ -62,8 +62,8 @@ export function storageIpcHandlers({
 
   return {
     storage: {
-      getUsage: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseGetStorageUsageInput(scoped.payload);
+      getUsage: payloadHandler(agentRequest(parseGetStorageUsageInput), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<StorageUsage | null>(scoped.serverId, {
           local: () => storage.usage(parsed),
           remote: async (serverId) => {
@@ -76,23 +76,23 @@ export function storageIpcHandlers({
           },
         });
       }),
-      deleteFile: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseDeleteStoredFileInput(scoped.payload);
+      deleteFile: payloadHandler(agentRequest(parseDeleteStoredFileInput), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<void>(scoped.serverId, {
           local: () => storage.deleteFile(parsed.fileId),
           remote: (serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
         });
       }),
-      clear: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseClearStorageInput(scoped.payload);
+      clear: payloadHandler(agentRequest(parseClearStorageInput), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer<void>(scoped.serverId, {
           local: () => storage.clear(parsed.category),
           remote: (serverId) => remoteChange(serverId, STORAGE_ROUTES.clear, parsed),
         });
       }),
       // A stored file is a sent or generated attachment, so the chat's open path serves it.
-      openFile: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseOpenStoredFileInput(scoped.payload);
+      openFile: payloadHandler(agentRequest(parseOpenStoredFileInput), (scoped) => {
+        const parsed = scoped.payload;
         return openAttachmentForServer({ mailbox, remoteServers, getMainWindow }, scoped.serverId, {
           attachmentId: parsed.fileId,
           action: parsed.action,

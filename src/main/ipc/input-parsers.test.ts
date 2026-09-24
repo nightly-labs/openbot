@@ -12,8 +12,10 @@ import {
   parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
+  parseAttachmentId,
   parseBrowserTakeoverResponse,
   parseCancelQueuedMessage,
+  parseChannelId,
   parseChooseAttachments,
   parseCreateAgent,
   parseCreateAgentMemory,
@@ -44,6 +46,7 @@ import {
   parseAnalyticsPreference,
   parseAppLanguagePreference,
   parseApprovalAutomation,
+  parseDeleteHostedSite,
   parseDynamicIslandAction,
   parseDynamicIslandInteractive,
   parseDynamicIslandPreference,
@@ -183,6 +186,16 @@ describe("app IPC input parsing", () => {
     expect(parseOptionalAgentId("chief")).toBe("chief");
     expect(() => parseAgentId(42)).toThrowError("agentId is required.");
     expect(() => parseAgentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("agentId is too long.");
+  });
+
+  it("validates channel and attachment identifiers and hosted site deletion", () => {
+    expect(parseChannelId("general")).toBe("general");
+    expect(() => parseChannelId(42)).toThrowError("channelId is required.");
+    expect(() => parseChannelId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("channelId is too long.");
+    expect(parseAttachmentId("attachment-1")).toBe("attachment-1");
+    expect(() => parseAttachmentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("attachmentId is too long.");
+    expect(parseDeleteHostedSite({ siteId: "site-1" })).toEqual({ siteId: "site-1" });
+    expect(() => parseDeleteHostedSite({})).toThrowError("siteId is required.");
   });
 
   it("keeps setup and permission error messages", () => {

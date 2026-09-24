@@ -621,7 +621,11 @@ function incompleteEmphasisMarkerTokenIndexes(tokens: Token[]): Set<number> {
     characters,
     (start, end) => owners[start] !== -1 && owners[start] === owners[end - 1],
   );
-  return new Set(markers.map((marker) => owners[marker.index]).filter((owner) => owner !== undefined && owner !== -1));
+  return new Set(
+    markers
+      .map((marker) => owners[marker.index])
+      .filter((owner): owner is number => owner !== undefined && owner !== -1),
+  );
 }
 
 function incompleteEmphasisMarkers(
@@ -700,7 +704,7 @@ function activeStreamingBlockTokenIndex(tokens: Token[]): number {
   const index = lastRenderableTokenIndex(tokens);
   if (index === -1 || index !== tokens.length - 1) return -1;
   const token = tokens[index];
-  if (tokenIs(token, "heading") && token.raw.includes("\n")) return -1;
+  if (!token || (tokenIs(token, "heading") && token.raw.includes("\n"))) return -1;
   return index;
 }
 

@@ -1104,14 +1104,14 @@ function captureIslandBlurs(targets: HTMLElement[]): Map<HTMLElement, number> {
 function computedScale(transform: string): number {
   if (!transform || transform === "none") return 1;
   const match = transform.match(/^matrix\(([^,]+)/);
-  const scale = match ? Number.parseFloat(match[1]) : Number.NaN;
+  const scale = Number.parseFloat(match?.[1] ?? "");
   return Number.isFinite(scale) ? scale : 1;
 }
 
 function computedBlur(filter: string): number {
   if (!filter || filter === "none") return 0;
   const match = filter.match(/blur\(([-\d.]+)px\)/);
-  const blur = match ? Number.parseFloat(match[1]) : Number.NaN;
+  const blur = Number.parseFloat(match?.[1] ?? "");
   return Number.isFinite(blur) ? blur : 0;
 }
 

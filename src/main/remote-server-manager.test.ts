@@ -397,9 +397,7 @@ describe("remote server links", () => {
       expect(manager.list().some((server) => server.id === gammaId)).toBe(false);
       expect(removeMember).not.toHaveBeenCalledWith(gammaId, `${gammaId}-member`);
       expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ hiddenHostIds: [gammaId] });
-      const directoryChanged = vi.fn(() => {
-        void manager.syncRemoteHosts();
-      });
+      const directoryChanged = vi.fn(() => manager.syncRemoteHosts());
       manager.on("directoryInvalidated", directoryChanged);
       hosts = hosts.filter((host) => host.hostId !== betaId);
       transport.emit("error", betaId, "session_revoked", "The remote session was revoked.");
@@ -409,6 +407,8 @@ describe("remote server links", () => {
       });
       await vi.waitFor(() => expect(manager.list().some((server) => server.id === betaId)).toBe(false));
       expect(directoryChanged).toHaveBeenCalledOnce();
+      // The sync writes servers.json after the list changes. Let it finish before cleanup removes the directory.
+      await directoryChanged.mock.results[0]?.value;
       expect(manager.activeServerId).toBe("local");
     } finally {
       await manager.stop();

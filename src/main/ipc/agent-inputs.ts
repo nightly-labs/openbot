@@ -14,6 +14,7 @@ import {
   type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
+  type EditQueuedMessageInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentAccess,
@@ -79,6 +80,14 @@ export function agentScope(value: unknown): AgentIpcRequest<null> {
 
 export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
+}
+
+export function parseChannelId(value: unknown): string {
+  return requireString(value, "channelId", INPUT_LIMITS.identifier);
+}
+
+export function parseAttachmentId(value: unknown): string {
+  return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
 }
 
 export function parseOptionalAgentId(value: unknown): string | undefined {
@@ -716,7 +725,7 @@ export function parseBrowserTakeoverResponse(value: unknown): RespondToBrowserTa
   return { requestId: value.requestId, decision: value.decision };
 }
 
-export function parseQueueEdit(value: unknown) {
+export function parseQueueEdit(value: unknown): EditQueuedMessageInput {
   if (!isObject(value)) throw new Error("Invalid queue edit request.");
   return { agentId: parseAgentId(value.agentId), ...decodeQueueEditRequest(value) };
 }

@@ -11,7 +11,7 @@ import {
   type WindowOpenHandlerResponse,
   webContents,
 } from "electron";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserHost } from "./browser-host";
 import type { BrowserContextMenuParams } from "./browser-shortcuts";
 import type { DynamicToolResult } from "./protocol";
@@ -464,7 +464,7 @@ describe("browser auth popups", () => {
   it("explains unsupported popup types", async () => {
     await popupRequest();
     expect(windowOpenHandlers.at(-1)?.({ url: "https://example.com", disposition: "other" }).action).toBe("deny");
-    expect(host.listTabs()[0].popupFailure?.message).toContain("popup type");
+    expect(host.listTabs()[0]?.popupFailure?.message).toContain("popup type");
   });
 
   it("restores safe URLs without claiming to restore live opener relationships", async () => {
@@ -490,7 +490,9 @@ describe("browser auth popups", () => {
     const handler = windowOpenHandlers.at(-1);
     expect(handler?.({ url: "https://example.com/auth" }).action).toBe("deny");
     expect(host.listTabs().at(-1)?.popupFailure?.message).toContain("tab limit");
-    await host.close(host.listTabs()[0].id);
+    const [first] = host.listTabs();
+    assert(first);
+    await host.close(first.id);
     const outcome = handler?.({ url: "https://example.com/auth" });
     expect(outcome?.action).toBe("allow");
     outcome?.createWindow?.({});
@@ -520,6 +522,7 @@ describe("browser tab capacity", () => {
       "The browser can have up to 25 open tabs.",
     );
     const tab = host.listTabs()[0];
+    assert(tab);
     await host.close(tab.id);
     await host.open("https://www.google.com", "thread-a", "agent-a");
     expect(host.listTabs()).toHaveLength(25);

@@ -1,7 +1,7 @@
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, AgentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { sortConversationMessages } from "../conversation-snapshots";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
 

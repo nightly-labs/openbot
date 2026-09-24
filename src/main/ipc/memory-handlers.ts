@@ -1,20 +1,19 @@
 // An agent's long-lived memories: the notes it carries between threads.
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { AgentService } from "../../backend/agent-service";
 import { decodeAgentMemories, decodeAgentMemory } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  parseAgentRequest,
+  agentRequest,
+  parseAgentId,
   parseCreateAgentMemory,
   parseDeleteAgentMemory,
   parseUpdateAgentMemory,
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
-import { requireString } from "./validation";
 
 interface MemoryIpcDependencies {
   service: AgentService;
@@ -27,16 +26,16 @@ export function memoryIpcHandlers({
 }: MemoryIpcDependencies): Pick<IpcGroupHandlers, "agentMemories"> {
   return {
     agentMemories: {
-      listMemories: payloadHandler(parseAgentRequest, (scoped) => {
-        const agentId = requireString(scoped.payload, "agentId", INPUT_LIMITS.identifier);
+      listMemories: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        const agentId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listMemories(agentId),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeAgentMemories),
         });
       }),
-      createMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCreateAgentMemory(scoped.payload);
+      createMemory: payloadHandler(agentRequest(parseCreateAgentMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createMemory(parsed),
           remote: (serverId) =>
@@ -46,8 +45,8 @@ export function memoryIpcHandlers({
             }),
         });
       }),
-      updateMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseUpdateAgentMemory(scoped.payload);
+      updateMemory: payloadHandler(agentRequest(parseUpdateAgentMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.updateMemory(parsed),
           remote: (serverId) =>
@@ -62,8 +61,8 @@ export function memoryIpcHandlers({
             ),
         });
       }),
-      deleteMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseDeleteAgentMemory(scoped.payload);
+      deleteMemory: payloadHandler(agentRequest(parseDeleteAgentMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.deleteMemory(parsed),
           remote: (serverId) =>
@@ -72,8 +71,8 @@ export function memoryIpcHandlers({
             }),
         });
       }),
-      clearMemories: payloadHandler(parseAgentRequest, (scoped) => {
-        const agentId = requireString(scoped.payload, "agentId", INPUT_LIMITS.identifier);
+      clearMemories: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        const agentId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.clearMemories(agentId),
           remote: (serverId) =>

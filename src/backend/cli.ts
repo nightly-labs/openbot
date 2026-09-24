@@ -303,9 +303,11 @@ export function claudeTakesPromptSnapshotFlag(version: string): boolean {
 
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
   const parts = version.split(".").map(Number);
-  for (let index = 0; index < minimum.length; index += 1) {
-    if (parts[index] > minimum[index]) return true;
-    if (parts[index] < minimum[index]) return false;
+  for (const [index, required] of minimum.entries()) {
+    // A missing part compares like NaN: neither above nor below the minimum.
+    const part = parts[index] ?? Number.NaN;
+    if (part > required) return true;
+    if (part < required) return false;
   }
   return true;
 }

@@ -1419,7 +1419,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       draftIds: input.attachmentDraftIds ?? [],
       replyToMessageId: input.replyToMessageId ?? null,
     });
-    const delivery = this.#mailbox.getDelivery(receipt.deliveries[0].id);
+    const [queued] = receipt.deliveries;
+    const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery) throw new Error("Unable to create queued message.");
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     this.#mailboxSync.syncMailboxMessages(snapshot);

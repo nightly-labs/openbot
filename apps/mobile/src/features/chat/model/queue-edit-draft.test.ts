@@ -46,7 +46,7 @@ it("orders queued deliveries by host position without mutating the received snap
     delivery,
   ];
   expect(orderedQueue(rows).map((item) => item.id)).toEqual(["delivery-1", "second"]);
-  expect(rows[0].id).toBe("second");
+  expect(rows[0]?.id).toBe("second");
 });
 it("keeps the held delivery in the list the host no longer reports", () => {
   const second = { ...delivery, id: "second", position: 2 };

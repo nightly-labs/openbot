@@ -69,10 +69,10 @@ wiring (`App.tsx`, `AppView.tsx`, `app-providers.tsx`, `app-bootstrap.tsx`, `Wor
 `WorkspaceOverlays.tsx`, `lazy-views.ts`), the cross-domain modules every feature reads and none
 owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`,
 `simple-context.tsx`, `scope-lifetime.ts`), `preview/` — whose mocks are the second implementation
-of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets
-(`base.css`, `transitions.css`; `action-menu.css` and `sliding-tabs.css` are now in
+of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets in `styles/`
+(`base.css`, `transitions.css`, `otp-input.css`; `action-menu.css` and `sliding-tabs.css` are now in
 `packages/ui/src/styles/`) —
-plus `app-shell.css`, which ends in a theme layer that assigns the palette across every domain
+plus `styles/app-shell.css`, which ends in a theme layer that assigns the palette across every domain
 at once and cannot be split until that layer is lifted out; its header says so. Stories stay in
 `src/renderer/stories/`, where the test rules relax.
 

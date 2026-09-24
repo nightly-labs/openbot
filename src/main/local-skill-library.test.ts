@@ -9,7 +9,7 @@ import { localSkillTools } from "./local-skill-tools";
 import { SkillMarketplaceService } from "./skill-marketplace-service";
 
 let root: string;
-let agents: AgentSummary[];
+let agents: [AgentSummary, AgentSummary];
 let library: LocalSkillLibrary;
 let service: SkillMarketplaceService;
 const network = vi.fn(async () => {
@@ -19,7 +19,7 @@ const markdown = (body: string) =>
   `---\nname: Weekly summary\ndescription: Summarize the week.\nexample-prompt: Summarize this week.\n---\n${body}`;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "openbot-local-skills-"));
-  agents = ["writer", "reader"].map((id) => ({
+  const testAgent = (id: string): AgentSummary => ({
     id,
     name: id,
     provider: "codex",
@@ -35,7 +35,8 @@ beforeEach(async () => {
     avatarSeed: id,
     avatarHue: null,
     avatarUrl: null,
-  }));
+  });
+  agents = [testAgent("writer"), testAgent("reader")];
   for (const agent of agents) await mkdir(join(agent.workspacePath, "draft"), { recursive: true });
   await writeFile(join(agents[0].workspacePath, "draft/SKILL.md"), markdown("First version"));
   library = new LocalSkillLibrary(join(root, "library"), () => agents);
@@ -72,7 +73,7 @@ describe("local skill library", () => {
     await writeFile(join(agents[0].workspacePath, "draft/SKILL.md"), markdown("Second version"));
     const second = await library.revise("writer", first.id, 1, "draft");
     const restarted = new LocalSkillLibrary(library.root, () => agents);
-    expect((await restarted.list())[0].version).toBe(2);
+    expect((await restarted.list())[0]?.version).toBe(2);
     expect((await restarted.get(first.id, 1)).instructions).toBe("First version");
     expect((await service.listInstalled("writer"))[0]).toMatchObject({
       installedVersion: 1,

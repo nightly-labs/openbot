@@ -1004,7 +1004,7 @@ function legacyWorkspaceRoots(renames: readonly AgentIdRename[]): readonly { fro
       for (const [rawFrom, rawTo] of [
         [from, to],
         [jsonEscape(from), jsonEscape(to)],
-      ]) {
+      ] as const) {
         roots.set(rawFrom, { from: rawFrom, to: rawTo });
       }
     }

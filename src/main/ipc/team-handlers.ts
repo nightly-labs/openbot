@@ -2,7 +2,7 @@ import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/c
 import type { HostService } from "../host-service";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
 import type { RemoteServerManager } from "../remote-server-manager";
-import { parseAgentRequest } from "./agent-inputs";
+import { agentRequest } from "./agent-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import {
@@ -25,7 +25,7 @@ import {
   parseSetTeamTyping,
   parseUpdateTeamMember,
 } from "./server-inputs";
-import { requireString, stringPayload } from "./validation";
+import { stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
@@ -79,18 +79,18 @@ export function teamIpcHandlers({
       ),
       refreshIdentity: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.refreshIdentity(serverId)),
       listMembers: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.listMembers(serverId)),
-      updateMember: payloadHandler(parseAgentRequest, (request) =>
-        remoteServers.updateMember(request.serverId, parseUpdateTeamMember(request.payload)),
+      updateMember: payloadHandler(agentRequest(parseUpdateTeamMember), ({ serverId, payload }) =>
+        remoteServers.updateMember(serverId, payload),
       ),
-      removeMember: payloadHandler(parseAgentRequest, (request) =>
-        remoteServers.removeMember(request.serverId, requireString(request.payload, "memberId")),
+      removeMember: payloadHandler(agentRequest(stringPayload("memberId")), ({ serverId, payload }) =>
+        remoteServers.removeMember(serverId, payload),
       ),
       listInvites: payloadHandler(stringPayload("serverId"), (serverId) => remoteServers.listInvites(serverId)),
-      revokeInvite: payloadHandler(parseAgentRequest, (request) =>
-        remoteServers.revokeInvite(request.serverId, requireString(request.payload, "inviteId")),
+      revokeInvite: payloadHandler(agentRequest(stringPayload("inviteId")), ({ serverId, payload }) =>
+        remoteServers.revokeInvite(serverId, payload),
       ),
-      createInvite: payloadHandler(parseAgentRequest, (request) =>
-        remoteServers.createInvite(request.serverId, parseCreateTeamInvite(request.payload)),
+      createInvite: payloadHandler(agentRequest(parseCreateTeamInvite), ({ serverId, payload }) =>
+        remoteServers.createInvite(serverId, payload),
       ),
       setTyping: payloadHandler(parseSetTeamTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {

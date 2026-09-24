@@ -44,10 +44,10 @@ export function SkillPreview(props: {
         blue = 0,
         total = 0;
       for (let i = 0; i < pixels.length; i += 4) {
-        const r = pixels[i],
-          g = pixels[i + 1],
-          b = pixels[i + 2];
-        const weight = (Math.max(r, g, b) - Math.min(r, g, b)) * pixels[i + 3];
+        const r = pixels[i] ?? 0,
+          g = pixels[i + 1] ?? 0,
+          b = pixels[i + 2] ?? 0;
+        const weight = (Math.max(r, g, b) - Math.min(r, g, b)) * (pixels[i + 3] ?? 0);
         red += r * weight;
         green += g * weight;
         blue += b * weight;

@@ -384,7 +384,8 @@ export class SkillMarketplaceService {
       delete entry.enabled;
     } else {
       const live = targetDirectories(agent.workspacePath, entry.slug);
-      const source = (await pathExists(live[0])) ? live[0] : (await pathExists(live[1])) ? live[1] : null;
+      const [primary, fallback] = live;
+      const source = (await pathExists(primary)) ? primary : (await pathExists(fallback)) ? fallback : null;
       const stash = disabledDirectory(agent.workspacePath, entry.slug);
       if (source) {
         await mkdir(dirname(stash), { recursive: true, mode: 0o700 });
@@ -436,7 +437,7 @@ export class SkillMarketplaceService {
   }
 }
 
-function targetDirectories(workspace: string, slug: string): string[] {
+function targetDirectories(workspace: string, slug: string): [string, string] {
   return [join(workspace, ".agents", "skills", slug), join(workspace, ".claude", "skills", slug)];
 }
 
@@ -514,7 +515,7 @@ async function replaceTargets(
   workspace: string,
   slug: string,
   files: Record<string, Uint8Array>,
-  targets = targetDirectories(workspace, slug),
+  targets: readonly string[] = targetDirectories(workspace, slug),
 ): Promise<void> {
   const completed: Array<{ target: string; backup: string | null }> = [];
   try {

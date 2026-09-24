@@ -17,6 +17,11 @@ and was omitted. It now has `typecheck:mobile`; the old name remains an alias fo
 `@openbot/brand`, `@openbot/contracts`, and `@openbot/team-client`. Its Expo and Uniwind generation
 writes ignored files before TypeScript runs.
 
+Each `typecheck` script starts TypeScript through `node_modules/typescript/bin/tsc`, not a bare
+`tsc`. `storybook-solidjs-vite` installs typescript@6 as `@typescript/old`, and bun links that
+package's `tsc` into `node_modules/.bin` in place of the TypeScript 7 one. A bare `tsc` therefore
+checks with TypeScript 6 without a warning; `scripts/dependency-catalog.test.ts` rejects one.
+
 Signal had a similar gap: `remote:check` was its only entry point and also required Compose
 validation. `typecheck:remote` and `test:remote` now run in CI. `remote:check:compose` validates both
 Compose files with the Docker CLI; it does not need a daemon. `remote:check` remains the combined
@@ -37,6 +42,15 @@ The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:u
 lint, desktop typecheck and build) takes about a minute, and each other typecheck takes a few
 seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
+
+`check:staged` lets Biome fix the working-tree copy of each staged file, and the hook then stages
+those files again. It stages again only the files that have no unstaged changes; otherwise the commit
+would also take the author's unstaged edits. When Biome changes a file that is only partly staged,
+the hook stops the commit and names the file. `scripts/pre-commit-hook.test.ts` covers the three cases.
+
+One project typecheck, such as `typecheck:node` or `typecheck:renderer`, takes under 10 seconds and
+less than 1.5 GB of memory. The load that the check rules prevent comes from the aggregate command,
+which starts all projects at the same time.
 
 The source of truth for CI is [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 Its main jobs are:

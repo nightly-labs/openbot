@@ -178,3 +178,5 @@ export interface LocalSkillRevisionInput {
   skillId: string;
   revision?: number;
 }
+/** Installs one exact revision, so the agent gets the copy the user read. */
+export type InstallLocalSkillInput = LocalSkillRevisionInput & { agentId: string; revision: number };

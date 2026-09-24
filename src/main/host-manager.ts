@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { isMissingFileError } from "../backend/file-errors";
 import {
   HOST_HEARTBEAT_TIMEOUT_MS,
   HOST_IDLE_GRACE_MS,
   hostStateSchema,
-  isMissingFile,
   readHostConfig,
   readOwnedJson,
   tenantStatusSchema,
@@ -82,7 +82,7 @@ export class HostManager {
       try {
         this.#state = await readOwnedJson(join(this.#directory, "state.json"), this.#hostUid, hostStateSchema);
       } catch (error) {
-        if (!isMissingFile(error)) throw error;
+        if (!isMissingFileError(error)) throw error;
       }
       this.#initialized = true;
       // No replay of an interrupted install. An administrator must verify and recover it.

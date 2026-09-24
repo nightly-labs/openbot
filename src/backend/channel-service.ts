@@ -557,9 +557,9 @@ export class ChannelService {
         // One eligible member is not a decision. Routing costs a full turn of the lead's own model,
         // so it runs only when there is a choice to make. This is silent on purpose: a dispatch
         // message exists to make a model's choice auditable, and no model was asked here.
-        const eligible = this.eligibleMembers(channel);
-        if (eligible.length === 1) {
-          task = { ...task, ownerAgentId: eligible[0] };
+        const [onlyMember, ...otherMembers] = this.eligibleMembers(channel);
+        if (onlyMember && otherMembers.length === 0) {
+          task = { ...task, ownerAgentId: onlyMember };
           this.store.update(channel, { tasks: [task] });
           channel = this.store.get(channelId);
         }

@@ -197,7 +197,7 @@ it("rejects desktop preload access in shared UI while allowing browser APIs and 
       const diagnostics = report.diagnostics.filter((item) => item.category === "plugin");
       expect(diagnostics.filter((item) => item.message.includes("errored"))).toEqual([]);
       expect(diagnostics).toHaveLength(expected);
-      if (expected) expect(diagnostics[0].severity).toBe("error");
+      if (expected) expect(diagnostics[0]?.severity).toBe("error");
     }
   } finally {
     rmSync(workspace, { recursive: true, force: true });

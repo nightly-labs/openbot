@@ -44,7 +44,8 @@ export const Gallery: Story = {
     </main>
   ),
   play: async ({ canvas, userEvent }) => {
-    const trigger = canvas.getAllByRole("button", { name: /Reasoning level/ })[0];
+    const [trigger] = canvas.getAllByRole("button", { name: /Reasoning level/ });
+    if (!trigger) throw new Error("Reasoning level trigger is missing.");
     await userEvent.click(trigger);
     const body = within(document.body);
     await userEvent.click(await body.findByRole("option", { name: "High" }));

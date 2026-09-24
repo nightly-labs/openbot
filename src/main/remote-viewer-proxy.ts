@@ -17,6 +17,7 @@ import {
   encodeRemoteDesktopSignalBinary,
   encodeRemoteDesktopSignalControl,
 } from "./remote-desktop-signal";
+import { rawDataBytes, rawDataSize, rawDataText } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -309,23 +310,6 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
     chunks.push(bytes);
   }
   return Buffer.concat(chunks);
-}
-
-function rawDataSize(data: Ws.RawData): number {
-  if (Array.isArray(data)) return data.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  return data.byteLength;
-}
-
-function rawDataBytes(data: Ws.RawData): Uint8Array {
-  if (Array.isArray(data)) return new Uint8Array(Buffer.concat(data));
-  if (data instanceof ArrayBuffer) return new Uint8Array(data.slice(0));
-  return new Uint8Array(Buffer.from(data.buffer, data.byteOffset, data.byteLength));
-}
-
-function rawDataText(data: Ws.RawData): string {
-  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
 }
 
 function sendText(response: ServerResponse, status: number, body: string): void {

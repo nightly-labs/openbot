@@ -1,9 +1,11 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { parse as parseYaml } from "yaml";
+import { isMissingFileError } from "../backend/file-errors";
+import { isPathInside } from "../backend/path-containment";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 export const OWNERSHIP_MARKER = ".openbot-managed.json";
@@ -40,8 +42,7 @@ export class ManagedSkillService {
     const results = await Promise.allSettled(
       agents.map((agent) => syncTargets(agent.workspacePath, content, this.slug)),
     );
-    for (let index = 0; index < results.length; index += 1) {
-      const result = results[index];
+    for (const [index, result] of results.entries()) {
       if (result.status === "fulfilled") {
         this.reportResult(result.value);
       } else {
@@ -172,17 +173,16 @@ async function verifySafeDirectory(workspaceRoot: string, directory: string): Pr
     await requireRealDirectory(current);
   }
   const resolvedDirectory = await realpath(directory);
-  if (!isInside(workspaceRoot, resolvedDirectory)) {
+  if (!isPathInside(workspaceRoot, resolvedDirectory)) {
     throw new Error(`Managed skill target escapes its workspace: ${directory}`);
   }
 }
 
 function containedRelativePath(workspaceRoot: string, candidate: string): string {
-  const path = relative(workspaceRoot, candidate);
-  if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) {
+  if (!isPathInside(workspaceRoot, candidate)) {
     throw new Error(`Managed skill target escapes its workspace: ${candidate}`);
   }
-  return path;
+  return relative(workspaceRoot, candidate);
 }
 
 async function requireRealDirectory(path: string): Promise<void> {
@@ -199,11 +199,6 @@ async function rejectSymlink(path: string): Promise<void> {
     if (isMissingFileError(error)) return;
     throw error;
   }
-}
-
-function isInside(root: string, candidate: string): boolean {
-  const path = relative(root, candidate);
-  return path === "" || (!path.startsWith(`..${sep}`) && path !== ".." && !isAbsolute(path));
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -223,10 +218,6 @@ async function optionalText(path: string): Promise<string | null> {
     if (isMissingFileError(error)) return null;
     throw error;
   }
-}
-
-function isMissingFileError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isFileExistsError(error: unknown): boolean {

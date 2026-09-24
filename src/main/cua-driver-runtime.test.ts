@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { CuaDriverActionTap } from "./cua-driver-action-tap";
 import {
   type CuaDriverCommandAliasInput,
@@ -61,8 +61,8 @@ describe("CuaDriverRuntime", () => {
     await driver.start();
 
     expect(spawned).toHaveLength(1);
-    expect(spawned[0].command).toBe("/opt/cua/bin/cua-driver");
-    expect(spawned[0].args).toEqual(["serve", "--socket", join(socketDirectory, "driver.sock"), "--no-overlay"]);
+    expect(spawned[0]?.command).toBe("/opt/cua/bin/cua-driver");
+    expect(spawned[0]?.args).toEqual(["serve", "--socket", join(socketDirectory, "driver.sock"), "--no-overlay"]);
     expect(driver.socketPath().startsWith(tmpdir())).toBe(true);
     expect(driver.socketPath()).not.toBe(join(tmpdir(), "driver.sock"));
   });
@@ -96,8 +96,8 @@ describe("CuaDriverRuntime", () => {
     const { driver, spawned } = await runtime();
     await driver.start();
 
-    expect(spawned[0].options.env.CUA_DRIVER_EMBEDDED).toBe("1");
-    expect(spawned[0].options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
+    expect(spawned[0]?.options.env.CUA_DRIVER_EMBEDDED).toBe("1");
+    expect(spawned[0]?.options.env.CUA_DRIVER_HOST_BUNDLE_ID).toBe("app.openbot.desktop");
   });
 
   it("leaves the cursor to OpenBot on every display", async () => {
@@ -109,7 +109,7 @@ describe("CuaDriverRuntime", () => {
     const { driver, spawned } = await runtime({ actionTap: new ActingTap() });
     await driver.start();
 
-    expect(spawned[0].args).toContain("--no-overlay");
+    expect(spawned[0]?.args).toContain("--no-overlay");
     expect(driver.lastPointer(60_000)).toEqual({ tool: "click", x: 600, y: 500, at: 0 });
   });
 
@@ -122,8 +122,8 @@ describe("CuaDriverRuntime", () => {
     const { driver, spawned } = await runtime();
     await driver.start();
 
-    expect(spawned[0].options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
-    expect(spawned[0].options.env.CUA_DRIVER_RS_UPDATE_CHECK).toBe("0");
+    expect(spawned[0]?.options.env.CUA_DRIVER_RS_TELEMETRY_ENABLED).toBe("0");
+    expect(spawned[0]?.options.env.CUA_DRIVER_RS_UPDATE_CHECK).toBe("0");
     // The providers spawn their own proxy, so the entry they are handed must carry them too.
     expect(driver.mcpServerConfig()?.env).toEqual([
       { key: "CUA_DRIVER_EMBEDDED", value: "1" },
@@ -219,8 +219,10 @@ describe("CuaDriverRuntime", () => {
     const address = driver.tapAddress();
     expect(address).not.toBe(driver.socketPath());
 
-    const exited = new Promise<void>((resolve) => children[0].once("exit", () => resolve()));
-    children[0].kill("SIGKILL");
+    const [child] = children;
+    assert(child);
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+    child.kill("SIGKILL");
     await exited;
     await vi.waitFor(() => expect(driver.running()).toBe(false));
 
@@ -272,7 +274,9 @@ describe("CuaDriverRuntime", () => {
       },
     });
     await driver.start();
-    await new Promise<void>((resolve) => children[0].stdout?.once("data", () => resolve()));
+    const [child] = children;
+    assert(child);
+    await new Promise<void>((resolve) => child.stdout?.once("data", () => resolve()));
 
     // What the panel does while `warmUp` is putting an ungranted daemon away.
     await Promise.all([driver.stop(), driver.state()]);
@@ -389,8 +393,10 @@ describe("CuaDriverRuntime", () => {
     expect(entries).toBe(1);
 
     // The runtime's own `exit` listener was added first, so it has run by the time this one does.
-    const died = new Promise<void>((resolve) => children[0].once("exit", () => resolve()));
-    children[0].kill("SIGKILL");
+    const [child] = children;
+    assert(child);
+    const died = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+    child.kill("SIGKILL");
     await died;
 
     expect(entries).toBe(2);
@@ -461,7 +467,7 @@ describe("CuaDriverRuntime", () => {
     await driver.start();
 
     expect(spawned).toHaveLength(1);
-    expect(spawned[0].args).toEqual(["serve", "--socket", driver.socketPath(), "--no-overlay"]);
+    expect(spawned[0]?.args).toEqual(["serve", "--socket", driver.socketPath(), "--no-overlay"]);
     expect(driver.socketPath().startsWith("\\\\.\\pipe\\")).toBe(true);
     // A Windows process started without `SystemRoot` cannot load the system libraries it links
     // against, so the proxy would fail before it reached the daemon.
@@ -496,12 +502,14 @@ describe("CuaDriverRuntime", () => {
     vi.stubEnv("XDG_SESSION_TYPE", "wayland");
     const wayland = await runtime({ platform: "linux" });
     await wayland.driver.start();
-    expect(wayland.spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
+    expect(wayland.spawned[0]?.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
 
     vi.stubEnv("XDG_SESSION_TYPE", "x11");
     const x11 = await runtime({ platform: "linux" });
     await x11.driver.start();
-    expect(x11.spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBeUndefined();
+    const [x11Spawn] = x11.spawned;
+    assert(x11Spawn);
+    expect(x11Spawn.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBeUndefined();
   });
 
   // A user who turned the backend off did so because their compositor handles it badly.
@@ -511,7 +519,7 @@ describe("CuaDriverRuntime", () => {
     const { driver, spawned } = await runtime({ platform: "linux" });
     await driver.start();
 
-    expect(spawned[0].options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("0");
+    expect(spawned[0]?.options.env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("0");
   });
 
   // Windows and Linux put no permission between a program and the desktop it already runs on. An

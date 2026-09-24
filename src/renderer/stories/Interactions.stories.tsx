@@ -190,22 +190,23 @@ export const MenuPopoverTooltip: Story = {
     const menuTrigger = canvas.getByRole("button", { name: "Agent actions" });
     await userEvent.click(menuTrigger);
     const menu = await body.findByRole("menu");
-    const menuItems = within(menu).getAllByRole("menuitem");
+    const [firstItem] = within(menu).getAllByRole("menuitem");
+    if (!firstItem) throw new Error("Agent actions menu has no items.");
     const menuStyle = getComputedStyle(menu);
-    const firstItemStyle = getComputedStyle(menuItems[0]);
+    const firstItemStyle = getComputedStyle(firstItem);
     await expect(menu).toBeVisible();
     await expect(menu).toHaveClass("ui-action-menu");
     await expect(menu.getBoundingClientRect().width).toBe(160);
     await expect(menuStyle.padding).toBe("4px");
     await expect(menuStyle.borderRadius).toBe("8px");
-    await expect(menuItems[0].getBoundingClientRect().height).toBe(32);
+    await expect(firstItem.getBoundingClientRect().height).toBe(32);
     await expect(firstItemStyle.padding).toBe("6px 8px");
     await expect(firstItemStyle.gap).toBe("8px");
     await expect(firstItemStyle.borderRadius).toBe("6px");
     await expect(firstItemStyle.fontSize).toBe("14px");
     await expect(firstItemStyle.lineHeight).toBe("20px");
     await expect(firstItemStyle.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-    await expect(menuItems[0].querySelector("svg")?.getBoundingClientRect().width).toBe(16);
+    await expect(firstItem.querySelector("svg")?.getBoundingClientRect().width).toBe(16);
     await expect(body.getByRole("menuitem", { name: "Duplicate" })).toHaveAttribute("data-disabled");
     const deleteItem = body.getByRole("menuitem", { name: "Delete" });
     const deleteIcon = deleteItem.querySelector("svg");
@@ -282,11 +283,13 @@ export const TabsAndRadioGroup: Story = {
           onChange={setChannel}
           aria-label="Default channel"
         >
-          {[
-            ["general", "General"],
-            ["research", "Research"],
-            ["support", "Support"],
-          ].map(([value, label]) => (
+          {(
+            [
+              ["general", "General"],
+              ["research", "Research"],
+              ["support", "Support"],
+            ] satisfies [string, string][]
+          ).map(([value, label]) => (
             <RadioGroup.Item class="foundation-radio-item" value={value}>
               <RadioGroup.ItemInput />
               <RadioGroup.ItemControl class="foundation-radio-control" />

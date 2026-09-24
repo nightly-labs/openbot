@@ -49,6 +49,7 @@ import {
 } from "./../provider-drivers";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
+import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -79,22 +80,6 @@ const PROVIDER_IDLE_CHECK_MS = 60_000;
 function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   const now = Date.now() / 1_000;
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
-}
-
-function withUsageReadTimeout<T>(promise: Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Usage read timed out.")), ACCOUNT_USAGE_READ_TIMEOUT_MS);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 /**
@@ -704,7 +689,11 @@ export class ProviderRuntime implements ProviderPort {
             if (!client) return;
             const model =
               provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
-            const usage = await withUsageReadTimeout(this.#refreshUsage(client, model, false));
+            const usage = await withTimeout(
+              this.#refreshUsage(client, model, false),
+              ACCOUNT_USAGE_READ_TIMEOUT_MS,
+              "Usage read timed out.",
+            );
             const limit = usage.limits[0];
             if (!limit || (!limit.primary && !limit.secondary)) return;
             collected.set(provider, { ...limit, id: provider });

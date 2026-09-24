@@ -92,8 +92,8 @@ function declaredClasses(source: string): Set<string> {
     // A prelude ends at its block. `;` and `}` end a declaration or a block instead, so
     // whatever was collecting is a value or the tail of a rule and never a selector.
     if (char === "{") {
-      for (const match of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
-        names.add(match[1]);
+      for (const [, name] of withoutComments.slice(start, index).matchAll(/\.(-?[a-zA-Z][a-zA-Z0-9_-]*)/gu)) {
+        if (name !== undefined) names.add(name);
       }
       start = index + 1;
     } else if (char === "}" || char === ";") {
@@ -205,7 +205,7 @@ export function checkUiFoundation(
     const source = readFileSync(path, "utf8");
     for (const word of source.matchAll(/[a-zA-Z][a-zA-Z0-9_-]*/gu)) named.add(word[0]);
     for (const region of classRegions(source)) {
-      for (const prefix of region.matchAll(CLASS_FAMILY_PREFIX)) families.push(prefix[1]);
+      for (const [, prefix] of region.matchAll(CLASS_FAMILY_PREFIX)) if (prefix !== undefined) families.push(prefix);
     }
   }
   for (const path of styleSheets) {

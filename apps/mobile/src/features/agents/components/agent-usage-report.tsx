@@ -109,11 +109,13 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
         </View>
       </SettingsSection>
       <SettingsSection title="Activity">
-        {[
-          ["Sessions", totals.sessions],
-          ["User messages", totals.userMessages],
-          ["Assistant messages", totals.assistantMessages],
-        ].map(([label, value]) => (
+        {(
+          [
+            ["Sessions", totals.sessions],
+            ["User messages", totals.userMessages],
+            ["Assistant messages", totals.assistantMessages],
+          ] as const
+        ).map(([label, value]) => (
           <SettingsRow key={label} trailing={<Typography>{value.toLocaleString()}</Typography>}>
             <Typography>{label}</Typography>
           </SettingsRow>

@@ -1,6 +1,6 @@
 import { EventEmitter, once } from "node:events";
 import { isString } from "@openbot/contracts/runtime-values";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import {
   decodeRemoteDesktopSignalBinary,
@@ -26,7 +26,8 @@ describe("RemoteViewerProxy", () => {
     const viewerUrl = await proxy.viewerUrl("host-1", "/v1/remote-screen/sessions/session-1/viewer");
     expect(new URL(viewerUrl).hostname).toBe("127.0.0.1");
     const html = await (await fetch(viewerUrl)).text();
-    const localPrefix = new URL(viewerUrl).pathname.split("/v1/")[0];
+    const [localPrefix] = new URL(viewerUrl).pathname.split("/v1/");
+    assert(localPrefix !== undefined);
     expect(html).toContain(`${localPrefix}/v1/remote-screen/session`);
     expect(html).toContain(`^${localPrefix.replaceAll("/", "\\/")}\\/v1\\/remote-screen\\/sessions\\/([A-Za-z0-9-]+)`);
 
