@@ -26,8 +26,13 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
           arriving.add(message.id);
       }
     }
-    setSnapshot({ agentId, messages, enabled, arriving });
-    return arriving;
+    // Keep the same set while a reply streams, so rows that read it do not re-render per chunk.
+    const next =
+      arriving.size === snapshot.arriving.size && [...arriving].every((id) => snapshot.arriving.has(id))
+        ? snapshot.arriving
+        : arriving;
+    setSnapshot({ agentId, messages, enabled, arriving: next });
+    return next;
   }
   return snapshot.arriving;
 }

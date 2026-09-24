@@ -1,7 +1,7 @@
 import { GlassView } from "expo-glass-effect";
 import { useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
-import { ArrowUp, Plus, Reply, Square, X } from "lucide-react-native";
+import { ArrowUp, Check, Mic, Plus, Reply, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -36,10 +36,12 @@ import { haptics } from "@/shared/lib/haptics";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
+import { composerAction } from "../model/voice-dictation";
 import { attachmentTypeLabel, formatFileSize, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
 import type { ChatAttachments } from "./use-chat-attachments";
+import { useVoiceDictation } from "./use-voice-dictation";
 
 // The field grows to this many lines, then keeps its height and scrolls.
 const MAX_INPUT_LINES = 5;
@@ -160,6 +162,20 @@ export function ChatComposer({
   const composing = Boolean(draft.trim()) || (attachments.items.length > 0 && !sending);
   const inputRef = useRef<TextInput>(null);
   const isFocused = useIsFocused();
+  const latestTextRef = useRef(draft);
+  const [sendGate] = useState(createComposerSendGate);
+  // Live dictation writes into the same draft as typing, so the user can read
+  // and edit it before an explicit send. Leaving the chat or losing the server
+  // stops listening and keeps the text.
+  const dictation = useVoiceDictation({
+    enabled: isFocused && !disabled,
+    onDraft: (text) => {
+      sendGate.edit();
+      latestTextRef.current = text;
+      onChangeDraft(text);
+    },
+  });
+  const dictating = dictation.phase !== "idle";
   const focusedReplyVersion = useRef(0);
   useEffect(() => {
     if (isFocused && !disabled && replyTarget && focusedReplyVersion.current !== replyFocusVersion) {
@@ -228,7 +244,7 @@ export function ChatComposer({
     // it, which is why it is safe to run on every open.
     if (menuOpen && openedWith?.focused) inputRef.current?.focus();
   }, [menuOpen, openedWith]);
-  const anchored = composing || Boolean(openedWith?.expanded);
+  const anchored = composing || dictating || Boolean(openedWith?.expanded);
   const held = useSharedValue(anchored ? 1 : 0);
   useEffect(() => {
     held.set(
@@ -262,6 +278,9 @@ export function ChatComposer({
       ],
     };
   });
+  const listeningStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: reducedMotion ? 1 : 1 + dictation.level.get() * 0.2 }],
+  }));
   const plusStyle = useAnimatedStyle(() => {
     const progress = expansion.get();
     const width = interpolate(progress, [0, 1], [restWidth, cardWidth]);
@@ -337,8 +356,6 @@ export function ChatComposer({
     ],
   }));
   const [focused, setFocused] = useState(false);
-  const latestTextRef = useRef(draft);
-  const [sendGate] = useState(createComposerSendGate);
 
   useLayoutEffect(() => {
     // Selecting a file is a draft edit even when TextInput never receives focus.
@@ -379,19 +396,22 @@ export function ChatComposer({
   // under the user's own press.
   const busy = sending || attachments.preparing;
   const attachmentsBlocked = disabled || sending || attachments.preparing;
+  // During dictation the plus becomes cancel, which puts back the draft from
+  // before the mic.
+  const leadingBlocked = dictating ? dictation.phase === "stopping" : attachmentsBlocked;
   // The card covers this glyph and draws the same corner, so the two trade
   // places on one progress: the glyph is gone by the time the card is drawn,
   // and back on the frames the card fades out. Waiting for the card to
   // unmount left the corner empty for the whole length of its collapse.
   const plusGlyphStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(menuProgress.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (attachmentsBlocked ? 0.45 : 1),
+    opacity: interpolate(menuProgress.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (leadingBlocked ? 0.45 : 1),
   }));
   // Where the plus is drawn, in either shape, from the constants that draw it.
   // Measuring it cannot work: `measureInWindow` reads the layout tree, and the
   // plus and the composer around it both carry Reanimated transforms that
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
-  const restingPlus = !hasDraft && !focused;
+  const restingPlus = !hasDraft && !focused && !dictating;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   const attachmentAnchor = {
@@ -399,13 +419,15 @@ export function ChatComposer({
     bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
     size: plusDrawn,
   };
-  // A draft still sends while the agent works: the host queues it. So stop only
-  // takes the control when there is nothing to send.
-  const stopMode = Boolean(onStop) && !hasDraft && !busy;
-  const primed = hasDraft || busy || stopMode;
-  const canPressSend = !disabled && !busy && hasDraft;
-  const stopPending = stopMode && stopping;
-  const pressable = stopMode ? !disabled && !stopPending : canPressSend;
+  const control = composerAction({
+    disabled,
+    hasDraft,
+    busy,
+    canStop: Boolean(onStop),
+    stopping,
+    voiceAvailable: dictation.available,
+    dictation: dictation.phase,
+  });
 
   function requestSend(): void {
     if (disabled || sending || attachments.preparing) return;
@@ -413,6 +435,32 @@ export function ChatComposer({
     if (action === "blur") inputRef.current?.blur();
     else if (action === "send") onSend(latestTextRef.current);
   }
+
+  function pressControl(): void {
+    switch (control.mode) {
+      case "stop":
+        onStop?.();
+        return;
+      case "dictate":
+        // Close the keyboard first: typing and recognition must not edit the
+        // draft at the same time, and the field is read-only until the mic stops.
+        inputRef.current?.blur();
+        dictation.start(latestTextRef.current);
+        return;
+      case "finish-dictation":
+        void dictation.finish();
+        return;
+      case "send":
+        requestSend();
+    }
+  }
+
+  const controlLabel = {
+    send: sendLabel,
+    stop: `Stop ${agentName}`,
+    dictate: "Dictate message",
+    "finish-dictation": "Stop dictation",
+  }[control.mode];
 
   const focusInput = useCallback(() => {
     if (!disabled) inputRef.current?.focus();
@@ -606,9 +654,9 @@ export function ChatComposer({
                     ref={inputRef}
                     nativeID="chat-composer-input"
                     accessibilityLabel={`Message ${agentName}`}
-                    accessibilityState={{ disabled }}
-                    editable={!disabled}
-                    showSoftInputOnFocus={!disabled}
+                    accessibilityState={{ disabled: disabled || dictating }}
+                    editable={!disabled && !dictating}
+                    showSoftInputOnFocus={!disabled && !dictating}
                     className="min-w-0 font-sans text-foreground"
                     autoCorrect
                     autoCapitalize="sentences"
@@ -736,33 +784,54 @@ export function ChatComposer({
                 }}
               >
                 <Animated.View style={controlStyle}>
+                  {control.mode === "finish-dictation" ? (
+                    // Grows with the input level, so the user sees that the mic hears them.
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        {
+                          position: "absolute",
+                          width: CONTROL_SIZE,
+                          height: CONTROL_SIZE,
+                          borderRadius: CONTROL_SIZE / 2,
+                          backgroundColor: action,
+                          opacity: 0.3,
+                        },
+                        listeningStyle,
+                      ]}
+                    />
+                  ) : null}
                   <Pressable
-                    accessibilityLabel={stopMode ? `Stop ${agentName}` : sendLabel}
+                    accessibilityLabel={controlLabel}
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: !pressable, busy: busy || stopPending }}
-                    disabled={!pressable}
+                    accessibilityState={{ disabled: !control.pressable, busy: control.spinner }}
+                    disabled={!control.pressable}
                     className="size-10 items-center justify-center rounded-full"
                     style={{
                       // Nothing to send reads as a bare glyph on the card, not as a
                       // filled control the user could press.
-                      backgroundColor: primed ? action : "transparent",
+                      backgroundColor: control.primed ? action : "transparent",
                       // The card dims as a whole when the composer is disabled.
                       // Dim only this control for a state the card does not show.
-                      opacity: disabled || pressable ? 1 : 0.45,
+                      opacity: disabled || control.pressable ? 1 : 0.45,
                     }}
-                    onPress={stopMode ? onStop : requestSend}
+                    onPress={pressControl}
                   >
-                    {busy || stopPending ? (
+                    {control.spinner ? (
                       <Spinner size="sm" color={String(actionForeground)} />
-                    ) : stopMode ? (
+                    ) : control.mode === "stop" ? (
                       <Square
                         color={String(actionForeground)}
                         fill={String(actionForeground)}
                         size={14}
                         strokeWidth={2}
                       />
+                    ) : control.mode === "dictate" ? (
+                      <Mic color={String(foreground)} size={21} strokeWidth={1.8} />
+                    ) : control.mode === "finish-dictation" ? (
+                      <Check color={String(actionForeground)} size={20} strokeWidth={2.4} />
                     ) : (
-                      <ArrowUp color={String(primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
+                      <ArrowUp color={String(control.primed ? actionForeground : muted)} size={21} strokeWidth={2.2} />
                     )}
                   </Pressable>
                 </Animated.View>
@@ -781,19 +850,27 @@ export function ChatComposer({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Add attachment"
-            accessibilityState={{ disabled: attachmentsBlocked }}
-            disabled={attachmentsBlocked}
+            accessibilityLabel={dictating ? "Cancel dictation" : "Add attachment"}
+            accessibilityState={{ disabled: leadingBlocked }}
+            disabled={leadingBlocked}
             hitSlop={4}
             className="size-10 items-center justify-center rounded-full"
             onPress={() => {
+              if (dictating) {
+                dictation.cancel();
+                return;
+              }
               void haptics.selection();
               setOpenedWith({ expanded: !restingPlus, focused });
               attachments.openMenu(attachmentAnchor);
             }}
           >
             <Animated.View style={plusGlyphStyle}>
-              <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
+              {dictating ? (
+                <X color={String(foreground)} size={22} strokeWidth={1.8} />
+              ) : (
+                <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
+              )}
             </Animated.View>
           </Pressable>
         </Animated.View>

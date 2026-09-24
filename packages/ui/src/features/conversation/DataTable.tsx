@@ -105,6 +105,60 @@ export function messageContentBlocks(body: string, streaming = false): MessageCo
   return foundStructuredBlock ? blocks : [{ type: "text", text: body }];
 }
 
+/**
+ * Gives back `next` with each block that equals the block at the same index in `previous` replaced
+ * by that earlier object. A streaming reply is parsed again on each revealed word; this keeps the
+ * blocks that did not grow unchanged, so they do not render again.
+ */
+export function reuseUnchangedBlocks(
+  previous: readonly MessageContentBlock[],
+  next: MessageContentBlock[],
+): MessageContentBlock[] {
+  return next.map((block, index) => {
+    const earlier = previous[index];
+    return earlier && sameContentBlock(earlier, block) ? earlier : block;
+  });
+}
+
+function sameContentBlock(earlier: MessageContentBlock, block: MessageContentBlock): boolean {
+  switch (earlier.type) {
+    case "text":
+      return block.type === "text" && earlier.text === block.text;
+    case "code":
+      return (
+        block.type === "code" &&
+        earlier.code === block.code &&
+        earlier.language === block.language &&
+        earlier.filename === block.filename
+      );
+    case "table":
+      return (
+        block.type === "table" &&
+        sameRows(
+          [earlier.headers, earlier.alignments, ...earlier.rows],
+          [block.headers, block.alignments, ...block.rows],
+        )
+      );
+    case "comparison-table":
+      return (
+        block.type === "comparison-table" &&
+        sameRows([earlier.headers, ...earlier.rows], [block.headers, ...block.rows])
+      );
+  }
+}
+
+function sameRows(earlier: readonly (readonly string[])[], rows: readonly (readonly string[])[]): boolean {
+  return (
+    earlier.length === rows.length &&
+    earlier.every((row, index) => {
+      const other = rows[index];
+      return (
+        other !== undefined && row.length === other.length && row.every((cell, cellIndex) => cell === other[cellIndex])
+      );
+    })
+  );
+}
+
 function parseCodeAt(
   lines: string[],
   startIndex: number,

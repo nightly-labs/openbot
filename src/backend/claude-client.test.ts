@@ -9,7 +9,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AgentStore } from "./agent-store";
-import { CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentClient } from "./claude-client";
+import { CLAUDE_IDLE_THREAD_LIMIT, CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentClient } from "./claude-client";
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
 import { loginShellPath } from "./mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
@@ -117,6 +117,22 @@ describe("ClaudeAgentClient", () => {
     ).resolves.toMatchObject({
       rateLimits: { secondary: { usedPercent: 34, windowDurationMins: 10_080 } },
     });
+    await client.stop();
+  });
+
+  it("starts no MCP server to list models or read usage", async () => {
+    const probes: DynamicRecord[] = [];
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.251" }, (params) => {
+      if (isDynamicRecord(params.options)) probes.push(params.options);
+      return new TestQuery(new TestQueue<TestStreamMessage>(), [], { rate_limits_available: false });
+    });
+    client.start();
+
+    await client.request("model/list", {}, decodeModelListResponse);
+    await client.request("account/rateLimits/read", { model: "claude-sonnet-4-6" }, decodeAccountRateLimitsReadResult);
+
+    expect(probes).toHaveLength(2);
+    for (const options of probes) expect(options).toMatchObject({ mcpServers: {}, strictMcpConfig: true });
     await client.stop();
   });
 
@@ -742,6 +758,46 @@ fi
     } finally {
       vi.useRealTimers();
     }
+    await client.stop();
+  });
+
+  it("keeps only the most recently idle thread processes and resumes a released one", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbot-claude-idle-limit-"));
+    const spawned: Array<{ query: TestQuery; output: TestQueue<TestStreamMessage>; options: DynamicRecord | null }> =
+      [];
+    const client = new ClaudeAgentClient({ executable: "/bin/true", version: "2.1.231" }, (params) => {
+      const output = new TestQueue<TestStreamMessage>();
+      const query = new TestQuery(output);
+      spawned.push({ query, output, options: isDynamicRecord(params.options) ? params.options : null });
+      return query;
+    });
+    const notifications: Array<{ method: string; params: unknown }> = [];
+    client.on("notification", (notification) => notifications.push(notification));
+    client.start();
+    const threadIds: string[] = [];
+    for (let index = 0; index <= CLAUDE_IDLE_THREAD_LIMIT; index += 1) {
+      const thread = await client.request(
+        "thread/start",
+        { cwd: root, model: "claude-sonnet-5", runtimeWorkspaceRoots: [root] },
+        decodeThreadResponse,
+      );
+      threadIds.push(thread.thread.id);
+    }
+    // Agents that start together open every thread before any turn starts, and none of them is idle.
+    expect(spawned.map((one) => one.query.closed)).toEqual(Array(CLAUDE_IDLE_THREAD_LIMIT + 1).fill(false));
+
+    for (const [index, threadId] of threadIds.entries()) {
+      const turnId = `00000000-0000-4000-8000-00000000000${index}`;
+      await startTurn(client, threadId, turnId);
+      spawned[index]?.output.push(resultMessage(threadId, turnId, ""));
+      await waitFor(() => notifications.filter((event) => event.method === "turn/completed").length === index + 1);
+    }
+    expect(spawned.map((one) => one.query.closed)).toEqual([true, ...Array(CLAUDE_IDLE_THREAD_LIMIT).fill(false)]);
+
+    await startTurn(client, threadIds[0] ?? "", "77777777-7777-4777-8777-777777777777");
+    expect(spawned.at(-1)?.options).toMatchObject({ resume: threadIds[0] });
+    // The thread in a turn is not idle, so the others keep their processes.
+    expect(spawned.slice(1, -1).map((one) => one.query.closed)).toEqual(Array(CLAUDE_IDLE_THREAD_LIMIT).fill(false));
     await client.stop();
   });
 

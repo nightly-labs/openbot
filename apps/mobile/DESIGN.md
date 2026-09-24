@@ -158,7 +158,8 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
 overlapping smooth masks. Each mask becomes transparent before the physical view edge.
-The material follows the system theme and has no additional solid color overlay. Render it
+The material follows the system theme. In dark mode a masked `bg-sheet` layer at 70% opacity
+covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
 scrolling does not update React state. This approximates a variable blur radius using public
 Expo APIs, as described in [Beautiful Expo](https://github.com/davidmokos/beautiful-expo).
@@ -169,7 +170,7 @@ maps them to utilities. Do not copy these hex values into components.
 
 | Role | Utility | Light | Dark |
 | --- | --- | --- | --- |
-| Sheet background | `bg-sheet` | `#fcfcfc` | `#121212` |
+| Sheet background | `bg-sheet` | `#fcfcfc` | `#141414` |
 | Group background | `bg-grouped` | `#f2f2f2` | `#212121` |
 | Supporting text | `text-grouped-secondary` | `#69696e` | `#96969b` |
 | Inset separator | `bg-grouped-border` | `#dddddf` | `#333335` |

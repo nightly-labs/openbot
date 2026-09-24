@@ -8,17 +8,18 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
-  BrowserTakeoverRequest,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  InstalledSkill,
   QueueSnapshot,
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  StorageUsage,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -26,8 +27,8 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
-import type { MobileAgentActivities } from "./agent-activity";
 import type { MobileConversationStore } from "./conversation-store";
+import type { LiveWorkspaceStore } from "./live-workspace-store";
 
 export type MobileServerKind = "local" | "remote";
 export type MobileServerState = "unknown" | "connecting" | "online" | "offline" | "error";
@@ -75,7 +76,6 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },
   ) => Promise<void>;
-  browserRequests: Record<string, BrowserTakeoverRequest[]>;
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
@@ -106,9 +106,9 @@ export interface MobileWorkspaceContextValue {
   hideChannel: (channelId: string, serverId: string) => boolean;
   unhideChannel: (channelId: string, serverId: string) => boolean;
   toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
-  unreadAgentIds: string[];
   conversationStore: MobileConversationStore;
-  activityByServer: Record<string, MobileAgentActivities>;
+  /** Activity, unread agents, and browser requests. Read them with a selector hook, not from the context. */
+  liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
@@ -129,6 +129,12 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
+  /** Null when the host does not advertise `installed-skills`. */
+  loadAgentSkills: (agentId: string, serverId: string) => Promise<InstalledSkill[] | null>;
+  /** Null when the host does not advertise `storage-v1`. */
+  loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
+  /** Owners and admins only; the host refuses a member. */
+  deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   loadOlderMessages: (agentId: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;

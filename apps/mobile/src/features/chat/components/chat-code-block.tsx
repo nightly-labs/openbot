@@ -3,12 +3,15 @@ import * as Clipboard from "expo-clipboard";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Check, Copy } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { type CodeToken, codeLanguage, highlightCode } from "../model/code-highlight";
 
-export function ChatCodeBlock({
+/** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
+const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
+
+export const ChatCodeBlock = memo(function ChatCodeBlock({
   text,
   language,
   selectable = true,
@@ -26,17 +29,26 @@ export function ChatCodeBlock({
   ]).map(String);
   const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const lastHighlight = useRef<number | null>(null);
   useEffect(() => {
     let active = true;
-    void highlightCode(text, language)
-      .then((tokens) => {
-        if (active) setHighlight({ text, language, tokens });
-      })
-      .catch(() => {
-        if (active) setHighlight(null);
-      });
+    const run = () => {
+      lastHighlight.current = Date.now();
+      void highlightCode(text, language)
+        .then((tokens) => {
+          if (active) setHighlight({ text, language, tokens });
+        })
+        .catch(() => {
+          if (active) setHighlight(null);
+        });
+    };
+    const last = lastHighlight.current;
+    const delay = last === null ? 0 : Math.max(0, STREAMING_HIGHLIGHT_INTERVAL_MS - (Date.now() - last));
+    const timer = delay === 0 ? null : setTimeout(run, delay);
+    if (timer === null) run();
     return () => {
       active = false;
+      if (timer !== null) clearTimeout(timer);
     };
   }, [text, language]);
   const colors: Partial<Record<ShjToken, ColorValue>> = {
@@ -53,7 +65,12 @@ export function ChatCodeBlock({
     deleted: error,
     err: error,
   };
-  const tokens = highlight?.text === text && highlight.language === language ? highlight.tokens : [{ text, offset: 0 }];
+  const tokens =
+    !highlight || highlight.language !== language || !text.startsWith(highlight.text)
+      ? [{ text, offset: 0 }]
+      : highlight.text === text
+        ? highlight.tokens
+        : [...highlight.tokens, { text: text.slice(highlight.text.length), offset: highlight.text.length }];
   const copied = copiedText === text;
   async function copy() {
     try {
@@ -107,4 +124,4 @@ export function ChatCodeBlock({
       </ScrollView>
     </View>
   );
-}
+});

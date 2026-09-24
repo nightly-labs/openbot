@@ -164,6 +164,43 @@ export function isSkillNote(value: unknown): value is string {
   return isString(value) && value.length > 0 && value.length <= SKILL_DESCRIPTION_MAX_LENGTH;
 }
 
+/**
+ * The installed skills a remote host lists for one agent (`GET /v1/agents/:agentId/skills`). The
+ * host is an untrusted sender: an unknown state fails the list, and an optional field that is not
+ * valid is dropped.
+ */
+export function decodeInstalledSkills(value: unknown): InstalledSkill[] {
+  if (!Array.isArray(value)) throw new Error("Invalid installed skill list.");
+  return value.map((item) => {
+    const skill = decodeRecord(item, "installed skill");
+    const state = requiredString(skill, "state");
+    if (!isOneOf(["installed", "update-available", "modified", "needs-repair"] as const, state)) {
+      throw new Error("Invalid installed skill state.");
+    }
+    const description = optionalSkillDescription(skill.description);
+    return {
+      skillId: requiredString(skill, "skillId"),
+      slug: requiredString(skill, "slug"),
+      name: requiredString(skill, "name"),
+      installedVersion: requiredNumber(skill, "installedVersion"),
+      availableVersion: requiredNumber(skill, "availableVersion"),
+      state,
+      ...(skill.enabled === false ? { enabled: false } : skill.enabled === true ? { enabled: true } : {}),
+      ...(isOneOf(INSTALLED_SKILL_ORIGINS, skill.origin) ? { origin: skill.origin } : {}),
+      ...(description ? { description } : {}),
+      ...(isSkillNote(skill.location) ? { location: skill.location } : {}),
+      ...(isSkillNote(skill.problem) ? { problem: skill.problem } : {}),
+    };
+  });
+}
+
+function optionalSkillDescription(value: unknown): string | undefined {
+  if (!isString(value)) return undefined;
+  const description = value.trim();
+  return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
+}
+
+import { decodeRecord, requiredNumber, requiredString } from "./ipc-decoding";
 import { isOneOf, isString } from "./runtime-values";
 
 export interface CreateLocalSkillInput {

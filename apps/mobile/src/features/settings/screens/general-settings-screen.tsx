@@ -1,9 +1,10 @@
 import { Host, Picker, Switch } from "@expo/ui";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUniwind } from "uniwind";
 import { saveAnalyticsPreference, useAnalyticsPreference } from "@/features/analytics/preference";
+import { dictationLanguageOptions } from "@/features/chat/model/voice-dictation";
 import {
   SettingsContent,
   SettingsNote,
@@ -11,8 +12,65 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import {
+  AUTOMATIC_DICTATION_LANGUAGE,
+  saveDictationLanguage,
+  useDictationLanguage,
+} from "@/features/settings/model/dictation-language";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { speechRecognition } from "@/shared/lib/speech-recognition";
+
+function DictationSection({ dark }: { dark: boolean }) {
+  const language = useDictationLanguage();
+  const [supported, setSupported] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void speechRecognition
+      ?.getSupportedLocales({})
+      .then(({ locales }) => {
+        if (active) setSupported(locales);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+  // Without the module the composer has no mic, so the setting would do nothing.
+  if (!speechRecognition) return null;
+  const automatic = language.value === AUTOMATIC_DICTATION_LANGUAGE;
+  const options = dictationLanguageOptions(supported, automatic ? null : language.value);
+  return (
+    <SettingsSection title="Dictation">
+      <SettingsRow
+        trailing={
+          <Host matchContents colorScheme={dark ? "dark" : "light"}>
+            <Picker
+              selectedValue={language.value}
+              enabled={language.ready && !language.saving}
+              onValueChange={(next) => {
+                setError(null);
+                void saveDictationLanguage(next).catch(() => setError("Could not save this setting. Try again."));
+              }}
+            >
+              <Picker.Item label="Automatic" value={AUTOMATIC_DICTATION_LANGUAGE} />
+              {options.map((option) => (
+                <Picker.Item key={option.value} label={option.label} value={option.value} />
+              ))}
+            </Picker>
+          </Host>
+        }
+      >
+        <Typography.Paragraph type="body-sm">Language</Typography.Paragraph>
+      </SettingsRow>
+      <SettingsNote>
+        {error ??
+          "The language you speak when you dictate a message. Automatic uses the first language in your phone settings that speech recognition supports."}
+      </SettingsNote>
+    </SettingsSection>
+  );
+}
 
 export function GeneralSettingsScreen() {
   const { theme } = useUniwind();
@@ -63,6 +121,7 @@ export function GeneralSettingsScreen() {
         </SettingsRow>
         <SettingsNote>{error || "System follows your device’s appearance."}</SettingsNote>
       </SettingsSection>
+      <DictationSection dark={theme === "dark"} />
       <SettingsSection title="Feedback">
         <SettingsRow>
           <Host

@@ -119,7 +119,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
     readonly provider: AgentProvider,
     readonly output = provider === "codex" ? "CODEX_DONE" : provider === "grok" ? "GROK_DONE" : "CLAUDE_DONE",
     readonly autoComplete = true,
-    private accountSignedIn = true,
+    public accountSignedIn = true,
     private readonly requestDelays: Readonly<Record<string, number>> = {},
     private readonly requestHook?: (method: string, provider: AgentProvider) => Promise<void>,
   ) {
