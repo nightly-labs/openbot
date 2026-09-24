@@ -114,6 +114,12 @@ export interface McpSignIn {
    * was actually spent is already gone from disk.
    */
   secrets: () => string[];
+  /**
+   * Whether this attempt asked to register and got no registration back. An authorization server
+   * that registers only the apps it approved, such as Figma's, refuses here, and the user's account
+   * is not the cause.
+   */
+  registrationFailed: () => boolean;
 }
 
 /**
@@ -272,6 +278,7 @@ export class McpOAuth implements McpOAuthAuthority {
       },
       abandon,
       secrets: () => provider.secrets(),
+      registrationFailed: () => provider.registrationPending,
     };
   }
 
@@ -369,6 +376,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #redirectAddressChecked = false;
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** Set when the SDK is told to register, and cleared when it saves what it registered. */
+  #registrationPending = false;
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -428,12 +437,22 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const record = this.#record();
     const client = record.client;
     this.recordSecret(client?.client_secret);
-    if (!client) return undefined;
+    if (!client) return this.#register();
     if (!this.#options.state || this.#exchangingCode) return client;
     if (client.redirect_uris.includes(this.#options.redirectUrl)) return client;
     const refreshWorthTrying = !this.#redirectAddressChecked && Boolean(record.tokens?.refresh_token);
     this.#redirectAddressChecked = true;
-    return refreshWorthTrying ? client : undefined;
+    return refreshWorthTrying ? client : this.#register();
+  }
+
+  get registrationPending(): boolean {
+    return this.#registrationPending;
+  }
+
+  /** No client, which makes the SDK register next. */
+  #register(): undefined {
+    this.#registrationPending = true;
+    return undefined;
   }
 
   /**
@@ -445,6 +464,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   async saveClientInformation(information: OAuthClientInformationFull): Promise<void> {
+    this.#registrationPending = false;
     this.recordSecret(information.client_secret);
     await this.#save({ client: information });
   }

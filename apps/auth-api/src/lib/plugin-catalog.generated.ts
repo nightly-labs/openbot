@@ -52,7 +52,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "figma",
       version: "1.0.0",
       featured: true,
-      detailSha256: "954af383280b4bbe1fe380013b46ed04ed23388de118de3d09bd59cd72116e3d",
+      detailSha256: "2443f0184dd650d5b0e735de31853e3a7d48fdcb1b9538472c4e5450f6c81746",
     },
     {
       slug: "sentry",
@@ -342,7 +342,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Figma",
     tagline: "Designs and prototypes",
     description:
-      "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Each user signs in to their own Figma account through the browser.",
+      "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Note: browser sign-in does not work yet, because Figma has not approved OpenBot as an MCP client. Only the local MCP server works: turn it on in the Figma desktop app (Dev Mode), then add a custom http MCP server with the URL http://127.0.0.1:3845/mcp.",
     category: "design",
     creatorName: "figma.com",
     iconUrl: "https://static.figma.com/app/icon/1/favicon.ico",
@@ -357,7 +357,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-figma-mcp",
         name: "Figma",
         description:
-          "File reading, component inspection, and asset extraction, over Figma's MCP server with browser sign-in.",
+          "File reading, component inspection, and asset extraction, over Figma's MCP server. Browser sign-in does not work yet; use the local MCP server from the Figma desktop app.",
         iconUrl: "https://static.figma.com/app/icon/1/favicon.ico",
         server: {
           name: "figma",

@@ -2,6 +2,7 @@ import { type OAuthClientProvider, UnauthorizedError } from "@modelcontextprotoc
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { AccessDeniedError, UnauthorizedClientError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
@@ -87,10 +88,11 @@ export async function probeMcpServer(
    * which reads the configuration, cannot know it. A transport reports a failure by quoting what it
    * sent, and this is the one reader that would otherwise put a bearer token on the user's screen.
    */
-  const failure = (error: unknown): McpProbeResult => ({
-    toolCount: 0,
-    error: boundedError(redactMcpValues(describeMcpError(error, config, timeoutMs), probeSecrets(server, signIn))),
-  });
+  const failure = (error: unknown): McpProbeResult => {
+    const refused = signIn?.registrationFailed() && isRegistrationRefusal(error);
+    const described = refused ? REGISTRATION_REFUSED : describeMcpError(error, config, timeoutMs);
+    return { toolCount: 0, error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))) };
+  };
 
   try {
     return { toolCount: await connectAndCount(server, signal, timeoutMs, signIn?.provider), error: null };
@@ -285,9 +287,29 @@ export function describeMcpError(error: unknown, config: McpServerConfig, timeou
   return redactMcpSecrets(message, config);
 }
 
+/**
+ * A refused registration is the service's choice, not the user's credentials: Figma, for one,
+ * registers only the MCP clients it approved. "Try again" and the API key cannot change it.
+ */
+const REGISTRATION_REFUSED =
+  "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.";
+
+function isAccessRefusal(status: number | null): boolean {
+  return status === 401 || status === 403;
+}
+
+/**
+ * The SDK keeps the status only when the refusal body is not an OAuth error. A body such as
+ * `{"error":"access_denied"}` arrives as its error class, with the status gone.
+ */
+function isRegistrationRefusal(error: unknown): boolean {
+  if (error instanceof AccessDeniedError || error instanceof UnauthorizedClientError) return true;
+  return isAccessRefusal(httpStatus(error));
+}
+
 /** What the user can change. A link from a service such as Composio stops working when it is deleted. */
 function statusAdvice(status: number) {
-  if (status === 401 || status === 403) return " Check the API key or other credentials.";
+  if (isAccessRefusal(status)) return " Check the API key or other credentials.";
   if (status === 404 || status === 410) return " Check the URL. The link may be wrong, expired, or deleted.";
   return "";
 }
