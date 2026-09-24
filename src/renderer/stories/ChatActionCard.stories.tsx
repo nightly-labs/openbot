@@ -42,13 +42,11 @@ export const Note: Story = {
 
 export const Busy: Story = { args: { status: { kind: "busy", text: "Saving…" } } };
 
-/** A change made from the card is done, and the footer offers a way back. */
-export const DoneWithAction: Story = {
-  args: { status: { kind: "done", text: "Saved", action: { label: "Undo", onClick: fn() } } },
-  play: async ({ args, canvas, userEvent }) => {
+/** A change made from the card is done. */
+export const Done: Story = {
+  args: { status: { kind: "done", text: "Saved" } },
+  play: async ({ canvas }) => {
     await expect(canvas.getByRole("status")).toHaveTextContent("Saved");
-    await userEvent.click(canvas.getByRole("button", { name: "Undo" }));
-    if (args.status?.kind === "done") await expect(args.status.action?.onClick).toHaveBeenCalledOnce();
   },
 };
 

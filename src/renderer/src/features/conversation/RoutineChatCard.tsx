@@ -31,7 +31,7 @@ export interface RoutineChatCardProps {
 type CardSave =
   | { status: "idle" }
   | { status: "saving" }
-  | { status: "saved"; routine: RoutineFields; undo: RoutineSchedule | null }
+  | { status: "saved"; routine: RoutineFields }
   | { status: "error"; message: string };
 
 /**
@@ -70,13 +70,13 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
   // Saves run one after another, so a slow host cannot apply an older schedule last.
   let saveQueue = Promise.resolve();
 
-  function saveSchedule(schedule: RoutineSchedule, undo: RoutineSchedule | null): void {
+  function saveSchedule(schedule: RoutineSchedule): void {
     const request = ++saveRequest;
     setSave({ status: "saving" });
-    saveQueue = saveQueue.then(() => sendSchedule(schedule, undo, request));
+    saveQueue = saveQueue.then(() => sendSchedule(schedule, request));
   }
 
-  async function sendSchedule(schedule: RoutineSchedule, undo: RoutineSchedule | null, request: number) {
+  async function sendSchedule(schedule: RoutineSchedule, request: number) {
     // Read when the save starts, so it keeps a rename or a pause that an earlier save loaded.
     const current = routine();
     try {
@@ -88,7 +88,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         timezone: current.timezone,
         schedule,
       });
-      if (request === saveRequest) setSave({ status: "saved", routine: saved, undo });
+      if (request === saveRequest) setSave({ status: "saved", routine: saved });
     } catch (caught) {
       if (request !== saveRequest) return;
       setSave({ status: "error", message: errorMessage(caught, "Could not save the schedule.") });
@@ -97,10 +97,6 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
   }
 
   const state = (): RoutineScheduleCardState => (props.latest ? save().status : "superseded");
-  const undo = () => {
-    const current = save();
-    return current.status === "saved" ? current.undo : null;
-  };
   const errorText = () => {
     const current = save();
     return current.status === "error" ? current.message : undefined;
@@ -131,21 +127,13 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
           setSave({ status: "error", message: problem });
           return;
         }
-        const previous = routine().trigger.schedule;
+        const saved = routine().trigger.schedule;
         const schedule = routineScheduleFromDraft(next);
         // A pick of the same value, or a change and a change back, keeps the saved schedule.
-        if (sameSchedule(schedule, routineScheduleFromDraft(routineScheduleToDraft(previous)))) return;
-        saveSchedule(schedule, previous);
+        if (sameSchedule(schedule, routineScheduleFromDraft(routineScheduleToDraft(saved)))) return;
+        saveSchedule(schedule);
       }}
       onOpenRoutine={() => props.onOpenRoutine({ routineId: routine().id, name: routine().name })}
-      onUndo={
-        undo()
-          ? () => {
-              const previous = undo();
-              if (previous) saveSchedule(previous, null);
-            }
-          : undefined
-      }
       onShowLatest={props.onShowLatest}
       elementRef={setElement}
     />

@@ -96,15 +96,6 @@ export const Saving: Story = { args: { state: "saving" } };
 
 export const Saved: Story = { args: { action: "updated", state: "saved" } };
 
-/** A change from the chat saves at once, so the saved line offers a way back. */
-export const SavedWithUndo: Story = {
-  args: { action: "updated", state: "saved", onUndo: fn() },
-  play: async ({ args, canvas, userEvent }) => {
-    await userEvent.click(canvas.getByRole("button", { name: "Undo" }));
-    await expect(args.onUndo).toHaveBeenCalledOnce();
-  },
-};
-
 /** A later card changed this routine. This one keeps the old schedule as a record only. */
 export const Superseded: Story = {
   args: { state: "superseded", nextRunLabel: undefined, onShowLatest: fn() },

@@ -14,7 +14,7 @@ export interface ChatActionCardAction {
 export type ChatActionCardStatus =
   | { kind: "note"; text: string; action?: ChatActionCardAction }
   | { kind: "busy"; text: string }
-  | { kind: "done"; text: string; action?: ChatActionCardAction }
+  | { kind: "done"; text: string }
   | { kind: "error"; text: string };
 
 export interface ChatActionCardProps {
@@ -89,7 +89,7 @@ export function ChatActionCard(props: ChatActionCardProps) {
 function ChatActionCardFooter(props: { status: ChatActionCardStatus }) {
   const action = () => {
     const status = props.status;
-    return status.kind === "note" || status.kind === "done" ? status.action : undefined;
+    return status.kind === "note" ? status.action : undefined;
   };
   return (
     <>

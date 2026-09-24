@@ -53,7 +53,7 @@ async function addSaturday(): Promise<void> {
 }
 
 describe("RoutineChatCard", () => {
-  it("saves a changed schedule at once and can undo it", async () => {
+  it("saves a changed schedule at once", async () => {
     const updateRoutine = vi.spyOn(setupOpenBot().api.agent, "updateRoutine");
     render(() => <RoutineChatCard action="created" routine={routine} agentId="chief" latest onOpenRoutine={vi.fn()} />);
 
@@ -69,15 +69,6 @@ describe("RoutineChatCard", () => {
       }),
     );
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved"));
-
-    await fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    await waitFor(() =>
-      expect(updateRoutine).toHaveBeenLastCalledWith(
-        expect.objectContaining({ schedule: { kind: "weekdays", time: "07:00" } }),
-      ),
-    );
-    expect(await screen.findByRole("button", { name: "Days: Weekdays" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
   });
 
   it("saves a time edit once, when its popover closes", async () => {

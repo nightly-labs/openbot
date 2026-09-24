@@ -21,8 +21,6 @@ export interface RoutineScheduleCardProps {
   /** For example "Warsaw time". Give it only when the routine zone is not the viewer's zone. */
   timeZoneLabel?: string;
   onOpenRoutine?: () => void;
-  /** Puts back the schedule from before the last save. Shown while the state is `saved`. */
-  onUndo?: () => void;
   /** Moves to the newest card of this routine. Shown while the state is `superseded`. */
   onShowLatest?: () => void;
   today?: Date;
@@ -46,14 +44,8 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
     switch (state()) {
       case "saving":
         return { kind: "busy", text: "Saving…" };
-      case "saved": {
-        const undo = props.onUndo;
-        return {
-          kind: "done",
-          text: ["Saved", nextRun()].filter(Boolean).join(" · "),
-          action: undo ? { label: "Undo", onClick: undo } : undefined,
-        };
-      }
+      case "saved":
+        return { kind: "done", text: ["Saved", nextRun()].filter(Boolean).join(" · ") };
       case "error":
         return { kind: "error", text: props.errorText ?? "Could not save the schedule." };
       case "deleted":
