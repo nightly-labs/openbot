@@ -39,8 +39,9 @@ function json<T>(value: T, status = 200): Response {
   });
 }
 
-function failure(status: number, message: string): Response {
-  return json({ error: { message } }, status);
+/** The same `{ error: { code, message } }` shape as every other account API refusal. */
+function failure(status: number, code: string, message: string): Response {
+  return json({ error: { code, message } }, status);
 }
 
 export function browserSessionToken(request: Request): string | null {
@@ -57,15 +58,17 @@ export function browserSessionToken(request: Request): string | null {
 /** A closed list of account operations. Chat traffic never passes through this handler. */
 export async function handleBrowserApi(request: Request, services: BrowserApiServices): Promise<Response> {
   const path = new URL(request.url).pathname.slice(PREFIX.length).replace(/\/$/u, "");
-  if (request.method !== "GET" && request.method !== "POST") return failure(405, "This method is not supported.");
+  if (request.method !== "GET" && request.method !== "POST")
+    return failure(405, "method_not_allowed", "This method is not supported.");
   if (
     request.method === "POST" &&
     (request.headers.get("Origin") !== new URL(request.url).origin ||
       request.headers.get("X-OpenBot-Browser") !== "1" ||
       !request.headers.get("Content-Type")?.toLowerCase().startsWith("application/json"))
   )
-    return failure(403, "The browser request was refused.");
-  if (request.headers.get("Sec-Fetch-Site") === "cross-site") return failure(403, "The browser request was refused.");
+    return failure(403, "browser_request_refused", "The browser request was refused.");
+  if (request.headers.get("Sec-Fetch-Site") === "cross-site")
+    return failure(403, "browser_request_refused", "The browser request was refused.");
   try {
     if (path === "email/start" && request.method === "POST") {
       const body = await readJsonObject(request);
@@ -101,11 +104,12 @@ export async function handleBrowserApi(request: Request, services: BrowserApiSer
       response.headers.set("Set-Cookie", `${COOKIE}=; ${COOKIE_ATTRIBUTES}; Max-Age=0`);
       return response;
     }
-    if (!token || !user) return failure(401, "Sign in is required.");
+    if (!token || !user) return failure(401, "sign_in_required", "Sign in is required.");
     if (path === "session" && request.method === "GET") return json({ user });
     if (path === "v2/remote/hosts" && request.method === "GET")
       return json({ hosts: await services.remote.listHosts(user.id) });
-    if (request.method !== "POST") return failure(404, "This browser operation is not available.");
+    if (request.method !== "POST")
+      return failure(404, "browser_operation_not_found", "This browser operation is not available.");
     const body = await readJsonObject(request);
     if (path === "v2/remote/sessions")
       return json(
@@ -133,7 +137,7 @@ export async function handleBrowserApi(request: Request, services: BrowserApiSer
       return json(await services.remote.previewInvite(requiredString(body, "token")));
     if (path === "v2/remote/invites/accept")
       return json(await services.remote.acceptInvite(user, requiredString(body, "token")));
-    return failure(404, "This browser operation is not available.");
+    return failure(404, "browser_operation_not_found", "This browser operation is not available.");
   } catch (error) {
     return services.errorResponse(error);
   }
