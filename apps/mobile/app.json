@@ -45,7 +45,7 @@
         "expo-camera",
         {
           "cameraPermission": "Allow OpenBot to use your camera to scan QR codes.",
-          "microphonePermission": false,
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
@@ -55,7 +55,7 @@
         {
           "photosPermission": "Allow OpenBot to access the photos you choose to share.",
           "cameraPermission": "Allow OpenBot to use your camera to add photos.",
-          "microphonePermission": false
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages."
         }
       ],
       [
@@ -87,7 +87,14 @@
       ],
       "expo-sharing",
       "expo-font",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow OpenBot to use the microphone to dictate messages.",
+          "speechRecognitionPermission": "Allow OpenBot to turn your speech into message text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
