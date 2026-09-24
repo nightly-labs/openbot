@@ -45,7 +45,7 @@ export interface MemoryProfileOptions {
   logger: Logger;
 }
 
-async function readPageMemory(session: CDPSession, target: string): Promise<PageMemory> {
+export async function readPageMemory(session: CDPSession, target: string): Promise<PageMemory> {
   await session.send("Performance.enable");
   const { metrics } = await session.send("Performance.getMetrics");
   await session.send("Performance.disable").catch(() => undefined);
@@ -94,11 +94,14 @@ export async function profileMemory(options: MemoryProfileOptions): Promise<Memo
   return { ...summarizeMemory(collectDescendants(parseProcessTable(stdout), rootPid), label), pages };
 }
 
-/** Writes a V8 heap snapshot of one page to `outPath`, streamed chunk by chunk. */
+/**
+ * Writes a V8 heap snapshot of one page to `outPath`, streamed chunk by chunk.
+ * The snapshot holds conversation text, so the file is owner-only.
+ */
 export async function writeHeapSnapshot(page: Page, outPath: string, logger: Logger): Promise<void> {
   await mkdir(dirname(outPath), { recursive: true });
   const session = await page.context().newCDPSession(page);
-  const file = createWriteStream(outPath);
+  const file = createWriteStream(outPath, { mode: 0o600 });
   try {
     session.on("HeapProfiler.addHeapSnapshotChunk", ({ chunk }) => {
       file.write(chunk);

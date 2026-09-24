@@ -345,6 +345,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
         onProviderLost: (client) => {
+          this.#boot.orphanDeliveriesOf(client.provider);
           this.#compaction.dispose();
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
@@ -370,6 +371,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               // it away. Only its own guard reports the turn the CLI is running.
               (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
           ),
+        isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         onProviderActivated: (provider, configRevision) => {
           if (provider === "opencode") this.#endpoints.clearReleased(configRevision);

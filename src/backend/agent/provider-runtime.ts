@@ -66,6 +66,11 @@ const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
 /** How long a provider CLI stays running with nothing to do before its process is stopped. */
 export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+/**
+ * The same for a provider no agent is set to. Every signed-in provider starts at launch to read its
+ * models, and an unused OpenCode process alone held about 300 MB for the full idle time.
+ */
+export const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
 
 /**
@@ -213,6 +218,8 @@ export interface ProviderHooks {
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** True while an agent is set to this provider, so a turn on it can come at any time. */
+  isProviderAssigned(provider: AgentProvider): boolean;
   /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
   onProviderResumed(provider: AgentProvider): void;
   /**
@@ -599,7 +606,8 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * Stops each provider process that ran no turn for `PROVIDER_IDLE_RELEASE_MS`. An idle CLI holds
+   * Stops each provider process that ran no turn for `PROVIDER_IDLE_RELEASE_MS`, or for
+   * `PROVIDER_UNASSIGNED_RELEASE_MS` when no agent is set to it. An idle CLI holds
    * hundreds of megabytes, and every signed-in provider starts at launch whether an agent uses it
    * or not. Its threads are unloaded, so the next turn resumes them on the process that replaces it.
    */
@@ -623,7 +631,10 @@ export class ProviderRuntime implements ProviderPort {
         this.#lastUsed.set(provider, now);
         continue;
       }
-      if (now - lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
+      const limit = this.#hooks.isProviderAssigned(provider)
+        ? PROVIDER_IDLE_RELEASE_MS
+        : PROVIDER_UNASSIGNED_RELEASE_MS;
+      if (now - lastUsed < limit) continue;
       // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
       this.#clients.delete(provider);
       this.#released.add(provider);
