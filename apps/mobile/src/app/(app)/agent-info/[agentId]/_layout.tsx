@@ -23,6 +23,8 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="appearance" options={{ title: "Appearance" }} />
       <Stack.Screen name="usage" options={{ title: "Usage" }} />
       <Stack.Screen name="memories" options={{ title: "Memories" }} />
+      <Stack.Screen name="skills" options={{ title: "Skills" }} />
+      <Stack.Screen name="files" options={{ title: "Files" }} />
       <Stack.Screen name="routines" options={{ title: "Routines" }} />
       <Stack.Screen name="memory" options={{ title: "Memory" }} />
       <Stack.Screen name="routine" options={{ title: "Routine" }} />

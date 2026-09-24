@@ -10,6 +10,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEd25519Identity, signEd25519 } from "./ed25519";
 import {
@@ -94,6 +95,38 @@ describe("browser remote peer recovery", () => {
     const network = await setupNetwork({ responseBody: response });
     await network.connect();
     const result = await network.runtime.execute({ id: "channel-request", type: "request", method, path, body });
+    expect(result).toMatchObject({ ok: true, status: 200, body: response });
+    expect(network.updates.at(-1)).toMatchObject({ state: "online" });
+    await network.runtime.dispose();
+  });
+  it.each<{ path: string; body: TeamProtocolV2Json; response: TeamProtocolV2Json }>([
+    {
+      path: STORAGE_ROUTES.usage,
+      body: { scope: "agent", agentId: "agent-one" },
+      response: {
+        scope: "agent",
+        agentId: "agent-one",
+        conversationId: null,
+        scannedAt: "2026-09-14T00:00:00Z",
+        freeBytes: null,
+        breakdown: [{ category: "attachments", bytes: 12, removable: false }],
+        agents: [],
+        conversations: [],
+        files: [],
+        truncated: false,
+      },
+    },
+    { path: STORAGE_ROUTES.deleteFile, body: { fileId: "file-one" }, response: {} },
+  ])("uses the optional storage codec for $path without disconnecting", async ({ path, body, response }) => {
+    const network = await setupNetwork({ responseBody: response });
+    await network.connect();
+    const result = await network.runtime.execute({
+      id: "storage-request",
+      type: "request",
+      method: "POST",
+      path,
+      body,
+    });
     expect(result).toMatchObject({ ok: true, status: 200, body: response });
     expect(network.updates.at(-1)).toMatchObject({ state: "online" });
     await network.runtime.dispose();
