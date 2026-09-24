@@ -1,4 +1,5 @@
 import { createEffect, flush, onSettled } from "solid-js";
+import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServers } from "./features/servers/servers-context";
@@ -37,7 +38,7 @@ export function AppBootstrap() {
         if (setupState()?.completed === true && centralAuth().status === "signed_in") setJoinServerOpen(true);
       });
     };
-    const unsubscribeInvite = window.openbot.servers.onInvite((inviteUrl) => {
+    const unsubscribeInvite = appPort().servers.onInvite((inviteUrl) => {
       receiveInvite(inviteUrl);
     });
     const receivePluginSlug = (slug: string) => {
@@ -46,17 +47,17 @@ export function AppBootstrap() {
         setSkillsMarketplaceOpen(true);
       });
     };
-    const unsubscribePlugin = window.openbot.plugins.onOpenListing((slug) => {
+    const unsubscribePlugin = appPort().plugins.onOpenListing((slug) => {
       receivePluginSlug(slug);
     });
     // Both subscriptions are in place before either link is asked for, because the first of these
     // two requests is what tells main that a window is listening.
-    void window.openbot.servers
-      .takePendingInvite()
+    void appPort()
+      .servers.takePendingInvite()
       .then((inviteUrl) => inviteUrl && receiveInvite(inviteUrl))
       .catch(() => undefined);
-    void window.openbot.plugins
-      .takePendingListing()
+    void appPort()
+      .plugins.takePendingListing()
       .then((slug) => slug && receivePluginSlug(slug))
       .catch(() => undefined);
     return () => {

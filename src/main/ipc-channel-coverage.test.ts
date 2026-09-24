@@ -37,7 +37,7 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 // where it follows the target window. What comes after the channel varies, and
 // the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
-const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeAgent", "invokeAgentForServer"];
+const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgent", "invokeAgentForServer"];
 const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
 
@@ -106,14 +106,11 @@ function decodeWrittenFromMain(value: unknown): Written | null {
 }
 `;
 
-// The preload's agent helpers take the channel as a parameter and pass it on,
+// The preload's invoke helpers take the channel as a parameter and pass it on,
 // so the forwarding call names a variable by design. Their own call sites carry
 // the IPC_CHANNELS reference and are what the scan checks, which is why the
 // helpers are listed as callees above.
-const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = [
-  "src/preload/index.ts: invokeAgentForServer(channel)",
-  "src/preload/index.ts: ipcRenderer.invoke(channel)",
-];
+const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = ["src/preload/index.ts: ipcRenderer.invoke(channel)"];
 
 const mainCalls = collectCalls(mainSources);
 const preloadCalls = collectCalls(preloadSources);

@@ -29,15 +29,16 @@ const UPDATE_ARTIFACTS = {
 const distRoot = resolve("dist");
 const artifactExtension = UPDATE_ARTIFACTS[platform].extension;
 const manifestPath = join(distRoot, UPDATE_ARTIFACTS[platform].manifest);
-const artifacts = (await readdir(distRoot)).filter((name) => name.endsWith(artifactExtension));
-if (artifacts.length !== 1) throw new Error(`Expected one ${artifactExtension} update artifact.`);
+const [artifact, ...extraArtifacts] = (await readdir(distRoot)).filter((name) => name.endsWith(artifactExtension));
+if (artifact === undefined || extraArtifacts.length > 0)
+  throw new Error(`Expected one ${artifactExtension} update artifact.`);
 
-const artifactPath = join(distRoot, artifacts[0]);
+const artifactPath = join(distRoot, artifact);
 await verifyMaximumSize(artifactPath, 700 * MIB);
 if (platform === "macos") {
-  const dmgs = (await readdir(distRoot)).filter((name) => name.endsWith(".dmg"));
-  if (dmgs.length !== 1) throw new Error("Expected one DMG artifact.");
-  await verifyMaximumSize(join(distRoot, dmgs[0]), 750 * MIB);
+  const [dmg, ...extraDmgs] = (await readdir(distRoot)).filter((name) => name.endsWith(".dmg"));
+  if (dmg === undefined || extraDmgs.length > 0) throw new Error("Expected one DMG artifact.");
+  await verifyMaximumSize(join(distRoot, dmg), 750 * MIB);
 }
 const embeddedBlockMapBytes = await verifyManifest(manifestPath, artifactPath);
 // An AppImage carries its block map inside the file, so the size the manifest records is what proves

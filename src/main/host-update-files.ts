@@ -4,6 +4,7 @@ import { lstat, open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
+import { isMissingFileError } from "../backend/file-errors";
 
 export const HOST_MANAGER_DIRECTORY = "/Library/Application Support/OpenBot/HostManager";
 export const HOST_POLL_MS = 5_000;
@@ -98,7 +99,7 @@ export async function writeProtocolJson(
     }
   } catch (error) {
     await unlink(temporary).catch((cleanupError: unknown) => {
-      if (!isMissingFile(cleanupError)) throw cleanupError;
+      if (!isMissingFileError(cleanupError)) throw cleanupError;
     });
     throw error;
   }
@@ -112,13 +113,9 @@ export async function readHostConfig(
     await verifyHostDirectory(directory, hostUid);
     return await readOwnedJson(join(directory, "config.json"), hostUid, hostConfigSchema);
   } catch (error) {
-    if (isMissingFile(error)) return null;
+    if (isMissingFileError(error)) return null;
     throw error;
   }
-}
-
-export function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 export async function verifyTenantDirectory(directory: string, uid: number, hostUid = 0): Promise<string> {

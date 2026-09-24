@@ -6,6 +6,7 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "./server-capabilities";
+import { serversPort } from "./servers-port";
 
 /**
  * The workspaces the user can switch between - the local one this computer
@@ -136,21 +137,23 @@ const Servers = createSimpleContext({
     });
 
     onSettled(() => {
-      const unsubscribeServers = window.openbot.servers.onEvent((value) => flush(() => applyServerSummaries(value)));
-      const unsubscribeHost = window.openbot.host.onEvent((status) => flush(() => setHostStatus(status)));
+      const unsubscribeServers = serversPort().servers.onEvent((value) => flush(() => applyServerSummaries(value)));
+      const unsubscribeHost = serversPort().host.onEvent((status) => flush(() => setHostStatus(status)));
       // One `then` rather than a `then`/`catch`/`finally` chain: every extra link
       // is another microtask between the summaries arriving and the per-server
       // bootstrap that waits on this promise, and that gap is long enough for the
       // view to paint a first pass from stale state.
-      void window.openbot.servers.list().then(
-        (value) => {
-          applyServerSummaries(value);
-          markServersLoaded();
-        },
-        () => markServersLoaded(),
-      );
-      void window.openbot.host
-        .getStatus()
+      void serversPort()
+        .servers.list()
+        .then(
+          (value) => {
+            applyServerSummaries(value);
+            markServersLoaded();
+          },
+          () => markServersLoaded(),
+        );
+      void serversPort()
+        .host.getStatus()
         .then(setHostStatus)
         .catch(() => undefined);
       return () => {
@@ -162,7 +165,7 @@ const Servers = createSimpleContext({
     async function retryServerConnection(serverId: string): Promise<void> {
       pendingCompatibilityRetryServerId = serverId;
       try {
-        await window.openbot.servers.retryConnection(serverId);
+        await serversPort().servers.retryConnection(serverId);
       } catch (error) {
         pendingCompatibilityRetryServerId = null;
         toast.error("The connection failed", {
@@ -178,7 +181,7 @@ const Servers = createSimpleContext({
     async function setServerMuted(serverId: string, muted: boolean, durationMs?: number): Promise<void> {
       try {
         applyServerSummaries(
-          await window.openbot.servers.setMuted(
+          await serversPort().servers.setMuted(
             durationMs === undefined ? { serverId, muted } : { serverId, muted, durationMs },
           ),
         );
@@ -191,7 +194,7 @@ const Servers = createSimpleContext({
 
     async function setServerNotificationLevel(serverId: string, level: ServerNotificationLevel): Promise<void> {
       try {
-        applyServerSummaries(await window.openbot.servers.setNotificationLevel({ serverId, level }));
+        applyServerSummaries(await serversPort().servers.setNotificationLevel({ serverId, level }));
       } catch (error) {
         toast.error("Could not change server notifications", {
           description: errorMessage(error, "Could not save the setting. Try again."),
@@ -210,7 +213,7 @@ const Servers = createSimpleContext({
         }),
       ]);
       try {
-        setServers(await window.openbot.servers.reorder({ serverIds }));
+        setServers(await serversPort().servers.reorder({ serverIds }));
       } catch (error) {
         setServers(previous);
         throw error;

@@ -284,7 +284,7 @@ function validateTimezone(timezone: string): void {
 
 function parseCron(expression: string): CronSpec {
   const values = expression.trim().split(/\s+/);
-  if (values.length !== 5) throw new RoutineInputError("Custom schedules must use five cron fields.");
+  if (!hasFiveFields(values)) throw new RoutineInputError("Custom schedules must use five cron fields.");
   return cronSpec(
     parseCronField(values[0], 0, 59, "minute"),
     parseCronField(values[1], 0, 23, "hour"),
@@ -292,6 +292,10 @@ function parseCron(expression: string): CronSpec {
     parseCronField(values[3], 1, 12, "month"),
     parseCronField(values[4], 0, 6, "weekday", true),
   );
+}
+
+function hasFiveFields(values: string[]): values is [string, string, string, string, string] {
+  return values.length === 5;
 }
 
 function parseCronField(
@@ -305,6 +309,7 @@ function parseCronField(
   const result = new Set<number>();
   for (const segment of source.split(",")) {
     const [rangeSource, stepSource] = segment.split("/");
+    if (rangeSource === undefined) throw new RoutineInputError(`The cron ${label} value is invalid.`);
     const step = stepSource === undefined ? 1 : Number(stepSource);
     if (!Number.isInteger(step) || step < 1) throw new RoutineInputError(`The cron ${label} step is invalid.`);
     let start: number;
@@ -313,9 +318,11 @@ function parseCronField(
       start = minimum;
       end = maximum;
     } else if (rangeSource.includes("-")) {
-      const pieces = rangeSource.split("-").map(Number);
-      if (pieces.length !== 2) throw new RoutineInputError(`The cron ${label} range is invalid.`);
-      [start, end] = pieces;
+      const [rangeStart, rangeEnd, ...extra] = rangeSource.split("-").map(Number);
+      if (rangeStart === undefined || rangeEnd === undefined || extra.length > 0)
+        throw new RoutineInputError(`The cron ${label} range is invalid.`);
+      start = rangeStart;
+      end = rangeEnd;
     } else {
       start = Number(rangeSource);
       end = start;
@@ -331,7 +338,7 @@ function parseCronField(
 }
 
 function parseTime(value: string): [number, number] {
-  const [hour, minute] = value.split(":").map(Number);
+  const [hour = Number.NaN, minute = Number.NaN] = value.split(":").map(Number);
   return [hour, minute];
 }
 

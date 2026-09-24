@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -37,6 +37,7 @@ import {
   WebContentsView,
   webContents,
 } from "electron";
+import { writeJsonFileAtomically } from "./atomic-json-file";
 import {
   BrowserCdpEngine,
   type BrowserScreencastFrame,
@@ -73,8 +74,10 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { isMissingFileError } from "./file-errors";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
+import { withTimeout } from "./with-timeout";
 
 interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
@@ -2168,16 +2171,7 @@ export class BrowserHost {
     this.#persistQueue = this.#persistQueue
       .catch(() => undefined)
       .then(async () => {
-        const temporaryPath = `${this.#statePath}.${randomUUID()}.tmp`;
-        try {
-          await writeFile(temporaryPath, `${JSON.stringify(state)}\n`, {
-            encoding: "utf8",
-            mode: 0o600,
-          });
-          await rename(temporaryPath, this.#statePath);
-        } finally {
-          await rm(temporaryPath, { force: true }).catch(() => undefined);
-        }
+        await writeJsonFileAtomically(this.#statePath, state);
       });
     return this.#persistQueue;
   }
@@ -2344,15 +2338,11 @@ async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
       tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
     };
   } catch (error) {
-    if (isMissingFile(error) || error instanceof SyntaxError) {
+    if (isMissingFileError(error) || error instanceof SyntaxError) {
       return { version: 2, activeTabId: null, tabs: [] };
     }
     throw error;
   }
-}
-
-function isMissingFile(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 function isAllowedMainUrl(value: string): boolean {
@@ -2696,20 +2686,6 @@ function uniqueDownloadPath(root: string, name: string, reserved: Set<string>): 
   for (let suffix = 1; ; suffix += 1) {
     const candidate = join(root, suffix === 1 ? name : `${stem} (${suffix})${extension}`);
     if (!reserved.has(candidate) && !existsSync(candidate)) return candidate;
-  }
-}
-
-async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
-  let timeout: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error(message)), milliseconds);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
   }
 }
 

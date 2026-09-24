@@ -6,6 +6,7 @@ import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { remoteDesktopPort } from "./remote-desktop-port";
 
 /**
  * Remote Control: viewing another machine's desktop through a server that
@@ -57,7 +58,7 @@ const RemoteDesktop = createSimpleContext({
     async function connectRemoteDesktop(serverId: string): Promise<RemoteDesktopConnectResult> {
       const analytics = desktopAnalytics.scope();
       try {
-        const result = await window.openbot.remoteDesktop.connect({ serverId });
+        const result = await remoteDesktopPort().remoteDesktop.connect({ serverId });
         if (result.status === "refused") {
           analytics.track("remote_desktop_action", {
             action: "connect",
@@ -87,7 +88,7 @@ const RemoteDesktop = createSimpleContext({
     async function disconnectRemoteDesktop(sessionId: string): Promise<void> {
       const analytics = desktopAnalytics.scope();
       try {
-        await window.openbot.remoteDesktop.disconnect(sessionId);
+        await remoteDesktopPort().remoteDesktop.disconnect(sessionId);
         setRemoteDesktopSessions((current) => current.filter((session) => session.id !== sessionId));
         analytics.track("remote_desktop_action", { action: "disconnect", result: "succeeded" });
       } catch (error) {
@@ -103,7 +104,7 @@ const RemoteDesktop = createSimpleContext({
     async function selectRemoteDesktopDisplay(serverId: string, displayId: string): Promise<void> {
       const analytics = desktopAnalytics.scope();
       try {
-        await window.openbot.remoteDesktop.selectDisplay({ serverId, displayId });
+        await remoteDesktopPort().remoteDesktop.selectDisplay({ serverId, displayId });
         setRemoteDesktopSessions((current) =>
           current.map((session) =>
             session.serverId === serverId ? { ...session, selectedDisplayId: displayId } : session,
@@ -277,11 +278,11 @@ const RemoteDesktop = createSimpleContext({
 
     onSettled(() => {
       if (platform.landingPreview) return;
-      const unsubscribe = window.openbot.remoteDesktop.onEvent((sessions) =>
+      const unsubscribe = remoteDesktopPort().remoteDesktop.onEvent((sessions) =>
         flush(() => setRemoteDesktopSessions(sessions)),
       );
-      void window.openbot.remoteDesktop
-        .list()
+      void remoteDesktopPort()
+        .remoteDesktop.list()
         .then(setRemoteDesktopSessions)
         .catch(() => undefined);
       return unsubscribe;

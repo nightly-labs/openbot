@@ -20,7 +20,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { act, isValidElement, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, expect, it, vi } from "vitest";
 import type { ChatTarget } from "@/features/chat/model/chat-target";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -160,7 +160,9 @@ const workspace = {
   unreadAgentIds: [],
   createAgent: vi.fn(async (_input: CreateAgentInput) => {}),
   updateAgent: vi.fn(async (input: UpdateAgentInput, _serverId?: string) => {
-    workspace.agents = [{ ...workspace.agents[0], ...input }];
+    const [agent] = workspace.agents;
+    assert(agent);
+    workspace.agents = [{ ...agent, ...input }];
   }),
   loadAgentAvatar: vi.fn(async (_id: string, _url: string, _serverId: string) => "data:image/png;base64,iVBORw0KGgo="),
   setAgentAvatar: vi.fn(
@@ -1446,7 +1448,10 @@ it("keeps a failed action in the sheet for retry and supports reassign", async (
   await click("Resume");
   const retries = channelRequests.mock.calls.filter(([path]) => path === CHANNEL_ROUTES.command);
   expect(retries).toHaveLength(2);
-  expect(retries[1][1]).toEqual(retries[0][1]);
+  const [firstRetry, secondRetry] = retries;
+  assert(firstRetry);
+  assert(secondRetry);
+  expect(secondRetry[1]).toEqual(firstRetry[1]);
   failChannelSave = false;
   await click("Reassign");
   await click("Travel");

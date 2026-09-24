@@ -1,5 +1,5 @@
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { type ChatMessage, type PendingChatMessage, presentChatMessages } from "./chat-messages";
 import { retainConfirmedAttachments, uploadChatAttachments } from "./upload-chat-attachments";
 
@@ -70,7 +70,9 @@ describe("chat attachment send", () => {
 });
 
 it("keeps local images until the receipt maps them to final attachment IDs", () => {
-  const local = { ...files[0], uri: "file:///photo.png" };
+  const [firstFile] = files;
+  assert(firstFile);
+  const local = { ...firstFile, uri: "file:///photo.png" };
   const pending: PendingChatMessage = {
     serverId: "receipt",
     baseline: new Set(),

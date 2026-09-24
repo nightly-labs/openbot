@@ -236,7 +236,7 @@ describe("local agent usage", () => {
       ["start", "2026-03-28T23:00:00Z"],
       ["end", "2026-03-29T21:59:59Z"],
       ["after", "2026-03-29T22:00:00Z"],
-    ])
+    ] as const)
       db.usage.record({ ...sample, counterId, occurredAt });
     expect(db.usage.read(input).totals.processedTokens).toBe(700);
     expect(() => parseAgentAnalyticsInput({ ...input, timeZone: "bad-zone" })).toThrow();

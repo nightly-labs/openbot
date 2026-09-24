@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import type { NotificationPreference } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 const DEFAULT_PREFERENCE: NotificationPreference = { desktopNotifications: true };
 
@@ -38,7 +39,7 @@ export class NotificationPreferenceStore {
         };
       }
     } catch (error) {
-      if (!isMissing(error) && !(error instanceof SyntaxError)) throw error;
+      if (!isMissingFileError(error) && !(error instanceof SyntaxError)) throw error;
     }
   }
 
@@ -71,20 +72,7 @@ export class NotificationPreferenceStore {
   }
 
   async #replace(stored: StoredNotificationPreference): Promise<void> {
-    const temporaryPath = `${this.#path}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporaryPath, `${JSON.stringify({ version: 1, ...stored })}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      });
-      await rename(temporaryPath, this.#path);
-      this.#stored = stored;
-    } finally {
-      await rm(temporaryPath, { force: true }).catch(() => undefined);
-    }
+    await writeJsonFileAtomically(this.#path, { version: 1, ...stored });
+    this.#stored = stored;
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

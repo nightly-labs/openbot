@@ -223,6 +223,12 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function storyReleaseNotesSkill(): MarketplaceSkillDetail {
+  const skill = STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"];
+  if (!skill) throw new Error("The release notes skill fixture is missing.");
+  return skill;
+}
+
 export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBotControls {
   const appInfo = clone(options.appInfo ?? STORY_APP_INFO);
   const defaultAuthState: CentralAuthState = {
@@ -317,7 +323,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const localSkills = clone(
     options.localSkills ?? [
       {
-        ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+        ...storyReleaseNotesSkill(),
         id: "local-skill-11111111-1111-4111-8111-111111111111",
         name: "Weekly summary",
         slug: "weekly-summary",
@@ -840,7 +846,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       localCreate: async ({ agentId, sourcePath }) => {
         const name = sourcePath.split("/").at(-1) || "New skill";
         const skill = {
-          ...STORY_MARKETPLACE_SKILL_DETAILS["skill-release-notes"],
+          ...storyReleaseNotesSkill(),
           id: `local-skill-${crypto.randomUUID()}`,
           name,
           slug: name,

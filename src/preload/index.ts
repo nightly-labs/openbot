@@ -4,10 +4,10 @@ import {
   type AgentMemory,
   type AgentModelOption,
   type AgentPublicationPreview,
+  type AgentRequestChannel,
   type AgentStatus,
   type AgentSubmission,
   type AgentSummary,
-  type AppLanguagePreference,
   type AttachmentImportEvent,
   type BrowserPreview,
   COMPUTER_USE_STATUSES,
@@ -48,11 +48,14 @@ import {
   decodeOptionalHostAnalytics,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
+  type ExportResult,
   type FilePreview,
   type HostedSiteSummary,
   type ImportAttachmentsInput,
   INSTALLED_SKILL_ORIGINS,
+  type InnerPayloadOf,
   type InstalledSkill,
+  type InstallMarketplaceAgentResult,
   IPC_CHANNELS,
   isAccountUsage,
   isAgentMemory,
@@ -60,7 +63,6 @@ import {
   isAgentProvider,
   isAgentStatus,
   isAgentSummary,
-  isAppLanguage,
   isAttachmentSummary,
   isAvatarHue,
   isAvatarSeed,
@@ -91,24 +93,23 @@ import {
   type MarketplaceAgentSummary,
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
-  type NotificationOpenedEvent,
   type OpenBotDesktopApi,
+  type PayloadOf,
   type ProviderApiKeyState,
   type ProviderCodeLoginStart,
   type QueuedMessageReceipt,
   type QueueSnapshot,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
-  type ScopedAgentEvent,
-  type ScopedDirectMessageEvent,
-  type ScopedDirectTypingEvent,
-  type ScopedTeamPresenceSnapshot,
+  type RequestChannel,
+  type ResultOf,
   type SharedTable,
   type SidebarLayoutSnapshot,
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
-  type UpdateStatus,
+  type VoiceModelStatus,
+  type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -123,28 +124,117 @@ import {
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { decodeScopedAgentEvent } from "./agent-event-decoding";
+import {
+  decodeAccountSessions,
+  decodeAnalyticsPreference,
+  decodeAppInfo,
+  decodeAppLanguagePreference,
+  decodeApprovalAutomationPreference,
+  decodeAppSetupState,
+  decodeCentralAuthState,
+  decodeMobileConnectedDevices,
+  decodeMobileConnectTicket,
+  decodeNotificationOpenedEvent,
+  decodeNotificationPreference,
+  decodeUpdatePreference,
+  decodeUpdateStatus,
+} from "./app-decoding";
+import {
+  decodeBrowserBounds,
+  decodeBrowserControlState,
+  decodeBrowserDisplayState,
+  decodeBrowserLiveViewEvent,
+  decodeBrowserPictureInPictureEvent,
+  decodeBrowserTab,
+  decodeBrowserTabs,
+} from "./browser-decoding";
 import { clipboardFiles } from "./clipboard-files";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
+import {
+  decodeDirectConversation,
+  decodeDirectConversationPage,
+  decodeDirectMessage,
+  decodeDirectReadState,
+  decodeDirectThreads,
+  decodeHostStatus,
+  decodeInvitePreview,
+  decodeInviteSummary,
+  decodeInviteUrl,
+  decodePendingInvite,
+  decodeRemoteDesktopConnectResult,
+  decodeRemoteDesktopSessions,
+  decodeScopedDirectMessage,
+  decodeScopedDirectTyping,
+  decodeScopedTeamPresence,
+  decodeServer,
+  decodeServers,
+  decodeTeamInvites,
+  decodeTeamMember,
+  decodeTeamMembers,
+  decodeTeamPresenceSnapshot,
+  decodeTeamSessions,
+} from "./team-decoding";
 
 const attachmentImportListeners = new Set<(event: AttachmentImportEvent) => void>();
 let selectedServerId: string = LOCAL_SERVER_ID;
 
-function invokeAgent<TResult>(
-  channel: string,
-  payload: unknown = null,
-  decoder: (value: unknown) => TResult,
-): Promise<TResult> {
-  return invokeAgentForServer(selectedServerId, channel, payload, decoder);
+// A typed endpoint fixes what the preload sends and what its decoder must return. An endpoint that
+// takes nothing takes no payload argument here.
+type PayloadArgs<Channel extends RequestChannel> = [PayloadOf<Channel>] extends [undefined]
+  ? []
+  : [payload: PayloadOf<Channel>];
+
+function invokeRequest<Channel extends RequestChannel>(
+  channel: Channel,
+  decode: (value: unknown) => ResultOf<Channel>,
+  ...payload: PayloadArgs<Channel>
+): Promise<ResultOf<Channel>> {
+  return ipcRenderer.invoke(channel, ...payload).then(decode);
 }
 
-function invokeAgentForServer<TResult>(
+function invokeAgent<Channel extends AgentRequestChannel>(
+  channel: Channel,
+  payload: InnerPayloadOf<Channel>,
+  decode: (value: unknown) => ResultOf<Channel>,
+): Promise<ResultOf<Channel>> {
+  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId: selectedServerId, payload };
+  return ipcRenderer.invoke(channel, request).then(decode);
+}
+
+function invokeAgentForServer<Channel extends AgentRequestChannel>(
   serverId: string,
-  channel: string,
-  payload: unknown,
-  decoder: (value: unknown) => TResult,
-): Promise<TResult> {
-  const request: AgentIpcRequest = { serverId, payload };
-  return ipcRenderer.invoke(channel, request).then(decoder);
+  channel: Channel,
+  payload: InnerPayloadOf<Channel>,
+  decode: (value: unknown) => ResultOf<Channel>,
+): Promise<ResultOf<Channel>> {
+  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId, payload };
+  return ipcRenderer.invoke(channel, request).then(decode);
+}
+
+const VOICE_MODEL_PHASES: readonly VoiceModelStatus["phase"][] = ["missing", "downloading", "ready", "error"];
+
+function decodeVoiceModelStatus(value: unknown): VoiceModelStatus {
+  const status = decodeRecord(value, "voice model status");
+  const { phase, progress } = status;
+  if (!isOneOf(VOICE_MODEL_PHASES, phase) || (progress !== null && !isNumber(progress))) {
+    throw new Error("Invalid voice model status.");
+  }
+  return { phase, progress, message: nullableString(status, "message") };
+}
+
+function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {
+  return { text: requiredString(decodeRecord(value, "voice transcription"), "text") };
+}
+
+function decodeExportResult(value: unknown): ExportResult {
+  return { saved: requiredBoolean(decodeRecord(value, "export result"), "saved") };
+}
+
+// The slug is checked again on arrival rather than trusted because it came from main. It began life
+// in a URL a web page chose, and this is the last point before the renderer looks it up.
+function decodePendingListing(value: unknown): string | null {
+  return typeof value === "string" && isPluginSlug(value) ? value : null;
 }
 
 function decodeComputerUseState(value: unknown): ComputerUseState {
@@ -366,12 +456,6 @@ function decodeCustomProviderResult(value: unknown): CustomProviderResult {
 function decodeNullablePath(value: unknown): string | null {
   if (value !== null && !isString(value)) throw new Error("Invalid directory response.");
   return value;
-}
-
-function decodeAppLanguagePreference(value: unknown): AppLanguagePreference {
-  if (!isDynamicRecord(value) || !isAppLanguage(value.language))
-    throw new Error("Invalid language preference response.");
-  return { language: value.language };
 }
 
 function decodeDynamicIslandPreference(value: unknown): DynamicIslandPreference {
@@ -623,6 +707,11 @@ function decodeSkillPage(value: unknown): MarketplaceSkillPage {
   return { skills: page.skills.map(decodeSkillSummary), nextCursor: nullableString(page, "nextCursor") };
 }
 
+function decodeSkillDetails(value: unknown): MarketplaceSkillDetail[] {
+  if (!Array.isArray(value)) throw new Error("Invalid local skill list.");
+  return value.map(decodeSkillDetail);
+}
+
 function decodeSkillDetail(value: unknown): MarketplaceSkillDetail {
   const item = decodeRecord(value, "skill detail");
   const summary = decodeSkillSummary(item);
@@ -809,6 +898,11 @@ function decodeAgentSubmissions(value: unknown): AgentSubmission[] {
   return value.map(decodeAgentSubmission);
 }
 
+function decodeAgentInstallation(value: unknown): InstallMarketplaceAgentResult {
+  const item = decodeRecord(value, "agent installation");
+  return { agent: decodeAgent(item.agent) };
+}
+
 function decodeAgentPublicationPreview(value: unknown): AgentPublicationPreview {
   const item = decodeRecord(value, "agent publication preview");
   const detail = decodeMarketplaceAgentDetail({
@@ -871,17 +965,18 @@ window.addEventListener("change", (event) => {
 });
 
 const openbotApi: OpenBotDesktopApi = {
-  getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getAppInfo),
-  getSetupState: () => ipcRenderer.invoke(IPC_CHANNELS.getSetupState),
-  saveSetup: (input) => ipcRenderer.invoke(IPC_CHANNELS.saveSetup, input),
-  getAnalyticsPreference: () => ipcRenderer.invoke(IPC_CHANNELS.getAnalyticsPreference),
-  setAnalyticsPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.setAnalyticsPreference, input),
-  getApprovalAutomation: () => ipcRenderer.invoke(IPC_CHANNELS.getApprovalAutomation),
-  setApprovalAutomation: (input) => ipcRenderer.invoke(IPC_CHANNELS.setApprovalAutomation, input),
-  getAppLanguagePreference: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.getAppLanguagePreference).then(decodeAppLanguagePreference),
+  getAppInfo: () => invokeRequest(IPC_CHANNELS.getAppInfo, decodeAppInfo),
+  getSetupState: () => invokeRequest(IPC_CHANNELS.getSetupState, decodeAppSetupState),
+  saveSetup: (input) => invokeRequest(IPC_CHANNELS.saveSetup, decodeAppSetupState, input),
+  getAnalyticsPreference: () => invokeRequest(IPC_CHANNELS.getAnalyticsPreference, decodeAnalyticsPreference),
+  setAnalyticsPreference: (input) =>
+    invokeRequest(IPC_CHANNELS.setAnalyticsPreference, decodeAnalyticsPreference, input),
+  getApprovalAutomation: () => invokeRequest(IPC_CHANNELS.getApprovalAutomation, decodeApprovalAutomationPreference),
+  setApprovalAutomation: (input) =>
+    invokeRequest(IPC_CHANNELS.setApprovalAutomation, decodeApprovalAutomationPreference, input),
+  getAppLanguagePreference: () => invokeRequest(IPC_CHANNELS.getAppLanguagePreference, decodeAppLanguagePreference),
   setAppLanguagePreference: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.setAppLanguagePreference, input).then(decodeAppLanguagePreference),
+    invokeRequest(IPC_CHANNELS.setAppLanguagePreference, decodeAppLanguagePreference, input),
   onAppLanguagePreference: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, preference: unknown) =>
       listener(decodeAppLanguagePreference(preference));
@@ -894,14 +989,12 @@ const openbotApi: OpenBotDesktopApi = {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.openSettings, handler);
   },
   dynamicIsland: {
-    getPreference: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPreference).then(decodeDynamicIslandPreference),
+    getPreference: () => invokeRequest(IPC_CHANNELS.dynamicIslandGetPreference, decodeDynamicIslandPreference),
     setPreference: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandSetPreference, input).then(decodeDynamicIslandPreference),
+      invokeRequest(IPC_CHANNELS.dynamicIslandSetPreference, decodeDynamicIslandPreference, input),
     publishPresentation: (presentation) =>
-      ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandPublishPresentation, presentation).then(decodeVoid),
-    getPresentation: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandGetPresentation).then(decodeDynamicIslandPresentation),
+      invokeRequest(IPC_CHANNELS.dynamicIslandPublishPresentation, decodeVoid, presentation),
+    getPresentation: () => invokeRequest(IPC_CHANNELS.dynamicIslandGetPresentation, decodeDynamicIslandPresentation),
     onPreference: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, preference: unknown) =>
         listener(decodeDynamicIslandPreference(preference));
@@ -920,60 +1013,49 @@ const openbotApi: OpenBotDesktopApi = {
       ipcRenderer.on(IPC_CHANNELS.dynamicIslandGeometry, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.dynamicIslandGeometry, handler);
     },
-    performAction: (action) => ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandPerformAction, action).then(decodeVoid),
-    performHaptic: () => ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandPerformHaptic).then(decodeVoid),
+    performAction: (action) => invokeRequest(IPC_CHANNELS.dynamicIslandPerformAction, decodeVoid, action),
+    performHaptic: () => invokeRequest(IPC_CHANNELS.dynamicIslandPerformHaptic, decodeVoid),
     onAction: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, action: unknown) =>
         listener(decodeDynamicIslandAction(action));
       ipcRenderer.on(IPC_CHANNELS.dynamicIslandAction, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.dynamicIslandAction, handler);
     },
-    setInteractive: (input) => ipcRenderer.invoke(IPC_CHANNELS.dynamicIslandSetInteractive, input).then(decodeVoid),
+    setInteractive: (input) => invokeRequest(IPC_CHANNELS.dynamicIslandSetInteractive, decodeVoid, input),
   },
-  getComputerUseState: () => ipcRenderer.invoke(IPC_CHANNELS.computerUseGetState).then(decodeComputerUseState),
+  getComputerUseState: () => invokeRequest(IPC_CHANNELS.computerUseGetState, decodeComputerUseState),
   openComputerUsePermissionPane: (permission) =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseOpenPermissionPane, permission).then(decodeComputerUseState),
-  closeComputerUsePermissionHelp: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseClosePermissionHelp).then(decodeVoid),
+    invokeRequest(IPC_CHANNELS.computerUseOpenPermissionPane, decodeComputerUseState, permission),
+  closeComputerUsePermissionHelp: () => invokeRequest(IPC_CHANNELS.computerUseClosePermissionHelp, decodeVoid),
   getComputerUsePermissionApp: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseGetPermissionApp).then(decodeComputerUsePermissionApp),
-  startComputerUsePermissionAppDrag: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseStartPermissionAppDrag).then(decodeVoid),
-  revealComputerUsePermissionApp: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.computerUseRevealPermissionApp).then(decodeVoid),
+    invokeRequest(IPC_CHANNELS.computerUseGetPermissionApp, decodeComputerUsePermissionApp),
+  startComputerUsePermissionAppDrag: () => invokeRequest(IPC_CHANNELS.computerUseStartPermissionAppDrag, decodeVoid),
+  revealComputerUsePermissionApp: () => invokeRequest(IPC_CHANNELS.computerUseRevealPermissionApp, decodeVoid),
   onComputerUseHighlightPlacement: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, placement: unknown) =>
       listener(decodeComputerUseHighlightPlacement(placement));
     ipcRenderer.on(IPC_CHANNELS.computerUseHighlightPlacement, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.computerUseHighlightPlacement, handler);
   },
-  openExternal: (destination) => ipcRenderer.invoke(IPC_CHANNELS.openExternal, destination),
-  connectProvider: (provider) => ipcRenderer.invoke(IPC_CHANNELS.connectProvider, provider),
-  // Decoded, unlike its two neighbours: this reply is read straight after the user's own CLI was
-  // replaced under the app, so the version and state in it are the point of the call.
-  updateProviderCli: (provider) =>
-    ipcRenderer.invoke(IPC_CHANNELS.updateProviderCli, provider).then(decodeAgentStatusFromMain),
-  refreshAgentProviders: () => ipcRenderer.invoke(IPC_CHANNELS.refreshAgentProviders),
-  // Both decoded for the same reason as `updateProviderCli`: the caller saved or removed a key and
-  // reads the provider's new state out of the reply.
-  setProviderApiKey: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.setProviderApiKey, input).then(decodeAgentStatusFromMain),
+  openExternal: (destination) => invokeRequest(IPC_CHANNELS.openExternal, decodeVoid, destination),
+  connectProvider: (provider) => invokeRequest(IPC_CHANNELS.connectProvider, decodeAgentStatusFromMain, provider),
+  updateProviderCli: (provider) => invokeRequest(IPC_CHANNELS.updateProviderCli, decodeAgentStatusFromMain, provider),
+  refreshAgentProviders: () => invokeRequest(IPC_CHANNELS.refreshAgentProviders, decodeAgentStatusFromMain),
+  setProviderApiKey: (input) => invokeRequest(IPC_CHANNELS.setProviderApiKey, decodeAgentStatusFromMain, input),
   clearProviderApiKey: (provider) =>
-    ipcRenderer.invoke(IPC_CHANNELS.clearProviderApiKey, provider).then(decodeAgentStatusFromMain),
+    invokeRequest(IPC_CHANNELS.clearProviderApiKey, decodeAgentStatusFromMain, provider),
   getProviderApiKeyState: (provider) =>
-    ipcRenderer.invoke(IPC_CHANNELS.getProviderApiKeyState, provider).then(decodeProviderApiKeyState),
+    invokeRequest(IPC_CHANNELS.getProviderApiKeyState, decodeProviderApiKeyState, provider),
   startProviderCodeLogin: (provider) =>
-    ipcRenderer.invoke(IPC_CHANNELS.startProviderCodeLogin, provider).then(decodeProviderCodeLoginStart),
+    invokeRequest(IPC_CHANNELS.startProviderCodeLogin, decodeProviderCodeLoginStart, provider),
   cancelProviderCodeLogin: (provider) =>
-    ipcRenderer.invoke(IPC_CHANNELS.cancelProviderCodeLogin, provider).then(decodeAgentStatusFromMain),
+    invokeRequest(IPC_CHANNELS.cancelProviderCodeLogin, decodeAgentStatusFromMain, provider),
   providerRuntimes: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesGetStatus).then(decodeProviderRuntimeSnapshot),
+    getStatus: () => invokeRequest(IPC_CHANNELS.providerRuntimesGetStatus, decodeProviderRuntimeSnapshot),
     download: (provider) =>
-      ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesDownload, provider).then(decodeProviderRuntimeSnapshot),
-    cancel: (provider) =>
-      ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesCancel, provider).then(decodeProviderRuntimeSnapshot),
-    checkForUpdates: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.providerRuntimesCheckForUpdates).then(decodeProviderRuntimeSnapshot),
+      invokeRequest(IPC_CHANNELS.providerRuntimesDownload, decodeProviderRuntimeSnapshot, provider),
+    cancel: (provider) => invokeRequest(IPC_CHANNELS.providerRuntimesCancel, decodeProviderRuntimeSnapshot, provider),
+    checkForUpdates: () => invokeRequest(IPC_CHANNELS.providerRuntimesCheckForUpdates, decodeProviderRuntimeSnapshot),
     onEvent: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, snapshot: unknown) =>
         listener(decodeProviderRuntimeSnapshot(snapshot));
@@ -981,88 +1063,79 @@ const openbotApi: OpenBotDesktopApi = {
       return () => ipcRenderer.removeListener(IPC_CHANNELS.providerRuntimesEvent, handler);
     },
   },
-  openUrl: (url) => ipcRenderer.invoke(IPC_CHANNELS.openUrl, url),
+  openUrl: (url) => invokeRequest(IPC_CHANNELS.openUrl, decodeVoid, url),
   voice: {
-    getModelStatus: () => ipcRenderer.invoke(IPC_CHANNELS.voiceGetModelStatus),
-    prepareModel: () => ipcRenderer.invoke(IPC_CHANNELS.voicePrepareModel),
-    transcribe: (input) => ipcRenderer.invoke(IPC_CHANNELS.voiceTranscribe, input),
+    getModelStatus: () => invokeRequest(IPC_CHANNELS.voiceGetModelStatus, decodeVoiceModelStatus),
+    prepareModel: () => invokeRequest(IPC_CHANNELS.voicePrepareModel, decodeVoiceModelStatus),
+    transcribe: (input) => invokeRequest(IPC_CHANNELS.voiceTranscribe, decodeVoiceTranscriptionResult, input),
     onModelStatus: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) => listener(status);
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => listener(decodeVoiceModelStatus(status));
       ipcRenderer.on(IPC_CHANNELS.voiceModelStatus, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.voiceModelStatus, handler);
     },
   },
   auth: {
-    getState: () => ipcRenderer.invoke(IPC_CHANNELS.authGetState),
-    retry: () => ipcRenderer.invoke(IPC_CHANNELS.authRetry),
-    requestEmailCode: (email) => ipcRenderer.invoke(IPC_CHANNELS.authRequestEmailCode, email),
-    verifyEmailCode: (challengeId, code) => ipcRenderer.invoke(IPC_CHANNELS.authVerifyEmailCode, { challengeId, code }),
-    updateName: (name) => ipcRenderer.invoke(IPC_CHANNELS.authUpdateName, name),
-    updateAvatar: (image) => ipcRenderer.invoke(IPC_CHANNELS.authUpdateAvatar, image),
-    createMobileConnect: () => ipcRenderer.invoke(IPC_CHANNELS.authCreateMobileConnect),
-    listMobileConnectedDevices: () => ipcRenderer.invoke(IPC_CHANNELS.authListMobileConnectedDevices),
-    listAccountSessions: () => ipcRenderer.invoke(IPC_CHANNELS.authListAccountSessions),
-    revokeAccountSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.authRevokeAccountSession, sessionId),
+    getState: () => invokeRequest(IPC_CHANNELS.authGetState, decodeCentralAuthState),
+    retry: () => invokeRequest(IPC_CHANNELS.authRetry, decodeCentralAuthState),
+    requestEmailCode: (email) => invokeRequest(IPC_CHANNELS.authRequestEmailCode, decodeCentralAuthState, email),
+    verifyEmailCode: (challengeId, code) =>
+      invokeRequest(IPC_CHANNELS.authVerifyEmailCode, decodeCentralAuthState, { challengeId, code }),
+    updateName: (name) => invokeRequest(IPC_CHANNELS.authUpdateName, decodeCentralAuthState, name),
+    updateAvatar: (image) => invokeRequest(IPC_CHANNELS.authUpdateAvatar, decodeCentralAuthState, image),
+    createMobileConnect: () => invokeRequest(IPC_CHANNELS.authCreateMobileConnect, decodeMobileConnectTicket),
+    listMobileConnectedDevices: () =>
+      invokeRequest(IPC_CHANNELS.authListMobileConnectedDevices, decodeMobileConnectedDevices),
+    listAccountSessions: () => invokeRequest(IPC_CHANNELS.authListAccountSessions, decodeAccountSessions),
+    revokeAccountSession: (sessionId) => invokeRequest(IPC_CHANNELS.authRevokeAccountSession, decodeVoid, sessionId),
     revokeMobileConnectedDevice: (sessionId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.authRevokeMobileConnectedDevice, sessionId),
-    logout: () => ipcRenderer.invoke(IPC_CHANNELS.authLogout),
+      invokeRequest(IPC_CHANNELS.authRevokeMobileConnectedDevice, decodeVoid, sessionId),
+    logout: () => invokeRequest(IPC_CHANNELS.authLogout, decodeCentralAuthState),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
+      const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(decodeCentralAuthState(state));
       ipcRenderer.on(IPC_CHANNELS.authEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.authEvent, handler);
     },
   },
   skills: {
-    localList: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.skillsLocalList).then((value) => {
-        if (!Array.isArray(value)) throw new Error("Invalid local skill list.");
-        return value.map(decodeSkillDetail);
-      }),
-    localGet: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalGet, input).then(decodeSkillDetail),
-    localCreate: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalCreate, input).then(decodeSkillDetail),
-    localRevise: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalRevise, input).then(decodeSkillDetail),
-    localInstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsLocalInstall, input).then(decodeInstalledSkill),
-    list: (query) => ipcRenderer.invoke(IPC_CHANNELS.skillsList, query ?? null).then(decodeSkillPage),
-    get: (skillId) => ipcRenderer.invoke(IPC_CHANNELS.skillsGet, skillId).then(decodeSkillDetail),
-    listMine: () => ipcRenderer.invoke(IPC_CHANNELS.skillsListMine).then(decodeSubmissions),
-    choosePackage: () => ipcRenderer.invoke(IPC_CHANNELS.skillsChoosePackage).then(decodeSkillPreview),
-    submit: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSubmit, input).then(decodeSubmission),
-    listInstalled: (agentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.skillsListInstalled, agentId).then(decodeInstalledSkillsFromMain),
-    install: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsInstall, input).then(decodeInstalledSkill),
-    uninstall: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsUninstall, input).then(decodeVoid),
-    setEnabled: (input) => ipcRenderer.invoke(IPC_CHANNELS.skillsSetEnabled, input).then(decodeInstalledSkill),
+    localList: () => invokeRequest(IPC_CHANNELS.skillsLocalList, decodeSkillDetails),
+    localGet: (input) => invokeRequest(IPC_CHANNELS.skillsLocalGet, decodeSkillDetail, input),
+    localCreate: (input) => invokeRequest(IPC_CHANNELS.skillsLocalCreate, decodeSkillDetail, input),
+    localRevise: (input) => invokeRequest(IPC_CHANNELS.skillsLocalRevise, decodeSkillDetail, input),
+    localInstall: (input) => invokeRequest(IPC_CHANNELS.skillsLocalInstall, decodeInstalledSkill, input),
+    list: (query) => invokeRequest(IPC_CHANNELS.skillsList, decodeSkillPage, query),
+    get: (skillId) => invokeRequest(IPC_CHANNELS.skillsGet, decodeSkillDetail, skillId),
+    listMine: () => invokeRequest(IPC_CHANNELS.skillsListMine, decodeSubmissions),
+    choosePackage: () => invokeRequest(IPC_CHANNELS.skillsChoosePackage, decodeSkillPreview),
+    submit: (input) => invokeRequest(IPC_CHANNELS.skillsSubmit, decodeSubmission, input),
+    listInstalled: (agentId) => invokeRequest(IPC_CHANNELS.skillsListInstalled, decodeInstalledSkillsFromMain, agentId),
+    install: (input) => invokeRequest(IPC_CHANNELS.skillsInstall, decodeInstalledSkill, input),
+    uninstall: (input) => invokeRequest(IPC_CHANNELS.skillsUninstall, decodeVoid, input),
+    setEnabled: (input) => invokeRequest(IPC_CHANNELS.skillsSetEnabled, decodeInstalledSkill, input),
   },
   hostedSites: {
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesList).then(decodeHostedSites),
-    chooseDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesChooseDirectory).then(decodeNullablePath),
-    publish: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesPublish, input).then(decodeHostedSite),
-    replace: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesReplace, input).then(decodeHostedSite),
-    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostedSitesDelete, input).then(decodeVoid),
+    list: () => invokeRequest(IPC_CHANNELS.hostedSitesList, decodeHostedSites),
+    chooseDirectory: () => invokeRequest(IPC_CHANNELS.hostedSitesChooseDirectory, decodeNullablePath),
+    publish: (input) => invokeRequest(IPC_CHANNELS.hostedSitesPublish, decodeHostedSite, input),
+    replace: (input) => invokeRequest(IPC_CHANNELS.hostedSitesReplace, decodeHostedSite, input),
+    delete: (input) => invokeRequest(IPC_CHANNELS.hostedSitesDelete, decodeVoid, input),
   },
   customProviders: {
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.customProvidersList).then(decodeCustomProviders),
-    save: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersSave, input).then(decodeCustomProviderResult),
-    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.customProvidersDelete, input).then(decodeCustomProviderResult),
+    list: () => invokeRequest(IPC_CHANNELS.customProvidersList, decodeCustomProviders),
+    save: (input) => invokeRequest(IPC_CHANNELS.customProvidersSave, decodeCustomProviderResult, input),
+    delete: (input) => invokeRequest(IPC_CHANNELS.customProvidersDelete, decodeCustomProviderResult, input),
   },
   agentImport: {
-    choose: () => ipcRenderer.invoke(IPC_CHANNELS.agentImportChoose).then(decodeAgentImportPreview),
-    apply: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentImportApply, input).then(decodeAgentImportResult),
-    discard: (token) => ipcRenderer.invoke(IPC_CHANNELS.agentImportDiscard, token).then(decodeVoid),
+    choose: () => invokeRequest(IPC_CHANNELS.agentImportChoose, decodeAgentImportPreview),
+    apply: (input) => invokeRequest(IPC_CHANNELS.agentImportApply, decodeAgentImportResult, input),
+    discard: (token) => invokeRequest(IPC_CHANNELS.agentImportDiscard, decodeVoid, token),
   },
   marketplaceAgents: {
-    list: (query) =>
-      ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsList, query ?? null).then(decodeMarketplaceAgentPage),
-    get: (agentId) => ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsGet, agentId).then(decodeMarketplaceAgentDetail),
-    listMine: () => ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsListMine).then(decodeAgentSubmissions),
-    preview: (agentId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsPreview, agentId).then(decodeAgentPublicationPreview),
-    submit: (input) => ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsSubmit, input).then(decodeAgentSubmission),
-    install: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.marketplaceAgentsInstall, input).then((value) => {
-        const item = decodeRecord(value, "agent installation");
-        return { agent: decodeAgent(item.agent) };
-      }),
+    list: (query) => invokeRequest(IPC_CHANNELS.marketplaceAgentsList, decodeMarketplaceAgentPage, query),
+    get: (agentId) => invokeRequest(IPC_CHANNELS.marketplaceAgentsGet, decodeMarketplaceAgentDetail, agentId),
+    listMine: () => invokeRequest(IPC_CHANNELS.marketplaceAgentsListMine, decodeAgentSubmissions),
+    preview: (agentId) => invokeRequest(IPC_CHANNELS.marketplaceAgentsPreview, decodeAgentPublicationPreview, agentId),
+    submit: (input) => invokeRequest(IPC_CHANNELS.marketplaceAgentsSubmit, decodeAgentSubmission, input),
+    install: (input) => invokeRequest(IPC_CHANNELS.marketplaceAgentsInstall, decodeAgentInstallation, input),
   },
   agent: {
     getStatus: () => invokeAgent(IPC_CHANNELS.agentGetStatus, null, decodeAgentStatusFromMain),
@@ -1070,7 +1143,7 @@ const openbotApi: OpenBotDesktopApi = {
       invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
     getAnalytics: (input, serverId) =>
       invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId ?? null, decodeAccountUsageFromMain),
+    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
     listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
     listAgents: (serverId) =>
       serverId === undefined
@@ -1169,162 +1242,172 @@ const openbotApi: OpenBotDesktopApi = {
     respondToBrowserSecret: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserSecret, input, decodeVoid),
     respondToBrowserTakeover: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserTakeover, input, decodeVoid),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedAgentEvent) => {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        const payload = decodeScopedAgentEvent(value);
         if (payload.serverId === selectedServerId) listener(payload.event);
       };
       ipcRenderer.on(IPC_CHANNELS.agentEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.agentEvent, handler);
     },
     onScopedEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedAgentEvent) => listener(payload);
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(decodeScopedAgentEvent(value));
       ipcRenderer.on(IPC_CHANNELS.agentEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.agentEvent, handler);
     },
   },
   browser: {
-    open: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserOpen, input),
-    activate: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserActivate, tabId),
-    navigate: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserNavigate, input),
-    reload: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserReload, tabId),
-    close: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserClose, tabId),
-    listTabs: () => ipcRenderer.invoke(IPC_CHANNELS.browserListTabs),
-    getDisplayState: () => ipcRenderer.invoke(IPC_CHANNELS.browserGetDisplayState),
-    getControlState: () => ipcRenderer.invoke(IPC_CHANNELS.browserGetControlState),
-    capturePreview: (tabId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.browserCapturePreview, tabId).then(decodeBrowserPreviewFromMain),
-    setVisible: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSetVisible, input),
-    startLiveView: (tabId) => ipcRenderer.invoke(IPC_CHANNELS.browserStartLiveView, tabId),
-    stopLiveView: () => ipcRenderer.invoke(IPC_CHANNELS.browserStopLiveView),
-    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input),
+    open: (input) => invokeRequest(IPC_CHANNELS.browserOpen, decodeBrowserTab, input),
+    activate: (tabId) => invokeRequest(IPC_CHANNELS.browserActivate, decodeVoid, tabId),
+    navigate: (input) => invokeRequest(IPC_CHANNELS.browserNavigate, decodeVoid, input),
+    reload: (tabId) => invokeRequest(IPC_CHANNELS.browserReload, decodeVoid, tabId),
+    close: (tabId) => invokeRequest(IPC_CHANNELS.browserClose, decodeVoid, tabId),
+    listTabs: () => invokeRequest(IPC_CHANNELS.browserListTabs, decodeBrowserTabs),
+    getDisplayState: () => invokeRequest(IPC_CHANNELS.browserGetDisplayState, decodeBrowserDisplayState),
+    getControlState: () => invokeRequest(IPC_CHANNELS.browserGetControlState, decodeBrowserControlState),
+    capturePreview: (tabId) => invokeRequest(IPC_CHANNELS.browserCapturePreview, decodeBrowserPreviewFromMain, tabId),
+    setVisible: (input) => invokeRequest(IPC_CHANNELS.browserSetVisible, decodeVoid, input),
+    startLiveView: (tabId) => invokeRequest(IPC_CHANNELS.browserStartLiveView, decodeVoid, tabId),
+    stopLiveView: () => invokeRequest(IPC_CHANNELS.browserStopLiveView, decodeVoid),
+    // Untyped: the renderer and wire input shapes differ on purpose. See `IPC_ENDPOINTS.browser`.
+    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input).then(decodeVoid),
     onLiveViewEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      const handler = (_event: Electron.IpcRendererEvent, event: unknown) =>
+        listener(decodeBrowserLiveViewEvent(event));
       ipcRenderer.on(IPC_CHANNELS.browserLiveViewEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserLiveViewEvent, handler);
     },
     onDisplayState: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: Parameters<typeof listener>[0]) => listener(state);
+      const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(decodeBrowserDisplayState(state));
       ipcRenderer.on(IPC_CHANNELS.browserDisplayStateEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserDisplayStateEvent, handler);
     },
-    openPictureInPicture: (bounds) => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureOpen, bounds),
-    closePictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureClose),
-    dockPictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureDock),
-    hidePictureInPicture: () => ipcRenderer.invoke(IPC_CHANNELS.browserPictureInPictureHide),
+    openPictureInPicture: (bounds) =>
+      invokeRequest(IPC_CHANNELS.browserPictureInPictureOpen, decodeBrowserBounds, bounds),
+    closePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureClose, decodeVoid),
+    dockPictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureDock, decodeVoid),
+    hidePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureHide, decodeVoid),
     onPictureInPictureEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, event: Parameters<typeof listener>[0]) => listener(event);
+      const handler = (_event: Electron.IpcRendererEvent, event: unknown) =>
+        listener(decodeBrowserPictureInPictureEvent(event));
       ipcRenderer.on(IPC_CHANNELS.browserPictureInPictureEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.browserPictureInPictureEvent, handler);
     },
   },
   update: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.updateGetStatus),
-    check: () => ipcRenderer.invoke(IPC_CHANNELS.updateCheck),
-    download: () => ipcRenderer.invoke(IPC_CHANNELS.updateDownload),
-    install: () => ipcRenderer.invoke(IPC_CHANNELS.updateInstall),
-    getPreference: () => ipcRenderer.invoke(IPC_CHANNELS.updateGetPreference),
-    setPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.updateSetPreference, input),
+    getStatus: () => invokeRequest(IPC_CHANNELS.updateGetStatus, decodeUpdateStatus),
+    check: () => invokeRequest(IPC_CHANNELS.updateCheck, decodeUpdateStatus),
+    download: () => invokeRequest(IPC_CHANNELS.updateDownload, decodeUpdateStatus),
+    install: () => invokeRequest(IPC_CHANNELS.updateInstall, decodeVoid),
+    getPreference: () => invokeRequest(IPC_CHANNELS.updateGetPreference, decodeUpdatePreference),
+    setPreference: (input) => invokeRequest(IPC_CHANNELS.updateSetPreference, decodeUpdatePreference, input),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => listener(status);
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => listener(decodeUpdateStatus(status));
       ipcRenderer.on(IPC_CHANNELS.updateEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.updateEvent, handler);
     },
   },
   notifications: {
-    getPreference: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsGetPreference),
-    setPreference: (input) => ipcRenderer.invoke(IPC_CHANNELS.notificationsSetPreference, input),
-    test: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsTest),
-    openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.notificationsOpenSettings),
+    getPreference: () => invokeRequest(IPC_CHANNELS.notificationsGetPreference, decodeNotificationPreference),
+    setPreference: (input) =>
+      invokeRequest(IPC_CHANNELS.notificationsSetPreference, decodeNotificationPreference, input),
+    test: () => invokeRequest(IPC_CHANNELS.notificationsTest, decodeVoid),
+    openSettings: () => invokeRequest(IPC_CHANNELS.notificationsOpenSettings, decodeVoid),
     onOpened: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, opened: NotificationOpenedEvent) => listener(opened);
+      const handler = (_event: Electron.IpcRendererEvent, opened: unknown) =>
+        listener(decodeNotificationOpenedEvent(opened));
       ipcRenderer.on(IPC_CHANNELS.notificationsOpenedEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.notificationsOpenedEvent, handler);
     },
   },
   maintenance: {
-    exportData: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportData),
-    exportDiagnostics: () => ipcRenderer.invoke(IPC_CHANNELS.maintenanceExportDiagnostics),
+    exportData: () => invokeRequest(IPC_CHANNELS.maintenanceExportData, decodeExportResult),
+    exportDiagnostics: () => invokeRequest(IPC_CHANNELS.maintenanceExportDiagnostics, decodeExportResult),
   },
   servers: {
-    list: async () => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversList)),
-    select: async (serverId) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSelect, serverId)),
-    reorder: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversReorder, input)),
-    setMuted: async (input) => rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetMuted, input)),
+    list: async () => rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversList, decodeServers)),
+    select: async (serverId) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSelect, decodeServers, serverId)),
+    reorder: async (input) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversReorder, decodeServers, input)),
+    setMuted: async (input) =>
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetMuted, decodeServers, input)),
     setNotificationLevel: async (input) =>
-      rememberActiveServer(await ipcRenderer.invoke(IPC_CHANNELS.serversSetNotificationLevel, input)),
+      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetNotificationLevel, decodeServers, input)),
     join: async (input) => {
-      const server = await ipcRenderer.invoke(IPC_CHANNELS.serversJoin, input);
+      const server = await invokeRequest(IPC_CHANNELS.serversJoin, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    previewInvite: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversPreviewInvite, input),
-    takePendingInvite: () => ipcRenderer.invoke(IPC_CHANNELS.serversTakePendingInvite),
+    previewInvite: (input) => invokeRequest(IPC_CHANNELS.serversPreviewInvite, decodeInvitePreview, input),
+    takePendingInvite: () => invokeRequest(IPC_CHANNELS.serversTakePendingInvite, decodePendingInvite),
     login: async (input) => {
-      const server = await ipcRenderer.invoke(IPC_CHANNELS.serversLogin, input);
+      const server = await invokeRequest(IPC_CHANNELS.serversLogin, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    retryConnection: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRetryConnection, serverId),
-    remove: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRemove, serverId),
-    getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.serversGetPresence),
-    getPresenceFor: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversGetPresenceFor, serverId),
-    refreshIdentity: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversRefreshIdentity, serverId),
-    listMembers: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversListMembers, serverId),
+    retryConnection: (serverId) => invokeRequest(IPC_CHANNELS.serversRetryConnection, decodeServer, serverId),
+    remove: (serverId) => invokeRequest(IPC_CHANNELS.serversRemove, decodeVoid, serverId),
+    getPresence: () => invokeRequest(IPC_CHANNELS.serversGetPresence, decodeTeamPresenceSnapshot),
+    getPresenceFor: (serverId) =>
+      invokeRequest(IPC_CHANNELS.serversGetPresenceFor, decodeTeamPresenceSnapshot, serverId),
+    refreshIdentity: (serverId) => invokeRequest(IPC_CHANNELS.serversRefreshIdentity, decodeServer, serverId),
+    listMembers: (serverId) => invokeRequest(IPC_CHANNELS.serversListMembers, decodeTeamMembers, serverId),
     updateMember: (serverId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversUpdateMember, { serverId, payload: input }),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversUpdateMember, input, decodeTeamMember),
     removeMember: (serverId, memberId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversRemoveMember, { serverId, payload: memberId }),
-    listInvites: (serverId) => ipcRenderer.invoke(IPC_CHANNELS.serversListInvites, serverId),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMember, memberId, decodeVoid),
+    listInvites: (serverId) => invokeRequest(IPC_CHANNELS.serversListInvites, decodeTeamInvites, serverId),
     revokeInvite: (serverId, inviteId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversRevokeInvite, { serverId, payload: inviteId }),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversRevokeInvite, inviteId, decodeVoid),
     createInvite: (serverId, input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.serversCreateInvite, { serverId, payload: input }),
-    setTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetTyping, input),
+      invokeAgentForServer(serverId, IPC_CHANNELS.serversCreateInvite, input, decodeInviteSummary),
+    setTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetTyping, decodeVoid, input),
     onPresence: (listener, serverId) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedTeamPresenceSnapshot) => {
-        if (payload.serverId === (serverId ?? selectedServerId)) listener(payload.snapshot);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedTeamPresence(payload);
+        if (scoped.serverId === (serverId ?? selectedServerId)) listener(scoped.snapshot);
       };
       ipcRenderer.on(IPC_CHANNELS.serversPresence, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversPresence, handler);
     },
-    listDirectThreads: () => ipcRenderer.invoke(IPC_CHANNELS.serversListDirectThreads),
-    readDirectConversation: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.serversReadDirectConversation, memberId),
-    readDirectConversationPage: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversReadDirectConversationPage, input),
-    sendDirectMessage: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSendDirectMessage, input),
-    markDirectRead: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversMarkDirectRead, input),
-    setDirectTyping: (input) => ipcRenderer.invoke(IPC_CHANNELS.serversSetDirectTyping, input),
+    listDirectThreads: () => invokeRequest(IPC_CHANNELS.serversListDirectThreads, decodeDirectThreads),
+    readDirectConversation: (memberId) =>
+      invokeRequest(IPC_CHANNELS.serversReadDirectConversation, decodeDirectConversation, memberId),
+    readDirectConversationPage: (input) =>
+      invokeRequest(IPC_CHANNELS.serversReadDirectConversationPage, decodeDirectConversationPage, input),
+    sendDirectMessage: (input) => invokeRequest(IPC_CHANNELS.serversSendDirectMessage, decodeDirectMessage, input),
+    markDirectRead: (input) => invokeRequest(IPC_CHANNELS.serversMarkDirectRead, decodeDirectReadState, input),
+    setDirectTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetDirectTyping, decodeVoid, input),
     onDirectMessage: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedDirectMessageEvent) => {
-        if (payload.serverId === selectedServerId) listener(payload.event);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedDirectMessage(payload);
+        if (scoped.serverId === selectedServerId) listener(scoped.event);
       };
       ipcRenderer.on(IPC_CHANNELS.serversDirectMessage, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversDirectMessage, handler);
     },
     onDirectTyping: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: ScopedDirectTypingEvent) => {
-        if (payload.serverId === selectedServerId) listener(payload.event);
+      const handler = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        const scoped = decodeScopedDirectTyping(payload);
+        if (scoped.serverId === selectedServerId) listener(scoped.event);
       };
       ipcRenderer.on(IPC_CHANNELS.serversDirectTyping, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversDirectTyping, handler);
     },
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, servers: Parameters<typeof listener>[0]) =>
-        listener(rememberActiveServer(servers));
+      const handler = (_event: Electron.IpcRendererEvent, servers: unknown) =>
+        listener(rememberActiveServer(decodeServers(servers)));
       ipcRenderer.on(IPC_CHANNELS.serversEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversEvent, handler);
     },
     onInvite: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, inviteUrl: string) => listener(inviteUrl);
+      const handler = (_event: Electron.IpcRendererEvent, inviteUrl: unknown) => listener(decodeInviteUrl(inviteUrl));
       ipcRenderer.on(IPC_CHANNELS.serversInvite, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.serversInvite, handler);
     },
   },
   plugins: {
-    // The slug is checked again on arrival rather than trusted because it came from main. It began
-    // life in a URL a web page chose, and this is the last point before the renderer looks it up.
-    takePendingListing: async () => {
-      const slug = await ipcRenderer.invoke(IPC_CHANNELS.pluginsTakePendingListing);
-      return typeof slug === "string" && isPluginSlug(slug) ? slug : null;
-    },
+    takePendingListing: () => invokeRequest(IPC_CHANNELS.pluginsTakePendingListing, decodePendingListing),
     onOpenListing: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, slug: unknown) => {
         if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);
@@ -1334,23 +1417,23 @@ const openbotApi: OpenBotDesktopApi = {
     },
   },
   host: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetStatus),
-    configure: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostConfigure, input),
-    updateIdentity: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateIdentity, input),
-    getPresence: () => ipcRenderer.invoke(IPC_CHANNELS.hostGetPresence),
-    start: () => ipcRenderer.invoke(IPC_CHANNELS.hostStart),
-    stop: () => ipcRenderer.invoke(IPC_CHANNELS.hostStop),
-    recheckScreenRecording: () => ipcRenderer.invoke(IPC_CHANNELS.hostRecheckScreenRecording),
-    listMembers: () => ipcRenderer.invoke(IPC_CHANNELS.hostListMembers),
-    updateMember: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostUpdateMember, input),
-    removeMember: (memberId) => ipcRenderer.invoke(IPC_CHANNELS.hostRemoveMember, memberId),
-    listSessions: () => ipcRenderer.invoke(IPC_CHANNELS.hostListSessions),
-    revokeSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.hostRevokeSession, sessionId),
-    listInvites: () => ipcRenderer.invoke(IPC_CHANNELS.hostListInvites),
-    revokeInvite: (inviteId) => ipcRenderer.invoke(IPC_CHANNELS.hostRevokeInvite, inviteId),
-    createInvite: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostCreateInvite, input),
+    getStatus: () => invokeRequest(IPC_CHANNELS.hostGetStatus, decodeHostStatus),
+    configure: (input) => invokeRequest(IPC_CHANNELS.hostConfigure, decodeHostStatus, input),
+    updateIdentity: (input) => invokeRequest(IPC_CHANNELS.hostUpdateIdentity, decodeHostStatus, input),
+    getPresence: () => invokeRequest(IPC_CHANNELS.hostGetPresence, decodeTeamPresenceSnapshot),
+    start: () => invokeRequest(IPC_CHANNELS.hostStart, decodeHostStatus),
+    stop: () => invokeRequest(IPC_CHANNELS.hostStop, decodeHostStatus),
+    recheckScreenRecording: () => invokeRequest(IPC_CHANNELS.hostRecheckScreenRecording, decodeHostStatus),
+    listMembers: () => invokeRequest(IPC_CHANNELS.hostListMembers, decodeTeamMembers),
+    updateMember: (input) => invokeRequest(IPC_CHANNELS.hostUpdateMember, decodeTeamMember, input),
+    removeMember: (memberId) => invokeRequest(IPC_CHANNELS.hostRemoveMember, decodeVoid, memberId),
+    listSessions: () => invokeRequest(IPC_CHANNELS.hostListSessions, decodeTeamSessions),
+    revokeSession: (sessionId) => invokeRequest(IPC_CHANNELS.hostRevokeSession, decodeVoid, sessionId),
+    listInvites: () => invokeRequest(IPC_CHANNELS.hostListInvites, decodeTeamInvites),
+    revokeInvite: (inviteId) => invokeRequest(IPC_CHANNELS.hostRevokeInvite, decodeVoid, inviteId),
+    createInvite: (input) => invokeRequest(IPC_CHANNELS.hostCreateInvite, decodeInviteSummary, input),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: Parameters<typeof listener>[0]) => listener(status);
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) => listener(decodeHostStatus(status));
       ipcRenderer.on(IPC_CHANNELS.hostEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.hostEvent, handler);
     },
@@ -1363,20 +1446,20 @@ const openbotApi: OpenBotDesktopApi = {
     deleteFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageDeleteFile, input, decodeVoid),
     clear: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageClear, input, decodeVoid),
     openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageOpenFile, input, decodeVoid),
-    openLocation: (input) => ipcRenderer.invoke(IPC_CHANNELS.storageOpenLocation, input).then(decodeVoid),
+    openLocation: (input) => invokeRequest(IPC_CHANNELS.storageOpenLocation, decodeVoid, input),
   },
   remoteDesktop: {
     checkSetup: (serverId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopCheckSetup, serverId).then(decodeRemoteDesktopSetupFromMain),
-    openSetup: (action) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopOpenSetup, action).then(decodeVoid),
-    test: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopTest, input).then(decodeRemoteDesktopTestFromMain),
-    list: () => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopList),
-    connect: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopConnect, input),
-    selectDisplay: (input) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopSelectDisplay, input),
-    disconnect: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.remoteDesktopDisconnect, sessionId),
+      invokeRequest(IPC_CHANNELS.remoteDesktopCheckSetup, decodeRemoteDesktopSetupFromMain, serverId),
+    openSetup: (action) => invokeRequest(IPC_CHANNELS.remoteDesktopOpenSetup, decodeVoid, action),
+    test: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopTest, decodeRemoteDesktopTestFromMain, input),
+    list: () => invokeRequest(IPC_CHANNELS.remoteDesktopList, decodeRemoteDesktopSessions),
+    connect: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopConnect, decodeRemoteDesktopConnectResult, input),
+    selectDisplay: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopSelectDisplay, decodeVoid, input),
+    disconnect: (sessionId) => invokeRequest(IPC_CHANNELS.remoteDesktopDisconnect, decodeVoid, sessionId),
     onEvent: (listener) => {
-      const handler = (_event: Electron.IpcRendererEvent, sessions: Parameters<typeof listener>[0]) =>
-        listener(sessions);
+      const handler = (_event: Electron.IpcRendererEvent, sessions: unknown) =>
+        listener(decodeRemoteDesktopSessions(sessions));
       ipcRenderer.on(IPC_CHANNELS.remoteDesktopEvent, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.remoteDesktopEvent, handler);
     },

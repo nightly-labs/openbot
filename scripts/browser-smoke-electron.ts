@@ -1989,13 +1989,16 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     if (frames.length < enough) {
       throw new Error(`The live view stopped after ${frames.length} frames instead of continuing past ${enough}.`);
     }
-    const elapsedSeconds = (frames[frames.length - 1].at - frames[0].at) / 1000;
+    const first = frames[0];
+    const last = frames.at(-1);
+    if (!first || !last) throw new Error("The live view sent no frames.");
+    const elapsedSeconds = (last.at - first.at) / 1000;
     const rate = elapsedSeconds > 0 ? (frames.length - 1) / elapsedSeconds : Number.POSITIVE_INFINITY;
     // The host paces the stream at about thirty frames a second. A page that draws faster than that
     // must not raise what the link and the watching computer have to carry.
     if (rate > 45) throw new Error(`The live view sent ${rate.toFixed(1)} frames a second, above the paced rate.`);
     const sequences = frames.map((frame) => frame.sequence);
-    if (sequences.some((value, index) => index > 0 && value <= sequences[index - 1])) {
+    if (sequences.some((value, index) => index > 0 && value <= (sequences[index - 1] ?? Number.NEGATIVE_INFINITY))) {
       throw new Error("Live view frames did not arrive in order.");
     }
 

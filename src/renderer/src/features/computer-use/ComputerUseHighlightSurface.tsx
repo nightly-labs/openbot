@@ -2,6 +2,7 @@ import type { ComputerUseHighlightPlacement } from "@openbot/contracts/ipc";
 import { createSignal, onSettled, Show } from "solid-js";
 import { ComputerUseAgentCursor } from "./ComputerUseAgentCursor";
 import { ComputerUseWindowHighlight } from "./ComputerUseWindowHighlight";
+import { computerUsePort } from "./computer-use-port";
 
 /**
  * The whole content of the overlay window OpenBot lays over the desktop while an agent works.
@@ -17,7 +18,7 @@ import { ComputerUseWindowHighlight } from "./ComputerUseWindowHighlight";
  */
 export function ComputerUseHighlightSurface() {
   const [placement, setPlacement] = createSignal<ComputerUseHighlightPlacement | null>(null);
-  onSettled(() => window.openbot.onComputerUseHighlightPlacement(setPlacement));
+  onSettled(() => computerUsePort().onComputerUseHighlightPlacement(setPlacement));
   return (
     <div class="computer-use-highlight-surface">
       <Show when={placement()}>

@@ -6,6 +6,9 @@ import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 import { OpenBotPlayground } from "../src/preview/OpenBotPlayground";
 import { STORY_AGENT_STATUS, STORY_AGENT_SUMMARIES, STORY_APP_INFO, STORY_SERVERS } from "./fixtures";
 
+const [storyLocalServer, storyRemoteServer] = STORY_SERVERS;
+if (!storyLocalServer || !storyRemoteServer) throw new Error("Story server fixtures need a local and a remote server.");
+
 const meta = {
   title: "App",
   component: App,
@@ -350,9 +353,9 @@ export const IncompatibleRemoteHost: Story = {
     <OpenBotPlayground
       options={{
         servers: [
-          { ...STORY_SERVERS[0], active: false },
+          { ...storyLocalServer, active: false },
           {
-            ...STORY_SERVERS[1],
+            ...storyRemoteServer,
             active: true,
             state: "incompatible",
             compatibility: {
@@ -386,9 +389,9 @@ export const DifferentRemoteVersions: Story = {
     <OpenBotPlayground
       options={{
         servers: [
-          { ...STORY_SERVERS[0], active: false },
+          { ...storyLocalServer, active: false },
           {
-            ...STORY_SERVERS[1],
+            ...storyRemoteServer,
             active: true,
             compatibility: {
               localAppVersion: "44.0.0",

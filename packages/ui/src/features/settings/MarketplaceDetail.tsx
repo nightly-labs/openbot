@@ -21,7 +21,7 @@ export function MarketplaceDetail(props: {
    * reflow, such as a window resize that rewraps the text.
    */
   const bodySize = new ResizeObserver(([entry]) => {
-    setHeight(`${entry.target.getBoundingClientRect().height}px`);
+    if (entry) setHeight(`${entry.target.getBoundingClientRect().height}px`);
   });
   onCleanup(() => bodySize.disconnect());
   const measureBody = (element: HTMLDivElement) => {

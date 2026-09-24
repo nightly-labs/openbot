@@ -7,11 +7,10 @@
 //
 // Electron-free, with the cipher injected, so its tests need neither a keychain nor a display.
 
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 import type { CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
 import { z } from "zod";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 
 export interface CustomProviderCipher {
@@ -206,17 +205,7 @@ export class CustomProviderStore {
     // The stored half only: every entry keeps the ciphertext it arrived with, so an untouched
     // endpoint is never decrypted and encrypted again.
     const providers = entries.map((entry) => entry.stored);
-    await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
-    const temporary = `${this.#path}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, `${JSON.stringify({ version: 1, providers })}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      });
-      await rename(temporary, this.#path);
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    await writeJsonFileAtomically(this.#path, { version: 1, providers }, { createDirectory: true });
   }
 }
 

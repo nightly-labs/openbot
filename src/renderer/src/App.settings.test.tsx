@@ -1,7 +1,7 @@
 import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
-import { expect, it, vi } from "vitest";
+import { assert, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { desktopAnalytics } from "./analytics";
 import {
@@ -27,7 +27,11 @@ describe("OpenBot connected desktop shell", () => {
     await waitFor(() => expect(window.openbot.agent.listInstalledSkills).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: "View agent settings" }));
     await fireEvent.click(await screen.findByRole("button", { name: /^Skills/ }));
-    await fireEvent.click((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]);
+    const [addFromMarketplace] = await screen.findAllByRole("button", { name: "Add from marketplace" });
+    assert(addFromMarketplace);
+    // The button stays disabled until the agent's skills load.
+    await waitFor(() => expect(addFromMarketplace).toBeEnabled());
+    await fireEvent.click(addFromMarketplace);
     expect(await screen.findByRole("heading", { name: "Marketplace" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Close marketplace" }));
     expect((await screen.findAllByRole("button", { name: "Add from marketplace" }))[0]).toBeEnabled();

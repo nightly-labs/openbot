@@ -15,7 +15,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentProfileDraft } from "@openbot/contracts/ipc";
@@ -49,6 +49,7 @@ import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 
 type StoredAgent = AgentSummary & { access: AgentAccess };
@@ -1196,10 +1197,10 @@ async function rewriteInternalWorkspaceSymlinks(
         let sourceRelativePath: string;
         try {
           const canonicalTarget = await realpath(resolvedSourceTarget);
-          if (!isPathWithin(canonicalSourceRoot, canonicalTarget)) continue;
+          if (!isPathInside(canonicalSourceRoot, canonicalTarget)) continue;
           sourceRelativePath = relative(canonicalSourceRoot, canonicalTarget);
         } catch {
-          if (!isPathWithin(sourceRoot, resolvedSourceTarget)) continue;
+          if (!isPathInside(sourceRoot, resolvedSourceTarget)) continue;
           sourceRelativePath = relative(sourceRoot, resolvedSourceTarget);
         }
         const finalTarget = join(finalRoot, sourceRelativePath);
@@ -1212,11 +1213,6 @@ async function rewriteInternalWorkspaceSymlinks(
     }
   };
   await visit(stagedRoot, sourceRoot, finalRoot);
-}
-
-function isPathWithin(root: string, candidate: string): boolean {
-  const path = relative(resolve(root), resolve(candidate));
-  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 
 async function workspaceMetadataFingerprint(root: string): Promise<string> {

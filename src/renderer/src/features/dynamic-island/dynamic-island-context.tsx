@@ -3,6 +3,7 @@ import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 import { DynamicIslandCoordinator } from "./dynamic-island-coordinator";
+import { dynamicIslandPort } from "./dynamic-island-port";
 
 /**
  * The macOS Dynamic Island projection: what the desktop shows about servers the
@@ -57,7 +58,9 @@ const DynamicIsland = createSimpleContext({
       queueMicrotask(() => {
         presentationScheduled = false;
         const presentation = coordinator.presentation(serverOrder());
-        void window.openbot.dynamicIsland.publishPresentation(presentation).catch(() => undefined);
+        void dynamicIslandPort()
+          .dynamicIsland.publishPresentation(presentation)
+          .catch(() => undefined);
       });
     }
 
@@ -84,7 +87,7 @@ const DynamicIsland = createSimpleContext({
     );
 
     onSettled(() =>
-      window.openbot.agent.onScopedEvent((event) => {
+      dynamicIslandPort().agent.onScopedEvent((event) => {
         flush(() => {
           const server = servers().find((candidate) => candidate.id === event.serverId);
           if (server?.kind === "remote" && server.state !== "online") return;

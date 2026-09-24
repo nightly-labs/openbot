@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentEvent,
@@ -20,7 +21,6 @@ import { routineConversationEventItemType, routineRunConversationEventItemType }
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { AgentRoutineStore } from "../agent-routine-store";
 import type { AgentStore } from "../agent-store";
-import { sortConversationMessages } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";

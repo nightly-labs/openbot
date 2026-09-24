@@ -6,7 +6,7 @@ import {
   usageTone,
   usageWindowLabel,
 } from "@openbot/ui/features/account/account-usage-view";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 
 describe("account usage view", () => {
   it("keeps one named row per provider and warns from the tightest window", () => {
@@ -44,7 +44,9 @@ describe("account usage view", () => {
       tone: "neutral",
     });
     expect(accountUsageSummary(rows)).toMatchObject({ provider: "claude", remainingPercent: 0 });
-    expect(accountUsageRowLabel(rows[0])).toContain("Claude, 0% left");
+    const [claudeRow] = rows;
+    assert(claudeRow);
+    expect(accountUsageRowLabel(claudeRow)).toContain("Claude, 0% left");
   });
 
   it("summarizes only the active agent's provider", () => {

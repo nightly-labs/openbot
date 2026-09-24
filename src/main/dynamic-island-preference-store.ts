@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DYNAMIC_ISLAND_SIZE_LIMITS,
@@ -7,6 +6,8 @@ import {
   isDynamicIslandSizePercent,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 export async function readDynamicIslandPreference(path: string): Promise<DynamicIslandPreference> {
   try {
@@ -46,7 +47,7 @@ export async function readDynamicIslandPreference(path: string): Promise<Dynamic
         : DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent,
     };
   } catch (error) {
-    if (isMissing(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
+    if (isMissingFileError(error) || error instanceof SyntaxError) return { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
     throw error;
   }
 }
@@ -55,19 +56,6 @@ export async function writeDynamicIslandPreference(
   path: string,
   preference: DynamicIslandPreference,
 ): Promise<DynamicIslandPreference> {
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify({ version: 3, ...preference })}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await rename(temporaryPath, path);
-    return { ...preference };
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
+  await writeJsonFileAtomically(path, { version: 3, ...preference });
+  return { ...preference };
 }

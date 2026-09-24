@@ -1,13 +1,13 @@
 // Routines: the scheduled standing instructions attached to one agent.
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { AgentService } from "../../backend/agent-service";
 import { decodeRoutine, decodeRoutineRun, decodeRoutineRuns, decodeRoutines } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  parseAgentRequest,
+  agentRequest,
+  parseAgentId,
   parseCreateRoutine,
   parseDeleteRoutine,
   parseListRoutineRuns,
@@ -16,7 +16,6 @@ import {
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
-import { requireString } from "./validation";
 
 interface RoutineIpcDependencies {
   service: AgentService;
@@ -29,16 +28,16 @@ export function routineIpcHandlers({
 }: RoutineIpcDependencies): Pick<IpcGroupHandlers, "agentRoutines"> {
   return {
     agentRoutines: {
-      listRoutines: payloadHandler(parseAgentRequest, (scoped) => {
-        const agentId = requireString(scoped.payload, "agentId", INPUT_LIMITS.identifier);
+      listRoutines: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+        const agentId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listRoutines(agentId),
           remote: (serverId) =>
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
         });
       }),
-      createRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCreateRoutine(scoped.payload);
+      createRoutine: payloadHandler(agentRequest(parseCreateRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createRoutine(parsed),
           remote: (serverId) =>
@@ -48,8 +47,8 @@ export function routineIpcHandlers({
             }),
         });
       }),
-      updateRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseUpdateRoutine(scoped.payload);
+      updateRoutine: payloadHandler(agentRequest(parseUpdateRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.updateRoutine(parsed),
           remote: (serverId) =>
@@ -64,8 +63,8 @@ export function routineIpcHandlers({
             ),
         });
       }),
-      deleteRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseDeleteRoutine(scoped.payload);
+      deleteRoutine: payloadHandler(agentRequest(parseDeleteRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.deleteRoutine(parsed),
           remote: (serverId) =>
@@ -79,8 +78,8 @@ export function routineIpcHandlers({
             ),
         });
       }),
-      testRoutine: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseTestRoutine(scoped.payload);
+      testRoutine: payloadHandler(agentRequest(parseTestRoutine), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.testRoutine(parsed),
           remote: (serverId) =>
@@ -92,8 +91,8 @@ export function routineIpcHandlers({
             ),
         });
       }),
-      listRoutineRuns: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseListRoutineRuns(scoped.payload);
+      listRoutineRuns: payloadHandler(agentRequest(parseListRoutineRuns), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listRoutineRuns(parsed),
           remote: (serverId) =>

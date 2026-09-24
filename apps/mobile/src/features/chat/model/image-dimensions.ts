@@ -32,17 +32,24 @@ function decodePrefix(base64: string): Uint8Array | null {
   }
 }
 
+// A byte past the end reads as 0, as `undefined` did in the bitwise operators below.
+function byte(bytes: Uint8Array, offset: number) {
+  return bytes[offset] ?? 0;
+}
 function u16be(bytes: Uint8Array, offset: number) {
-  return (bytes[offset] << 8) | bytes[offset + 1];
+  return (byte(bytes, offset) << 8) | byte(bytes, offset + 1);
 }
 function u16le(bytes: Uint8Array, offset: number) {
-  return bytes[offset] | (bytes[offset + 1] << 8);
+  return byte(bytes, offset) | (byte(bytes, offset + 1) << 8);
 }
 function u24le(bytes: Uint8Array, offset: number) {
-  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+  return byte(bytes, offset) | (byte(bytes, offset + 1) << 8) | (byte(bytes, offset + 2) << 16);
 }
 function u32be(bytes: Uint8Array, offset: number) {
-  return ((bytes[offset] << 24) >>> 0) + ((bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]);
+  return (
+    ((byte(bytes, offset) << 24) >>> 0) +
+    ((byte(bytes, offset + 1) << 16) | (byte(bytes, offset + 2) << 8) | byte(bytes, offset + 3))
+  );
 }
 function ascii(bytes: Uint8Array, offset: number, length: number) {
   return String.fromCharCode(...bytes.subarray(offset, offset + length));
@@ -64,7 +71,7 @@ function webp(bytes: Uint8Array): ImageDimensions | null {
   if (chunk === "VP8X") return { width: u24le(bytes, 24) + 1, height: u24le(bytes, 27) + 1 };
   if (chunk === "VP8 ") return { width: u16le(bytes, 26) & 0x3fff, height: u16le(bytes, 28) & 0x3fff };
   if (chunk === "VP8L") {
-    const bits = bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24);
+    const bits = u24le(bytes, 21) | (byte(bytes, 24) << 24);
     return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
   }
   return null;
@@ -76,7 +83,7 @@ function jpeg(bytes: Uint8Array): ImageDimensions | null {
   let offset = 2;
   while (offset + 4 <= bytes.length) {
     if (bytes[offset] !== 0xff) return null;
-    const marker = bytes[offset + 1];
+    const marker = byte(bytes, offset + 1);
     // Fill bytes and markers without a length.
     if (marker === 0xff) {
       offset += 1;

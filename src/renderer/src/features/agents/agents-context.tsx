@@ -19,6 +19,7 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { readAgentSelection, writeAgentSelection } from "./agent-selection";
+import { agentsPort } from "./agents-port";
 
 /**
  * The agents on the active server: the roster, which one is open, the provider
@@ -168,7 +169,7 @@ const Agents = createSimpleContext({
       const properties = analyticsAgentProperties(agentId);
       const changedFields = Object.keys(updates);
       try {
-        const stored = await window.openbot.agent.updateAgent({
+        const stored = await agentsPort().agent.updateAgent({
           agentId,
           ...updates,
         });
@@ -204,7 +205,7 @@ const Agents = createSimpleContext({
       const analytics = desktopAnalytics.scope();
       const properties = analyticsAgentProperties(agentId);
       try {
-        const stored = await window.openbot.agent.setAvatar({ agentId, image });
+        const stored = await agentsPort().agent.setAvatar({ agentId, image });
         const next = toAgentProfile(stored);
         setAgentList((current) => {
           const existing = current.find((agent) => agent.id === agentId);

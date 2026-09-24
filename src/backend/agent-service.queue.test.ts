@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEVELOPMENT_DEFAULT_MODEL, DEVELOPMENT_DEFAULT_REASONING_EFFORT } from "./agent/development-defaults";
 import type { AgentProvider } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -49,7 +49,9 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
     await store.getOrCreate("chief");
     const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
-    const deliveryId = first.deliveries[0].id;
+    const [original] = first.deliveries;
+    assert(original);
+    const deliveryId = original.id;
     const editing = await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" });
     expect(editing.deliveries[0]).toMatchObject({ id: deliveryId, text: "Original" });
     // Every device keeps the row, marked as being edited, rather than watching it disappear.
@@ -74,6 +76,7 @@ describe.sequential("AgentService: queue", () => {
     const file = join(root, "retry-upload.txt");
     await writeFile(file, "New attachment after lost response");
     const [draft] = await mailbox.prepareImportedAttachments([file], []);
+    assert(draft);
     await expect(service.editQueuedMessage("chief", { ...save, attachmentDraftIds: [draft.id] })).rejects.toThrow(
       "different contents",
     );
@@ -89,21 +92,25 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
     const starts = client.requests.filter((request) => request.method === "turn/start");
     expect(starts).toHaveLength(1);
-    expect(firstInputText(starts[0].params)).toContain("Edited on phone");
+    expect(firstInputText(starts[0]?.params)).toContain("Edited on phone");
     const removed = await mailbox.enqueue({
       sender: { kind: "user" },
       recipientAgentIds: ["chief"],
       text: "Never send this",
     });
+    const [removedDelivery] = removed.deliveries;
+    assert(removedDelivery);
     await service.editQueuedMessage("chief", {
       action: "begin",
-      deliveryId: removed.deliveries[0].id,
+      deliveryId: removedDelivery.id,
       editId: "removed-edit",
     });
     const next = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Continue" });
-    await service.cancelQueuedMessage("chief", removed.deliveries[0].id);
+    const [nextDelivery] = next.deliveries;
+    assert(nextDelivery);
+    await service.cancelQueuedMessage("chief", removedDelivery.id);
     // Deletion finishes the edit too: cancellation retries confirm, but Save cannot revive it.
-    const cancelRemoved = { action: "cancel" as const, deliveryId: removed.deliveries[0].id, editId: "removed-edit" };
+    const cancelRemoved = { action: "cancel" as const, deliveryId: removedDelivery.id, editId: "removed-edit" };
     await service.editQueuedMessage("chief", cancelRemoved);
     await service.editQueuedMessage("chief", cancelRemoved);
     await expect(
@@ -114,11 +121,10 @@ describe.sequential("AgentService: queue", () => {
       }),
     ).rejects.toThrow("cancelled");
     await waitFor(
-      () =>
-        mailbox.listQueue("chief").deliveries.find((item) => item.id === next.deliveries[0].id)?.status === "completed",
+      () => mailbox.listQueue("chief").deliveries.find((item) => item.id === nextDelivery.id)?.status === "completed",
     );
     expect(client.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
-    expect(mailbox.listQueue("chief").deliveries.find((item) => item.id === removed.deliveries[0].id)?.status).toBe(
+    expect(mailbox.listQueue("chief").deliveries.find((item) => item.id === removedDelivery.id)?.status).toBe(
       "cancelled",
     );
   });
@@ -132,7 +138,9 @@ describe.sequential("AgentService: queue", () => {
     await store.getOrCreate("chief");
     await service.sendMessage({ agentId: "chief", text: "Active task" });
     const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
-    const deliveryId = first.deliveries[0].id;
+    const [original] = first.deliveries;
+    assert(original);
+    const deliveryId = original.id;
     const saveA = {
       action: "save" as const,
       deliveryId,
@@ -169,12 +177,15 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
     await store.getOrCreate("chief");
     const first = await mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Original" });
-    const deliveryId = first.deliveries[0].id;
+    const [original] = first.deliveries;
+    assert(original);
+    const deliveryId = original.id;
     await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "phone-edit" });
     await service.editQueuedMessage("chief", { action: "cancel", deliveryId, editId: "phone-edit" });
     const file = join(root, "late-upload.txt");
     await writeFile(file, "Late upload");
     const [draft] = await mailbox.prepareImportedAttachments([file], []);
+    assert(draft);
     // A cancel whose response was lost leaves the editor open. The save that follows it
     // must report the rejection instead of success, so the client keeps the typed text.
     await expect(
@@ -194,7 +205,7 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => mailbox.listQueue("chief").deliveries[0]?.status === "completed");
     const starts = client.requests.filter((request) => request.method === "turn/start");
     expect(starts).toHaveLength(1);
-    expect(firstInputText(starts[0].params)).toContain("Original");
+    expect(firstInputText(starts[0]?.params)).toContain("Original");
   });
 
   it("starts a new agent in a development build on the OpenCode development model", async () => {
@@ -1460,7 +1471,9 @@ describe.sequential("AgentService: queue", () => {
     // Waiting, not failed: a message to a busy agent always queues.
     expect(held.deliveries.map((delivery) => delivery.status)).toEqual(["queued"]);
 
-    const deliveryId = held.deliveries[0].id;
+    const [heldDelivery] = held.deliveries;
+    assert(heldDelivery);
+    const deliveryId = heldDelivery.id;
     await service.editQueuedMessage("chief", { action: "begin", deliveryId, editId: "channel-wait-edit" });
     const events: AgentEvent[] = [];
     service.on("event", (event) => events.push(event));
@@ -1519,6 +1532,7 @@ describe.sequential("AgentService: queue", () => {
 
     const sales = service.listQueue("sales-outbound").deliveries[0];
     const inbox = service.listQueue("inbox-manager").deliveries[0];
+    assert(sales && inbox);
     expect(sales.messageId).toBe(inbox.messageId);
     expect(sales.sender).toEqual({ kind: "agent", agentId: "chief" });
     expect(sales.text).toBe("Please prepare your reports.");

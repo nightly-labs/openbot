@@ -3,7 +3,7 @@
 import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 import { developmentStatePaths, resetDevelopmentState, resolveDevelopmentAppDataRoot } from "./reset-dev-state";
 import { DEVELOPMENT_SEED_MANIFEST_FILE } from "./seed-dev-state";
 
@@ -28,6 +28,7 @@ describe("reset dev state", () => {
   it("deletes app, test-client, and legacy host data but keeps production data", async () => {
     const appDataRoot = await makeTemporaryDirectory();
     const [appPath, testClientPath, legacyHostPath] = developmentStatePaths(appDataRoot);
+    assert(appPath && testClientPath && legacyHostPath);
     const productionPath = join(appDataRoot, "OpenBot");
 
     await Promise.all([
@@ -63,6 +64,7 @@ describe("reset dev state", () => {
     const appDataRoot = join(root, "app-data");
     const homeDirectory = join(root, "home");
     const [appPath] = developmentStatePaths(appDataRoot);
+    assert(appPath);
     const generatedRoot = join(homeDirectory, "OpenBot", "Shared", "Transfers", "generated");
     const seedDirectory = join(generatedRoot, "de305d54-75b4-431b-adb2-eb6b9e546014");
     const sharedFile = join(homeDirectory, "OpenBot", "Shared", "keep.txt");

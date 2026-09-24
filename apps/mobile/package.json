@@ -96,7 +96,7 @@
     "ios:release:testflight": "gh workflow run release-ios.yml --ref main",
     "lint": "biome check --max-diagnostics=none src",
     "codegen": "expo customize tsconfig.json && uniwind generate-artifacts --css ./global.css --dts ./src/uniwind-types.d.ts",
-    "typecheck": "bun run codegen && tsc --noEmit",
+    "typecheck": "bun run codegen && bun ../../node_modules/typescript/bin/tsc --noEmit",
     "doctor": "bunx expo-doctor@latest"
   },
   "private": true

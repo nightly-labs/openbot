@@ -3,7 +3,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 import { type DynamicToolNamespace, LocalMcpBridge } from "./local-mcp-bridge";
 
 const TOOLS: DynamicToolNamespace[] = [
@@ -95,8 +95,11 @@ describe("LocalMcpBridge", () => {
       }),
     );
 
-    const firstClient = await connect(first.servers[0]);
-    const secondClient = await connect(second.servers[0]);
+    const [firstServer] = first.servers;
+    const [secondServer] = second.servers;
+    assert(firstServer && secondServer);
+    const firstClient = await connect(firstServer);
+    const secondClient = await connect(secondServer);
     expect((await firstClient.listTools()).tools.map((tool) => tool.name)).toEqual(["echo"]);
     expect(await firstClient.callTool({ name: "echo", arguments: {} })).toMatchObject({
       content: [{ type: "text", text: "hello" }],
@@ -113,7 +116,7 @@ describe("LocalMcpBridge", () => {
     clients.push(unauthorized);
     await expect(
       unauthorized.connect(
-        new StreamableHTTPClientTransport(new URL(first.servers[0].url), {
+        new StreamableHTTPClientTransport(new URL(firstServer.url), {
           requestInit: { headers: { Authorization: "Bearer wrong-token" } },
         }),
       ),
@@ -125,9 +128,9 @@ describe("LocalMcpBridge", () => {
     clients.push(closed);
     await expect(
       closed.connect(
-        new StreamableHTTPClientTransport(new URL(first.servers[0].url), {
+        new StreamableHTTPClientTransport(new URL(firstServer.url), {
           requestInit: {
-            headers: Object.fromEntries(first.servers[0].headers.map((header) => [header.name, header.value])),
+            headers: Object.fromEntries(firstServer.headers.map((header) => [header.name, header.value])),
           },
         }),
       ),

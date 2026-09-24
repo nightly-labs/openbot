@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
+import type { QueueEditRequest } from "./team-protocol/queue-edit-v1";
 
 export const QUEUE_DELIVERY_STATUSES = [
   "queued",
@@ -192,3 +193,6 @@ export interface InterruptTurnInput {
   agentId: string;
   turnId: string;
 }
+
+/** A queue edit for one agent. The Team API route names the agent, so the request body does not. */
+export type EditQueuedMessageInput = QueueEditRequest & { agentId: string };

@@ -47,6 +47,7 @@ import {
   type ThreadItem,
 } from "./protocol";
 import { createDiagnosticStream } from "./stderr-diagnostics";
+import { withTimeout } from "./with-timeout";
 
 /**
  * How long model discovery may spend on asking an agent for each model's reasoning efforts. One
@@ -1317,18 +1318,4 @@ function isAuthenticationError(error: unknown): boolean {
   return /auth|login|credential|token|unauthori[sz]ed|api key/i.test(
     error instanceof Error ? error.message : String(error),
   );
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  let timer: NodeJS.Timeout | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }

@@ -40,10 +40,11 @@ export function mentionQuery(source: string, cursor: number) {
   if (cursor < 0) return null;
   const draft = mentionDraft(source);
   const match = /(?:^|\s)@([^@\n]*)$/u.exec(draft.text.slice(0, cursor));
-  if (!match) return null;
-  const start = cursor - match[1].length - 1;
+  const query = match?.[1];
+  if (query === undefined) return null;
+  const start = cursor - query.length - 1;
   if (draft.mentions.some((mention) => start >= mention.start && start < mention.end)) return null;
-  return { start, end: cursor, query: match[1].toLocaleLowerCase() };
+  return { start, end: cursor, query: query.toLocaleLowerCase() };
 }
 
 export function insertMention(
@@ -73,9 +74,9 @@ export function plainMentionParts<T extends { id: string; name: string }>(body: 
   const expression = new RegExp(`@(${names})(?=$|[\\s.,!?;:()\\[\\]{}])`, "giu");
   let cursor = 0;
   for (const match of body.matchAll(expression)) {
-    if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(body[match.index - 1])) continue;
+    if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(body.charAt(match.index - 1))) continue;
     if (match.index > cursor) parts.push({ text: body.slice(cursor, match.index), agent: undefined });
-    parts.push({ text: match[0], agent: byName.get(match[1].toLocaleLowerCase()) });
+    parts.push({ text: match[0], agent: byName.get((match[1] ?? "").toLocaleLowerCase()) });
     cursor = match.index + match[0].length;
   }
   if (cursor < body.length) parts.push({ text: body.slice(cursor), agent: undefined });

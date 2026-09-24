@@ -14,6 +14,7 @@ import {
   type DeleteChannelRoutineInput,
   type DeleteRoutineInput,
   type DownloadAttachmentsInput,
+  type EditQueuedMessageInput,
   type ImportAttachmentsInput,
   type InterruptTurnInput,
   isAgentAccess,
@@ -52,6 +53,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import type { PayloadDecoder } from "../trusted-ipc";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -63,8 +65,29 @@ export function parseAgentRequest(value: unknown): AgentIpcRequest {
   };
 }
 
+/** Checks the server scope first, then decodes the payload inside it. */
+export function agentRequest<Payload>(decode: PayloadDecoder<Payload>): PayloadDecoder<AgentIpcRequest<Payload>> {
+  return (value) => {
+    const scoped = parseAgentRequest(value);
+    return { serverId: scoped.serverId, payload: decode(scoped.payload) };
+  };
+}
+
+/** Checks the server scope of a request that carries nothing else. The preload sends `null`. */
+export function agentScope(value: unknown): AgentIpcRequest<null> {
+  return { serverId: parseAgentRequest(value).serverId, payload: null };
+}
+
 export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
+}
+
+export function parseChannelId(value: unknown): string {
+  return requireString(value, "channelId", INPUT_LIMITS.identifier);
+}
+
+export function parseAttachmentId(value: unknown): string {
+  return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
 }
 
 export function parseOptionalAgentId(value: unknown): string | undefined {
@@ -702,7 +725,7 @@ export function parseBrowserTakeoverResponse(value: unknown): RespondToBrowserTa
   return { requestId: value.requestId, decision: value.decision };
 }
 
-export function parseQueueEdit(value: unknown) {
+export function parseQueueEdit(value: unknown): EditQueuedMessageInput {
   if (!isObject(value)) throw new Error("Invalid queue edit request.");
   return { agentId: parseAgentId(value.agentId), ...decodeQueueEditRequest(value) };
 }

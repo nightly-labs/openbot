@@ -10,6 +10,7 @@ import { errorMessage } from "@openbot/ui/error-message";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { createEffect, createStore } from "solid-js";
 import { serverSupportsCapability } from "../servers/server-capabilities";
+import { filesPort } from "./files-port";
 
 /** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
 export function serverHasStorage(server: ServerSummary | undefined): server is ServerSummary {
@@ -78,7 +79,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     });
     try {
       const input = force ? { ...current.input, force: true } : current.input;
-      const usage = await window.openbot.storage.getUsage(input, current.serverId);
+      const usage = await filesPort().storage.getUsage(input, current.serverId);
       if (id !== request) return;
       setState((draft) => {
         draft.usage = usage;
@@ -111,7 +112,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     const current = target();
     if (!current) return;
     try {
-      await window.openbot.storage.clear({ category }, current.serverId);
+      await filesPort().storage.clear({ category }, current.serverId);
     } finally {
       await refresh(true);
     }
@@ -126,7 +127,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     if (!current) return;
     if (action === "delete") {
       try {
-        await window.openbot.storage.deleteFile({ fileId: file.id }, current.serverId);
+        await filesPort().storage.deleteFile({ fileId: file.id }, current.serverId);
       } finally {
         await refresh(true);
       }
@@ -135,7 +136,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     if (action === "retry") return refresh(true);
     if (action === "show-in-chat") return handlers.onShowInChat(file);
     try {
-      await window.openbot.storage.openFile({ fileId: file.id, action }, current.serverId);
+      await filesPort().storage.openFile({ fileId: file.id, action }, current.serverId);
     } catch (error) {
       toast.error(`Could not open “${file.name}”`, { description: errorMessage(error, "Try again.") });
     }

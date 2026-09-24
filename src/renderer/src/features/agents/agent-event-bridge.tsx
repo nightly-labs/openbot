@@ -22,6 +22,7 @@ import { useSidebar } from "../sidebar/sidebar-context";
 import { cleanAgentMessageText } from "./agent-message-text";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
+import { agentsPort } from "./agents-port";
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
 const ERROR_DESCRIPTION_LIMIT = 300;
@@ -98,8 +99,8 @@ export function AgentEventBridge() {
       case "status":
         applyAgentStatus(event.status);
         if (event.status.phase === "ready") {
-          void window.openbot.agent
-            .listModels()
+          void agentsPort()
+            .agent.listModels()
             .then(setModelOptions)
             .catch(() => undefined);
         }
@@ -139,8 +140,8 @@ export function AgentEventBridge() {
         {
           const request = ++readRefresh;
           const serverId = activeServerId();
-          void window.openbot.agent
-            .listConversationReads()
+          void agentsPort()
+            .agent.listConversationReads()
             .then((reads) => {
               if (request === readRefresh && serverId === activeServerId()) applyConversationReads(reads);
             })
@@ -319,7 +320,7 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
-    const unsubscribe = window.openbot.agent.onEvent((event) => {
+    const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
         void channels.refresh();
         return;

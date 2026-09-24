@@ -4,7 +4,7 @@ import { connect } from "node:net";
 import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type * as Ws from "ws";
 import { z } from "zod";
 import { RemoteScreenGateway, type RemoteScreenRuntime } from "./remote-screen-gateway";
@@ -559,9 +559,11 @@ describe("RemoteScreenGateway", () => {
     await vi.waitFor(() => expect(upstreamMessages).toHaveLength(1));
     const firstSlot = Number(upstreamMessages[0]?.user.match(/(\d+)$/)?.[1]);
     const firstIndex = firstSlot - 1;
+    const firstCookie = cookies[firstIndex];
+    assert(firstCookie !== undefined);
     const connected = await fetch(`${origin}/v1/remote-screen/sessions/${sessions[firstIndex]?.id}/viewer-state`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookies[firstIndex] },
+      headers: { "Content-Type": "application/json", Cookie: firstCookie },
       body: JSON.stringify({
         source: "openbot-moonlight",
         type: "viewer-state",

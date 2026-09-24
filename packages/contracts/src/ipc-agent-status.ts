@@ -149,3 +149,40 @@ export function isAgentStatus(value: unknown): value is AgentStatus {
     value.fullAccess === true
   );
 }
+
+export interface SetProviderApiKeyInput {
+  provider: AgentProviderId;
+  key: string;
+}
+
+/**
+ * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
+ * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
+ */
+export type ProviderApiKeyStatus = "missing" | "saved" | "unreadable";
+
+/** What the renderer may know about a stored key: its status. Never the key. */
+export interface ProviderApiKeyState {
+  provider: AgentProviderId;
+  status: ProviderApiKeyStatus;
+}
+
+/**
+ * What a started code sign-in gives the renderer: a code to show, or nothing left to do.
+ *
+ * `connected` is the provider that turned out to be signed in already, which the user reaches by
+ * asking for a code on a computer where the account arrived some other way. The token traded for
+ * the code never crosses this boundary; how the sign-in ends arrives as a provider status, the same
+ * way the browser sign-in's does.
+ */
+export type ProviderCodeLoginStart =
+  | {
+      kind: "code";
+      /** The one-time code the user types on the other device. Safe to show and to read out. */
+      userCode: string;
+      /** The page to type it on. Always https. */
+      verificationUrl: string;
+      /** Epoch milliseconds. When OpenBot gives up on this code, which is what the dialog counts down to. */
+      expiresAt: number;
+    }
+  | { kind: "connected" };

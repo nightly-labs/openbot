@@ -4,14 +4,18 @@ import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  agentRequest,
+  agentScope,
   parseAcknowledgeFailedTurn,
   parseAgentId,
   parseAgentRequest,
   parseApprovalResponse,
+  parseAttachmentId,
   parseBrowserTakeoverResponse,
   parseCancelQueuedMessage,
+  parseChannelId,
   parseChooseAttachments,
   parseCreateAgent,
   parseCreateAgentMemory,
@@ -42,6 +46,7 @@ import {
   parseAnalyticsPreference,
   parseAppLanguagePreference,
   parseApprovalAutomation,
+  parseDeleteHostedSite,
   parseDynamicIslandAction,
   parseDynamicIslandInteractive,
   parseDynamicIslandPreference,
@@ -181,6 +186,16 @@ describe("app IPC input parsing", () => {
     expect(parseOptionalAgentId("chief")).toBe("chief");
     expect(() => parseAgentId(42)).toThrowError("agentId is required.");
     expect(() => parseAgentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("agentId is too long.");
+  });
+
+  it("validates channel and attachment identifiers and hosted site deletion", () => {
+    expect(parseChannelId("general")).toBe("general");
+    expect(() => parseChannelId(42)).toThrowError("channelId is required.");
+    expect(() => parseChannelId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("channelId is too long.");
+    expect(parseAttachmentId("attachment-1")).toBe("attachment-1");
+    expect(() => parseAttachmentId("x".repeat(INPUT_LIMITS.identifier + 1))).toThrowError("attachmentId is too long.");
+    expect(parseDeleteHostedSite({ siteId: "site-1" })).toEqual({ siteId: "site-1" });
+    expect(() => parseDeleteHostedSite({})).toThrowError("siteId is required.");
   });
 
   it("keeps setup and permission error messages", () => {
@@ -702,6 +717,24 @@ describe("agent IPC input parsing", () => {
     expect(() => parseBrowserTakeoverResponse({ requestId: "takeover-1", decision: "maybe" })).toThrowError(
       "Invalid browser takeover response.",
     );
+  });
+});
+
+describe("agent request envelope", () => {
+  it("checks the server scope before the inner decoder sees the payload", () => {
+    const decode = vi.fn((value: unknown) => requireString(value, "Table name"));
+
+    expect(() => agentRequest(decode)({ payload: "notes" })).toThrowError("serverId is required.");
+    expect(decode).not.toHaveBeenCalled();
+    expect(() => agentRequest(decode)({ serverId: "local", payload: 7 })).toThrowError("Table name is required.");
+    expect(agentRequest(decode)({ serverId: "local", payload: "notes" })).toEqual({
+      serverId: "local",
+      payload: "notes",
+    });
+  });
+
+  it("drops the payload of a request that carries only a scope", () => {
+    expect(agentScope({ serverId: "local", payload: { stray: true } })).toEqual({ serverId: "local", payload: null });
   });
 });
 

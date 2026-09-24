@@ -1,6 +1,7 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { createMemo, Loading, Show } from "solid-js";
+import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
@@ -283,7 +284,7 @@ function ServerSettings() {
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
-            onOpenScreenRecordingSettings={() => window.openbot.openExternal("mac-screen-recording")}
+            onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
             // Only for this computer: the runtime a remote host starts its own servers with is that
@@ -386,7 +387,7 @@ function AppSettings(props: AccountProps) {
         onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
         providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
         codeLogin={localProviderDownloads() ? codeLogin : undefined}
-        hostedSitesApi={window.openbot.hostedSites}
+        hostedSitesApi={appPort().hostedSites}
         turboModePending={turboModePending()}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}

@@ -9,6 +9,7 @@ import type {
   ReplaceHostedSiteInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isMissingFileError } from "../backend/file-errors";
 
 const MAX_FILES = 20;
 const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
@@ -219,14 +220,14 @@ async function detectFramework(root: string): Promise<HostedSiteFramework> {
       return "astro";
     }
   } catch (error) {
-    if (!isMissing(error)) throw new Error("The site package.json is invalid.");
+    if (!isMissingFileError(error)) throw new Error("The site package.json is invalid.");
   }
   for (const name of ["astro.config.mjs", "astro.config.js", "astro.config.ts"]) {
     try {
       await lstat(join(root, name));
       return "astro";
     } catch (error) {
-      if (!isMissing(error)) throw error;
+      if (!isMissingFileError(error)) throw error;
     }
   }
   return "vanilla";
@@ -253,7 +254,8 @@ async function staticAstroOutput(root: string): Promise<string> {
   }
   const output = join(root, "dist");
   const stats = await lstat(output).catch((error: unknown) => {
-    if (isMissing(error)) throw new Error("Build the Astro project first. Its existing dist/ directory is required.");
+    if (isMissingFileError(error))
+      throw new Error("Build the Astro project first. Its existing dist/ directory is required.");
     throw error;
   });
   if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error("Astro dist/ must be a real directory.");
@@ -427,11 +429,7 @@ async function exists(path: string): Promise<boolean> {
     await lstat(path);
     return true;
   } catch (error) {
-    if (isMissing(error)) return false;
+    if (isMissingFileError(error)) return false;
     throw error;
   }
-}
-
-function isMissing(error: unknown): boolean {
-  return isDynamicRecord(error) && error.code === "ENOENT";
 }

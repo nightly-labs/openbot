@@ -7,7 +7,13 @@ import {
   type AgentApproval,
   type AgentPromptQuestion,
   type AgentRuntimeSnapshot,
+  type AgentSummary,
 } from "@openbot/contracts/ipc";
+import type { MailboxStore } from "../mailbox-store";
+import type { OpenBotDatabase } from "../openbot-database";
+import type { AttentionRegistry } from "./attention-registry";
+import type { ConversationRuntime } from "./conversation-runtime";
+import type { TurnLifecycle } from "./turn-lifecycle";
 
 export function compactRuntimeQuestion(
   question: AgentPromptQuestion,
@@ -117,4 +123,76 @@ export function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntime
 
 export function runtimeSnapshotBytes(snapshot: AgentRuntimeSnapshot): number {
   return Buffer.byteLength(JSON.stringify({ type: "runtime-snapshot", snapshot }));
+}
+
+export interface RuntimeSnapshotSources {
+  agents: AgentSummary[];
+  conversation: Pick<ConversationRuntime, "snapshot">;
+  database: Pick<OpenBotDatabase, "readConversationRuntime">;
+  mailbox: Pick<MailboxStore, "listRuntimeWork">;
+  turn: Pick<TurnLifecycle, "failedTurns">;
+  attention: Pick<AttentionRegistry, "runtimeAttention">;
+}
+
+/** The runtime view of every agent: active turns, queued work, latest messages and attention. */
+export function buildRuntimeSnapshot({
+  agents,
+  conversation,
+  database,
+  mailbox,
+  turn,
+  attention,
+}: RuntimeSnapshotSources): AgentRuntimeSnapshot {
+  const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
+    id: agent.id,
+    name: agent.name,
+    notifications: agent.notifications,
+    preview: agent.preview.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
+    updatedAt: agent.updatedAt,
+    avatarSeed: agent.avatarSeed,
+    avatarHue: agent.avatarHue,
+    avatarUrl: agent.avatarUrl,
+  }));
+  const activeTurns: AgentRuntimeSnapshot["activeTurns"] = [];
+  const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
+  for (const agent of agents) {
+    const live = conversation.snapshot(agent.id);
+    const liveLatest = [...(live?.messages ?? [])]
+      .reverse()
+      .find(
+        (message) =>
+          (message.author === "assistant" || message.author === "agent") &&
+          message.itemType !== "commentary" &&
+          message.itemType !== "question_prompt" &&
+          message.itemType !== "agent_attachment",
+      );
+    const persisted =
+      !live || !liveLatest
+        ? database.readConversationRuntime(agent.id, agent.threadId)
+        : { activeTurnId: null, latestMessage: null };
+    const activeTurnId = live ? live.activeTurnId : persisted.activeTurnId;
+    if (activeTurnId && agent.threadId) {
+      activeTurns.push({ agentId: agent.id, threadId: agent.threadId, turnId: activeTurnId });
+    }
+    const latest = liveLatest ?? persisted.latestMessage;
+    if (latest) {
+      latestMessages.push({
+        agentId: agent.id,
+        id: latest.id,
+        text: latest.text.slice(0, AGENT_RUNTIME_TEXT_LIMIT),
+        createdAt: latest.createdAt,
+      });
+    }
+  }
+  return fitRuntimeSnapshot({
+    agents: runtimeAgents,
+    activeTurns,
+    work: mailbox.listRuntimeWork(
+      agents.map((agent) => agent.id),
+      turn.failedTurns(),
+    ),
+    latestMessages,
+    ...attention.runtimeAttention(),
+    failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
+  });
 }

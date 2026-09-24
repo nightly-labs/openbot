@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type ApprovalAutomationPreference,
@@ -9,6 +8,8 @@ import {
   type SetApprovalAutomationInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { writeJsonFileAtomically } from "../backend/atomic-json-file";
+import { isMissingFileError } from "../backend/file-errors";
 
 /** Missing settings use the product default; invalid settings always require approval. */
 export async function readApprovalAutomation(
@@ -20,12 +21,12 @@ export async function readApprovalAutomation(
   try {
     const contents = await readFile(path, "utf8").catch((error) => {
       // Keep the released file readable by older installations. Never write a migration to it.
-      if (isMissing(error) && legacyPath) return readFile(legacyPath, "utf8");
+      if (isMissingFileError(error) && legacyPath) return readFile(legacyPath, "utf8");
       throw error;
     });
     parsed = JSON.parse(contents);
   } catch (error) {
-    if (isMissing(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
+    if (isMissingFileError(error)) return { ...DEFAULT_APPROVAL_AUTOMATION_PREFERENCE, autoApproveOverrides: {} };
     if (error instanceof SyntaxError) return { turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} };
     throw error;
   }
@@ -55,15 +56,8 @@ export async function writeApprovalAutomation(
   path: string,
   preference: ApprovalAutomationPreference,
 ): Promise<ApprovalAutomationPreference> {
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  const payload = { version: 2, ...preference };
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify(payload)}\n`, { encoding: "utf8", mode: 0o600 });
-    await rename(temporaryPath, path);
-    return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-  }
+  await writeJsonFileAtomically(path, { version: 2, ...preference });
+  return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
 }
 
 export interface ApprovalAutomationOptions {
@@ -171,8 +165,4 @@ export class ApprovalAutomation {
       autoApproveOverrides: Object.fromEntries(overrides),
     };
   }
-}
-
-function isMissing(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

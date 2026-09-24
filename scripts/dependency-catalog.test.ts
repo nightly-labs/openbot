@@ -125,6 +125,36 @@ describe("dependency catalog", () => {
   });
 });
 
+// storybook-solidjs-vite depends on @typescript/typescript6, which installs typescript@6 as
+// @typescript/old. Bun links that package's `tsc` into node_modules/.bin in place of the
+// TypeScript 7 one, and a patch cannot remove it because bun takes the bin list from bun.lock.
+// A script that runs a bare `tsc` therefore checks with TypeScript 6 and no error says so.
+describe("typecheck scripts", () => {
+  const TYPESCRIPT_CLI = resolve(repositoryRoot, "node_modules/typescript/bin/tsc");
+
+  it("run the catalog's TypeScript by path, never a bare tsc", () => {
+    const wrong: string[] = [];
+    for (const manifest of manifests) {
+      const scripts = readManifest(manifest).scripts;
+      if (!isDynamicRecord(scripts)) continue;
+      for (const [name, command] of Object.entries(scripts)) {
+        if (!isString(command)) continue;
+        for (const step of command.split(/&&|\|\||;/u).map((part) => part.trim().split(/\s+/u))) {
+          const [program, entry] = step;
+          const cli = program === "bun" || program === "node" ? entry : undefined;
+          const directory = join(repositoryRoot, manifest, "..");
+          if (program === "tsc" || program === "tsc6") wrong.push(`${manifest} ${name}: bare ${program}`);
+          if (cli?.endsWith("typescript/bin/tsc") && resolve(directory, cli) !== TYPESCRIPT_CLI) {
+            wrong.push(`${manifest} ${name}: ${cli} is not the root typescript package`);
+          }
+        }
+      }
+    }
+
+    expect(wrong).toEqual([]);
+  });
+});
+
 // The remote API image installs from a pruned checkout: the Dockerfile copies the
 // root manifest and lockfile, then one manifest per workspace, and runs
 // `bun install --frozen-lockfile --filter @openbot/remote-api`. Bun refuses that

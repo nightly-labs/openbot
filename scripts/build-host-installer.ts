@@ -110,7 +110,7 @@ async function build(): Promise<void> {
       ["openbot-relaunch.sh", `${HOST_MANAGER_DIRECTORY}/openbot-relaunch.sh`],
       ["app.openbot.host-manager.plist", "/Library/LaunchDaemons/app.openbot.host-manager.plist"],
       ["app.openbot.desktop.relaunch.plist", "/Library/LaunchAgents/app.openbot.desktop.relaunch.plist"],
-    ]) {
+    ] as const) {
       await mkdir(dirname(join(payload, target)), { recursive: true });
       await copyFile(`build/macos/host-updates/${source}`, join(payload, target));
     }

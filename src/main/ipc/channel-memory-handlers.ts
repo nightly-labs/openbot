@@ -1,20 +1,19 @@
 // What a channel remembers: the notes every member of it carries into a turn.
 
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { decodeChannelMemories, decodeChannelMemory } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import type { AgentService } from "../../backend/agent-service";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  parseAgentRequest,
+  agentRequest,
+  parseChannelId,
   parseCreateChannelMemory,
   parseDeleteChannelMemory,
   parseUpdateChannelMemory,
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
-import { requireString } from "./validation";
 
 interface ChannelMemoryIpcDependencies {
   service: AgentService;
@@ -27,8 +26,8 @@ export function channelMemoryIpcHandlers({
 }: ChannelMemoryIpcDependencies): Pick<IpcGroupHandlers, "channelMemories"> {
   return {
     channelMemories: {
-      listChannelMemories: payloadHandler(parseAgentRequest, (scoped) => {
-        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+      listChannelMemories: payloadHandler(agentRequest(parseChannelId), (scoped) => {
+        const channelId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.listChannelMemories(channelId),
           remote: (serverId) =>
@@ -38,8 +37,8 @@ export function channelMemoryIpcHandlers({
             }),
         });
       }),
-      createChannelMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseCreateChannelMemory(scoped.payload);
+      createChannelMemory: payloadHandler(agentRequest(parseCreateChannelMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createChannelMemory(parsed),
           remote: (serverId) =>
@@ -49,8 +48,8 @@ export function channelMemoryIpcHandlers({
             }),
         });
       }),
-      updateChannelMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseUpdateChannelMemory(scoped.payload);
+      updateChannelMemory: payloadHandler(agentRequest(parseUpdateChannelMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.updateChannelMemory(parsed),
           remote: (serverId) =>
@@ -60,8 +59,8 @@ export function channelMemoryIpcHandlers({
             }),
         });
       }),
-      deleteChannelMemory: payloadHandler(parseAgentRequest, (scoped) => {
-        const parsed = parseDeleteChannelMemory(scoped.payload);
+      deleteChannelMemory: payloadHandler(agentRequest(parseDeleteChannelMemory), (scoped) => {
+        const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.deleteChannelMemory(parsed),
           remote: (serverId) =>
@@ -71,8 +70,8 @@ export function channelMemoryIpcHandlers({
             }),
         });
       }),
-      clearChannelMemories: payloadHandler(parseAgentRequest, (scoped) => {
-        const channelId = requireString(scoped.payload, "channelId", INPUT_LIMITS.identifier);
+      clearChannelMemories: payloadHandler(agentRequest(parseChannelId), (scoped) => {
+        const channelId = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.clearChannelMemories(channelId),
           remote: (serverId) =>

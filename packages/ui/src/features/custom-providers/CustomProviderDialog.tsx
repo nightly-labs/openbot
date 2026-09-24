@@ -204,7 +204,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       read: (row) => row.id,
       write: (index, value) =>
         setDraft((state) => {
-          state.models[index].id = value;
+          const model = state.models[index];
+          if (model) model.id = value;
         }),
     },
     {
@@ -214,7 +215,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       read: (row) => row.name,
       write: (index, value) =>
         setDraft((state) => {
-          state.models[index].name = value;
+          const model = state.models[index];
+          if (model) model.name = value;
         }),
     },
   ];
@@ -228,7 +230,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       read: (row) => row.name,
       write: (index, value) =>
         setDraft((state) => {
-          state.headers[index].name = value;
+          const header = state.headers[index];
+          if (header) header.name = value;
         }),
     },
     {
@@ -239,7 +242,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       read: (row) => row.value,
       write: (index, value) =>
         setDraft((state) => {
-          state.headers[index].value = value;
+          const header = state.headers[index];
+          if (header) header.value = value;
         }),
     },
   ];
