@@ -6,6 +6,7 @@ import {
   type ComponentProps,
   createContext,
   forwardRef,
+  memo,
   type PropsWithChildren,
   useCallback,
   useContext,
@@ -50,7 +51,10 @@ import { ChatMessageGesture } from "./chat-message-gesture";
 import { useReplyHaptics } from "./use-reply-haptics";
 
 type VisibleMessage = Exclude<ChatMessage, { kind: "thinking" }>;
-const TailLayoutContext = createContext<{ id: string | null; motion: ChatMotion } | null>(null);
+const TailLayoutContext = createContext<{
+  id: string | null;
+  onTailStartLayout: ChatMotion["onTailStartLayout"];
+} | null>(null);
 
 function MessageCell({ children, item, onLayout, onFocusCapture, style }: CellRendererProps<VisibleMessage>) {
   const tail = useContext(TailLayoutContext);
@@ -60,7 +64,7 @@ function MessageCell({ children, item, onLayout, onFocusCapture, style }: CellRe
       {...nativeProps}
       onLayout={(event) => {
         onLayout?.(event);
-        if (item.id === tail?.id) tail.motion.onTailStartLayout(item.id, event);
+        if (item.id === tail?.id) tail.onTailStartLayout(item.id, event);
       }}
     >
       {children}
@@ -207,6 +211,319 @@ interface ChatMessageListProps {
   } | null;
 }
 
+type ChatUpload = NonNullable<ChatMessageListProps["upload"]>;
+
+/**
+ * The inputs every row shares. The list keeps this object stable while a reply streams, so a
+ * streamed chunk re-renders only the row whose message changed.
+ */
+interface MessageRowShared {
+  agents: MobileAgent[];
+  agentsById: ReadonlyMap<string, MobileAgent>;
+  targetKind: ChatTarget["kind"];
+  serverId: string;
+  canSend: boolean;
+  muted: ViewStyle["backgroundColor"];
+  themeMuted: string;
+  foreground: ViewStyle["backgroundColor"];
+  userForeground: string;
+  userBubbleStyle: ComponentProps<typeof Animated.View>["style"];
+  firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
+  onUserLayout: ChatMotion["onUserLayout"];
+  screenReaderEnabled: boolean;
+  arrivals: ReadonlySet<string>;
+  /** Arriving replies animate: the screen is focused, online, active, and shows the response. */
+  animationActive: boolean;
+  /** Arriving replies also play back word by word: motion and screen reader settings allow it. */
+  playbackActive: boolean;
+  replySession: { progress: Map<string, number>; revealed: Set<string> };
+  /** Changes when a reply reveals its first word, so a waiting row renders its bubble. */
+  revealedCount: number;
+  markRevealed: (id: string) => void;
+  replyHaptics: ReturnType<typeof useReplyHaptics>;
+  canReply: boolean;
+  canSelectQuestion: boolean;
+  actions: {
+    reply: (message: ChatBubbleMessage) => void;
+    openActions: (message: ChatBubbleMessage) => void;
+    selectQuestion: (messageId: string) => void;
+  };
+}
+
+function playbackEligible(message: VisibleMessage) {
+  return (
+    message.kind === "message" &&
+    message.author === "agent" &&
+    (message.streaming || message.status === "completed") &&
+    !message.superseded &&
+    (!message.speaker || message.speaker.kind === "agent")
+  );
+}
+
+function playbackEnabled(message: VisibleMessage, shared: MessageRowShared) {
+  return playbackEligible(message) && shared.playbackActive && shared.arrivals.has(message.id);
+}
+
+// The activity row stands in for a reply until its first word is played back. Rendering the
+// padded bubble before then leaves an empty pill beside the row.
+function awaitingFirstWord(message: VisibleMessage, shared: MessageRowShared) {
+  return (
+    message.kind === "message" &&
+    message.body.trim().length > 0 &&
+    playbackEnabled(message, shared) &&
+    !shared.replySession.revealed.has(message.id) &&
+    (shared.replySession.progress.get(message.id) ?? 0) === 0
+  );
+}
+
+const MessageRow = memo(function MessageRow({
+  message,
+  isTailUser,
+  isFirstUser,
+  source,
+  questionForm,
+  upload,
+  shared,
+}: {
+  message: VisibleMessage;
+  isTailUser: boolean;
+  isFirstUser: boolean;
+  /** The message this one replies to. */
+  source?: ChatMessage;
+  /** Set only on the row of the question it controls. */
+  questionForm?: QuestionPromptController;
+  /** Set only on the row whose files are uploading. */
+  upload?: ChatUpload;
+  shared: MessageRowShared;
+}) {
+  const {
+    agents,
+    agentsById,
+    targetKind,
+    serverId,
+    canSend,
+    muted,
+    themeMuted,
+    foreground,
+    userForeground,
+    userBubbleStyle,
+    firstMessageStyle,
+    onUserLayout,
+    screenReaderEnabled,
+    arrivals,
+    replySession,
+    markRevealed,
+    replyHaptics,
+    actions,
+  } = shared;
+  const eligible = playbackEligible(message);
+  const enabled = playbackEnabled(message, shared);
+  const complete = message.kind === "message" && message.status === "completed";
+  const playback = useMemo(
+    () =>
+      eligible
+        ? {
+            id: message.id,
+            complete,
+            progress: replySession.progress,
+            enabled,
+            onWord: (word: string, index: number) => {
+              markRevealed(message.id);
+              replyHaptics.onWord(word, index);
+            },
+            onComplete: replyHaptics.onComplete,
+          }
+        : undefined,
+    [eligible, message.id, complete, replySession.progress, enabled, markRevealed, replyHaptics],
+  );
+  const waiting = awaitingFirstWord(message, shared);
+  const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
+  const rendered =
+    message.kind === "exchange" || message.kind === "channel-routing" ? (
+      <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
+        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+          {message.kind === "channel-routing"
+            ? message.event.action === "assigned"
+              ? "Assigned to"
+              : "Continuing with"
+            : exchangeLabel(message.exchange)}
+        </Typography.Paragraph>
+        {(message.kind === "channel-routing"
+          ? [message.event.agentId]
+          : message.exchange.direction === "incoming"
+            ? [message.exchange.senderAgentId]
+            : message.exchange.recipientAgentIds
+        ).map((id) => {
+          const legacyName =
+            message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
+          const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
+          const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
+          const badge = (
+            <View key={id ?? legacyName} className="flex-row items-center gap-1">
+              {participant ? (
+                <BloubAvatarThumbnail
+                  agentId={participant.id}
+                  serverId={participant.serverId}
+                  hue={participant.avatarHue}
+                  seed={participant.avatarSeed}
+                  size={22}
+                />
+              ) : null}
+              <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+                {participant?.name ??
+                  (message.kind === "channel-routing" ? (legacyName ?? "Unavailable agent") : "Unknown agent")}
+              </Typography.Paragraph>
+            </View>
+          );
+          return message.kind === "channel-routing" && participant ? (
+            <Link
+              key={participant.id}
+              href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
+              asChild
+            >
+              <Pressable accessibilityRole="link" accessibilityLabel={`Open chat with ${participant.name}`}>
+                {badge}
+              </Pressable>
+            </Link>
+          ) : (
+            <View key={id ?? legacyName}>{badge}</View>
+          );
+        })}
+      </View>
+    ) : message.kind === "question" ? (
+      <ChatQuestionPrompt
+        key={message.id}
+        prompt={message.prompt}
+        controller={questionForm}
+        canSend={canSend}
+        onActivate={shared.canSelectQuestion ? () => actions.selectQuestion(message.id) : undefined}
+      />
+    ) : (
+      <Animated.View
+        key={message.id}
+        entering={
+          arrivals.has(message.id) && !isFirstUser
+            ? message.author === "user"
+              ? USER_MESSAGE_ENTRANCE
+              : undefined
+            : undefined
+        }
+        className={
+          message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
+        }
+        style={[{ borderCurve: "circular" }, isFirstUser ? firstMessageStyle : undefined]}
+      >
+        {message.speaker && message.author !== "user" ? (
+          <View className="flex-row items-center gap-1 px-1">
+            {message.speaker.kind === "agent" ? (
+              <BloubAvatarThumbnail
+                agentId={speaker?.id}
+                serverId={speaker?.serverId}
+                seed={speaker?.avatarSeed ?? message.speaker.id}
+                hue={speaker?.avatarHue ?? null}
+                size={20}
+              />
+            ) : null}
+            <Typography.Paragraph type="body-xs" className="text-muted">
+              {message.speaker.name}
+              {message.superseded ? " · Superseded" : ""}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
+        {message.imageGeneration ? (
+          <ChatImageGeneration
+            generation={message.imageGeneration}
+            status={imageGenerationStatus(message.streaming, message.status)}
+            attachment={message.attachments?.[0]}
+            serverId={serverId}
+          />
+        ) : null}
+        {/* A generation owns its first attachment, the image; any further files follow in order. */}
+        {(message.imageGeneration ? message.attachments?.slice(1) : message.attachments)?.map((attachment, index) => (
+          <ChatAttachmentView
+            key={attachment.id}
+            attachment={attachment}
+            serverId={serverId}
+            alignment={message.author === "user" ? "right" : "left"}
+            upload={upload ? uploadProgressAt(index, upload.completed, upload.current) : undefined}
+          />
+        ))}
+        {upload && upload.completed < (message.attachments?.length ?? 0) ? (
+          <Button variant="ghost" size="sm" className="self-end" isDisabled={upload.cancelling} onPress={upload.cancel}>
+            <Button.Label>
+              {upload.cancelling
+                ? "Cancelling…"
+                : `Cancel upload · ${upload.completed} of ${message.attachments?.length ?? 0}`}
+            </Button.Label>
+          </Button>
+        ) : null}
+        {message.body.trim() ? (
+          <ChatBubble
+            agent={message.author === "agent"}
+            collapsed={waiting}
+            className={
+              message.author === "user"
+                ? `self-end rounded-[30px] px-4 py-3 ${targetKind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
+            }
+            style={[
+              { borderCurve: "circular", overflow: "hidden" },
+              message.author === "user" && targetKind === "agent" ? userBubbleStyle : undefined,
+            ]}
+          >
+            <ChatMarkdown
+              agents={agents}
+              body={message.body}
+              selectable={message.author === "user"}
+              color={message.author === "user" && targetKind === "agent" ? userForeground : foreground}
+              playback={playback}
+              animationEnabled={shared.animationActive && arrivals.has(message.id)}
+            />
+          </ChatBubble>
+        ) : null}
+      </Animated.View>
+    );
+  if (message.kind !== "message") return rendered;
+  return (
+    <View
+      key={message.id}
+      className={
+        message.author === "agent"
+          ? "max-w-full self-start gap-1"
+          : message.attachments?.length
+            ? "max-w-full self-end gap-1"
+            : "max-w-[88%] self-end gap-1"
+      }
+      onLayout={isTailUser ? onUserLayout : undefined}
+    >
+      {message.replyToMessageId ? (
+        <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
+          <CornerUpRight size={14} color={themeMuted} />
+          <Typography.Paragraph
+            type="body-xs"
+            numberOfLines={1}
+            className="shrink text-muted"
+            accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
+          >
+            {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
+          </Typography.Paragraph>
+        </View>
+      ) : null}
+      {message.author === "agent" ? (
+        <ChatMessageGesture
+          screenReaderEnabled={screenReaderEnabled}
+          onReply={shared.canReply ? () => actions.reply(message) : undefined}
+          onOpenActions={() => actions.openActions(message)}
+        >
+          {rendered}
+        </ChatMessageGesture>
+      ) : (
+        rendered
+      )}
+    </View>
+  );
+});
+
 export function ChatMessageList({
   upload,
   target,
@@ -283,7 +600,7 @@ export function ChatMessageList({
     () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
     [conversationKey],
   );
-  const [, setRevealedCount] = useState(0);
+  const [revealedCount, setRevealedCount] = useState(0);
   const markRevealed = useCallback(
     (id: string) => {
       if (replySession.revealed.has(id)) return;
@@ -330,248 +647,118 @@ export function ChatMessageList({
       if (first) setBoundary({ firstId: first.id, headId });
     } else if (canLoadOlder) onLoadOlder();
   };
-  const playbackEligible = (message: VisibleMessage) =>
-    message.kind === "message" &&
-    message.author === "agent" &&
-    (message.streaming || message.status === "completed") &&
-    !message.superseded &&
-    (!message.speaker || message.speaker.kind === "agent");
-  const playbackEnabled = (message: VisibleMessage) =>
-    playbackEligible(message) &&
-    animateMessages &&
-    arrivals.has(message.id) &&
-    motion.responseVisible &&
-    !reducedMotion &&
-    !screenReaderEnabled;
-  // The activity row stands in for a reply until its first word is played back. Rendering the
-  // padded bubble before then leaves an empty pill beside the row.
-  const awaitingFirstWord = (message: VisibleMessage) =>
-    message.kind === "message" &&
-    message.body.trim().length > 0 &&
-    playbackEnabled(message) &&
-    !replySession.revealed.has(message.id) &&
-    (replySession.progress.get(message.id) ?? 0) === 0;
+  const actionHandlers = useRef({ onReply, onOpenActions, onSelectQuestion });
+  actionHandlers.current = { onReply, onOpenActions, onSelectQuestion };
+  const actions = useMemo<MessageRowShared["actions"]>(
+    () => ({
+      reply: (message) => actionHandlers.current.onReply?.(message),
+      openActions: (message) => actionHandlers.current.onOpenActions(message),
+      selectQuestion: (messageId) => actionHandlers.current.onSelectQuestion?.(messageId),
+    }),
+    [],
+  );
+  const animationActive = animateMessages && motion.responseVisible;
+  const shared = useMemo<MessageRowShared>(
+    () => ({
+      agents,
+      agentsById,
+      targetKind: target.kind,
+      serverId: target.serverId,
+      canSend,
+      muted,
+      themeMuted,
+      foreground,
+      userForeground,
+      userBubbleStyle,
+      firstMessageStyle: motion.firstMessageStyle,
+      onUserLayout: motion.onUserLayout,
+      screenReaderEnabled,
+      arrivals,
+      animationActive,
+      playbackActive: animationActive && !reducedMotion && !screenReaderEnabled,
+      replySession,
+      revealedCount,
+      markRevealed,
+      replyHaptics,
+      canReply: Boolean(onReply),
+      canSelectQuestion: Boolean(onSelectQuestion),
+      actions,
+    }),
+    [
+      agents,
+      agentsById,
+      target.kind,
+      target.serverId,
+      canSend,
+      muted,
+      themeMuted,
+      foreground,
+      userForeground,
+      userBubbleStyle,
+      motion.firstMessageStyle,
+      motion.onUserLayout,
+      screenReaderEnabled,
+      arrivals,
+      animationActive,
+      reducedMotion,
+      replySession,
+      revealedCount,
+      markRevealed,
+      replyHaptics,
+      onReply,
+      onSelectQuestion,
+      actions,
+    ],
+  );
   const listRef = useRef<FlatList<VisibleMessage>>(null);
-  const tailLayout = useMemo(() => ({ id: tailId, motion }), [tailId, motion]);
+  const tailLayout = useMemo(
+    () => ({ id: tailId, onTailStartLayout: motion.onTailStartLayout }),
+    [tailId, motion.onTailStartLayout],
+  );
   const seekLatest = useCallback(() => {
     if (motion.needsInitialPosition() && visibleMessages.length) listRef.current?.scrollToEnd({ animated: false });
   }, [motion.needsInitialPosition, visibleMessages.length]);
   useEffect(() => {
     if (tailId && motion.needsSendPosition() && !motion.atLatest) listRef.current?.scrollToEnd({ animated: false });
   }, [tailId, motion.needsSendPosition, motion.atLatest]);
-  const renderMessage = (message: (typeof visibleMessages)[number], isTailUser: boolean, isFirstUser: boolean) => {
-    const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
-    const rendered =
-      message.kind === "exchange" || message.kind === "channel-routing" ? (
-        <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
-          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-            {message.kind === "channel-routing"
-              ? message.event.action === "assigned"
-                ? "Assigned to"
-                : "Continuing with"
-              : exchangeLabel(message.exchange)}
-          </Typography.Paragraph>
-          {(message.kind === "channel-routing"
-            ? [message.event.agentId]
-            : message.exchange.direction === "incoming"
-              ? [message.exchange.senderAgentId]
-              : message.exchange.recipientAgentIds
-          ).map((id) => {
-            const legacyName =
-              message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
-            const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
-            const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
-            const badge = (
-              <View key={id ?? legacyName} className="flex-row items-center gap-1">
-                {participant ? (
-                  <BloubAvatarThumbnail
-                    agentId={participant.id}
-                    serverId={participant.serverId}
-                    hue={participant.avatarHue}
-                    seed={participant.avatarSeed}
-                    size={22}
-                  />
-                ) : null}
-                <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-                  {participant?.name ??
-                    (message.kind === "channel-routing" ? (legacyName ?? "Unavailable agent") : "Unknown agent")}
-                </Typography.Paragraph>
-              </View>
-            );
-            return message.kind === "channel-routing" && participant ? (
-              <Link
-                key={participant.id}
-                href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
-                asChild
-              >
-                <Pressable accessibilityRole="link" accessibilityLabel={`Open chat with ${participant.name}`}>
-                  {badge}
-                </Pressable>
-              </Link>
-            ) : (
-              <View key={id ?? legacyName}>{badge}</View>
-            );
-          })}
-        </View>
-      ) : message.kind === "question" ? (
-        <ChatQuestionPrompt
-          key={message.id}
-          prompt={message.prompt}
-          controller={message.id === questionForm?.messageId ? questionForm : undefined}
-          canSend={canSend}
-          onActivate={onSelectQuestion ? () => onSelectQuestion(message.id) : undefined}
-        />
-      ) : (
+  const pendingReveal = visibleMessages.some((message) => awaitingFirstWord(message, shared));
+  const { responseStyle, responseVisible } = motion;
+  const firstRowIsHead = !hasOlder && !hasCachedOlder;
+  const renderItem = useCallback(
+    ({ item, index }: { item: VisibleMessage; index: number }) => {
+      const response = index + windowStart > tailIndex;
+      return (
         <Animated.View
-          key={message.id}
-          entering={
-            arrivals.has(message.id) && !isFirstUser
-              ? message.author === "user"
-                ? USER_MESSAGE_ENTRANCE
-                : undefined
-              : undefined
-          }
-          className={
-            message.author === "user"
-              ? "max-w-full items-end self-end gap-2"
-              : "max-w-full items-start self-start gap-2"
-          }
-          style={[{ borderCurve: "circular" }, isFirstUser ? motion.firstMessageStyle : undefined]}
+          style={[{ paddingBottom: 10 }, response ? responseStyle : undefined]}
+          accessibilityElementsHidden={response && !responseVisible}
+          importantForAccessibility={response && !responseVisible ? "no-hide-descendants" : "auto"}
         >
-          {message.speaker && message.author !== "user" ? (
-            <View className="flex-row items-center gap-1 px-1">
-              {message.speaker.kind === "agent" ? (
-                <BloubAvatarThumbnail
-                  agentId={speaker?.id}
-                  serverId={speaker?.serverId}
-                  seed={speaker?.avatarSeed ?? message.speaker.id}
-                  hue={speaker?.avatarHue ?? null}
-                  size={20}
-                />
-              ) : null}
-              <Typography.Paragraph type="body-xs" className="text-muted">
-                {message.speaker.name}
-                {message.superseded ? " · Superseded" : ""}
-              </Typography.Paragraph>
-            </View>
-          ) : null}
-          {message.imageGeneration ? (
-            <ChatImageGeneration
-              generation={message.imageGeneration}
-              status={imageGenerationStatus(message.streaming, message.status)}
-              attachment={message.attachments?.[0]}
-              serverId={target.serverId}
-            />
-          ) : null}
-          {/* A generation owns its first attachment, the image; any further files follow in order. */}
-          {(message.imageGeneration ? message.attachments?.slice(1) : message.attachments)?.map((attachment, index) => (
-            <ChatAttachmentView
-              key={attachment.id}
-              attachment={attachment}
-              serverId={target.serverId}
-              alignment={message.author === "user" ? "right" : "left"}
-              upload={
-                upload?.messageId === message.id ? uploadProgressAt(index, upload.completed, upload.current) : undefined
-              }
-            />
-          ))}
-          {upload?.messageId === message.id && upload.completed < (message.attachments?.length ?? 0) ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-end"
-              isDisabled={upload.cancelling}
-              onPress={upload.cancel}
-            >
-              <Button.Label>
-                {upload.cancelling
-                  ? "Cancelling…"
-                  : `Cancel upload · ${upload.completed} of ${message.attachments?.length ?? 0}`}
-              </Button.Label>
-            </Button>
-          ) : null}
-          {message.body.trim() ? (
-            <ChatBubble
-              agent={message.author === "agent"}
-              collapsed={awaitingFirstWord(message)}
-              className={
-                message.author === "user"
-                  ? `self-end rounded-[30px] px-4 py-3 ${target.kind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
-                  : `max-w-full self-start rounded-[30px] ${awaitingFirstWord(message) ? "" : "px-4 py-3"}`
-              }
-              style={[
-                { borderCurve: "circular", overflow: "hidden" },
-                message.author === "user" && target.kind === "agent" ? userBubbleStyle : undefined,
-              ]}
-            >
-              <ChatMarkdown
-                agents={agents}
-                body={message.body}
-                selectable={message.author === "user"}
-                color={message.author === "user" && target.kind === "agent" ? userForeground : foreground}
-                playback={
-                  playbackEligible(message)
-                    ? {
-                        id: message.id,
-                        complete: message.status === "completed",
-                        progress: replySession.progress,
-                        enabled: playbackEnabled(message),
-                        onWord: (word, index) => {
-                          markRevealed(message.id);
-                          replyHaptics.onWord(word, index);
-                        },
-                        onComplete: replyHaptics.onComplete,
-                      }
-                    : undefined
-                }
-                animationEnabled={animateMessages && arrivals.has(message.id) && motion.responseVisible}
-              />
-            </ChatBubble>
-          ) : null}
+          <MessageRow
+            message={item}
+            isTailUser={index + windowStart === tailIndex}
+            isFirstUser={index === 0 && firstRowIsHead}
+            source={
+              item.kind === "message" && item.replyToMessageId ? messagesById.get(item.replyToMessageId) : undefined
+            }
+            questionForm={item.id === questionForm?.messageId ? questionForm : undefined}
+            upload={upload?.messageId === item.id ? upload : undefined}
+            shared={shared}
+          />
         </Animated.View>
       );
-    if (message.kind !== "message") return rendered;
-    const source = message.replyToMessageId ? messagesById.get(message.replyToMessageId) : undefined;
-    return (
-      <View
-        key={message.id}
-        className={
-          message.author === "agent"
-            ? "max-w-full self-start gap-1"
-            : message.attachments?.length
-              ? "max-w-full self-end gap-1"
-              : "max-w-[88%] self-end gap-1"
-        }
-        onLayout={isTailUser ? motion.onUserLayout : undefined}
-      >
-        {message.replyToMessageId ? (
-          <View className={`flex-row items-center gap-1 ${message.author === "user" ? "self-end" : "self-start"}`}>
-            <CornerUpRight size={14} color={themeMuted} />
-            <Typography.Paragraph
-              type="body-xs"
-              numberOfLines={1}
-              className="shrink text-muted"
-              accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
-            >
-              {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
-            </Typography.Paragraph>
-          </View>
-        ) : null}
-        {message.author === "agent" ? (
-          <ChatMessageGesture
-            screenReaderEnabled={screenReaderEnabled}
-            onReply={onReply ? () => onReply(message) : undefined}
-            onOpenActions={() => onOpenActions(message)}
-          >
-            {rendered}
-          </ChatMessageGesture>
-        ) : (
-          rendered
-        )}
-      </View>
-    );
-  };
-  const pendingReveal = visibleMessages.some(awaitingFirstWord);
+    },
+    [
+      windowStart,
+      tailIndex,
+      responseStyle,
+      responseVisible,
+      firstRowIsHead,
+      messagesById,
+      questionForm,
+      upload,
+      shared,
+    ],
+  );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
       (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
@@ -651,17 +838,7 @@ export function ChatMessageList({
             if (motion.historyVisible && canLoadOlder && (hasCachedOlder || !olderError)) loadPrevious();
           }}
           onStartReachedThreshold={0.5}
-          renderItem={({ item, index }) => (
-            <Animated.View
-              style={[{ paddingBottom: 10 }, index + windowStart > tailIndex ? motion.responseStyle : undefined]}
-              accessibilityElementsHidden={index + windowStart > tailIndex && !motion.responseVisible}
-              importantForAccessibility={
-                index + windowStart > tailIndex && !motion.responseVisible ? "no-hide-descendants" : "auto"
-              }
-            >
-              {renderMessage(item, index + windowStart === tailIndex, index === 0 && !hasOlder && !hasCachedOlder)}
-            </Animated.View>
-          )}
+          renderItem={renderItem}
           renderScrollComponent={(props) => (
             <ChatScrollView
               {...props}

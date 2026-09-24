@@ -1,6 +1,8 @@
 import {
   type AgentIpcRequest,
   type AttachmentImportEvent,
+  decodeAgentImportPreview,
+  decodeAgentImportResult,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelMemories,
@@ -47,6 +49,7 @@ import {
 import { decodeScopedAgentEvent } from "./agent-event-decoding";
 import {
   decodeAccountSessions,
+  decodeAgentImportSkill,
   decodeAnalyticsPreference,
   decodeAppInfo,
   decodeAppLanguagePreference,
@@ -396,6 +399,13 @@ const openbotApi: OpenBotDesktopApi = {
     list: () => invokeRequest(IPC_ENDPOINTS.customProviders.list, decodeCustomProviders),
     save: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.save, decodeCustomProviderResult, input),
     delete: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.delete, decodeCustomProviderResult, input),
+  },
+  agentImport: {
+    choose: () => invokeRequest(IPC_ENDPOINTS.agentImport.choose, decodeAgentImportPreview),
+    apply: (input) => invokeRequest(IPC_ENDPOINTS.agentImport.apply, decodeAgentImportResult, input),
+    discard: (token) => invokeRequest(IPC_ENDPOINTS.agentImport.discard, decodeVoid, token),
+    readSkill: () => invokeRequest(IPC_ENDPOINTS.agentImport.readSkill, decodeAgentImportSkill),
+    saveSkill: () => invokeRequest(IPC_ENDPOINTS.agentImport.saveSkill, decodeExportResult),
   },
   marketplaceAgents: {
     list: (query) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.list, decodeMarketplaceAgentPage, query),

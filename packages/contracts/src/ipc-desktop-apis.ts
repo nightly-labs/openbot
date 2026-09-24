@@ -374,6 +374,18 @@ export interface StorageDesktopApi {
   openLocation: Invoke<typeof IPC_ENDPOINTS.storage.openLocation>;
 }
 
+/**
+ * Agent import into the local host. `choose` opens the file dialog and answers null when the user
+ * cancels. A token is used once: `apply` and `discard` both release the staged archive.
+ */
+export interface AgentImportDesktopApi {
+  choose: Invoke<typeof IPC_ENDPOINTS.agentImport.choose>;
+  apply: Invoke<typeof IPC_ENDPOINTS.agentImport.apply>;
+  discard: Invoke<typeof IPC_ENDPOINTS.agentImport.discard>;
+  readSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.readSkill>;
+  saveSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.saveSkill>;
+}
+
 export interface OpenBotDesktopApi {
   getAppInfo: Invoke<typeof IPC_ENDPOINTS.app.getAppInfo>;
   getSetupState: Invoke<typeof IPC_ENDPOINTS.app.getSetupState>;
@@ -434,6 +446,7 @@ export interface OpenBotDesktopApi {
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
   storage: StorageDesktopApi;
+  agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   auth: CentralAuthDesktopApi;

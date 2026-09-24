@@ -82,10 +82,18 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     drawerProgress.set(0);
   }, [drawerProgress, session]);
 
+  // Rows attach their swipe to this gesture, so it must stay the same object. A new gesture on each
+  // navigation or drawer change would rebuild the swipe of every row.
+  const openingEnabled = useSharedValue(false);
+  useEffect(() => {
+    openingEnabled.set(!drawerOpen && pathname === "/connected");
+  }, [drawerOpen, openingEnabled, pathname]);
   const openingGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!drawerOpen && pathname === "/connected")
+        .onTouchesDown((_event, manager) => {
+          if (!openingEnabled.get()) manager.fail();
+        })
         .activeOffsetX(12)
         .failOffsetX(-10)
         .failOffsetY([-10, 10])
@@ -106,7 +114,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
             ),
           );
         }),
-    [commitDrawerState, drawerOpen, drawerProgress, drawerWidth, pathname],
+    [commitDrawerState, drawerProgress, drawerWidth, openingEnabled],
   );
 
   const closingGesture = useMemo(

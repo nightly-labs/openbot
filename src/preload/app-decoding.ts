@@ -231,6 +231,12 @@ export function decodePendingListing(value: unknown): string | null {
   return typeof value === "string" && isPluginSlug(value) ? value : null;
 }
 
+/** The export skill's text, shown for the user to copy. It is Markdown, never markup. */
+export function decodeAgentImportSkill(value: unknown): string {
+  if (!isString(value) || !value) throw new Error("Invalid export skill response.");
+  return value;
+}
+
 export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
 
 export function decodeHostedSite(value: unknown): HostedSiteSummary {

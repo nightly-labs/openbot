@@ -52,6 +52,7 @@ import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
+import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
@@ -246,6 +247,7 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
   marketplaceAgents: AgentMarketplaceService;
+  agentImport: AgentImportService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
   cuaDriver: CuaDriverRuntime;
@@ -933,6 +935,15 @@ export async function createApplicationServices({
       return Promise.resolve(iceServers);
     },
   });
+  // Imported channels are created by the local user, as when they create one by hand.
+  const agentImport = new AgentImportService(
+    service,
+    {
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    () => host.channelActor(),
+  );
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => host.shutdown());
   const signedInState = centralAuth.getState();
   if (signedInState.status === "signed_in") {
@@ -1189,6 +1200,7 @@ export async function createApplicationServices({
     hostedSites,
     customProviders,
     marketplaceAgents,
+    agentImport,
     voice,
     dynamicIsland,
     cuaDriver,

@@ -86,6 +86,7 @@ import {
   SIDEBAR_PEOPLE_SECTION_ID,
   SIDEBAR_UNASSIGNED_SECTION_ID,
 } from "@openbot/contracts/ipc";
+import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
 import {
@@ -2178,6 +2179,53 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     storage: createMockStorage(),
+    agentImport: {
+      choose: async () => clone(AGENT_IMPORT_PREVIEW),
+      apply: async ({ token, keys, channelKeys }) => {
+        if (token !== AGENT_IMPORT_PREVIEW.token) throw new Error("The export is no longer open. Choose it again.");
+        const selected = AGENT_IMPORT_PREVIEW.agents.filter((agent) => keys.includes(agent.key));
+        const imported = selected.map((agent) =>
+          createAgentSummary({ name: agent.name, title: agent.title, description: agent.description }),
+        );
+        agents = [...agents, ...imported];
+        emitAgentEvent({ type: "agents-changed", agents });
+        // Channels follow the main process: the members that imported, and at least one of them.
+        const agentIds = new Map(selected.map((agent, index) => [agent.key, imported[index]?.id ?? ""]));
+        const channels = [];
+        const skippedChannels = [];
+        for (const source of AGENT_IMPORT_PREVIEW.channels.filter((channel) => channelKeys.includes(channel.key))) {
+          const members = source.memberKeys.flatMap((key) => {
+            const agentId = agentIds.get(key);
+            return agentId ? [{ agentId }] : [];
+          });
+          if (members.length === 0) {
+            skippedChannels.push({
+              key: source.key,
+              name: source.name,
+              reason: "None of its agents were imported.",
+            });
+            continue;
+          }
+          const channel = await api.agent.channelCommand({
+            type: "save",
+            operationId: crypto.randomUUID(),
+            channelId: crypto.randomUUID(),
+            draft: {
+              name: source.name,
+              title: source.title,
+              instructions: "",
+              members,
+              leadAgentId: source.leadKey ? (agentIds.get(source.leadKey) ?? null) : null,
+            },
+          });
+          channels.push({ id: channel.id, name: channel.name });
+        }
+        return clone({ agents: imported, skipped: [], channels, skippedChannels, warnings: [] });
+      },
+      discard: async () => undefined,
+      readSkill: async () => AGENT_IMPORT_SKILL,
+      saveSkill: async () => ({ saved: true }),
+    },
     remoteDesktop: {
       checkSetup: async () => ({
         platform: "darwin",

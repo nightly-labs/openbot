@@ -19,6 +19,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
+import type { AgentImportPreview, AgentImportResult, ApplyAgentImportInput } from "./ipc-agent-import";
 import type {
   AgentMemory,
   CreateAgentMemoryInput,
@@ -640,6 +641,16 @@ export const IPC_ENDPOINTS = {
     clear: request<AgentIpcRequest<ClearStorageInput>, void>()("storage:clear"),
     openFile: request<AgentIpcRequest<OpenStoredFileInput>, void>()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
+  },
+  // Bound against the agent import service, which holds the staged archives.
+  agentImport: {
+    choose: request<undefined, AgentImportPreview | null>()("agent-import:choose"),
+    apply: request<ApplyAgentImportInput, AgentImportResult>()("agent-import:apply"),
+    discard: request<string, void>()("agent-import:discard"),
+    // The export skill for a user who sets up the export agent in Grok Bot by hand. Main reads it
+    // from the app's resources, and `saveSkill` asks where to write it.
+    readSkill: request<undefined, string>()("agent-import:read-skill"),
+    saveSkill: request<undefined, ExportResult>()("agent-import:save-skill"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

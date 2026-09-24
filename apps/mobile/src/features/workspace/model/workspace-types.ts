@@ -8,7 +8,6 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
-  BrowserTakeoverRequest,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
@@ -28,8 +27,8 @@ import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-ed
 import type { RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { MobileChannelStore } from "@/features/channels/model/channel-store";
-import type { MobileAgentActivities } from "./agent-activity";
 import type { MobileConversationStore } from "./conversation-store";
+import type { LiveWorkspaceStore } from "./live-workspace-store";
 
 export type MobileServerKind = "local" | "remote";
 export type MobileServerState = "unknown" | "connecting" | "online" | "offline" | "error";
@@ -77,7 +76,6 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },
   ) => Promise<void>;
-  browserRequests: Record<string, BrowserTakeoverRequest[]>;
   respondToBrowserSecret: (serverId: string, input: RespondToBrowserSecretInput) => Promise<void>;
   sidebarByServer: Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>;
   mutateSidebarLayout: (serverId: string, action: SidebarLayoutAction) => Promise<void>;
@@ -108,9 +106,9 @@ export interface MobileWorkspaceContextValue {
   hideChannel: (channelId: string, serverId: string) => boolean;
   unhideChannel: (channelId: string, serverId: string) => boolean;
   toggleChannelPin: (channelId: string, serverId: string) => ToggleAgentPinResult;
-  unreadAgentIds: string[];
   conversationStore: MobileConversationStore;
-  activityByServer: Record<string, MobileAgentActivities>;
+  /** Activity, unread agents, and browser requests. Read them with a selector hook, not from the context. */
+  liveState: LiveWorkspaceStore;
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
