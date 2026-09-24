@@ -36,6 +36,7 @@ async function createHostService(
       | "revokeRemoteInvite"
       | "remoteControlPlaneUrl"
       | "sendTeamInviteEmail"
+      | "allowLocalDevelopmentInvites"
     >
   > = {},
   /** Supplied only by the screen recording cases, which need a runtime to hold an answer. */
@@ -235,7 +236,10 @@ describe("HostService account binding", () => {
     const loading = new Promise<RemoteInvites>((resolve) => {
       deliver = resolve;
     });
-    const { service, signIn } = await createHostService({ listRemoteInvites: () => loading });
+    const { service, signIn } = await createHostService({
+      remoteControlPlaneUrl: "https://api.openbot.run",
+      listRemoteInvites: () => loading,
+    });
     await signIn(second);
     await service.configure({ serverName: "Studio Air" });
     await signIn(first);
@@ -258,6 +262,30 @@ describe("HostService account binding", () => {
 
     // A's invitation, and the address it was sent to, must not reach B's renderer.
     await expect(pending).resolves.toEqual([]);
+  });
+
+  it("lists and revokes a local development host's invitations in its own team file", async () => {
+    const remoteCalls: string[] = [];
+    const { service, signIn, store } = await createHostService({
+      allowLocalDevelopmentInvites: true,
+      remoteControlPlaneUrl: "http://127.0.0.1:8787",
+      listRemoteInvites: async () => {
+        remoteCalls.push("list");
+        return [];
+      },
+      revokeRemoteInvite: async () => {
+        remoteCalls.push("revoke");
+      },
+    });
+    await signIn(first);
+    await service.configure({ serverName: "Studio Mac" });
+    const invite = await store.createInvite("member", "guest@example.com", { permanent: false });
+
+    expect(await service.listInvites()).toEqual([expect.objectContaining({ id: invite.id })]);
+    await service.revokeInvite(invite.id);
+
+    expect(await service.listInvites()).toEqual([]);
+    expect(remoteCalls).toEqual([]);
   });
 
   it("does not push a server update to the remote directory once the account has changed", async () => {

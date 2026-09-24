@@ -797,7 +797,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   listInvites(): TeamInviteSummary[] | Promise<TeamInviteSummary[]> {
     const hostId = this.#options.store.getIdentity()?.serverId;
-    if (hostId && this.#options.listRemoteInvites) {
+    if (hostId && this.#remoteInviteApiUrl() && this.#options.listRemoteInvites) {
       return this.#options.listRemoteInvites(hostId).then((invites) => {
         // As in `listMembers`: a switch while the directory loaded makes these the previous
         // account's invitations, their email addresses included. Answer with the now-active
@@ -901,26 +901,33 @@ export class HostService extends EventEmitter<HostEvents> {
     await Promise.all([this.#options.endRemoteSession?.(sessionId), this.#webrtcGateway?.revokeSession(sessionId)]);
   }
 
+  /**
+   * Where invitations live: the account directory, or `null` for this machine's own team file. A
+   * local development host keeps them in its file, so listing and revoking read where creating wrote.
+   */
+  #remoteInviteApiUrl(): string | null {
+    if (this.#options.allowLocalDevelopmentInvites) return null;
+    return this.#options.remoteControlPlaneUrl || null;
+  }
+
   revokeInvite(inviteId: string): Promise<void> {
-    if (this.#options.revokeRemoteInvite) return this.#options.revokeRemoteInvite(inviteId);
+    if (this.#remoteInviteApiUrl() && this.#options.revokeRemoteInvite)
+      return this.#options.revokeRemoteInvite(inviteId);
     return this.#options.store.revokeInvite(inviteId);
   }
 
   async createInvite(input: CreateTeamInviteInput): Promise<InviteSummary> {
     const identity = this.#options.store.getIdentity();
     if (!identity) throw new Error("Name this OpenBot before publishing it.");
-    if (
-      !this.#options.allowLocalDevelopmentInvites &&
-      this.#options.createRemoteInvite &&
-      this.#options.remoteControlPlaneUrl
-    ) {
+    const remoteInviteApiUrl = this.#remoteInviteApiUrl();
+    if (remoteInviteApiUrl && this.#options.createRemoteInvite) {
       const invite = await this.#options.createRemoteInvite(identity.serverId, input);
       // The invitation belongs to the account that asked for it, so it stays on that host
       // and shows up in its invite list. What must not happen is emailing it under the new
       // account's authorization, or handing it back to the renderer the new account sees.
       this.#assertStillActiveHost(identity.serverId);
       const inviteUrl = createInviteUrl({
-        apiUrl: this.#options.remoteControlPlaneUrl,
+        apiUrl: remoteInviteApiUrl,
         serverId: identity.serverId,
         fingerprint: identity.fingerprint,
         token: invite.token,
