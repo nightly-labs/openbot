@@ -24,4 +24,10 @@ describe("fileResponse", () => {
 
     await expect(fileResponse(join(directory, "missing.png"), {})).rejects.toThrow(/ENOENT/);
   });
+
+  it("rejects a directory instead of a body that fails after the headers", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "openbot-file-response-"));
+
+    await expect(fileResponse(directory, {})).rejects.toThrow("Not a regular file.");
+  });
 });

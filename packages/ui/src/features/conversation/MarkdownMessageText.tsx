@@ -109,19 +109,26 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   // retain up to 200 obsolete token trees and evict completed messages, so
   // only a settled body enters the shared cache.
   const tokens = createMemo(() => lexBlockTokens(props.body, props.streaming !== true));
-  const contentProps = (): MarkdownContentProps => ({
-    imagesAsLinks: props.imagesAsLinks,
-    agents: props.agents,
-    skills: props.skills,
-    attachments: props.attachments,
-    citations: props.citations,
-    onSelectAgent: props.onSelectAgent,
-    onOpenLink: props.onOpenLink,
-    onOpenAttachment: props.onOpenAttachment,
-    onOpenSharedFile: props.onOpenSharedFile,
-    onOpenWorkspaceFile: props.onOpenWorkspaceFile,
-    fileDirectory: messageFileDirectory(props.body),
+  // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
+  // `content` object and run their reads again. Only a new directory changes it.
+  const fileDirectory = createMemo(() => messageFileDirectory(props.body), {
+    equals: (previous, next) => previous?.path === next?.path && previous?.kind === next?.kind,
   });
+  const contentProps = createMemo(
+    (): MarkdownContentProps => ({
+      imagesAsLinks: props.imagesAsLinks,
+      agents: props.agents,
+      skills: props.skills,
+      attachments: props.attachments,
+      citations: props.citations,
+      onSelectAgent: props.onSelectAgent,
+      onOpenLink: props.onOpenLink,
+      onOpenAttachment: props.onOpenAttachment,
+      onOpenSharedFile: props.onOpenSharedFile,
+      onOpenWorkspaceFile: props.onOpenWorkspaceFile,
+      fileDirectory: fileDirectory(),
+    }),
+  );
 
   return (
     <>

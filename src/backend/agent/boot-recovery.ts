@@ -95,7 +95,13 @@ export class BootRecovery {
   }
 
   async reconcileUnresolvedDeliveries(): Promise<void> {
-    for (const context of this.#mailbox.unresolvedDeliveries()) {
+    const unresolved = this.#mailbox.unresolvedDeliveries();
+    // A delivery settled by another path never becomes unresolved again, so its mark goes too.
+    const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
+    for (const id of this.#orphanedDeliveryIds) {
+      if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
+    }
+    for (const context of unresolved) {
       const { delivery } = context;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
       let terminal: "completed" | "failed" | "interrupted" = "interrupted";

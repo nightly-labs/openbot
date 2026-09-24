@@ -785,6 +785,29 @@ describe("OpenCode ACP session loading", () => {
     expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: threadIds[0], cwd: fake.directory }]);
   });
 
+  it("counts a session loaded only for a read toward the idle limit", async () => {
+    const fake = await createFakeOpencodeAgent();
+    const closeLog = join(fake.directory, "closed-sessions.ndjson");
+    vi.stubEnv("OPENBOT_FAKE_ACP_CLOSE_LOG", closeLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const threadIds = Array.from({ length: ACP_IDLE_SESSION_LIMIT + 1 }, (_, index) => `ses_stored_${index}`);
+    const closedSessions = async () =>
+      (await readFile(closeLog, "utf8").catch(() => ""))
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line).sessionId)
+        .filter((sessionId) => threadIds.includes(sessionId));
+
+    // What boot recovery does after a restart: it reads every stored session, and each read loads one.
+    for (const threadId of threadIds) {
+      await client.request("thread/read", { threadId, cwd: fake.directory, includeTurns: true }, decodeThreadResponse);
+    }
+
+    // Each open session holds its own set of the user's MCP servers until the agent closes it.
+    await vi.waitFor(async () => expect(await closedSessions()).toEqual([threadIds[0]]));
+  });
+
   it("reports a session an agent cannot load as missing instead of asking for it", async () => {
     const fake = await createFakeOpencodeAgent();
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);

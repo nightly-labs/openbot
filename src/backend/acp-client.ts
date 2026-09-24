@@ -127,8 +127,9 @@ interface AcpThread {
   workspaceRoots: string[];
   idleRelease: ReturnType<typeof setTimeout> | null;
   /**
-   * When the session last finished a turn, so the longest idle session is the first to close. `0`
-   * for a session that is open for a turn that has not started yet: only the timeout closes it.
+   * When the session last finished a turn or was loaded only for a read, so the longest idle session
+   * is the first to close. `0` for a session that is open for a turn that has not started yet: only
+   * the timeout closes it.
    */
   idleSince: number;
 }
@@ -634,6 +635,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const held = this.#threads.get(id);
     if (held) return held;
     if (!getString(params, "cwd")) return null;
+    // A resume that is already loading this session opens it for a turn, not for this read.
+    const resuming = this.#startingThreads.has(id);
     try {
       await this.#ensureInitialized();
       if (!this.#loadsSessions) return null;
@@ -642,7 +645,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.emit("diagnostic", redactText(`ACP session load for a read failed: ${String(error)}`));
       return null;
     }
-    return this.#threads.get(id) ?? null;
+    const thread = this.#threads.get(id) ?? null;
+    // Boot recovery reads every stored session, and each loaded session holds its own set of the
+    // user's MCP servers. A session loaded only for a read is idle from the start, so the idle limit
+    // counts it and keeps only the most recent ones warm for a first turn.
+    if (thread && !resuming && thread.idleSince === 0 && !thread.activeTurn) {
+      thread.idleSince = Date.now();
+      this.#releaseIdleThreadsOverLimit();
+    }
+    return thread;
   }
 
   /** Whether the agent answers `session/load`, which it advertises in its initialization. */
