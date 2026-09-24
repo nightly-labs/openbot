@@ -70,6 +70,19 @@ describe("listSiblingOpenBotInstances", () => {
     expect(siblings).toEqual([{ pid: 202, uid: 502 }]);
   });
 
+  it("rejects a failed scan instead of reporting no siblings", async () => {
+    await expect(
+      listSiblingOpenBotInstances({
+        executablePath: EXECUTABLE,
+        currentPid: 101,
+        platform: "darwin",
+        listProcesses: async () => {
+          throw new Error("scan failed");
+        },
+      }),
+    ).rejects.toThrow("scan failed");
+  });
+
   it("does not scan where ps is unavailable", async () => {
     const listProcesses = vi.fn(async () => PS_OUTPUT);
     const siblings = await listSiblingOpenBotInstances({

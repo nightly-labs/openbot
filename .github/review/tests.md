@@ -28,11 +28,9 @@ Report a finding when the diff:
   observe the mocks. *Exception:* `electron`, `electron-updater`, and `node:` built-ins have no
   injectable seam and are exempt by policy.
 - Adds a new test *file* for a boundary an existing file already covers, or tests the same behaviour
-  at both the component and the application level. `AGENTS.md` requires the lowest stable boundary,
-  once.
+  at both the component and the application level. `AGENTS.md` asks for one test, preferably E2E.
 
-Do not report a missing test unless you can name the concrete regression it would catch, and do not
-ask for coverage of a mandatory boundary that the diff already covers elsewhere. A thin test at one
-of the seams `AGENTS.md` makes mandatory — the renderer-to-main trust boundary, the IPC contract,
-schema and migrations, persisted state, secrets, the provider process boundary, the Team API wire
-protocol, the updater — is not a finding for being thin.
+Do not report a missing test unless you can name the concrete regression it would catch, and that
+regression can lose user data, break a released protocol, weaken the trust boundary, or leak a
+secret. `AGENTS.md` does not ask for a regression test by default. A thin test at one of those
+seams is not a finding for being thin.

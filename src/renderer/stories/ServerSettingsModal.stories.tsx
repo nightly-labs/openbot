@@ -9,17 +9,6 @@ import { createMockOpenBot } from "./mock-openbot";
 const localServer = STORY_SERVERS.find((server) => server.kind === "local") ?? STORY_SERVERS[0];
 const remoteServer = STORY_SERVERS.find((server) => server.kind === "remote") ?? STORY_SERVERS[1];
 if (!remoteServer) throw new Error("Story server fixtures need a remote server.");
-const denseMembers = Array.from({ length: 4 }, (_, group) =>
-  STORY_PRESENCE.members.map((member, index) => ({
-    ...member,
-    id: `${member.id}-${group}`,
-    name: group === 0 ? member.name : `${member.name} ${group + 1}`,
-    username: `${member.username}-${group}`,
-    email: `member-${group}-${index}@example.com`,
-    role: group === 0 ? member.role : "member",
-    online: (group + index) % 3 === 0,
-  })),
-).flat();
 
 const meta = {
   title: "Settings/ServerSettingsModal",
@@ -158,29 +147,6 @@ export const RemoteAdministrator: Story = {
   },
 };
 
-export const Members: Story = {};
-
-export const MembersUnpublished: Story = {
-  args: {
-    server: { ...remoteServer, state: "offline", role: "admin" },
-    hostStatus: null,
-  },
-};
-
-export const MembersSmallViewport: Story = {
-  parameters: {
-    viewport: { defaultViewport: "serverNarrow" },
-  },
-};
-
-export const DenseMemberList: Story = {
-  args: {
-    server: { ...remoteServer, role: "admin" },
-    hostStatus: null,
-    members: denseMembers,
-  },
-};
-
 export const RemoteMember: Story = {
   args: {
     server: { ...remoteServer, role: "member" },
@@ -189,26 +155,9 @@ export const RemoteMember: Story = {
   },
 };
 
-export const HostScreenRecordingBlocked: Story = {
-  args: { hostStatus: { ...STORY_HOST_STATUS, remoteDesktopScreenRecordingDenied: true } },
-};
-
-export const HostPermissionsReady: Story = {
-  render: (args) => <RemoteSetupStory settings={args} permission="allowed" />,
-};
-
-export const HostPermissionCheckFailed: Story = {
-  render: (args) => <RemoteSetupStory settings={args} permission="failed" />,
-};
-
-function RemoteSetupStory(props: { settings: ServerSettingsModalProps; permission?: "allowed" | "failed" }) {
+function RemoteSetupStory(props: { settings: ServerSettingsModalProps }) {
   const previous = window.openbot;
   const mock = createMockOpenBot({ hostStatus: props.settings.hostStatus ?? undefined });
-  const check = mock.api.remoteDesktop.checkSetup;
-  mock.api.remoteDesktop.checkSetup = async (serverId) => ({
-    ...(await check(serverId)),
-    ...(props.permission ? { screenRecording: props.permission, accessibility: props.permission } : {}),
-  });
   window.openbot = mock.api;
   onSettled(() => () => {
     mock.dispose();

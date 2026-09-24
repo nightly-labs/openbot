@@ -34,28 +34,6 @@ const storyUpdateStatus: UpdateStatus = {
   message: null,
   errorCode: null,
 };
-const availableUpdateStatus: UpdateStatus = {
-  ...storyUpdateStatus,
-  phase: "available",
-  availableVersion: "0.3.0",
-};
-const readyUpdateStatus: UpdateStatus = {
-  ...availableUpdateStatus,
-  phase: "ready",
-  progress: 100,
-};
-/** A managed Mac: Host Manager owns the shared application, so the tenant only watches. */
-const hostManagedUpdateStatus: UpdateStatus = {
-  ...storyUpdateStatus,
-  phase: "up-to-date",
-  managedByHost: true,
-};
-const hostManagedDownloadStatus: UpdateStatus = {
-  ...hostManagedUpdateStatus,
-  phase: "downloading",
-  availableVersion: "0.3.0",
-  progress: 42,
-};
 const providerAgentStatus: AgentStatus = {
   phase: "blocked",
   cliVersion: null,
@@ -131,15 +109,11 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
 
 function SettingsModalStory(props: {
   initialOpen: boolean;
-  initialUpdateStatus?: UpdateStatus;
-  mockDownloadUpdate?: boolean;
   providerDownloads?: boolean;
   providerUpdate?: boolean;
   providerUpdateFailure?: boolean;
-  simulateMobileConnection?: boolean;
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
-  customProviderSaveFails?: boolean;
   codeSignIn?: boolean;
 }) {
   const previousApi = window.openbot;
@@ -162,7 +136,7 @@ function SettingsModalStory(props: {
   });
   const [open, setOpen] = createSignal(props.initialOpen);
   const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
-  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(props.initialUpdateStatus ?? storyUpdateStatus);
+  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyUpdateStatus);
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
   const [mobileDevices, setMobileDevices] = createSignal<MobileConnectedDevice[]>([
     {
@@ -173,19 +147,12 @@ function SettingsModalStory(props: {
       lastActiveAt: Date.now() - 45_000,
     },
   ]);
-  let mobileConnectionTimer: number | undefined;
-
-  onCleanup(() => {
-    if (mobileConnectionTimer !== undefined) window.clearTimeout(mobileConnectionTimer);
-  });
-
   const codeLogin = createFakeCodeLogin({ finishAfterMs: 0 });
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
     props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
   );
 
   async function addCustomProvider(): Promise<CustomProviderRestart> {
-    if (props.customProviderSaveFails) throw new Error("House Router refused the API key.");
     return "restarted";
   }
 
@@ -206,34 +173,10 @@ function SettingsModalStory(props: {
   }
 
   async function runUpdateAction(): Promise<void> {
-    if (!props.mockDownloadUpdate || updateStatus().phase !== "available") {
-      setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
-      return;
-    }
-
-    const downloadingStatus = { ...updateStatus(), phase: "downloading", progress: 0 } as const;
-    setUpdateStatus(downloadingStatus);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setUpdateStatus({ ...downloadingStatus, progress: 48 });
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setUpdateStatus({ ...downloadingStatus, phase: "ready", progress: 100 });
+    setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
   }
 
   async function createMobileConnect(): Promise<{ qrData: string; expiresAt: number }> {
-    if (props.simulateMobileConnection) {
-      mobileConnectionTimer = window.setTimeout(() => {
-        setMobileDevices((current) => [
-          ...current,
-          {
-            sessionId: "22222222-2222-4222-8222-222222222222",
-            name: "OpenBot iPhone",
-            platform: "ios",
-            connectedAt: Date.now(),
-            lastActiveAt: Date.now(),
-          },
-        ]);
-      }, 500);
-    }
     return {
       qrData:
         "openbot://mobile-connect?api=https%3A%2F%2Fapi.openbot.run&ticket=storybook-mobile-ticket_1234567890abcdef",
@@ -369,11 +312,6 @@ export const CustomProviderList: Story = {
   render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderList />,
 };
 
-/** The endpoint is refused, so the form stays with the values, including the key the user typed. */
-export const CustomProviderSaveFails: Story = {
-  render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderSaveFails />,
-};
-
 /**
  * The ChatGPT row signed out. The sign-in finished on another device sits in the row's actions
  * menu, so the row still leads with one button.
@@ -399,30 +337,6 @@ export const ProviderUpdateAvailable: Story = {
 
 export const ProviderUpdateRetry: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure />,
-};
-
-export const MobileConnectSuccess: Story = {
-  render: () => <SettingsModalStory initialOpen simulateMobileConnection />,
-};
-
-export const UpdateAvailable: Story = {
-  render: () => <SettingsModalStory initialOpen initialUpdateStatus={availableUpdateStatus} />,
-};
-
-export const DownloadUpdateFlow: Story = {
-  render: () => <SettingsModalStory initialOpen initialUpdateStatus={availableUpdateStatus} mockDownloadUpdate />,
-};
-
-export const ReadyToInstall: Story = {
-  render: () => <SettingsModalStory initialOpen initialUpdateStatus={readyUpdateStatus} />,
-};
-
-export const HostManagedUpdates: Story = {
-  render: () => <SettingsModalStory initialOpen initialUpdateStatus={hostManagedUpdateStatus} />,
-};
-
-export const HostManagedUpdateInProgress: Story = {
-  render: () => <SettingsModalStory initialOpen initialUpdateStatus={hostManagedDownloadStatus} />,
 };
 
 export const Interactive: Story = {

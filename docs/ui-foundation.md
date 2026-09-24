@@ -19,7 +19,7 @@ Features — the `src/renderer/src/features/<domain>/` directories — import pr
 
 Colours must come from the semantic `--openbot-*` variables. Text sizes, radii and animation durations use tokens. Hover applies only inside `@media (hover: hover) and (pointer: fine)`, pressable controls use `scale(0.97)`, and animations stay below 300 ms and respect `prefers-reduced-motion`.
 
-`bun run check:ui` blocks native buttons and switches, hand-rolled dialogs/menus/tabs/listboxes, direct Kobalte/Lucide imports outside the UI layer, and colour literals along with untokenized text sizes, radii and transition durations. The check covers every renderer stylesheet as well as inline declarations in TSX; the only place a colour literal is allowed is the shared palette `packages/brand/src/tokens.css`. It also checks that the complex namespaces have not gone back to direct Kobalte aliases. Every migration budget is zero, except the `data-testid` budget, which stays at the five hooks already in the tree.
+`bun run check:ui` blocks native buttons and switches, hand-rolled dialogs/menus/tabs/listboxes, direct Kobalte/Lucide imports outside the UI layer, and colour literals along with untokenized text sizes, radii and transition durations. The check covers every renderer stylesheet as well as inline declarations in TSX; the only place a colour literal is allowed is the shared palette `packages/brand/src/tokens.css`. It also checks that the complex namespaces have not gone back to direct Kobalte aliases. Every migration budget is zero, including the `data-testid` budget.
 
 ## Verification
 

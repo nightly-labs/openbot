@@ -724,6 +724,26 @@ describe("agent tab cleanup", () => {
     return result.contentItems.map((item) => ("text" in item ? item.text : "")).join("");
   }
 
+  it("closes a tab the calling agent owns and frees its capacity", async () => {
+    const tab = await host.open("https://example.com/one", "thread-a", "agent-a");
+
+    const result = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }));
+
+    expect(result.success).toBe(true);
+    expect(resultText(result)).toContain('"closed":true');
+    expect(host.listTabs()).toEqual([]);
+  });
+
+  it("refuses to close a tab owned by a different agent", async () => {
+    const tab = await host.open("https://example.com/one", "thread-a", "agent-a");
+
+    const result = await host.handleDynamicTool(toolCall("close_tab", { tabId: tab.id }, "agent-b", "thread-b"));
+
+    expect(result.success).toBe(false);
+    expect(resultText(result)).toContain("Unknown browser tab");
+    expect(host.listTabs()).toEqual([expect.objectContaining({ id: tab.id })]);
+  });
+
   it("leaves a concurrent agent's tabs open when one agent closes its own", async () => {
     const mine = await host.open("https://example.com/mine", "thread-a", "agent-a");
     const theirs = await host.open("https://example.com/theirs", "thread-b", "agent-b");
