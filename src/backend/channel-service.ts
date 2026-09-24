@@ -629,7 +629,7 @@ export class ChannelService {
               .find((item) => item.id === decision.taskId && item.id !== task?.id && !terminal(item));
             if (!existing?.ownerAgentId) throw new ChannelRoutingError("Choose a member for this request.");
             this.requireMember(channel, existing.ownerAgentId);
-            const source = this.store.messages(channelId).find((item) => item.id === task?.requestMessageId);
+            const source = task ? this.store.message(channelId, task.requestMessageId) : null;
             const affected = descendants(this.store.tasks(channelId), existing.id);
             this.store.update(channel, {
               tasks: [
@@ -756,7 +756,7 @@ export class ChannelService {
       // now only serves a task an earlier version queued with its drafts still open: it turns
       // those drafts into attachments and rewrites the stored request. Every other dispatch -
       // a resume, or a hand-off to another task - re-sends the committed copies instead.
-      const request = this.store.messages(channelId).find((message) => message.id === task.requestMessageId);
+      const request = this.store.message(channelId, task.requestMessageId);
       const ownsRequest = request?.taskId === task.id;
       const committing = ownsRequest && task.attachmentDraftIds.length > 0;
       try {
@@ -1216,11 +1216,7 @@ export class ChannelService {
     const operationId = `tool:${turnId}:${callId}`;
     if (this.store.database.commandResult(`channels:${operationId}`) !== undefined) return { accepted: true };
     if (tool === "channel_result") {
-      if (
-        this.store
-          .messages(channelId)
-          .some((item) => item.id === `channel-result-${assignment.id}-revision-${assignment.taskRevision}`)
-      )
+      if (this.store.message(channelId, `channel-result-${assignment.id}-revision-${assignment.taskRevision}`))
         return { accepted: true };
       if (!isString(args.text) || !args.text.trim() || args.text.length > 100_000)
         throw new Error("Provide a task result.");
@@ -1270,7 +1266,7 @@ export class ChannelService {
     this.requireMember(channel, args.recipientAgentId);
     if (args.recipientAgentId === agentId) throw new Error("Choose another channel member.");
     const sourceMessageIds = args.sourceMessageIds;
-    if (sourceMessageIds.some((id) => !this.store.messages(channelId).some((message) => message.id === id)))
+    if (sourceMessageIds.some((id) => !this.store.message(channelId, id)))
       throw new Error("A source message is unavailable.");
     const root = tasks.find((item) => item.id === task.rootTaskId);
     if (!root) throw new Error("The root task is unavailable.");

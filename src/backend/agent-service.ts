@@ -664,6 +664,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       providers: this.#providers,
       endpoints: this.#endpoints,
       drain: this.#drain,
+      routines: this.#routines,
       hooks: {
         channelAssignment: (deliveryId) => this.channels.store.assignmentForDelivery(deliveryId),
       },

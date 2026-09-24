@@ -181,6 +181,19 @@ export class ChannelStore {
     });
   }
 
+  /** One message by id, read through the primary key rather than the whole history. */
+  message(channelId: string, messageId: string): ChannelMessage | null {
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND message_id = ?")
+        .get(channelId, messageId),
+    );
+    if (!row) return null;
+    const value = JSON.parse(requiredStringColumn(row, "message_json"));
+    if (!isChannelMessage(value)) throw new Error("Invalid stored channel message.");
+    return value;
+  }
+
   tasks(channelId: string): ChannelTask[] {
     return databaseRows(
       this.database.connection

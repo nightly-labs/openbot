@@ -19,7 +19,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
-import { stopRemoteProcess } from "./remote-diagnostics";
+import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
 /** The address OpenBot listens on itself, between the agents' proxies and the daemon. */
@@ -622,7 +622,7 @@ export class CuaDriverRuntime {
 
   #pipeDiagnostics(child: ChildProcess): void {
     for (const stream of [child.stdout, child.stderr]) {
-      stream?.on("data", (chunk: Buffer) => this.#options.onDiagnostic?.(chunk.toString("utf8")));
+      forwardDiagnosticLines(stream, (text) => this.#options.onDiagnostic?.(text));
     }
   }
 

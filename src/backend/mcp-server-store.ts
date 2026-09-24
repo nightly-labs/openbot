@@ -131,7 +131,8 @@ export class McpServerStore {
       db.exec("COMMIT");
       return stored;
     } catch (error) {
-      db.exec("ROLLBACK");
+      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
+      if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }
@@ -190,7 +191,8 @@ export class McpServerStore {
       db.exec("COMMIT");
       return converted;
     } catch (error) {
-      db.exec("ROLLBACK");
+      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
+      if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }

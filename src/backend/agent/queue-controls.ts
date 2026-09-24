@@ -11,10 +11,11 @@ import type { MailboxStore } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
-import { agentNamesById, deliveryInput } from "./delivery-content";
+import { agentNamesById, deliveryPromptInput } from "./delivery-content";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import type { RoutineScheduler } from "./routine-scheduler";
 import { providerForAgent } from "./thread-items";
 
 export interface QueueControlsHooks {
@@ -30,6 +31,7 @@ export interface QueueControlsOptions {
   providers: ProviderRuntime;
   endpoints: CustomEndpoints;
   drain: DrainScheduler;
+  routines: RoutineScheduler;
   hooks: QueueControlsHooks;
 }
 
@@ -47,6 +49,7 @@ export class QueueControls {
   readonly #providers: ProviderRuntime;
   readonly #endpoints: CustomEndpoints;
   readonly #drain: DrainScheduler;
+  readonly #routines: RoutineScheduler;
   readonly #hooks: QueueControlsHooks;
 
   constructor(options: QueueControlsOptions) {
@@ -57,6 +60,7 @@ export class QueueControls {
     this.#providers = options.providers;
     this.#endpoints = options.endpoints;
     this.#drain = options.drain;
+    this.#routines = options.routines;
     this.#hooks = options.hooks;
   }
 
@@ -190,7 +194,12 @@ export class QueueControls {
           threadId: session.externalSessionId,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
-          input: deliveryInput(context, agentNamesById(this.#store.list())),
+          input: deliveryPromptInput(context, {
+            agentNames: agentNamesById(this.#store.list()),
+            snapshot,
+            routineRun:
+              context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+          }),
         },
         decodeRecordResponse,
       );

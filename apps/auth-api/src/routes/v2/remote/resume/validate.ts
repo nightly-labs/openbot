@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { z } from "zod";
+import { JSON_BODY_LIMIT, readRequestBytes } from "../../../../server/json-body";
 import {
   apiError,
   json,
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/v2/remote/resume/validate")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = await request.text();
+          const body = new TextDecoder().decode(await readRequestBytes(request, JSON_BODY_LIMIT));
           if (!(await verifyRemoteServiceRequest(request, body))) {
             return apiError(401, "invalid_signature", "The Remote service signature is invalid.");
           }

@@ -15,7 +15,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
-import { stopRemoteProcess } from "./remote-diagnostics";
+import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
 export class SunshineApiError extends Error {
   constructor(readonly status: number) {
@@ -39,6 +39,7 @@ const SUNSHINE_PORT_FAMILY_SPAN = SUNSHINE_PORT_FAMILY_MAX_OFFSET - SUNSHINE_POR
 const SUNSHINE_BASE_PORT_STEP = SUNSHINE_PORT_FAMILY_SPAN + 5;
 const SUNSHINE_BASE_PORT_CEILING = 65_535 - SUNSHINE_PORT_FAMILY_MAX_OFFSET;
 const SUNSHINE_ALLOCATION_ATTEMPTS = 64;
+const READINESS_ATTEMPT_TIMEOUT_MS = 5_000;
 const SUNSHINE_START_ATTEMPTS = 3;
 const MOONLIGHT_WEBRTC_RANGE_SIZE = 32;
 const MOONLIGHT_WEBRTC_RANGE_START = 40_000;
@@ -873,10 +874,11 @@ export class SunshineMoonlightRuntime {
       // shared between them would join a line neither printed and miss the one that matters.
       const saidCaptureDenied = createScreenCaptureDenialWatcher();
       stream?.on("data", (chunk) => {
-        const message = chunk.toString("utf8");
-        if (source === "sunshine" && saidCaptureDenied(message)) this.#screenCaptureDenied = true;
-        this.#options.onDiagnostic?.(source, message.replaceAll(this.#moonlightHeader, "[REDACTED]"));
+        if (source === "sunshine" && saidCaptureDenied(chunk.toString("utf8"))) this.#screenCaptureDenied = true;
       });
+      forwardDiagnosticLines(stream, (text) =>
+        this.#options.onDiagnostic?.(source, text.replaceAll(this.#moonlightHeader, "[REDACTED]")),
+      );
     }
   }
 }
@@ -1030,6 +1032,9 @@ async function waitForHttps(
           response.resume();
           resolve();
         });
+        request.setTimeout(readinessAttemptTimeout(deadline), () =>
+          request.destroy(new Error("Sunshine did not answer.")),
+        );
         request.once("error", reject);
       });
       return;
@@ -1069,7 +1074,7 @@ async function waitForHttp(url: string, init: RequestInit, child?: { exitCode: n
       throw new Error(`Moonlight Web exited before ${url} became ready.`);
     }
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(readinessAttemptTimeout(deadline)) });
       if (response.ok) return;
     } catch {
       // Retry while the local service starts.
@@ -1077,6 +1082,14 @@ async function waitForHttp(url: string, init: RequestInit, child?: { exitCode: n
     await shortDelay();
   }
   throw new Error("Moonlight Web did not become ready.");
+}
+
+/**
+ * One readiness request's limit. A service that accepts the connection and never answers would
+ * otherwise hold the wait past its deadline, and the loop would not see the process exit meanwhile.
+ */
+function readinessAttemptTimeout(deadline: number): number {
+  return Math.max(1, Math.min(READINESS_ATTEMPT_TIMEOUT_MS, deadline - Date.now()));
 }
 
 function shortDelay(): Promise<void> {
