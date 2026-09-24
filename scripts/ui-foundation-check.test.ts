@@ -163,41 +163,65 @@ it("checks primitive adapters when the shared UI is outside the renderer", () =>
   expect(clean.failures).toEqual([]);
 });
 
-it("rejects desktop preload access in shared UI while allowing browser APIs and documentation", () => {
-  const workspace = mkdtempSync(resolve(tmpdir(), "ui-boundary-"));
+interface PluginDiagnostic {
+  category: string;
+  severity: string;
+  message: string;
+  location?: { start?: { line?: number } };
+}
+
+/** Runs one GritQL plugin on one fixture file and returns only the plugin's diagnostics. */
+function pluginDiagnostics(plugin: string, fixture: string, extension: string): PluginDiagnostic[] {
+  const workspace = mkdtempSync(resolve(tmpdir(), "ui-plugin-"));
   try {
-    const plugin = resolve(import.meta.dirname, "../tools/ui-foundation/no-desktop-preload.grit");
     writeFileSync(
       resolve(workspace, "biome.json"),
       JSON.stringify({
-        plugins: [plugin],
+        plugins: [resolve(import.meta.dirname, "../tools/ui-foundation", plugin)],
         linter: { enabled: true, rules: { recommended: false } },
         formatter: { enabled: false },
         assist: { enabled: false },
       }),
     );
-    for (const [sourceRoot, file, expected] of [
-      [fixtureRenderer, "DesktopPreload.ts", 6],
-      [fixtureRenderer, "OptionalPreload.ts", 1],
-      [fixtureRenderer, "IndexedPreload.ts", 1],
-      [cleanRenderer, "BrowserGlobals.ts", 0],
-    ] as const) {
-      const target = resolve(workspace, "fixture.ts");
-      writeFileSync(target, readFileSync(resolve(sourceRoot, "components/ui", file)));
-      const result = spawnSync(
-        resolve(import.meta.dirname, "../node_modules/.bin/biome"),
-        ["check", target, `--config-path=${workspace}`, "--reporter=json"],
-        { encoding: "utf8" },
-      );
-      const report: { diagnostics: { category: string; severity: string; message: string }[] } = JSON.parse(
-        result.stdout,
-      );
-      const diagnostics = report.diagnostics.filter((item) => item.category === "plugin");
-      expect(diagnostics.filter((item) => item.message.includes("errored"))).toEqual([]);
-      expect(diagnostics).toHaveLength(expected);
-      if (expected) expect(diagnostics[0]?.severity).toBe("error");
-    }
+    const target = resolve(workspace, `fixture.${extension}`);
+    writeFileSync(target, readFileSync(fixture));
+    const result = spawnSync(
+      resolve(import.meta.dirname, "../node_modules/.bin/biome"),
+      ["check", target, `--config-path=${workspace}`, "--reporter=json"],
+      { encoding: "utf8" },
+    );
+    const report: { diagnostics: PluginDiagnostic[] } = JSON.parse(result.stdout);
+    const diagnostics = report.diagnostics.filter((item) => item.category === "plugin");
+    expect(diagnostics.filter((item) => item.message.includes("errored"))).toEqual([]);
+    return diagnostics;
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+}
+
+it("rejects desktop preload access in shared UI while allowing browser APIs and documentation", () => {
+  for (const [sourceRoot, file, expected] of [
+    [fixtureRenderer, "DesktopPreload.ts", 6],
+    [fixtureRenderer, "OptionalPreload.ts", 1],
+    [fixtureRenderer, "IndexedPreload.ts", 1],
+    [cleanRenderer, "BrowserGlobals.ts", 0],
+  ] as const) {
+    const diagnostics = pluginDiagnostics("no-desktop-preload.grit", resolve(sourceRoot, "components/ui", file), "ts");
+    expect(diagnostics).toHaveLength(expected);
+    if (expected) expect(diagnostics[0]?.severity).toBe("error");
+  }
+});
+
+it("rejects a story play function on each line its fixture marks, and nothing in a visual story", () => {
+  const fixture = resolve(fixtureRenderer, "stories/Play.stories.tsx");
+  const marked = readFileSync(fixture, "utf8")
+    .split("\n")
+    .flatMap((line, index) => (line.trimEnd().endsWith("// flag") ? [index + 1] : []));
+  const flagged = pluginDiagnostics("no-story-play.grit", fixture, "tsx").map((item) => item.location?.start?.line);
+
+  expect(marked.length).toBeGreaterThan(0);
+  expect(flagged).toEqual(marked);
+  expect(pluginDiagnostics("no-story-play.grit", resolve(cleanRenderer, "stories/Visual.stories.tsx"), "tsx")).toEqual(
+    [],
+  );
 });

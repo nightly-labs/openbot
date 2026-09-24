@@ -1,0 +1,15 @@
+language js(typescript)
+
+or {
+  `play: $value` where {
+    $value <: or {
+      JsArrowFunctionExpression(),
+      JsFunctionExpression(),
+      `$_.play`
+    }
+  },
+  `play($args) { $body }`,
+  `$_.play = $_`
+} as $play where {
+  register_diagnostic(span=$play, message="Do not add a story play function. CI only builds Storybook, so a play function never runs. Use a story for a visual state only; see the Tests section of AGENTS.md.", severity="error")
+}

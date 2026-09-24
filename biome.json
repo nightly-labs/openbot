@@ -206,6 +206,10 @@
       ]
     },
     {
+      "includes": ["**/*.stories.ts", "**/*.stories.tsx"],
+      "plugins": ["./tools/ui-foundation/no-story-play.grit"]
+    },
+    {
       "includes": ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
       "plugins": ["./tools/ui-foundation/no-desktop-preload.grit"],
       "linter": {

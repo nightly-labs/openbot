@@ -153,7 +153,7 @@ Biome rejects these patterns in tests: `toHaveClass`, `toHaveStyle`, `getCompute
 assertions reached through CSS classes, an awaited bare `setTimeout`, and `it.only`.
 Use `toHaveFocus()` to name the element whose focus matters. Storybook stories are the place for
 visual checks. Stories have no `play` functions: CI only builds Storybook, so a play function never
-ran.
+ran. `tools/ui-foundation/no-story-play.grit` rejects a new one in any `*.stories.tsx` file.
 
 GritQL cannot connect a test query to the product's `data-testid` attribute. `check:ui` counts
 renderer `data-testid` attributes separately, with a budget of zero.
