@@ -73,6 +73,7 @@ import {
 } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { appPort } from "../../app-port";
+import { writeClipboardText } from "../../clipboard";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
 import { SkillPreview } from "../../components/SkillPreview";
 import { type SkillsPort, skillsPort } from "../../skills-port";
@@ -295,6 +296,10 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     void appPort()
       .openUrl(safe)
       .catch(() => setError("Could not open the link."));
+  }
+
+  function copyPluginLink(slug: string) {
+    void writeClipboardText(createPluginShareUrl(slug)).catch(() => setError("Could not copy the link."));
   }
 
   /**
@@ -1240,7 +1245,7 @@ description: Turn merged work into clear, consistent release notes.
                                     ? (prompt) => props.onRunPluginPrompt?.(market.browse.targetAgentId, prompt)
                                     : undefined
                                 }
-                                onCopyLink={() => navigator.clipboard.writeText(createPluginShareUrl(plugin.slug))}
+                                onCopyLink={() => copyPluginLink(plugin.slug)}
                                 onOpenUrl={openPluginUrl}
                               />
                             )}

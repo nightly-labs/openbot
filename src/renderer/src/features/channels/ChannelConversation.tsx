@@ -168,6 +168,7 @@ export function ChannelConversation() {
     () => channels.state.selectedId,
     () => {
       resetPanel();
+      setCopyError(null);
       setPanel((state) => {
         state.memories.count = 0;
         state.routines.count = 0;
@@ -221,6 +222,7 @@ export function ChannelConversation() {
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [openMoreMessageId, setOpenMoreMessageId] = createSignal<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = createSignal<string | null>(null);
+  const [copyError, setCopyError] = createSignal<string | null>(null);
   const [newMessageCount, setNewMessageCount] = createSignal(0);
   let stickToLatest = true;
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
@@ -363,10 +365,11 @@ export function ChannelConversation() {
     );
     if (!text) return;
     setOpenMoreMessageId(null);
+    setCopyError(null);
     try {
       await writeClipboardText(text);
     } catch {
-      // The copy button does not show "Copied", which tells the reader the copy failed.
+      setCopyError("Could not copy the message.");
       return;
     }
     setCopiedMessageId(message.id);
@@ -486,6 +489,7 @@ export function ChannelConversation() {
           </Button>
         </p>
       </Show>
+      <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
 
       <Show when={channels.state.page} fallback={<p>Loading channel…</p>}>
         {(page) => (

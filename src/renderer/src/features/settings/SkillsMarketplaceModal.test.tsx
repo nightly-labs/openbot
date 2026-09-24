@@ -1773,5 +1773,27 @@ describe("SkillsMarketplaceModal", () => {
 
       await waitFor(() => expect(writeText).toHaveBeenCalledWith("https://openbot.run/plugins/aave"));
     });
+
+    it("reports a link copy that the clipboard refuses", async () => {
+      const writeText = vi.fn().mockRejectedValue(new DOMException("Document is not focused.", "NotAllowedError"));
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+      Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn(() => false) });
+      try {
+        renderMarketplace({
+          open: true,
+          agents: [{ id: "writer", name: "Writer" }],
+          activeAgentId: "writer",
+          onOpenChange: vi.fn(),
+          plugins: [plugin],
+          pluginServerId: "local",
+        });
+        await openPluginPage();
+        fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+
+        await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not copy the link."));
+      } finally {
+        Reflect.deleteProperty(document, "execCommand");
+      }
+    });
   });
 });
