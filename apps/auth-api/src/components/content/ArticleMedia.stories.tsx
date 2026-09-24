@@ -250,7 +250,7 @@ export const MountPad: Story = {
 export const ColourFamilies: Story = {
   render: () => (
     <ProseColumn>
-      {["OpenBot 101", "Write a guide for OpenBot", "One agent, many providers", "Run the team server yourself"].map(
+      {["OpenBot 101", "WTF Is OpenBot?", "One agent, many providers", "Run the team server yourself"].map(
         (title) => (
           <ArticleImage
             src={pickAModel}
