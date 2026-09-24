@@ -28,7 +28,7 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS } from "./provider-runtime";
+import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS, PROVIDER_UNASSIGNED_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;
@@ -2042,6 +2042,21 @@ describe.sequential("ProviderRuntime: idle release", () => {
     const resumed = first.requests.slice(firstRequests).find((request) => request.method === "thread/resume");
     expect(getString(resumed?.params, "threadId")).toBe(session);
     expect(afterRelease()).not.toContain("thread/start");
+  });
+
+  it("stops a provider no agent is set to well before one an agent uses", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const started = await startService(root, { provider: "codex", output: "DONE" });
+    service = started.service;
+    expect((await started.store.getOrCreate("chief")).provider).toBe("codex");
+    const opencode = started.clientFor("opencode");
+    expect(opencode?.running).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(PROVIDER_UNASSIGNED_RELEASE_MS + 2 * 60_000);
+    await waitFor(() => opencode?.running === false);
+    expect(started.client.running).toBe(true);
+    expect(service.getStatus().providers?.find((row) => row.id === "opencode")?.state).toBe("available");
   });
 
   it("keeps a provider process that is running a turn", async () => {

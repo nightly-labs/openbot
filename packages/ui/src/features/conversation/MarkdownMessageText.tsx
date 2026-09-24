@@ -1,6 +1,6 @@
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
-import type { Token, Tokens } from "marked";
+import type { Token, Tokens, TokensList } from "marked";
 import { marked } from "marked";
 import { createMemo, For, Show } from "solid-js";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
@@ -76,10 +76,10 @@ function headingLevel(depth: number): 1 | 2 | 3 | 4 | 5 | 6 {
 // virtualization re-renders settled messages often). Cap the size so a long
 // session cannot grow this without bound.
 const LEXER_CACHE_LIMIT = 200;
-const lexerCache = new Map<string, Token[]>();
+const lexerCache = new Map<string, TokensList>();
 const inlineLexerCache = new Map<string, Token[]>();
 
-function lexBlockTokens(body: string, cache: boolean): Token[] {
+function lexBlockTokens(body: string, cache: boolean): TokensList {
   if (!cache) return marked.lexer(body, { breaks: true, gfm: true });
   const cached = lexerCache.get(body);
   if (cached) return cached;
@@ -127,6 +127,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
     <>
       <MarkdownBlocks
         tokens={tokens()}
+        linkDefinitions={JSON.stringify(tokens().links)}
         content={contentProps()}
         streaming={props.streaming}
         streamingTail={props.streamingTail}
@@ -158,25 +159,48 @@ export function MarkdownInlineText(
   return <MarkdownInline tokens={tokens()} content={contentProps()} />;
 }
 
+interface RenderedToken {
+  token: Token;
+  streaming: boolean;
+  streamingTail: boolean;
+}
+
 function MarkdownBlocks(props: {
   tokens: Token[];
+  /**
+   * The document's link reference definitions. A new definition can turn text in an earlier
+   * block into a link, so a change here renders every block again.
+   */
+  linkDefinitions?: string;
   content: MarkdownContentProps;
   streaming?: boolean;
   streamingTail?: boolean;
 }) {
   const tokens = createMemo(() => props.tokens);
-  const renderedTokens = createMemo(() => {
+  // A streaming reply gives new tokens for the whole body on each revealed word. Keeping the
+  // earlier item for a token with the same source keeps its block mounted, so only the growing
+  // tail renders again.
+  const renderedTokens = createMemo<{ linkDefinitions: string | undefined; items: RenderedToken[] }>((previous) => {
     const values = tokens();
+    const linkDefinitions = props.linkDefinitions;
+    const earlierItems = previous && previous.linkDefinitions === linkDefinitions ? previous.items : [];
     const lastTokenIndex = lastRenderableTokenIndex(values);
     const streamingTokenIndex = activeStreamingBlockTokenIndex(values);
-    return values.map((token, index) => ({
-      token,
-      streaming: props.streaming === true && index === streamingTokenIndex,
-      streamingTail: props.streamingTail === true && index === lastTokenIndex,
-    }));
+    const items = values.map((token, index) => {
+      const streaming = props.streaming === true && index === streamingTokenIndex;
+      const streamingTail = props.streamingTail === true && index === lastTokenIndex;
+      const earlier = earlierItems[index];
+      return earlier?.token.raw === token.raw &&
+        earlier.token.type === token.type &&
+        earlier.streaming === streaming &&
+        earlier.streamingTail === streamingTail
+        ? earlier
+        : { token, streaming, streamingTail };
+    });
+    return { linkDefinitions, items };
   });
   return (
-    <For each={renderedTokens()}>
+    <For each={renderedTokens().items}>
       {(item) => (
         <MarkdownBlock
           token={item.token}

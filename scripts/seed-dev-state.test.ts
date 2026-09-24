@@ -16,6 +16,7 @@ import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName } from "../src/main/development-profile";
 import { readSetupState } from "../src/main/setup-store";
 import { TeamStore } from "../src/main/team-store";
+import { parseSeedScale } from "./seed-dev-scale";
 import {
   cleanupSeedOwnedTransfers,
   DEVELOPMENT_SEED_MANIFEST_FILE,
@@ -316,6 +317,37 @@ describe("development state seed", () => {
       targetProfile: profilePath,
     });
     await expect(readFile(sentinel, "utf8")).resolves.toBe("keep");
+  });
+
+  it("adds scaled agents, histories, channels and images that the stores read back", async () => {
+    const { appDataRoot, homeDirectory } = await createRoots();
+    const result = await seedDevelopmentState({
+      appDataRoot,
+      homeDirectory,
+      agentModel: SEED_FALLBACK_AGENT,
+      scale: parseSeedScale("agents:2,messages:10,channels:1,channelMessages:6,attachments:1"),
+    });
+    expect(result).toMatchObject({ agents: 6, conversations: 6, attachments: 11, channels: 3, channelMessages: 18 });
+
+    const profilePath = join(appDataRoot, developmentUserDataName("app"));
+    const agents = new AgentStore(profilePath, homeDirectory);
+    await agents.initialize();
+    const scaled = agents.list().find((agent) => agent.id === "scale-001");
+    const messages = scaled ? agents.database.readConversation(scaled.id, scaled.threadId).messages : [];
+    expect(messages).toHaveLength(11);
+    expect(messages.flatMap((message) => message.attachments ?? []).map((attachment) => attachment.mimeType)).toEqual([
+      "image/png",
+    ]);
+    const channel = new ChannelStore(agents.database).page("scale-channel-001");
+    expect(channel.messages).toHaveLength(6);
+    agents.database.close();
+  });
+
+  it("rejects a scale it cannot seed", () => {
+    expect(() => parseSeedScale("agents:10,widgets:3")).toThrow("--scale takes key:count pairs");
+    expect(() => parseSeedScale("agents:-1")).toThrow("--scale agents must be an integer");
+    expect(() => parseSeedScale("attachments:5")).toThrow("agents must be at least 1");
+    expect(parseSeedScale("agents:10,messages:200")).toMatchObject({ channelMessages: 200 });
   });
 
   it("keeps an existing isolated profile when seeding only if missing", async () => {
