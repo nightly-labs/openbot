@@ -2,7 +2,7 @@
   "slug": "figma",
   "name": "Figma",
   "tagline": "Designs and prototypes",
-  "description": "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Each user signs in to their own Figma account through the browser.",
+  "description": "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Note: browser sign-in does not work yet, because Figma has not approved OpenBot as an MCP client. Only the local MCP server works: turn it on in the Figma desktop app (Dev Mode), then add a custom http MCP server with the URL http://127.0.0.1:3845/mcp.",
   "category": "design",
   "creatorName": "figma.com",
   "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
@@ -16,7 +16,7 @@
     {
       "id": "app-figma-mcp",
       "name": "Figma",
-      "description": "File reading, component inspection, and asset extraction, over Figma's MCP server with browser sign-in.",
+      "description": "File reading, component inspection, and asset extraction, over Figma's MCP server. Browser sign-in does not work yet; use the local MCP server from the Figma desktop app.",
       "iconUrl": "https://static.figma.com/app/icon/1/favicon.ico",
       "server": {
         "name": "figma",
