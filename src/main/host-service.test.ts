@@ -36,7 +36,7 @@ async function createHostService(
       | "revokeRemoteInvite"
       | "remoteControlPlaneUrl"
       | "sendTeamInviteEmail"
-      | "allowLocalDevelopmentInvites"
+      | "localDevelopmentHost"
     >
   > = {},
   /** Supplied only by the screen recording cases, which need a runtime to hold an answer. */
@@ -264,17 +264,27 @@ describe("HostService account binding", () => {
     await expect(pending).resolves.toEqual([]);
   });
 
-  it("lists and revokes a local development host's invitations in its own team file", async () => {
+  it("keeps a local development host's members and invitations in its own team file", async () => {
     const remoteCalls: string[] = [];
     const { service, signIn, store } = await createHostService({
-      allowLocalDevelopmentInvites: true,
+      localDevelopmentHost: true,
       remoteControlPlaneUrl: "http://127.0.0.1:8787",
       listRemoteInvites: async () => {
-        remoteCalls.push("list");
+        remoteCalls.push("list invites");
         return [];
       },
       revokeRemoteInvite: async () => {
-        remoteCalls.push("revoke");
+        remoteCalls.push("revoke invite");
+      },
+      listRemoteMembers: async () => {
+        remoteCalls.push("list members");
+        return [];
+      },
+      updateRemoteMember: async () => {
+        remoteCalls.push("update member");
+      },
+      removeRemoteMember: async () => {
+        remoteCalls.push("remove member");
       },
     });
     await signIn(first);
@@ -283,8 +293,16 @@ describe("HostService account binding", () => {
 
     expect(await service.listInvites()).toEqual([expect.objectContaining({ id: invite.id })]);
     await service.revokeInvite(invite.id);
-
     expect(await service.listInvites()).toEqual([]);
+
+    const joined = await store.createInvite("member");
+    const { member } = await store.acceptInvite(joined.token, "guest", "guest-password");
+    expect(await service.listMembers()).toContainEqual(expect.objectContaining({ id: member.id, role: "member" }));
+    await service.updateMember({ memberId: member.id, role: "admin" });
+    expect(await service.listMembers()).toContainEqual(expect.objectContaining({ id: member.id, role: "admin" }));
+    await service.removeMember(member.id);
+
+    expect((await service.listMembers()).map((listed) => listed.id)).not.toContain(member.id);
     expect(remoteCalls).toEqual([]);
   });
 

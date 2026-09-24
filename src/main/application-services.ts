@@ -887,7 +887,7 @@ export async function createApplicationServices({
       centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
     removeRemoteMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
     updateRemoteHostLogo: (hostId, image, version) => centralAuth.updateRemoteHostLogo(hostId, image, version),
-    allowLocalDevelopmentInvites: developmentRemoteRole === "host",
+    localDevelopmentHost: developmentRemoteRole === "host",
     logDirectory: join(app.getPath("userData"), "logs", "remote"),
     removeLegacyRemoteDesktopCredential: async () => {
       const credentialPath = join(app.getPath("userData"), LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE);

@@ -20,6 +20,7 @@ import type {
 import { isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { parse as parseYaml } from "yaml";
+import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { listManagedSkillsForChat } from "./managed-skill-service";
@@ -617,11 +618,7 @@ async function readLock(workspace: string): Promise<SkillsLock> {
   return value;
 }
 async function writeLock(workspace: string, lock: SkillsLock): Promise<void> {
-  const path = lockPath(workspace);
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(lock, null, 2)}\n`, { mode: 0o600 });
-  await rename(temporary, path);
+  await writeFileAtomically(lockPath(workspace), `${JSON.stringify(lock, null, 2)}\n`, { createDirectory: true });
 }
 async function pathExists(path: string): Promise<boolean> {
   try {

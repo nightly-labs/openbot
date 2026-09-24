@@ -41,6 +41,7 @@ import {
 } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
 import type * as Ws from "ws";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import { contentDispositionFileName } from "./content-disposition";
 import {
   decodeRemoteDesktopSignalBinary,
   decodeRemoteDesktopSignalControl,
@@ -484,9 +485,7 @@ export class TeamWebRtcHostPeer {
     }
     if (response.status !== 204 && (isFile || !contentType.includes("json"))) {
       const bytes = new Uint8Array(await response.arrayBuffer());
-      const disposition = response.headers.get("content-disposition") ?? "";
-      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/iu)?.[1];
-      const name = encodedName ? decodeURIComponent(encodedName) : "remote-file";
+      const name = contentDispositionFileName(response.headers.get("content-disposition"), "remote-file");
       const transferId = await this.#files.send(peerId, {
         name,
         mimeType: contentType || "application/octet-stream",

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
   CentralAuthIssue,
@@ -1180,9 +1181,8 @@ function decodeCreatedRemoteInvite(value: unknown): {
     inviteId: requiredString(record, "inviteId"),
     token: requiredString(record, "token"),
     expiresAt: record.expiresAt,
-    // A Worker from before permanent links answers without these fields.
-    permanent: record.permanent === true,
-    useCount: isNumber(record.useCount) ? record.useCount : 0,
+    permanent: isPermanentInvite(record.permanent, record.expiresAt),
+    useCount: inviteUseCount(record.useCount),
   };
 }
 
@@ -1201,8 +1201,8 @@ function decodeRemoteInvite(value: unknown): RemoteInviteRecord {
     expiresAt: record.expiresAt,
     usedAt: record.usedAt,
     revokedAt: record.revokedAt,
-    permanent: record.permanent === true,
-    useCount: isNumber(record.useCount) ? record.useCount : 0,
+    permanent: isPermanentInvite(record.permanent, record.expiresAt),
+    useCount: inviteUseCount(record.useCount),
   };
 }
 
@@ -1226,7 +1226,7 @@ function decodeRemoteInvitePreview(value: unknown): RemoteInvitePreview {
     role: record.role,
     expiresAt: record.expiresAt,
     emailBound: record.emailBound,
-    permanent: record.permanent === true,
+    permanent: isPermanentInvite(record.permanent, record.expiresAt),
     devicePublicKey: record.devicePublicKey,
   };
 }

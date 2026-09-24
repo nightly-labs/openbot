@@ -1,5 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createInviteUrl, PERMANENT_INVITE_EXPIRES_AT_MS, parseInviteUrl } from "@openbot/contracts/invite-links";
+import { createInviteUrl, inviteUseCount, isPermanentInvite, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -384,7 +384,7 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
     role: value.role,
     expiresAt: value.expiresAt,
     emailBound: value.emailBound,
-    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
+    permanent: isPermanentInvite(value.permanent, value.expiresAt),
     devicePublicKey: value.devicePublicKey,
   };
 }
@@ -434,9 +434,8 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
     expiresAt: value.expiresAt,
     usedAt: value.usedAt,
     revokedAt: value.revokedAt,
-    permanent: value.permanent === true || value.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS,
-    useCount:
-      isNumber(value.useCount) && Number.isSafeInteger(value.useCount) && value.useCount >= 0 ? value.useCount : 0,
+    permanent: isPermanentInvite(value.permanent, value.expiresAt),
+    useCount: inviteUseCount(value.useCount),
   };
 }
 

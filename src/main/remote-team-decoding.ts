@@ -1,5 +1,6 @@
 // Team identity, membership and invitations, as a host or the account service sends them.
 
+import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import type {
   InvitePreview,
   InviteSummary,
@@ -76,15 +77,15 @@ function decodeTeamInvite(value: unknown): TeamInviteSummary {
   const record = decodeRecord(value, "team invitation");
   const role = requiredString(record, "role");
   if (role !== "admin" && role !== "member") throw new Error("Invalid invitation role.");
+  const expiresAt = requiredString(record, "expiresAt");
   return {
     id: requiredString(record, "id"),
     role,
-    expiresAt: requiredString(record, "expiresAt"),
+    expiresAt,
     usedAt: nullableString(record, "usedAt"),
     email: nullableString(record, "email"),
-    // A host from before permanent links answers without these fields.
-    permanent: record.permanent === true,
-    useCount: typeof record.useCount === "number" ? record.useCount : 0,
+    permanent: isPermanentInvite(record.permanent, expiresAt),
+    useCount: inviteUseCount(record.useCount),
   };
 }
 
@@ -104,10 +105,11 @@ export function decodeInvitePreview(
   const record = decodeRecord(value, "invitation preview");
   const role = requiredString(record, "role");
   if (role !== "admin" && role !== "member") throw new Error("Invalid invitation preview response.");
+  const expiresAt = requiredString(record, "expiresAt");
   return {
     role,
-    expiresAt: requiredString(record, "expiresAt"),
+    expiresAt,
     emailBound: requiredBoolean(record, "emailBound"),
-    permanent: record.permanent === true,
+    permanent: isPermanentInvite(record.permanent, expiresAt),
   };
 }

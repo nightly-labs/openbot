@@ -369,24 +369,21 @@ void main().catch((error) => {
   app.exit(1);
 });
 
+const SCENARIOS = [
+  "background",
+  "controls",
+  "tool-boundary",
+  "evaluation",
+  "wait-deadlines",
+  "live-view",
+  "secret-handoff",
+  "popups",
+];
+
 async function main(): Promise<void> {
   const scenario = process.argv.find((argument) => argument.startsWith("--scenario="))?.slice("--scenario=".length);
-  if (
-    scenario !== undefined &&
-    ![
-      "background",
-      "controls",
-      "tool-boundary",
-      "evaluation",
-      "wait-deadlines",
-      "live-view",
-      "secret-handoff",
-      "popups",
-    ].includes(scenario)
-  ) {
-    throw new Error(
-      `Unknown browser smoke scenario: ${scenario}. Use background, controls, tool-boundary, evaluation, wait-deadlines, or live-view.`,
-    );
+  if (scenario !== undefined && !SCENARIOS.includes(scenario)) {
+    throw new Error(`Unknown browser smoke scenario: ${scenario}. Use ${SCENARIOS.join(", ")}.`);
   }
   const googleLive = process.argv.includes("--google-live");
   const xLive = process.argv.includes("--x-live");

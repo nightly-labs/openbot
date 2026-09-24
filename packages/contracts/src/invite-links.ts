@@ -25,6 +25,21 @@ export function isNeverExpiringInvite(value: string): boolean {
   return Number.isFinite(parsed) && parsed >= PERMANENT_INVITE_EXPIRES_AT_MS;
 }
 
+/**
+ * Whether a decoded invitation is permanent. An older Worker or host sends no `permanent` flag,
+ * and the frozen Team API projections strip it, so the never-expires deadline also counts.
+ * `expiresAt` is epoch milliseconds from the account directory or an ISO date from a host.
+ */
+export function isPermanentInvite(permanent: unknown, expiresAt: number | string): boolean {
+  if (permanent === true) return true;
+  return typeof expiresAt === "number" ? expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS : isNeverExpiringInvite(expiresAt);
+}
+
+/** The join count of a decoded invitation. A missing or invalid count, from an older sender, is 0. */
+export function inviteUseCount(value: unknown): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
 const INVITE_FIELDS = ["api", "fingerprint", "invite", "server"] as const;
 const BASE64URL_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,64}$/u;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
