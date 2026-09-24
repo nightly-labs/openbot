@@ -76,9 +76,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
 
   onCleanup(scrollFades.stop);
 
+  // Only the newest list applies: an older response can arrive after a save and undo it.
+  let listRequest = 0;
+
   async function loadRoutines(): Promise<void> {
+    const request = ++listRequest;
     try {
       const next = await props.port.list();
+      if (request !== listRequest) return;
       setRoutines(next);
       setRoutinesLoaded(true);
       props.onCountChange(next.length);
@@ -87,10 +92,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       if (selectedId && !selected) closeEditor();
       if (selected) refreshDraft(selected);
     } catch (caught) {
+      if (request !== listRequest) return;
       setRoutinesLoaded(false);
       setError(errorMessage(caught, "Could not load routines."));
     } finally {
-      setLoading(false);
+      if (request === listRequest) setLoading(false);
     }
   }
 

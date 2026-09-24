@@ -28,11 +28,7 @@ export interface RoutineChatCardProps {
   onFocusHandled?: () => void;
 }
 
-type CardSave =
-  | { status: "idle" }
-  | { status: "saving" }
-  | { status: "saved"; routine: RoutineFields }
-  | { status: "error"; message: string };
+type CardSave = { status: "idle" } | { status: "saving" } | { status: "saved" } | { status: "error"; message: string };
 
 /**
  * The chat record of a routine the agent created or changed. The person can move its schedule
@@ -40,21 +36,23 @@ type CardSave =
  */
 export function RoutineChatCard(props: RoutineChatCardProps) {
   const [save, setSave] = createSignal<CardSave>({ status: "idle" });
-  // The save result is newer than the routine list until the list loads again.
+  // The save result is newer than the routine list until the list loads again. It stays while a
+  // later save runs, so the card does not go back to an older list.
+  const [lastSaved, setLastSaved] = createSignal<RoutineFields>();
   const routine = () => {
-    const current = save();
-    if (current.status !== "saved") return props.routine;
-    return current.routine.updatedAt > props.routine.updatedAt ? current.routine : props.routine;
+    const saved = lastSaved();
+    return saved && saved.updatedAt > props.routine.updatedAt ? saved : props.routine;
   };
   const [draft, setDraft] = createSignal<RoutineScheduleDraft>(routineScheduleToDraft(props.routine.trigger.schedule));
   // The edit in progress. It saves when the edit ends; signal reads lag behind writes, so the
   // save reads this and not `draft()`.
   let pending: RoutineScheduleDraft | undefined;
   createEffect(
-    () => routine().trigger.schedule,
+    // A refresh from an earlier save must not replace the schedule that is saving now.
+    () => (save().status === "saving" ? undefined : routine().trigger.schedule),
     (schedule) => {
       // A list refresh while a popover is open must not undo the edit shown in it.
-      if (!pending) setDraft(routineScheduleToDraft(schedule));
+      if (schedule && !pending) setDraft(routineScheduleToDraft(schedule));
     },
   );
   const [element, setElement] = createSignal<HTMLElement>();
@@ -67,11 +65,15 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     },
   );
   let saveRequest = 0;
+  // The schedule of the save in progress. A change back to the saved schedule during that save
+  // is a new save, not a repeat of the saved one.
+  let requested: RoutineSchedule | undefined;
   // Saves run one after another, so a slow host cannot apply an older schedule last.
   let saveQueue = Promise.resolve();
 
   function saveSchedule(schedule: RoutineSchedule): void {
     const request = ++saveRequest;
+    requested = schedule;
     setSave({ status: "saving" });
     saveQueue = saveQueue.then(() => sendSchedule(schedule, request));
   }
@@ -88,9 +90,13 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         timezone: current.timezone,
         schedule,
       });
-      if (request === saveRequest) setSave({ status: "saved", routine: saved });
+      setLastSaved(saved);
+      if (request !== saveRequest) return;
+      requested = undefined;
+      setSave({ status: "saved" });
     } catch (caught) {
       if (request !== saveRequest) return;
+      requested = undefined;
       setSave({ status: "error", message: errorMessage(caught, "Could not save the schedule.") });
       setDraft(routineScheduleToDraft(routine().trigger.schedule));
     }
@@ -127,10 +133,10 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
           setSave({ status: "error", message: problem });
           return;
         }
-        const saved = routine().trigger.schedule;
+        const current = requested ?? routineScheduleFromDraft(routineScheduleToDraft(routine().trigger.schedule));
         const schedule = routineScheduleFromDraft(next);
         // A pick of the same value, or a change and a change back, keeps the saved schedule.
-        if (sameSchedule(schedule, routineScheduleFromDraft(routineScheduleToDraft(saved)))) return;
+        if (sameSchedule(schedule, current)) return;
         saveSchedule(schedule);
       }}
       onOpenRoutine={() => props.onOpenRoutine({ routineId: routine().id, name: routine().name })}

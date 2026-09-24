@@ -168,6 +168,17 @@ describe("routine schedule edits", () => {
     expect(switchDraftKind(window, "custom", today)).toEqual(routineScheduleFromDraft(window));
   });
 
+  it("keeps a monthly day 31 on a date that exists when the run becomes yearly", () => {
+    const monthly: RoutineScheduleDraft = { kind: "monthly", day: 31, time: "09:00" };
+    expect(switchDraftKind(monthly, "yearly", today)).toEqual({ kind: "yearly", month: 9, day: 30, time: "09:00" });
+    const february = new Date(2026, 1, 10);
+    expect(switchDraftKind(monthly, "yearly", february)).toMatchObject({ month: 2, day: 29 });
+    expect(routineDraftProblem({ kind: "yearly", month: 9, day: 31, time: "09:00" })).toBe(
+      "Choose a date that exists.",
+    );
+    expect(routineDraftProblem({ kind: "yearly", month: 2, day: 29, time: "09:00" })).toBeNull();
+  });
+
   it("does not save an hours window that ends before it starts, or an empty cron", () => {
     expect(
       routineDraftProblem({ kind: "hourly", everyHours: 1, days: EVERY_DAY, window: { start: "22:00", end: "18:00" } }),

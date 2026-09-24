@@ -114,13 +114,12 @@ export function switchDraftKind(
       return { kind, weekday: days?.[0] ?? today.getDay(), time };
     case "monthly":
       return { kind, day: draft.kind === "yearly" ? draft.day : today.getDate(), time };
-    case "yearly":
-      return {
-        kind,
-        month: today.getMonth() + 1,
-        day: draft.kind === "monthly" ? draft.day : today.getDate(),
-        time,
-      };
+    case "yearly": {
+      const month = today.getMonth() + 1;
+      // A monthly day 31 has no date in a short month.
+      const day = draft.kind === "monthly" ? Math.min(draft.day, routineYearlyDaysInMonth(month)) : today.getDate();
+      return { kind, month, day, time };
+    }
     case "custom":
       // Custom starts from the run the person had, so the switch alone does not move it.
       return { kind, expression: routineDraftCron(draft) };
@@ -310,6 +309,11 @@ const YEARLY_CALENDAR_YEAR = 2024;
 
 export function routineYearlyDateKey(month: number, day: number): string {
   return routineDateKey(new Date(YEARLY_CALENDAR_YEAR, month - 1, day));
+}
+
+/** February has 29 days, so a yearly run can be on February 29. */
+export function routineYearlyDaysInMonth(month: number): number {
+  return new Date(YEARLY_CALENDAR_YEAR, month, 0).getDate();
 }
 
 export function isRoutineYearlyCalendarYear(date: Date): boolean {

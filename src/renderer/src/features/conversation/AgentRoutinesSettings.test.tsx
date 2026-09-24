@@ -1,4 +1,4 @@
-import type { Routine, RoutineRun } from "@openbot/contracts/ipc";
+import type { Routine, RoutineFields, RoutineRun } from "@openbot/contracts/ipc";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -380,5 +380,37 @@ describe("AgentRoutinesSettings", () => {
         expect.objectContaining({ name: "Quick check", schedule: { kind: "daily", time: "08:30" } }),
       ),
     );
+  });
+
+  it("ignores a routine list that arrives after a newer one", async () => {
+    setupOpenBot({ routines: { chief: [routine] } });
+    const lists: ((routines: RoutineFields[]) => void)[] = [];
+    let reload = () => {};
+    const port = {
+      ...agentRoutinesPort("chief"),
+      list: () => new Promise<RoutineFields[]>((resolve) => lists.push(resolve)),
+      subscribe: (next: () => void) => {
+        reload = next;
+        return () => {};
+      },
+    };
+    render(() => <AgentRoutinesSettings port={port} onCountChange={vi.fn()} />);
+    lists[0]?.([routine]);
+    await fireEvent.click(await screen.findByRole("button", { name: /Weekdays at 7:00 AM/ }));
+
+    reload();
+    reload();
+    const moved: Routine = {
+      ...routine,
+      trigger: { ...routine.trigger, schedule: { kind: "daily", time: "08:30" } },
+      updatedAt: "2026-08-25T13:00:00.000Z",
+    };
+    lists[2]?.([moved]);
+    expect(await screen.findByRole("button", { name: "Time: 8:30 AM" })).toBeInTheDocument();
+    lists[1]?.([routine]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.getByRole("button", { name: "Time: 8:30 AM" })).toBeInTheDocument();
   });
 });

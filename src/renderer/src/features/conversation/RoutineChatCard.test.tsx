@@ -93,6 +93,34 @@ describe("RoutineChatCard", () => {
     );
   });
 
+  it("saves a change back to the old schedule while an earlier save runs", async () => {
+    const agent = setupOpenBot().api.agent;
+    const saveRoutine = agent.updateRoutine.bind(agent);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const updateRoutine = vi.spyOn(agent, "updateRoutine").mockImplementationOnce(async (input) => {
+      await held;
+      return saveRoutine(input);
+    });
+    render(() => <RoutineChatCard action="created" routine={routine} agentId="chief" latest onOpenRoutine={vi.fn()} />);
+
+    await addSaturday();
+    await fireEvent.click(screen.getByRole("button", { name: /^Days:/ }));
+    const saturday = await screen.findByRole("button", { name: "Saturday" });
+    await fireEvent.click(saturday);
+    await fireEvent.keyDown(saturday, { key: "Escape" });
+    release();
+
+    await waitFor(() => expect(updateRoutine).toHaveBeenCalledTimes(2));
+    expect(updateRoutine).toHaveBeenLastCalledWith(
+      expect.objectContaining({ schedule: { kind: "weekdays", time: "07:00" } }),
+    );
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved"));
+    expect(screen.getByRole("button", { name: "Days: Weekdays" })).toBeInTheDocument();
+  });
+
   it("shows why a save failed and puts the saved schedule back", async () => {
     vi.spyOn(setupOpenBot().api.agent, "updateRoutine").mockRejectedValue(new Error("The routine is busy."));
     render(() => <RoutineChatCard action="updated" routine={routine} agentId="chief" latest onOpenRoutine={vi.fn()} />);

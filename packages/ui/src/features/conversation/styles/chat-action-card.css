@@ -82,8 +82,10 @@
   line-height: var(--openbot-leading-md);
 }
 
-.chat-action-card-footer:empty {
-  display: none;
+/* Without a status the footer holds only its empty live region, so it takes no space. */
+.chat-action-card-footer-empty {
+  min-height: 0;
+  margin-top: calc(-1 * var(--openbot-space-3));
 }
 
 .chat-action-card-status {

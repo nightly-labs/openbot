@@ -79,40 +79,40 @@ export function ChatActionCard(props: ChatActionCardProps) {
         </Show>
       </header>
       {props.children}
-      <footer class="chat-action-card-footer">
-        <Show when={props.status}>{(status) => <ChatActionCardFooter status={status()} />}</Show>
-      </footer>
+      <ChatActionCardFooter status={props.status} />
     </article>
   );
 }
 
-function ChatActionCardFooter(props: { status: ChatActionCardStatus }) {
+function ChatActionCardFooter(props: { status?: ChatActionCardStatus }) {
+  const kind = () => props.status?.kind;
+  const text = () => props.status?.text;
   const action = () => {
     const status = props.status;
-    return status.kind === "note" ? status.action : undefined;
+    return status?.kind === "note" ? status.action : undefined;
   };
   return (
-    <>
-      <Show when={props.status.kind === "note"}>
-        <span class="chat-action-card-note">{props.status.text}</span>
+    <footer class={["chat-action-card-footer", { "chat-action-card-footer-empty": !props.status }]}>
+      <Show when={kind() === "note"}>
+        <span class="chat-action-card-note">{text()}</span>
       </Show>
-      {/* The region stays while its text changes, so assistive technology reads each change. */}
+      {/* The region is in the page before its first text, so assistive technology reads each change. */}
       <span class="chat-action-card-status" role="status">
         <Switch>
-          <Match when={props.status.kind === "busy"}>
+          <Match when={kind() === "busy"}>
             <Spinner size="sm" />
-            {props.status.text}
+            {text()}
           </Match>
-          <Match when={props.status.kind === "done"}>
+          <Match when={kind() === "done"}>
             <Check aria-hidden="true" />
-            {props.status.text}
+            {text()}
           </Match>
         </Switch>
       </span>
-      <Show when={props.status.kind === "error"}>
+      <Show when={kind() === "error"}>
         <span class="chat-action-card-status chat-action-card-error" role="alert">
           <TriangleAlert aria-hidden="true" />
-          {props.status.text}
+          {text()}
         </span>
       </Show>
       <Show when={action()}>
@@ -128,6 +128,6 @@ function ChatActionCardFooter(props: { status: ChatActionCardStatus }) {
           </Button>
         )}
       </Show>
-    </>
+    </footer>
   );
 }

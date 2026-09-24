@@ -10,6 +10,7 @@ import {
   routineHourlyCron,
   routineHourlyMinute,
   routineRunsPerDay,
+  routineYearlyDaysInMonth,
 } from "./routine-schedule-draft";
 import { routineTimeMinutes } from "./routine-schedule-ui";
 
@@ -33,6 +34,8 @@ export function routineDraftProblem(draft: RoutineScheduleDraft): string | null 
       return "A one-time routine cannot be saved yet.";
     case "hourly":
       return routineRunsPerDay(draft.window, draft.everyHours) === 0 ? "End time must be after start time." : null;
+    case "yearly":
+      return draft.day > routineYearlyDaysInMonth(draft.month) ? "Choose a date that exists." : null;
     case "custom": {
       const expression = draft.expression.trim();
       if (!expression) return "Enter a cron expression.";
