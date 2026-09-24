@@ -22,8 +22,8 @@ untrusted frame cannot reach a parser.
 `ipc-channel-coverage.test.ts` restricts the name `ipcMain` to `ipc/define-ipc-group.ts`. An aliased
 import elsewhere could otherwise register a handler without a sender check. The test restricts the
 trusted wrapper names to that file too: the wrappers accept string channels, so direct use could
-create an endpoint outside the declared groups. Direct `IPC_CHANNELS.x` references keep renderer
-sends visible to the same coverage checks.
+create an endpoint outside the declared groups. Direct `IPC_ENDPOINTS.group.name` references keep
+renderer sends visible to the same coverage checks.
 
 `index.ts` calls `app.setPath`, `app.enableSandbox` and
 `protocol.registerSchemesAsPrivileged` at module scope. Tests that import it need an Electron mock.

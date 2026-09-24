@@ -1,6 +1,5 @@
 import {
   type AgentIpcRequest,
-  type AgentRequestChannel,
   type AttachmentImportEvent,
   decodeAgentProfileDraft,
   decodeChannel,
@@ -16,16 +15,12 @@ import {
   decodeMcpTestResult,
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
-  type EventChannel,
-  type EventPayloadOf,
+  type EventEndpoint,
   type ImportAttachmentsInput,
-  type InnerPayloadOf,
-  IPC_CHANNELS,
+  IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   type OpenBotDesktopApi,
-  type PayloadOf,
-  type RequestChannel,
-  type ResultOf,
+  type RequestEndpoint,
 } from "@openbot/contracts/ipc";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -157,51 +152,51 @@ let selectedServerId: string = LOCAL_SERVER_ID;
 
 // A typed endpoint fixes what the preload sends and what its decoder must return. An endpoint that
 // takes nothing takes no payload argument here.
-type PayloadArgs<Channel extends RequestChannel> = [PayloadOf<Channel>] extends [undefined]
-  ? []
-  : [payload: PayloadOf<Channel>];
+// The payload and result come from the endpoint alone. `NoInfer` keeps a decoder or an argument from
+// widening them, so a decoder that returns less than the endpoint promises is a type error.
+type PayloadArgs<Payload> = [Payload] extends [undefined] ? [] : [payload: Payload];
 
-function invokeRequest<Channel extends RequestChannel>(
-  channel: Channel,
-  decode: (value: unknown) => ResultOf<Channel>,
-  ...payload: PayloadArgs<Channel>
-): Promise<ResultOf<Channel>> {
-  return ipcRenderer.invoke(channel, ...payload).then(decode);
+function invokeRequest<Payload, Result>(
+  endpoint: RequestEndpoint<string, Payload, Result>,
+  decode: (value: unknown) => NoInfer<Result>,
+  ...payload: PayloadArgs<NoInfer<Payload>>
+): Promise<Result> {
+  return ipcRenderer.invoke(endpoint.channel, ...payload).then(decode);
 }
 
-function invokeAgent<Channel extends AgentRequestChannel>(
-  channel: Channel,
-  payload: InnerPayloadOf<Channel>,
-  decode: (value: unknown) => ResultOf<Channel>,
-): Promise<ResultOf<Channel>> {
-  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId: selectedServerId, payload };
-  return ipcRenderer.invoke(channel, request).then(decode);
+function invokeAgent<Input, Result>(
+  endpoint: RequestEndpoint<string, AgentIpcRequest<Input>, Result>,
+  payload: NoInfer<Input>,
+  decode: (value: unknown) => NoInfer<Result>,
+): Promise<Result> {
+  const request: AgentIpcRequest<Input> = { serverId: selectedServerId, payload };
+  return ipcRenderer.invoke(endpoint.channel, request).then(decode);
 }
 
-function invokeAgentForServer<Channel extends AgentRequestChannel>(
+function invokeAgentForServer<Input, Result>(
   serverId: string,
-  channel: Channel,
-  payload: InnerPayloadOf<Channel>,
-  decode: (value: unknown) => ResultOf<Channel>,
-): Promise<ResultOf<Channel>> {
-  const request: AgentIpcRequest<InnerPayloadOf<Channel>> = { serverId, payload };
-  return ipcRenderer.invoke(channel, request).then(decode);
+  endpoint: RequestEndpoint<string, AgentIpcRequest<Input>, Result>,
+  payload: NoInfer<Input>,
+  decode: (value: unknown) => NoInfer<Result>,
+): Promise<Result> {
+  const request: AgentIpcRequest<Input> = { serverId, payload };
+  return ipcRenderer.invoke(endpoint.channel, request).then(decode);
 }
 
 // The one place the preload subscribes to main. It hands on the raw value, so a caller that keeps
 // only one server's events can decode and check it before the renderer sees it.
-function listen(channel: EventChannel, onValue: (value: unknown) => void): () => void {
+function listen(endpoint: EventEndpoint, onValue: (value: unknown) => void): () => void {
   const handler = (_event: Electron.IpcRendererEvent, value: unknown) => onValue(value);
-  ipcRenderer.on(channel, handler);
-  return () => ipcRenderer.removeListener(channel, handler);
+  ipcRenderer.on(endpoint.channel, handler);
+  return () => ipcRenderer.removeListener(endpoint.channel, handler);
 }
 
-function subscribe<Channel extends EventChannel>(
-  channel: Channel,
-  decode: (value: unknown) => EventPayloadOf<Channel>,
-  listener: (payload: EventPayloadOf<Channel>) => void,
+function subscribe<Payload>(
+  endpoint: EventEndpoint<string, Payload>,
+  decode: (value: unknown) => NoInfer<Payload>,
+  listener: (payload: NoInfer<Payload>) => void,
 ): () => void {
-  return listen(channel, (value) => listener(decode(value)));
+  return listen(endpoint, (value) => listener(decode(value)));
 }
 
 function rememberActiveServer<T extends { id: string; active: boolean }[]>(servers: T): T {
@@ -233,7 +228,7 @@ async function importFiles(files: File[]): Promise<void> {
     }
     const attachments = await invokeAgentForServer(
       serverId,
-      IPC_CHANNELS.agentImportAttachments,
+      IPC_ENDPOINTS.agentAttachments.importAttachments,
       input,
       decodeAttachments,
     );
@@ -280,394 +275,414 @@ window.addEventListener("change", (event) => {
 });
 
 const openbotApi: OpenBotDesktopApi = {
-  getAppInfo: () => invokeRequest(IPC_CHANNELS.getAppInfo, decodeAppInfo),
-  getSetupState: () => invokeRequest(IPC_CHANNELS.getSetupState, decodeAppSetupState),
-  saveSetup: (input) => invokeRequest(IPC_CHANNELS.saveSetup, decodeAppSetupState, input),
-  getAnalyticsPreference: () => invokeRequest(IPC_CHANNELS.getAnalyticsPreference, decodeAnalyticsPreference),
+  getAppInfo: () => invokeRequest(IPC_ENDPOINTS.app.getAppInfo, decodeAppInfo),
+  getSetupState: () => invokeRequest(IPC_ENDPOINTS.app.getSetupState, decodeAppSetupState),
+  saveSetup: (input) => invokeRequest(IPC_ENDPOINTS.app.saveSetup, decodeAppSetupState, input),
+  getAnalyticsPreference: () => invokeRequest(IPC_ENDPOINTS.app.getAnalyticsPreference, decodeAnalyticsPreference),
   setAnalyticsPreference: (input) =>
-    invokeRequest(IPC_CHANNELS.setAnalyticsPreference, decodeAnalyticsPreference, input),
-  getApprovalAutomation: () => invokeRequest(IPC_CHANNELS.getApprovalAutomation, decodeApprovalAutomationPreference),
+    invokeRequest(IPC_ENDPOINTS.app.setAnalyticsPreference, decodeAnalyticsPreference, input),
+  getApprovalAutomation: () =>
+    invokeRequest(IPC_ENDPOINTS.app.getApprovalAutomation, decodeApprovalAutomationPreference),
   setApprovalAutomation: (input) =>
-    invokeRequest(IPC_CHANNELS.setApprovalAutomation, decodeApprovalAutomationPreference, input),
-  getAppLanguagePreference: () => invokeRequest(IPC_CHANNELS.getAppLanguagePreference, decodeAppLanguagePreference),
+    invokeRequest(IPC_ENDPOINTS.app.setApprovalAutomation, decodeApprovalAutomationPreference, input),
+  getAppLanguagePreference: () =>
+    invokeRequest(IPC_ENDPOINTS.app.getAppLanguagePreference, decodeAppLanguagePreference),
   setAppLanguagePreference: (input) =>
-    invokeRequest(IPC_CHANNELS.setAppLanguagePreference, decodeAppLanguagePreference, input),
+    invokeRequest(IPC_ENDPOINTS.app.setAppLanguagePreference, decodeAppLanguagePreference, input),
   onAppLanguagePreference: (listener) =>
-    subscribe(IPC_CHANNELS.appLanguagePreference, decodeAppLanguagePreference, listener),
-  onOpenSettings: (listener) => listen(IPC_CHANNELS.openSettings, () => listener()),
+    subscribe(IPC_ENDPOINTS.app.appLanguagePreference, decodeAppLanguagePreference, listener),
+  onOpenSettings: (listener) => listen(IPC_ENDPOINTS.app.openSettings, () => listener()),
   dynamicIsland: {
-    getPreference: () => invokeRequest(IPC_CHANNELS.dynamicIslandGetPreference, decodeDynamicIslandPreference),
+    getPreference: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.getPreference, decodeDynamicIslandPreference),
     setPreference: (input) =>
-      invokeRequest(IPC_CHANNELS.dynamicIslandSetPreference, decodeDynamicIslandPreference, input),
+      invokeRequest(IPC_ENDPOINTS.dynamicIsland.setPreference, decodeDynamicIslandPreference, input),
     publishPresentation: (presentation) =>
-      invokeRequest(IPC_CHANNELS.dynamicIslandPublishPresentation, decodeVoid, presentation),
-    getPresentation: () => invokeRequest(IPC_CHANNELS.dynamicIslandGetPresentation, decodeDynamicIslandPresentation),
+      invokeRequest(IPC_ENDPOINTS.dynamicIsland.publishPresentation, decodeVoid, presentation),
+    getPresentation: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.getPresentation, decodeDynamicIslandPresentation),
     onPreference: (listener) =>
-      subscribe(IPC_CHANNELS.dynamicIslandPreference, decodeDynamicIslandPreference, listener),
+      subscribe(IPC_ENDPOINTS.dynamicIsland.preference, decodeDynamicIslandPreference, listener),
     onPresentation: (listener) =>
-      subscribe(IPC_CHANNELS.dynamicIslandPresentation, decodeDynamicIslandPresentation, listener),
-    onGeometry: (listener) => subscribe(IPC_CHANNELS.dynamicIslandGeometry, decodeDynamicIslandGeometry, listener),
-    performAction: (action) => invokeRequest(IPC_CHANNELS.dynamicIslandPerformAction, decodeVoid, action),
-    performHaptic: () => invokeRequest(IPC_CHANNELS.dynamicIslandPerformHaptic, decodeVoid),
-    onAction: (listener) => subscribe(IPC_CHANNELS.dynamicIslandAction, decodeDynamicIslandAction, listener),
-    setInteractive: (input) => invokeRequest(IPC_CHANNELS.dynamicIslandSetInteractive, decodeVoid, input),
+      subscribe(IPC_ENDPOINTS.dynamicIsland.presentation, decodeDynamicIslandPresentation, listener),
+    onGeometry: (listener) => subscribe(IPC_ENDPOINTS.dynamicIsland.geometry, decodeDynamicIslandGeometry, listener),
+    performAction: (action) => invokeRequest(IPC_ENDPOINTS.dynamicIsland.performAction, decodeVoid, action),
+    performHaptic: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.performHaptic, decodeVoid),
+    onAction: (listener) => subscribe(IPC_ENDPOINTS.dynamicIsland.action, decodeDynamicIslandAction, listener),
+    setInteractive: (input) => invokeRequest(IPC_ENDPOINTS.dynamicIsland.setInteractive, decodeVoid, input),
   },
-  getComputerUseState: () => invokeRequest(IPC_CHANNELS.computerUseGetState, decodeComputerUseState),
+  getComputerUseState: () => invokeRequest(IPC_ENDPOINTS.computerUse.getState, decodeComputerUseState),
   openComputerUsePermissionPane: (permission) =>
-    invokeRequest(IPC_CHANNELS.computerUseOpenPermissionPane, decodeComputerUseState, permission),
-  closeComputerUsePermissionHelp: () => invokeRequest(IPC_CHANNELS.computerUseClosePermissionHelp, decodeVoid),
+    invokeRequest(IPC_ENDPOINTS.computerUse.openPermissionPane, decodeComputerUseState, permission),
+  closeComputerUsePermissionHelp: () => invokeRequest(IPC_ENDPOINTS.computerUse.closePermissionHelp, decodeVoid),
   getComputerUsePermissionApp: () =>
-    invokeRequest(IPC_CHANNELS.computerUseGetPermissionApp, decodeComputerUsePermissionApp),
-  startComputerUsePermissionAppDrag: () => invokeRequest(IPC_CHANNELS.computerUseStartPermissionAppDrag, decodeVoid),
-  revealComputerUsePermissionApp: () => invokeRequest(IPC_CHANNELS.computerUseRevealPermissionApp, decodeVoid),
+    invokeRequest(IPC_ENDPOINTS.computerUse.getPermissionApp, decodeComputerUsePermissionApp),
+  startComputerUsePermissionAppDrag: () => invokeRequest(IPC_ENDPOINTS.computerUse.startPermissionAppDrag, decodeVoid),
+  revealComputerUsePermissionApp: () => invokeRequest(IPC_ENDPOINTS.computerUse.revealPermissionApp, decodeVoid),
   onComputerUseHighlightPlacement: (listener) =>
-    subscribe(IPC_CHANNELS.computerUseHighlightPlacement, decodeComputerUseHighlightPlacement, listener),
-  openExternal: (destination) => invokeRequest(IPC_CHANNELS.openExternal, decodeVoid, destination),
-  connectProvider: (provider) => invokeRequest(IPC_CHANNELS.connectProvider, decodeAgentStatusFromMain, provider),
-  updateProviderCli: (provider) => invokeRequest(IPC_CHANNELS.updateProviderCli, decodeAgentStatusFromMain, provider),
-  refreshAgentProviders: () => invokeRequest(IPC_CHANNELS.refreshAgentProviders, decodeAgentStatusFromMain),
-  setProviderApiKey: (input) => invokeRequest(IPC_CHANNELS.setProviderApiKey, decodeAgentStatusFromMain, input),
+    subscribe(IPC_ENDPOINTS.computerUse.highlightPlacement, decodeComputerUseHighlightPlacement, listener),
+  openExternal: (destination) => invokeRequest(IPC_ENDPOINTS.app.openExternal, decodeVoid, destination),
+  connectProvider: (provider) =>
+    invokeRequest(IPC_ENDPOINTS.providers.connectProvider, decodeAgentStatusFromMain, provider),
+  updateProviderCli: (provider) =>
+    invokeRequest(IPC_ENDPOINTS.providers.updateProviderCli, decodeAgentStatusFromMain, provider),
+  refreshAgentProviders: () => invokeRequest(IPC_ENDPOINTS.providers.refreshAgentProviders, decodeAgentStatusFromMain),
+  setProviderApiKey: (input) =>
+    invokeRequest(IPC_ENDPOINTS.providers.setProviderApiKey, decodeAgentStatusFromMain, input),
   clearProviderApiKey: (provider) =>
-    invokeRequest(IPC_CHANNELS.clearProviderApiKey, decodeAgentStatusFromMain, provider),
+    invokeRequest(IPC_ENDPOINTS.providers.clearProviderApiKey, decodeAgentStatusFromMain, provider),
   getProviderApiKeyState: (provider) =>
-    invokeRequest(IPC_CHANNELS.getProviderApiKeyState, decodeProviderApiKeyState, provider),
+    invokeRequest(IPC_ENDPOINTS.providers.getProviderApiKeyState, decodeProviderApiKeyState, provider),
   startProviderCodeLogin: (provider) =>
-    invokeRequest(IPC_CHANNELS.startProviderCodeLogin, decodeProviderCodeLoginStart, provider),
+    invokeRequest(IPC_ENDPOINTS.providers.startProviderCodeLogin, decodeProviderCodeLoginStart, provider),
   cancelProviderCodeLogin: (provider) =>
-    invokeRequest(IPC_CHANNELS.cancelProviderCodeLogin, decodeAgentStatusFromMain, provider),
+    invokeRequest(IPC_ENDPOINTS.providers.cancelProviderCodeLogin, decodeAgentStatusFromMain, provider),
   providerRuntimes: {
-    getStatus: () => invokeRequest(IPC_CHANNELS.providerRuntimesGetStatus, decodeProviderRuntimeSnapshot),
+    getStatus: () => invokeRequest(IPC_ENDPOINTS.providerRuntimes.getStatus, decodeProviderRuntimeSnapshot),
     download: (provider) =>
-      invokeRequest(IPC_CHANNELS.providerRuntimesDownload, decodeProviderRuntimeSnapshot, provider),
-    cancel: (provider) => invokeRequest(IPC_CHANNELS.providerRuntimesCancel, decodeProviderRuntimeSnapshot, provider),
-    checkForUpdates: () => invokeRequest(IPC_CHANNELS.providerRuntimesCheckForUpdates, decodeProviderRuntimeSnapshot),
-    onEvent: (listener) => subscribe(IPC_CHANNELS.providerRuntimesEvent, decodeProviderRuntimeSnapshot, listener),
+      invokeRequest(IPC_ENDPOINTS.providerRuntimes.download, decodeProviderRuntimeSnapshot, provider),
+    cancel: (provider) => invokeRequest(IPC_ENDPOINTS.providerRuntimes.cancel, decodeProviderRuntimeSnapshot, provider),
+    checkForUpdates: () => invokeRequest(IPC_ENDPOINTS.providerRuntimes.checkForUpdates, decodeProviderRuntimeSnapshot),
+    onEvent: (listener) => subscribe(IPC_ENDPOINTS.providerRuntimes.event, decodeProviderRuntimeSnapshot, listener),
   },
-  openUrl: (url) => invokeRequest(IPC_CHANNELS.openUrl, decodeVoid, url),
+  openUrl: (url) => invokeRequest(IPC_ENDPOINTS.app.openUrl, decodeVoid, url),
   voice: {
-    getModelStatus: () => invokeRequest(IPC_CHANNELS.voiceGetModelStatus, decodeVoiceModelStatus),
-    prepareModel: () => invokeRequest(IPC_CHANNELS.voicePrepareModel, decodeVoiceModelStatus),
-    transcribe: (input) => invokeRequest(IPC_CHANNELS.voiceTranscribe, decodeVoiceTranscriptionResult, input),
-    onModelStatus: (listener) => subscribe(IPC_CHANNELS.voiceModelStatus, decodeVoiceModelStatus, listener),
+    getModelStatus: () => invokeRequest(IPC_ENDPOINTS.voice.getModelStatus, decodeVoiceModelStatus),
+    prepareModel: () => invokeRequest(IPC_ENDPOINTS.voice.prepareModel, decodeVoiceModelStatus),
+    transcribe: (input) => invokeRequest(IPC_ENDPOINTS.voice.transcribe, decodeVoiceTranscriptionResult, input),
+    onModelStatus: (listener) => subscribe(IPC_ENDPOINTS.voice.modelStatus, decodeVoiceModelStatus, listener),
   },
   auth: {
-    getState: () => invokeRequest(IPC_CHANNELS.authGetState, decodeCentralAuthState),
-    retry: () => invokeRequest(IPC_CHANNELS.authRetry, decodeCentralAuthState),
-    requestEmailCode: (email) => invokeRequest(IPC_CHANNELS.authRequestEmailCode, decodeCentralAuthState, email),
+    getState: () => invokeRequest(IPC_ENDPOINTS.auth.getState, decodeCentralAuthState),
+    retry: () => invokeRequest(IPC_ENDPOINTS.auth.retry, decodeCentralAuthState),
+    requestEmailCode: (email) => invokeRequest(IPC_ENDPOINTS.auth.requestEmailCode, decodeCentralAuthState, email),
     verifyEmailCode: (challengeId, code) =>
-      invokeRequest(IPC_CHANNELS.authVerifyEmailCode, decodeCentralAuthState, { challengeId, code }),
-    updateName: (name) => invokeRequest(IPC_CHANNELS.authUpdateName, decodeCentralAuthState, name),
-    updateAvatar: (image) => invokeRequest(IPC_CHANNELS.authUpdateAvatar, decodeCentralAuthState, image),
-    createMobileConnect: () => invokeRequest(IPC_CHANNELS.authCreateMobileConnect, decodeMobileConnectTicket),
+      invokeRequest(IPC_ENDPOINTS.auth.verifyEmailCode, decodeCentralAuthState, { challengeId, code }),
+    updateName: (name) => invokeRequest(IPC_ENDPOINTS.auth.updateName, decodeCentralAuthState, name),
+    updateAvatar: (image) => invokeRequest(IPC_ENDPOINTS.auth.updateAvatar, decodeCentralAuthState, image),
+    createMobileConnect: () => invokeRequest(IPC_ENDPOINTS.auth.createMobileConnect, decodeMobileConnectTicket),
     listMobileConnectedDevices: () =>
-      invokeRequest(IPC_CHANNELS.authListMobileConnectedDevices, decodeMobileConnectedDevices),
-    listAccountSessions: () => invokeRequest(IPC_CHANNELS.authListAccountSessions, decodeAccountSessions),
-    revokeAccountSession: (sessionId) => invokeRequest(IPC_CHANNELS.authRevokeAccountSession, decodeVoid, sessionId),
+      invokeRequest(IPC_ENDPOINTS.auth.listMobileConnectedDevices, decodeMobileConnectedDevices),
+    listAccountSessions: () => invokeRequest(IPC_ENDPOINTS.auth.listAccountSessions, decodeAccountSessions),
+    revokeAccountSession: (sessionId) => invokeRequest(IPC_ENDPOINTS.auth.revokeAccountSession, decodeVoid, sessionId),
     revokeMobileConnectedDevice: (sessionId) =>
-      invokeRequest(IPC_CHANNELS.authRevokeMobileConnectedDevice, decodeVoid, sessionId),
-    logout: () => invokeRequest(IPC_CHANNELS.authLogout, decodeCentralAuthState),
-    onEvent: (listener) => subscribe(IPC_CHANNELS.authEvent, decodeCentralAuthState, listener),
+      invokeRequest(IPC_ENDPOINTS.auth.revokeMobileConnectedDevice, decodeVoid, sessionId),
+    logout: () => invokeRequest(IPC_ENDPOINTS.auth.logout, decodeCentralAuthState),
+    onEvent: (listener) => subscribe(IPC_ENDPOINTS.auth.event, decodeCentralAuthState, listener),
   },
   skills: {
-    localList: () => invokeRequest(IPC_CHANNELS.skillsLocalList, decodeSkillDetails),
-    localGet: (input) => invokeRequest(IPC_CHANNELS.skillsLocalGet, decodeSkillDetail, input),
-    localCreate: (input) => invokeRequest(IPC_CHANNELS.skillsLocalCreate, decodeSkillDetail, input),
-    localRevise: (input) => invokeRequest(IPC_CHANNELS.skillsLocalRevise, decodeSkillDetail, input),
-    localInstall: (input) => invokeRequest(IPC_CHANNELS.skillsLocalInstall, decodeInstalledSkill, input),
-    list: (query) => invokeRequest(IPC_CHANNELS.skillsList, decodeSkillPage, query),
-    get: (skillId) => invokeRequest(IPC_CHANNELS.skillsGet, decodeSkillDetail, skillId),
-    listMine: () => invokeRequest(IPC_CHANNELS.skillsListMine, decodeSubmissions),
-    choosePackage: () => invokeRequest(IPC_CHANNELS.skillsChoosePackage, decodeSkillPreview),
-    submit: (input) => invokeRequest(IPC_CHANNELS.skillsSubmit, decodeSubmission, input),
-    listInstalled: (agentId) => invokeRequest(IPC_CHANNELS.skillsListInstalled, decodeInstalledSkillsFromMain, agentId),
-    install: (input) => invokeRequest(IPC_CHANNELS.skillsInstall, decodeInstalledSkill, input),
-    uninstall: (input) => invokeRequest(IPC_CHANNELS.skillsUninstall, decodeVoid, input),
-    setEnabled: (input) => invokeRequest(IPC_CHANNELS.skillsSetEnabled, decodeInstalledSkill, input),
+    localList: () => invokeRequest(IPC_ENDPOINTS.skills.localList, decodeSkillDetails),
+    localGet: (input) => invokeRequest(IPC_ENDPOINTS.skills.localGet, decodeSkillDetail, input),
+    localCreate: (input) => invokeRequest(IPC_ENDPOINTS.skills.localCreate, decodeSkillDetail, input),
+    localRevise: (input) => invokeRequest(IPC_ENDPOINTS.skills.localRevise, decodeSkillDetail, input),
+    localInstall: (input) => invokeRequest(IPC_ENDPOINTS.skills.localInstall, decodeInstalledSkill, input),
+    list: (query) => invokeRequest(IPC_ENDPOINTS.skills.list, decodeSkillPage, query),
+    get: (skillId) => invokeRequest(IPC_ENDPOINTS.skills.get, decodeSkillDetail, skillId),
+    listMine: () => invokeRequest(IPC_ENDPOINTS.skills.listMine, decodeSubmissions),
+    choosePackage: () => invokeRequest(IPC_ENDPOINTS.skills.choosePackage, decodeSkillPreview),
+    submit: (input) => invokeRequest(IPC_ENDPOINTS.skills.submit, decodeSubmission, input),
+    listInstalled: (agentId) =>
+      invokeRequest(IPC_ENDPOINTS.skills.listInstalled, decodeInstalledSkillsFromMain, agentId),
+    install: (input) => invokeRequest(IPC_ENDPOINTS.skills.install, decodeInstalledSkill, input),
+    uninstall: (input) => invokeRequest(IPC_ENDPOINTS.skills.uninstall, decodeVoid, input),
+    setEnabled: (input) => invokeRequest(IPC_ENDPOINTS.skills.setEnabled, decodeInstalledSkill, input),
   },
   hostedSites: {
-    list: () => invokeRequest(IPC_CHANNELS.hostedSitesList, decodeHostedSites),
-    chooseDirectory: () => invokeRequest(IPC_CHANNELS.hostedSitesChooseDirectory, decodeNullablePath),
-    publish: (input) => invokeRequest(IPC_CHANNELS.hostedSitesPublish, decodeHostedSite, input),
-    replace: (input) => invokeRequest(IPC_CHANNELS.hostedSitesReplace, decodeHostedSite, input),
-    delete: (input) => invokeRequest(IPC_CHANNELS.hostedSitesDelete, decodeVoid, input),
+    list: () => invokeRequest(IPC_ENDPOINTS.hostedSites.list, decodeHostedSites),
+    chooseDirectory: () => invokeRequest(IPC_ENDPOINTS.hostedSites.chooseDirectory, decodeNullablePath),
+    publish: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.publish, decodeHostedSite, input),
+    replace: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.replace, decodeHostedSite, input),
+    delete: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.delete, decodeVoid, input),
   },
   customProviders: {
-    list: () => invokeRequest(IPC_CHANNELS.customProvidersList, decodeCustomProviders),
-    save: (input) => invokeRequest(IPC_CHANNELS.customProvidersSave, decodeCustomProviderResult, input),
-    delete: (input) => invokeRequest(IPC_CHANNELS.customProvidersDelete, decodeCustomProviderResult, input),
+    list: () => invokeRequest(IPC_ENDPOINTS.customProviders.list, decodeCustomProviders),
+    save: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.save, decodeCustomProviderResult, input),
+    delete: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.delete, decodeCustomProviderResult, input),
   },
   marketplaceAgents: {
-    list: (query) => invokeRequest(IPC_CHANNELS.marketplaceAgentsList, decodeMarketplaceAgentPage, query),
-    get: (agentId) => invokeRequest(IPC_CHANNELS.marketplaceAgentsGet, decodeMarketplaceAgentDetail, agentId),
-    listMine: () => invokeRequest(IPC_CHANNELS.marketplaceAgentsListMine, decodeAgentSubmissions),
-    preview: (agentId) => invokeRequest(IPC_CHANNELS.marketplaceAgentsPreview, decodeAgentPublicationPreview, agentId),
-    submit: (input) => invokeRequest(IPC_CHANNELS.marketplaceAgentsSubmit, decodeAgentSubmission, input),
-    install: (input) => invokeRequest(IPC_CHANNELS.marketplaceAgentsInstall, decodeAgentInstallation, input),
+    list: (query) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.list, decodeMarketplaceAgentPage, query),
+    get: (agentId) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.get, decodeMarketplaceAgentDetail, agentId),
+    listMine: () => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.listMine, decodeAgentSubmissions),
+    preview: (agentId) =>
+      invokeRequest(IPC_ENDPOINTS.marketplaceAgents.preview, decodeAgentPublicationPreview, agentId),
+    submit: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.submit, decodeAgentSubmission, input),
+    install: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.install, decodeAgentInstallation, input),
   },
   agent: {
-    getStatus: () => invokeAgent(IPC_CHANNELS.agentGetStatus, null, decodeAgentStatusFromMain),
+    getStatus: () => invokeAgent(IPC_ENDPOINTS.agent.getStatus, null, decodeAgentStatusFromMain),
     getHostAnalytics: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.hostGetAnalytics, input, decodeHostAnalyticsFromMain),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.getHostAnalytics, input, decodeHostAnalyticsFromMain),
     getAnalytics: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentGetAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_CHANNELS.agentGetUsage, agentId, decodeAccountUsageFromMain),
-    listModels: () => invokeAgent(IPC_CHANNELS.agentListModels, null, decodeAgentModels),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.getAnalytics, input, decodeAgentAnalyticsFromMain),
+    getUsage: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.getUsage, agentId, decodeAccountUsageFromMain),
+    listModels: () => invokeAgent(IPC_ENDPOINTS.agent.listModels, null, decodeAgentModels),
     listAgents: (serverId) =>
       serverId === undefined
-        ? invokeAgent(IPC_CHANNELS.agentList, null, decodeAgents)
-        : invokeAgentForServer(serverId, IPC_CHANNELS.agentList, null, decodeAgents),
+        ? invokeAgent(IPC_ENDPOINTS.agent.list, null, decodeAgents)
+        : invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.list, null, decodeAgents),
     listInstalledSkills: (agentId) =>
-      invokeAgent(IPC_CHANNELS.agentListInstalledSkills, agentId, decodeInstalledSkillsFromMain),
-    listChannels: () => invokeAgent(IPC_CHANNELS.agentListChannels, null, decodeChannelSummaries),
-    readChannel: (input) => invokeAgent(IPC_CHANNELS.agentReadChannel, input, decodeChannelPage),
-    channelCommand: (input) => invokeAgent(IPC_CHANNELS.agentChannelCommand, input, decodeChannel),
-    deleteChannel: (channelId) => invokeAgent(IPC_CHANNELS.agentDeleteChannel, channelId, decodeVoid),
-    getSidebarLayout: () => invokeAgent(IPC_CHANNELS.agentGetSidebarLayout, null, decodeSidebarLayout),
-    mutateSidebarLayout: (action) => invokeAgent(IPC_CHANNELS.agentMutateSidebarLayout, action, decodeSidebarLayout),
-    generateProfile: (input) => invokeAgent(IPC_CHANNELS.agentGenerateProfile, input, decodeAgentProfileDraft),
-    saveProfile: (input) => invokeAgent(IPC_CHANNELS.agentSaveProfile, input, decodeSaveAgentProfileResult),
-    createAgent: (input) => invokeAgent(IPC_CHANNELS.agentCreate, input, decodeAgent),
-    duplicateAgent: (agentId) => invokeAgent(IPC_CHANNELS.agentDuplicate, agentId, decodeDuplicateAgentResultFromMain),
-    updateAgent: (input) => invokeAgent(IPC_CHANNELS.agentUpdate, input, decodeAgent),
-    setAvatar: (input) => invokeAgent(IPC_CHANNELS.agentSetAvatar, input, decodeAgent),
-    deleteAgent: (agentId) => invokeAgent(IPC_CHANNELS.agentDelete, agentId, decodeVoid),
-    listMemories: (agentId) => invokeAgent(IPC_CHANNELS.agentListMemories, agentId, decodeMemories),
-    createMemory: (input) => invokeAgent(IPC_CHANNELS.agentCreateMemory, input, decodeMemory),
-    updateMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateMemory, input, decodeMemory),
-    deleteMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteMemory, input, decodeVoid),
-    clearMemories: (agentId) => invokeAgent(IPC_CHANNELS.agentClearMemories, agentId, decodeVoid),
-    listTables: () => invokeAgent(IPC_CHANNELS.sharedListTables, null, decodeTables),
-    deleteTable: (input) => invokeAgent(IPC_CHANNELS.sharedDeleteTable, input, decodeVoid),
-    listRoutines: (agentId) => invokeAgent(IPC_CHANNELS.agentListRoutines, agentId, decodeRoutines),
-    createRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateRoutine, input, decodeRoutine),
-    updateRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateRoutine, input, decodeRoutine),
-    deleteRoutine: (input) => invokeAgent(IPC_CHANNELS.agentDeleteRoutine, input, decodeVoid),
-    testRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestRoutine, input, decodeRoutineRun),
-    listRoutineRuns: (input) => invokeAgent(IPC_CHANNELS.agentListRoutineRuns, input, decodeRoutineRuns),
+      invokeAgent(IPC_ENDPOINTS.agent.listInstalledSkills, agentId, decodeInstalledSkillsFromMain),
+    listChannels: () => invokeAgent(IPC_ENDPOINTS.agent.listChannels, null, decodeChannelSummaries),
+    readChannel: (input) => invokeAgent(IPC_ENDPOINTS.agent.readChannel, input, decodeChannelPage),
+    channelCommand: (input) => invokeAgent(IPC_ENDPOINTS.agent.channelCommand, input, decodeChannel),
+    deleteChannel: (channelId) => invokeAgent(IPC_ENDPOINTS.agent.deleteChannel, channelId, decodeVoid),
+    getSidebarLayout: () => invokeAgent(IPC_ENDPOINTS.agent.getSidebarLayout, null, decodeSidebarLayout),
+    mutateSidebarLayout: (action) => invokeAgent(IPC_ENDPOINTS.agent.mutateSidebarLayout, action, decodeSidebarLayout),
+    generateProfile: (input) => invokeAgent(IPC_ENDPOINTS.agent.generateProfile, input, decodeAgentProfileDraft),
+    saveProfile: (input) => invokeAgent(IPC_ENDPOINTS.agent.saveProfile, input, decodeSaveAgentProfileResult),
+    createAgent: (input) => invokeAgent(IPC_ENDPOINTS.agent.create, input, decodeAgent),
+    duplicateAgent: (agentId) =>
+      invokeAgent(IPC_ENDPOINTS.agent.duplicate, agentId, decodeDuplicateAgentResultFromMain),
+    updateAgent: (input) => invokeAgent(IPC_ENDPOINTS.agent.update, input, decodeAgent),
+    setAvatar: (input) => invokeAgent(IPC_ENDPOINTS.agent.setAvatar, input, decodeAgent),
+    deleteAgent: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.delete, agentId, decodeVoid),
+    listMemories: (agentId) => invokeAgent(IPC_ENDPOINTS.agentMemories.listMemories, agentId, decodeMemories),
+    createMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.createMemory, input, decodeMemory),
+    updateMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.updateMemory, input, decodeMemory),
+    deleteMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.deleteMemory, input, decodeVoid),
+    clearMemories: (agentId) => invokeAgent(IPC_ENDPOINTS.agentMemories.clearMemories, agentId, decodeVoid),
+    listTables: () => invokeAgent(IPC_ENDPOINTS.sharedTables.listTables, null, decodeTables),
+    deleteTable: (input) => invokeAgent(IPC_ENDPOINTS.sharedTables.deleteTable, input, decodeVoid),
+    listRoutines: (agentId) => invokeAgent(IPC_ENDPOINTS.agentRoutines.listRoutines, agentId, decodeRoutines),
+    createRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.createRoutine, input, decodeRoutine),
+    updateRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.updateRoutine, input, decodeRoutine),
+    deleteRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.deleteRoutine, input, decodeVoid),
+    testRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.testRoutine, input, decodeRoutineRun),
+    listRoutineRuns: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.listRoutineRuns, input, decodeRoutineRuns),
     listChannelMemories: (channelId) =>
-      invokeAgent(IPC_CHANNELS.agentListChannelMemories, channelId, decodeChannelMemories),
-    createChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentCreateChannelMemory, input, decodeChannelMemory),
-    updateChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentUpdateChannelMemory, input, decodeChannelMemory),
-    deleteChannelMemory: (input) => invokeAgent(IPC_CHANNELS.agentDeleteChannelMemory, input, decodeVoid),
-    clearChannelMemories: (channelId) => invokeAgent(IPC_CHANNELS.agentClearChannelMemories, channelId, decodeVoid),
+      invokeAgent(IPC_ENDPOINTS.channelMemories.listChannelMemories, channelId, decodeChannelMemories),
+    createChannelMemory: (input) =>
+      invokeAgent(IPC_ENDPOINTS.channelMemories.createChannelMemory, input, decodeChannelMemory),
+    updateChannelMemory: (input) =>
+      invokeAgent(IPC_ENDPOINTS.channelMemories.updateChannelMemory, input, decodeChannelMemory),
+    deleteChannelMemory: (input) => invokeAgent(IPC_ENDPOINTS.channelMemories.deleteChannelMemory, input, decodeVoid),
+    clearChannelMemories: (channelId) =>
+      invokeAgent(IPC_ENDPOINTS.channelMemories.clearChannelMemories, channelId, decodeVoid),
     listChannelRoutines: (channelId) =>
-      invokeAgent(IPC_CHANNELS.agentListChannelRoutines, channelId, decodeChannelRoutines),
-    createChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentCreateChannelRoutine, input, decodeChannelRoutine),
-    updateChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentUpdateChannelRoutine, input, decodeChannelRoutine),
-    deleteChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentDeleteChannelRoutine, input, decodeVoid),
-    testChannelRoutine: (input) => invokeAgent(IPC_CHANNELS.agentTestChannelRoutine, input, decodeChannelRoutineRun),
+      invokeAgent(IPC_ENDPOINTS.channelRoutines.listChannelRoutines, channelId, decodeChannelRoutines),
+    createChannelRoutine: (input) =>
+      invokeAgent(IPC_ENDPOINTS.channelRoutines.createChannelRoutine, input, decodeChannelRoutine),
+    updateChannelRoutine: (input) =>
+      invokeAgent(IPC_ENDPOINTS.channelRoutines.updateChannelRoutine, input, decodeChannelRoutine),
+    deleteChannelRoutine: (input) => invokeAgent(IPC_ENDPOINTS.channelRoutines.deleteChannelRoutine, input, decodeVoid),
+    testChannelRoutine: (input) =>
+      invokeAgent(IPC_ENDPOINTS.channelRoutines.testChannelRoutine, input, decodeChannelRoutineRun),
     listChannelRoutineRuns: (input) =>
-      invokeAgent(IPC_CHANNELS.agentListChannelRoutineRuns, input, decodeChannelRoutineRuns),
+      invokeAgent(IPC_ENDPOINTS.channelRoutines.listChannelRoutineRuns, input, decodeChannelRoutineRuns),
     // `invokeAgentForServer`, never `invokeAgent`: the settings modal can be open for a server the
     // user has not switched to, and `invokeAgent` would pin the selected one.
     listMcpServers: (serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversListMcpServers, null, decodeMcpServerConfigs),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.list, null, decodeMcpServerConfigs),
     saveMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversSaveMcpServer, input, decodeMcpServerConfigs),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.save, input, decodeMcpServerConfigs),
     removeMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMcpServer, input, decodeMcpServerConfigs),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.remove, input, decodeMcpServerConfigs),
     setMcpServerEnabled: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversSetMcpServerEnabled, input, decodeMcpServerConfigs),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.setEnabled, input, decodeMcpServerConfigs),
     testMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversTestMcpServer, input, decodeMcpTestResult),
-    readConversation: (agentId) => invokeAgent(IPC_CHANNELS.agentReadConversation, agentId, decodeConversation),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.test, input, decodeMcpTestResult),
+    readConversation: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.readConversation, agentId, decodeConversation),
     readConversationPage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentReadConversationPage, input, decodeConversationPageFromMain),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.readConversationPage, input, decodeConversationPageFromMain),
     searchConversationMessages: (input) =>
-      invokeAgent(IPC_CHANNELS.agentSearchConversationMessages, input, decodeConversationSearchPageFromMain),
-    listConversationReads: () => invokeAgent(IPC_CHANNELS.agentListConversationReads, null, decodeReadStates),
+      invokeAgent(IPC_ENDPOINTS.agent.searchConversationMessages, input, decodeConversationSearchPageFromMain),
+    listConversationReads: () => invokeAgent(IPC_ENDPOINTS.agent.listConversationReads, null, decodeReadStates),
     markConversationRead: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentMarkConversationRead, input, decodeReadState),
-    chooseAttachments: (input) => invokeAgent(IPC_CHANNELS.agentChooseAttachments, input, decodeAttachments),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.markConversationRead, input, decodeReadState),
+    chooseAttachments: (input) =>
+      invokeAgent(IPC_ENDPOINTS.agentAttachments.chooseAttachments, input, decodeAttachments),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);
       return () => attachmentImportListeners.delete(listener);
     },
     discardDraftAttachment: (attachmentId, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentDiscardDraftAttachment, attachmentId, decodeVoid),
-    downloadAttachments: (input) => invokeAgent(IPC_CHANNELS.agentDownloadAttachments, input, decodeVoid),
-    openAttachment: (input) => invokeAgent(IPC_CHANNELS.agentOpenAttachment, input, decodeVoid),
-    openSharedFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenSharedFile, input, decodeVoid),
-    openWorkspaceFile: (input) => invokeAgent(IPC_CHANNELS.agentOpenWorkspaceFile, input, decodeVoid),
-    previewSharedFile: (input) => invokeAgent(IPC_CHANNELS.agentPreviewSharedFile, input, decodeFilePreview),
-    previewWorkspaceFile: (input) => invokeAgent(IPC_CHANNELS.agentPreviewWorkspaceFile, input, decodeFilePreview),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agentAttachments.discardDraftAttachment, attachmentId, decodeVoid),
+    downloadAttachments: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.downloadAttachments, input, decodeVoid),
+    openAttachment: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openAttachment, input, decodeVoid),
+    openSharedFile: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openSharedFile, input, decodeVoid),
+    openWorkspaceFile: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openWorkspaceFile, input, decodeVoid),
+    previewSharedFile: (input) =>
+      invokeAgent(IPC_ENDPOINTS.agentAttachments.previewSharedFile, input, decodeFilePreview),
+    previewWorkspaceFile: (input) =>
+      invokeAgent(IPC_ENDPOINTS.agentAttachments.previewWorkspaceFile, input, decodeFilePreview),
     sendMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentSendMessage, input, decodeReceipt),
-    setMessageReaction: (input) => invokeAgent(IPC_CHANNELS.agentSetMessageReaction, input, decodeVoid),
-    listQueue: (agentId) => invokeAgent(IPC_CHANNELS.agentListQueue, agentId, decodeQueue),
-    acknowledgeFailedTurn: (input) => invokeAgent(IPC_CHANNELS.agentAcknowledgeFailedTurn, input, decodeVoid),
-    cancelQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentCancelQueuedMessage, input, decodeVoid),
-    steerQueuedMessage: (input) => invokeAgent(IPC_CHANNELS.agentSteerQueuedMessage, input, decodeVoid),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.sendMessage, input, decodeReceipt),
+    setMessageReaction: (input) => invokeAgent(IPC_ENDPOINTS.agent.setMessageReaction, input, decodeVoid),
+    listQueue: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.listQueue, agentId, decodeQueue),
+    acknowledgeFailedTurn: (input) => invokeAgent(IPC_ENDPOINTS.agent.acknowledgeFailedTurn, input, decodeVoid),
+    cancelQueuedMessage: (input) => invokeAgent(IPC_ENDPOINTS.agent.cancelQueuedMessage, input, decodeVoid),
+    steerQueuedMessage: (input) => invokeAgent(IPC_ENDPOINTS.agent.steerQueuedMessage, input, decodeVoid),
     editQueuedMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentEditQueuedMessage, input, decodeQueue),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.editQueuedMessage, input, decodeQueue),
     updateQueuedMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.agentUpdateQueuedMessage, input, decodeVoid),
-    reorderQueue: (input) => invokeAgent(IPC_CHANNELS.agentReorderQueue, input, decodeVoid),
-    interrupt: (input) => invokeAgent(IPC_CHANNELS.agentInterrupt, input, decodeVoid),
-    respondToPrompt: (input) => invokeAgent(IPC_CHANNELS.agentRespondToPrompt, input, decodeVoid),
-    respondToApproval: (input) => invokeAgent(IPC_CHANNELS.agentRespondToApproval, input, decodeVoid),
-    respondToBrowserSecret: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserSecret, input, decodeVoid),
-    respondToBrowserTakeover: (input) => invokeAgent(IPC_CHANNELS.agentRespondToBrowserTakeover, input, decodeVoid),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.updateQueuedMessage, input, decodeVoid),
+    reorderQueue: (input) => invokeAgent(IPC_ENDPOINTS.agent.reorderQueue, input, decodeVoid),
+    interrupt: (input) => invokeAgent(IPC_ENDPOINTS.agent.interrupt, input, decodeVoid),
+    respondToPrompt: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToPrompt, input, decodeVoid),
+    respondToApproval: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToApproval, input, decodeVoid),
+    respondToBrowserSecret: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToBrowserSecret, input, decodeVoid),
+    respondToBrowserTakeover: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToBrowserTakeover, input, decodeVoid),
     onEvent: (listener) =>
-      subscribe(IPC_CHANNELS.agentEvent, decodeScopedAgentEvent, (payload) => {
+      subscribe(IPC_ENDPOINTS.agent.event, decodeScopedAgentEvent, (payload) => {
         if (payload.serverId === selectedServerId) listener(payload.event);
       }),
-    onScopedEvent: (listener) => subscribe(IPC_CHANNELS.agentEvent, decodeScopedAgentEvent, listener),
+    onScopedEvent: (listener) => subscribe(IPC_ENDPOINTS.agent.event, decodeScopedAgentEvent, listener),
   },
   browser: {
-    open: (input) => invokeRequest(IPC_CHANNELS.browserOpen, decodeBrowserTab, input),
-    activate: (tabId) => invokeRequest(IPC_CHANNELS.browserActivate, decodeVoid, tabId),
-    navigate: (input) => invokeRequest(IPC_CHANNELS.browserNavigate, decodeVoid, input),
-    reload: (tabId) => invokeRequest(IPC_CHANNELS.browserReload, decodeVoid, tabId),
-    close: (tabId) => invokeRequest(IPC_CHANNELS.browserClose, decodeVoid, tabId),
-    listTabs: () => invokeRequest(IPC_CHANNELS.browserListTabs, decodeBrowserTabs),
-    getDisplayState: () => invokeRequest(IPC_CHANNELS.browserGetDisplayState, decodeBrowserDisplayState),
-    getControlState: () => invokeRequest(IPC_CHANNELS.browserGetControlState, decodeBrowserControlState),
-    capturePreview: (tabId) => invokeRequest(IPC_CHANNELS.browserCapturePreview, decodeBrowserPreviewFromMain, tabId),
-    setVisible: (input) => invokeRequest(IPC_CHANNELS.browserSetVisible, decodeVoid, input),
-    startLiveView: (tabId) => invokeRequest(IPC_CHANNELS.browserStartLiveView, decodeVoid, tabId),
-    stopLiveView: () => invokeRequest(IPC_CHANNELS.browserStopLiveView, decodeVoid),
+    open: (input) => invokeRequest(IPC_ENDPOINTS.browser.open, decodeBrowserTab, input),
+    activate: (tabId) => invokeRequest(IPC_ENDPOINTS.browser.activate, decodeVoid, tabId),
+    navigate: (input) => invokeRequest(IPC_ENDPOINTS.browser.navigate, decodeVoid, input),
+    reload: (tabId) => invokeRequest(IPC_ENDPOINTS.browser.reload, decodeVoid, tabId),
+    close: (tabId) => invokeRequest(IPC_ENDPOINTS.browser.close, decodeVoid, tabId),
+    listTabs: () => invokeRequest(IPC_ENDPOINTS.browser.listTabs, decodeBrowserTabs),
+    getDisplayState: () => invokeRequest(IPC_ENDPOINTS.browser.getDisplayState, decodeBrowserDisplayState),
+    getControlState: () => invokeRequest(IPC_ENDPOINTS.browser.getControlState, decodeBrowserControlState),
+    capturePreview: (tabId) => invokeRequest(IPC_ENDPOINTS.browser.capturePreview, decodeBrowserPreviewFromMain, tabId),
+    setVisible: (input) => invokeRequest(IPC_ENDPOINTS.browser.setVisible, decodeVoid, input),
+    startLiveView: (tabId) => invokeRequest(IPC_ENDPOINTS.browser.startLiveView, decodeVoid, tabId),
+    stopLiveView: () => invokeRequest(IPC_ENDPOINTS.browser.stopLiveView, decodeVoid),
     // Untyped: the renderer and wire input shapes differ on purpose. See `IPC_ENDPOINTS.browser`.
-    sendLiveViewInput: (input) => ipcRenderer.invoke(IPC_CHANNELS.browserSendLiveViewInput, input).then(decodeVoid),
-    onLiveViewEvent: (listener) => subscribe(IPC_CHANNELS.browserLiveViewEvent, decodeBrowserLiveViewEvent, listener),
-    onDisplayState: (listener) => subscribe(IPC_CHANNELS.browserDisplayStateEvent, decodeBrowserDisplayState, listener),
+    sendLiveViewInput: (input) =>
+      ipcRenderer.invoke(IPC_ENDPOINTS.browser.sendLiveViewInput.channel, input).then(decodeVoid),
+    onLiveViewEvent: (listener) => subscribe(IPC_ENDPOINTS.browser.liveViewEvent, decodeBrowserLiveViewEvent, listener),
+    onDisplayState: (listener) =>
+      subscribe(IPC_ENDPOINTS.browser.displayStateEvent, decodeBrowserDisplayState, listener),
     openPictureInPicture: (bounds) =>
-      invokeRequest(IPC_CHANNELS.browserPictureInPictureOpen, decodeBrowserBounds, bounds),
-    closePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureClose, decodeVoid),
-    dockPictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureDock, decodeVoid),
-    hidePictureInPicture: () => invokeRequest(IPC_CHANNELS.browserPictureInPictureHide, decodeVoid),
+      invokeRequest(IPC_ENDPOINTS.browser.pictureInPictureOpen, decodeBrowserBounds, bounds),
+    closePictureInPicture: () => invokeRequest(IPC_ENDPOINTS.browser.pictureInPictureClose, decodeVoid),
+    dockPictureInPicture: () => invokeRequest(IPC_ENDPOINTS.browser.pictureInPictureDock, decodeVoid),
+    hidePictureInPicture: () => invokeRequest(IPC_ENDPOINTS.browser.pictureInPictureHide, decodeVoid),
     onPictureInPictureEvent: (listener) =>
-      subscribe(IPC_CHANNELS.browserPictureInPictureEvent, decodeBrowserPictureInPictureEvent, listener),
+      subscribe(IPC_ENDPOINTS.browser.pictureInPictureEvent, decodeBrowserPictureInPictureEvent, listener),
   },
   update: {
-    getStatus: () => invokeRequest(IPC_CHANNELS.updateGetStatus, decodeUpdateStatus),
-    check: () => invokeRequest(IPC_CHANNELS.updateCheck, decodeUpdateStatus),
-    download: () => invokeRequest(IPC_CHANNELS.updateDownload, decodeUpdateStatus),
-    install: () => invokeRequest(IPC_CHANNELS.updateInstall, decodeVoid),
-    getPreference: () => invokeRequest(IPC_CHANNELS.updateGetPreference, decodeUpdatePreference),
-    setPreference: (input) => invokeRequest(IPC_CHANNELS.updateSetPreference, decodeUpdatePreference, input),
-    onEvent: (listener) => subscribe(IPC_CHANNELS.updateEvent, decodeUpdateStatus, listener),
+    getStatus: () => invokeRequest(IPC_ENDPOINTS.update.getStatus, decodeUpdateStatus),
+    check: () => invokeRequest(IPC_ENDPOINTS.update.check, decodeUpdateStatus),
+    download: () => invokeRequest(IPC_ENDPOINTS.update.download, decodeUpdateStatus),
+    install: () => invokeRequest(IPC_ENDPOINTS.update.install, decodeVoid),
+    getPreference: () => invokeRequest(IPC_ENDPOINTS.update.getPreference, decodeUpdatePreference),
+    setPreference: (input) => invokeRequest(IPC_ENDPOINTS.update.setPreference, decodeUpdatePreference, input),
+    onEvent: (listener) => subscribe(IPC_ENDPOINTS.update.event, decodeUpdateStatus, listener),
   },
   notifications: {
-    getPreference: () => invokeRequest(IPC_CHANNELS.notificationsGetPreference, decodeNotificationPreference),
+    getPreference: () => invokeRequest(IPC_ENDPOINTS.notifications.getPreference, decodeNotificationPreference),
     setPreference: (input) =>
-      invokeRequest(IPC_CHANNELS.notificationsSetPreference, decodeNotificationPreference, input),
-    test: () => invokeRequest(IPC_CHANNELS.notificationsTest, decodeVoid),
-    openSettings: () => invokeRequest(IPC_CHANNELS.notificationsOpenSettings, decodeVoid),
-    onOpened: (listener) => subscribe(IPC_CHANNELS.notificationsOpenedEvent, decodeNotificationOpenedEvent, listener),
+      invokeRequest(IPC_ENDPOINTS.notifications.setPreference, decodeNotificationPreference, input),
+    test: () => invokeRequest(IPC_ENDPOINTS.notifications.test, decodeVoid),
+    openSettings: () => invokeRequest(IPC_ENDPOINTS.notifications.openSettings, decodeVoid),
+    onOpened: (listener) => subscribe(IPC_ENDPOINTS.notifications.openedEvent, decodeNotificationOpenedEvent, listener),
   },
   maintenance: {
-    exportData: () => invokeRequest(IPC_CHANNELS.maintenanceExportData, decodeExportResult),
-    exportDiagnostics: () => invokeRequest(IPC_CHANNELS.maintenanceExportDiagnostics, decodeExportResult),
+    exportData: () => invokeRequest(IPC_ENDPOINTS.maintenance.exportData, decodeExportResult),
+    exportDiagnostics: () => invokeRequest(IPC_ENDPOINTS.maintenance.exportDiagnostics, decodeExportResult),
   },
   servers: {
-    list: async () => rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversList, decodeServers)),
+    list: async () => rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.list, decodeServers)),
     select: async (serverId) =>
-      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSelect, decodeServers, serverId)),
+      rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.select, decodeServers, serverId)),
     reorder: async (input) =>
-      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversReorder, decodeServers, input)),
+      rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.reorder, decodeServers, input)),
     setMuted: async (input) =>
-      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetMuted, decodeServers, input)),
+      rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.setMuted, decodeServers, input)),
     setNotificationLevel: async (input) =>
-      rememberActiveServer(await invokeRequest(IPC_CHANNELS.serversSetNotificationLevel, decodeServers, input)),
+      rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.setNotificationLevel, decodeServers, input)),
     join: async (input) => {
-      const server = await invokeRequest(IPC_CHANNELS.serversJoin, decodeServer, input);
+      const server = await invokeRequest(IPC_ENDPOINTS.servers.join, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    previewInvite: (input) => invokeRequest(IPC_CHANNELS.serversPreviewInvite, decodeInvitePreview, input),
-    takePendingInvite: () => invokeRequest(IPC_CHANNELS.serversTakePendingInvite, decodePendingInvite),
+    previewInvite: (input) => invokeRequest(IPC_ENDPOINTS.servers.previewInvite, decodeInvitePreview, input),
+    takePendingInvite: () => invokeRequest(IPC_ENDPOINTS.servers.takePendingInvite, decodePendingInvite),
     login: async (input) => {
-      const server = await invokeRequest(IPC_CHANNELS.serversLogin, decodeServer, input);
+      const server = await invokeRequest(IPC_ENDPOINTS.servers.login, decodeServer, input);
       selectedServerId = server.id;
       return server;
     },
-    retryConnection: (serverId) => invokeRequest(IPC_CHANNELS.serversRetryConnection, decodeServer, serverId),
-    remove: (serverId) => invokeRequest(IPC_CHANNELS.serversRemove, decodeVoid, serverId),
-    getPresence: () => invokeRequest(IPC_CHANNELS.serversGetPresence, decodeTeamPresenceSnapshot),
+    retryConnection: (serverId) => invokeRequest(IPC_ENDPOINTS.servers.retryConnection, decodeServer, serverId),
+    remove: (serverId) => invokeRequest(IPC_ENDPOINTS.servers.remove, decodeVoid, serverId),
+    getPresence: () => invokeRequest(IPC_ENDPOINTS.servers.getPresence, decodeTeamPresenceSnapshot),
     getPresenceFor: (serverId) =>
-      invokeRequest(IPC_CHANNELS.serversGetPresenceFor, decodeTeamPresenceSnapshot, serverId),
-    refreshIdentity: (serverId) => invokeRequest(IPC_CHANNELS.serversRefreshIdentity, decodeServer, serverId),
-    listMembers: (serverId) => invokeRequest(IPC_CHANNELS.serversListMembers, decodeTeamMembers, serverId),
+      invokeRequest(IPC_ENDPOINTS.servers.getPresenceFor, decodeTeamPresenceSnapshot, serverId),
+    refreshIdentity: (serverId) => invokeRequest(IPC_ENDPOINTS.servers.refreshIdentity, decodeServer, serverId),
+    listMembers: (serverId) => invokeRequest(IPC_ENDPOINTS.servers.listMembers, decodeTeamMembers, serverId),
     updateMember: (serverId, input) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversUpdateMember, input, decodeTeamMember),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.servers.updateMember, input, decodeTeamMember),
     removeMember: (serverId, memberId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversRemoveMember, memberId, decodeVoid),
-    listInvites: (serverId) => invokeRequest(IPC_CHANNELS.serversListInvites, decodeTeamInvites, serverId),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.servers.removeMember, memberId, decodeVoid),
+    listInvites: (serverId) => invokeRequest(IPC_ENDPOINTS.servers.listInvites, decodeTeamInvites, serverId),
     revokeInvite: (serverId, inviteId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversRevokeInvite, inviteId, decodeVoid),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.servers.revokeInvite, inviteId, decodeVoid),
     createInvite: (serverId, input) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.serversCreateInvite, input, decodeInviteSummary),
-    setTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetTyping, decodeVoid, input),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.servers.createInvite, input, decodeInviteSummary),
+    setTyping: (input) => invokeRequest(IPC_ENDPOINTS.servers.setTyping, decodeVoid, input),
     onPresence: (listener, serverId) =>
-      subscribe(IPC_CHANNELS.serversPresence, decodeScopedTeamPresence, (scoped) => {
+      subscribe(IPC_ENDPOINTS.servers.presence, decodeScopedTeamPresence, (scoped) => {
         if (scoped.serverId === (serverId ?? selectedServerId)) listener(scoped.snapshot);
       }),
-    listDirectThreads: () => invokeRequest(IPC_CHANNELS.serversListDirectThreads, decodeDirectThreads),
+    listDirectThreads: () => invokeRequest(IPC_ENDPOINTS.servers.listDirectThreads, decodeDirectThreads),
     readDirectConversation: (memberId) =>
-      invokeRequest(IPC_CHANNELS.serversReadDirectConversation, decodeDirectConversation, memberId),
+      invokeRequest(IPC_ENDPOINTS.servers.readDirectConversation, decodeDirectConversation, memberId),
     readDirectConversationPage: (input) =>
-      invokeRequest(IPC_CHANNELS.serversReadDirectConversationPage, decodeDirectConversationPage, input),
-    sendDirectMessage: (input) => invokeRequest(IPC_CHANNELS.serversSendDirectMessage, decodeDirectMessage, input),
-    markDirectRead: (input) => invokeRequest(IPC_CHANNELS.serversMarkDirectRead, decodeDirectReadState, input),
-    setDirectTyping: (input) => invokeRequest(IPC_CHANNELS.serversSetDirectTyping, decodeVoid, input),
+      invokeRequest(IPC_ENDPOINTS.servers.readDirectConversationPage, decodeDirectConversationPage, input),
+    sendDirectMessage: (input) => invokeRequest(IPC_ENDPOINTS.servers.sendDirectMessage, decodeDirectMessage, input),
+    markDirectRead: (input) => invokeRequest(IPC_ENDPOINTS.servers.markDirectRead, decodeDirectReadState, input),
+    setDirectTyping: (input) => invokeRequest(IPC_ENDPOINTS.servers.setDirectTyping, decodeVoid, input),
     onDirectMessage: (listener) =>
-      subscribe(IPC_CHANNELS.serversDirectMessage, decodeScopedDirectMessage, (scoped) => {
+      subscribe(IPC_ENDPOINTS.servers.directMessage, decodeScopedDirectMessage, (scoped) => {
         if (scoped.serverId === selectedServerId) listener(scoped.event);
       }),
     onDirectTyping: (listener) =>
-      subscribe(IPC_CHANNELS.serversDirectTyping, decodeScopedDirectTyping, (scoped) => {
+      subscribe(IPC_ENDPOINTS.servers.directTyping, decodeScopedDirectTyping, (scoped) => {
         if (scoped.serverId === selectedServerId) listener(scoped.event);
       }),
     onEvent: (listener) =>
-      subscribe(IPC_CHANNELS.serversEvent, decodeServers, (servers) => listener(rememberActiveServer(servers))),
-    onInvite: (listener) => subscribe(IPC_CHANNELS.serversInvite, decodeInviteUrl, listener),
+      subscribe(IPC_ENDPOINTS.servers.event, decodeServers, (servers) => listener(rememberActiveServer(servers))),
+    onInvite: (listener) => subscribe(IPC_ENDPOINTS.servers.invite, decodeInviteUrl, listener),
   },
   plugins: {
-    takePendingListing: () => invokeRequest(IPC_CHANNELS.pluginsTakePendingListing, decodePendingListing),
+    takePendingListing: () => invokeRequest(IPC_ENDPOINTS.plugins.takePendingListing, decodePendingListing),
     onOpenListing: (listener) =>
-      listen(IPC_CHANNELS.pluginsOpenListing, (slug) => {
+      listen(IPC_ENDPOINTS.plugins.openListing, (slug) => {
         if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);
       }),
   },
   host: {
-    getStatus: () => invokeRequest(IPC_CHANNELS.hostGetStatus, decodeHostStatus),
-    configure: (input) => invokeRequest(IPC_CHANNELS.hostConfigure, decodeHostStatus, input),
-    updateIdentity: (input) => invokeRequest(IPC_CHANNELS.hostUpdateIdentity, decodeHostStatus, input),
-    getPresence: () => invokeRequest(IPC_CHANNELS.hostGetPresence, decodeTeamPresenceSnapshot),
-    start: () => invokeRequest(IPC_CHANNELS.hostStart, decodeHostStatus),
-    stop: () => invokeRequest(IPC_CHANNELS.hostStop, decodeHostStatus),
-    recheckScreenRecording: () => invokeRequest(IPC_CHANNELS.hostRecheckScreenRecording, decodeHostStatus),
-    listMembers: () => invokeRequest(IPC_CHANNELS.hostListMembers, decodeTeamMembers),
-    updateMember: (input) => invokeRequest(IPC_CHANNELS.hostUpdateMember, decodeTeamMember, input),
-    removeMember: (memberId) => invokeRequest(IPC_CHANNELS.hostRemoveMember, decodeVoid, memberId),
-    listSessions: () => invokeRequest(IPC_CHANNELS.hostListSessions, decodeTeamSessions),
-    revokeSession: (sessionId) => invokeRequest(IPC_CHANNELS.hostRevokeSession, decodeVoid, sessionId),
-    listInvites: () => invokeRequest(IPC_CHANNELS.hostListInvites, decodeTeamInvites),
-    revokeInvite: (inviteId) => invokeRequest(IPC_CHANNELS.hostRevokeInvite, decodeVoid, inviteId),
-    createInvite: (input) => invokeRequest(IPC_CHANNELS.hostCreateInvite, decodeInviteSummary, input),
-    onEvent: (listener) => subscribe(IPC_CHANNELS.hostEvent, decodeHostStatus, listener),
+    getStatus: () => invokeRequest(IPC_ENDPOINTS.host.getStatus, decodeHostStatus),
+    configure: (input) => invokeRequest(IPC_ENDPOINTS.host.configure, decodeHostStatus, input),
+    updateIdentity: (input) => invokeRequest(IPC_ENDPOINTS.host.updateIdentity, decodeHostStatus, input),
+    getPresence: () => invokeRequest(IPC_ENDPOINTS.host.getPresence, decodeTeamPresenceSnapshot),
+    start: () => invokeRequest(IPC_ENDPOINTS.host.start, decodeHostStatus),
+    stop: () => invokeRequest(IPC_ENDPOINTS.host.stop, decodeHostStatus),
+    recheckScreenRecording: () => invokeRequest(IPC_ENDPOINTS.host.recheckScreenRecording, decodeHostStatus),
+    listMembers: () => invokeRequest(IPC_ENDPOINTS.host.listMembers, decodeTeamMembers),
+    updateMember: (input) => invokeRequest(IPC_ENDPOINTS.host.updateMember, decodeTeamMember, input),
+    removeMember: (memberId) => invokeRequest(IPC_ENDPOINTS.host.removeMember, decodeVoid, memberId),
+    listSessions: () => invokeRequest(IPC_ENDPOINTS.host.listSessions, decodeTeamSessions),
+    revokeSession: (sessionId) => invokeRequest(IPC_ENDPOINTS.host.revokeSession, decodeVoid, sessionId),
+    listInvites: () => invokeRequest(IPC_ENDPOINTS.host.listInvites, decodeTeamInvites),
+    revokeInvite: (inviteId) => invokeRequest(IPC_ENDPOINTS.host.revokeInvite, decodeVoid, inviteId),
+    createInvite: (input) => invokeRequest(IPC_ENDPOINTS.host.createInvite, decodeInviteSummary, input),
+    onEvent: (listener) => subscribe(IPC_ENDPOINTS.host.event, decodeHostStatus, listener),
   },
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.
   storage: {
     getUsage: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_CHANNELS.storageGetUsage, input, decodeOptionalStorageUsage),
-    deleteFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageDeleteFile, input, decodeVoid),
-    clear: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageClear, input, decodeVoid),
-    openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_CHANNELS.storageOpenFile, input, decodeVoid),
-    openLocation: (input) => invokeRequest(IPC_CHANNELS.storageOpenLocation, decodeVoid, input),
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.getUsage, input, decodeOptionalStorageUsage),
+    deleteFile: (input, serverId) =>
+      invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.deleteFile, input, decodeVoid),
+    clear: (input, serverId) => invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.clear, input, decodeVoid),
+    openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.openFile, input, decodeVoid),
+    openLocation: (input) => invokeRequest(IPC_ENDPOINTS.storage.openLocation, decodeVoid, input),
   },
   remoteDesktop: {
     checkSetup: (serverId) =>
-      invokeRequest(IPC_CHANNELS.remoteDesktopCheckSetup, decodeRemoteDesktopSetupFromMain, serverId),
-    openSetup: (action) => invokeRequest(IPC_CHANNELS.remoteDesktopOpenSetup, decodeVoid, action),
-    test: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopTest, decodeRemoteDesktopTestFromMain, input),
-    list: () => invokeRequest(IPC_CHANNELS.remoteDesktopList, decodeRemoteDesktopSessions),
-    connect: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopConnect, decodeRemoteDesktopConnectResult, input),
-    selectDisplay: (input) => invokeRequest(IPC_CHANNELS.remoteDesktopSelectDisplay, decodeVoid, input),
-    disconnect: (sessionId) => invokeRequest(IPC_CHANNELS.remoteDesktopDisconnect, decodeVoid, sessionId),
-    onEvent: (listener) => subscribe(IPC_CHANNELS.remoteDesktopEvent, decodeRemoteDesktopSessions, listener),
+      invokeRequest(IPC_ENDPOINTS.remoteDesktop.checkSetup, decodeRemoteDesktopSetupFromMain, serverId),
+    openSetup: (action) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.openSetup, decodeVoid, action),
+    test: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.test, decodeRemoteDesktopTestFromMain, input),
+    list: () => invokeRequest(IPC_ENDPOINTS.remoteDesktop.list, decodeRemoteDesktopSessions),
+    connect: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.connect, decodeRemoteDesktopConnectResult, input),
+    selectDisplay: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.selectDisplay, decodeVoid, input),
+    disconnect: (sessionId) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.disconnect, decodeVoid, sessionId),
+    onEvent: (listener) => subscribe(IPC_ENDPOINTS.remoteDesktop.event, decodeRemoteDesktopSessions, listener),
   },
 };
 
