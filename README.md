@@ -206,6 +206,12 @@ Agents can use `list_local_skills`, `read_local_skill`, `revise_skill`, and `ins
 
 Optional scripts, references, and assets follow the Codex skill folder structure. A PNG at `assets/icon.png` supplies the local preview logo. The built-in `openbot-skill-creator` guide explains the format and validation limits. Registration does not run scripts.
 
+## Import agents from Grok Bot
+
+Open **Server settings → Import** on this computer. Add the [OpenBot export agent](https://x.ai/bot/gI0XdhhDYPJeyQaqQBC0O) to Grok Bot and say "Export my agents for OpenBot". It saves one `.zip` file to Downloads. Choose that file in OpenBot, select the agents, and import them.
+
+The import adds each agent's name, instructions, avatar, skills, routines, and memories. Workspace files are copied to `imported/` in the agent's workspace if you included them. Chat history is not copied: the export agent keeps the important facts as memories. The file is read on this computer and is not uploaded. The export skill and its format are in [`resources/agent-import/grok-bot/SKILL.md`](resources/agent-import/grok-bot/SKILL.md).
+
 ## Commands
 
 The browser client is served at `/app` by the public web app. For local development, run

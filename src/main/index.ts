@@ -20,6 +20,7 @@ import {
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
+import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
@@ -325,6 +326,7 @@ function registerIpcHandlers({
   hostedSites,
   customProviders,
   marketplaceAgents,
+  agentImport,
   voice,
   dynamicIsland,
   cuaDriver,
@@ -367,6 +369,13 @@ function registerIpcHandlers({
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
     ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
+    ...agentImportIpcHandlers({
+      agentImport,
+      getMainWindow,
+      exportSkillPath: app.isPackaged
+        ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
+        : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
+    }),
     ...updateIpcHandlers({ updater, updatePreferenceFile }),
     ...notificationIpcHandlers({
       notificationPreference,

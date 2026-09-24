@@ -108,6 +108,18 @@ export class LocalSkillLibrary {
     });
   }
 
+  /** Removes a revision a failed import published. A skill left with no revision is removed too. */
+  withdraw(id: string, revision: number): Promise<void> {
+    return this.serialize(async () => {
+      const directory = this.directory(id);
+      const path = join(directory, String(await this.revision(id, revision)));
+      await rejectLinks(this.root, path);
+      await rm(path, { recursive: true, force: true });
+      if (!(await readdir(directory)).some((name) => /^[1-9]\d*$/u.test(name)))
+        await rm(directory, { recursive: true, force: true });
+    });
+  }
+
   private async source(agentId: string, sourcePath: string): Promise<Uint8Array> {
     const agent = this.agents().find((item) => item.id === agentId);
     if (!agent) throw new Error("Choose a local agent first.");
