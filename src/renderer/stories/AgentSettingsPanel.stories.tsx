@@ -25,6 +25,7 @@ const meta = {
     onUpdateAgent: fn(async () => undefined),
     onUpdateRuntimeSettings: fn(async () => true),
     onSetAgentAvatar: fn(async () => undefined),
+    onGenerateAvatar: fn(async () => true),
   },
   render: (args) => (
     <main class="agent-memories-story-stage">

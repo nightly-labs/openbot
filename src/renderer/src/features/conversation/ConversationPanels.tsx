@@ -19,6 +19,11 @@ import { Portal } from "@solidjs/web";
 import { createEffect, Loading, lazy, onSettled, Show } from "solid-js";
 import { conversationPort } from "./conversation-port";
 
+/** The chat message that asks an agent to make its own avatar with the managed `openbot-avatar` skill. */
+function avatarGenerationRequest(prompt: string): string {
+  return `Use the openbot-avatar skill to make a new avatar image for yourself and set it as your avatar. Description: ${prompt}`;
+}
+
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLButtonElement) => void }) {
   const controller = useConversationController();
@@ -303,6 +308,19 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onUpdateAgent={props.onUpdateAgent}
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}
+              onGenerateAvatar={
+                props.server?.kind === "local" && agentReady()
+                  ? async (agentId, prompt) => {
+                      if (!props.server) return false;
+                      const sent = await props.onSendMessage(avatarGenerationRequest(prompt), [], null, {
+                        serverId: props.server.id,
+                        agentId,
+                      });
+                      if (sent) setActiveRightPanel("none");
+                      return sent;
+                    }
+                  : undefined
+              }
               skillSelectionRequest={skillSettingsRequest()?.agentId === agent().id ? skillSettingsRequest() : null}
               routineSelectionRequest={
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null

@@ -82,6 +82,8 @@ export interface AgentSettingsPanelProps {
     updates: AgentRuntimeSettingsPatch,
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  /** Asks the agent to make its own avatar from a description. Left out, the Generate section is hidden. */
+  onGenerateAvatar?: (agentId: string, prompt: string) => Promise<boolean>;
 }
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
@@ -96,6 +98,8 @@ interface AgentTextFields {
 interface AvatarEditor {
   batch: number;
   candidateSeed: string;
+  generateBusy: boolean;
+  generatePrompt: string;
   hue: AvatarHue | null;
   pickerOpen: boolean;
   seed: string;
@@ -131,6 +135,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     avatar: {
       batch: 0,
       candidateSeed: "agent",
+      generateBusy: false,
+      generatePrompt: "",
       hue: null,
       pickerOpen: false,
       seed: "agent",
@@ -228,6 +234,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         if (agentChanged) {
           state.avatar.candidateSeed = agent.avatarSeed;
           state.avatar.batch = 0;
+          state.avatar.generatePrompt = "";
           state.avatar.pickerOpen = false;
         }
       });
@@ -429,6 +436,38 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
+  async function generateAgentAvatar(): Promise<void> {
+    const prompt = draft.avatar.generatePrompt.trim();
+    if (!props.onGenerateAvatar || !prompt || draft.avatar.generateBusy) return;
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.avatar.generateBusy = true;
+      state.saveError = null;
+    });
+    try {
+      const sent = await props.onGenerateAvatar(agentId, prompt);
+      if (disposed || props.agent.id !== agentId) return;
+      if (!sent) {
+        setSaveError("Could not ask the agent to generate an avatar.");
+        return;
+      }
+      setDraft((state) => {
+        state.avatar.generatePrompt = "";
+        state.avatar.pickerOpen = false;
+      });
+    } catch (error) {
+      if (!disposed && props.agent.id === agentId) {
+        setSaveError(errorMessage(error, "Could not ask the agent to generate an avatar."));
+      }
+    } finally {
+      if (!disposed) {
+        setDraft((state) => {
+          state.avatar.generateBusy = false;
+        });
+      }
+    }
+  }
+
   async function selectGeneratedAvatar(seed: string): Promise<void> {
     if (avatarUrl() && !(await setCustomAvatar(null))) return;
     setDraft((state) => {
@@ -592,6 +631,40 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     <small>PNG, JPEG or WebP · square crop</small>
                   </span>
                 </Button>
+                <Show when={props.onGenerateAvatar}>
+                  <div class="avatar-editor-divider" />
+                  <div class="avatar-editor-heading">
+                    <span>Generate</span>
+                  </div>
+                  <form
+                    class="avatar-generate"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void generateAgentAvatar();
+                    }}
+                  >
+                    <Textarea
+                      value={draft.avatar.generatePrompt}
+                      aria-label="Avatar description"
+                      placeholder="Describe your avatar…"
+                      maxlength={INPUT_LIMITS.agentDescription}
+                      rows="4"
+                      disabled={draft.avatar.generateBusy}
+                      onValueChange={(value) =>
+                        setDraft((state) => {
+                          state.avatar.generatePrompt = value;
+                        })
+                      }
+                    />
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      disabled={draft.avatar.generateBusy || !draft.avatar.generatePrompt.trim()}
+                    >
+                      Generate
+                    </Button>
+                  </form>
+                </Show>
                 <div class="avatar-editor-divider" />
                 <div class="avatar-editor-heading">
                   <span>Generated face</span>
