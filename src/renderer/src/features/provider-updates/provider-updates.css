@@ -8,18 +8,24 @@
   fill: var(--openbot-provider-current);
 }
 
-/* One card, one size, for the whole update. The notification is held open from the offer through to
-   the outcome, and the states do not all carry a button - "Setting up" has nothing to offer and a
-   finished update has nothing left - so the row the button sits in is reserved from the start. A
-   height that changes cannot be animated away here: sonner measures the natural height by setting
-   `height: auto` on the toast and reading the box back, which lands it on the new size before a
-   transition has anything to run between. Holding the shape is the honest answer, and it is also the
-   calmer one - the box a user pressed Update on is the box that reports the result.
+/* The action sits beside the words it acts on, centred on the title and the version line, rather than
+   in a row of its own under them. The words stop at the button while it is there; a state with no
+   button gives them the full width, so the running update's bar reaches the right edge. */
+.provider-update-toast[data-sonner-toast][data-styled="true"] [data-action] {
+  grid-row: 1;
+  align-self: center;
+}
 
-   The first row has a floor as well as a ceiling, because the running update hands its whole content
-   column across both rows and a grid would otherwise shrink the first row to fit it. */
-.provider-update-toast[data-sonner-toast][data-styled="true"] {
-  grid-template-rows: minmax(var(--openbot-control-xl), auto) var(--openbot-control-md);
+.provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-action:not([data-idle="true"]))
+  [data-content] {
+  grid-column: 2;
+}
+
+/* In the first row the button is under the close control, which floats over the top right corner,
+   so it keeps the same room clear that the words keep. */
+.ui-toaster.ui-toaster-closeable .provider-update-toast[data-sonner-toast][data-styled="true"] [data-action],
+.ui-toaster .provider-update-toast[data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-action] {
+  margin-right: var(--openbot-space-6);
 }
 
 /* A state with nothing to offer marks its label instead of losing it, and the button goes out of the
@@ -30,17 +36,10 @@
   display: none;
 }
 
-/* The running update reaches into the row the button has left. Sonner builds the toast's children
-   itself, so the bar cannot be one of them - it goes in the description, and the description is
-   stretched down the card instead, which puts the bar exactly where the Update button was. */
-.provider-update-toast[data-sonner-toast][data-styled="true"]:has(.provider-update-toast-progress) [data-content] {
-  grid-row: 1 / -1;
-  align-self: stretch;
-}
-
+/* The running update puts its bar under the version line. Sonner builds the toast's children itself,
+   so the bar cannot be one of them - it goes in the description, as a line of its own. */
 .provider-update-toast[data-sonner-toast][data-styled="true"] [data-description]:has(.provider-update-toast-progress) {
   display: flex;
-  flex: 1;
   flex-direction: column;
 }
 
@@ -52,19 +51,17 @@
   white-space: nowrap;
 }
 
-/* The bar and the percentage, in the reserved row and nowhere else - `margin-top` pushes them to the
-   foot of the stretched description, and the fixed height makes that foot the button's row. */
+/* The bar and the percentage, on one line under the version. */
 .provider-update-toast-progress {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-3);
-  height: var(--openbot-control-md);
-  margin-top: auto;
+  margin-top: var(--openbot-space-2);
 }
 
 /* The content column keeps its words clear of the close control, which floats over the top right
-   corner. The progress row is below that corner, so it takes the room back and ends where the Update
-   button ended. */
+   corner. The progress row is below that corner, so it takes the room back and ends at the card's
+   right padding. */
 .ui-toaster.ui-toaster-closeable .provider-update-toast .provider-update-toast-progress,
 .ui-toaster .provider-update-toast:has([data-close-button]) .provider-update-toast-progress {
   margin-right: calc(-1 * var(--openbot-space-6));

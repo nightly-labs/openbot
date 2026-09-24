@@ -69,6 +69,11 @@ interface FakeServerOptions {
   advertisedPrmPath?: string;
   /** Authorization servers the default protected-resource metadata names. */
   defaultAuthorizationServers?: string[];
+  /**
+   * Answers every registration with a 403: empty, as Figma does for an app it has not approved, or
+   * with an RFC 6749 error body.
+   */
+  refuseRegistration?: "empty" | "oauth-error";
 }
 
 async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeServer> {
@@ -119,6 +124,14 @@ async function startFakeServer(options: FakeServerOptions = {}): Promise<FakeSer
       if (path === "/register") {
         const body = await readBody(request);
         state.registrations += 1;
+        if (options.refuseRegistration === "empty") {
+          response.writeHead(403).end();
+          return;
+        }
+        if (options.refuseRegistration === "oauth-error") {
+          sendJson(response, 403, { error: "access_denied", error_description: "Unknown client." });
+          return;
+        }
         // Echoed, as RFC 7591 says a registration answer does, so a test can read back the
         // address this installation asked its grants to be sent to.
         const { redirect_uris: uris } = registrationRequestSchema.parse(JSON.parse(body || "{}"));
@@ -803,6 +816,22 @@ describe("signing in to an http MCP server", () => {
     // And the hand-off path answers with the same token without going anywhere.
     expect(await oauth.accessToken(server.url)).toBe(ACCESS_TOKEN);
   });
+
+  it.each(["empty", "oauth-error"] as const)(
+    "says the service refused OpenBot, not the account, when registration answers 403 (%s)",
+    async (refuseRegistration) => {
+      const server = await fakeServer({ refuseRegistration });
+      const openExternal = vi.fn(async () => undefined);
+      const oauth = new McpOAuth({ storage: memoryStorage(), redirectUrl: "openbot://mcp-auth", openExternal });
+
+      expect(await testMcpServer(config(server.url), 10_000, undefined, oauth)).toEqual({
+        toolCount: 0,
+        error:
+          "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
+      });
+      expect(openExternal).not.toHaveBeenCalled();
+    },
+  );
 
   it("says so plainly when a server answers 401 and nobody is signing in", async () => {
     const server = await fakeServer();

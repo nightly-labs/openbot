@@ -136,7 +136,9 @@ export class OpenBotToolRouter {
             const agentId = this.#conversation.agentForThread(request.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
             if (request.params.tool === "request_takeover" || request.params.tool === "submit_secret") {
-              client.respond(request.id, await this.#attention.surfaceBrowserTakeover(request));
+              const result = await this.#attention.surfaceBrowserTakeover(client, request);
+              // A takeover of a stopped client ends with a cancel, and that process has nothing to answer.
+              if (client.running) client.respond(request.id, result);
               return;
             }
             if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {

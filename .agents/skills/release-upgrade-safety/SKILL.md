@@ -111,7 +111,7 @@ a gate can be selected without opening anything:
   anything under `packages/contracts/src/team-protocol/`, plus `docs/RELEASING.md`, which this
   audit defers its compatibility matrix to.
 - **D. IPC channels** → [gate-d-ipc.md](references/gate-d-ipc.md)
-  `packages/contracts/src/ipc-channels.ts` **or any of its mirrors** — `src/main/index.ts`,
+  `packages/contracts/src/ipc-endpoints.ts` **or any of its mirrors** — `src/main/index.ts`,
   `src/main/ipc/`, `src/preload/index.ts`, `src/renderer/src/preview/mock-openbot.ts`. Deleting a
   handler or an `invoke` breaks a live channel without touching the list at all.
 - **E. Account Worker** → [gate-e-account-worker.md](references/gate-e-account-worker.md)

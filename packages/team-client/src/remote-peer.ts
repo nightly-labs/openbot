@@ -28,6 +28,7 @@ import {
   channelResponse,
   isChannelRoute,
 } from "@openbot/contracts/team-protocol/channels-v1";
+import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
@@ -685,12 +686,14 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           status: frame.result.status,
           body: isChannelRoute(pending.path)
             ? channelResponse(pending.path, frame.result.status, frame.result.body)
-            : decodeTeamProtocolV4WebRtcHttpResponse(
-                pending.method,
-                pending.path,
-                frame.result.status,
-                frame.result.body,
-              ),
+            : isStorageRoute(pending.path)
+              ? storageResponse(pending.path, frame.result.status, frame.result.body)
+              : decodeTeamProtocolV4WebRtcHttpResponse(
+                  pending.method,
+                  pending.path,
+                  frame.result.status,
+                  frame.result.body,
+                ),
         });
       }
       // Keep the request registered until decoding succeeds, so failPeer can
@@ -804,7 +807,9 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       ? null
       : isChannelRoute(path)
         ? channelRequest(path, body)
-        : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
+        : isStorageRoute(path)
+          ? storageRequest(path, body)
+          : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {

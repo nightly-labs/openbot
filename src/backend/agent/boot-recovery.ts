@@ -1,3 +1,4 @@
+import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeProviderHistory, snapshotFromThread } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
@@ -7,6 +8,7 @@ import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import { providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
 export interface BootRecoveryHooks {
@@ -32,9 +34,11 @@ export interface BootRecoveryOptions {
  *   stale active turns, expires unanswered prompts, marks streaming messages
  *   interrupted.
  * - `reconcileUnresolvedDeliveries` runs once providers are ready: asks the
- *   provider what really happened to each unsettled delivery instead of
+ *   provider what really happened to each orphaned delivery instead of
  *   assuming, and conservatively keeps `interrupted` on any doubt — never
- *   repeats uncertain side effects.
+ *   repeats uncertain side effects. A delivery is orphaned when the process
+ *   that ran it is gone: the previous OpenBot run, or a provider CLI that
+ *   exited. Any other unsettled delivery is a live turn of this run.
  * - `backfillProviderHistory` merges provider-side turns that happened while
  *   OpenBot was down into the persisted conversation.
  *
@@ -50,6 +54,13 @@ export class BootRecovery {
   readonly #mailboxSync: MailboxSync;
   readonly #threads: ThreadLifecycle;
   readonly #hooks: BootRecoveryHooks;
+  /**
+   * Readiness also follows a provider restart, and startup readiness can come after the user's
+   * first message has started on a provider that was ready sooner. Settling every unresolved
+   * delivery then read a live turn as finished: its reply arrived in a chat that already showed
+   * no active turn, and `markTerminal` cannot correct a terminal status.
+   */
+  readonly #orphanedDeliveryIds = new Set<string>();
 
   constructor(options: BootRecoveryOptions) {
     this.#store = options.store;
@@ -74,9 +85,25 @@ export class BootRecovery {
     ];
   }
 
+  /** The provider CLI exited, so the deliveries it was running have no turn left to finish. */
+  orphanDeliveriesOf(provider: AgentProvider): void {
+    const agents = this.#store.list();
+    for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
+      const agent = agents.find((candidate) => candidate.id === delivery.recipientAgentId);
+      if (agent && providerForAgent(agent) === provider) this.#orphanedDeliveryIds.add(delivery.id);
+    }
+  }
+
   async reconcileUnresolvedDeliveries(): Promise<void> {
-    for (const context of this.#mailbox.unresolvedDeliveries()) {
+    const unresolved = this.#mailbox.unresolvedDeliveries();
+    // A delivery settled by another path never becomes unresolved again, so its mark goes too.
+    const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
+    for (const id of this.#orphanedDeliveryIds) {
+      if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
+    }
+    for (const context of unresolved) {
       const { delivery } = context;
+      if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
       let terminal: "completed" | "failed" | "interrupted" = "interrupted";
       let reason = "OpenBot restarted before this delivery reached a confirmed terminal state.";
       try {
@@ -131,6 +158,7 @@ export class BootRecovery {
   }
 
   recoverPersistedTurns(): void {
+    for (const { delivery } of this.#mailbox.unresolvedDeliveries()) this.#orphanedDeliveryIds.add(delivery.id);
     for (const agent of this.threads()) {
       if (!agent.threadId) continue;
       const snapshot = this.#store.database.readConversation(agent.id, agent.threadId);

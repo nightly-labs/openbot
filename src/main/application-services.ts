@@ -40,7 +40,7 @@ import type {
   ProviderRuntimeSnapshot,
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import { IPC_CHANNELS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
@@ -52,6 +52,7 @@ import { McpOAuth } from "../backend/mcp-oauth-provider";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
+import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { HostAnalytics } from "./analytics";
@@ -246,6 +247,7 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
   marketplaceAgents: AgentMarketplaceService;
+  agentImport: AgentImportService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
   cuaDriver: CuaDriverRuntime;
@@ -421,7 +423,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserPictureInPictureEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.pictureInPictureEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserPictureInPicture, "picture in picture", () => browserPictureInPicture.destroy());
@@ -933,6 +935,15 @@ export async function createApplicationServices({
       return Promise.resolve(iceServers);
     },
   });
+  // Imported channels are created by the local user, as when they create one by hand.
+  const agentImport = new AgentImportService(
+    service,
+    {
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    () => host.channelActor(),
+  );
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => host.shutdown());
   const signedInState = centralAuth.getState();
   if (signedInState.status === "signed_in") {
@@ -1039,7 +1050,7 @@ export async function createApplicationServices({
     onEvent: (event) => {
       const window = windows.getMainWindow();
       if (!window || window.isDestroyed()) return;
-      sendToRenderer(window, IPC_CHANNELS.browserLiveViewEvent, event);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => browserView.stop());
@@ -1189,6 +1200,7 @@ export async function createApplicationServices({
     hostedSites,
     customProviders,
     marketplaceAgents,
+    agentImport,
     voice,
     dynamicIsland,
     cuaDriver,

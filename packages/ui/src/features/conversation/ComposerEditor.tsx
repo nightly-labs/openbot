@@ -484,7 +484,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   function handleKeyDown(event: KeyboardEvent) {
     if (props.disabled) return;
-    if (event.key === "Enter" && (isComposing || event.isComposing)) return;
+    /*
+     * The browser owns the IME composition buffer. The key that starts a composition comes before
+     * `compositionstart` and without `isComposing`; Chromium marks it with keyCode 229 ("Process").
+     */
+    if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
     if (handleMentionPickerKeyDown(event)) return;
     if (event.key === "Backspace" && removeAutomaticMentionSpace()) {
       event.preventDefault();
@@ -517,10 +521,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
      * to insert the text. Letting the default action write some characters and this handler write
      * the rest raced, and a native insert that landed a task late, or one reported with a
      * composition input type, was read as "no native input" and the character went in twice.
-     * A composing key still goes to the browser, which owns the composition buffer.
      */
-    const printableKey =
-      event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.isComposing && !isComposing;
+    const printableKey = event.key.length === 1 && !event.ctrlKey && !event.metaKey;
     if (printableKey) {
       event.preventDefault();
       insertPrintableKey(event.key);

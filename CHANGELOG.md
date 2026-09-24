@@ -5,6 +5,40 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-24
+
+### Added
+
+- Import agents from Grok Bot in Server settings, Import. Add the OpenBot export agent to Grok Bot,
+  send it one message, and choose the `.zip` file it saves. OpenBot imports each agent you select
+  with its instructions, avatar, skills, routines and memories, and optional workspace files. The
+  file is read on this computer and is not uploaded. Chat history is not copied.
+- Dictate a message on mobile. With an empty message field, press the microphone. The text shows in
+  the field while you speak, and you send it when you are ready. Set the language in Settings,
+  General, Dictation.
+- Delete a channel from the channel row menu on mobile. Only server owners and admins see Delete.
+- Show Skills and Files in the agent info on mobile.
+
+### Changed
+
+- Use less memory and CPU. OpenBot stops a provider CLI that no agent uses after 60 seconds, keeps
+  fewer idle Claude, OpenCode and Grok sessions open, and streams attachments from disk. The first
+  message to an agent after a long idle time can take a little longer.
+- Scroll and type with fewer frame drops in the mobile chat and agent list.
+- Use a darker dark-mode background for the mobile screen, drawer and sheets.
+- Show the provider Update button on the same row as the update message.
+- Save an agent with empty instructions on mobile.
+
+### Fixed
+
+- Remove a question or approval from the screen when its provider stops. Before, it stayed until a
+  restart, and each answer failed.
+- Keep the approvals of other providers when one provider stops.
+- Keep pending questions and approvals in the web app when the host sends a partial update.
+- Type Chinese, Japanese and Korean with an input method in the message field. Before, a Latin
+  letter went in before each segment.
+- Show the size of a stored file that is a link, not the size of its target, in Storage.
+
 ## [0.20.1] - 2026-09-23
 
 ### Fixed

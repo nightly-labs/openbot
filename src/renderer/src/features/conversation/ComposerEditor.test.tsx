@@ -124,6 +124,19 @@ describe("ComposerEditor", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
+  it("leaves the key that starts an IME composition to the browser", async () => {
+    const { editor, onValueChange } = renderComposer();
+
+    await fireEvent.keyDown(editor, { key: "n", keyCode: 229 });
+    await fireEvent.keyDown(editor, { key: "Process", keyCode: 229 });
+    expect(onValueChange).not.toHaveBeenCalled();
+
+    await fireEvent.compositionStart(editor);
+    await typeQuery(editor, "你好");
+    await fireEvent.compositionEnd(editor);
+    expect(onValueChange).toHaveBeenLastCalledWith("你好");
+  });
+
   it("tags an MCP server from the same trigger the skills answer", async () => {
     const { editor, onValueChange } = renderComposer([], "", [], [], [mcpServer()]);
 

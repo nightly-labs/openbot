@@ -176,6 +176,7 @@
     "./features/files/StorageOverview": "./src/features/files/StorageOverview.tsx",
     "./features/files/StorageUsageBar": "./src/features/files/StorageUsageBar.tsx",
     "./features/files/files-view": "./src/features/files/files-view.ts",
+    "./features/import/AgentImportView": "./src/features/import/AgentImportView.tsx",
     "./components/GlobalSearch": "./src/components/GlobalSearch.tsx",
     "./components/ProviderCodeLoginDialog": "./src/components/ProviderCodeLoginDialog.tsx",
     "./components/QuestionPromptBubble": "./src/components/QuestionPromptBubble.tsx",
@@ -207,6 +208,7 @@
     "./features/agents/agent-avatar-mood": "./src/features/agents/agent-avatar-mood.ts",
     "./features/conversation/conversation.css": "./src/features/conversation/conversation.css",
     "./features/files/files.css": "./src/features/files/files.css",
+    "./features/import/agent-import.css": "./src/features/import/agent-import.css",
     "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
     "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
   },

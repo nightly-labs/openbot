@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
-import { type CentralAuthState, IPC_CHANNELS } from "@openbot/contracts/ipc";
+import { type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
@@ -20,6 +20,7 @@ import {
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
+import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
@@ -325,6 +326,7 @@ function registerIpcHandlers({
   hostedSites,
   customProviders,
   marketplaceAgents,
+  agentImport,
   voice,
   dynamicIsland,
   cuaDriver,
@@ -367,6 +369,13 @@ function registerIpcHandlers({
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
     ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
+    ...agentImportIpcHandlers({
+      agentImport,
+      getMainWindow,
+      exportSkillPath: app.isPackaged
+        ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
+        : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
+    }),
     ...updateIpcHandlers({ updater, updatePreferenceFile }),
     ...notificationIpcHandlers({
       notificationPreference,
@@ -500,7 +509,7 @@ function forwardCentralAuth(state: CentralAuthState): void {
     });
   const window = windowHolder.current;
   if (!window || window.isDestroyed()) return;
-  sendToRenderer(window, IPC_CHANNELS.authEvent, state);
+  sendToRenderer(window, IPC_ENDPOINTS.auth.event, state);
 }
 
 /**
@@ -520,8 +529,8 @@ function acceptDeepLink(link: DeepLink): void {
   showMainWindow(window);
   const delivered =
     link.kind === "invite"
-      ? sendToRenderer(window, IPC_CHANNELS.serversInvite, link.url)
-      : sendToRenderer(window, IPC_CHANNELS.pluginsOpenListing, link.slug);
+      ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
+      : sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
   if (delivered) pendingDeepLink = null;
 }
 
@@ -704,7 +713,7 @@ if (!hasSingleInstanceLock) {
       language.subscribe((preference) => {
         configureApplicationMenu(service, updater, language.translate);
         for (const window of BrowserWindow.getAllWindows()) {
-          sendToRenderer(window, IPC_CHANNELS.appLanguagePreference, preference);
+          sendToRenderer(window, IPC_ENDPOINTS.app.appLanguagePreference, preference);
         }
       });
       await dynamicIsland

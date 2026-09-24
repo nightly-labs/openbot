@@ -1506,7 +1506,9 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "starting");
     await service.stop();
 
-    expect(["failed", "interrupted"]).toContain(service.listQueue("chief").deliveries[0]?.status);
+    // The drain ends before `stop` returns: the provider confirmed the turn, or the stop failed it.
+    // Only the next boot's reconcile can find a confirmed turn interrupted.
+    expect(["running", "failed"]).toContain(service.listQueue("chief").deliveries[0]?.status);
   });
 
   it("fans out an idempotent agent tool message with referenced files", async () => {

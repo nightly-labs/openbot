@@ -5,10 +5,14 @@ renderer-to-main trust boundary. [Main-process rules](../main/AGENTS.md#trust-bo
 
 - `index.ts` maps each `OpenBotDesktopApi` method to one IPC channel and exposes the result with
   `contextBridge.exposeInMainWorld`. Add no business rules here.
-- Decode each value that main sends before the renderer can read it. Keep the preload `FromMain`
-  decoders apart from the main `FromHost` decoders. They protect different boundaries.
+- Decode each value that main sends before the renderer can read it. Put decoders in the
+  `*-decoding.ts` file for their domain, not in `index.ts`. Keep the preload `FromMain` decoders
+  apart from the main `FromHost` decoders. They protect different boundaries.
+- Invoke through `invokeRequest`, `invokeAgent` or `invokeAgentForServer`. Subscribe through
+  `subscribe(endpoint, decode, listener)`; use `listen` only when the event has no payload or the
+  handler checks the raw value itself. Do not call `ipcRenderer.on` directly.
 - Invoke only request endpoints from `IPC_ENDPOINTS`, and subscribe only to event endpoints.
-  `src/main/ipc-channel-coverage.test.ts` reads this source and fails on an unused or extra channel.
+  `src/main/ipc-channel-coverage.test.ts` reads these sources and fails on an unused or extra channel.
 - Do not expose `ipcRenderer`, Electron objects, or Node APIs to the page. `team-webrtc.ts` gives
   the hidden WebRTC window only one `MessagePort`.
 - Add a method in the same change as its channel, handler, and preview mock. See

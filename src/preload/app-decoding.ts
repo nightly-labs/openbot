@@ -1,4 +1,5 @@
-// What main answers for the app shell, the account, the updater and notifications.
+// What main answers for the app shell, the account, the updater, notifications, voice, exports,
+// hosted sites, custom providers and remote desktop.
 //
 // Each decoder checks every field the contract type requires and keeps each optional field it
 // carries, so a value the renderer reads always has the shape its type says.
@@ -13,21 +14,34 @@ import {
   type CentralAuthIssue,
   type CentralAuthState,
   type CentralAuthUser,
+  type CustomProviderResult,
+  type CustomProviderSummary,
+  type ExportResult,
+  type HostedSiteSummary,
   isAgentModel,
   isAgentProvider,
   isAppLanguage,
   isApprovalAutomationPreference,
+  isCustomProviderResult,
+  isCustomProviderSummary,
+  isRemoteDesktopSetupStatus,
+  isRemoteDesktopTestStatus,
   type MobileConnectedDevice,
   type MobileConnectTicket,
   type NotificationOpenedEvent,
   type NotificationPreference,
+  type RemoteDesktopSetupStatus,
+  type RemoteDesktopTestStatus,
   UPDATE_PHASES,
   type UpdatePreference,
   type UpdateStatus,
+  type VoiceModelStatus,
+  type VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
   decodeRecord,
+  emptyDecoder,
   guardedDecoder,
   nullableNumber,
   nullableString,
@@ -35,6 +49,7 @@ import {
   requiredNumber,
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
+import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export function decodeAppInfo(value: unknown): AppInfo {
@@ -189,4 +204,110 @@ export function decodeNotificationOpenedEvent(value: unknown): NotificationOpene
     agentId: requiredString(opened, "agentId"),
     threadId: nullableString(opened, "threadId"),
   };
+}
+
+const VOICE_MODEL_PHASES: readonly VoiceModelStatus["phase"][] = ["missing", "downloading", "ready", "error"];
+
+export function decodeVoiceModelStatus(value: unknown): VoiceModelStatus {
+  const status = decodeRecord(value, "voice model status");
+  const { phase, progress } = status;
+  if (!isOneOf(VOICE_MODEL_PHASES, phase) || (progress !== null && !isNumber(progress))) {
+    throw new Error("Invalid voice model status.");
+  }
+  return { phase, progress, message: nullableString(status, "message") };
+}
+
+export function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {
+  return { text: requiredString(decodeRecord(value, "voice transcription"), "text") };
+}
+
+export function decodeExportResult(value: unknown): ExportResult {
+  return { saved: requiredBoolean(decodeRecord(value, "export result"), "saved") };
+}
+
+// The slug is checked again on arrival rather than trusted because it came from main. It began life
+// in a URL a web page chose, and this is the last point before the renderer looks it up.
+export function decodePendingListing(value: unknown): string | null {
+  return typeof value === "string" && isPluginSlug(value) ? value : null;
+}
+
+/** The export skill's text, shown for the user to copy. It is Markdown, never markup. */
+export function decodeAgentImportSkill(value: unknown): string {
+  if (!isString(value) || !value) throw new Error("Invalid export skill response.");
+  return value;
+}
+
+export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
+
+export function decodeHostedSite(value: unknown): HostedSiteSummary {
+  const site = decodeRecord(value, "hosted site");
+  if (
+    !isString(site.id) ||
+    !isString(site.hostname) ||
+    !isString(site.url) ||
+    !isString(site.title) ||
+    !isString(site.description) ||
+    (site.framework !== "vanilla" && site.framework !== "astro") ||
+    (site.status !== "active" && site.status !== "deleted" && site.status !== "expired" && site.status !== "blocked") ||
+    !isNumber(site.fileCount) ||
+    !isNumber(site.size) ||
+    (site.expiresAt !== null && !isString(site.expiresAt)) ||
+    !isString(site.updatedAt)
+  ) {
+    throw new Error("Invalid hosted site response.");
+  }
+  return {
+    id: site.id,
+    hostname: site.hostname,
+    url: site.url,
+    title: site.title,
+    description: site.description,
+    framework: site.framework,
+    status: decodeHostedSiteStatus(site.status),
+    fileCount: site.fileCount,
+    size: site.size,
+    expiresAt: site.expiresAt,
+    updatedAt: site.updatedAt,
+  };
+}
+
+function decodeHostedSiteStatus(value: unknown): HostedSiteSummary["status"] {
+  if (value === "active" || value === "deleted" || value === "expired" || value === "blocked") return value;
+  throw new Error("Invalid hosted site status.");
+}
+
+export function decodeHostedSites(value: unknown): HostedSiteSummary[] {
+  if (!Array.isArray(value)) throw new Error("Invalid hosted site list response.");
+  return value.map(decodeHostedSite);
+}
+
+/**
+ * The guard, not a decoder of its own: it is the assertion that a summary carries no `apiKey`, and a
+ * second implementation here could disagree with it. It fails closed on the whole list, so a main
+ * process that ever put a key in a row empties the picker rather than leaking one.
+ */
+export function decodeCustomProviders(value: unknown): CustomProviderSummary[] {
+  if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) {
+    throw new Error("Invalid custom provider list response.");
+  }
+  return value;
+}
+
+export function decodeCustomProviderResult(value: unknown): CustomProviderResult {
+  if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider response.");
+  return value;
+}
+
+export function decodeNullablePath(value: unknown): string | null {
+  if (value !== null && !isString(value)) throw new Error("Invalid directory response.");
+  return value;
+}
+
+export function decodeRemoteDesktopSetupFromMain(value: unknown): RemoteDesktopSetupStatus {
+  if (!isRemoteDesktopSetupStatus(value)) throw new Error("Invalid remote desktop setup response.");
+  return { ...value };
+}
+export function decodeRemoteDesktopTestFromMain(value: unknown): RemoteDesktopTestStatus {
+  if (!isRemoteDesktopTestStatus(value)) throw new Error("Invalid remote desktop test response.");
+  return { ...value };
 }

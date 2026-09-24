@@ -1,14 +1,15 @@
-import { analyticsRange, parseAnalyticsRange } from "@openbot/contracts/ipc";
+import { analyticsRange, type InstalledSkill, parseAnalyticsRange } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { type PropsWithChildren, useEffect, useState } from "react";
+import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { AgentFiles } from "./agent-files";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
 import { AgentUsageReport } from "./agent-usage-report";
 
@@ -19,7 +20,7 @@ export function AgentInformation({
 }: {
   agent: MobileAgent;
   available: boolean;
-  section: "usage" | "memories" | "routines" | "memory" | "routine";
+  section: "usage" | "memories" | "routines" | "memory" | "routine" | "skills" | "files";
 }) {
   useEffect(() => {
     if (section === "usage") mobileAnalytics.track("usage_viewed", {});
@@ -59,6 +60,32 @@ export function AgentInformation({
     queryKey: [...key, "routines"],
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });
+  const skills = useQuery({
+    ...options,
+    enabled: available && section === "skills",
+    queryKey: [...key, "skills"],
+    queryFn: async () => {
+      const installed = await workspace.loadAgentSkills(agent.id, agent.serverId);
+      return installed && userAssignedSkills(installed);
+    },
+  });
+  // The host caches a scan. A retry or a deletion measures again, as on desktop.
+  const forceStorageScan = useRef(false);
+  const storage = useQuery({
+    ...options,
+    enabled: available && section === "files",
+    queryKey: [...key, "storage"],
+    queryFn: () => {
+      const force = forceStorageScan.current;
+      forceStorageScan.current = false;
+      return workspace.loadAgentStorage(agent.id, agent.serverId, force);
+    },
+  });
+  function rescanStorage() {
+    forceStorageScan.current = true;
+    void storage.refetch();
+  }
+  const role = workspace.servers.find((server) => server.id === agent.serverId)?.role;
   const usage = useQuery({
     ...options,
     enabled: available && section === "usage",
@@ -227,6 +254,69 @@ export function AgentInformation({
           </SettingsRow>
         </InformationSection>
       ) : null}
+      {section === "skills" ? (
+        <>
+          <InformationSection
+            title="Skills"
+            list
+            available={available}
+            pending={skills.isPending}
+            failed={skills.isError}
+            retry={() => void skills.refetch()}
+          >
+            {skills.data === null ? (
+              <SettingsRow>
+                <Typography.Paragraph>
+                  This host does not support skills. Update OpenBot on the host.
+                </Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
+            {skills.data?.map((skill) => (
+              <SettingsRow key={skill.skillId} supportingText={skillMeta(skill)}>
+                <Typography.Paragraph numberOfLines={1}>{skill.name}</Typography.Paragraph>
+                {skill.description ? (
+                  <Typography.Paragraph type="body-xs" numberOfLines={3} className="text-grouped-secondary">
+                    {skill.description}
+                  </Typography.Paragraph>
+                ) : null}
+              </SettingsRow>
+            ))}
+            {skills.data?.length === 0 ? (
+              <SettingsRow>
+                <Typography.Paragraph className="text-grouped-secondary">No skills yet.</Typography.Paragraph>
+              </SettingsRow>
+            ) : null}
+          </InformationSection>
+          <SettingsNote>Skills for this agent are managed on the host.</SettingsNote>
+        </>
+      ) : null}
+      {section === "files" ? (
+        <InformationSection
+          title="Files"
+          list
+          available={available}
+          pending={storage.isPending}
+          failed={storage.isError}
+          retry={rescanStorage}
+        >
+          {storage.data ? (
+            <AgentFiles
+              agent={agent}
+              usage={storage.data}
+              canDelete={role === "owner" || role === "admin"}
+              onChanged={rescanStorage}
+            />
+          ) : (
+            <SettingsSection>
+              <SettingsRow>
+                <Typography.Paragraph>
+                  This host does not support file management. Update OpenBot on the host.
+                </Typography.Paragraph>
+              </SettingsRow>
+            </SettingsSection>
+          )}
+        </InformationSection>
+      ) : null}
       {section === "memory" ? (
         !recordId ? (
           <MemoryEditor agent={agent} available={available} />
@@ -323,7 +413,11 @@ function InformationSection({
     );
   }
   if (list && available && !pending && !failed)
-    return title === "Memories" || title === "Routines" ? <SettingsSection>{children}</SettingsSection> : children;
+    return title === "Memories" || title === "Routines" || title === "Skills" ? (
+      <SettingsSection>{children}</SettingsSection>
+    ) : (
+      children
+    );
   return (
     <SettingsSection title={title}>
       <SettingsRow>
@@ -348,4 +442,25 @@ function InformationSection({
       </SettingsRow>
     </SettingsSection>
   );
+}
+
+/** The skills the user assigned, as the desktop agent settings list them: built-in skills are hidden. */
+function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
+  return skills
+    .filter(
+      (skill) =>
+        skill.origin !== "managed" && skill.slug !== "openbot-site-hosting" && skill.skillId !== "openbot-site-hosting",
+    )
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function skillMeta(skill: InstalledSkill): string {
+  const parts = [
+    skill.origin === "workspace" ? (skill.location ?? "Workspace folder") : `v${skill.installedVersion}`,
+    skill.state === "update-available" ? `v${skill.availableVersion} available` : null,
+    skill.state === "needs-repair" ? "Needs repair" : null,
+    skill.state === "modified" ? "Modified" : null,
+    skill.enabled === false ? "Disabled" : null,
+  ];
+  return parts.filter(Boolean).join(" · ");
 }

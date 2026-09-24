@@ -9,12 +9,14 @@ import { ChannelsPutAgentsInOneRoom } from "./channels-put-agents-in-one-room";
 import { EveryAgentGetsAWorkspace } from "./every-agent-gets-a-workspace";
 import { IntroducingOpenBot } from "./introducing-openbot";
 import { OneAgentManyProviders } from "./one-agent-many-providers";
+import { OpenBotVsGrokBot } from "./openbot-vs-grokbot";
 import { RoutinesGiveAnAgentASchedule } from "./routines-give-an-agent-a-schedule";
 import { RunTheTeamServerYourself } from "./run-the-team-server-yourself";
 import { WhatGetsRedactedBeforeItLeaves } from "./what-gets-redacted-before-it-leaves";
 import { YourWorkStaysOnYourComputer } from "./your-work-stays-on-your-computer";
 
 export const NEWS_ARTICLE_BODIES: Readonly<Record<string, ArticleBody>> = {
+  "openbot-vs-grokbot": OpenBotVsGrokBot,
   "introducing-openbot": IntroducingOpenBot,
   "your-work-stays-on-your-computer": YourWorkStaysOnYourComputer,
   "one-agent-many-providers": OneAgentManyProviders,

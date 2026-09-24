@@ -9,8 +9,8 @@ below.
 
 ## IPC endpoints
 
-- Declare endpoints in `packages/contracts/src/ipc-channels.ts` and `ipc-endpoints.ts`. Implement them
-  in `src/main/ipc/`, one file per domain. Do not put handlers in `index.ts`.
+- Declare endpoints in `packages/contracts/src/ipc-endpoints.ts`. Implement them in
+  `src/main/ipc/`, one file per domain. Do not put handlers in `index.ts`.
 - Follow `ipc/team-handlers.ts`: a `*IpcDependencies` interface, destructured dependencies, a
   `*IpcHandlers` function that returns handlers keyed by endpoint name, and a
   `Pick<IpcGroupHandlers, …>` return type. Do not import from `index.ts`.
@@ -24,10 +24,10 @@ below.
   `*-inputs.ts` parsers. The sender check must run before decoding. Do not bind raw `unknown` as a
   no-payload handler.
 - Use `sendToRenderer` from `renderer-ipc.ts` to send messages. It drops messages for destroyed or
-  loading windows. Its channel argument must be a direct `IPC_CHANNELS.x` reference; do not use a
-  string literal or an intermediate variable. Handlers do not name channels; groups do.
-- Add a channel in one change across `ipc-channels.ts`, `ipc-endpoints.ts`, `src/main/ipc/`,
-  `src/preload/index.ts` and `src/renderer/src/preview/mock-openbot.ts`. See
+  loading windows. Its endpoint argument must be a direct `IPC_ENDPOINTS.group.name` reference;
+  do not use a string literal or an intermediate variable. Handlers do not name channels; groups do.
+- Add a channel in one change across `ipc-endpoints.ts`, `src/main/ipc/`, `src/preload/index.ts`
+  and `src/renderer/src/preview/mock-openbot.ts`. See
   [contract rules](../../packages/contracts/AGENTS.md) for coverage, including the untyped preload.
 
 ## Trust boundary

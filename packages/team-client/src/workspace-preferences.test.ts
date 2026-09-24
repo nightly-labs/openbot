@@ -43,6 +43,30 @@ describe("remote workspace preferences", () => {
     expect(open().read("host")).toEqual({ hidden: ["agent-hidden"], pinned: ["agent-one"], pinnedChannels: [] });
   });
 
+  it("reads storage once and keeps a failed write from changing the stored value", () => {
+    const values = new Map<string, string>();
+    let reads = 0;
+    let failWrites = false;
+    const preferences = createWorkspacePreferences("https://api.example.test", "alice", {
+      get: (key) => {
+        reads += 1;
+        return values.get(key) ?? null;
+      },
+      set: (key, value) => {
+        if (failWrites) throw new Error("Storage full");
+        values.set(key, value);
+      },
+    });
+    preferences.write("host", { hidden: [], pinned: ["agent"] });
+    preferences.read("host");
+    preferences.read("other-host");
+    preferences.read("other-host");
+    expect(reads).toBe(1);
+    failWrites = true;
+    expect(() => preferences.write("host", { hidden: [], pinned: [] })).toThrow("Storage full");
+    expect(preferences.read("host")).toEqual({ hidden: [], pinned: ["agent"] });
+  });
+
   it("reports unreadable preferences and failed writes instead of silently resetting them", () => {
     const preferences = createWorkspacePreferences("https://api.example.test", "alice", {
       get: () => '{"version":1,"hidden":[42],"pinned":[]}',

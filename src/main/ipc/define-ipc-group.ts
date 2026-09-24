@@ -1,6 +1,6 @@
 // Binding a group of endpoints to the implementations behind them.
 //
-// A registrar used to be a sequence of `handleTrusted(IPC_CHANNELS.x, ...)` calls, and nothing said
+// A registrar used to be a sequence of `handleTrusted(channel, ...)` calls, and nothing said
 // the sequence was complete. A channel declared in `packages/contracts` and never registered
 // compiled, shipped, and surfaced as "No handler registered for 'agent:list-models'" the first time
 // a user opened the feature. A static scan of the source text was what noticed, which meant the

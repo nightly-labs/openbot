@@ -2,7 +2,7 @@
   "name": "openbot",
   "productName": "OpenBot",
   "desktopName": "openbot.desktop",
-  "version": "0.20.1",
+  "version": "0.21.0",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",
   "author": {
     "name": "Norbert Bodziony",
@@ -117,6 +117,7 @@
     "dev:automation": "bun scripts/dev-automation/cli.ts",
     "dev:cpu": "bun scripts/dev-automation/cli.ts cpu",
     "dev:memory": "bun scripts/dev-automation/cli.ts memory",
+    "dev:bench": "tsx scripts/dev-automation/bench.ts",
     "dev:status": "bun scripts/dev-stack.ts status",
     "dev:verify": "bun scripts/dev-verify.ts",
     "dev:mobile": "bun scripts/dev-mobile.ts",
@@ -283,6 +284,7 @@
     "expo-router@57.0.22": "patches/expo-router@57.0.22.patch",
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
-    "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch"
+    "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch",
+    "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch"
   }
 }

@@ -72,27 +72,90 @@ export function presentChatMessages(
   const result = visible.map((message) => {
     // Keep the local image mounted until the caller caches the final attachment IDs.
     if (pending?.serverId === message.id) return pending.message;
-    return aliases.has(message.id) ? { ...message, id: aliases.get(message.id) ?? message.id } : message;
+    const alias = aliases.get(message.id);
+    if (alias === undefined) return message;
+    let aliased = aliasedMessages.get(message);
+    if (aliased?.id !== alias) {
+      aliased = { ...message, id: alias };
+      aliasedMessages.set(message, aliased);
+    }
+    return aliased;
   });
   if (pending && !messages.some((message) => message.id === pending.serverId)) result.push(pending.message);
   return result;
 }
 
 const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
+const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
+
+/** Reuse the item projected from the same host message, so memoized rows skip unchanged items. */
+function projectedMarker(
+  cache: WeakMap<ConversationMessage, ChatMessage>,
+  message: ConversationMessage,
+  project: () => ChatMessage,
+) {
+  let item = cache.get(message);
+  if (!item) {
+    item = project();
+    cache.set(message, item);
+  }
+  return item;
+}
+
+/** The order of the last sorted transcript, and the fields that decided it. */
+let lastOrder: { key: string; ids: string[] } | null = null;
+
+/**
+ * The sort reads only these fields. A streamed chunk changes only text and status, so the order of
+ * the previous frame applies and the transcript is not sorted again.
+ */
+function sortedConversationMessages(messages: readonly ConversationMessage[]) {
+  const key = messages
+    .map(
+      (message) =>
+        `${message.id}\u0000${message.turnId ?? ""}\u0000${message.createdAt}\u0000${message.author}\u0000${message.itemType ?? ""}\u0000${message.exchange?.direction ?? ""}`,
+    )
+    .join("\u0001");
+  if (lastOrder?.key === key) {
+    const byId = new Map(messages.map((message) => [message.id, message]));
+    const ordered = lastOrder.ids.flatMap((id) => byId.get(id) ?? []);
+    if (byId.size === messages.length && ordered.length === messages.length) return ordered;
+  }
+  const sorted = sortConversationMessages([...messages]);
+  lastOrder = { key, ids: sorted.map((message) => message.id) };
+  return sorted;
+}
 
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
-  for (const message of sortConversationMessages([...messages])) {
+  for (const message of sortedConversationMessages(messages)) {
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
-      result.push({ id: `exchange:${message.id}`, kind: "exchange", exchange: message.exchange });
+      const { exchange } = message;
+      result.push(
+        projectedMarker(projectedExchanges, message, () => ({
+          id: `exchange:${message.id}`,
+          kind: "exchange",
+          exchange,
+        })),
+      );
       // Match desktop: exchanges have markers, not another agent's text bubble.
       // Incoming attachments remain visible below their marker.
       if (message.exchange.direction !== "incoming" || !message.attachments?.length) continue;
     }
     if (message.questionPrompt) {
-      result.push({ id: message.id, kind: "question", turnId: message.turnId, prompt: message.questionPrompt });
+      const prompt = message.questionPrompt;
+      result.push(
+        projectedMarker(projectedQuestions, message, () => ({
+          id: message.id,
+          kind: "question",
+          turnId: message.turnId,
+          prompt,
+        })),
+      );
       continue;
     }
     // A generation has no text or attachment until its image arrives, and it still needs its placeholder.

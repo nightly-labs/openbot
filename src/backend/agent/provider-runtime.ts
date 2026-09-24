@@ -66,6 +66,11 @@ const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
 /** How long a provider CLI stays running with nothing to do before its process is stopped. */
 export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+/**
+ * The same for a provider no agent is set to. Every signed-in provider starts at launch to read its
+ * models, and an unused OpenCode process alone held about 300 MB for the full idle time.
+ */
+export const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
 
 /**
@@ -202,10 +207,19 @@ export interface ProviderHooks {
   onProvidersReady(): Promise<void>;
   /** The cleanup #handleExit used to inline: prompts, approvals, takeovers, compaction, browser. */
   onProviderLost(client: AgentClient): void;
+  /**
+   * Runs when the runtime stops a client it used for a reason other than an exit: an idle release,
+   * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
+   * skips such a client, and it can never answer its pending prompts, approvals and browser
+   * takeovers. It runs after the stop, so a request the process sent while it stopped is cleared too.
+   */
+  onClientStopped(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** True while an agent is set to this provider, so a turn on it can come at any time. */
+  isProviderAssigned(provider: AgentProvider): boolean;
   /** Runs after a CLI replacement, so deliveries held back during it are delivered. */
   onProviderResumed(provider: AgentProvider): void;
   /**
@@ -592,7 +606,8 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * Stops each provider process that ran no turn for `PROVIDER_IDLE_RELEASE_MS`. An idle CLI holds
+   * Stops each provider process that ran no turn for `PROVIDER_IDLE_RELEASE_MS`, or for
+   * `PROVIDER_UNASSIGNED_RELEASE_MS` when no agent is set to it. An idle CLI holds
    * hundreds of megabytes, and every signed-in provider starts at launch whether an agent uses it
    * or not. Its threads are unloaded, so the next turn resumes them on the process that replaces it.
    */
@@ -616,13 +631,17 @@ export class ProviderRuntime implements ProviderPort {
         this.#lastUsed.set(provider, now);
         continue;
       }
-      if (now - lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
+      const limit = this.#hooks.isProviderAssigned(provider)
+        ? PROVIDER_IDLE_RELEASE_MS
+        : PROVIDER_UNASSIGNED_RELEASE_MS;
+      if (now - lastUsed < limit) continue;
       // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
       this.#clients.delete(provider);
       this.#released.add(provider);
       this.#conversation.unloadClientThreads(client);
       logger.info("Stopped an idle provider CLI.", { provider });
       await client.stop().catch(() => undefined);
+      this.#hooks.onClientStopped(client);
     }
   }
 
@@ -1108,6 +1127,9 @@ export class ProviderRuntime implements ProviderPort {
       activeClients.map(async ([provider, client]) => {
         try {
           const account = await client.request("account/read", { refreshToken: true }, decodeAccountReadResult, 5_000);
+          // A sign-in can finish while the read waits and put a new client in place. The activation
+          // stopped this one and set the status, so this answer describes nothing the app still uses.
+          if (this.#clients.get(provider) !== client) return;
           if (account.account) {
             requireProviderDriver(provider).validateAccount(account.account);
             this.#accounts.set(provider, account.account);
@@ -1126,7 +1148,9 @@ export class ProviderRuntime implements ProviderPort {
           this.#cli.delete(provider);
           this.#accounts.delete(provider);
           await client.stop().catch(() => undefined);
+          this.#hooks.onClientStopped(client);
         } catch {
+          if (this.#clients.get(provider) !== client) return;
           // Keep a working client when an explicit account refresh is temporarily unavailable.
           const label = provider === "codex" ? "ChatGPT" : providerLabel(provider);
           this.#setStatus({
@@ -1290,7 +1314,10 @@ export class ProviderRuntime implements ProviderPort {
           throw error;
         }
 
-        if (previousClient && previousClient !== client) await previousClient.stop().catch(() => undefined);
+        if (previousClient && previousClient !== client) {
+          await previousClient.stop().catch(() => undefined);
+          this.#hooks.onClientStopped(previousClient);
+        }
         if (provider === "codex") void this.#refreshUsage(client).catch(() => undefined);
         if (notifyReady) await this.#hooks.onProvidersReady();
       });
