@@ -2,7 +2,8 @@
 
 `@openbot/team-client` holds the Team connection code that desktop, mobile, and the public web
 client share: the remote directory, the authenticated WebRTC peer, recovery, file transfer, and
-WebRTC framing.
+WebRTC framing. It also holds the Dynamic Island state (`dynamic-island-coordinator.ts`), which the
+macOS island and the iOS Live Activity both read, so the two show the same event for the same state.
 
 - Do not change the meaning of a shipped wire format. `webrtc-framing.ts` encodes the frames of
   Team protocol v2, and hosts and clients of older releases still use it. Put a new behaviour behind

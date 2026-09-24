@@ -1,6 +1,14 @@
-import { BotEngine, type BotFrame, blendExpression, EXPRESSION_BY_ID, SHAPE_BY_ID } from "@norbert_bodziony/bloub";
+import {
+  BotEngine,
+  type BotFrame,
+  blendExpression,
+  COLOR_BY_ID,
+  EXPRESSION_BY_ID,
+  SHAPE_BY_ID,
+} from "@norbert_bodziony/bloub";
 import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
 import { type AvatarMood, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
+import type { AvatarHue } from "@openbot/contracts/ipc";
 
 /**
  * The pose the working cycle holds. It is shape-safe by type, so the cycle can never hand back a
@@ -45,6 +53,11 @@ export function nativeFrame(frame: BotFrame) {
 }
 
 export type BloubActivityFrame = ReturnType<typeof nativeFrame>;
+
+export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string {
+  const profile = bloubAvatarProfile(seed, hue);
+  return COLOR_BY_ID.get(profile.color)?.hex ?? "#8b5cf6";
+}
 
 /**
  * The shape and face to sample for an agent. Color and agent identity do not change it.

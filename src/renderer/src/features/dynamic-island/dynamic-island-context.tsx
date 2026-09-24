@@ -1,8 +1,9 @@
+import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
+import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, flush, onSettled } from "solid-js";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
-import { DynamicIslandCoordinator } from "./dynamic-island-coordinator";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
 /**
@@ -32,7 +33,7 @@ const DynamicIsland = createSimpleContext({
   init: () => {
     const platform = usePlatform();
     const { servers, activeServerId } = useServers();
-    const coordinator = new DynamicIslandCoordinator();
+    const coordinator = new DynamicIslandCoordinator(errorMessage);
     const connectedServers = new Set(["local"]);
     let presentationScheduled = false;
 

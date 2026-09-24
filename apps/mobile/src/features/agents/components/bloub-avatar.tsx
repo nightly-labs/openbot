@@ -1,12 +1,15 @@
-import { BotEngine, COLOR_BY_ID } from "@norbert_bodziony/bloub";
-import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
+import { BotEngine } from "@norbert_bodziony/bloub";
 import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { memo, useId, useMemo } from "react";
 import Animated, { type DerivedValue, useAnimatedProps } from "react-native-reanimated";
 import Svg, { Circle, Defs, FeColorMatrix, Filter, G, Mask, Path, Rect } from "react-native-svg";
 import { useBloubActivityFrame } from "@/features/agents/components/use-bloub-activity-frame";
-import { type BloubActivityFrame, bloubActivityGeometry } from "@/features/agents/model/bloub-activity";
+import {
+  type BloubActivityFrame,
+  bloubActivityGeometry,
+  getBloubAvatarColor,
+} from "@/features/agents/model/bloub-activity";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import {
   DISCONNECTED_APPEARANCE,
@@ -162,11 +165,6 @@ const AvatarThumbnail = memo(function AvatarThumbnail({
     </Svg>
   );
 });
-
-export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string {
-  const profile = bloubAvatarProfile(seed, hue);
-  return COLOR_BY_ID.get(profile.color)?.hex ?? "#8b5cf6";
-}
 
 function thumbnailColor(color: string, disconnected: boolean) {
   if (!disconnected) return color;

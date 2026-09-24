@@ -131,6 +131,7 @@ export function AgentListRow({
   const linkTrigger = (
     <Link.Trigger>
       <ChatLinkPressable
+        chatId={dismissToChat ? undefined : agent.id}
         accessibilityLabel={`Open chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
         accessibilityRole="button"
         accessibilityActions={enableActions ? [{ name: "pin", label: `Pin ${agent.name}` }] : undefined}

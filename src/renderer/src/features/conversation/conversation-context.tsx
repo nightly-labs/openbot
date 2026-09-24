@@ -6,6 +6,7 @@ import type {
   ConversationReadState,
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
+import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage } from "@openbot/ui/data";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
@@ -23,7 +24,6 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
-import { cleanAgentMessageText } from "../agents/agent-message-text";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
 import { appendLatestRuntimeMessages } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";

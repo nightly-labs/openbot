@@ -58,6 +58,7 @@
     "expo-system-ui": "~57.0.4",
     "expo-updates": "~57.0.23",
     "expo-web-browser": "~57.0.3",
+    "expo-widgets": "~57.0.20",
     "heroui-native": "^1.0.8",
     "lucide-react-native": "^1.38.0",
     "marked": "catalog:",

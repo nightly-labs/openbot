@@ -6,10 +6,11 @@ import type {
   QueueSnapshot,
   ScopedAgentEvent,
 } from "@openbot/contracts/ipc";
-import { cleanAgentMessageText } from "../agents/agent-message-text";
+import { cleanAgentMessageText } from "./agent-message-text";
 import {
   countDynamicIslandAttention,
   createDynamicIslandPresentation,
+  type DynamicIslandErrorText,
   type DynamicIslandMessageSource,
   type DynamicIslandPresentationInput,
   selectDynamicIslandPresentation,
@@ -28,6 +29,11 @@ type ServerRuntime = DynamicIslandPresentationInput & {
 
 export class DynamicIslandCoordinator {
   readonly #servers = new Map<string, ServerRuntime>();
+  readonly #errorText: DynamicIslandErrorText;
+
+  constructor(errorText: DynamicIslandErrorText) {
+    this.#errorText = errorText;
+  }
 
   serverState(
     serverId: string,
@@ -102,6 +108,18 @@ export class DynamicIslandCoordinator {
       rawMessageBodies,
       receivedRuntimeSnapshot: previous?.receivedRuntimeSnapshot ?? false,
     });
+  }
+
+  /**
+   * Sets one server's unread replies from the host read state. Mobile uses it instead of counting
+   * arrivals, so a chat read on any device clears the island.
+   */
+  replaceUnreadReplies(serverId: string, unreadReplies: Record<string, number>): void {
+    const runtime = this.#runtime(serverId);
+    runtime.unreadReplies = { ...unreadReplies };
+    runtime.unreadMessageIds = Object.fromEntries(
+      Object.entries(runtime.unreadMessageIds ?? {}).filter(([agentId]) => (unreadReplies[agentId] ?? 0) > 0),
+    );
   }
 
   retainServers(serverIds: readonly string[]): void {
@@ -261,8 +279,8 @@ export class DynamicIslandCoordinator {
     let attentionCount = 0;
     const ordered = serverOrder.flatMap((serverId) => {
       const runtime = this.#servers.get(serverId);
-      if (runtime) attentionCount += countDynamicIslandAttention(runtime);
-      return runtime ? [createDynamicIslandPresentation(runtime)] : [];
+      if (runtime) attentionCount += countDynamicIslandAttention(runtime, this.#errorText);
+      return runtime ? [createDynamicIslandPresentation(runtime, this.#errorText)] : [];
     });
     return selectDynamicIslandPresentation(ordered, attentionCount);
   }
