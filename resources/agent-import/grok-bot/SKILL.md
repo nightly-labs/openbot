@@ -20,6 +20,10 @@ file when the manifest is invalid, so follow the format below exactly.
    - chats: read them only to write memories (step 3);
    - workspace files, only if the user agrees (step 2).
 
+   Do not export the agent that runs this skill. It exists only to make the export, so leave it out
+   of the agent list and out of `openbot-import.json`, even when the user asks for all agents. Also
+   leave this skill (`openbot-export`) out of every agent's skills.
+
    If you cannot read a part, tell the user what you could not export. Do not guess its contents.
 
 2. **Ask about files.** Show the list of agents and the total size of their workspace files. Ask:
@@ -55,7 +59,9 @@ agents/<key>/files/…                    optional workspace files
 ```
 
 `<key>` is a short unique ID for the agent: lowercase letters, digits, and hyphens, such as
-`research` or `sales-outbound`. All paths for an agent must start with `agents/<key>/`.
+`research` or `sales-outbound`. It has 64 characters or fewer, and it does not start or end with a
+hyphen. When you make a key from a long agent name, keep only the first words. All paths for an
+agent must start with `agents/<key>/`.
 
 `openbot-import.json`:
 
@@ -125,7 +131,9 @@ with an invalid schedule and tells the user; the rest of the agent still imports
 
 - [ ] `openbot-import.json` is at the root of the zip, not inside a subfolder you added by mistake.
 - [ ] `format` is `openbot-agent-import` and `version` is `1`.
-- [ ] Each `key` is unique, and each path starts with `agents/<key>/`.
+- [ ] Each `key` is unique and 64 characters or fewer, and each path starts with `agents/<key>/`.
 - [ ] Each skill folder has `SKILL.md` with frontmatter.
+- [ ] The agent that runs this skill is not in `openbot-import.json`.
+- [ ] No agent has an `openbot-export` skill folder.
 - [ ] No secrets, `.env` files, keys, nested archives, `.git`, or `node_modules`.
 - [ ] Workspace files are included only if the user said yes.
