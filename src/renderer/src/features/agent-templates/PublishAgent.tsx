@@ -5,6 +5,7 @@ import { errorMessage } from "@openbot/ui/error-message";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { createStore } from "solid-js";
 import { writeClipboardText } from "../../clipboard";
+import { renderAgentTemplateCard } from "./agent-template-card";
 import { agentTemplatesPort } from "./agent-templates-port";
 
 interface PublishState {
@@ -67,8 +68,11 @@ export function createPublishAgent() {
 
   async function publish(): Promise<void> {
     const agentId = state.agentId;
-    if (!agentId) return;
-    const publication = await agentTemplatesPort().agentTemplates.publish(agentId);
+    const preview = state.preview;
+    if (!agentId || !preview) return;
+    // The card is only the link preview image: when it cannot be drawn, the agent is published without it.
+    const card = await renderAgentTemplateCard(preview).catch(() => null);
+    const publication = await agentTemplatesPort().agentTemplates.publish({ agentId, card });
     if (state.agentId !== agentId) return;
     setState((draft) => {
       if (draft.preview) draft.preview.publication = publication;

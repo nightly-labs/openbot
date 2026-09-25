@@ -18,8 +18,10 @@ import {
   type AvatarImageInput,
   type InstallAgentTemplateInput,
   type InstallAgentTemplateResult,
+  isAgentTemplateCardPng,
   isAgentTemplateDetail,
   isAgentTemplateSnapshot,
+  type PublishAgentTemplateInput,
   type RoutineSchedule,
   toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
@@ -99,12 +101,14 @@ export class AgentTemplateService {
       ...(await this.snapshot(agent)),
       agentId,
       avatarUrl: agent.avatarUrl,
+      avatarImage: await this.readAvatar(agentId),
       updatedAt: agent.updatedAt,
       publication: owned ? publication(owned) : null,
     };
   }
 
-  async publish(agentId: string): Promise<AgentTemplatePublication> {
+  async publish({ agentId, card }: PublishAgentTemplateInput): Promise<AgentTemplatePublication> {
+    if (card && !isAgentTemplateCardPng(card)) throw new Error("The share card is invalid.");
     const agent = this.requireAgent(agentId);
     const snapshot = await this.snapshot(agent);
     if (!snapshot.description) throw new Error("Add instructions to this agent before publishing it.");
@@ -114,11 +118,9 @@ export class AgentTemplateService {
     const form = new FormData();
     form.set("snapshot", JSON.stringify(snapshot));
     form.set("sourceAgentId", agentId);
-    const avatar = this.agents.resolveAvatar(agentId);
-    if (avatar) {
-      const bytes = new Uint8Array(await readFile(avatar.path));
-      form.set("avatar", new Blob([toArrayBuffer(bytes)], { type: avatar.mimeType }), "avatar");
-    }
+    const avatar = await this.readAvatar(agentId);
+    if (avatar) form.set("avatar", new Blob([toArrayBuffer(avatar.bytes)], { type: avatar.mimeType }), "avatar");
+    if (card) form.set("card", new Blob([toArrayBuffer(card)], { type: "image/png" }), "card.png");
     const owned = await this.auth.requestAuthorized(
       "/v1/agent-templates/",
       { method: "POST", body: form },
@@ -253,6 +255,12 @@ export class AgentTemplateService {
         schedule: trigger.schedule,
       })),
     });
+  }
+
+  private async readAvatar(agentId: string): Promise<AvatarImageInput | null> {
+    const avatar = this.agents.resolveAvatar(agentId);
+    if (!avatar) return null;
+    return { mimeType: avatar.mimeType, bytes: new Uint8Array(await readFile(avatar.path)) };
   }
 
   private async owned(agentId: string): Promise<OwnedTemplate | null> {

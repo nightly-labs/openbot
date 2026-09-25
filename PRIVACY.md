@@ -145,8 +145,9 @@ The service stores:
 - optional host logo files and their content types when the owner uploads a logo.
 - published agent templates: the agent name, title, instructions, avatar, routine names, schedules
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
-  agent ID, and creation and update times. Anyone with the link can read a template. Unpublish
-  removes it. Templates do not include workspace files, memories, conversations, or integration
+  agent ID, a share card image made from these fields, and creation and update times. Anyone
+  with the link can read a template, and sites such as X show the share card when the link is
+  posted. Unpublish removes the template and its images. Templates do not include workspace files, memories, conversations, or integration
   credentials.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication

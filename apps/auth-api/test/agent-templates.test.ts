@@ -16,6 +16,16 @@ const owner = { id: "user-1", name: "Owner", email: "owner@example.com", avatarU
 const intruder = { id: "user-2", name: "Other", email: "other@example.com", avatarUrl: null };
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
 
+/** A PNG signature and IHDR chunk of the given size: all the card check reads. */
+function cardPng(width = 1200, height = 630): Uint8Array {
+  const bytes = new Uint8Array(33);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return bytes;
+}
+
 function snapshot(overrides: Partial<AgentTemplateSnapshot> = {}): AgentTemplateSnapshot {
   return {
     name: "Writer",
@@ -97,6 +107,38 @@ describe("agent templates", () => {
     ).rejects.toMatchObject({ status: 400 });
   });
 
+  it("serves the share card, replaces it on republish, and removes it on unpublish", async () => {
+    const { templates, bucket } = setup();
+    const { id } = await templates.publish({
+      user: owner,
+      sourceAgentId: "a",
+      snapshot: snapshot(),
+      avatar: null,
+      card: cardPng(),
+    });
+    expect((await templates.get(id)).cardUrl).toMatch(new RegExp(`^/v1/agent-templates/${id}/card\\?v=`));
+    expect((await templates.card(id)).httpMetadata?.contentType).toBe("image/png");
+    expect(bucket.size).toBe(1);
+
+    await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card: cardPng() });
+    expect(bucket.size).toBe(1);
+
+    await templates.unpublish(owner.id, id);
+    await expect(templates.card(id)).rejects.toMatchObject({ status: 404 });
+    expect(bucket.size).toBe(0);
+  });
+
+  it.each([
+    ["a JPEG", Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, ...new Uint8Array(29)])],
+    ["a PNG of another size", cardPng(1200, 1200)],
+  ])("refuses %s as the share card", async (_reason, card) => {
+    const { templates, bucket } = setup();
+    await expect(
+      templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null, card }),
+    ).rejects.toMatchObject({ status: 400, code: "invalid_card" });
+    expect(bucket.size).toBe(0);
+  });
+
   it("is not listed in the agent marketplace", async () => {
     const { templates, database } = setup();
     await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });
@@ -122,7 +164,7 @@ function setup() {
   database
     .prepare("INSERT INTO users(id, email, name) VALUES (?, ?, ?)")
     .run(intruder.id, intruder.email, intruder.name);
-  const bucket = new Set<string>();
+  const bucket = new Map<string, string | undefined>();
   return { database, bucket, templates: new AgentTemplates({ DB: d1(database), SKILLS: memoryBucket(bucket) }) };
 }
 
@@ -179,35 +221,52 @@ function statement(database: DatabaseSync, query: string, values: SQLInputValue[
   };
 }
 
-function memoryBucket(objects = new Set<string>()): R2Bucket {
+function memoryBucket(objects = new Map<string, string | undefined>()): R2Bucket {
   const unused = () => {
     throw new Error("Unused");
   };
   return {
-    async put(key) {
-      objects.add(key);
-      return {
-        key,
-        version: "1",
-        size: 0,
-        etag: "etag",
-        httpEtag: '"etag"',
-        checksums: { toJSON: () => ({}) },
-        uploaded: new Date(),
-        storageClass: "Standard",
-        customMetadata: {},
-        httpMetadata: {},
-        range: undefined,
-        writeHttpMetadata() {},
-      } satisfies R2Object;
+    async put(key, _value, options) {
+      const contentType = options?.httpMetadata instanceof Headers ? undefined : options?.httpMetadata?.contentType;
+      objects.set(key, contentType);
+      return storedObject(key, contentType);
     },
     async delete(keys) {
       for (const key of Array.isArray(keys) ? keys : [keys]) objects.delete(key);
     },
     head: unused,
-    get: unused,
+    async get(key) {
+      if (!objects.has(key)) return null;
+      return {
+        ...storedObject(key, objects.get(key)),
+        body: new ReadableStream(),
+        bodyUsed: false,
+        arrayBuffer: async () => new ArrayBuffer(0),
+        bytes: async () => new Uint8Array(),
+        text: async () => "",
+        json: async () => JSON.parse("{}"),
+        blob: async () => new Blob(),
+      } satisfies R2ObjectBody;
+    },
     list: unused,
     createMultipartUpload: unused,
     resumeMultipartUpload: unused,
   };
+}
+
+function storedObject(key: string, contentType: string | undefined) {
+  return {
+    key,
+    version: "1",
+    size: 0,
+    etag: "etag",
+    httpEtag: '"etag"',
+    checksums: { toJSON: () => ({}) },
+    uploaded: new Date(),
+    storageClass: "Standard",
+    customMetadata: {},
+    httpMetadata: { contentType },
+    range: undefined,
+    writeHttpMetadata() {},
+  } satisfies R2Object;
 }

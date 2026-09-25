@@ -62,6 +62,7 @@ export function storyAgentTemplatePreview(
     ...structuredClone(STORY_AGENT_TEMPLATE_SNAPSHOT),
     agentId,
     avatarUrl: null,
+    avatarImage: null,
     updatedAt: "2026-09-25T09:06:00.000Z",
     publication,
   };
@@ -71,6 +72,6 @@ export const STORY_AGENT_TEMPLATE_DETAIL: AgentTemplateDetail = {
   ...structuredClone(STORY_AGENT_TEMPLATE_SNAPSHOT),
   id: STORY_AGENT_TEMPLATE_ID,
   avatarUrl: null,
-  creatorName: "Aleksander",
+  creatorName: "Sam Rivera",
   updatedAt: "2026-09-25T09:06:00.000Z",
 };

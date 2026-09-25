@@ -1212,8 +1212,14 @@ their `SKILL.md` text. It has no workspace files and no memories. The Publish bu
 header opens `PublishAgentDialog`; `src/main/agent-template-service.ts` builds the snapshot, stops
 when a text field looks like a secret, and posts it to the Account Worker. The Worker keeps one row
 per account and local agent in D1 `agent_templates`, so a second publish updates the same link.
-There is no review and no marketplace listing. `openbot.run/agents/<id>` is a public page, and its
-button opens `openbot://agents/<id>`, the third renderer link kind in
+There is no review and no marketplace listing. Before a publish, the renderer draws a 1200×630 share
+card (`agent-template-card.tsx`) with the agent's avatar and text. It draws it there because the
+avatar and its fonts are there, and it uses a `data:` URL because the Content Security Policy
+refuses `blob:` images. The Worker accepts only a PNG of that size, stores it in R2, and serves it
+as the page's `og:image`, so a post on X shows the agent. `openbot.run/agents/<id>` is a public
+card page, tinted with the avatar colour. The Bloub library uses browser-only APIs when its module
+loads, so the page loads the avatar and its colour in the browser after hydration. Its button opens
+`openbot://agents/<id>`, the third renderer link kind in
 `src/main/deep-link-router.ts`. The app then shows the template in `AgentTemplateInstallDialog`;
 like a plugin link, the link itself installs nothing.
 

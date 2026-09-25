@@ -4,6 +4,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentTemplateDetail,
   type AgentTemplateSnapshot,
+  isAgentTemplateCardPng,
   isAgentTemplateSnapshot,
   toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
@@ -24,6 +25,7 @@ interface TemplateRow {
   source_agent_id: string;
   snapshot_json: string;
   avatar_key: string | null;
+  card_key: string | null;
   updated_at: number;
   creator_name: string | null;
 }
@@ -41,6 +43,8 @@ export class AgentTemplates {
     sourceAgentId: unknown;
     snapshot: unknown;
     avatar: { bytes: Uint8Array; mimeType: string } | null;
+    /** The share card for link previews: a PNG of `AGENT_TEMPLATE_CARD` size. */
+    card?: Uint8Array | null;
   }): Promise<OwnedAgentTemplate> {
     const sourceAgentId = input.sourceAgentId;
     if (typeof sourceAgentId !== "string" || !sourceAgentId.trim() || sourceAgentId.length > INPUT_LIMITS.identifier)
@@ -51,12 +55,15 @@ export class AgentTemplates {
     await this.validateSkills(snapshot);
     if (input.avatar && !isValidAvatarImage(input.avatar.mimeType, input.avatar.bytes))
       throw new AgentMarketplaceError(400, "invalid_avatar", "Choose a valid PNG, JPEG, or WebP avatar.");
+    const card = input.card ?? null;
+    if (card && !isAgentTemplateCardPng(card))
+      throw new AgentMarketplaceError(400, "invalid_card", "The share card must be a 1200×630 PNG.");
 
     const existing = await this.bindings.DB.prepare(
-      "SELECT id, avatar_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
+      "SELECT id, avatar_key, card_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
     )
       .bind(input.user.id, sourceAgentId)
-      .first<{ id: string; avatar_key: string | null }>();
+      .first<{ id: string; avatar_key: string | null; card_key: string | null }>();
     if (!existing) {
       const count = await this.bindings.DB.prepare(
         "SELECT count(*) AS count FROM agent_templates WHERE owner_user_id = ?",
@@ -76,26 +83,33 @@ export class AgentTemplates {
         httpMetadata: { contentType: input.avatar.mimeType },
       });
     }
+    let cardKey: string | null = null;
+    if (card) {
+      cardKey = `agent-templates/${id}/${crypto.randomUUID()}.card.png`;
+      await this.bindings.SKILLS.put(cardKey, card, { httpMetadata: { contentType: "image/png" } });
+    }
     try {
       if (existing) {
         await this.bindings.DB.prepare(
-          "UPDATE agent_templates SET snapshot_json = ?, avatar_key = ?, updated_at = ? WHERE id = ? AND owner_user_id = ?",
+          "UPDATE agent_templates SET snapshot_json = ?, avatar_key = ?, card_key = ?, updated_at = ? WHERE id = ? AND owner_user_id = ?",
         )
-          .bind(JSON.stringify(snapshot), avatarKey, now, id, input.user.id)
+          .bind(JSON.stringify(snapshot), avatarKey, cardKey, now, id, input.user.id)
           .run();
       } else {
         await this.bindings.DB.prepare(
-          `INSERT INTO agent_templates(id, owner_user_id, source_agent_id, snapshot_json, avatar_key, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO agent_templates(id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-          .bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, now, now)
+          .bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now)
           .run();
       }
     } catch (error) {
       if (avatarKey) await this.bindings.SKILLS.delete(avatarKey);
+      if (cardKey) await this.bindings.SKILLS.delete(cardKey);
       throw error;
     }
     if (existing?.avatar_key) await this.bindings.SKILLS.delete(existing.avatar_key);
+    if (existing?.card_key) await this.bindings.SKILLS.delete(existing.card_key);
     return { id, sourceAgentId, updatedAt: new Date(now).toISOString() };
   }
 
@@ -122,6 +136,7 @@ export class AgentTemplates {
       ...toAgentTemplateSnapshot(snapshot),
       id: row.id,
       avatarUrl: row.avatar_key ? `/v1/agent-templates/${row.id}/avatar?v=${row.updated_at}` : null,
+      cardUrl: row.card_key ? `/v1/agent-templates/${row.id}/card?v=${row.updated_at}` : null,
       creatorName: row.creator_name?.trim() || "OpenBot user",
       updatedAt: new Date(row.updated_at).toISOString(),
     };
@@ -135,24 +150,33 @@ export class AgentTemplates {
     return object;
   }
 
+  async card(id: string) {
+    const row = await this.row(id);
+    if (!row?.card_key) throw new AgentMarketplaceError(404, "card_not_found", "The share card was not found.");
+    const object = await this.bindings.SKILLS.get(row.card_key);
+    if (!object) throw new AgentMarketplaceError(404, "card_not_found", "The share card was not found.");
+    return object;
+  }
+
   async unpublish(userId: string, id: string): Promise<void> {
     const row = await this.bindings.DB.prepare(
-      "SELECT avatar_key FROM agent_templates WHERE id = ? AND owner_user_id = ?",
+      "SELECT avatar_key, card_key FROM agent_templates WHERE id = ? AND owner_user_id = ?",
     )
       .bind(id, userId)
-      .first<{ avatar_key: string | null }>();
+      .first<{ avatar_key: string | null; card_key: string | null }>();
     if (!row) throw notFound();
     await this.bindings.DB.prepare("DELETE FROM agent_templates WHERE id = ? AND owner_user_id = ?")
       .bind(id, userId)
       .run();
     if (row.avatar_key) await this.bindings.SKILLS.delete(row.avatar_key);
+    if (row.card_key) await this.bindings.SKILLS.delete(row.card_key);
   }
 
   private row(id: string) {
     if (!isAgentTemplateId(id)) return Promise.resolve(null);
     return this.bindings.DB.prepare(
       `SELECT templates.id, templates.source_agent_id, templates.snapshot_json, templates.avatar_key,
-              templates.updated_at, users.name AS creator_name
+              templates.card_key, templates.updated_at, users.name AS creator_name
        FROM agent_templates templates JOIN users ON users.id = templates.owner_user_id
        WHERE templates.id = ?`,
     )

@@ -10,6 +10,7 @@ import {
   type AgentTemplateDetail,
   type AgentTemplatePreview,
   type AgentTemplatePublication,
+  type AvatarImageInput,
   INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   type InstallMarketplaceAgentResult,
@@ -329,9 +330,21 @@ export function decodeAgentTemplatePreview(value: unknown): AgentTemplatePreview
     ...snapshot,
     agentId: requiredString(item, "agentId"),
     avatarUrl: nullableString(item, "avatarUrl"),
+    avatarImage: decodePreviewAvatarImage(item.avatarImage),
     updatedAt: nullableString(item, "updatedAt"),
     publication: item.publication === null ? null : decodeAgentTemplatePublication(item.publication),
   };
+}
+
+function decodePreviewAvatarImage(value: unknown): AvatarImageInput | null {
+  if (value === null) return null;
+  if (
+    !isDynamicRecord(value) ||
+    !isOneOf(["image/png", "image/jpeg", "image/webp"] as const, value.mimeType) ||
+    !(value.bytes instanceof Uint8Array)
+  )
+    throw new Error("Invalid agent template avatar.");
+  return { mimeType: value.mimeType, bytes: value.bytes };
 }
 
 export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {

@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
-import type { AgentSummary } from "./ipc-agents";
+import type { AgentSummary, AvatarImageInput } from "./ipc-agents";
 import type { MarketplaceAgentRoutine, MarketplaceAgentSkill } from "./ipc-marketplace-agents";
 import { isRoutineSchedule } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
@@ -27,6 +27,8 @@ export interface AgentTemplateSnapshot {
 export interface AgentTemplateDetail extends AgentTemplateSnapshot {
   id: string;
   avatarUrl: string | null;
+  /** The share card image (`AGENT_TEMPLATE_CARD`), or null when the publish sent none. */
+  cardUrl?: string | null;
   creatorName: string;
   updatedAt: string;
 }
@@ -41,8 +43,16 @@ export interface AgentTemplatePublication {
 export interface AgentTemplatePreview extends AgentTemplateSnapshot {
   agentId: string;
   avatarUrl: string | null;
+  /** The uploaded avatar's bytes, so the share card can draw it. Null for a generated avatar. */
+  avatarImage: AvatarImageInput | null;
   updatedAt: string | null;
   publication: AgentTemplatePublication | null;
+}
+
+export interface PublishAgentTemplateInput {
+  agentId: string;
+  /** A PNG of `AGENT_TEMPLATE_CARD` size for link previews, or null to publish without one. */
+  card: Uint8Array | null;
 }
 
 export interface InstallAgentTemplateInput {
@@ -52,6 +62,27 @@ export interface InstallAgentTemplateInput {
 
 export interface InstallAgentTemplateResult {
   agent: AgentSummary;
+}
+
+/** The share card: the 1.91:1 image X and other sites show for a link. */
+export const AGENT_TEMPLATE_CARD = {
+  width: 1200,
+  height: 630,
+  maxBytes: 1_500_000,
+} as const;
+
+/** Reads the PNG signature and the IHDR size, so a card of another type or size is refused. */
+export function isAgentTemplateCardPng(bytes: Uint8Array): boolean {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.byteLength < 24 || bytes.byteLength > AGENT_TEMPLATE_CARD.maxBytes) return false;
+  if (!signature.every((byte, index) => bytes[index] === byte)) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const chunk = String.fromCharCode(bytes[12] ?? 0, bytes[13] ?? 0, bytes[14] ?? 0, bytes[15] ?? 0);
+  return (
+    chunk === "IHDR" &&
+    view.getUint32(16) === AGENT_TEMPLATE_CARD.width &&
+    view.getUint32(20) === AGENT_TEMPLATE_CARD.height
+  );
 }
 
 export const AGENT_TEMPLATE_LIMITS = {
@@ -130,6 +161,7 @@ export function isAgentTemplateDetail(value: unknown): value is AgentTemplateDet
     isDynamicRecord(value) &&
     isString(value.id) &&
     (value.avatarUrl === null || isString(value.avatarUrl)) &&
+    (value.cardUrl === undefined || value.cardUrl === null || isString(value.cardUrl)) &&
     isString(value.creatorName) &&
     isString(value.updatedAt)
   );

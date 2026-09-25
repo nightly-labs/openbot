@@ -1,6 +1,10 @@
 // Link-only agent templates: publishing a local agent, and previewing and installing a shared one.
 
-import type { InstallAgentTemplateInput } from "@openbot/contracts/ipc";
+import {
+  type InstallAgentTemplateInput,
+  isAgentTemplateCardPng,
+  type PublishAgentTemplateInput,
+} from "@openbot/contracts/ipc";
 import type { AgentTemplateService } from "../agent-template-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { isObject, requireString, stringPayload } from "./validation";
@@ -22,7 +26,7 @@ export function agentTemplateIpcHandlers({
   return {
     agentTemplates: {
       preview: payloadHandler(stringPayload("agentId"), (agentId) => agentTemplates.preview(agentId)),
-      publish: payloadHandler(stringPayload("agentId"), (agentId) => agentTemplates.publish(agentId)),
+      publish: payloadHandler(parsePublishAgentTemplate, (input) => agentTemplates.publish(input)),
       unpublish: payloadHandler(stringPayload("agentId"), (agentId) => agentTemplates.unpublish(agentId)),
       get: payloadHandler(stringPayload("templateId"), (templateId) => agentTemplates.get(templateId)),
       install: payloadHandler(parseInstallAgentTemplate, (input) => agentTemplates.install(input)),
@@ -37,4 +41,12 @@ function parseInstallAgentTemplate(input: unknown): InstallAgentTemplateInput {
     templateId: requireString(input.templateId, "templateId"),
     timezone: requireString(input.timezone, "timezone", 255),
   };
+}
+
+function parsePublishAgentTemplate(input: unknown): PublishAgentTemplateInput {
+  if (!isObject(input)) throw new Error("Invalid agent publication.");
+  const card = input.card;
+  if (card !== null && !(card instanceof Uint8Array && isAgentTemplateCardPng(card)))
+    throw new Error("The share card is invalid.");
+  return { agentId: requireString(input.agentId, "agentId"), card };
 }

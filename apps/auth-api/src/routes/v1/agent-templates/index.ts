@@ -23,9 +23,12 @@ export const Route = createFileRoute("/v1/agent-templates/")({
           const form = await readMultipartFormData(request, TEMPLATE_BODY_LIMIT);
           const snapshotText = form.get("snapshot");
           const avatar = form.get("avatar");
+          const card = form.get("card");
           if (!isString(snapshotText)) return apiError(400, "invalid_template", "An agent template is required.");
           if (avatar !== null && !(avatar instanceof File))
             return apiError(400, "invalid_avatar", "The avatar is invalid.");
+          if (card !== null && !(card instanceof File))
+            return apiError(400, "invalid_card", "The share card must be a 1200×630 PNG.");
           let snapshot: unknown;
           try {
             snapshot = JSON.parse(snapshotText);
@@ -41,6 +44,7 @@ export const Route = createFileRoute("/v1/agent-templates/")({
                 avatar instanceof File
                   ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
                   : null,
+              card: card instanceof File ? new Uint8Array(await card.arrayBuffer()) : null,
             }),
             201,
           );

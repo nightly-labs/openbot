@@ -57,6 +57,7 @@ import { Route as V1TeamHostsIceServersRouteImport } from './routes/v1/team-host
 import { Route as V1TeamInvitationsEmailRouteImport } from './routes/v1/team-invitations/email'
 import { Route as V1TeamTunnelsProvisionRouteImport } from './routes/v1/team-tunnels/provision'
 import { Route as V1AgentTemplatesTemplateIdAvatarRouteImport } from './routes/v1/agent-templates/$templateId/avatar'
+import { Route as V1AgentTemplatesTemplateIdCardRouteImport } from './routes/v1/agent-templates/$templateId/card'
 import { Route as V1AuthEmailStartRouteImport } from './routes/v1/auth/email/start'
 import { Route as V1AuthEmailVerifyRouteImport } from './routes/v1/auth/email/verify'
 import { Route as V1MarketplaceAgentsIndexRouteImport } from './routes/v1/marketplace/agents/index'
@@ -337,6 +338,12 @@ const V1AgentTemplatesTemplateIdAvatarRoute =
     path: '/avatar',
     getParentRoute: () => V1AgentTemplatesTemplateIdRoute,
   } as any)
+const V1AgentTemplatesTemplateIdCardRoute =
+  V1AgentTemplatesTemplateIdCardRouteImport.update({
+    id: '/card',
+    path: '/card',
+    getParentRoute: () => V1AgentTemplatesTemplateIdRoute,
+  } as any)
 const V1AuthEmailStartRoute = V1AuthEmailStartRouteImport.update({
   id: '/v1/auth/email/start',
   path: '/v1/auth/email/start',
@@ -588,6 +595,7 @@ export interface FileRoutesByFullPath {
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -674,6 +682,7 @@ export interface FileRoutesByTo {
   '/v1/sites': typeof V1SitesIndexRoute
   '/v1/skills': typeof V1SkillsIndexRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -761,6 +770,7 @@ export interface FileRoutesById {
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
   '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -849,6 +859,7 @@ export interface FileRouteTypes {
     | '/v1/sites/'
     | '/v1/skills/'
     | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -935,6 +946,7 @@ export interface FileRouteTypes {
     | '/v1/sites'
     | '/v1/skills'
     | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -1021,6 +1033,7 @@ export interface FileRouteTypes {
     | '/v1/sites/'
     | '/v1/skills/'
     | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -1471,6 +1484,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1AgentTemplatesTemplateIdAvatarRouteImport
       parentRoute: typeof V1AgentTemplatesTemplateIdRoute
     }
+    '/v1/agent-templates/$templateId/card': {
+      id: '/v1/agent-templates/$templateId/card'
+      path: '/card'
+      fullPath: '/v1/agent-templates/$templateId/card'
+      preLoaderRoute: typeof V1AgentTemplatesTemplateIdCardRouteImport
+      parentRoute: typeof V1AgentTemplatesTemplateIdRoute
+    }
     '/v1/auth/email/start': {
       id: '/v1/auth/email/start'
       path: '/v1/auth/email/start'
@@ -1740,12 +1760,14 @@ const V1MeRouteWithChildren = V1MeRoute._addFileChildren(V1MeRouteChildren)
 
 interface V1AgentTemplatesTemplateIdRouteChildren {
   V1AgentTemplatesTemplateIdAvatarRoute: typeof V1AgentTemplatesTemplateIdAvatarRoute
+  V1AgentTemplatesTemplateIdCardRoute: typeof V1AgentTemplatesTemplateIdCardRoute
 }
 
 const V1AgentTemplatesTemplateIdRouteChildren: V1AgentTemplatesTemplateIdRouteChildren =
   {
     V1AgentTemplatesTemplateIdAvatarRoute:
       V1AgentTemplatesTemplateIdAvatarRoute,
+    V1AgentTemplatesTemplateIdCardRoute: V1AgentTemplatesTemplateIdCardRoute,
   }
 
 const V1AgentTemplatesTemplateIdRouteWithChildren =

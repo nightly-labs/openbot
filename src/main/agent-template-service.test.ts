@@ -60,7 +60,7 @@ describe("publishing an agent template", () => {
       service("Drafts product writing.", "---\nname: Notes\ndescription: x\n---\nBearer abcdefghijk"),
     ],
   ])("refuses a secret in %s and sends nothing", async (field, { templates, auth }) => {
-    await expect(templates.publish(agent.id)).rejects.toThrow(
+    await expect(templates.publish({ agentId: agent.id, card: null })).rejects.toThrow(
       `Remove the secret or email address from ${field} before publishing.`,
     );
     expect(auth.requestAuthorized).not.toHaveBeenCalled();

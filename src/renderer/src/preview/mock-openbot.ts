@@ -1087,7 +1087,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           updatedAt: agent.updatedAt,
         });
       },
-      publish: async (agentId) => {
+      publish: async ({ agentId }) => {
         if (!agents.some((candidate) => candidate.id === agentId)) throw new Error("Choose a local agent first.");
         const publication = { ...STORY_AGENT_TEMPLATE_PUBLICATION, publishedAt: new Date().toISOString() };
         agentTemplatePublications.set(agentId, publication);

@@ -46,6 +46,7 @@ import type {
   AgentTemplatePublication,
   InstallAgentTemplateInput,
   InstallAgentTemplateResult,
+  PublishAgentTemplateInput,
 } from "./ipc-agent-templates";
 import type {
   AgentSummary,
@@ -424,7 +425,7 @@ export const IPC_ENDPOINTS = {
   // `openbot://agents/<id>` link; there is no endpoint that installs from a link without the dialog.
   agentTemplates: {
     preview: request<string, AgentTemplatePreview>()("agent-templates:preview"),
-    publish: request<string, AgentTemplatePublication>()("agent-templates:publish"),
+    publish: request<PublishAgentTemplateInput, AgentTemplatePublication>()("agent-templates:publish"),
     unpublish: request<string, void>()("agent-templates:unpublish"),
     get: request<string, AgentTemplateDetail>()("agent-templates:get"),
     install: request<InstallAgentTemplateInput, InstallAgentTemplateResult>()("agent-templates:install"),

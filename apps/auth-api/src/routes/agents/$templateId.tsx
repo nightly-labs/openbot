@@ -1,4 +1,4 @@
-import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
+import { AGENT_TEMPLATE_CARD, type AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { createFileRoute, notFound } from "@tanstack/solid-router";
 import { AgentTemplatePage } from "../../components/agents/AgentTemplatePage";
 import { agentTemplatePath } from "../../lib/agent-template-path";
@@ -19,6 +19,13 @@ function agentTemplateHead(template: AgentTemplateDetail, siteUrl: string) {
   const url = new URL(agentTemplatePath(template.id), siteUrl).toString();
   const title = `${template.name} — OpenBot agent`;
   const description = template.title || template.description.slice(0, 200);
+  // The agent's own share card when the publish sent one, so a post on X shows this agent.
+  const card = template.cardUrl
+    ? {
+        url: new URL(template.cardUrl, siteUrl).toString(),
+        alt: `${template.name}, an OpenBot agent by ${template.creatorName}`,
+      }
+    : { url: OPENBOT_SOCIAL_IMAGE_URL, alt: OPENBOT_SOCIAL_IMAGE_ALT };
   return {
     meta: [
       { title },
@@ -29,12 +36,20 @@ function agentTemplateHead(template: AgentTemplateDetail, siteUrl: string) {
       { property: "og:url", content: url },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
-      { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
-      { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
+      { property: "og:image", content: card.url },
+      { property: "og:image:alt", content: card.alt },
+      ...(template.cardUrl
+        ? [
+            { property: "og:image:type", content: "image/png" },
+            { property: "og:image:width", content: String(AGENT_TEMPLATE_CARD.width) },
+            { property: "og:image:height", content: String(AGENT_TEMPLATE_CARD.height) },
+          ]
+        : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: description },
-      { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
+      { name: "twitter:image", content: card.url },
+      { name: "twitter:image:alt", content: card.alt },
     ],
     links: [{ rel: "canonical", href: url }],
   };

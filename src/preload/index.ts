@@ -423,7 +423,7 @@ const openbotApi: OpenBotDesktopApi = {
   },
   agentTemplates: {
     preview: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.preview, decodeAgentTemplatePreview, agentId),
-    publish: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.publish, decodeAgentTemplatePublication, agentId),
+    publish: (input) => invokeRequest(IPC_ENDPOINTS.agentTemplates.publish, decodeAgentTemplatePublication, input),
     unpublish: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.unpublish, decodeVoid, agentId),
     get: (templateId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.get, decodeAgentTemplateDetail, templateId),
     install: (input) => invokeRequest(IPC_ENDPOINTS.agentTemplates.install, decodeAgentInstallation, input),
