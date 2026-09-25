@@ -440,13 +440,13 @@ describe("the live browser view on a host", () => {
   });
 
   it("closes invalidated views and rejects reuse of their session", async () => {
-    let invalidate: (() => void) | undefined;
+    let invalidate: ((reason: string) => void) | undefined;
     const stop = vi.fn(async () => undefined);
     const dispatch = vi.fn(async () => undefined);
     const gateway = new BrowserViewGateway({
       browser: {
-        startView: async (_tabId, _onFrame, onInvalidated) => {
-          invalidate = onInvalidated;
+        startView: async (_tabId, _onFrame, onEnded) => {
+          invalidate = onEnded;
           return stop;
         },
         dispatchViewInput: dispatch,
@@ -461,7 +461,7 @@ describe("the live browser view on a host", () => {
     await new Promise((resolve) => socket.once("open", resolve));
     await vi.waitFor(() => expect(invalidate).toBeDefined());
     const closed = new Promise((resolve) => socket.once("close", resolve));
-    invalidate?.();
+    invalidate?.("Authentication changed the browser view. Open a new view to continue.");
     await closed;
     expect(gateway.activeViewCount()).toBe(0);
     expect(stop).toHaveBeenCalledOnce();

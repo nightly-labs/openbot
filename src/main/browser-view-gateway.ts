@@ -195,8 +195,8 @@ export class BrowserViewGateway {
             }
           }
         },
-        () => {
-          void this.#closeSession(session, "Authentication changed the browser view. Open a new view to continue.");
+        (reason) => {
+          void this.#closeSession(session, reason);
         },
       );
       if (session.socket === client) session.stopView = stopView;

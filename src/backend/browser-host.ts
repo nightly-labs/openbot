@@ -901,10 +901,11 @@ export class BrowserHost {
     for (const invalidate of [...tab.viewInvalidations]) invalidate();
   }
 
+  /** `onEnded` gets the reason to show when the view stops before its stop function is called. */
   async startView(
     tabId: string,
     onFrame: (frame: BrowserScreencastFrame) => void,
-    onInvalidated?: () => void,
+    onEnded?: (reason: string) => void,
   ): Promise<() => Promise<void>> {
     const tab = this.#requireTab(tabId);
     if (tab.secret?.submitted) throw new Error("Browser view is protected during authentication.");
@@ -913,7 +914,7 @@ export class BrowserHost {
     const invalidate = () => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
-      onInvalidated?.();
+      onEnded?.("Authentication changed the browser view. Open a new view to continue.");
     };
     tab.viewInvalidations.add(invalidate);
     try {
@@ -921,6 +922,11 @@ export class BrowserHost {
         { quality: VIEW_FRAME_QUALITY, maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT },
         (frame) => {
           if (!tab.secret?.submitted && tab.captureGeneration === generation) onFrame(frame);
+        },
+        (error) => {
+          tab.viewInvalidations.delete(invalidate);
+          logger.warn("The live browser view stopped.", { error: toLogValue(error) });
+          onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
       );
       let stopped = false;

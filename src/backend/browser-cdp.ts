@@ -984,11 +984,16 @@ export class BrowserCdpEngine {
    * next one: without the acknowledgement the screencast stops after the first frame. Frames are
    * acknowledged as fast as they arrive and forwarded no faster than `createFramePacer` allows, so a
    * page that animates cannot raise what the link and the client have to carry.
+   *
+   * `onEnded` runs when the stream stops after it started and before the stop function is called:
+   * a view that cannot start again must not freeze on its last frame.
    */
   async startScreencast(
     options: BrowserScreencastOptions,
     onFrame: (frame: BrowserScreencastFrame) => void,
+    onEnded?: (error: unknown) => void,
   ): Promise<() => Promise<void>> {
+    let live = false;
     let stopRequested = false;
     let stop = (): void => undefined;
     const stopped = new Promise<void>((resolve) => {
@@ -1050,6 +1055,7 @@ export class BrowserCdpEngine {
                 maxHeight: options.maxHeight,
                 everyNthFrame: 1,
               });
+              live = true;
               started();
               await Promise.race([stopped, detached]);
             } finally {
@@ -1063,7 +1069,10 @@ export class BrowserCdpEngine {
         pacer.stop();
       }
     })();
-    void running.catch((error: unknown) => failed(error));
+    void running.catch((error: unknown) => {
+      if (!live) failed(error);
+      else if (!stopRequested) onEnded?.(error);
+    });
     await ready;
     return async () => {
       stop();
