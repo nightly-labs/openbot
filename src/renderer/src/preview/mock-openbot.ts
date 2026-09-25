@@ -787,7 +787,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
         return clone(authState);
       },
-      verifyEmailCode: async (_challengeId, _code) => {
+      verifyEmailCode: async () => {
         const email = authState.status === "code_sent" ? authState.email : "person@example.com";
         const user: CentralAuthUser = {
           id: "user-1",

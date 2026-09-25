@@ -1,5 +1,4 @@
 import type { AgentEvent } from "./ipc-agent-events";
-import type { CentralAuthState } from "./ipc-app-auth";
 import type { AttachmentImportEvent } from "./ipc-attachments";
 import type { BrowserBounds, BrowserLiveViewInput } from "./ipc-browser";
 import type { GroupApi, Invoke, IPC_ENDPOINTS, IpcEndpoints, Subscribe } from "./ipc-endpoints";
@@ -59,21 +58,7 @@ export interface BrowserDesktopApi {
   onPictureInPictureEvent: Subscribe<typeof IPC_ENDPOINTS.browser.pictureInPictureEvent>;
 }
 
-export interface CentralAuthDesktopApi {
-  getState: Invoke<typeof IPC_ENDPOINTS.auth.getState>;
-  retry: Invoke<typeof IPC_ENDPOINTS.auth.retry>;
-  requestEmailCode: Invoke<typeof IPC_ENDPOINTS.auth.requestEmailCode>;
-  verifyEmailCode: (challengeId: string, code: string) => Promise<CentralAuthState>;
-  updateName: Invoke<typeof IPC_ENDPOINTS.auth.updateName>;
-  updateAvatar: Invoke<typeof IPC_ENDPOINTS.auth.updateAvatar>;
-  createMobileConnect: Invoke<typeof IPC_ENDPOINTS.auth.createMobileConnect>;
-  listMobileConnectedDevices: Invoke<typeof IPC_ENDPOINTS.auth.listMobileConnectedDevices>;
-  listAccountSessions: Invoke<typeof IPC_ENDPOINTS.auth.listAccountSessions>;
-  revokeAccountSession: Invoke<typeof IPC_ENDPOINTS.auth.revokeAccountSession>;
-  revokeMobileConnectedDevice: Invoke<typeof IPC_ENDPOINTS.auth.revokeMobileConnectedDevice>;
-  logout: Invoke<typeof IPC_ENDPOINTS.auth.logout>;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.auth.event>;
-}
+export type CentralAuthDesktopApi = GroupApi<IpcEndpoints["auth"]>;
 
 export type UpdateDesktopApi = GroupApi<IpcEndpoints["update"]>;
 

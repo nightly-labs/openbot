@@ -564,7 +564,7 @@ export function installOpenbotStub(): void {
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       transcribe: vi.fn().mockResolvedValue({ text: "Voice transcript" }),
     }),
-    auth: {
+    auth: stubGroup(IPC_ENDPOINTS.auth, "auth", {
       getState: vi.fn().mockResolvedValue({
         status: "signed_in",
         user: { id: "user-1", email: "person@example.com", name: null, avatarUrl: null },
@@ -591,12 +591,7 @@ export function installOpenbotStub(): void {
       }),
       logout: vi.fn().mockResolvedValue({ status: "signed_out" }),
       onEvent: vi.fn(authBridge.subscribe),
-      createMobileConnect: notStubbed("auth.createMobileConnect"),
-      listMobileConnectedDevices: notStubbed("auth.listMobileConnectedDevices"),
-      listAccountSessions: notStubbed("auth.listAccountSessions"),
-      revokeAccountSession: notStubbed("auth.revokeAccountSession"),
-      revokeMobileConnectedDevice: notStubbed("auth.revokeMobileConnectedDevice"),
-    },
+    }),
     agent: {
       ...createMockChannels(
         (event) => emitAgentEvent?.(event),
