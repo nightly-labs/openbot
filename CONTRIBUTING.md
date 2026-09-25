@@ -114,10 +114,17 @@ The first review, a review after a rebase or a merge of the base branch, and a r
 the `norbiai` label read the whole pull request. Add the label when a change since the last review
 needs the whole pull request read again.
 
-`NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
-`high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
-`gpt-6-astra` or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking for more is
-answered with a warning and the run goes ahead at `low`.
+`NorbiAI-Effort` reaches `gpt-6-astra` and the Claude models only. A `chatgpt-web/*` slug carries
+its own level — the `high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair
+the effort with another model or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking
+for more is answered with a warning and the run goes ahead at `low`.
+
+For a second opinion from Claude, name `claude-opus-5-5`, `claude-opus-5` or `claude-sonnet-5`. The
+review then runs on Claude Code, with the Claude login on the runner mac, in place of Codex. It uses
+the same prompt, merge block and findings list. A Claude review without `NorbiAI-Effort` runs at
+`high`. Claude Code can only read: it gets the Read, Grep and Glob tools and the `git diff`,
+`git show`, `git log` and `git ls-files` commands. It does not load the pull request's own settings,
+hooks, `CLAUDE.md` or MCP servers.
 
 The same two directives work in a `/norbiai review` comment, where they override the description for
 that one run. On a pull request from a fork only the comment is read: the description belongs to
