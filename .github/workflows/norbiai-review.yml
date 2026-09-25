@@ -143,15 +143,16 @@ jobs:
       # What a pull request gets when it asks for nothing. Every other run is this pair
       # plus whatever the pull request or the review request overrode, and the override is
       # scoped to that one run: nothing here is written back, so the next pull request
-      # starts from these values again.
-      DEFAULT_MODEL: chatgpt-web/extra-high
+      # starts from these values again. A Claude model here runs at `CLAUDE_DEFAULT_EFFORT`.
+      # Name `chatgpt-web/extra-high` to review on Codex instead.
+      DEFAULT_MODEL: claude-opus-5-5
       # The default instead, when every changed file is documentation, a story, a test or a
       # message table. Has to be on `ALLOWED_MODELS`.
       LOW_RISK_MODEL: chatgpt-web/medium
-      # Only `gpt-6-astra` reads this. A `chatgpt-web/*` slug carries its own level — the
-      # `high` in `chatgpt-web/high` is the reasoning level, already chosen — so the effort
-      # passed alongside it is ignored, and the default stays at the cheapest value rather
-      # than implying a depth the bridge models never got.
+      # A Codex model that reads the effort gets this: only `gpt-6-astra`. A `chatgpt-web/*`
+      # slug carries its own level — the `high` in `chatgpt-web/high` is the reasoning level,
+      # already chosen — so the effort passed alongside it is ignored, and the default stays
+      # at the cheapest value rather than implying a depth the bridge models never got.
       DEFAULT_EFFORT: low
       # An override is untrusted free text, and it reaches a command line. Membership in
       # these lists is the whole validation: anything else is refused and the default runs
@@ -159,7 +160,15 @@ jobs:
       # list here to offer a new choice — space separated, exact match.
       ALLOWED_MODELS: >-
         chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro
-        gpt-6-astra
+        gpt-6-astra claude-opus-5-5
+      # The models Claude Code runs instead of Codex, through the Claude login on the runner
+      # mac. Each is also on `ALLOWED_MODELS` and `EFFORT_MODELS`. Only Opus 5.5 is offered,
+      # by an explicit decision.
+      CLAUDE_MODELS: claude-opus-5-5
+      # A Claude model reads the effort, and the shared `DEFAULT_EFFORT` is the cheapest
+      # level because no Codex model that reads it may go higher. A Claude review asked
+      # for without an effort gets this one instead.
+      CLAUDE_DEFAULT_EFFORT: high
       # What `gpt-6-astra` accepts, less the two longest. `minimal` is not on the model's own
       # list, so offering it would only buy a refused run; `max` and `ultra` are on it and are
       # withheld by an explicit decision. Offering a level nobody should pick invites the run
@@ -175,7 +184,7 @@ jobs:
       # naming an effort beside one describes a setting that did nothing — which is what the
       # published review used to report. The list decides what that review says, and a model
       # added here has to be one that really takes the setting.
-      EFFORT_MODELS: gpt-6-astra
+      EFFORT_MODELS: gpt-6-astra claude-opus-5-5
 
     steps:
       - name: Checkout repository
@@ -403,7 +412,13 @@ jobs:
 
           choose model "$comment_model" "$pr_model" "$default_model" "$ALLOWED_MODELS"
           model=$resolved
-          choose "reasoning effort" "$comment_effort" "$pr_effort" "$DEFAULT_EFFORT" "$ALLOWED_EFFORTS"
+          cli=codex
+          default_effort=$DEFAULT_EFFORT
+          if listed "$model" "$CLAUDE_MODELS"; then
+            cli=claude
+            default_effort=$CLAUDE_DEFAULT_EFFORT
+          fi
+          choose "reasoning effort" "$comment_effort" "$pr_effort" "$default_effort" "$ALLOWED_EFFORTS"
           effort=$resolved
 
           # A ceiling, not a default, and the reason it is applied here rather than by
@@ -426,6 +441,7 @@ jobs:
 
           {
             echo "model=$model"
+            echo "cli=$cli"
             echo "effort=$effort"
             echo "reviewer=$reviewer"
           } >> "$GITHUB_OUTPUT"
@@ -634,6 +650,7 @@ jobs:
           WITHDRAWN_FILE: ${{ steps.previous.outputs.withdrawn_file }}
           RESPONSES_FILE: ${{ steps.previous.outputs.responses_file }}
           MODEL: ${{ steps.reviewer.outputs.model }}
+          REVIEWER_CLI: ${{ steps.reviewer.outputs.cli }}
           EFFORT: ${{ steps.reviewer.outputs.effort }}
           REVIEWED_SHA: ${{ steps.previous.outputs.reviewed_sha }}
           # The label is the explicit request for a full read.
@@ -646,6 +663,7 @@ jobs:
           PARTIAL_DIFF_MAX_BYTES: 60000
         run: |
           set -euo pipefail
+          REVIEWER_CLI=${REVIEWER_CLI:-codex}
 
           prompt_file="$RUNNER_TEMP/norbiai-prompt.txt"
           live_file="$RUNNER_TEMP/norbiai-live.txt"
@@ -900,27 +918,30 @@ jobs:
           # each one that needs sign-in costs a start-up turn. Only servers from `config.toml`
           # accept this override: a plugin server rejects it and Codex then refuses to start,
           # so the overrides are tried on `mcp list` first and dropped if that fails.
+          # Claude Code runs with no MCP server at all: `--strict-mcp-config` and no config.
           mcp_args=()
-          mcp_disabled=""
-          mcp_errors="$RUNNER_TEMP/norbiai-mcp-errors.txt"
-          if mcp_names=$(codex mcp list --json 2> "$mcp_errors" |
-            bun --config="$composer_bunfig" --no-install -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled !== false) console.log(server.name)' 2>&1); then
-            while IFS= read -r name; do
-              case "$name" in
-                "" | *[!A-Za-z0-9_-]*) ;;
-                *)
-                  mcp_args+=(--config "mcp_servers.${name}.enabled=false")
-                  mcp_disabled="$mcp_disabled $name"
-                  ;;
-              esac
-            done <<< "$mcp_names"
-            echo "MCP servers to disable:${mcp_disabled:- none}"
-          else
-            echo "::notice title=NorbiAI kept MCP servers::Could not list them: $(head -1 "$mcp_errors") $(printf '%s' "$mcp_names" | head -1)"
-          fi
-          if [ "${#mcp_args[@]}" -gt 0 ] && ! mcp_check=$(codex ${mcp_args[@]+"${mcp_args[@]}"} mcp list --json 2>&1); then
-            echo "::notice title=NorbiAI kept MCP servers::Codex rejected the overrides: $(printf '%s' "$mcp_check" | head -1)"
-            mcp_args=()
+          if [ "$REVIEWER_CLI" = codex ]; then
+            mcp_disabled=""
+            mcp_errors="$RUNNER_TEMP/norbiai-mcp-errors.txt"
+            if mcp_names=$(codex mcp list --json 2> "$mcp_errors" |
+              bun --config="$composer_bunfig" --no-install -e 'for (const server of JSON.parse(await Bun.stdin.text())) if (server.enabled !== false) console.log(server.name)' 2>&1); then
+              while IFS= read -r name; do
+                case "$name" in
+                  "" | *[!A-Za-z0-9_-]*) ;;
+                  *)
+                    mcp_args+=(--config "mcp_servers.${name}.enabled=false")
+                    mcp_disabled="$mcp_disabled $name"
+                    ;;
+                esac
+              done <<< "$mcp_names"
+              echo "MCP servers to disable:${mcp_disabled:- none}"
+            else
+              echo "::notice title=NorbiAI kept MCP servers::Could not list them: $(head -1 "$mcp_errors") $(printf '%s' "$mcp_names" | head -1)"
+            fi
+            if [ "${#mcp_args[@]}" -gt 0 ] && ! mcp_check=$(codex ${mcp_args[@]+"${mcp_args[@]}"} mcp list --json 2>&1); then
+              echo "::notice title=NorbiAI kept MCP servers::Codex rejected the overrides: $(printf '%s' "$mcp_check" | head -1)"
+              mcp_args=()
+            fi
           fi
 
           # Which bridge version ran this, and whether Bigger Context was on. The runners are
@@ -943,7 +964,91 @@ jobs:
           fi
           echo "Bridge ${bridge_version}, Bigger Context ${bigger_context}"
 
+          # Claude Code runs in the pull request's checkout, which the pull request writes, so
+          # nothing in it may configure the run: `--setting-sources user` keeps out the
+          # project's settings, hooks and CLAUDE.md, and `--strict-mcp-config` with no config
+          # leaves no MCP server. The tools only read. Read, Grep and Glob are refused outside
+          # the checkout, and Bash runs only the read commands below; the run is not
+          # interactive, so every other command is refused. The deny rules close the options
+          # of those commands that write a file or read one outside the repository. A `*`
+          # matches anywhere in the command: on Claude Code 2.1.282, `git diff --output=<file>`
+          # and `git diff --no-index /etc/hosts /dev/null` were both refused.
+          # `git grep` and `git blame` are left out: `-O` runs a program and `--contents`
+          # reads any file, and the Grep tool does the same search.
+          claude_allowed=('Bash(git diff:*)' 'Bash(git show:*)' 'Bash(git log:*)' 'Bash(git ls-files:*)')
+          claude_denied=('Bash(*--output*)' 'Bash(*--no-index*)')
+          claude_errors_file="$RUNNER_TEMP/norbiai-claude-errors.txt"
+          claude_facts_file="$RUNNER_TEMP/norbiai-claude-facts.txt"
+          claude_version=""
+          if [ "$REVIEWER_CLI" = claude ]; then
+            claude_version=$(claude --version 2>/dev/null | head -1 | cut -d ' ' -f 1 | tr -cd '0-9A-Za-z.-' | cut -c 1-40 || true)
+            echo "Claude Code ${claude_version:-unknown}"
+          fi
+          claude_tool_calls=0
+          claude_tokens=""
+          claude_error=""
+
+          run_claude() {
+            : > "$last_message_file"
+            timeout 900 claude --print \
+              --model "$MODEL" \
+              --effort "$EFFORT" \
+              --output-format stream-json \
+              --verbose \
+              --setting-sources user \
+              --strict-mcp-config \
+              --no-session-persistence \
+              --tools Read,Grep,Glob,Bash \
+              --allowedTools "${claude_allowed[@]}" \
+              --disallowedTools "${claude_denied[@]}" \
+              < "$prompt_file" 2> "$claude_errors_file" | tee "$live_file"
+            exit_code=${PIPESTATUS[0]}
+            head -c 4000 "$claude_errors_file" >&2
+            # Each line is one event that Claude Code wrote, and a tool's output stays inside
+            # the JSON of its own event, so no text from the pull request can pose as an
+            # event. Unlike the Codex transcript, the result event is a channel this step
+            # can trust: the answer, the tool calls and the error all come from it.
+            : > "$claude_facts_file"
+            LIVE_FILE="$live_file" LAST_MESSAGE_FILE="$last_message_file" FACTS_FILE="$claude_facts_file" \
+              bun --config="$composer_bunfig" --no-install -e '
+                let toolCalls = 0;
+                let result;
+                for (const line of (await Bun.file(process.env.LIVE_FILE).text()).split("\n")) {
+                  let event;
+                  try {
+                    event = JSON.parse(line);
+                  } catch {
+                    continue;
+                  }
+                  if (event?.type === "assistant" && Array.isArray(event.message?.content)) {
+                    toolCalls += event.message.content.filter((block) => block?.type === "tool_use").length;
+                  }
+                  if (event?.type === "result") result = event;
+                }
+                const usage = result?.usage ?? {};
+                const tokens = ["input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"]
+                  .reduce((sum, key) => sum + (Number.isFinite(usage[key]) ? usage[key] : 0), 0);
+                let error = "";
+                if (result?.is_error) {
+                  const status = result.api_error_status ? `API status ${result.api_error_status}: ` : "";
+                  error = status + String(result.result || result.subtype || "").split("\n")[0];
+                } else if (result?.subtype === "success" && typeof result.result === "string") {
+                  await Bun.write(process.env.LAST_MESSAGE_FILE, result.result);
+                }
+                await Bun.write(process.env.FACTS_FILE, `${toolCalls}\n${result ? tokens : ""}\n${error}\n`);
+              ' || echo "::notice title=NorbiAI could not read the Claude events::The review is judged without them."
+            claude_tool_calls=$(sed -n 1p "$claude_facts_file" | tr -cd '0-9')
+            claude_tokens=$(sed -n 2p "$claude_facts_file" | tr -cd '0-9')
+            # One sanitised line, because it goes on to `$GITHUB_OUTPUT` and into a comment.
+            claude_error=$(sed -n 3p "$claude_facts_file" | tr -d '\r\n' | tr -c 'A-Za-z0-9 .,:;/()-' ' ' |
+              cut -c 1-200 | sed 's/[. ]*$//')
+          }
+
           run_reviewer() {
+            if [ "$REVIEWER_CLI" = claude ]; then
+              run_claude
+              return
+            fi
             # The runners share one bridge, which allows 5 browser turns at a time, and a
             # cancelled run can keep its turn for a while. That refusal comes in seconds, so
             # wait for a free turn instead of failing the review.
@@ -972,9 +1077,17 @@ jobs:
 
           # A review of code it never read. Through the bridge, a reviewer sometimes makes no
           # tool call and reports that its tools were unavailable, and that answer has the
-          # shape of a clean review. Codex prints `exec` on a line of its own for each command.
+          # shape of a clean review. Codex prints `exec` on a line of its own for each command;
+          # Claude Code's events count the calls.
+          reviewer_read_code() {
+            if [ "$REVIEWER_CLI" = claude ]; then
+              [ "${claude_tool_calls:-0}" -gt 0 ]
+            else
+              grep -q '^exec$' "$live_file"
+            fi
+          }
           review_is_blind() {
-            if [ "$diff_whole" != true ] && ! grep -q '^exec$' "$live_file"; then
+            if [ "$diff_whole" != true ] && ! reviewer_read_code; then
               return 0
             fi
             awk '/^## Verdict/ { text = ""; on = 1; next } /^## / { on = 0 } on { text = text " " $0 } END { print text }' "$message_file" |
@@ -992,7 +1105,11 @@ jobs:
           set -e
           # Recorded in the comment so the cost of a review can be followed without the logs.
           review_seconds=$(( SECONDS - review_started ))
-          tokens_used=$(awk '/^tokens used$/ { getline; value = $0 } END { gsub(/[^0-9]/, "", value); print value }' "$live_file")
+          if [ "$REVIEWER_CLI" = claude ]; then
+            tokens_used=$claude_tokens
+          else
+            tokens_used=$(awk '/^tokens used$/ { getline; value = $0 } END { gsub(/[^0-9]/, "", value); print value }' "$live_file")
+          fi
 
           # The prompt echo holds the marker once, so a second one on a line of its own is
           # the answer starting. It is a boundary no pull request can move: the value is
@@ -1018,7 +1135,8 @@ jobs:
           fi
 
           salvaged=false
-          if [ "$exit_code" -ne 0 ] && [ ! -s "$last_message_file" ] &&
+          # Only a Codex run can drop this way: Claude Code talks to the API itself.
+          if [ "$REVIEWER_CLI" = codex ] && [ "$exit_code" -ne 0 ] && [ ! -s "$last_message_file" ] &&
             [ "${marker_hits:-0}" -ge 2 ] && [ "$previous_findings" = false ]; then
             # The bridge prints its reconnection notices, and Codex its token count, below
             # the answer. Neither belongs in the published review.
@@ -1091,6 +1209,13 @@ jobs:
               reason="Reviewer did not read the code it had to review. Human review required."
             elif [ "$exit_code" -eq 124 ]; then
               reason="Review timed out after 15 minutes. Human review required."
+            elif [ "$exit_code" -ne 0 ] && [ "$REVIEWER_CLI" = claude ]; then
+              # Read from Claude Code's result event, which no pull request can write.
+              reason="Reviewer exited with code ${exit_code}."
+              if [ -n "$claude_error" ]; then
+                reason="${reason} Claude Code reported: ${claude_error}."
+              fi
+              reason="${reason} Human review required."
             elif [ "$exit_code" -ne 0 ]; then
               # The exit code named no cause, so a capacity refusal, a dropped stream and a
               # crash all published the same sentence and only the logs told them apart.
@@ -1129,6 +1254,7 @@ jobs:
             echo "salvaged=$salvaged"
             echo "bridge_version=$bridge_version"
             echo "bigger_context=$bigger_context"
+            echo "claude_version=$claude_version"
             echo "files_changed=$files_changed"
             echo "lines_added=$lines_added"
             echo "lines_removed=$lines_removed"
@@ -1166,6 +1292,8 @@ jobs:
           SALVAGED: ${{ steps.review.outputs.salvaged }}
           BRIDGE_VERSION: ${{ steps.review.outputs.bridge_version }}
           BIGGER_CONTEXT: ${{ steps.review.outputs.bigger_context }}
+          REVIEWER_CLI: ${{ steps.reviewer.outputs.cli }}
+          CLAUDE_VERSION: ${{ steps.review.outputs.claude_version }}
           REVIEWED_SINCE: ${{ steps.review.outputs.reviewed_since }}
           RUN_ID: ${{ github.run_id }}
         run: |
@@ -1192,6 +1320,9 @@ jobs:
           # On the failure comment as well: which bridge version failed is the first question
           # every bridge outage asked, and the logs were the only answer.
           host_line="Bridge ${BRIDGE_VERSION:-unknown}, Bigger Context ${BIGGER_CONTEXT:-unknown}"
+          if [ "${REVIEWER_CLI:-}" = claude ]; then
+            host_line="Claude Code ${CLAUDE_VERSION:-unknown}"
+          fi
 
           review_ids=$(
             gh api --paginate \

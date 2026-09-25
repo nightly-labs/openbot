@@ -50,6 +50,8 @@ function resolve({ description = "", comment = "", fork = false, changedFiles = 
       CAPPED_MODEL: job.env.CAPPED_MODEL,
       CAPPED_MODEL_EFFORT: job.env.CAPPED_MODEL_EFFORT,
       EFFORT_MODELS: job.env.EFFORT_MODELS,
+      CLAUDE_MODELS: job.env.CLAUDE_MODELS,
+      CLAUDE_DEFAULT_EFFORT: job.env.CLAUDE_DEFAULT_EFFORT,
       PR_BODY_FILE: bodyPath,
       CHANGED_FILES_FILE: changedFilesPath,
       SAME_REPO: fork ? "false" : "true",
@@ -63,10 +65,20 @@ function resolve({ description = "", comment = "", fork = false, changedFiles = 
     const separator = line.indexOf("=");
     chosen.set(line.slice(0, separator), line.slice(separator + 1));
   }
-  return { model: chosen.get("model"), effort: chosen.get("effort"), reviewer: chosen.get("reviewer"), log };
+  return {
+    model: chosen.get("model"),
+    cli: chosen.get("cli"),
+    effort: chosen.get("effort"),
+    reviewer: chosen.get("reviewer"),
+    log,
+  };
 }
 
-const defaults = { model: job.env.DEFAULT_MODEL, effort: job.env.DEFAULT_EFFORT };
+const defaultIsClaude = job.env.CLAUDE_MODELS?.split(" ").includes(job.env.DEFAULT_MODEL ?? "");
+const defaults = {
+  model: job.env.DEFAULT_MODEL,
+  effort: defaultIsClaude ? job.env.CLAUDE_DEFAULT_EFFORT : job.env.DEFAULT_EFFORT,
+};
 
 describe("NorbiAI reviewer selection", () => {
   it("reviews on the defaults when the pull request asks for nothing", () => {
@@ -285,6 +297,21 @@ describe("NorbiAI reviewer selection", () => {
     });
 
     expect(model).toBe("chatgpt-web/medium");
+  });
+
+  // The shared default effort is the cheapest level, because the Codex model that reads it
+  // may go no higher. A Claude review that asked for no effort would run at that level.
+  it("reviews on Claude Code by default, at the Claude default effort unless asked", () => {
+    expect(resolve({ description: "Fixes a bug." })).toMatchObject({
+      cli: "claude",
+      effort: job.env.CLAUDE_DEFAULT_EFFORT,
+      reviewer: `claude-opus-5-5, reasoning effort ${job.env.CLAUDE_DEFAULT_EFFORT}`,
+    });
+    expect(resolve({ description: "NorbiAI-Effort: low" })).toMatchObject({
+      cli: "claude",
+      effort: "low",
+    });
+    expect(resolve({ description: "NorbiAI-Model: chatgpt-web/extra-high" }).cli).toBe("codex");
   });
 
   // The published review says what ran. Naming an effort beside a chatgpt-web slug described
