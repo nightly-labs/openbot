@@ -1215,6 +1215,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     await this.#mailbox.initialize();
     this.#mcp.migrateCatalogBridgesToHttp();
     this.channels.restoreDeliveryLinks();
+    this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
     await this.#threads.reconcileProviderSessionFiles();
     this.#boot.recoverPersistedTurns();
     this.#hostedSites.restore();

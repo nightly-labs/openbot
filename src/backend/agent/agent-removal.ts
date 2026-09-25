@@ -99,6 +99,7 @@ export class AgentRemoval {
     try {
       this.#routines.arm();
       await this.deleteData(agent ?? { id: agentId, threadId: null });
+      this.#channels.removeDeletedMembers(new Set(this.#store.list().map((candidate) => candidate.id)));
       this.#duplication.forget(agentId);
       if (!wasPending) this.#hooks.emit({ type: "agents-changed", agents: this.#hooks.listAgents() });
     } finally {

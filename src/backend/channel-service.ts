@@ -210,8 +210,8 @@ export class ChannelService {
     const known = this.hooks.agents();
     if (command.type === "save") {
       const existing = this.store.exists(command.channelId) ? this.store.get(command.channelId) : null;
-      // A deleted agent stays in the membership list, and the settings panel offers to remove it.
-      // Only a member the draft adds has to be available: rejecting the ones already stored would
+      // Agent deletion removes the agent from each channel, but a database from an older version can
+      // still hold a deleted member, and the settings panel offers to remove it. Only a member the draft adds has to be available: rejecting the ones already stored would
       // hold every later save of the channel, so the reader could not remove the first of two
       // deleted members, or edit any other field.
       // A save that edits an open channel must never bring a deleted one back. Settings save on
@@ -906,6 +906,26 @@ export class ChannelService {
             assignments: [{ ...assignment, deliveryId: delivery.delivery.id }],
           });
       }
+  }
+
+  /**
+   * Takes every agent without a record out of each channel's members. Agent deletion calls this, and
+   * so does startup, for members that older versions and an interrupted deletion left behind.
+   *
+   * The lead moves the way the settings panel moves it: to the first member that stays. A task the
+   * deleted agent owned needs nothing here, because the pump pauses a task whose owner is gone.
+   */
+  removeDeletedMembers(agentIds: ReadonlySet<string>): void {
+    for (const channelId of this.store.ids()) {
+      const channel = this.store.get(channelId);
+      const members = channel.members.filter((member) => agentIds.has(member.agentId));
+      if (members.length === channel.members.length) continue;
+      const leadAgentId = members.some((member) => member.agentId === channel.leadAgentId)
+        ? channel.leadAgentId
+        : (members[0]?.agentId ?? null);
+      this.store.update({ ...channel, members, leadAgentId });
+      this.publish(channelId);
+    }
   }
 
   deliveryUncertain(deliveryId: string): void {
