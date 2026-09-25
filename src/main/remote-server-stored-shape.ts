@@ -46,7 +46,7 @@ export interface StoredRemoteServer {
 // that followed it, not by an index: a list the user removes a server from renumbers, and an index
 // taken before the removal would move the preserved entry past the servers it used to sit behind.
 // Null means it was last.
-export interface PreservedRemoteServer {
+interface PreservedRemoteServer {
   beforeId: string | null;
   entry: DynamicRecord;
 }
@@ -219,7 +219,7 @@ function idOf(entry: DynamicRecord): string | null {
   return isString(entry.id) ? entry.id : null;
 }
 
-export function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
+function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
   if (
     !isDynamicRecord(value) ||
     !isString(value.id) ||

@@ -59,7 +59,7 @@ export interface StorageUsageSources {
 export class StorageNotFoundError extends Error {}
 
 /** A folder with more entries than this counts what it reached and marks the result truncated. */
-export const STORAGE_WALK_ENTRY_LIMIT = 100_000;
+const STORAGE_WALK_ENTRY_LIMIT = 100_000;
 const STAT_BATCH = 64;
 const LOG_FILE = /\.log(\.\d+)?$/;
 const CACHE_TTL_MS = 60_000;
@@ -75,7 +75,7 @@ interface TreeSize {
  * Bytes of the regular files under `root`. A symbolic link is never followed, so a workspace that
  * links to a large folder does not count it, and a loop cannot run forever.
  */
-export async function measureTree(root: string, entryLimit = STORAGE_WALK_ENTRY_LIMIT): Promise<TreeSize> {
+async function measureTree(root: string, entryLimit = STORAGE_WALK_ENTRY_LIMIT): Promise<TreeSize> {
   let start: string;
   try {
     start = await realpath(root);
@@ -436,7 +436,7 @@ function uniqueBytes(files: readonly MeasuredFile[]): number {
  * Removes what is in each cache folder, or the rotated log files, and nothing else: the folders
  * stay, and a subfolder of a log folder (such as the transfer journal) is not touched.
  */
-export async function clearStorageCategory(roots: StorageRoots, category: ClearableStorageCategory): Promise<void> {
+async function clearStorageCategory(roots: StorageRoots, category: ClearableStorageCategory): Promise<void> {
   if (category === "logs") {
     for (const directory of roots.logs)
       await Promise.all((await logFiles(directory)).map((path) => rm(path, { force: true })));

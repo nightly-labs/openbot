@@ -27,10 +27,6 @@ export function rememberImageDimensions(id: string, dimensions: ImageDimensions)
   dimensionCache.remember(id, dimensions);
 }
 
-export function knownImageDimensions(id: string): ImageDimensions | null {
-  return dimensionCache.get(id);
-}
-
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
 export function attachmentTypeLabel(name: string, mimeType: string): string {
   const extension = attachmentFileExtension(name);

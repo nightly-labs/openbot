@@ -128,5 +128,3 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
 
   return { state, openForm, closeForm, openList, closeList, submit, remove };
 }
-
-export type CustomProviderHost = ReturnType<typeof createCustomProviderHostState>;

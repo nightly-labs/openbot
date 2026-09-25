@@ -161,13 +161,13 @@ export function createBrowser(overrides: Partial<TeamApiBrowser> = {}): TeamApiB
 }
 
 /** The owner `configure: true` creates, and the credentials `login()` sends. */
-export const FIXTURE_OWNER = {
+const FIXTURE_OWNER = {
   team: "Studio Mac",
   username: "owner",
   password: "correct horse battery",
 } as const;
 
-export interface StartedTeamApi {
+interface StartedTeamApi {
   readonly api: TeamApiServer;
   /** `http://127.0.0.1:<port>`, the origin every request helper here takes first. */
   readonly base: string;
@@ -356,7 +356,7 @@ export function nextJsonEvents(websocket: WebSocket, count: number): Promise<Tes
   });
 }
 
-export function decodeTestRealtimeEvent(value: unknown): TestRealtimeEvent {
+function decodeTestRealtimeEvent(value: unknown): TestRealtimeEvent {
   if (!isDynamicRecord(value) || !isString(value.type)) {
     throw new Error("Invalid test realtime event.");
   }

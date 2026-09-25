@@ -138,7 +138,7 @@ export type { TestMcpServerOptions } from "./agent/mcp-gateway";
 // Both types were declared in this module before the split and are part of the frozen public
 // surface, so they keep being reachable from here rather than only from the controller that owns
 // them now. `Pick<AgentService, ...>` in team-api-server.ts does not cover exported types.
-export type { AgentClientFactory } from "./agent/provider-runtime";
+
 export type { RoutineMutationOptions } from "./agent/routine-scheduler";
 export type { ResolvedSharedFile } from "./workspace-paths";
 

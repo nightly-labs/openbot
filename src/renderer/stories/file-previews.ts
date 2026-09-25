@@ -162,7 +162,7 @@ export const TEXT_PREVIEW = filePreview("provider-session.log", "text/plain", "t
 
 export const SOURCE_PREVIEW = filePreview("current-agent-keys.ts", "text/typescript", "text", SOURCE);
 
-export const JSON_PREVIEW = filePreview("evidence-map.json", "application/json", "text", JSON_DATA);
+const JSON_PREVIEW = filePreview("evidence-map.json", "application/json", "text", JSON_DATA);
 
 export const IMAGE_PREVIEW = filePreview("trust-boundary.svg", "image/svg+xml", "image", SVG);
 

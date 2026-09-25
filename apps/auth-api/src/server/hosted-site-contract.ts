@@ -123,7 +123,7 @@ function parseFile(value: unknown, seen: Set<string>): HostedSiteFileManifest {
   return { path, size: value.size, mimeType: value.mimeType.toLowerCase() };
 }
 
-export function normalizeHostedSitePath(value: string): string {
+function normalizeHostedSitePath(value: string): string {
   const path = value.replaceAll("\\", "/").replace(/^\.\//u, "");
   if (!path || path.length > 240 || path.startsWith("/") || path.endsWith("/") || path.includes("//")) {
     throw invalid("A file path is invalid.");

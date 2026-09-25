@@ -26,7 +26,7 @@ import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler } from "./scoped-handler";
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
-export interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
+interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
 }

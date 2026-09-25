@@ -12,19 +12,15 @@ import { z } from "zod";
 
 export type {
   IceServer,
-  SignalChannel,
   SignalClientMessage,
   SignalErrorCode,
-  SignalRelayMessage,
   SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
 export {
-  SIGNAL_ERROR_CODES,
   SIGNAL_MESSAGE_BYTES_LIMIT,
-  SIGNAL_PROTOCOL_VERSION,
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "@openbot/contracts/signal-protocol/messages";
-export type { RemoteMemberRole, RemoteRole, RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
+export type { RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 export {
   REMOTE_TICKET_AUDIENCE,
   REMOTE_TICKET_PROTOCOL_VERSION,

@@ -196,5 +196,3 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     activityLabel,
   };
 }
-
-export type ActivityStore = ReturnType<typeof createActivityStore>;

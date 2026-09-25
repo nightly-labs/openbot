@@ -147,7 +147,7 @@ export function pluginExternalHref(url: string | null): string | null {
  * Without it, picking `Design` and `Data & Analytics` would ask for a plugin that is both. One
  * group is the whole list today, and the type says so rather than keeping a name nothing carries.
  */
-export type PluginTagGroup = "category";
+type PluginTagGroup = "category";
 
 export interface PluginTag {
   group: PluginTagGroup;

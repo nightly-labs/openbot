@@ -34,7 +34,7 @@ type PromptMarkers = Record<string, string | undefined>;
 const NO_MARKERS: PromptMarkers = {};
 
 /** The four accessors one server scope sees, with its own id already applied. */
-export interface ServerPromptMarkers {
+interface ServerPromptMarkers {
   presentedPromptResolutions: () => PromptMarkers;
   setPresentedPromptResolutions: (update: (current: PromptMarkers) => PromptMarkers) => void;
   submittedPromptRequests: () => PromptMarkers;

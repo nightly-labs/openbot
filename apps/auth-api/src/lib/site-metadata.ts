@@ -5,7 +5,7 @@
 
 export const OPENBOT_SITE_URL = "https://openbot.run/";
 export const OPENBOT_SITE_TITLE = "OpenBot: AI teammates for real work";
-export const OPENBOT_SITE_DESCRIPTION =
+const OPENBOT_SITE_DESCRIPTION =
   "Run Codex and Claude side by side as persistent AI teammates, each with its own workspace, queue, and context.";
 export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
@@ -25,7 +25,7 @@ export function siteUrlForPage(pageUrl: URL): string {
   return OPENBOT_PRODUCTION_HOSTS.has(pageUrl.hostname) ? OPENBOT_SITE_URL : `${pageUrl.origin}/`;
 }
 
-export const OPENBOT_SOFTWARE_APPLICATION = {
+const OPENBOT_SOFTWARE_APPLICATION = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "OpenBot",

@@ -8,7 +8,7 @@ export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 const ANALYTICS_SCHEMA_VERSION = 8;
 
-export type LandingAcquisitionSource = "direct" | "search" | "social" | "github" | "other";
+type LandingAcquisitionSource = "direct" | "search" | "social" | "github" | "other";
 
 /** How far into an article the reader got. Reported once per depth per article view. */
 export type ArticleReadDepth = "start" | "half" | "end";

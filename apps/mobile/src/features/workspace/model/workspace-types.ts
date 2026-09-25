@@ -30,7 +30,7 @@ import type { MobileChannelStore } from "@/features/channels/model/channel-store
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 
-export type MobileServerKind = "local" | "remote";
+type MobileServerKind = "local" | "remote";
 export type MobileServerState = "unknown" | "connecting" | "online" | "offline" | "error";
 export type MobileServerDirectoryState = "loading" | "ready" | "error";
 
@@ -65,7 +65,7 @@ export interface MobileAgent {
   avatarHue: AvatarHue | null;
 }
 
-export type ToggleAgentPinResult = "pinned" | "unpinned" | "error";
+type ToggleAgentPinResult = "pinned" | "unpinned" | "error";
 
 interface AddRemoteServerInput {
   inviteUrl: string;

@@ -266,7 +266,7 @@ function workableWindows(visible: readonly DriverWindow[]): DriverWindow[] {
   );
 }
 
-export function readWindows(payload: unknown): DriverWindow[] {
+function readWindows(payload: unknown): DriverWindow[] {
   if (!isDynamicRecord(payload) || !Array.isArray(payload.windows)) return [];
   const windows: DriverWindow[] = [];
   for (const entry of payload.windows) {

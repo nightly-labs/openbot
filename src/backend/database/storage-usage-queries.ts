@@ -27,7 +27,7 @@ export interface StoragePlacement {
   createdAt: string;
 }
 
-export const STORAGE_PLACEMENT_PAGE = 500;
+const STORAGE_PLACEMENT_PAGE = 500;
 
 /** Agent chats only. A channel context thread is internal: the user never sees it as a chat. */
 export function storageThreads(db: DatabaseSync, agentId?: string): StorageThread[] {

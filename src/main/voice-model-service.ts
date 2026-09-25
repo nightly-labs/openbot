@@ -6,8 +6,8 @@ import { dirname } from "node:path";
 import type { VoiceModelStatus } from "@openbot/contracts/ipc";
 
 export const WHISPER_MODEL_NAME = "ggml-medium-q5_0.bin";
-export const WHISPER_MODEL_BYTES = 539_212_467;
-export const WHISPER_MODEL_SHA256 = "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f";
+const WHISPER_MODEL_BYTES = 539_212_467;
+const WHISPER_MODEL_SHA256 = "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f";
 export const WHISPER_MODEL_URL =
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-medium-q5_0.bin";
 

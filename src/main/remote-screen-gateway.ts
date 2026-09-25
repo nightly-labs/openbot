@@ -26,7 +26,7 @@ import {
 import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const GRANT_TTL_MS = 60_000;
-export const REMOTE_DESKTOP_MAX_SESSIONS = 4;
+const REMOTE_DESKTOP_MAX_SESSIONS = 4;
 const VIEWER_COOKIE = "openbotRemoteViewer";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;

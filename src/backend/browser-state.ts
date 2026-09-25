@@ -20,9 +20,9 @@ export interface StoredBrowserTab {
  * A viewport this large would allocate a backing store big enough to take the whole app down, and the
  * bound is on the *physical* pixels, so a modest CSS size with a 4x scale factor still trips it.
  */
-export const MAX_PHYSICAL_VIEWPORT_PIXELS = 8_388_608;
+const MAX_PHYSICAL_VIEWPORT_PIXELS = 8_388_608;
 
-export function isSafeViewportSize(width: number, height: number, deviceScaleFactor: number): boolean {
+function isSafeViewportSize(width: number, height: number, deviceScaleFactor: number): boolean {
   return width * height * deviceScaleFactor * deviceScaleFactor <= MAX_PHYSICAL_VIEWPORT_PIXELS;
 }
 
@@ -39,7 +39,7 @@ export function defaultBrowserEnvironment(): BrowserEnvironment {
  * trusted, because a hand-edited or truncated file would otherwise hand a viewport straight to
  * `Emulation.setDeviceMetricsOverride`.
  */
-export function browserEnvironment(value: unknown): BrowserEnvironment | null {
+function browserEnvironment(value: unknown): BrowserEnvironment | null {
   if (!isRecord(value) || !isRecord(value.viewport)) return null;
   const viewport = value.viewport;
   if (viewport.mode !== "fill" && viewport.mode !== "custom") return null;

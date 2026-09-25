@@ -48,5 +48,3 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
 
   return { mcpServers };
 }
-
-export type McpServersStore = ReturnType<typeof createMcpServersStore>;

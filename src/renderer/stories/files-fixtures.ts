@@ -376,7 +376,7 @@ export const FILES_CHIEF_ROWS = FILES_ROWS.filter((file) => file.agentId === "ch
 export const FILES_CHIEF_CONVERSATIONS = FILES_CONVERSATIONS.filter((chat) => chat.agentId === "chief");
 
 export const FILES_LAUNCH_ROWS = FILES_ROWS.filter((file) => file.conversation?.id === "c-launch");
-export const FILES_SOURCES_ROWS = FILES_ROWS.filter((file) => file.conversation?.id === "c-sources");
+const FILES_SOURCES_ROWS = FILES_ROWS.filter((file) => file.conversation?.id === "c-sources");
 
 /** The pricing-brief chat with one file of each status, for the missing and remote row design. */
 export const FILES_STATUS_ROWS: StoredFileRow[] = [

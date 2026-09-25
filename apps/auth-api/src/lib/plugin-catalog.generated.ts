@@ -111,12 +111,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   ],
 };
 
-export interface PluginCatalogPrompt {
+interface PluginCatalogPrompt {
   id: string;
   text: string;
 }
 
-export interface PluginCatalogApp {
+interface PluginCatalogApp {
   id: string;
   name: string;
   description: string;
@@ -124,7 +124,7 @@ export interface PluginCatalogApp {
   server: PluginCatalogServer;
 }
 
-export type PluginCatalogServer =
+type PluginCatalogServer =
   | { name: string; transport: "http"; url: string; auth?: unknown }
   | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
 

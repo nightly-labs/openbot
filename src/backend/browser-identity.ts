@@ -13,7 +13,7 @@
  */
 export type BrowserSiteIdentity = "native" | "scrubbed";
 
-export interface BrowserSitePolicy {
+interface BrowserSitePolicy {
   readonly hosts: readonly string[];
   readonly identity: BrowserSiteIdentity;
   readonly reason: string;

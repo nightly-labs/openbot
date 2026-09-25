@@ -10,10 +10,10 @@ import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from "../protocol";
 
-export const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
-export const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
-export const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
-export const MCP_ELICITATION_DECLINE = "Don't allow";
+const MCP_ELICITATION_DECISION_ID = "mcp-elicitation-decision";
+const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
+const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
+const MCP_ELICITATION_DECLINE = "Don't allow";
 /** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
 
@@ -110,7 +110,7 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
 }
 
 /** One question per requested field, so a plugin can collect an API key or any other value. */
-export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
+function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
   const message = getString(params, "message")?.trim();
   return Object.entries(properties).flatMap(([id, property]) => {

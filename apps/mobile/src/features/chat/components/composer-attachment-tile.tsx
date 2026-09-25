@@ -7,7 +7,7 @@ import Animated, { cubicBezier, Easing, Keyframe, LinearTransition, ReduceMotion
 import { attachmentTypeLabel, formatFileSize } from "./attachment-preview";
 import type { ChatAttachment } from "./use-chat-attachments";
 
-export const ATTACHMENT_TILE_SIZE = 112;
+const ATTACHMENT_TILE_SIZE = 112;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 // A new file grows in from slightly smaller, never from nothing; a removed one shrinks as it fades.
 // The rest of the row then slides into the space, so the order the user chose stays readable.

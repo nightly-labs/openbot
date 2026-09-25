@@ -29,7 +29,7 @@ export interface ArchiveDigest {
  * hash its source publishes, and the installed files have the hashes recorded when they were
  * installed (see `INSTALL_RECORD`).
  */
-export type RuntimeSource = "lock" | "latest";
+type RuntimeSource = "lock" | "latest";
 
 export interface RuntimeSpec {
   runtime: ManagedRuntimeId;
@@ -58,7 +58,7 @@ export const INSTALL_RECORD = "openbot-install.json";
 
 /** Everything a staging step may use. `downloadSmallFile` is passed in so fetching stays private
  *  to the manager: a descriptor can ask for a checksummed LICENSE, and nothing else. */
-export interface ProviderStageContext {
+interface ProviderStageContext {
   readonly spec: RuntimeSpec;
   /** The verified archive or bare binary the manager downloaded. */
   readonly downloadedPath: string;
@@ -119,7 +119,7 @@ async function stageBunx(binary: string, bunx: string): Promise<void> {
   }
 }
 
-export const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDescriptor> = {
+const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDescriptor> = {
   codex: {
     runtime: "codex",
     spec: (target, lock) => {

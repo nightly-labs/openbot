@@ -27,7 +27,7 @@ import { parseRemoveMcpServer, parseSaveMcpServer, parseSetMcpServerEnabled, par
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The AgentService members this registrar reaches, and nothing else. */
-export interface McpServerService {
+interface McpServerService {
   listMcpServers(): McpServerConfig[];
   saveMcpServer(input: SaveMcpServerInput): McpServerConfig[];
   removeMcpServer(input: RemoveMcpServerInput): McpServerConfig[];
@@ -36,7 +36,7 @@ export interface McpServerService {
 }
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
-export interface McpRemoteServers {
+interface McpRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
 }

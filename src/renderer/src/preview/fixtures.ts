@@ -35,7 +35,7 @@ import type { AgentProfile } from "@openbot/ui/data";
 import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
 
-export const STORY_NOW = "2026-08-19T10:00:00.000Z";
+const STORY_NOW = "2026-08-19T10:00:00.000Z";
 
 export const STORY_AGENT_SUMMARIES: AgentSummary[] = [
   {

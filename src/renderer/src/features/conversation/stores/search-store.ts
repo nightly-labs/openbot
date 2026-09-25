@@ -196,5 +196,3 @@ export function createSearchStore(deps: SearchStoreDeps) {
     setChatSearchInputElement,
   };
 }
-
-export type SearchStore = ReturnType<typeof createSearchStore>;

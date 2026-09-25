@@ -172,5 +172,3 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     restoreVoiceTranscript,
   };
 }
-
-export type ComposerStore = ReturnType<typeof createComposerStore>;

@@ -21,7 +21,7 @@ const modifiers = z
   .max(4)
   .optional();
 
-export const browserTargetSchema = z.discriminatedUnion("kind", [
+const browserTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("ref"), ref: identifier, revision }),
   z.object({
     kind: z.literal("role"),

@@ -72,7 +72,7 @@ export async function testMcpServer(
  * The providers make their own connections when an agent starts; a probe never becomes the
  * connection an agent talks to.
  */
-export async function probeMcpServer(
+async function probeMcpServer(
   server: UsableMcpServer,
   signal: AbortSignal,
   timeoutMs = MCP_PROBE_TIMEOUT_MS,

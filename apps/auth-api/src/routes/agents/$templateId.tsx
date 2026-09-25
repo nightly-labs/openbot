@@ -5,7 +5,7 @@ import { agentTemplatePath } from "../../lib/agent-template-path";
 import { readAgentTemplate } from "../../lib/agent-templates";
 import { OPENBOT_SOCIAL_IMAGE_ALT, OPENBOT_SOCIAL_IMAGE_URL } from "../../lib/site-metadata";
 
-export async function loadAgentTemplate(templateId: string): Promise<AgentTemplateDetail> {
+async function loadAgentTemplate(templateId: string): Promise<AgentTemplateDetail> {
   const template = await readAgentTemplate({ data: templateId });
   if (!template) throw notFound();
   return template;

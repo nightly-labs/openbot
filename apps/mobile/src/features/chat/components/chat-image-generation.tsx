@@ -43,7 +43,7 @@ function requestedRatio(aspectRatio: ImageGenerationAspectRatio) {
 }
 
 /** The frame holds the requested shape until the image reports its own, so it does not jump. */
-export function generationFrame(ratio: number, maxWidth: number) {
+function generationFrame(ratio: number, maxWidth: number) {
   const width = Math.min(maxWidth, MAX_HEIGHT * ratio);
   return { width: Math.round(width), height: Math.round(width / ratio) };
 }

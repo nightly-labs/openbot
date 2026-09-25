@@ -52,5 +52,3 @@ export function createQueueStore(deps: QueueStoreDeps) {
     queuePanelVisible,
   };
 }
-
-export type QueueStore = ReturnType<typeof createQueueStore>;

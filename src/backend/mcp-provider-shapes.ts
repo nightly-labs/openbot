@@ -54,7 +54,7 @@ export type McpAuthorizationSource = (config: McpServerConfig) => Promise<string
  * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
  * say so without probing anything.
  */
-export type McpDropReason = "command_not_found" | "working_directory_unsupported" | "unusable";
+type McpDropReason = "command_not_found" | "working_directory_unsupported" | "unusable";
 
 /** One server a provider did not get, named so the user can be told which one and why. */
 export interface McpServerDrop {
@@ -213,7 +213,7 @@ export function appendToolRuntimes(path: string | null, binDirectories: readonly
  * directory. Anything else is passed through untouched, including a relative path, which a user
  * writes against the agent's own workspace.
  */
-export function resolveMcpWorkingDirectory(value: string): string {
+function resolveMcpWorkingDirectory(value: string): string {
   const trimmed = value.trim();
   // A backslash separates only on Windows. On the other systems it is an ordinary character of a
   // file name, so `~\project` there names a directory called `~\project`.

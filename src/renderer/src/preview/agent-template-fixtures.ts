@@ -6,9 +6,9 @@ import type {
   AgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
 
-export const STORY_AGENT_TEMPLATE_ID = "k3VfX9qLm2Rw8TzA1bN5cQ";
+const STORY_AGENT_TEMPLATE_ID = "k3VfX9qLm2Rw8TzA1bN5cQ";
 
-export const STORY_AGENT_TEMPLATE_SNAPSHOT: AgentTemplateSnapshot = {
+const STORY_AGENT_TEMPLATE_SNAPSHOT: AgentTemplateSnapshot = {
   name: "dr eggbot",
   title: "Agent designer",
   description:

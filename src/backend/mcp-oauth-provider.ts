@@ -83,14 +83,14 @@ export interface McpOAuthOptions {
 }
 
 /** Long enough to find the right account and read a consent page, short enough to end by itself. */
-export const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
+const MCP_SIGN_IN_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**
  * How long a token exchange may hold a thread start or a test. The probe and the hand-off both
  * resolve every token before they connect, so an authorization server that accepts a connection
  * but never finishes its response would otherwise stall either past its own deadline.
  */
-export const MCP_TOKEN_TIMEOUT_MS = 10_000;
+const MCP_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
  * An access token is refreshed this long before it is due to expire, so a thread that starts at the

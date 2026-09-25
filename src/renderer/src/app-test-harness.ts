@@ -116,7 +116,6 @@ export let emitPresence: ((snapshot: TeamPresenceSnapshot) => void) | undefined;
 export let emitDirectMessage: ((event: DirectMessageRealtimeEvent) => void) | undefined;
 export let emitDirectTyping: ((event: DirectTypingRealtimeEvent) => void) | undefined;
 export let emitInvite: ((inviteUrl: string) => void) | undefined;
-export let emitOpenPluginListing: ((slug: string) => void) | undefined;
 export let emitDynamicIslandAction: ((action: DynamicIslandAction) => void) | undefined;
 
 type BridgeListener<Event> = (event: Event) => void;
@@ -205,9 +204,8 @@ const directTypingBridge = createEventBridge<DirectTypingRealtimeEvent>((emit) =
 const inviteBridge = createEventBridge<string>((emit) => {
   emitInvite = emit;
 });
-const pluginListingBridge = createEventBridge<string>((emit) => {
-  emitOpenPluginListing = emit;
-});
+// No test opens a plugin listing yet, so nothing keeps its emitter.
+const pluginListingBridge = createEventBridge<string>(() => undefined);
 const dynamicIslandActionBridge = createEventBridge<DynamicIslandAction>((emit) => {
   emitDynamicIslandAction = emit;
 });
