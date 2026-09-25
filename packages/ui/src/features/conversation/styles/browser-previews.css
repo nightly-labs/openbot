@@ -250,6 +250,55 @@ body:has(.browser-panel-expanded) .app-frame {
   flex: 1;
 }
 
+/*
+ * A host's page is drawn on a canvas at the host's viewport shape, not the window's. Full bleed would
+ * leave bars beside a page of another shape, so the live panel is a card of the page's own shape: the
+ * tab strip and toolbar on top, the frame below at its exact aspect ratio, and the app visible
+ * through the backdrop around it. `BrowserPanel` sets the frame size once the first frame is drawn;
+ * until then the card takes a common desktop shape.
+ */
+.browser-panel-expanded.browser-panel-live {
+  --browser-live-gutter: var(--openbot-space-6);
+  --browser-live-gutter-top: var(--browser-live-gutter);
+  /* The header and toolbar heights from `browser-panel.css`. */
+  --browser-live-chrome: calc(34px + 39px);
+  inset: var(--browser-live-gutter-top) 0 var(--browser-live-gutter);
+  width: min(
+    100vw -
+    2 *
+    var(--browser-live-gutter),
+    (100dvh - var(--browser-live-gutter-top) - var(--browser-live-gutter) - var(--browser-live-chrome)) *
+    var(--browser-frame-width, 16) /
+    var(--browser-frame-height, 10)
+  );
+  height: fit-content;
+  max-height: calc(100dvh - var(--browser-live-gutter-top) - var(--browser-live-gutter));
+  /* With `inset` and a content height, auto margins center the card in the space inside the gutters. */
+  margin: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  box-shadow: var(--openbot-shadow-overlay);
+}
+
+/* The card starts below the macOS traffic lights (y 13..26), so the header needs no inset for them. */
+.browser-panel-expanded.browser-panel-live.browser-panel-mac-controls {
+  --browser-live-gutter-top: calc(var(--openbot-space-8) + var(--openbot-space-2));
+}
+
+.browser-panel-expanded.browser-panel-live .browser-panel-header {
+  padding-inline: var(--openbot-space-2) var(--openbot-space-1);
+}
+
+.browser-panel-expanded.browser-panel-live .browser-surface {
+  flex: 0 1 auto;
+  aspect-ratio: var(--browser-frame-width, 16) / var(--browser-frame-height, 10);
+}
+
+.browser-panel-live .browser-hide {
+  position: static;
+  flex: 0 0 auto;
+}
+
 .browser-secret-card {
   display: grid;
   gap: var(--openbot-space-4);

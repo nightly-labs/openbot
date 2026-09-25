@@ -17,6 +17,10 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
   return {
     browser: mock.api.browser,
     browserTabs: () => mock.api.browser.listTabs(),
+    openBrowserTab: (input) => mock.api.browser.open(input),
+    navigateBrowserTab: (input) => mock.api.browser.navigate(input),
+    reloadBrowserTab: (tabId) => mock.api.browser.reload(tabId),
+    closeBrowserTab: (tabId) => mock.api.browser.close(tabId),
     getSidebarLayout: () => agent.getSidebarLayout(),
     mutateSidebarLayout: (action) => agent.mutateSidebarLayout(action),
     respondToTakeover: (input) => agent.respondToBrowserTakeover(input),
