@@ -34,7 +34,7 @@ Two files still mirror the list, and they are not enforced the same way.
 | Mirror | What it is | What holds it |
 | --- | --- | --- |
 | `src/preload/index.ts`, bridged groups | one `bridgeGroup(IPC_ENDPOINTS.group, decoders)` per group; the decoder map is keyed by every endpoint | `tsc` (`TS2741` / `TS2353`), and the coverage test for the group reference |
-| `src/preload/index.ts`, hand-written groups | the `invokeRequest` and `subscribe` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
+| `src/preload/index.ts`, hand-written groups | the `invokeAgentForServer`, `ipcRenderer.invoke` and `listen` calls | `src/main/ipc-channel-coverage.test.ts` |
 | `src/renderer/src/preview/mock-openbot.ts` | the second implementation Storybook and the preview run against | `tsc`, against `OpenBotDesktopApi` |
 
 The main process is no longer one of them. `registerIpcGroups` in `src/main/ipc/define-ipc-group.ts`

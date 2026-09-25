@@ -10,7 +10,7 @@ Renderer and main ship in one binary, so a channel rename is **not** an upgrade 
 older ever calls it. The hazard is drift between the list and its hand-written mirrors, which is a
 runtime rejection in the build you are about to sign. Confirm all of them moved together, per the
 table in `packages/contracts/AGENTS.md`: the handlers that `registerIpcGroups` binds from
-`src/main/ipc/`, the `invokeRequest` and `subscribe` calls in `src/preload/index.ts`, and
+`src/main/ipc/`, the `bridgeGroup` maps and hand-written calls in `src/preload/index.ts`, and
 `src/renderer/src/preview/mock-openbot.ts`, the second implementation Storybook and the preview run
 against.
 

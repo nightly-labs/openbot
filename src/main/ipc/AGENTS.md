@@ -18,8 +18,8 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
    change and the key to add.
 4. Add the handler here and the method in `src/renderer/src/preview/mock-openbot.ts`. In the preload,
    a bridged group needs one decoder in its `bridgeGroup` map (`TS2741` names it). A hand-written group
-   needs the call (`invokeRequest(IPC_ENDPOINTS.group.name, decode, input)`, `invokeAgentForServer` for a
-   server-scoped payload, or `subscribe` for an event). The decoder comes from a preload decoding
+   needs the call (`invokeAgentForServer` for a server-scoped payload, `ipcRenderer.invoke` for the
+   untyped endpoint, or `listen` for an event). The decoder comes from a preload decoding
    module, such as `src/preload/team-decoding.ts`, or is `decodeVoid`.
 
 Step 3 is the point. In a bridged group every step announces itself. In a hand-written group, a
