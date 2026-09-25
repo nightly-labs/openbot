@@ -42,13 +42,18 @@ takes one object per group, keyed by every request endpoint in it, so a channel 
 `TS2741`, a handler for an endpoint that does not exist is `TS2353`, and a group no registrar covers
 is `TS2741` at `src/main/index.ts`. `src/main/AGENTS.md` has the shape to copy.
 
-A typed endpoint (`request<Payload, Result>()`, `event<Payload>()`) also sets the renderer signature.
-Declare its `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` or
+A typed endpoint (`request<Payload, Result>()`, `event<Payload>()`) also sets the renderer
+signature. Declare its `OpenBotDesktopApi` method as `Invoke<typeof IPC_ENDPOINTS.group.name>` or
 `Subscribe<...>`. Then a payload or result change in `ipc-endpoints.ts` reaches the interface, the
-preload and the mock without a second edit. A server-scoped payload (`AgentIpcRequest<Input>`) becomes
-`(input: Input)`, or `()` for `AgentIpcRequest<null>`, because the preload adds the selected server. Write the signature by hand only when
-the method reshapes its arguments or reads preload state, or for `browser.sendLiveViewInput`, the one
-untyped endpoint.
+preload and the mock without a second edit. Declare a server-scoped endpoint with
+`scopedRequest<Input, Result>()` or, when it carries only the server, `scopedQuery<Result>()`;
+`request` does not compile with an `AgentIpcRequest` payload. Main receives
+`AgentIpcRequest<Input>`. The renderer signature is `(input: Input, serverId?: string)`, or
+`(serverId?: string)`, because the preload builds the scope and uses the selected server when the
+caller names none. Pass `"required"` as the last type argument when a caller must always name the
+server, such as a settings panel that can show a server the user has not switched to. Write the
+signature by hand only when the method reshapes its arguments or reads preload state, or for
+`browser.sendLiveViewInput`, the one untyped endpoint.
 
 A group whose methods all pass straight through is generated whole: `GroupApi<IpcEndpoints["group"]>`
 gives its interface, a request keeps its key, and an event is `on` and the key (`voice.modelStatus`
@@ -56,8 +61,10 @@ is `onModelStatus`). The preload builds it with `bridgeGroup` and the test harne
 so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `app` and `providers` are spread into
 the top level. There are no per-method overrides: a group that needs one is written by hand. These
 stay by hand: `computerUse` (renamed top-level members), `browser` (the untyped endpoint and renamed
-members), `auth` (`verifyEmailCode` reshapes its arguments), `servers` (preload state), and every
-server-scoped group, because `bridgeGroup` has no decoder type for an `AgentIpcRequest` payload.
+members), `auth` (`verifyEmailCode` reshapes its arguments), `servers` (preload state, and member and
+invite calls that take the server first), and `attachmentImports`, which only the preload calls with
+the paths of dropped files and which the renderer must never reach. The eight agent groups are spread
+into `agent`, so their keys are the renderer names (`agent.listAgents`, `mcpServers.saveMcpServer`).
 
 In a hand-written group the preload is still the link no type pairs with an endpoint. Its API object
 is nested and renamed, so a channel it never invokes is dead trust-boundary surface that compiles.

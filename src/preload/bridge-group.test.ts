@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
-import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { IPC_ENDPOINTS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { beforeEach, expect, it, vi } from "vitest";
 
 // `bridgeGroup` builds these methods from `IPC_ENDPOINTS`, so no line of the preload names them.
@@ -64,6 +64,34 @@ it("sends at most one input, and none when the caller passes none", async () => 
   bridge.invoke.mockResolvedValue(status);
   await expect(api().voice.getModelStatus()).resolves.toEqual(status);
   expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.voice.getModelStatus.channel);
+});
+
+// Main reads the server from the scope and routes to it, so a wrong server acts on another host.
+it("scopes a request to the selected server unless the caller names one", async () => {
+  bridge.invoke.mockResolvedValue([]);
+
+  await api().agent.listMemories("agent-1");
+  expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.agentMemories.listMemories.channel, {
+    serverId: LOCAL_SERVER_ID,
+    payload: "agent-1",
+  });
+  await api().agent.listMemories("agent-1", "remote-1");
+  expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.agentMemories.listMemories.channel, {
+    serverId: "remote-1",
+    payload: "agent-1",
+  });
+
+  // A scope that carries nothing takes the server as its only argument.
+  await api().agent.listAgents();
+  expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.agent.listAgents.channel, {
+    serverId: LOCAL_SERVER_ID,
+    payload: null,
+  });
+  await api().agent.listAgents("remote-1");
+  expect(bridge.invoke).toHaveBeenLastCalledWith(IPC_ENDPOINTS.agent.listAgents.channel, {
+    serverId: "remote-1",
+    payload: null,
+  });
 });
 
 it("rejects a result that does not decode", async () => {

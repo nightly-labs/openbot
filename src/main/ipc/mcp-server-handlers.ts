@@ -133,7 +133,7 @@ export function mcpServerIpcHandlers({
 
   return {
     mcpServers: {
-      list: payloadHandler(agentScope, (scoped) =>
+      listMcpServers: payloadHandler(agentScope, (scoped) =>
         routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => service.listMcpServers(),
           // The one read route, and the only one the host answers to a GET.
@@ -143,7 +143,7 @@ export function mcpServerIpcHandlers({
           },
         }),
       ),
-      save: payloadHandler(agentRequest(parseSaveMcpServer), (scoped) => {
+      saveMcpServer: payloadHandler(agentRequest(parseSaveMcpServer), (scoped) => {
         const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => {
@@ -153,14 +153,14 @@ export function mcpServerIpcHandlers({
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
         });
       }),
-      remove: payloadHandler(agentRequest(parseRemoveMcpServer), (scoped) => {
+      removeMcpServer: payloadHandler(agentRequest(parseRemoveMcpServer), (scoped) => {
         const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => service.removeMcpServer(parsed),
           remote: (serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
         });
       }),
-      setEnabled: payloadHandler(agentRequest(parseSetMcpServerEnabled), (scoped) => {
+      setMcpServerEnabled: payloadHandler(agentRequest(parseSetMcpServerEnabled), (scoped) => {
         const parsed = scoped.payload;
         return routeToServer<McpServerConfig[]>(scoped.serverId, {
           local: () => {
@@ -172,7 +172,7 @@ export function mcpServerIpcHandlers({
       }),
       // The machine that holds the configuration is the machine that must make the connection, so a
       // test against a remote server runs on that host and not here.
-      test: payloadHandler(agentRequest(parseTestMcpServer), (scoped) => {
+      testMcpServer: payloadHandler(agentRequest(parseTestMcpServer), (scoped) => {
         const parsed = scoped.payload;
         return routeToServer<McpTestResult>(scoped.serverId, {
           // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The

@@ -26,6 +26,7 @@ import {
   LOCAL_SERVER_ID,
   type OpenBotDesktopApi,
   type RequestEndpoint,
+  type ServerScope,
   type Untyped,
 } from "@openbot/contracts/ipc";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -174,15 +175,6 @@ function invokeRequest<Payload, Result>(
   return ipcRenderer.invoke(endpoint.channel, ...payload).then(decode);
 }
 
-function invokeAgent<Input, Result>(
-  endpoint: RequestEndpoint<string, AgentIpcRequest<Input>, Result>,
-  payload: NoInfer<Input>,
-  decode: (value: unknown) => NoInfer<Result>,
-): Promise<Result> {
-  const request: AgentIpcRequest<Input> = { serverId: selectedServerId, payload };
-  return ipcRenderer.invoke(endpoint.channel, request).then(decode);
-}
-
 function invokeAgentForServer<Input, Result>(
   serverId: string,
   endpoint: RequestEndpoint<string, AgentIpcRequest<Input>, Result>,
@@ -219,15 +211,13 @@ function dropInvalid<Payload>(decode: (value: unknown) => Payload | null): Dropp
   return { drop: decode };
 }
 
-// One decoder per endpoint of a bridged group. A scoped or untyped endpoint has no decoder type,
-// so a group that holds one cannot be bridged and stays written by hand.
+// One decoder per endpoint of a bridged group. An untyped endpoint has no decoder type, so a group
+// that holds one cannot be bridged and stays written by hand.
 type DecoderFor<Endpoint> =
   Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
     ? [Payload] extends [Untyped]
       ? never
-      : [Payload] extends [AgentIpcRequest<unknown>]
-        ? never
-        : (value: unknown) => Result
+      : (value: unknown) => Result
     : Endpoint extends EventEndpoint<string, infer Payload>
       ? ((value: unknown) => Payload) | DroppingDecoder<Payload>
       : never;
@@ -263,7 +253,11 @@ function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, 
       if (typeof decode !== "function") throw new Error(`The preload cannot drop the result of ${endpoint.channel}.`);
       // Main takes at most one payload, so nothing past it reaches the channel. The types erase which
       // endpoints take none, so an argument given to such a method is still sent, and main ignores it.
-      api[name] = (...args: unknown[]) => ipcRenderer.invoke(endpoint.channel, ...args.slice(0, 1)).then(decode);
+      const { scope } = endpoint;
+      api[name] =
+        scope === undefined
+          ? (...args: unknown[]) => ipcRenderer.invoke(endpoint.channel, ...args.slice(0, 1)).then(decode)
+          : (...args: unknown[]) => ipcRenderer.invoke(endpoint.channel, scopedRequest(scope, args)).then(decode);
     } else if (typeof decode === "function") {
       api[name] = (listener: (payload: unknown) => void) => listen(endpoint, (value) => listener(decode(value)));
     } else {
@@ -275,6 +269,13 @@ function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, 
     }
   }
   return api;
+}
+
+// The server is the argument after the payload, or the only one when the scope carries nothing. It is
+// read at call time, so a method bridged before the user switches servers follows the switch.
+function scopedRequest(scope: ServerScope, args: readonly unknown[]): AgentIpcRequest<unknown> {
+  const [payload, server] = scope === "empty" ? [null, args[0]] : [args[0], args[1]];
+  return { serverId: typeof server === "string" ? server : selectedServerId, payload };
 }
 
 function rememberActiveServer<T extends { id: string; active: boolean }[]>(servers: T): T {
@@ -306,7 +307,7 @@ async function importFiles(files: File[]): Promise<void> {
     }
     const attachments = await invokeAgentForServer(
       serverId,
-      IPC_ENDPOINTS.agentAttachments.importAttachments,
+      IPC_ENDPOINTS.attachmentImports.importAttachments,
       input,
       decodeAttachments,
     );
@@ -350,6 +351,50 @@ window.addEventListener("change", (event) => {
   const input = event.target;
   if (!(input instanceof HTMLInputElement) || input.dataset.openbotAttachmentPicker !== "true") return;
   void importFiles([...(input.files ?? [])]);
+});
+
+// Bridged apart from the API object, because `onEvent` narrows its `onScopedEvent`.
+const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
+  getStatus: decodeAgentStatusFromMain,
+  getHostAnalytics: decodeHostAnalyticsFromMain,
+  getAnalytics: decodeAgentAnalyticsFromMain,
+  getUsage: decodeAccountUsageFromMain,
+  listModels: decodeAgentModels,
+  listAgents: decodeAgents,
+  listInstalledSkills: decodeInstalledSkillsFromMain,
+  listChannels: decodeChannelSummaries,
+  readChannel: decodeChannelPage,
+  channelCommand: decodeChannel,
+  deleteChannel: decodeVoid,
+  getSidebarLayout: decodeSidebarLayout,
+  mutateSidebarLayout: decodeSidebarLayout,
+  generateProfile: decodeAgentProfileDraft,
+  saveProfile: decodeSaveAgentProfileResult,
+  createAgent: decodeAgent,
+  duplicateAgent: decodeDuplicateAgentResultFromMain,
+  updateAgent: decodeAgent,
+  setAvatar: decodeAgent,
+  deleteAgent: decodeVoid,
+  readConversation: decodeConversation,
+  readConversationPage: decodeConversationPageFromMain,
+  searchConversationMessages: decodeConversationSearchPageFromMain,
+  listConversationReads: decodeReadStates,
+  markConversationRead: decodeReadState,
+  sendMessage: decodeReceipt,
+  setMessageReaction: decodeVoid,
+  listQueue: decodeQueue,
+  acknowledgeFailedTurn: decodeVoid,
+  cancelQueuedMessage: decodeVoid,
+  steerQueuedMessage: decodeVoid,
+  editQueuedMessage: decodeQueue,
+  updateQueuedMessage: decodeVoid,
+  reorderQueue: decodeVoid,
+  interrupt: decodeVoid,
+  respondToPrompt: decodeVoid,
+  respondToApproval: decodeVoid,
+  respondToBrowserSecret: decodeVoid,
+  respondToBrowserTakeover: decodeVoid,
+  scopedEvent: decodeScopedAgentEvent,
 });
 
 const openbotApi: OpenBotDesktopApi = {
@@ -485,124 +530,66 @@ const openbotApi: OpenBotDesktopApi = {
     openLink: dropInvalid(decodePendingAgentTemplate),
   }),
   agent: {
-    getStatus: () => invokeAgent(IPC_ENDPOINTS.agent.getStatus, null, decodeAgentStatusFromMain),
-    getHostAnalytics: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.getHostAnalytics, input, decodeHostAnalyticsFromMain),
-    getAnalytics: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.getAnalytics, input, decodeAgentAnalyticsFromMain),
-    getUsage: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.getUsage, agentId, decodeAccountUsageFromMain),
-    listModels: () => invokeAgent(IPC_ENDPOINTS.agent.listModels, null, decodeAgentModels),
-    listAgents: (serverId) =>
-      serverId === undefined
-        ? invokeAgent(IPC_ENDPOINTS.agent.list, null, decodeAgents)
-        : invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.list, null, decodeAgents),
-    listInstalledSkills: (agentId) =>
-      invokeAgent(IPC_ENDPOINTS.agent.listInstalledSkills, agentId, decodeInstalledSkillsFromMain),
-    listChannels: () => invokeAgent(IPC_ENDPOINTS.agent.listChannels, null, decodeChannelSummaries),
-    readChannel: (input) => invokeAgent(IPC_ENDPOINTS.agent.readChannel, input, decodeChannelPage),
-    channelCommand: (input) => invokeAgent(IPC_ENDPOINTS.agent.channelCommand, input, decodeChannel),
-    deleteChannel: (channelId) => invokeAgent(IPC_ENDPOINTS.agent.deleteChannel, channelId, decodeVoid),
-    getSidebarLayout: () => invokeAgent(IPC_ENDPOINTS.agent.getSidebarLayout, null, decodeSidebarLayout),
-    mutateSidebarLayout: (action) => invokeAgent(IPC_ENDPOINTS.agent.mutateSidebarLayout, action, decodeSidebarLayout),
-    generateProfile: (input) => invokeAgent(IPC_ENDPOINTS.agent.generateProfile, input, decodeAgentProfileDraft),
-    saveProfile: (input) => invokeAgent(IPC_ENDPOINTS.agent.saveProfile, input, decodeSaveAgentProfileResult),
-    createAgent: (input) => invokeAgent(IPC_ENDPOINTS.agent.create, input, decodeAgent),
-    duplicateAgent: (agentId) =>
-      invokeAgent(IPC_ENDPOINTS.agent.duplicate, agentId, decodeDuplicateAgentResultFromMain),
-    updateAgent: (input) => invokeAgent(IPC_ENDPOINTS.agent.update, input, decodeAgent),
-    setAvatar: (input) => invokeAgent(IPC_ENDPOINTS.agent.setAvatar, input, decodeAgent),
-    deleteAgent: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.delete, agentId, decodeVoid),
-    listMemories: (agentId) => invokeAgent(IPC_ENDPOINTS.agentMemories.listMemories, agentId, decodeMemories),
-    createMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.createMemory, input, decodeMemory),
-    updateMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.updateMemory, input, decodeMemory),
-    deleteMemory: (input) => invokeAgent(IPC_ENDPOINTS.agentMemories.deleteMemory, input, decodeVoid),
-    clearMemories: (agentId) => invokeAgent(IPC_ENDPOINTS.agentMemories.clearMemories, agentId, decodeVoid),
-    listTables: () => invokeAgent(IPC_ENDPOINTS.sharedTables.listTables, null, decodeTables),
-    deleteTable: (input) => invokeAgent(IPC_ENDPOINTS.sharedTables.deleteTable, input, decodeVoid),
-    listRoutines: (agentId) => invokeAgent(IPC_ENDPOINTS.agentRoutines.listRoutines, agentId, decodeRoutines),
-    createRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.createRoutine, input, decodeRoutine),
-    updateRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.updateRoutine, input, decodeRoutine),
-    deleteRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.deleteRoutine, input, decodeVoid),
-    testRoutine: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.testRoutine, input, decodeRoutineRun),
-    listRoutineRuns: (input) => invokeAgent(IPC_ENDPOINTS.agentRoutines.listRoutineRuns, input, decodeRoutineRuns),
-    listChannelMemories: (channelId) =>
-      invokeAgent(IPC_ENDPOINTS.channelMemories.listChannelMemories, channelId, decodeChannelMemories),
-    createChannelMemory: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelMemories.createChannelMemory, input, decodeChannelMemory),
-    updateChannelMemory: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelMemories.updateChannelMemory, input, decodeChannelMemory),
-    deleteChannelMemory: (input) => invokeAgent(IPC_ENDPOINTS.channelMemories.deleteChannelMemory, input, decodeVoid),
-    clearChannelMemories: (channelId) =>
-      invokeAgent(IPC_ENDPOINTS.channelMemories.clearChannelMemories, channelId, decodeVoid),
-    listChannelRoutines: (channelId) =>
-      invokeAgent(IPC_ENDPOINTS.channelRoutines.listChannelRoutines, channelId, decodeChannelRoutines),
-    createChannelRoutine: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelRoutines.createChannelRoutine, input, decodeChannelRoutine),
-    updateChannelRoutine: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelRoutines.updateChannelRoutine, input, decodeChannelRoutine),
-    deleteChannelRoutine: (input) => invokeAgent(IPC_ENDPOINTS.channelRoutines.deleteChannelRoutine, input, decodeVoid),
-    testChannelRoutine: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelRoutines.testChannelRoutine, input, decodeChannelRoutineRun),
-    listChannelRoutineRuns: (input) =>
-      invokeAgent(IPC_ENDPOINTS.channelRoutines.listChannelRoutineRuns, input, decodeChannelRoutineRuns),
-    // `invokeAgentForServer`, never `invokeAgent`: the settings modal can be open for a server the
-    // user has not switched to, and `invokeAgent` would pin the selected one.
-    listMcpServers: (serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.list, null, decodeMcpServerConfigs),
-    saveMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.save, input, decodeMcpServerConfigs),
-    removeMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.remove, input, decodeMcpServerConfigs),
-    setMcpServerEnabled: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.setEnabled, input, decodeMcpServerConfigs),
-    testMcpServer: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.mcpServers.test, input, decodeMcpTestResult),
-    readConversation: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.readConversation, agentId, decodeConversation),
-    readConversationPage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.readConversationPage, input, decodeConversationPageFromMain),
-    searchConversationMessages: (input) =>
-      invokeAgent(IPC_ENDPOINTS.agent.searchConversationMessages, input, decodeConversationSearchPageFromMain),
-    listConversationReads: () => invokeAgent(IPC_ENDPOINTS.agent.listConversationReads, null, decodeReadStates),
-    markConversationRead: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.markConversationRead, input, decodeReadState),
-    chooseAttachments: (input) =>
-      invokeAgent(IPC_ENDPOINTS.agentAttachments.chooseAttachments, input, decodeAttachments),
+    ...agentGroup,
+    ...bridgeGroup(IPC_ENDPOINTS.agentMemories, {
+      listMemories: decodeMemories,
+      createMemory: decodeMemory,
+      updateMemory: decodeMemory,
+      deleteMemory: decodeVoid,
+      clearMemories: decodeVoid,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.sharedTables, {
+      listTables: decodeTables,
+      deleteTable: decodeVoid,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.agentRoutines, {
+      listRoutines: decodeRoutines,
+      createRoutine: decodeRoutine,
+      updateRoutine: decodeRoutine,
+      deleteRoutine: decodeVoid,
+      testRoutine: decodeRoutineRun,
+      listRoutineRuns: decodeRoutineRuns,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.channelMemories, {
+      listChannelMemories: decodeChannelMemories,
+      createChannelMemory: decodeChannelMemory,
+      updateChannelMemory: decodeChannelMemory,
+      deleteChannelMemory: decodeVoid,
+      clearChannelMemories: decodeVoid,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.channelRoutines, {
+      listChannelRoutines: decodeChannelRoutines,
+      createChannelRoutine: decodeChannelRoutine,
+      updateChannelRoutine: decodeChannelRoutine,
+      deleteChannelRoutine: decodeVoid,
+      testChannelRoutine: decodeChannelRoutineRun,
+      listChannelRoutineRuns: decodeChannelRoutineRuns,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.mcpServers, {
+      listMcpServers: decodeMcpServerConfigs,
+      saveMcpServer: decodeMcpServerConfigs,
+      removeMcpServer: decodeMcpServerConfigs,
+      setMcpServerEnabled: decodeMcpServerConfigs,
+      testMcpServer: decodeMcpTestResult,
+    }),
+    ...bridgeGroup(IPC_ENDPOINTS.agentAttachments, {
+      chooseAttachments: decodeAttachments,
+      discardDraftAttachment: decodeVoid,
+      downloadAttachments: decodeVoid,
+      openAttachment: decodeVoid,
+      openSharedFile: decodeVoid,
+      openWorkspaceFile: decodeVoid,
+      previewSharedFile: decodeFilePreview,
+      previewWorkspaceFile: decodeFilePreview,
+    }),
     onAttachmentImport: (listener) => {
       attachmentImportListeners.add(listener);
       return () => attachmentImportListeners.delete(listener);
     },
-    discardDraftAttachment: (attachmentId, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agentAttachments.discardDraftAttachment, attachmentId, decodeVoid),
-    downloadAttachments: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.downloadAttachments, input, decodeVoid),
-    openAttachment: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openAttachment, input, decodeVoid),
-    openSharedFile: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openSharedFile, input, decodeVoid),
-    openWorkspaceFile: (input) => invokeAgent(IPC_ENDPOINTS.agentAttachments.openWorkspaceFile, input, decodeVoid),
-    previewSharedFile: (input) =>
-      invokeAgent(IPC_ENDPOINTS.agentAttachments.previewSharedFile, input, decodeFilePreview),
-    previewWorkspaceFile: (input) =>
-      invokeAgent(IPC_ENDPOINTS.agentAttachments.previewWorkspaceFile, input, decodeFilePreview),
-    sendMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.sendMessage, input, decodeReceipt),
-    setMessageReaction: (input) => invokeAgent(IPC_ENDPOINTS.agent.setMessageReaction, input, decodeVoid),
-    listQueue: (agentId) => invokeAgent(IPC_ENDPOINTS.agent.listQueue, agentId, decodeQueue),
-    acknowledgeFailedTurn: (input) => invokeAgent(IPC_ENDPOINTS.agent.acknowledgeFailedTurn, input, decodeVoid),
-    cancelQueuedMessage: (input) => invokeAgent(IPC_ENDPOINTS.agent.cancelQueuedMessage, input, decodeVoid),
-    steerQueuedMessage: (input) => invokeAgent(IPC_ENDPOINTS.agent.steerQueuedMessage, input, decodeVoid),
-    editQueuedMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.editQueuedMessage, input, decodeQueue),
-    updateQueuedMessage: (input, serverId = selectedServerId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.agent.updateQueuedMessage, input, decodeVoid),
-    reorderQueue: (input) => invokeAgent(IPC_ENDPOINTS.agent.reorderQueue, input, decodeVoid),
-    interrupt: (input) => invokeAgent(IPC_ENDPOINTS.agent.interrupt, input, decodeVoid),
-    respondToPrompt: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToPrompt, input, decodeVoid),
-    respondToApproval: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToApproval, input, decodeVoid),
-    respondToBrowserSecret: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToBrowserSecret, input, decodeVoid),
-    respondToBrowserTakeover: (input) => invokeAgent(IPC_ENDPOINTS.agent.respondToBrowserTakeover, input, decodeVoid),
     onEvent: (listener) =>
-      subscribe(IPC_ENDPOINTS.agent.event, decodeScopedAgentEvent, (payload) => {
-        if (payload.serverId === selectedServerId) listener(payload.event);
+      agentGroup.onScopedEvent((scoped) => {
+        if (scoped.serverId === selectedServerId) listener(scoped.event);
       }),
-    onScopedEvent: (listener) => subscribe(IPC_ENDPOINTS.agent.event, decodeScopedAgentEvent, listener),
   },
   browser: {
     open: (input) => invokeRequest(IPC_ENDPOINTS.browser.open, decodeBrowserTab, input),
@@ -738,15 +725,13 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.
-  storage: {
-    getUsage: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.getUsage, input, decodeOptionalStorageUsage),
-    deleteFile: (input, serverId) =>
-      invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.deleteFile, input, decodeVoid),
-    clear: (input, serverId) => invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.clear, input, decodeVoid),
-    openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.openFile, input, decodeVoid),
-    openLocation: (input) => invokeRequest(IPC_ENDPOINTS.storage.openLocation, decodeVoid, input),
-  },
+  storage: bridgeGroup(IPC_ENDPOINTS.storage, {
+    getUsage: decodeOptionalStorageUsage,
+    deleteFile: decodeVoid,
+    clear: decodeVoid,
+    openFile: decodeVoid,
+    openLocation: decodeVoid,
+  }),
   remoteDesktop: bridgeGroup(IPC_ENDPOINTS.remoteDesktop, {
     checkSetup: decodeRemoteDesktopSetupFromMain,
     openSetup: decodeVoid,

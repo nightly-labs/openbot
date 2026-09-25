@@ -67,7 +67,7 @@ export function createRendererForwarders({
     if (!window || window.isDestroyed()) return;
     sendToRenderer(
       window,
-      IPC_ENDPOINTS.agent.event,
+      IPC_ENDPOINTS.agent.scopedEvent,
       bufferedLive ? { serverId, event, bufferedLive } : { serverId, event },
     );
     void notifyAgentEvent(serverId, event).catch(() => undefined);

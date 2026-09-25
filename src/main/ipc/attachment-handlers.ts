@@ -71,8 +71,17 @@ export function attachmentIpcHandlers({
   mailbox,
   remoteServers,
   getMainWindow,
-}: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments"> {
+}: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments" | "attachmentImports"> {
   return {
+    attachmentImports: {
+      importAttachments: payloadHandler(agentRequest(parseImportAttachments), (scoped) => {
+        const parsed = scoped.payload;
+        return routeToServer(scoped.serverId, {
+          local: () => service.prepareImportedAttachments(parsed.paths, parsed.data),
+          remote: (serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
+        });
+      }),
+    },
     agentAttachments: {
       chooseAttachments: payloadHandler(agentRequest(parseChooseAttachments), async (parsed) => {
         const mainWindow = getMainWindow();
@@ -103,13 +112,6 @@ export function attachmentIpcHandlers({
         return routeToServer(serverId, {
           local: () => service.prepareAttachments(result.filePaths),
           remote: (target) => uploadRemotePaths(remoteServers, target, result.filePaths),
-        });
-      }),
-      importAttachments: payloadHandler(agentRequest(parseImportAttachments), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.prepareImportedAttachments(parsed.paths, parsed.data),
-          remote: (serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
         });
       }),
       discardDraftAttachment: payloadHandler(agentRequest(parseAttachmentId), (scoped) => {

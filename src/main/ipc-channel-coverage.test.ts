@@ -41,7 +41,7 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 // where it follows the target window. What comes after the channel varies, and
 // the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
-const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgent", "invokeAgentForServer"];
+const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgentForServer"];
 const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen", "subscribe"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
 // These take a whole group, `IPC_ENDPOINTS.group`, and reach every endpoint in it.

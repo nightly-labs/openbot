@@ -107,7 +107,7 @@ function setup(options: { ensureToolRuntimesReady?: () => Promise<void> }): {
       toolRuntimes: () => NO_MCP_TOOL_RUNTIMES,
     }).mcpServers,
   );
-  const listener = registrations.get(IPC_ENDPOINTS.mcpServers.test.channel);
+  const listener = registrations.get(IPC_ENDPOINTS.mcpServers.testMcpServer.channel);
   if (!listener) throw new Error("The MCP test handler was not registered.");
   return {
     ensureToolRuntimesReady,
