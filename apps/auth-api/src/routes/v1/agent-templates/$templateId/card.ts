@@ -5,9 +5,9 @@ import { marketplaceErrorResponse, requestAgentTemplates } from "../../../../ser
 export const Route = createFileRoute("/v1/agent-templates/$templateId/card")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ request, params }) => {
         try {
-          const object = await requestAgentTemplates().card(params.templateId);
+          const object = await requestAgentTemplates().card(params.templateId, request.headers);
           const headers = new Headers();
           object.writeHttpMetadata(headers);
           headers.set("Content-Type", "image/png");
@@ -16,6 +16,8 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId/card")({
           headers.set("Cache-Control", "public, no-cache");
           headers.set("ETag", object.httpEtag);
           headers.set("X-Content-Type-Options", "nosniff");
+          // R2 leaves out the body when If-None-Match still matches: the image has not changed.
+          if (!("body" in object)) return new Response(null, { status: 304, headers });
           return new Response(object.body, { headers });
         } catch (error) {
           return marketplaceErrorResponse(error);

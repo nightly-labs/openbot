@@ -91,6 +91,25 @@ describe("agent templates", () => {
     await expect(templates.unpublish(owner.id, id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it("stops a 21st published agent in the write itself and leaves no images behind", async () => {
+    const { templates, bucket } = setup();
+    for (let index = 0; index < 20; index++)
+      await templates.publish({ user: owner, sourceAgentId: `agent-${index}`, snapshot: snapshot(), avatar: null });
+
+    await expect(
+      templates.publish({
+        user: owner,
+        sourceAgentId: "agent-20",
+        snapshot: snapshot(),
+        avatar: { bytes: png, mimeType: "image/png" },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(bucket.size).toBe(0);
+    await expect(
+      templates.publish({ user: owner, sourceAgentId: "agent-0", snapshot: snapshot({ name: "Again" }), avatar: null }),
+    ).resolves.toMatchObject({ sourceAgentId: "agent-0" });
+  });
+
   it("gives an agent published again after an unpublish the same link", async () => {
     const { templates } = setup();
     const first = await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });

@@ -90,40 +90,59 @@ export class AgentTemplates {
       cardKey = `agent-templates/${id}/${crypto.randomUUID()}.card.png`;
       await this.bindings.SKILLS.put(cardKey, card, { httpMetadata: { contentType: "image/png" } });
     }
-    let publishedId = id;
-    let previous: StoredImages = { avatarKey: null, cardKey: null };
-    try {
-      // One transaction reads the image keys the row has and writes the new row, so the keys this
-      // publish replaces are the ones it deletes, even when two publishes of one agent run at once.
-      // The upsert means two first publishes meet here, not in a constraint error.
-      const [before, written] = await this.bindings.DB.batch([
-        this.bindings.DB.prepare(
-          "SELECT avatar_key, card_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
-        ).bind(input.user.id, sourceAgentId),
-        this.bindings.DB.prepare(
-          `INSERT INTO agent_templates(
-             id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, unpublished_at, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
-           ON CONFLICT(owner_user_id, source_agent_id) DO UPDATE SET
-             snapshot_json = excluded.snapshot_json,
-             avatar_key = excluded.avatar_key,
-             card_key = excluded.card_key,
-             unpublished_at = NULL,
-             updated_at = excluded.updated_at
-           RETURNING id`,
-        ).bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now),
-      ]);
-      previous = storedImages(before?.results?.[0]);
-      const returned = written?.results?.[0];
-      if (isDynamicRecord(returned) && typeof returned.id === "string") publishedId = returned.id;
-    } catch (error) {
-      if (avatarKey) await this.bindings.SKILLS.delete(avatarKey);
-      if (cardKey) await this.bindings.SKILLS.delete(cardKey);
-      throw error;
+    // If this batch fails after it committed, the row names the new images, so a failure here does
+    // not delete them: an unused image is better than a live template with a broken one.
+    // One transaction reads the image keys the row has and writes the new row, so the keys this
+    // publish replaces are the ones it deletes, even when two publishes of one agent run at once.
+    // The upsert means two first publishes meet here, not in a constraint error. The limit is
+    // checked in the same statement: the row is written only while the owner has fewer than 20
+    // published agents, or when this agent is already one of them.
+    const written = await this.bindings.DB.batch([
+      this.bindings.DB.prepare(
+        "SELECT avatar_key, card_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
+      ).bind(input.user.id, sourceAgentId),
+      this.bindings.DB.prepare(
+        `INSERT INTO agent_templates(
+           id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, unpublished_at, created_at, updated_at
+         )
+         SELECT ?, ?, ?, ?, ?, ?, NULL, ?, ?
+         WHERE (SELECT count(*) FROM agent_templates WHERE owner_user_id = ? AND unpublished_at IS NULL) < ?
+            OR EXISTS (
+              SELECT 1 FROM agent_templates
+              WHERE owner_user_id = ? AND source_agent_id = ? AND unpublished_at IS NULL
+            )
+         ON CONFLICT(owner_user_id, source_agent_id) DO UPDATE SET
+           snapshot_json = excluded.snapshot_json,
+           avatar_key = excluded.avatar_key,
+           card_key = excluded.card_key,
+           unpublished_at = NULL,
+           updated_at = excluded.updated_at
+         RETURNING id`,
+      ).bind(
+        id,
+        input.user.id,
+        sourceAgentId,
+        JSON.stringify(snapshot),
+        avatarKey,
+        cardKey,
+        now,
+        now,
+        input.user.id,
+        MAX_TEMPLATES_PER_USER,
+        input.user.id,
+        sourceAgentId,
+      ),
+    ]);
+    const previous = storedImages(written[0]?.results?.[0]);
+    const returned = written[1]?.results?.[0];
+    if (!isDynamicRecord(returned) || typeof returned.id !== "string") {
+      // Nothing was written: the limit stopped it, so the new images are not named by any row.
+      await this.deleteImages([avatarKey, cardKey]);
+      throw new AgentMarketplaceError(409, "template_limit", "You can publish up to 20 agents.");
     }
-    if (previous.avatarKey && previous.avatarKey !== avatarKey) await this.bindings.SKILLS.delete(previous.avatarKey);
-    if (previous.cardKey && previous.cardKey !== cardKey) await this.bindings.SKILLS.delete(previous.cardKey);
-    return { id: publishedId, sourceAgentId, updatedAt: new Date(now).toISOString() };
+    // The publish has succeeded; the old images are removed on a best-effort basis.
+    await this.deleteImages([previous.avatarKey, previous.cardKey]);
+    return { id: returned.id, sourceAgentId, updatedAt: new Date(now).toISOString() };
   }
 
   async listMine(userId: string): Promise<OwnedAgentTemplate[]> {
@@ -156,18 +175,19 @@ export class AgentTemplates {
     };
   }
 
-  async avatar(id: string) {
+  /** With the request headers, an unchanged image comes back without a body, for a 304. */
+  async avatar(id: string, conditions?: Headers) {
     const row = await this.row(id);
     if (!row?.avatar_key) throw new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.");
-    const object = await this.bindings.SKILLS.get(row.avatar_key);
+    const object = await this.bindings.SKILLS.get(row.avatar_key, conditions ? { onlyIf: conditions } : undefined);
     if (!object) throw new AgentMarketplaceError(404, "avatar_not_found", "The avatar was not found.");
     return object;
   }
 
-  async card(id: string) {
+  async card(id: string, conditions?: Headers) {
     const row = await this.row(id);
     if (!row?.card_key) throw new AgentMarketplaceError(404, "card_not_found", "The share card was not found.");
-    const object = await this.bindings.SKILLS.get(row.card_key);
+    const object = await this.bindings.SKILLS.get(row.card_key, conditions ? { onlyIf: conditions } : undefined);
     if (!object) throw new AgentMarketplaceError(404, "card_not_found", "The share card was not found.");
     return object;
   }
@@ -192,8 +212,19 @@ export class AgentTemplates {
     const row = before?.results?.[0];
     if (!row) throw notFound();
     const images = storedImages(row);
-    if (images.avatarKey) await this.bindings.SKILLS.delete(images.avatarKey);
-    if (images.cardKey) await this.bindings.SKILLS.delete(images.cardKey);
+    // The unpublish has happened; a failed delete must not turn it into an error that a retry
+    // can no longer fix, because the row no longer names these images.
+    await this.deleteImages([images.avatarKey, images.cardKey]);
+  }
+
+  private async deleteImages(keys: Array<string | null>): Promise<void> {
+    const present = keys.filter((key): key is string => key !== null);
+    if (present.length === 0) return;
+    try {
+      await this.bindings.SKILLS.delete(present);
+    } catch (error) {
+      console.warn("agent-templates: could not delete images", { keys: present, error: String(error) });
+    }
   }
 
   private row(id: string) {
