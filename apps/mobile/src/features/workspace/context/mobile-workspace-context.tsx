@@ -94,6 +94,7 @@ import { MobileConversationStore } from "@/features/workspace/model/conversation
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import { applyMobileQueueEvent } from "@/features/workspace/model/queue-cache";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
+import { decodeServerOrder, serverAccent, serverOrderKey, sortServers } from "@/features/workspace/model/server-order";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
 import type {
@@ -115,10 +116,6 @@ export type {
   ToggleAgentPinResult,
 } from "@/features/workspace/model/workspace-types";
 
-// Five distinct hues for the server rail, taken from the palette's categorical set
-// (--openbot-file-blue/-orange/-teal/-pink and --openbot-success). Hardcoded because
-// @openbot/brand ships tokens as CSS only, and these are picked per index in JS.
-const SERVER_ACCENTS = ["#74b9ff", "#f0a06a", "#6bc7d9", "#d98ac9", "#31cf76"] as const;
 type RemoteAgent = Pick<
   AgentSummary,
   "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
@@ -133,7 +130,7 @@ const EMPTY_SERVER: MobileServer = {
   initialConnectionPending: true,
   connectionMessage: null,
   address: null,
-  accent: SERVER_ACCENTS[0],
+  accent: serverAccent("unavailable"),
   publicKey: "",
   membershipId: "",
   role: "member",
@@ -208,6 +205,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [session.apiUrl, session.user.id],
   );
   const [preferences, setPreferences] = useState<Record<string, RemoteWorkspacePreferences>>({});
+  const orderKey = serverOrderKey(session.apiUrl, session.user.id);
+  const storedServerOrder = useMemo(() => {
+    try {
+      return decodeServerOrder(SecureStore.getItem(orderKey));
+    } catch {
+      return [];
+    }
+  }, [orderKey]);
+  const [savedServerOrder, setSavedServerOrder] = useState<{ key: string; ids: string[] } | null>(null);
+  const serverOrder = savedServerOrder?.key === orderKey ? savedServerOrder.ids : storedServerOrder;
+  const orderedServers = useMemo(() => sortServers(servers, serverOrder), [servers, serverOrder]);
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
   const hiddenAgentIds = (activeServerId ? preferences[activeServerId]?.hidden : null) ?? NO_IDS;
@@ -246,7 +254,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
-        return hosts.map((host, index) => {
+        return hosts.map((host) => {
           const previous = previousServers.get(host.hostId);
           return {
             id: host.hostId,
@@ -257,7 +265,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             connectionMessage: previous?.connectionMessage ?? null,
             recoveryStatus: previous?.recoveryStatus,
             address: null,
-            accent: SERVER_ACCENTS[index % SERVER_ACCENTS.length] ?? SERVER_ACCENTS[0],
+            accent: serverAccent(host.hostId),
             publicKey: previous?.publicKey ?? host.devicePublicKey,
             membershipId: host.membershipId,
             role: host.role,
@@ -759,7 +767,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       channelStore,
-      servers,
+      servers: orderedServers,
+      reorderServers: (serverIds) => {
+        try {
+          SecureStore.setItem(orderKey, JSON.stringify(serverIds), {
+            keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+          });
+          setSavedServerOrder({ key: orderKey, ids: serverIds });
+          return true;
+        } catch {
+          Alert.alert("Could not save server order", "Your previous order has been kept. Please try again.");
+          return false;
+        }
+      },
       teamDirectory: directory,
       serverDirectoryState,
       serverDirectoryError,
@@ -836,7 +856,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             initialConnectionPending: true,
             connectionMessage: null,
             address: null,
-            accent: SERVER_ACCENTS[0],
+            accent: serverAccent(host.hostId),
             publicKey: host.devicePublicKey,
             membershipId: host.membershipId,
             role: host.role,
@@ -1283,6 +1303,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     teamApi,
     serverDirectoryState,
     servers,
+    orderedServers,
+    orderKey,
     session.host,
     session.apiUrl,
     session.user.id,

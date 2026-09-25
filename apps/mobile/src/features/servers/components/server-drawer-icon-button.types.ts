@@ -5,6 +5,6 @@ export interface ServerDrawerIconButtonProps extends PropsWithChildren {
   accessibilityLabel: string;
   color: ColorValue;
   fallbackVariant?: "filled" | "plain";
-  systemName: "gearshape" | "plus";
+  systemName: "checkmark" | "gearshape" | "plus";
   onPress: () => void;
 }
