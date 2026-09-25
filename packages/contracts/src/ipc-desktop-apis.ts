@@ -1,16 +1,8 @@
 import type { AgentEvent } from "./ipc-agent-events";
 import type { AttachmentImportEvent } from "./ipc-attachments";
-import type { BrowserBounds, BrowserLiveViewInput } from "./ipc-browser";
-import type { GroupApi, Invoke, IPC_ENDPOINTS, IpcEndpoints, Subscribe } from "./ipc-endpoints";
-import type {
-  CreateTeamInviteInput,
-  DirectMessageRealtimeEvent,
-  DirectTypingRealtimeEvent,
-  InviteSummary,
-  TeamMemberSummary,
-  TeamPresenceSnapshot,
-  UpdateTeamMemberInput,
-} from "./ipc-team-host";
+import type { BrowserLiveViewInput } from "./ipc-browser";
+import type { GroupApi, IpcEndpoints } from "./ipc-endpoints";
+import type { DirectMessageRealtimeEvent, DirectTypingRealtimeEvent, TeamPresenceSnapshot } from "./ipc-team-host";
 
 /**
  * Every agent group, spread into one namespace. Each scoped method takes its server last; left out,
@@ -34,29 +26,21 @@ export type AgentTemplatesDesktopApi = GroupApi<IpcEndpoints["agentTemplates"]>;
 
 export type MarketplaceAgentsDesktopApi = GroupApi<IpcEndpoints["marketplaceAgents"]>;
 
-export interface BrowserDesktopApi {
-  open: Invoke<typeof IPC_ENDPOINTS.browser.open>;
-  activate: Invoke<typeof IPC_ENDPOINTS.browser.activate>;
-  navigate: Invoke<typeof IPC_ENDPOINTS.browser.navigate>;
-  reload: Invoke<typeof IPC_ENDPOINTS.browser.reload>;
-  close: Invoke<typeof IPC_ENDPOINTS.browser.close>;
-  listTabs: Invoke<typeof IPC_ENDPOINTS.browser.listTabs>;
-  getDisplayState: Invoke<typeof IPC_ENDPOINTS.browser.getDisplayState>;
-  getControlState: Invoke<typeof IPC_ENDPOINTS.browser.getControlState>;
-  capturePreview: Invoke<typeof IPC_ENDPOINTS.browser.capturePreview>;
-  setVisible: Invoke<typeof IPC_ENDPOINTS.browser.setVisible>;
-  /** Starts a live view of a tab on the active remote server. A local tab is already on screen. */
-  startLiveView: Invoke<typeof IPC_ENDPOINTS.browser.startLiveView>;
-  stopLiveView: Invoke<typeof IPC_ENDPOINTS.browser.stopLiveView>;
+/**
+ * `startLiveView` starts a live view of a tab on the active remote server; a local tab is already on
+ * screen. `sendLiveViewInput` is the untyped `browserInput` endpoint, so it is written here.
+ */
+export interface BrowserDesktopApi extends GroupApi<IpcEndpoints["browser"]> {
   sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
-  onLiveViewEvent: Subscribe<typeof IPC_ENDPOINTS.browser.liveViewEvent>;
-  onDisplayState: Subscribe<typeof IPC_ENDPOINTS.browser.displayStateEvent>;
-  openPictureInPicture: (bounds?: BrowserBounds) => Promise<BrowserBounds>;
-  closePictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureClose>;
-  dockPictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureDock>;
-  hidePictureInPicture: Invoke<typeof IPC_ENDPOINTS.browser.pictureInPictureHide>;
-  onPictureInPictureEvent: Subscribe<typeof IPC_ENDPOINTS.browser.pictureInPictureEvent>;
 }
+
+/**
+ * Only the help window may call `startPermissionAppDrag`; main refuses every other sender. Only the
+ * overlay surface listens to `onHighlightPlacement`. It is pushed rather than asked for: the overlay
+ * carries no control and invokes nothing, so a window that floats over another application's has no
+ * channel it could be driven through.
+ */
+export type ComputerUseDesktopApi = GroupApi<IpcEndpoints["computerUse"]>;
 
 export type CentralAuthDesktopApi = GroupApi<IpcEndpoints["auth"]>;
 
@@ -70,39 +54,15 @@ export type MaintenanceDesktopApi = GroupApi<IpcEndpoints["maintenance"]>;
 
 export type DynamicIslandDesktopApi = GroupApi<IpcEndpoints["dynamicIsland"]>;
 
-export interface ServersDesktopApi {
-  setMuted: Invoke<typeof IPC_ENDPOINTS.servers.setMuted>;
-  setNotificationLevel: Invoke<typeof IPC_ENDPOINTS.servers.setNotificationLevel>;
-  list: Invoke<typeof IPC_ENDPOINTS.servers.list>;
-  select: Invoke<typeof IPC_ENDPOINTS.servers.select>;
-  reorder: Invoke<typeof IPC_ENDPOINTS.servers.reorder>;
-  join: Invoke<typeof IPC_ENDPOINTS.servers.join>;
-  previewInvite: Invoke<typeof IPC_ENDPOINTS.servers.previewInvite>;
-  takePendingInvite: Invoke<typeof IPC_ENDPOINTS.servers.takePendingInvite>;
-  login: Invoke<typeof IPC_ENDPOINTS.servers.login>;
-  retryConnection: Invoke<typeof IPC_ENDPOINTS.servers.retryConnection>;
-  remove: Invoke<typeof IPC_ENDPOINTS.servers.remove>;
-  getPresence: Invoke<typeof IPC_ENDPOINTS.servers.getPresence>;
-  getPresenceFor: Invoke<typeof IPC_ENDPOINTS.servers.getPresenceFor>;
-  refreshIdentity: Invoke<typeof IPC_ENDPOINTS.servers.refreshIdentity>;
-  listMembers: Invoke<typeof IPC_ENDPOINTS.servers.listMembers>;
-  updateMember: (serverId: string, input: UpdateTeamMemberInput) => Promise<TeamMemberSummary>;
-  removeMember: (serverId: string, memberId: string) => Promise<void>;
-  listInvites: Invoke<typeof IPC_ENDPOINTS.servers.listInvites>;
-  revokeInvite: (serverId: string, inviteId: string) => Promise<void>;
-  createInvite: (serverId: string, input: CreateTeamInviteInput) => Promise<InviteSummary>;
-  setTyping: Invoke<typeof IPC_ENDPOINTS.servers.setTyping>;
+/**
+ * The preload wraps some bridged methods: the server list calls record which server is selected, and
+ * `onEvent` does too. The scoped events come from every server; the three methods below keep one.
+ */
+export interface ServersDesktopApi extends GroupApi<IpcEndpoints["servers"]> {
+  /** `onScopedPresence` for one server: the selected one when `serverId` is left out. */
   onPresence: (listener: (snapshot: TeamPresenceSnapshot) => void, serverId?: string) => () => void;
-  listDirectThreads: Invoke<typeof IPC_ENDPOINTS.servers.listDirectThreads>;
-  readDirectConversation: Invoke<typeof IPC_ENDPOINTS.servers.readDirectConversation>;
-  readDirectConversationPage: Invoke<typeof IPC_ENDPOINTS.servers.readDirectConversationPage>;
-  sendDirectMessage: Invoke<typeof IPC_ENDPOINTS.servers.sendDirectMessage>;
-  markDirectRead: Invoke<typeof IPC_ENDPOINTS.servers.markDirectRead>;
-  setDirectTyping: Invoke<typeof IPC_ENDPOINTS.servers.setDirectTyping>;
   onDirectMessage: (listener: (event: DirectMessageRealtimeEvent) => void) => () => void;
   onDirectTyping: (listener: (event: DirectTypingRealtimeEvent) => void) => () => void;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.servers.event>;
-  onInvite: Subscribe<typeof IPC_ENDPOINTS.servers.invite>;
 }
 
 /**
@@ -143,20 +103,7 @@ export type AgentImportDesktopApi = GroupApi<IpcEndpoints["agentImport"]>;
 // The `app` and `providers` groups sit at the top level, as they did before groups existed.
 export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupApi<IpcEndpoints["providers"]> {
   dynamicIsland: DynamicIslandDesktopApi;
-  getComputerUseState: Invoke<typeof IPC_ENDPOINTS.computerUse.getState>;
-  openComputerUsePermissionPane: Invoke<typeof IPC_ENDPOINTS.computerUse.openPermissionPane>;
-  closeComputerUsePermissionHelp: Invoke<typeof IPC_ENDPOINTS.computerUse.closePermissionHelp>;
-  getComputerUsePermissionApp: Invoke<typeof IPC_ENDPOINTS.computerUse.getPermissionApp>;
-  /** Starts the native drag. Only the help window may call it; every other sender is refused. */
-  startComputerUsePermissionAppDrag: Invoke<typeof IPC_ENDPOINTS.computerUse.startPermissionAppDrag>;
-  revealComputerUsePermissionApp: Invoke<typeof IPC_ENDPOINTS.computerUse.revealPermissionApp>;
-  /**
-   * Where to draw the rim over the window an agent works in. Only the overlay surface listens.
-   *
-   * It is pushed rather than asked for: the overlay carries no control and invokes nothing, so a
-   * window that floats over another application's has no channel it could be driven through.
-   */
-  onComputerUseHighlightPlacement: Subscribe<typeof IPC_ENDPOINTS.computerUse.highlightPlacement>;
+  computerUse: ComputerUseDesktopApi;
   providerRuntimes: ProviderRuntimesDesktopApi;
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;

@@ -515,7 +515,7 @@ export const SCENARIOS: Scenario[] = [
     description: "Computer Use state read (starts the driver when permitted), idle 2 min",
     seed: SHOWCASE,
     act: async (context) => {
-      const state = await context.evaluate<{ status: string }>("window.openbot.getComputerUseState()");
+      const state = await context.evaluate<{ status: string }>("window.openbot.computerUse.getState()");
       context.logger.info(`Computer Use: ${state.status}`);
       context.record({ "computerUse.ready": state.status === "ready" ? 1 : 0 });
       await context.wait(2 * MINUTE);

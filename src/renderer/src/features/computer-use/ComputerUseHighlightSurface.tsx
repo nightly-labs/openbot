@@ -18,7 +18,7 @@ import { computerUsePort } from "./computer-use-port";
  */
 export function ComputerUseHighlightSurface() {
   const [placement, setPlacement] = createSignal<ComputerUseHighlightPlacement | null>(null);
-  onSettled(() => computerUsePort().onComputerUseHighlightPlacement(setPlacement));
+  onSettled(() => computerUsePort().computerUse.onHighlightPlacement(setPlacement));
   return (
     <div class="computer-use-highlight-surface">
       <Show when={placement()}>

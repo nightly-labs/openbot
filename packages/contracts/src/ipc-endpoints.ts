@@ -269,7 +269,7 @@ declare const serverArgument: unique symbol;
 
 /**
  * The payload and result of an endpoint that has no types. The main binder and the preload accept
- * anything for it. Only `browser.sendLiveViewInput` uses it: see the comment at that endpoint.
+ * anything for it. Only `browserInput.sendLiveViewInput` uses it: see the comment at that endpoint.
  */
 export interface Untyped {
   readonly [untypedBrand]: true;
@@ -635,16 +635,19 @@ export const IPC_ENDPOINTS = {
     setVisible: request<BrowserVisibilityInput, void>()("browser:set-visible"),
     startLiveView: request<string, void>()("browser:start-live-view"),
     stopLiveView: request<undefined, void>()("browser:stop-live-view"),
-    // The one untyped endpoint. The renderer sends `BrowserLiveViewInput` and main reads the wire
-    // `BrowserViewInput`, which differ on purpose (see `ipc-browser.ts`); main's wire decoder fills the rest.
-    sendLiveViewInput: untypedRequest("browser:send-live-view-input"),
     liveViewEvent: event<BrowserLiveViewEvent>()("browser:live-view-event"),
-    displayStateEvent: event<BrowserDisplayState>()("browser:display-state-event"),
-    pictureInPictureOpen: request<BrowserBounds | undefined, BrowserBounds>()("browser:picture-in-picture-open"),
-    pictureInPictureClose: request<undefined, void>()("browser:picture-in-picture-close"),
-    pictureInPictureDock: request<undefined, void>()("browser:picture-in-picture-dock"),
-    pictureInPictureHide: request<undefined, void>()("browser:picture-in-picture-hide"),
+    displayState: event<BrowserDisplayState>()("browser:display-state-event"),
+    openPictureInPicture: request<BrowserBounds | undefined, BrowserBounds>()("browser:picture-in-picture-open"),
+    closePictureInPicture: request<undefined, void>()("browser:picture-in-picture-close"),
+    dockPictureInPicture: request<undefined, void>()("browser:picture-in-picture-dock"),
+    hidePictureInPicture: request<undefined, void>()("browser:picture-in-picture-hide"),
     pictureInPictureEvent: event<BrowserPictureInPictureEvent>()("browser:picture-in-picture-event"),
+  },
+  // Not part of `browser`, so that group can be bridged: this is the one untyped endpoint. The renderer
+  // sends `BrowserLiveViewInput` and main reads the wire `BrowserViewInput`, which differ on purpose
+  // (see `ipc-browser.ts`); main's wire decoder fills the rest.
+  browserInput: {
+    sendLiveViewInput: untypedRequest("browser:send-live-view-input"),
   },
   servers: {
     list: request<undefined, ServerSummary[]>()("servers:list"),
@@ -662,13 +665,13 @@ export const IPC_ENDPOINTS = {
     getPresenceFor: request<string, TeamPresenceSnapshot>()("servers:get-presence-for"),
     refreshIdentity: request<string, ServerSummary>()("servers:refresh-identity"),
     listMembers: request<string, TeamMemberSummary[]>()("servers:list-members"),
-    updateMember: scopedRequest<UpdateTeamMemberInput, TeamMemberSummary>()("servers:update-member"),
-    removeMember: scopedRequest<string, void>()("servers:remove-member"),
+    updateMember: scopedRequest<UpdateTeamMemberInput, TeamMemberSummary, "required">()("servers:update-member"),
+    removeMember: scopedRequest<string, void, "required">()("servers:remove-member"),
     listInvites: request<string, TeamInviteSummary[]>()("servers:list-invites"),
-    revokeInvite: scopedRequest<string, void>()("servers:revoke-invite"),
-    createInvite: scopedRequest<CreateTeamInviteInput, InviteSummary>()("servers:create-invite"),
+    revokeInvite: scopedRequest<string, void, "required">()("servers:revoke-invite"),
+    createInvite: scopedRequest<CreateTeamInviteInput, InviteSummary, "required">()("servers:create-invite"),
     setTyping: request<SetTeamTypingInput, void>()("servers:set-typing"),
-    presence: event<ScopedTeamPresenceSnapshot>()("servers:presence"),
+    scopedPresence: event<ScopedTeamPresenceSnapshot>()("servers:presence"),
     listDirectThreads: request<undefined, DirectThreadSummary[]>()("servers:list-direct-threads"),
     readDirectConversation: request<string, DirectConversationSnapshot>()("servers:read-direct-conversation"),
     readDirectConversationPage: request<ReadDirectConversationPageInput, DirectConversationPage>()(
@@ -677,8 +680,8 @@ export const IPC_ENDPOINTS = {
     sendDirectMessage: request<SendDirectMessageInput, DirectMessage>()("servers:send-direct-message"),
     markDirectRead: request<MarkDirectReadInput, DirectConversationReadState>()("servers:mark-direct-read"),
     setDirectTyping: request<DirectTypingInput, void>()("servers:set-direct-typing"),
-    directMessage: event<ScopedDirectMessageEvent>()("servers:direct-message"),
-    directTyping: event<ScopedDirectTypingEvent>()("servers:direct-typing"),
+    scopedDirectMessage: event<ScopedDirectMessageEvent>()("servers:direct-message"),
+    scopedDirectTyping: event<ScopedDirectTypingEvent>()("servers:direct-typing"),
     event: event<ServerSummary[]>()("servers:event"),
     invite: event<string>()("servers:invite"),
   },

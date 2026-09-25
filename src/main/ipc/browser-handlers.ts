@@ -50,7 +50,7 @@ export function browserIpcHandlers({
   browser,
   remoteServers,
   browserView,
-}: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser"> {
+}: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser" | "browserInput"> {
   return {
     browser: {
       open: payloadHandler(parseBrowserOpen, (parsed) =>
@@ -167,16 +167,18 @@ export function browserIpcHandlers({
       // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
       startLiveView: payloadHandler(stringPayload("tabId"), (tabId) => browserView.start(tabId)),
       stopLiveView: handler(() => browserView.stop()),
+      openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
+        browserPictureInPicture.open(bounds),
+      ),
+      closePictureInPicture: handler(() => browserPictureInPicture.close()),
+      dockPictureInPicture: handler(() => browserPictureInPicture.dock()),
+      hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
+    },
+    browserInput: {
       // The protocol's own decoder is the boundary check: what the renderer sends is dispatched on a
       // host that never sees this process, so it passes the same reading the host applies to any
       // other member's input, and reaches the socket without a second one.
       sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),
-      pictureInPictureOpen: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
-        browserPictureInPicture.open(bounds),
-      ),
-      pictureInPictureClose: handler(() => browserPictureInPicture.close()),
-      pictureInPictureDock: handler(() => browserPictureInPicture.dock()),
-      pictureInPictureHide: handler(() => browserPictureInPicture.hide()),
     },
   };
 }

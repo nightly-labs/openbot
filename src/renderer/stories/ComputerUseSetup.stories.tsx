@@ -17,7 +17,7 @@ const permissionsRequired: ComputerUseState = {
 function MockedSetup(props: { state?: ComputerUseState; error?: Error; loading?: boolean }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
-  mock.api.getComputerUseState = props.loading
+  mock.api.computerUse.getState = props.loading
     ? () => new Promise(() => undefined)
     : props.error
       ? async () => {

@@ -41,8 +41,8 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 // where it follows the target window. What comes after the channel varies, and
 // the scan reads only the channel position, so it does not care.
 const MAIN_SEND_CALLEES = ["sendToRenderer"];
-const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgentForServer"];
-const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen", "subscribe"];
+const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeAgentForServer"];
+const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
 // These take a whole group, `IPC_ENDPOINTS.group`, and reach every endpoint in it.
 const PRELOAD_GROUP_CALLEES = ["bridgeGroup"];
@@ -65,9 +65,9 @@ const CHANNEL_ARGUMENT_POSITION: ReadonlyMap<string, number> = new Map(
   ].map((callee): readonly [string, number] => [callee, CHANNEL_AFTER_RECIPIENT.includes(callee) ? 1 : 0]),
 );
 
-// Main uses the first two names for servers and stores that have nothing to do with IPC, so only the
-// preload scan reads them as channel calls.
-const PRELOAD_ONLY_CALLEES = ["listen", "subscribe", ...PRELOAD_GROUP_CALLEES];
+// Main uses `listen` for servers that have nothing to do with IPC, so only the preload scan reads
+// these as channel calls.
+const PRELOAD_ONLY_CALLEES = ["listen", ...PRELOAD_GROUP_CALLEES];
 
 // An endpoint as `group.name`. Only the one untyped endpoint reads `.channel` at its call site,
 // because it goes to ipcRenderer.invoke directly.

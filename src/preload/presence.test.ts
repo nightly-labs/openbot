@@ -34,12 +34,12 @@ it("delivers settings presence for an unselected server and removes the subscrip
   const stopSelected = bridge.api.current.servers.onPresence(selected);
   const stopSettings = bridge.api.current.servers.onPresence(settings, "remote");
   const remote = { serverId: "remote", members: [], updatedAt: "2026-09-08T00:00:00Z" };
-  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.presence.channel) ?? [])
+  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.scopedPresence.channel) ?? [])
     handler(null, { serverId: "remote", snapshot: remote });
   expect(settings).toHaveBeenCalledWith(remote);
   expect(selected).not.toHaveBeenCalled();
   stopSettings();
-  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.presence.channel) ?? [])
+  for (const handler of bridge.listeners.get(IPC_ENDPOINTS.servers.scopedPresence.channel) ?? [])
     handler(null, { serverId: "remote", snapshot: remote });
   expect(settings).toHaveBeenCalledTimes(1);
   stopSelected();

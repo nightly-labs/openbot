@@ -50,7 +50,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   let reading = false;
 
   function close(): void {
-    void computerUsePort().closeComputerUsePermissionHelp();
+    void computerUsePort().computerUse.closePermissionHelp();
   }
 
   // Computer Use can poll its driver. Sunshine checks start the runtime when it is idle,
@@ -64,7 +64,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
         if (!disposed)
           setGranted(state[permission === "screen-recording" ? "screenRecording" : "accessibility"] === "allowed");
       } else {
-        const state = await computerUsePort().getComputerUseState();
+        const state = await computerUsePort().computerUse.getState();
         if (!disposed) setGranted(state.permissions.some((entry) => entry.id === permission && entry.granted));
       }
     } catch {
@@ -78,7 +78,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
 
   async function readApp(): Promise<void> {
     try {
-      const next = await computerUsePort().getComputerUsePermissionApp();
+      const next = await computerUsePort().computerUse.getPermissionApp();
       if (!disposed) setApp(next);
     } catch {
       // No card. The steps still name the application, and the list still accepts a bundle dropped
@@ -89,7 +89,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
   async function reveal(): Promise<void> {
     setError(null);
     try {
-      await computerUsePort().revealComputerUsePermissionApp();
+      await computerUsePort().computerUse.revealPermissionApp();
     } catch (cause) {
       setError(errorMessage(cause, "The application could not be shown in Finder."));
     }
@@ -143,7 +143,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
               setDragging(true);
               setError(null);
               void computerUsePort()
-                .startComputerUsePermissionAppDrag()
+                .computerUse.startPermissionAppDrag()
                 .catch((cause) => setError(errorMessage(cause, "The application could not be dragged.")))
                 .finally(() => setDragging(false));
             }}
