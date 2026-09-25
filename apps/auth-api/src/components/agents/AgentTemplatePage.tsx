@@ -1,10 +1,10 @@
-import { AppLogo } from "@openbot/brand";
 import { createOpenBotAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import { agentTemplatePath } from "../../lib/agent-template-path";
 import { landingAnalytics } from "../../lib/analytics";
 import { OPENBOT_LINKS } from "../../lib/landing-links";
+import { ContentHeader } from "../content/ContentHeader";
 import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
 
 // The Bloub library, which draws the avatar and owns its colours, uses browser-only APIs as soon as
@@ -51,12 +51,7 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
 
   return (
     <div class="landing-page agent-share-page" style={accentStyle(accent())}>
-      <header class="agent-share-header">
-        <a class="landing-brand" href="/" aria-label="OpenBot home">
-          <AppLogo variant="production" class="landing-brand-logo" />
-          <span>OpenBot</span>
-        </a>
-      </header>
+      <ContentHeader />
 
       <main class="agent-share-main">
         <article class="agent-share-card" aria-labelledby="agent-share-name">

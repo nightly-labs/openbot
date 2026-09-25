@@ -3008,23 +3008,6 @@ a {
     var(--openbot-bg-canvas);
 }
 
-.agent-share-header {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  padding: clamp(28px, 5vw, 48px) 20px 0;
-}
-
-.agent-share-header .landing-brand {
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.agent-share-header .landing-brand-logo {
-  width: 36px;
-  height: 36px;
-}
-
 .agent-share-main {
   display: flex;
   flex-direction: column;

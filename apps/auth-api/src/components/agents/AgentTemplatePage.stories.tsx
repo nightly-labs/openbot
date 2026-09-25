@@ -1,4 +1,6 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
+import type { JSX } from "@solidjs/web";
+import { createRootRoute, createRoute, createRouter, RouterContextProvider } from "@tanstack/solid-router";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 // The site's stylesheet, loaded only when a site story opens. See `ArticleMedia.stories.tsx`.
 import "../../styles.css";
@@ -50,11 +52,30 @@ const TEMPLATE: AgentTemplateDetail = {
   ],
 };
 
+/**
+ * The site header's links need a router. The real route tree carries Worker-only modules, so this is
+ * the same small stand-in tree `test/plugins-page.test.tsx` uses. It is built at module level:
+ * creating a router writes reactive state, which Solid refuses inside a component.
+ */
+const rootRoute = createRootRoute();
+rootRoute.addChildren([
+  createRoute({ getParentRoute: () => rootRoute, path: "/" }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/news" }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/guides" }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/plugins" }),
+]);
+const router = createRouter({ routeTree: rootRoute });
+
+function WithRouter(props: { children: () => JSX.Element }) {
+  return <RouterContextProvider router={router}>{props.children}</RouterContextProvider>;
+}
+
 const meta = {
   title: "Site/Agent template page",
   component: AgentTemplatePage,
   args: { template: TEMPLATE },
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
+  render: (args) => <WithRouter>{() => <AgentTemplatePage {...args} />}</WithRouter>,
 } satisfies Meta<typeof AgentTemplatePage>;
 
 export default meta;
