@@ -8,7 +8,7 @@ export interface BrowserDynamicToolHooks {
   onUploadOperationStarted?: (completion: Promise<void>) => void;
 }
 
-type BrowserInputCall = Extract<
+export type BrowserInputCall = Extract<
   BrowserToolCall,
   {
     tool: "click" | "type" | "press" | "hover" | "scroll" | "select_option" | "set_checked" | "drag" | "upload_files";
