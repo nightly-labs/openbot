@@ -1,0 +1,144 @@
+name: Cloudflare preview
+
+# The trusted half of the pull request preview. The `preview` job in ci.yml builds the pull
+# request's Worker without secrets. This workflow runs the `main` version of this file and of every
+# script it calls, with the preview deploy token, after that CI run completes. It never installs or
+# runs pull request code: it reads only the built files and the generated wrangler.json, and
+# `scripts/check-preview-worker-config.ts` requires that config to match the one `main` builds.
+#
+# GitHub runs a `workflow_run` workflow only from the default branch, so a change to this file
+# takes effect after it merges.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: cloudflare-preview-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  upload:
+    name: Upload Cloudflare preview
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-preview
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      # A CI run of an older commit, or of a closed pull request, uploads nothing: the newer run
+      # has its own upload.
+      - name: Find the pull request and its build
+        id: source
+        shell: bash
+        run: |
+          pr_number="$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")"
+          if [[ ! "$pr_number" =~ ^[0-9]+$ ]]; then
+            echo "The CI run names no pull request."
+            exit 0
+          fi
+          pr_fields="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+            --jq '[.state, .head.sha, .head.repo.full_name] | @tsv')"
+          read -r state head_sha head_repository <<< "$pr_fields"
+          if [[ "$state" != "open" || "$head_sha" != "$HEAD_SHA" || "$head_repository" != "$GITHUB_REPOSITORY" ]]; then
+            echo "Pull request #${pr_number} is closed or has a newer commit."
+            exit 0
+          fi
+          artifact_count="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '[.artifacts[] | select(.name == "cloudflare-preview" and (.expired | not))] | length')"
+          if [[ "$artifact_count" != "1" ]]; then
+            echo "CI run ${RUN_ID} has no preview build."
+            exit 0
+          fi
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Check out main
+        if: steps.source.outputs.pr_number
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        if: steps.source.outputs.pr_number
+        uses: ./.github/actions/setup-bun
+
+      - name: Build the main Worker config
+        if: steps.source.outputs.pr_number
+        shell: bash
+        env:
+          CLOUDFLARE_ENV: preview
+        run: |
+          bun run api:build
+          mv apps/auth-api/dist "$RUNNER_TEMP/main-dist"
+
+      - name: Download the pull request build
+        if: steps.source.outputs.pr_number
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cloudflare-preview
+          path: apps/auth-api/dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Require the main Worker config
+        if: steps.source.outputs.pr_number
+        run: bun scripts/check-preview-worker-config.ts "$RUNNER_TEMP/main-dist/server/wrangler.json" apps/auth-api/dist/server/wrangler.json
+
+      - name: Upload preview version
+        if: steps.source.outputs.pr_number
+        id: deploy-preview
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_PREVIEW_DEPLOY_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/auth-api
+          packageManager: bun
+          command: versions upload --config dist/server/wrangler.json --preview-alias pr-${{ steps.source.outputs.pr_number }}
+
+      - name: Read stable preview URL
+        if: steps.source.outputs.pr_number
+        id: preview-url
+        shell: bash
+        env:
+          WRANGLER_OUTPUT: ${{ steps.deploy-preview.outputs.command-output }}
+        run: |
+          preview_url="$(printf '%s\n' "$WRANGLER_OUTPUT" | sed -n 's/^Version Preview Alias URL: //p' | tail -n 1)"
+          if [[ ! "$preview_url" =~ ^https://[a-z0-9.-]+\.workers\.dev/?$ ]]; then
+            echo "Wrangler did not return a valid preview alias URL." >&2
+            exit 1
+          fi
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+
+      - name: Add preview comment
+        if: steps.source.outputs.pr_number
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.preview-url.outputs.url }}
+          PR_NUMBER: ${{ steps.source.outputs.pr_number }}
+        run: |
+          marker='<!-- openbot-cloudflare-preview -->'
+          body="${marker}
+          ## Cloudflare preview
+
+          [Open the landing preview](${PREVIEW_URL})
+
+          Updated for commit \`${HEAD_SHA}\`."
+          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq 'map(select(.body | contains("<!-- openbot-cloudflare-preview -->")))[0].id // empty')"
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+          fi

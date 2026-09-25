@@ -84,8 +84,17 @@ Its main jobs are:
 | Surfaces | `ubuntu-latest` | `bun run mobile:typecheck`, `bun run typecheck:sites`, `bun run typecheck:team-client`, `bun run typecheck:remote`, `bun run --parallel typecheck:logging typecheck:user-errors typecheck:i18n`, `bun run remote:check:compose` |
 | API | `ubuntu-latest` | `bun run check:api` |
 | Storybook build | `ubuntu-latest` | `bun run build-storybook` |
+| Cloudflare preview build | `ubuntu-latest` | `CLOUDFLARE_ENV=preview bun run api:build`, then upload `apps/auth-api/dist` |
 
-All of these jobs gate Cloudflare production deployment on `main`. Surfaces was previously missing from
+The preview build job has no secrets. After the CI run completes, the trusted
+[cloudflare-preview.yml](../.github/workflows/cloudflare-preview.yml) workflow runs its `main`
+version with the preview deploy token. It skips a closed pull request, a newer commit, and a fork. It
+builds the `main` Worker config, and `scripts/check-preview-worker-config.ts` stops the upload when
+the pull request's generated `wrangler.json` differs from it in anything but the code entry and the
+compatibility settings. Thus a pull request that changes the preview Worker name, bindings, vars, or
+routes gets no preview. A change to `cloudflare-preview.yml` takes effect only after it merges.
+
+All of these jobs except the preview build gate Cloudflare production deployment on `main`. Surfaces was previously missing from
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
