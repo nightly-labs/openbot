@@ -34,8 +34,9 @@ container, so its type coverage matters.
 
 `tsconfig.node.json` and `tsconfig.web.json` set `verbatimModuleSyntax`: a file compiles alone the
 same way under `tsc` and the bundler, because a type-only import must say `import type`. It had no
-findings when it was turned on. `exactOptionalPropertyTypes` is not on yet: it had 458 errors in 213
-files of the Node and web projects on 2026-09-25. The type ratchet holds it to those counts.
+findings when it was turned on. `exactOptionalPropertyTypes` is not on yet: it had 481 errors in 226
+files of the projects that extend `tsconfig.base.json` on 2026-09-26. The type ratchet holds it to
+those counts.
 
 The Signal Dockerfile installs from a pruned checkout with one manifest copy per workspace.
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
@@ -231,10 +232,12 @@ findings were all `if (cachedPromise)` presence checks. Biome cannot select a Gr
 ### Type debt ratchet
 
 `bun run types:ratchet` does the same for TypeScript options. For each option in
-`tools/typescript/type-baseline.json`, it runs `tsc` on `tsconfig.node.json` and `tsconfig.web.json`
-with the option on and compares the errors of each file to the baseline. An error that both projects
-report counts once. The rules for `--write` and `--add=<option>` are the same as for the lint
-ratchet. The run takes about 3 seconds. When an option has no errors left, turn it on in
+`tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
+extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares the errors of each
+file to the baseline. An error that two projects report counts once. `apps/mobile` extends the Expo
+base config, so the ratchet does not check it. The rules for `--write` and `--add=<option>` are the
+same as for the lint ratchet: `scripts/debt-ratchet.ts` holds them for both. The run takes about 4
+seconds. When an option has no errors left, turn it on in
 `tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
 `bun run typecheck` runs every script that matches that pattern.
 
