@@ -73,11 +73,8 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
             </h1>
             <p class="agent-share-creator">by {props.template.creatorName}</p>
 
-            <Show when={props.template.title || counts().length > 0}>
-              <ul class="agent-share-tags" aria-label="About this agent">
-                <Show when={props.template.title}>
-                  <li class="agent-share-role">{props.template.title}</li>
-                </Show>
+            <Show when={counts().length > 0}>
+              <ul class="agent-share-tags" aria-label="What this agent brings">
                 <For each={counts()}>{(label) => <li>{label}</li>}</For>
               </ul>
             </Show>

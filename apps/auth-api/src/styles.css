@@ -3118,7 +3118,7 @@ a {
   font-size: 15px;
 }
 
-/* The role and what the agent brings, as one row of small tags. */
+/* What the agent brings, as one row of small tags. */
 .agent-share-tags {
   display: flex;
   flex-wrap: wrap;
@@ -3136,13 +3136,6 @@ a {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-secondary);
   font-size: 12px;
-}
-
-.agent-share-tags > .agent-share-role {
-  border-color: color-mix(in srgb, var(--agent-share-accent) 40%, transparent);
-  background: color-mix(in srgb, var(--agent-share-accent) 12%, transparent);
-  color: var(--openbot-text-primary);
-  font-weight: 500;
 }
 
 /* Clamped, the instructions read as one paragraph, so the ellipsis never lands on a blank line.
