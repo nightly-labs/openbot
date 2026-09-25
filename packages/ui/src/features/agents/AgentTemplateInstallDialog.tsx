@@ -1,5 +1,5 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
-import { Button, Dialog, Heading, IconButton, Text, TriangleAlert, toast, X } from "@openbot/ui";
+import { Button, Dialog, Heading, IconButton, Text, toast, X } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, Show } from "solid-js";
 import { AgentAvatar } from "./AgentAvatar";
@@ -79,18 +79,16 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                         By {detail().creatorName}
                       </Text>
                     </header>
-                    <div class="agent-template-warning" role="note">
-                      <TriangleAlert aria-hidden="true" />
-                      <Text variant="caption" tone="secondary">
-                        This agent was made by another OpenBot user. It can act on your behalf after you add it.
-                      </Text>
-                    </div>
                     <div class="agent-template-detail">
                       <TemplateInstructions title={detail().title} description={detail().description} />
                       <TemplateSkills skills={detail().skills} expandable />
                       <TemplateRoutines routines={detail().routines} labelled />
                     </div>
                   </div>
+                  {/* The same quiet line the share page shows above its button, right where the choice is made. */}
+                  <Text variant="caption" tone="muted" class="agent-template-notice" role="note">
+                    Made by another OpenBot user. It can act on your behalf once added.
+                  </Text>
                   <footer class="agent-template-actions">
                     <Button type="button" variant="ghost" disabled={installing()} onClick={() => changeOpen(false)}>
                       Cancel

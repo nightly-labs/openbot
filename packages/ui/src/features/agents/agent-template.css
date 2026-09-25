@@ -196,18 +196,18 @@
   white-space: pre-wrap;
 }
 
-.agent-template-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--openbot-space-2);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-control);
-  padding: var(--openbot-space-3);
-  color: var(--openbot-text-secondary);
+/* The share page's notice: one quiet line above the buttons, with the divider above it. */
+.agent-template-notice {
+  flex-shrink: 0;
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3) var(--openbot-space-2) 0;
+  color: var(--openbot-text-dim);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+  text-wrap: balance;
 }
 
-.agent-template-warning > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  flex: 0 0 auto;
+.agent-template-notice + .agent-template-actions {
+  border-top: 0;
+  padding-top: var(--openbot-space-2);
 }
