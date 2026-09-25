@@ -1,5 +1,5 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
-import { Button, Dialog, Heading, IconButton, Text, TriangleAlert, X } from "@openbot/ui";
+import { Button, Dialog, Heading, IconButton, Text, TriangleAlert, toast, X } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, Show } from "solid-js";
 import { AgentAvatar } from "./AgentAvatar";
@@ -11,8 +11,6 @@ export interface AgentTemplateInstallDialogProps {
   /** The template a link named. Null while it loads. */
   detail: AgentTemplateDetail | null;
   loading: boolean;
-  /** A failure to load the template. An install failure is shown by the dialog itself. */
-  error: string | null;
   onInstall: () => Promise<void>;
 }
 
@@ -22,22 +20,19 @@ export interface AgentTemplateInstallDialogProps {
  */
 export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProps) {
   const [installing, setInstalling] = createSignal(false);
-  const [installError, setInstallError] = createSignal<string | null>(null);
 
   async function install(): Promise<void> {
     setInstalling(true);
-    setInstallError(null);
     try {
       await props.onInstall();
     } catch (error) {
-      setInstallError(errorMessage(error, "Could not add the agent."));
+      toast.error(errorMessage(error, "Could not add the agent."));
     } finally {
       setInstalling(false);
     }
   }
 
   function changeOpen(open: boolean): void {
-    if (!open) setInstallError(null);
     props.onOpenChange(open);
   }
 
@@ -60,8 +55,8 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
               when={props.detail}
               fallback={
                 <div class="agent-template-body">
-                  <Text tone={props.error ? "danger" : "muted"} role={props.error ? "alert" : "status"}>
-                    {props.error ?? (props.loading ? "Loading agent…" : "")}
+                  <Text tone="muted" role="status">
+                    {props.loading ? "Loading agent…" : ""}
                   </Text>
                 </div>
               }
@@ -95,13 +90,6 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                       <TemplateSkills skills={detail().skills} expandable />
                       <TemplateRoutines routines={detail().routines} labelled />
                     </div>
-                    <Show when={installError()}>
-                      {(message) => (
-                        <Text tone="danger" variant="caption" role="alert">
-                          {message()}
-                        </Text>
-                      )}
-                    </Show>
                   </div>
                   <footer class="agent-template-actions">
                     <Button type="button" variant="ghost" disabled={installing()} onClick={() => changeOpen(false)}>

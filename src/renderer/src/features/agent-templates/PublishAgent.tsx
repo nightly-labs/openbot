@@ -1,5 +1,6 @@
 import { createAgentTemplateShareUrl } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplatePreview } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { createStore } from "solid-js";
@@ -11,7 +12,6 @@ interface PublishState {
   agentId: string | null;
   preview: AgentTemplatePreview | null;
   loading: boolean;
-  error: string | null;
 }
 
 /**
@@ -24,7 +24,6 @@ export function createPublishAgent() {
     agentId: null,
     preview: null,
     loading: false,
-    error: null,
   });
 
   async function load(agentId: string): Promise<void> {
@@ -37,10 +36,13 @@ export function createPublishAgent() {
       });
     } catch (error) {
       if (state.agentId !== agentId) return;
+      // Nothing can be shown without the preview, so the dialog closes and the toast says why.
       setState((draft) => {
-        draft.error = errorMessage(error, "Could not read the agent.");
+        draft.open = false;
+        draft.agentId = null;
         draft.loading = false;
       });
+      toast.error(errorMessage(error, "Could not read the agent."));
     }
   }
 
@@ -50,7 +52,6 @@ export function createPublishAgent() {
       draft.agentId = agentId;
       draft.preview = null;
       draft.loading = true;
-      draft.error = null;
     });
     void load(agentId);
   }
@@ -96,7 +97,6 @@ export function createPublishAgent() {
       }
       preview={state.preview}
       loading={state.loading}
-      error={state.error}
       onPublish={publish}
       onUnpublish={unpublish}
       onCopyLink={copyLink}

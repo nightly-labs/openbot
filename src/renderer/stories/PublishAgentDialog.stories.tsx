@@ -1,3 +1,4 @@
+import { Toaster } from "@openbot/ui";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -8,7 +9,6 @@ const args: Parameters<typeof PublishAgentDialog>[0] = {
   onOpenChange: fn(),
   preview: storyAgentTemplatePreview("dr-eggbot"),
   loading: false,
-  error: null,
   onPublish: fn(async () => undefined),
   onUnpublish: fn(async () => undefined),
   onCopyLink: fn(async () => undefined),
@@ -19,6 +19,14 @@ const meta = {
   component: PublishAgentDialog,
   args,
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
+  decorators: [
+    (Story) => (
+      <>
+        <Story />
+        <Toaster />
+      </>
+    ),
+  ],
 } satisfies Meta<typeof PublishAgentDialog>;
 
 export default meta;
@@ -36,14 +44,10 @@ export const NoRoutinesOrSkills: Story = {
 
 export const Loading: Story = { args: { preview: null, loading: true } };
 
-export const LoadFailed: Story = {
-  args: { preview: null, error: "Choose a local agent first." },
-};
-
 export const PublishFails: Story = {
   args: {
     onPublish: fn(async () => {
-      throw new Error("Remove the secret from the description before publishing.");
+      throw new Error("Remove the secret or email address from the instructions before publishing.");
     }),
   },
 };

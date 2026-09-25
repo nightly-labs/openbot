@@ -1,4 +1,5 @@
 import type { AgentSummary, AgentTemplateDetail } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
 import { createEffect, createStore } from "solid-js";
@@ -7,7 +8,6 @@ import { agentTemplatesPort } from "./agent-templates-port";
 interface InstallState {
   detail: AgentTemplateDetail | null;
   loading: boolean;
-  error: string | null;
 }
 
 /**
@@ -19,14 +19,13 @@ export function AgentTemplateInstall(props: {
   onClose: () => void;
   onInstalled: (agent: AgentSummary) => Promise<void>;
 }) {
-  const [state, setState] = createStore<InstallState>({ detail: null, loading: false, error: null });
+  const [state, setState] = createStore<InstallState>({ detail: null, loading: false });
 
   createEffect(
     () => props.templateId,
     (templateId) => {
       setState((draft) => {
         draft.detail = null;
-        draft.error = null;
         draft.loading = templateId !== null;
       });
       if (!templateId) return;
@@ -42,10 +41,12 @@ export function AgentTemplateInstall(props: {
         })
         .catch((error: unknown) => {
           if (!current) return;
+          // Nothing can be shown without the template, so the dialog closes and the toast says why.
           setState((draft) => {
-            draft.error = errorMessage(error, "Could not read the shared agent.");
             draft.loading = false;
           });
+          props.onClose();
+          toast.error(errorMessage(error, "Could not read the shared agent."));
         });
       return () => {
         current = false;
@@ -72,7 +73,6 @@ export function AgentTemplateInstall(props: {
       }}
       detail={state.detail}
       loading={state.loading}
-      error={state.error}
       onInstall={install}
     />
   );

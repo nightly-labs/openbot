@@ -11,6 +11,7 @@ import {
   ItemGroup,
   Link2Off,
   Text,
+  toast,
   X,
 } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
@@ -24,8 +25,6 @@ export interface PublishAgentDialogProps {
   /** The agent as it would be published, with its current publication. Null while it loads. */
   preview: AgentTemplatePreview | null;
   loading: boolean;
-  /** A failure to load the preview. Action failures are shown by the dialog itself. */
-  error: string | null;
   onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
   onCopyLink: () => Promise<void>;
@@ -36,26 +35,24 @@ type Pending = "publish" | "unpublish" | "copy" | null;
 
 /**
  * Publishes one agent as a link-only template: its instructions, skills and routines. Files and
- * memories stay on this computer. After a publish the same dialog shows the link and can update or
- * remove it.
+ * memories stay on this computer. After a publish the same dialog can copy, update or remove the
+ * link. A failed action is reported in a toast.
  */
 export function PublishAgentDialog(props: PublishAgentDialogProps) {
   const [view, setView] = createSignal<View>("summary");
   const [pending, setPending] = createSignal<Pending>(null);
-  const [actionError, setActionError] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
   const published = () => props.preview?.publication ?? null;
   let closeButton: HTMLButtonElement | undefined;
 
   async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
     setPending(kind);
-    setActionError(null);
     try {
       await action();
       setCopied(kind !== "unpublish");
     } catch (error) {
       setCopied(false);
-      setActionError(errorMessage(error, fallback));
+      toast.error(errorMessage(error, fallback));
     } finally {
       setPending(null);
     }
@@ -64,7 +61,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
   function changeOpen(open: boolean): void {
     if (!open) {
       setView("summary");
-      setActionError(null);
       setCopied(false);
     }
     props.onOpenChange(open);
@@ -114,8 +110,8 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
               when={props.preview}
               fallback={
                 <div class="agent-template-body">
-                  <Text tone={props.error ? "danger" : "muted"} role={props.error ? "alert" : "status"}>
-                    {props.error ?? (props.loading ? "Loading agent…" : "")}
+                  <Text tone="muted" role="status">
+                    {props.loading ? "Loading agent…" : ""}
                   </Text>
                 </div>
               }
@@ -161,14 +157,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                         onClick={() => setView("routines")}
                       />
                     </ItemGroup>
-
-                    <Show when={actionError()}>
-                      {(message) => (
-                        <Text tone="danger" variant="caption" role="alert">
-                          {message()}
-                        </Text>
-                      )}
-                    </Show>
                   </div>
 
                   <footer class="agent-template-actions">
