@@ -123,8 +123,9 @@ The service applies limits per email, per IP, per challenge, and per resend.
 
 ## Authentication data retention
 
-The production Worker runs once each minute. Each run delivers pending remote
-authorization events and cleans up hosted sites. The midnight UTC run also deletes
+The production Worker runs once each 5 minutes. Each run delivers pending remote
+authorization events and cleans up hosted sites. Both are retry paths: a request
+schedules its own first attempt, so a run only repeats what failed. The midnight UTC run also deletes
 expired or consumed email challenges, expired or revoked sessions, expired or
 consumed team authentication tickets, and expired rate-limit records. A successful
 retention run logs only aggregate deletion counts.
