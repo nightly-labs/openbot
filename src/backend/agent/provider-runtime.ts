@@ -1954,18 +1954,27 @@ export class ProviderRuntime implements ProviderPort {
       provider,
       setTimeout(() => {
         this.#restartTimers.delete(provider);
-        // A turn in the backoff may have started the provider already: a second connect would
-        // replace that client and leave it running.
-        if (this.#hooks.isStopping() || this.#clients.has(provider) || this.#providerStarts.has(provider)) return;
-        const start = this.#connect("restarting", [provider])
-          .catch((error) => this.#emitError(`${provider}_restart_failed`, error))
-          .finally(() => {
-            this.#providerStarts.delete(provider);
-          });
-        this.#providerStarts.set(provider, start);
-        recordRestartActivity();
+        void this.#restart(provider);
       }, delayMs),
     );
+  }
+
+  async #restart(provider: AgentProvider): Promise<void> {
+    const disposals = this.#disposals;
+    // A turn in the backoff may have started the provider already: a second connect would replace
+    // that client and leave it running. That start can also end with no client, when the client it
+    // added exits before the start ends, so the retry waits for it rather than being dropped.
+    for (let pending = this.#providerStarts.get(provider); pending; pending = this.#providerStarts.get(provider)) {
+      await pending.catch(() => undefined);
+    }
+    if (this.#hooks.isStopping() || disposals !== this.#disposals || this.#clients.has(provider)) return;
+    const start = this.#connect("restarting", [provider])
+      .catch((error) => this.#emitError(`${provider}_restart_failed`, error))
+      .finally(() => {
+        this.#providerStarts.delete(provider);
+      });
+    this.#providerStarts.set(provider, start);
+    recordRestartActivity();
   }
 
   /**
