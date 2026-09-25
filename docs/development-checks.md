@@ -42,6 +42,11 @@ The Signal Dockerfile installs from a pruned checkout with one manifest copy per
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
 cover the workspace dependency graph; keep that check when changing workspace dependencies.
 
+`check:assets` reads `git ls-files` and fails on an image or video file outside the directories
+listed in `scripts/check-image-assets.ts`. `AGENTS.md` does not permit pull request screenshots in
+the repository, and a screenshot committed for a review stays in the history of `main`. The check
+reads the whole tree, not only the pull request diff, so it gives the same result locally and in CI.
+
 The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
 `bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
 `bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
