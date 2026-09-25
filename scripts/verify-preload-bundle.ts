@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { groupApiMethodName, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { groupApiMethodName, IPC_ENDPOINTS, type IpcEndpoint } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 
 // Runs the built preload bundles in a VM with a fake Electron, after `bun run build`. The types
@@ -9,7 +10,8 @@ import { createOpenBotLogger } from "@openbot/logging";
 // - loads a module that a sandboxed preload cannot load, or loads code with `import()`;
 // - exposes a world other than `openbot`, or a value other than a function or a method group;
 // - exposes a method that `IPC_ENDPOINTS` and the hand-written list below do not name, or omits one;
-// - sends a method to a channel other than the channel of its endpoint.
+// - sends a method to a channel other than the channel of its endpoint, or with the wrong operation:
+//   a request must `invoke`, and an event must subscribe with `on` or `once`.
 
 type IpcGroupName = keyof typeof IPC_ENDPOINTS;
 
@@ -60,8 +62,10 @@ const HAND_WRITTEN_METHODS = [
   "servers.onDirectTyping",
 ];
 
-// The modules that Electron gives a sandboxed preload.
+// The modules that Electron gives a sandboxed preload. The VM gets the Node module for each one
+// except `electron`, which is the fake below.
 const SANDBOX_MODULES = new Set(["electron", "events", "timers", "url"]);
+const nodeRequire = createRequire(import.meta.url);
 
 const PRELOAD_DIRECTORY = resolve(import.meta.dirname, "../out/preload");
 
@@ -71,6 +75,11 @@ type BridgeMethod = (payloadOrListener: unknown) => unknown;
 interface IpcCall {
   readonly method: "invoke" | "on" | "once";
   readonly channel: string;
+}
+
+interface ExpectedMethod {
+  readonly channel: string;
+  readonly kind: IpcEndpoint["kind"];
 }
 
 interface PreloadRun {
@@ -97,9 +106,9 @@ for (const path of exposed.keys()) {
 for (const path of [...expected.keys(), ...HAND_WRITTEN_METHODS]) {
   if (!exposed.has(path)) failures.push(`window.openbot.${path} is not exposed.`);
 }
-for (const [path, channel] of expected) {
+for (const [path, endpoint] of expected) {
   const method = exposed.get(path);
-  if (method !== undefined) checkChannel(main, path, method, channel);
+  if (method !== undefined) checkCall(main, path, method, endpoint);
 }
 
 const teamWebrtc = runPreload("teamWebrtc.cjs");
@@ -147,6 +156,7 @@ function runPreload(fileName: string): PreloadRun {
   const context = {
     require: (name: string) => {
       if (name === "electron") return electron;
+      if (SANDBOX_MODULES.has(name)) return nodeRequire(`node:${name}`);
       throw new Error(`The verifier has no fake for ${name}.`);
     },
     module,
@@ -165,15 +175,15 @@ function runPreload(fileName: string): PreloadRun {
   return { worlds, calls };
 }
 
-// Each method path, such as `agent.listAgents`, with the channel of its endpoint.
-function expectedMethods(): Map<string, string> {
-  const methods = new Map<string, string>();
+// Each method path, such as `agent.listAgents`, with the channel and kind of its endpoint.
+function expectedMethods(): Map<string, ExpectedMethod> {
+  const methods = new Map<string, ExpectedMethod>();
   for (const [group, endpoints] of Object.entries(IPC_ENDPOINTS)) {
     const parent = isGroupName(group) ? GROUP_PATHS[group] : null;
     if (parent === null) continue;
     for (const [key, endpoint] of Object.entries(endpoints)) {
       const name = groupApiMethodName(key, endpoint);
-      methods.set(parent === "" ? name : `${parent}.${name}`, endpoint.channel);
+      methods.set(parent === "" ? name : `${parent}.${name}`, { channel: endpoint.channel, kind: endpoint.kind });
     }
   }
   return methods;
@@ -191,7 +201,7 @@ function collectMethods(value: unknown, path: string, into: Map<string, BridgeMe
   for (const [key, child] of Object.entries(value)) collectMethods(child, path ? `${path}.${key}` : key, into);
 }
 
-function checkChannel(run: PreloadRun, path: string, method: BridgeMethod, channel: string) {
+function checkCall(run: PreloadRun, path: string, method: BridgeMethod, expected: ExpectedMethod) {
   const start = run.calls.length;
   try {
     // A request method takes the listener as its payload, and an event method subscribes it.
@@ -200,9 +210,13 @@ function checkChannel(run: PreloadRun, path: string, method: BridgeMethod, chann
     failures.push(`window.openbot.${path} threw: ${error instanceof Error ? error.message : String(error)}.`);
     return;
   }
-  const sent = run.calls.slice(start).map((call) => call.channel);
-  if (sent.length !== 1 || sent[0] !== channel) {
-    failures.push(`window.openbot.${path} must use ${channel}; it used: ${sent.join(", ") || "no channel"}.`);
+  const sent = run.calls.slice(start);
+  const operation = expected.kind === "request" ? "ipcRenderer.invoke" : "ipcRenderer.on or ipcRenderer.once";
+  const call = sent.length === 1 ? sent[0] : undefined;
+  const operationMatches = expected.kind === "request" ? call?.method === "invoke" : call?.method !== "invoke";
+  if (call?.channel !== expected.channel || !operationMatches) {
+    const used = sent.map((c) => `${c.method} ${c.channel}`).join(", ") || "no channel";
+    failures.push(`window.openbot.${path} must call ${operation} on ${expected.channel}; it used: ${used}.`);
   }
 }
 
