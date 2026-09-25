@@ -5,6 +5,8 @@ import type { MobileAgentActivities } from "./agent-activity";
 export interface LiveWorkspaceState {
   activityByServer: Record<string, MobileAgentActivities>;
   unreadAgentIds: string[];
+  /** The unread message count of each agent, from the host read state. `unreadAgentIds` decides which count. */
+  unreadCounts: Record<string, number>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
 }
 
@@ -13,7 +15,12 @@ export interface LiveWorkspaceState {
  * so each consumer reads only the part it shows through a selector, and only that part re-renders.
  */
 export class LiveWorkspaceStore {
-  #state: LiveWorkspaceState = { activityByServer: {}, unreadAgentIds: [], browserRequests: {} };
+  #state: LiveWorkspaceState = {
+    activityByServer: {},
+    unreadAgentIds: [],
+    unreadCounts: {},
+    browserRequests: {},
+  };
   readonly #listeners = new Set<() => void>();
 
   get = () => this.#state;

@@ -19,6 +19,7 @@ import { MobileSessionProvider, useMobileSession } from "@/features/auth/context
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
+import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { BloubAnimationProvider } from "@/shared/components/bloub-loader";
 import { SplashBackdrop } from "@/shared/components/splash-backdrop";
@@ -140,6 +141,7 @@ export default function RootLayout() {
   useEffect(() => {
     void loadAppearance().catch(() => undefined);
     void loadHapticsPreference().catch(() => undefined);
+    void loadLiveActivitiesPreference().catch(() => undefined);
     void loadDictationLanguage().catch(() => undefined);
   }, []);
 

@@ -18,7 +18,9 @@ import {
   useDictationLanguage,
 } from "@/features/settings/model/dictation-language";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
+import { saveLiveActivitiesPreference, useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { isIOS } from "@/shared/lib/platform";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 
 function DictationSection({ dark }: { dark: boolean }) {
@@ -67,6 +69,40 @@ function DictationSection({ dark }: { dark: boolean }) {
       <SettingsNote>
         {error ??
           "The language you speak when you dictate a message. Automatic uses the first language in your phone settings that speech recognition supports."}
+      </SettingsNote>
+    </SettingsSection>
+  );
+}
+
+/** Live Activities exist only on iOS. iOS Settings can also turn them off for the app. */
+function LiveActivitiesSection({ dark }: { dark: boolean }) {
+  const preference = useLiveActivitiesPreference();
+  const [error, setError] = useState<string | null>(null);
+  function save(enabled: boolean) {
+    setError(null);
+    void saveLiveActivitiesPreference(enabled).catch(() => setError("Could not save this setting. Try again."));
+  }
+  if (!isIOS) return null;
+  return (
+    <SettingsSection title="Live Activities">
+      <SettingsRow>
+        <Host matchContents={{ vertical: true }} style={{ width: "100%" }} colorScheme={dark ? "dark" : "light"}>
+          <Switch
+            value={preference.enabled}
+            disabled={!preference.ready || preference.saving}
+            label="Show agent activity"
+            onValueChange={save}
+          />
+        </Host>
+      </SettingsRow>
+      {error ? (
+        <SettingsRow disabled={preference.saving} disclosure={false} onPress={() => save(preference.enabled)}>
+          <Typography.Paragraph type="body-sm">Retry saving Live Activities setting</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      <SettingsNote>
+        {error ??
+          "Shows agent work, messages, questions, and approvals on the Lock Screen and in the Dynamic Island while OpenBot runs."}
       </SettingsNote>
     </SettingsSection>
   );
@@ -148,6 +184,7 @@ export function GeneralSettingsScreen() {
         ) : null}
         <SettingsNote>{hapticsError ?? "Touch feedback for actions in the app on this device."}</SettingsNote>
       </SettingsSection>
+      <LiveActivitiesSection dark={theme === "dark"} />
       <SettingsSection title="Privacy">
         <SettingsRow>
           <Host

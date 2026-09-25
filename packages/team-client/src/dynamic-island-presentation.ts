@@ -11,7 +11,6 @@ import type {
   DynamicIslandTakeoverItem,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
@@ -20,6 +19,12 @@ type AttentionCandidate =
   | { mode: "takeover"; item: DynamicIslandTakeoverItem }
   | { mode: "question"; item: DynamicIslandPromptItem }
   | { mode: "failed"; item: DynamicIslandFailureItem };
+
+/**
+ * Turns a host error into the text the island shows. It must redact secrets, because the text leaves
+ * the conversation view. Desktop and mobile pass `userErrorMessage` from `@openbot/user-errors`.
+ */
+export type DynamicIslandErrorText = (error: string | null | undefined, fallback: string) => string;
 
 export interface DynamicIslandPresentationInput {
   serverId: string;
@@ -67,15 +72,21 @@ export function selectDynamicIslandPresentation(
   return { ...selected, remainingCount: Math.max(0, attentionCount - 1) };
 }
 
-export function countDynamicIslandAttention(input: DynamicIslandPresentationInput): number {
+export function countDynamicIslandAttention(
+  input: DynamicIslandPresentationInput,
+  errorText: DynamicIslandErrorText,
+): number {
   const visibleAgents = input.agents.filter((agent) => agent.notifications);
-  return collectAttention(input, new Map(visibleAgents.map((agent) => [agent.id, agent]))).length;
+  return collectAttention(input, new Map(visibleAgents.map((agent) => [agent.id, agent])), errorText).length;
 }
 
-export function createDynamicIslandPresentation(input: DynamicIslandPresentationInput): DynamicIslandPresentation {
+export function createDynamicIslandPresentation(
+  input: DynamicIslandPresentationInput,
+  errorText: DynamicIslandErrorText,
+): DynamicIslandPresentation {
   const visibleAgents = input.agents.filter((agent) => agent.notifications);
   const agentsById = new Map(visibleAgents.map((agent) => [agent.id, agent]));
-  const attentionItems = collectAttention(input, agentsById).sort(
+  const attentionItems = collectAttention(input, agentsById, errorText).sort(
     (left, right) => presentationPriority(left.mode) - presentationPriority(right.mode),
   );
   const attention = attentionItems[0];
@@ -153,6 +164,7 @@ function runningDelivery(snapshot: QueueSnapshot | undefined) {
 function collectAttention(
   input: DynamicIslandPresentationInput,
   agentsById: Map<string, DynamicIslandAgentSource>,
+  errorText: DynamicIslandErrorText,
 ): AttentionCandidate[] {
   const items: AttentionCandidate[] = [];
   for (const [agentId, approval] of Object.entries(input.pendingApprovals)) {
@@ -237,18 +249,14 @@ function collectAttention(
         turnId,
         agent: agentIdentity(agent),
         title: "Task failed",
-        detail: failureDetail(delivery?.error),
+        detail: truncate(
+          errorText(delivery?.error, "The task stopped before it could finish. Open the conversation to try again."),
+          600,
+        ),
       },
     });
   }
   return items;
-}
-
-function failureDetail(error: string | null | undefined): string {
-  return truncate(
-    errorMessage(error, "The task stopped before it could finish. Open the conversation to try again."),
-    600,
-  );
 }
 
 function truncate(value: string, length: number): string {
