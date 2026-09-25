@@ -4,9 +4,21 @@ on:
   push:
     tags:
       - "v*.*.*"
-  # Exercises the Host signing keychain on its own, so a credential or keychain problem is found
-  # without pushing a tag. This path builds nothing and publishes nothing.
+  # A manual run publishes nothing. `host-signing` exercises the Host signing keychain on its own,
+  # so a credential or keychain problem is found without pushing a tag; it builds nothing, and it
+  # must run on a tag ref because the `release` environment admits only tags. `dry-run` runs the
+  # release path on any ref, without the macOS job and the publish job: they need the tag-only
+  # `release` secrets. It also makes no provenance attestation, because an attestation of a public
+  # repository is a public Sigstore record.
   workflow_dispatch:
+    inputs:
+      mode:
+        description: What the manual run checks
+        type: choice
+        options:
+          - host-signing
+          - dry-run
+        default: host-signing
 
 permissions: {}
 
@@ -22,9 +34,9 @@ concurrency:
 jobs:
   validate:
     name: Validate release tag
-    # Gating the one job every build and the publish depend on keeps a manual run off the release
-    # path entirely, rather than relying on each of them to opt out.
-    if: github.event_name == 'push'
+    # Gating the one job every build and the publish depend on keeps a host signing run off the
+    # release path entirely, rather than relying on each of them to opt out.
+    if: github.event_name == 'push' || inputs.mode == 'dry-run'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -40,6 +52,7 @@ jobs:
           persist-credentials: false
 
       - name: Require release commit on main
+        if: github.event_name == 'push'
         shell: bash
         run: |
           git fetch origin main --no-tags
@@ -60,7 +73,7 @@ jobs:
         run: |
           package_version="$(bun -p 'require("./package.json").version')"
           tag_version="${GITHUB_REF_NAME#v}"
-          if [[ "$package_version" != "$tag_version" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$package_version" != "$tag_version" ]]; then
             echo "Tag $GITHUB_REF_NAME does not match package.json version $package_version." >&2
             exit 1
           fi
@@ -90,7 +103,7 @@ jobs:
 
   host-signing:
     name: Check Host signing keychain
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'host-signing'
     runs-on: macos-14
     timeout-minutes: 20
     environment: release
@@ -154,6 +167,7 @@ jobs:
   macos:
     name: Build signed macOS ARM64 release
     needs: validate
+    if: github.event_name == 'push'
     runs-on: macos-14
     timeout-minutes: 90
     environment: release
@@ -403,7 +417,8 @@ jobs:
     needs: validate
     runs-on: windows-2025
     timeout-minutes: 35
-    environment: release
+    # These jobs read no secrets. The environment limits a tag build to tags; a dry run has none.
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
       attestations: write
       contents: read
@@ -511,6 +526,7 @@ jobs:
           upload-release-assets: false
 
       - name: Attest Windows release provenance
+        if: github.event_name == 'push'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/SHA256SUMS-windows.txt
@@ -548,7 +564,8 @@ jobs:
             suffix: linux-arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
-    environment: release
+    # These jobs read no secrets. The environment limits a tag build to tags; a dry run has none.
+    environment: ${{ github.event_name == 'push' && 'release' || '' }}
     permissions:
       attestations: write
       contents: read
@@ -651,6 +668,7 @@ jobs:
           upload-release-assets: false
 
       - name: Attest Linux release provenance
+        if: github.event_name == 'push'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/SHA256SUMS-${{ matrix.suffix }}.txt
@@ -671,6 +689,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [validate, macos, windows, linux]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
