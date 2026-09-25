@@ -47,6 +47,14 @@ listed in `scripts/check-image-assets.ts`. `AGENTS.md` does not permit pull requ
 the repository, and a screenshot committed for a review stays in the history of `main`. The check
 reads the whole tree, not only the pull request diff, so it gives the same result locally and in CI.
 
+`src/backend/transfer-budget.test.ts` runs two turns with a fake provider. It counts the SQL
+statements of each turn and of one conversation read, and the JSON bytes of that read and of the
+events that one turn sends to the renderer. Each value has a hard cap about 30% above the value
+measured when the cap was set. The test writes the values and caps to
+`.openbot-build/transfer-budget.json`, and the desktop test job uploads that file. A red budget
+means a change made a turn or a read do more work: make the change cheaper, or raise the cap and
+give the reason in the pull request.
+
 The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
 `bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
 `bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
