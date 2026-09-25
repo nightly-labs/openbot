@@ -29,11 +29,12 @@ Nothing else in the repository decides those facts. Main and the preload pass th
 such as `IPC_ENDPOINTS.auth.event`, and read `.channel` from it; they do not write a wire value.
 `ipc-channel-coverage.test.ts` fails when two endpoints share one wire value.
 
-Two files still mirror the list by hand, and they are not enforced the same way.
+Two files still mirror the list, and they are not enforced the same way.
 
 | Mirror | What it is | What holds it |
 | --- | --- | --- |
-| `src/preload/index.ts` | the `invokeRequest` and `subscribe` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
+| `src/preload/index.ts`, bridged groups | one `bridgeGroup(IPC_ENDPOINTS.group, decoders)` per group; the decoder map is keyed by every endpoint | `tsc` (`TS2741` / `TS2353`), and the coverage test for the group reference |
+| `src/preload/index.ts`, hand-written groups | the `invokeRequest` and `subscribe` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
 | `src/renderer/src/preview/mock-openbot.ts` | the second implementation Storybook and the preview run against | `tsc`, against `OpenBotDesktopApi` |
 
 The main process is no longer one of them. `registerIpcGroups` in `src/main/ipc/define-ipc-group.ts`
@@ -49,10 +50,19 @@ preload and the mock without a second edit. A server-scoped payload (`AgentIpcRe
 the method reshapes its arguments or reads preload state, or for `browser.sendLiveViewInput`, the one
 untyped endpoint.
 
-The preload is still the link no type pairs with an endpoint. Its API object is nested and renamed, so
-a channel it never invokes is dead trust-boundary surface that compiles.
+A group whose methods all pass straight through is generated whole: `GroupApi<IpcEndpoints["group"]>`
+gives its interface, a request keeps its key, and an event is `on` and the key (`voice.modelStatus`
+is `onModelStatus`). The preload builds it with `bridgeGroup` and the test harness with `stubGroup`,
+so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `app` and `providers` are spread into
+the top level. There are no per-method overrides: a group that needs one is written by hand. These
+stay by hand: `computerUse` (renamed top-level members), `browser` (the untyped endpoint and renamed
+members), `auth` (`verifyEmailCode` reshapes its arguments), `servers` (preload state), and every
+server-scoped group, because `bridgeGroup` has no decoder type for an `AgentIpcRequest` payload.
+
+In a hand-written group the preload is still the link no type pairs with an endpoint. Its API object
+is nested and renamed, so a channel it never invokes is dead trust-boundary surface that compiles.
 `ipc-channel-coverage.test.ts` reads the preload sources and asserts they invoke exactly the request
-endpoints and subscribe to exactly the event ones.
+endpoints and subscribe to exactly the event ones, counting a bridged group as all of its endpoints.
 
 The mock needs no test. Both it and the preload bridge are annotated `: OpenBotDesktopApi`, so a
 missing method is `TS2741` and a method the interface never declared is `TS2353` — the type checker
@@ -64,4 +74,5 @@ story that silently shows nothing.
 
 Adding a channel means `ipc-endpoints.ts`, its registrar, the preload and the mock in the same
 change. You do not have to remember that list: add the channel, and
-`bun run typecheck:node` and `bun run typecheck:renderer` name every step but the preload.
+`bun run typecheck:node` and `bun run typecheck:renderer` name every step but the preload call of a
+hand-written group.

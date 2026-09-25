@@ -340,17 +340,36 @@ export const IPC_ENDPOINTS = {
   providers: {
     connectProvider: request<AgentProviderId, AgentStatus>()("app:connect-provider"),
     refreshAgentProviders: request<undefined, AgentStatus>()("app:refresh-agent-providers"),
+    /**
+     * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
+     * so the version they end on is whatever that updater fetches, which owes nothing to the version
+     * OpenBot pins for the runtime it manages.
+     */
     updateProviderCli: request<ManagedProviderId, AgentStatus>()("app:update-provider-cli"),
+    /**
+     * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
+     *
+     * The key only ever travels towards main. There is no getter for it, and
+     * `getProviderApiKeyState` answers with a status, because a renderer that can read a key back
+     * puts it in every crash report, export and screenshot that follows.
+     */
     setProviderApiKey: request<SetProviderApiKeyInput, AgentStatus>()("app:set-provider-api-key"),
     clearProviderApiKey: request<AgentProviderId, AgentStatus>()("app:clear-provider-api-key"),
     getProviderApiKeyState: request<AgentProviderId, ProviderApiKeyState>()("app:get-provider-api-key-state"),
+    /**
+     * Starts a sign-in the user finishes on another device, for a provider whose descriptor says
+     * `codeSignIn`. Cancel it with `cancelProviderCodeLogin`; leaving it running holds one provider
+     * process open until the code expires.
+     */
     startProviderCodeLogin: request<AgentProviderId, ProviderCodeLoginStart>()("app:start-provider-code-login"),
+    /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
     cancelProviderCodeLogin: request<AgentProviderId, AgentStatus>()("app:cancel-provider-code-login"),
   },
   providerRuntimes: {
     getStatus: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:get-status"),
     download: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:download"),
     cancel: request<ManagedProviderId, ProviderRuntimeSnapshot>()("provider-runtimes:cancel"),
+    /** Asks each provider's upstream for its latest release. Rejects when no source answered. */
     checkForUpdates: request<undefined, ProviderRuntimeSnapshot>()("provider-runtimes:check-for-updates"),
     event: event<ProviderRuntimeSnapshot>()("provider-runtimes:event"),
   },
@@ -459,9 +478,13 @@ export const IPC_ENDPOINTS = {
   notifications: {
     getPreference: request<undefined, NotificationPreference>()("notifications:get-preference"),
     setPreference: request<NotificationPreference, NotificationPreference>()("notifications:set-preference"),
+    // Shows one OS notification now, even when the window has focus, so the user can check that the
+    // operating system lets OpenBot show them.
     test: request<undefined, void>()("notifications:test"),
+    // Opens the operating system page where the user allows OpenBot notifications. It rejects on a
+    // system that has no such page.
     openSettings: request<undefined, void>()("notifications:open-settings"),
-    openedEvent: event<NotificationOpenedEvent>()("notifications:opened-event"),
+    opened: event<NotificationOpenedEvent>()("notifications:opened-event"),
   },
   agent: {
     getStatus: request<AgentIpcRequest<null>, AgentStatus>()("agent:get-status"),
@@ -685,6 +708,14 @@ export const IPC_ENDPOINTS = {
     getPresence: request<undefined, TeamPresenceSnapshot>()("host:get-presence"),
     start: request<undefined, HostStatus>()("host:start"),
     stop: request<undefined, HostStatus>()("host:stop"),
+    /**
+     * Asks the screen sharing runtime again whether the operating system lets it record, and answers
+     * the status that holds the result.
+     *
+     * The refusal is remembered, because the runtime that reported it is dropped so that the next
+     * attempt reads a new grant. Without this call only another member's attempt could clear it, and
+     * the host owner who just gave the grant would keep reading that they had not.
+     */
     recheckScreenRecording: request<undefined, HostStatus>()("host:recheck-screen-recording"),
     listMembers: request<undefined, TeamMemberSummary[]>()("host:list-members"),
     createInvite: request<CreateTeamInviteInput, InviteSummary>()("host:create-invite"),
@@ -711,14 +742,19 @@ export const IPC_ENDPOINTS = {
 export type IpcEndpoints = typeof IPC_ENDPOINTS;
 
 // What a typed endpoint looks like to the renderer. A server-scoped payload loses its scope, because
-// the preload adds the selected server; a scope that carries nothing takes no argument.
-type ArgsOf<Payload> = [Payload] extends [undefined]
+// the preload adds the selected server; a scope that carries nothing takes no argument. A payload
+// that may be `undefined` is an optional argument.
+type OptionalArgs<Payload> = [Payload] extends [undefined]
   ? []
-  : [Payload] extends [AgentIpcRequest<infer Inner>]
-    ? [Inner] extends [null]
-      ? []
-      : [input: Inner]
+  : undefined extends Payload
+    ? [input?: Exclude<Payload, undefined>]
     : [input: Payload];
+
+type ArgsOf<Payload> = [Payload] extends [AgentIpcRequest<infer Inner>]
+  ? [Inner] extends [null]
+    ? []
+    : OptionalArgs<Inner>
+  : OptionalArgs<Payload>;
 
 /**
  * The `OpenBotDesktopApi` signature of a typed request, so a method that passes its input straight
@@ -736,3 +772,21 @@ export type Subscribe<Endpoint> =
   Endpoint extends EventEndpoint<string, infer Payload>
     ? (listener: [Payload] extends [undefined] ? () => void : (payload: Payload) => void) => () => void
     : never;
+
+type MethodName<Key extends string, Endpoint> = Endpoint extends EventEndpoint ? `on${Capitalize<Key>}` : Key;
+
+/**
+ * The `OpenBotDesktopApi` surface of a group whose methods pass straight through: a request keeps
+ * its key, and an event is `on` and the key. The preload builds it with `bridgeGroup`, so a new
+ * endpoint in such a group needs no line in `ipc-desktop-apis.ts`.
+ */
+export type GroupApi<Group extends IpcEndpointGroup> = {
+  -readonly [Key in keyof Group & string as MethodName<Key, Group[Key]>]: Group[Key] extends EventEndpoint
+    ? Subscribe<Group[Key]>
+    : Invoke<Group[Key]>;
+};
+
+/** The runtime twin of `GroupApi`'s method names, for the preload bridge and the test harness. */
+export function groupApiMethodName(key: string, endpoint: IpcEndpoint): string {
+  return endpoint.kind === "event" ? `on${key.charAt(0).toUpperCase()}${key.slice(1)}` : key;
+}

@@ -12,9 +12,8 @@ import type {
   ReadConversationPageInput,
   SendMessageInput,
 } from "./ipc-conversations";
-import type { Invoke, IPC_ENDPOINTS, Subscribe } from "./ipc-endpoints";
+import type { GroupApi, Invoke, IPC_ENDPOINTS, IpcEndpoints, Subscribe } from "./ipc-endpoints";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
-import type { MarketplaceAgentPage, MarketplaceAgentQuery } from "./ipc-marketplace-agents";
 import type {
   McpServerConfig,
   McpTestResult,
@@ -29,7 +28,6 @@ import type {
   QueueSnapshot,
   UpdateQueuedMessageInput,
 } from "./ipc-queue";
-import type { MarketplaceSkillPage, MarketplaceSkillQuery } from "./ipc-skills";
 import type {
   ClearStorageInput,
   DeleteStoredFileInput,
@@ -136,24 +134,9 @@ export interface AgentDesktopApi {
   onScopedEvent: Subscribe<typeof IPC_ENDPOINTS.agent.event>;
 }
 
-export interface AgentTemplatesDesktopApi {
-  preview: Invoke<typeof IPC_ENDPOINTS.agentTemplates.preview>;
-  publish: Invoke<typeof IPC_ENDPOINTS.agentTemplates.publish>;
-  unpublish: Invoke<typeof IPC_ENDPOINTS.agentTemplates.unpublish>;
-  get: Invoke<typeof IPC_ENDPOINTS.agentTemplates.get>;
-  install: Invoke<typeof IPC_ENDPOINTS.agentTemplates.install>;
-  takePendingLink: Invoke<typeof IPC_ENDPOINTS.agentTemplates.takePendingLink>;
-  onOpenLink: Subscribe<typeof IPC_ENDPOINTS.agentTemplates.openLink>;
-}
+export type AgentTemplatesDesktopApi = GroupApi<IpcEndpoints["agentTemplates"]>;
 
-export interface MarketplaceAgentsDesktopApi {
-  list: (query?: MarketplaceAgentQuery) => Promise<MarketplaceAgentPage>;
-  get: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.get>;
-  listMine: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.listMine>;
-  preview: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.preview>;
-  submit: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.submit>;
-  install: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.install>;
-}
+export type MarketplaceAgentsDesktopApi = GroupApi<IpcEndpoints["marketplaceAgents"]>;
 
 export interface BrowserDesktopApi {
   open: Invoke<typeof IPC_ENDPOINTS.browser.open>;
@@ -195,55 +178,15 @@ export interface CentralAuthDesktopApi {
   onEvent: Subscribe<typeof IPC_ENDPOINTS.auth.event>;
 }
 
-export interface UpdateDesktopApi {
-  getStatus: Invoke<typeof IPC_ENDPOINTS.update.getStatus>;
-  check: Invoke<typeof IPC_ENDPOINTS.update.check>;
-  download: Invoke<typeof IPC_ENDPOINTS.update.download>;
-  install: Invoke<typeof IPC_ENDPOINTS.update.install>;
-  getPreference: Invoke<typeof IPC_ENDPOINTS.update.getPreference>;
-  setPreference: Invoke<typeof IPC_ENDPOINTS.update.setPreference>;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.update.event>;
-}
+export type UpdateDesktopApi = GroupApi<IpcEndpoints["update"]>;
 
-export interface NotificationsDesktopApi {
-  getPreference: Invoke<typeof IPC_ENDPOINTS.notifications.getPreference>;
-  setPreference: Invoke<typeof IPC_ENDPOINTS.notifications.setPreference>;
-  // Shows one OS notification now, even when the window has focus, so the user can check that the
-  // operating system lets OpenBot show them.
-  test: Invoke<typeof IPC_ENDPOINTS.notifications.test>;
-  // Opens the operating system page where the user allows OpenBot notifications. It rejects on a
-  // system that has no such page.
-  openSettings: Invoke<typeof IPC_ENDPOINTS.notifications.openSettings>;
-  onOpened: Subscribe<typeof IPC_ENDPOINTS.notifications.openedEvent>;
-}
+export type NotificationsDesktopApi = GroupApi<IpcEndpoints["notifications"]>;
 
-export interface ProviderRuntimesDesktopApi {
-  getStatus: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.getStatus>;
-  download: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.download>;
-  cancel: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.cancel>;
-  /** Asks each provider's upstream for its latest release. Rejects when no source answered. */
-  checkForUpdates: Invoke<typeof IPC_ENDPOINTS.providerRuntimes.checkForUpdates>;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.providerRuntimes.event>;
-}
+export type ProviderRuntimesDesktopApi = GroupApi<IpcEndpoints["providerRuntimes"]>;
 
-export interface MaintenanceDesktopApi {
-  exportData: Invoke<typeof IPC_ENDPOINTS.maintenance.exportData>;
-  exportDiagnostics: Invoke<typeof IPC_ENDPOINTS.maintenance.exportDiagnostics>;
-}
+export type MaintenanceDesktopApi = GroupApi<IpcEndpoints["maintenance"]>;
 
-export interface DynamicIslandDesktopApi {
-  getPreference: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.getPreference>;
-  setPreference: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.setPreference>;
-  publishPresentation: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.publishPresentation>;
-  getPresentation: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.getPresentation>;
-  onPreference: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.preference>;
-  onPresentation: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.presentation>;
-  onGeometry: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.geometry>;
-  performAction: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.performAction>;
-  performHaptic: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.performHaptic>;
-  onAction: Subscribe<typeof IPC_ENDPOINTS.dynamicIsland.action>;
-  setInteractive: Invoke<typeof IPC_ENDPOINTS.dynamicIsland.setInteractive>;
-}
+export type DynamicIslandDesktopApi = GroupApi<IpcEndpoints["dynamicIsland"]>;
 
 export interface ServersDesktopApi {
   setMuted: Invoke<typeof IPC_ENDPOINTS.servers.setMuted>;
@@ -284,92 +227,24 @@ export interface ServersDesktopApi {
  * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
  * and a link that carried the listing itself would let the address bar describe what gets installed.
  */
-export interface PluginsDesktopApi {
-  takePendingListing: Invoke<typeof IPC_ENDPOINTS.plugins.takePendingListing>;
-  onOpenListing: Subscribe<typeof IPC_ENDPOINTS.plugins.openListing>;
-}
+export type PluginsDesktopApi = GroupApi<IpcEndpoints["plugins"]>;
 
-export interface HostDesktopApi {
-  getStatus: Invoke<typeof IPC_ENDPOINTS.host.getStatus>;
-  configure: Invoke<typeof IPC_ENDPOINTS.host.configure>;
-  updateIdentity: Invoke<typeof IPC_ENDPOINTS.host.updateIdentity>;
-  getPresence: Invoke<typeof IPC_ENDPOINTS.host.getPresence>;
-  start: Invoke<typeof IPC_ENDPOINTS.host.start>;
-  stop: Invoke<typeof IPC_ENDPOINTS.host.stop>;
-  /**
-   * Asks the screen sharing runtime again whether the operating system lets it record, and answers
-   * the status that holds the result.
-   *
-   * The refusal is remembered, because the runtime that reported it is dropped so that the next
-   * attempt reads a new grant. Without this call only another member's attempt could clear it, and
-   * the host owner who just gave the grant would keep reading that they had not.
-   */
-  recheckScreenRecording: Invoke<typeof IPC_ENDPOINTS.host.recheckScreenRecording>;
-  listMembers: Invoke<typeof IPC_ENDPOINTS.host.listMembers>;
-  updateMember: Invoke<typeof IPC_ENDPOINTS.host.updateMember>;
-  removeMember: Invoke<typeof IPC_ENDPOINTS.host.removeMember>;
-  listSessions: Invoke<typeof IPC_ENDPOINTS.host.listSessions>;
-  revokeSession: Invoke<typeof IPC_ENDPOINTS.host.revokeSession>;
-  listInvites: Invoke<typeof IPC_ENDPOINTS.host.listInvites>;
-  revokeInvite: Invoke<typeof IPC_ENDPOINTS.host.revokeInvite>;
-  createInvite: Invoke<typeof IPC_ENDPOINTS.host.createInvite>;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.host.event>;
-}
+export type HostDesktopApi = GroupApi<IpcEndpoints["host"]>;
 
-export interface RemoteDesktopDesktopApi {
-  checkSetup: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.checkSetup>;
-  openSetup: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.openSetup>;
-  test: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.test>;
-  list: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.list>;
-  connect: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.connect>;
-  selectDisplay: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.selectDisplay>;
-  disconnect: Invoke<typeof IPC_ENDPOINTS.remoteDesktop.disconnect>;
-  onEvent: Subscribe<typeof IPC_ENDPOINTS.remoteDesktop.event>;
-}
+export type RemoteDesktopDesktopApi = GroupApi<IpcEndpoints["remoteDesktop"]>;
 
-export interface VoiceDesktopApi {
-  getModelStatus: Invoke<typeof IPC_ENDPOINTS.voice.getModelStatus>;
-  prepareModel: Invoke<typeof IPC_ENDPOINTS.voice.prepareModel>;
-  transcribe: Invoke<typeof IPC_ENDPOINTS.voice.transcribe>;
-  onModelStatus: Subscribe<typeof IPC_ENDPOINTS.voice.modelStatus>;
-}
+export type VoiceDesktopApi = GroupApi<IpcEndpoints["voice"]>;
 
-export interface SkillsDesktopApi {
-  localList: Invoke<typeof IPC_ENDPOINTS.skills.localList>;
-  localGet: Invoke<typeof IPC_ENDPOINTS.skills.localGet>;
-  localCreate: Invoke<typeof IPC_ENDPOINTS.skills.localCreate>;
-  localRevise: Invoke<typeof IPC_ENDPOINTS.skills.localRevise>;
-  localInstall: Invoke<typeof IPC_ENDPOINTS.skills.localInstall>;
+export type SkillsDesktopApi = GroupApi<IpcEndpoints["skills"]>;
 
-  list: (query?: MarketplaceSkillQuery) => Promise<MarketplaceSkillPage>;
-  get: Invoke<typeof IPC_ENDPOINTS.skills.get>;
-  listMine: Invoke<typeof IPC_ENDPOINTS.skills.listMine>;
-  choosePackage: Invoke<typeof IPC_ENDPOINTS.skills.choosePackage>;
-  submit: Invoke<typeof IPC_ENDPOINTS.skills.submit>;
-  listInstalled: Invoke<typeof IPC_ENDPOINTS.skills.listInstalled>;
-  install: Invoke<typeof IPC_ENDPOINTS.skills.install>;
-  uninstall: Invoke<typeof IPC_ENDPOINTS.skills.uninstall>;
-  setEnabled: Invoke<typeof IPC_ENDPOINTS.skills.setEnabled>;
-}
-
-export interface HostedSitesDesktopApi {
-  list: Invoke<typeof IPC_ENDPOINTS.hostedSites.list>;
-  chooseDirectory: Invoke<typeof IPC_ENDPOINTS.hostedSites.chooseDirectory>;
-  publish: Invoke<typeof IPC_ENDPOINTS.hostedSites.publish>;
-  replace: Invoke<typeof IPC_ENDPOINTS.hostedSites.replace>;
-  delete: Invoke<typeof IPC_ENDPOINTS.hostedSites.delete>;
-}
+export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 
 /**
  * The user's own model endpoints. `save` and `delete` both answer with the whole list plus how the
  * provider restart went, so the renderer replaces its snapshot in one write and can say honestly
  * whether the models are on their way.
  */
-export interface CustomProvidersDesktopApi {
-  list: Invoke<typeof IPC_ENDPOINTS.customProviders.list>;
-  save: Invoke<typeof IPC_ENDPOINTS.customProviders.save>;
-  delete: Invoke<typeof IPC_ENDPOINTS.customProviders.delete>;
-}
+export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]>;
 
 /**
  * Storage and files of one host. Every method names its server, because the settings modal can be
@@ -388,26 +263,10 @@ export interface StorageDesktopApi {
  * Agent import into the local host. `choose` opens the file dialog and answers null when the user
  * cancels. A token is used once: `apply` and `discard` both release the staged archive.
  */
-export interface AgentImportDesktopApi {
-  choose: Invoke<typeof IPC_ENDPOINTS.agentImport.choose>;
-  apply: Invoke<typeof IPC_ENDPOINTS.agentImport.apply>;
-  discard: Invoke<typeof IPC_ENDPOINTS.agentImport.discard>;
-  readSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.readSkill>;
-  saveSkill: Invoke<typeof IPC_ENDPOINTS.agentImport.saveSkill>;
-}
+export type AgentImportDesktopApi = GroupApi<IpcEndpoints["agentImport"]>;
 
-export interface OpenBotDesktopApi {
-  getAppInfo: Invoke<typeof IPC_ENDPOINTS.app.getAppInfo>;
-  getSetupState: Invoke<typeof IPC_ENDPOINTS.app.getSetupState>;
-  saveSetup: Invoke<typeof IPC_ENDPOINTS.app.saveSetup>;
-  getAnalyticsPreference: Invoke<typeof IPC_ENDPOINTS.app.getAnalyticsPreference>;
-  setAnalyticsPreference: Invoke<typeof IPC_ENDPOINTS.app.setAnalyticsPreference>;
-  getApprovalAutomation: Invoke<typeof IPC_ENDPOINTS.app.getApprovalAutomation>;
-  setApprovalAutomation: Invoke<typeof IPC_ENDPOINTS.app.setApprovalAutomation>;
-  getAppLanguagePreference: Invoke<typeof IPC_ENDPOINTS.app.getAppLanguagePreference>;
-  setAppLanguagePreference: Invoke<typeof IPC_ENDPOINTS.app.setAppLanguagePreference>;
-  onAppLanguagePreference: Subscribe<typeof IPC_ENDPOINTS.app.appLanguagePreference>;
-  onOpenSettings: Subscribe<typeof IPC_ENDPOINTS.app.openSettings>;
+// The `app` and `providers` groups sit at the top level, as they did before groups existed.
+export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupApi<IpcEndpoints["providers"]> {
   dynamicIsland: DynamicIslandDesktopApi;
   getComputerUseState: Invoke<typeof IPC_ENDPOINTS.computerUse.getState>;
   openComputerUsePermissionPane: Invoke<typeof IPC_ENDPOINTS.computerUse.openPermissionPane>;
@@ -423,35 +282,7 @@ export interface OpenBotDesktopApi {
    * window that floats over another application's has no channel it could be driven through.
    */
   onComputerUseHighlightPlacement: Subscribe<typeof IPC_ENDPOINTS.computerUse.highlightPlacement>;
-  openExternal: Invoke<typeof IPC_ENDPOINTS.app.openExternal>;
-  connectProvider: Invoke<typeof IPC_ENDPOINTS.providers.connectProvider>;
-  refreshAgentProviders: Invoke<typeof IPC_ENDPOINTS.providers.refreshAgentProviders>;
-  /**
-   * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
-   * so the version they end on is whatever that updater fetches, which owes nothing to the version
-   * OpenBot pins for the runtime it manages.
-   */
-  updateProviderCli: Invoke<typeof IPC_ENDPOINTS.providers.updateProviderCli>;
-  /**
-   * Stores the optional API key a provider's paid catalog needs, and reconnects the provider.
-   *
-   * The key only ever travels towards main. There is no getter for it, and
-   * `getProviderApiKeyState` answers with a status, because a renderer that can read a key back
-   * puts it in every crash report, export and screenshot that follows.
-   */
-  setProviderApiKey: Invoke<typeof IPC_ENDPOINTS.providers.setProviderApiKey>;
-  clearProviderApiKey: Invoke<typeof IPC_ENDPOINTS.providers.clearProviderApiKey>;
-  getProviderApiKeyState: Invoke<typeof IPC_ENDPOINTS.providers.getProviderApiKeyState>;
-  /**
-   * Starts a sign-in the user finishes on another device, for a provider whose descriptor says
-   * `codeSignIn`. Cancel it with `cancelProviderCodeLogin`; leaving it running holds one provider
-   * process open until the code expires.
-   */
-  startProviderCodeLogin: Invoke<typeof IPC_ENDPOINTS.providers.startProviderCodeLogin>;
-  /** Abandons a code sign-in: the provider is told, the code is dead, and the provider goes idle. */
-  cancelProviderCodeLogin: Invoke<typeof IPC_ENDPOINTS.providers.cancelProviderCodeLogin>;
   providerRuntimes: ProviderRuntimesDesktopApi;
-  openUrl: Invoke<typeof IPC_ENDPOINTS.app.openUrl>;
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;

@@ -1,4 +1,3 @@
-import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import {
   type AgentIpcRequest,
   type AttachmentImportEvent,
@@ -19,13 +18,16 @@ import {
   decodeOptionalStorageUsage,
   decodeSaveAgentProfileResult,
   type EventEndpoint,
+  type GroupApi,
+  groupApiMethodName,
   type ImportAttachmentsInput,
   IPC_ENDPOINTS,
+  type IpcEndpointGroup,
   LOCAL_SERVER_ID,
   type OpenBotDesktopApi,
   type RequestEndpoint,
+  type Untyped,
 } from "@openbot/contracts/ipc";
-import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -207,6 +209,74 @@ function subscribe<Payload>(
   return listen(endpoint, (value) => listener(decode(value)));
 }
 
+// An event decoder that answers null for a value the renderer must not see. The event is dropped,
+// not thrown: a deep link carries an id that began in a URL a web page chose.
+interface DroppingDecoder<Payload> {
+  readonly drop: (value: unknown) => Payload | null;
+}
+
+function dropInvalid<Payload>(decode: (value: unknown) => Payload | null): DroppingDecoder<Payload> {
+  return { drop: decode };
+}
+
+// One decoder per endpoint of a bridged group. A scoped or untyped endpoint has no decoder type,
+// so a group that holds one cannot be bridged and stays written by hand.
+type DecoderFor<Endpoint> =
+  Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
+    ? [Payload] extends [Untyped]
+      ? never
+      : [Payload] extends [AgentIpcRequest<unknown>]
+        ? never
+        : (value: unknown) => Result
+    : Endpoint extends EventEndpoint<string, infer Payload>
+      ? ((value: unknown) => Payload) | DroppingDecoder<Payload>
+      : never;
+
+type GroupDecoders<Group extends IpcEndpointGroup> = { -readonly [Key in keyof Group]: DecoderFor<Group[Key]> };
+
+type BridgeDecoder = ((value: unknown) => unknown) | DroppingDecoder<unknown>;
+type BridgeMethod = (...args: never[]) => Promise<unknown> | (() => void);
+
+// Builds a whole group whose methods pass straight through, as `GroupApi` names them. The decoder map
+// is exhaustive, so a new endpoint without a decoder does not compile. It is a plain object of
+// functions, which `contextBridge` copies as it copies the literals around it.
+//
+// The typed signature is an overload because no loop can build a key-remapped type step by step.
+// The implementation sets one method for each endpoint under `groupApiMethodName`, the runtime twin
+// of the names `GroupApi` gives.
+function bridgeGroup<Group extends IpcEndpointGroup>(
+  group: Group,
+  decoders: NoInfer<GroupDecoders<Group>>,
+): GroupApi<Group>;
+function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, BridgeDecoder | undefined>>): object {
+  for (const key of Object.keys(decoders)) {
+    if (!Object.hasOwn(group, key)) throw new Error(`The preload has a decoder for no endpoint: ${key}.`);
+  }
+  const api: Record<string, BridgeMethod> = {};
+  for (const [key, endpoint] of Object.entries(group)) {
+    const decode = decoders[key];
+    if (decode === undefined) throw new Error(`The preload has no decoder for ${endpoint.channel}.`);
+    const name = groupApiMethodName(key, endpoint);
+    // Event `x` and request `onX` share one name, and the second would silently replace the first.
+    if (Object.hasOwn(api, name)) throw new Error(`The preload has two methods named ${name}.`);
+    if (endpoint.kind === "request") {
+      if (typeof decode !== "function") throw new Error(`The preload cannot drop the result of ${endpoint.channel}.`);
+      // Main takes at most one payload, so nothing past it reaches the channel. The types erase which
+      // endpoints take none, so an argument given to such a method is still sent, and main ignores it.
+      api[name] = (...args: unknown[]) => ipcRenderer.invoke(endpoint.channel, ...args.slice(0, 1)).then(decode);
+    } else if (typeof decode === "function") {
+      api[name] = (listener: (payload: unknown) => void) => listen(endpoint, (value) => listener(decode(value)));
+    } else {
+      api[name] = (listener: (payload: unknown) => void) =>
+        listen(endpoint, (value) => {
+          const payload = decode.drop(value);
+          if (payload !== null) listener(payload);
+        });
+    }
+  }
+  return api;
+}
+
 function rememberActiveServer<T extends { id: string; active: boolean }[]>(servers: T): T {
   selectedServerId = servers.find((server) => server.active)?.id ?? LOCAL_SERVER_ID;
   return servers;
@@ -283,40 +353,44 @@ window.addEventListener("change", (event) => {
 });
 
 const openbotApi: OpenBotDesktopApi = {
-  getAppInfo: () => invokeRequest(IPC_ENDPOINTS.app.getAppInfo, decodeAppInfo),
-  getSetupState: () => invokeRequest(IPC_ENDPOINTS.app.getSetupState, decodeAppSetupState),
-  saveSetup: (input) => invokeRequest(IPC_ENDPOINTS.app.saveSetup, decodeAppSetupState, input),
-  getAnalyticsPreference: () => invokeRequest(IPC_ENDPOINTS.app.getAnalyticsPreference, decodeAnalyticsPreference),
-  setAnalyticsPreference: (input) =>
-    invokeRequest(IPC_ENDPOINTS.app.setAnalyticsPreference, decodeAnalyticsPreference, input),
-  getApprovalAutomation: () =>
-    invokeRequest(IPC_ENDPOINTS.app.getApprovalAutomation, decodeApprovalAutomationPreference),
-  setApprovalAutomation: (input) =>
-    invokeRequest(IPC_ENDPOINTS.app.setApprovalAutomation, decodeApprovalAutomationPreference, input),
-  getAppLanguagePreference: () =>
-    invokeRequest(IPC_ENDPOINTS.app.getAppLanguagePreference, decodeAppLanguagePreference),
-  setAppLanguagePreference: (input) =>
-    invokeRequest(IPC_ENDPOINTS.app.setAppLanguagePreference, decodeAppLanguagePreference, input),
-  onAppLanguagePreference: (listener) =>
-    subscribe(IPC_ENDPOINTS.app.appLanguagePreference, decodeAppLanguagePreference, listener),
-  onOpenSettings: (listener) => listen(IPC_ENDPOINTS.app.openSettings, () => listener()),
-  dynamicIsland: {
-    getPreference: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.getPreference, decodeDynamicIslandPreference),
-    setPreference: (input) =>
-      invokeRequest(IPC_ENDPOINTS.dynamicIsland.setPreference, decodeDynamicIslandPreference, input),
-    publishPresentation: (presentation) =>
-      invokeRequest(IPC_ENDPOINTS.dynamicIsland.publishPresentation, decodeVoid, presentation),
-    getPresentation: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.getPresentation, decodeDynamicIslandPresentation),
-    onPreference: (listener) =>
-      subscribe(IPC_ENDPOINTS.dynamicIsland.preference, decodeDynamicIslandPreference, listener),
-    onPresentation: (listener) =>
-      subscribe(IPC_ENDPOINTS.dynamicIsland.presentation, decodeDynamicIslandPresentation, listener),
-    onGeometry: (listener) => subscribe(IPC_ENDPOINTS.dynamicIsland.geometry, decodeDynamicIslandGeometry, listener),
-    performAction: (action) => invokeRequest(IPC_ENDPOINTS.dynamicIsland.performAction, decodeVoid, action),
-    performHaptic: () => invokeRequest(IPC_ENDPOINTS.dynamicIsland.performHaptic, decodeVoid),
-    onAction: (listener) => subscribe(IPC_ENDPOINTS.dynamicIsland.action, decodeDynamicIslandAction, listener),
-    setInteractive: (input) => invokeRequest(IPC_ENDPOINTS.dynamicIsland.setInteractive, decodeVoid, input),
-  },
+  ...bridgeGroup(IPC_ENDPOINTS.app, {
+    getAppInfo: decodeAppInfo,
+    getSetupState: decodeAppSetupState,
+    saveSetup: decodeAppSetupState,
+    getAnalyticsPreference: decodeAnalyticsPreference,
+    setAnalyticsPreference: decodeAnalyticsPreference,
+    getApprovalAutomation: decodeApprovalAutomationPreference,
+    setApprovalAutomation: decodeApprovalAutomationPreference,
+    getAppLanguagePreference: decodeAppLanguagePreference,
+    setAppLanguagePreference: decodeAppLanguagePreference,
+    appLanguagePreference: decodeAppLanguagePreference,
+    openSettings: decodeVoid,
+    openExternal: decodeVoid,
+    openUrl: decodeVoid,
+  }),
+  ...bridgeGroup(IPC_ENDPOINTS.providers, {
+    connectProvider: decodeAgentStatusFromMain,
+    refreshAgentProviders: decodeAgentStatusFromMain,
+    updateProviderCli: decodeAgentStatusFromMain,
+    setProviderApiKey: decodeAgentStatusFromMain,
+    clearProviderApiKey: decodeAgentStatusFromMain,
+    getProviderApiKeyState: decodeProviderApiKeyState,
+    startProviderCodeLogin: decodeProviderCodeLoginStart,
+    cancelProviderCodeLogin: decodeAgentStatusFromMain,
+  }),
+  dynamicIsland: bridgeGroup(IPC_ENDPOINTS.dynamicIsland, {
+    getPreference: decodeDynamicIslandPreference,
+    setPreference: decodeDynamicIslandPreference,
+    publishPresentation: decodeVoid,
+    getPresentation: decodeDynamicIslandPresentation,
+    preference: decodeDynamicIslandPreference,
+    presentation: decodeDynamicIslandPresentation,
+    geometry: decodeDynamicIslandGeometry,
+    performAction: decodeVoid,
+    performHaptic: decodeVoid,
+    action: decodeDynamicIslandAction,
+    setInteractive: decodeVoid,
+  }),
   getComputerUseState: () => invokeRequest(IPC_ENDPOINTS.computerUse.getState, decodeComputerUseState),
   openComputerUsePermissionPane: (permission) =>
     invokeRequest(IPC_ENDPOINTS.computerUse.openPermissionPane, decodeComputerUseState, permission),
@@ -327,37 +401,19 @@ const openbotApi: OpenBotDesktopApi = {
   revealComputerUsePermissionApp: () => invokeRequest(IPC_ENDPOINTS.computerUse.revealPermissionApp, decodeVoid),
   onComputerUseHighlightPlacement: (listener) =>
     subscribe(IPC_ENDPOINTS.computerUse.highlightPlacement, decodeComputerUseHighlightPlacement, listener),
-  openExternal: (destination) => invokeRequest(IPC_ENDPOINTS.app.openExternal, decodeVoid, destination),
-  connectProvider: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.connectProvider, decodeAgentStatusFromMain, provider),
-  updateProviderCli: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.updateProviderCli, decodeAgentStatusFromMain, provider),
-  refreshAgentProviders: () => invokeRequest(IPC_ENDPOINTS.providers.refreshAgentProviders, decodeAgentStatusFromMain),
-  setProviderApiKey: (input) =>
-    invokeRequest(IPC_ENDPOINTS.providers.setProviderApiKey, decodeAgentStatusFromMain, input),
-  clearProviderApiKey: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.clearProviderApiKey, decodeAgentStatusFromMain, provider),
-  getProviderApiKeyState: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.getProviderApiKeyState, decodeProviderApiKeyState, provider),
-  startProviderCodeLogin: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.startProviderCodeLogin, decodeProviderCodeLoginStart, provider),
-  cancelProviderCodeLogin: (provider) =>
-    invokeRequest(IPC_ENDPOINTS.providers.cancelProviderCodeLogin, decodeAgentStatusFromMain, provider),
-  providerRuntimes: {
-    getStatus: () => invokeRequest(IPC_ENDPOINTS.providerRuntimes.getStatus, decodeProviderRuntimeSnapshot),
-    download: (provider) =>
-      invokeRequest(IPC_ENDPOINTS.providerRuntimes.download, decodeProviderRuntimeSnapshot, provider),
-    cancel: (provider) => invokeRequest(IPC_ENDPOINTS.providerRuntimes.cancel, decodeProviderRuntimeSnapshot, provider),
-    checkForUpdates: () => invokeRequest(IPC_ENDPOINTS.providerRuntimes.checkForUpdates, decodeProviderRuntimeSnapshot),
-    onEvent: (listener) => subscribe(IPC_ENDPOINTS.providerRuntimes.event, decodeProviderRuntimeSnapshot, listener),
-  },
-  openUrl: (url) => invokeRequest(IPC_ENDPOINTS.app.openUrl, decodeVoid, url),
-  voice: {
-    getModelStatus: () => invokeRequest(IPC_ENDPOINTS.voice.getModelStatus, decodeVoiceModelStatus),
-    prepareModel: () => invokeRequest(IPC_ENDPOINTS.voice.prepareModel, decodeVoiceModelStatus),
-    transcribe: (input) => invokeRequest(IPC_ENDPOINTS.voice.transcribe, decodeVoiceTranscriptionResult, input),
-    onModelStatus: (listener) => subscribe(IPC_ENDPOINTS.voice.modelStatus, decodeVoiceModelStatus, listener),
-  },
+  providerRuntimes: bridgeGroup(IPC_ENDPOINTS.providerRuntimes, {
+    getStatus: decodeProviderRuntimeSnapshot,
+    download: decodeProviderRuntimeSnapshot,
+    cancel: decodeProviderRuntimeSnapshot,
+    checkForUpdates: decodeProviderRuntimeSnapshot,
+    event: decodeProviderRuntimeSnapshot,
+  }),
+  voice: bridgeGroup(IPC_ENDPOINTS.voice, {
+    getModelStatus: decodeVoiceModelStatus,
+    prepareModel: decodeVoiceModelStatus,
+    transcribe: decodeVoiceTranscriptionResult,
+    modelStatus: decodeVoiceModelStatus,
+  }),
   auth: {
     getState: () => invokeRequest(IPC_ENDPOINTS.auth.getState, decodeCentralAuthState),
     retry: () => invokeRequest(IPC_ENDPOINTS.auth.retry, decodeCentralAuthState),
@@ -376,63 +432,58 @@ const openbotApi: OpenBotDesktopApi = {
     logout: () => invokeRequest(IPC_ENDPOINTS.auth.logout, decodeCentralAuthState),
     onEvent: (listener) => subscribe(IPC_ENDPOINTS.auth.event, decodeCentralAuthState, listener),
   },
-  skills: {
-    localList: () => invokeRequest(IPC_ENDPOINTS.skills.localList, decodeSkillDetails),
-    localGet: (input) => invokeRequest(IPC_ENDPOINTS.skills.localGet, decodeSkillDetail, input),
-    localCreate: (input) => invokeRequest(IPC_ENDPOINTS.skills.localCreate, decodeSkillDetail, input),
-    localRevise: (input) => invokeRequest(IPC_ENDPOINTS.skills.localRevise, decodeSkillDetail, input),
-    localInstall: (input) => invokeRequest(IPC_ENDPOINTS.skills.localInstall, decodeInstalledSkill, input),
-    list: (query) => invokeRequest(IPC_ENDPOINTS.skills.list, decodeSkillPage, query),
-    get: (skillId) => invokeRequest(IPC_ENDPOINTS.skills.get, decodeSkillDetail, skillId),
-    listMine: () => invokeRequest(IPC_ENDPOINTS.skills.listMine, decodeSubmissions),
-    choosePackage: () => invokeRequest(IPC_ENDPOINTS.skills.choosePackage, decodeSkillPreview),
-    submit: (input) => invokeRequest(IPC_ENDPOINTS.skills.submit, decodeSubmission, input),
-    listInstalled: (agentId) =>
-      invokeRequest(IPC_ENDPOINTS.skills.listInstalled, decodeInstalledSkillsFromMain, agentId),
-    install: (input) => invokeRequest(IPC_ENDPOINTS.skills.install, decodeInstalledSkill, input),
-    uninstall: (input) => invokeRequest(IPC_ENDPOINTS.skills.uninstall, decodeVoid, input),
-    setEnabled: (input) => invokeRequest(IPC_ENDPOINTS.skills.setEnabled, decodeInstalledSkill, input),
-  },
-  hostedSites: {
-    list: () => invokeRequest(IPC_ENDPOINTS.hostedSites.list, decodeHostedSites),
-    chooseDirectory: () => invokeRequest(IPC_ENDPOINTS.hostedSites.chooseDirectory, decodeNullablePath),
-    publish: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.publish, decodeHostedSite, input),
-    replace: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.replace, decodeHostedSite, input),
-    delete: (input) => invokeRequest(IPC_ENDPOINTS.hostedSites.delete, decodeVoid, input),
-  },
-  customProviders: {
-    list: () => invokeRequest(IPC_ENDPOINTS.customProviders.list, decodeCustomProviders),
-    save: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.save, decodeCustomProviderResult, input),
-    delete: (input) => invokeRequest(IPC_ENDPOINTS.customProviders.delete, decodeCustomProviderResult, input),
-  },
-  agentImport: {
-    choose: () => invokeRequest(IPC_ENDPOINTS.agentImport.choose, decodeAgentImportPreview),
-    apply: (input) => invokeRequest(IPC_ENDPOINTS.agentImport.apply, decodeAgentImportResult, input),
-    discard: (token) => invokeRequest(IPC_ENDPOINTS.agentImport.discard, decodeVoid, token),
-    readSkill: () => invokeRequest(IPC_ENDPOINTS.agentImport.readSkill, decodeAgentImportSkill),
-    saveSkill: () => invokeRequest(IPC_ENDPOINTS.agentImport.saveSkill, decodeExportResult),
-  },
-  marketplaceAgents: {
-    list: (query) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.list, decodeMarketplaceAgentPage, query),
-    get: (agentId) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.get, decodeMarketplaceAgentDetail, agentId),
-    listMine: () => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.listMine, decodeAgentSubmissions),
-    preview: (agentId) =>
-      invokeRequest(IPC_ENDPOINTS.marketplaceAgents.preview, decodeAgentPublicationPreview, agentId),
-    submit: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.submit, decodeAgentSubmission, input),
-    install: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.install, decodeAgentInstallation, input),
-  },
-  agentTemplates: {
-    preview: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.preview, decodeAgentTemplatePreview, agentId),
-    publish: (input) => invokeRequest(IPC_ENDPOINTS.agentTemplates.publish, decodeAgentTemplatePublication, input),
-    unpublish: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.unpublish, decodeVoid, agentId),
-    get: (templateId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.get, decodeAgentTemplateDetail, templateId),
-    install: (input) => invokeRequest(IPC_ENDPOINTS.agentTemplates.install, decodeAgentInstallation, input),
-    takePendingLink: () => invokeRequest(IPC_ENDPOINTS.agentTemplates.takePendingLink, decodePendingAgentTemplate),
-    onOpenLink: (listener) =>
-      listen(IPC_ENDPOINTS.agentTemplates.openLink, (id) => {
-        if (typeof id === "string" && isAgentTemplateId(id)) listener(id);
-      }),
-  },
+  skills: bridgeGroup(IPC_ENDPOINTS.skills, {
+    localList: decodeSkillDetails,
+    localGet: decodeSkillDetail,
+    localCreate: decodeSkillDetail,
+    localRevise: decodeSkillDetail,
+    localInstall: decodeInstalledSkill,
+    list: decodeSkillPage,
+    get: decodeSkillDetail,
+    listMine: decodeSubmissions,
+    choosePackage: decodeSkillPreview,
+    submit: decodeSubmission,
+    listInstalled: decodeInstalledSkillsFromMain,
+    install: decodeInstalledSkill,
+    uninstall: decodeVoid,
+    setEnabled: decodeInstalledSkill,
+  }),
+  hostedSites: bridgeGroup(IPC_ENDPOINTS.hostedSites, {
+    list: decodeHostedSites,
+    chooseDirectory: decodeNullablePath,
+    publish: decodeHostedSite,
+    replace: decodeHostedSite,
+    delete: decodeVoid,
+  }),
+  customProviders: bridgeGroup(IPC_ENDPOINTS.customProviders, {
+    list: decodeCustomProviders,
+    save: decodeCustomProviderResult,
+    delete: decodeCustomProviderResult,
+  }),
+  agentImport: bridgeGroup(IPC_ENDPOINTS.agentImport, {
+    choose: decodeAgentImportPreview,
+    apply: decodeAgentImportResult,
+    discard: decodeVoid,
+    readSkill: decodeAgentImportSkill,
+    saveSkill: decodeExportResult,
+  }),
+  marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
+    list: decodeMarketplaceAgentPage,
+    get: decodeMarketplaceAgentDetail,
+    listMine: decodeAgentSubmissions,
+    preview: decodeAgentPublicationPreview,
+    submit: decodeAgentSubmission,
+    install: decodeAgentInstallation,
+  }),
+  agentTemplates: bridgeGroup(IPC_ENDPOINTS.agentTemplates, {
+    preview: decodeAgentTemplatePreview,
+    publish: decodeAgentTemplatePublication,
+    unpublish: decodeVoid,
+    get: decodeAgentTemplateDetail,
+    install: decodeAgentInstallation,
+    takePendingLink: decodePendingAgentTemplate,
+    openLink: dropInvalid(decodePendingAgentTemplate),
+  }),
   agent: {
     getStatus: () => invokeAgent(IPC_ENDPOINTS.agent.getStatus, null, decodeAgentStatusFromMain),
     getHostAnalytics: (input, serverId) =>
@@ -580,27 +631,26 @@ const openbotApi: OpenBotDesktopApi = {
     onPictureInPictureEvent: (listener) =>
       subscribe(IPC_ENDPOINTS.browser.pictureInPictureEvent, decodeBrowserPictureInPictureEvent, listener),
   },
-  update: {
-    getStatus: () => invokeRequest(IPC_ENDPOINTS.update.getStatus, decodeUpdateStatus),
-    check: () => invokeRequest(IPC_ENDPOINTS.update.check, decodeUpdateStatus),
-    download: () => invokeRequest(IPC_ENDPOINTS.update.download, decodeUpdateStatus),
-    install: () => invokeRequest(IPC_ENDPOINTS.update.install, decodeVoid),
-    getPreference: () => invokeRequest(IPC_ENDPOINTS.update.getPreference, decodeUpdatePreference),
-    setPreference: (input) => invokeRequest(IPC_ENDPOINTS.update.setPreference, decodeUpdatePreference, input),
-    onEvent: (listener) => subscribe(IPC_ENDPOINTS.update.event, decodeUpdateStatus, listener),
-  },
-  notifications: {
-    getPreference: () => invokeRequest(IPC_ENDPOINTS.notifications.getPreference, decodeNotificationPreference),
-    setPreference: (input) =>
-      invokeRequest(IPC_ENDPOINTS.notifications.setPreference, decodeNotificationPreference, input),
-    test: () => invokeRequest(IPC_ENDPOINTS.notifications.test, decodeVoid),
-    openSettings: () => invokeRequest(IPC_ENDPOINTS.notifications.openSettings, decodeVoid),
-    onOpened: (listener) => subscribe(IPC_ENDPOINTS.notifications.openedEvent, decodeNotificationOpenedEvent, listener),
-  },
-  maintenance: {
-    exportData: () => invokeRequest(IPC_ENDPOINTS.maintenance.exportData, decodeExportResult),
-    exportDiagnostics: () => invokeRequest(IPC_ENDPOINTS.maintenance.exportDiagnostics, decodeExportResult),
-  },
+  update: bridgeGroup(IPC_ENDPOINTS.update, {
+    getStatus: decodeUpdateStatus,
+    check: decodeUpdateStatus,
+    download: decodeUpdateStatus,
+    install: decodeVoid,
+    getPreference: decodeUpdatePreference,
+    setPreference: decodeUpdatePreference,
+    event: decodeUpdateStatus,
+  }),
+  notifications: bridgeGroup(IPC_ENDPOINTS.notifications, {
+    getPreference: decodeNotificationPreference,
+    setPreference: decodeNotificationPreference,
+    test: decodeVoid,
+    openSettings: decodeVoid,
+    opened: decodeNotificationOpenedEvent,
+  }),
+  maintenance: bridgeGroup(IPC_ENDPOINTS.maintenance, {
+    exportData: decodeExportResult,
+    exportDiagnostics: decodeExportResult,
+  }),
   servers: {
     list: async () => rememberActiveServer(await invokeRequest(IPC_ENDPOINTS.servers.list, decodeServers)),
     select: async (serverId) =>
@@ -664,31 +714,28 @@ const openbotApi: OpenBotDesktopApi = {
       subscribe(IPC_ENDPOINTS.servers.event, decodeServers, (servers) => listener(rememberActiveServer(servers))),
     onInvite: (listener) => subscribe(IPC_ENDPOINTS.servers.invite, decodeInviteUrl, listener),
   },
-  plugins: {
-    takePendingListing: () => invokeRequest(IPC_ENDPOINTS.plugins.takePendingListing, decodePendingListing),
-    onOpenListing: (listener) =>
-      listen(IPC_ENDPOINTS.plugins.openListing, (slug) => {
-        if (typeof slug === "string" && isPluginSlug(slug)) listener(slug);
-      }),
-  },
-  host: {
-    getStatus: () => invokeRequest(IPC_ENDPOINTS.host.getStatus, decodeHostStatus),
-    configure: (input) => invokeRequest(IPC_ENDPOINTS.host.configure, decodeHostStatus, input),
-    updateIdentity: (input) => invokeRequest(IPC_ENDPOINTS.host.updateIdentity, decodeHostStatus, input),
-    getPresence: () => invokeRequest(IPC_ENDPOINTS.host.getPresence, decodeTeamPresenceSnapshot),
-    start: () => invokeRequest(IPC_ENDPOINTS.host.start, decodeHostStatus),
-    stop: () => invokeRequest(IPC_ENDPOINTS.host.stop, decodeHostStatus),
-    recheckScreenRecording: () => invokeRequest(IPC_ENDPOINTS.host.recheckScreenRecording, decodeHostStatus),
-    listMembers: () => invokeRequest(IPC_ENDPOINTS.host.listMembers, decodeTeamMembers),
-    updateMember: (input) => invokeRequest(IPC_ENDPOINTS.host.updateMember, decodeTeamMember, input),
-    removeMember: (memberId) => invokeRequest(IPC_ENDPOINTS.host.removeMember, decodeVoid, memberId),
-    listSessions: () => invokeRequest(IPC_ENDPOINTS.host.listSessions, decodeTeamSessions),
-    revokeSession: (sessionId) => invokeRequest(IPC_ENDPOINTS.host.revokeSession, decodeVoid, sessionId),
-    listInvites: () => invokeRequest(IPC_ENDPOINTS.host.listInvites, decodeTeamInvites),
-    revokeInvite: (inviteId) => invokeRequest(IPC_ENDPOINTS.host.revokeInvite, decodeVoid, inviteId),
-    createInvite: (input) => invokeRequest(IPC_ENDPOINTS.host.createInvite, decodeInviteSummary, input),
-    onEvent: (listener) => subscribe(IPC_ENDPOINTS.host.event, decodeHostStatus, listener),
-  },
+  plugins: bridgeGroup(IPC_ENDPOINTS.plugins, {
+    takePendingListing: decodePendingListing,
+    openListing: dropInvalid(decodePendingListing),
+  }),
+  host: bridgeGroup(IPC_ENDPOINTS.host, {
+    getStatus: decodeHostStatus,
+    configure: decodeHostStatus,
+    updateIdentity: decodeHostStatus,
+    getPresence: decodeTeamPresenceSnapshot,
+    start: decodeHostStatus,
+    stop: decodeHostStatus,
+    recheckScreenRecording: decodeHostStatus,
+    listMembers: decodeTeamMembers,
+    updateMember: decodeTeamMember,
+    removeMember: decodeVoid,
+    listSessions: decodeTeamSessions,
+    revokeSession: decodeVoid,
+    listInvites: decodeTeamInvites,
+    revokeInvite: decodeVoid,
+    createInvite: decodeInviteSummary,
+    event: decodeHostStatus,
+  }),
   // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
   // decoded in main before it reached this point.
   storage: {
@@ -700,17 +747,16 @@ const openbotApi: OpenBotDesktopApi = {
     openFile: (input, serverId) => invokeAgentForServer(serverId, IPC_ENDPOINTS.storage.openFile, input, decodeVoid),
     openLocation: (input) => invokeRequest(IPC_ENDPOINTS.storage.openLocation, decodeVoid, input),
   },
-  remoteDesktop: {
-    checkSetup: (serverId) =>
-      invokeRequest(IPC_ENDPOINTS.remoteDesktop.checkSetup, decodeRemoteDesktopSetupFromMain, serverId),
-    openSetup: (action) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.openSetup, decodeVoid, action),
-    test: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.test, decodeRemoteDesktopTestFromMain, input),
-    list: () => invokeRequest(IPC_ENDPOINTS.remoteDesktop.list, decodeRemoteDesktopSessions),
-    connect: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.connect, decodeRemoteDesktopConnectResult, input),
-    selectDisplay: (input) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.selectDisplay, decodeVoid, input),
-    disconnect: (sessionId) => invokeRequest(IPC_ENDPOINTS.remoteDesktop.disconnect, decodeVoid, sessionId),
-    onEvent: (listener) => subscribe(IPC_ENDPOINTS.remoteDesktop.event, decodeRemoteDesktopSessions, listener),
-  },
+  remoteDesktop: bridgeGroup(IPC_ENDPOINTS.remoteDesktop, {
+    checkSetup: decodeRemoteDesktopSetupFromMain,
+    openSetup: decodeVoid,
+    test: decodeRemoteDesktopTestFromMain,
+    list: decodeRemoteDesktopSessions,
+    connect: decodeRemoteDesktopConnectResult,
+    selectDisplay: decodeVoid,
+    disconnect: decodeVoid,
+    event: decodeRemoteDesktopSessions,
+  }),
 };
 
 contextBridge.exposeInMainWorld("openbot", openbotApi);

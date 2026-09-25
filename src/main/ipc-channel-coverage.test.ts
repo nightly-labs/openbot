@@ -11,7 +11,9 @@
 // Three links have no type to carry them, and they are what is left here:
 //
 //   - the preload invokes and subscribes by endpoint, and its API object is shaped for the
-//     renderer rather than for IPC_ENDPOINTS, so nothing pairs a method with an endpoint;
+//     renderer rather than for IPC_ENDPOINTS, so nothing pairs a method with an endpoint. A group
+//     the preload builds whole with `bridgeGroup` is paired by its decoder map, and the scan reads
+//     that call as every endpoint of the group;
 //   - an event is sent from wherever it happens, by any number of call sites, so "every event
 //     channel has a sender" is a property of the source and not of a type;
 //   - the sender check, the rule that keeps every registration behind it, and the rule that
@@ -42,6 +44,8 @@ const MAIN_SEND_CALLEES = ["sendToRenderer"];
 const PRELOAD_INVOKE_CALLEES = ["ipcRenderer.invoke", "invokeRequest", "invokeAgent", "invokeAgentForServer"];
 const PRELOAD_SUBSCRIBE_CALLEES = ["ipcRenderer.on", "ipcRenderer.once", "listen", "subscribe"];
 const PRELOAD_UNSUBSCRIBE_CALLEES = ["ipcRenderer.removeListener", "ipcRenderer.off"];
+// These take a whole group, `IPC_ENDPOINTS.group`, and reach every endpoint in it.
+const PRELOAD_GROUP_CALLEES = ["bridgeGroup"];
 
 const requestChannels = channelsOfKind("request");
 const eventChannels = channelsOfKind("event");
@@ -52,18 +56,25 @@ const CHANNEL_AFTER_RECIPIENT = ["sendToRenderer", "invokeAgentForServer"];
 
 // Every call shape the scan knows, with the position its channel argument sits in.
 const CHANNEL_ARGUMENT_POSITION: ReadonlyMap<string, number> = new Map(
-  [...MAIN_SEND_CALLEES, ...PRELOAD_INVOKE_CALLEES, ...PRELOAD_SUBSCRIBE_CALLEES, ...PRELOAD_UNSUBSCRIBE_CALLEES].map(
-    (callee): readonly [string, number] => [callee, CHANNEL_AFTER_RECIPIENT.includes(callee) ? 1 : 0],
-  ),
+  [
+    ...MAIN_SEND_CALLEES,
+    ...PRELOAD_INVOKE_CALLEES,
+    ...PRELOAD_SUBSCRIBE_CALLEES,
+    ...PRELOAD_UNSUBSCRIBE_CALLEES,
+    ...PRELOAD_GROUP_CALLEES,
+  ].map((callee): readonly [string, number] => [callee, CHANNEL_AFTER_RECIPIENT.includes(callee) ? 1 : 0]),
 );
 
-// Main uses these two names for servers and stores that have nothing to do with IPC, so only the
+// Main uses the first two names for servers and stores that have nothing to do with IPC, so only the
 // preload scan reads them as channel calls.
-const PRELOAD_ONLY_CALLEES = ["listen", "subscribe"];
+const PRELOAD_ONLY_CALLEES = ["listen", "subscribe", ...PRELOAD_GROUP_CALLEES];
 
 // An endpoint as `group.name`. Only the one untyped endpoint reads `.channel` at its call site,
 // because it goes to ipcRenderer.invoke directly.
 const ENDPOINT_REFERENCE = /^IPC_ENDPOINTS\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)(?:\.channel)?$/;
+
+// A whole group, as a group callee takes it.
+const GROUP_REFERENCE = /^IPC_ENDPOINTS\.([A-Za-z0-9_]+)$/;
 
 const sources = new Map<string, string>();
 
@@ -112,9 +123,10 @@ function decodeWrittenFromMain(value: unknown): Written | null {
 `;
 
 // The preload's invoke and subscribe helpers take the endpoint as a parameter and
-// pass it on, so the forwarding call names a variable by design. Their own call
-// sites carry the IPC_ENDPOINTS reference and are what the scan checks, which is
-// why the helpers are listed as callees above.
+// pass it on, so the forwarding call names a variable by design. `bridgeGroup`
+// does the same for each endpoint of the group it walks. Their own call sites
+// carry the IPC_ENDPOINTS reference and are what the scan checks, which is why
+// the helpers are listed as callees above.
 const FORWARDED_CHANNEL_ARGUMENTS: readonly string[] = [
   "src/preload/index.ts: ipcRenderer.invoke(endpoint.channel)",
   "src/preload/index.ts: ipcRenderer.on(endpoint.channel)",
@@ -126,8 +138,12 @@ const mainCalls = collectCalls(mainSources, PRELOAD_ONLY_CALLEES);
 const preloadCalls = collectCalls(preloadSources, []);
 
 const sent = channelsCalledBy(mainCalls, MAIN_SEND_CALLEES);
-const invoked = channelsCalledBy(preloadCalls, PRELOAD_INVOKE_CALLEES);
-const subscribed = channelsCalledBy(preloadCalls, PRELOAD_SUBSCRIBE_CALLEES);
+const bridgedGroups = groupsCalledBy(preloadCalls, PRELOAD_GROUP_CALLEES);
+const invoked = union(channelsCalledBy(preloadCalls, PRELOAD_INVOKE_CALLEES), endpointsOf(bridgedGroups, "request"));
+const subscribed = union(
+  channelsCalledBy(preloadCalls, PRELOAD_SUBSCRIBE_CALLEES),
+  endpointsOf(bridgedGroups, "event"),
+);
 const unsubscribed = channelsCalledBy(preloadCalls, PRELOAD_UNSUBSCRIBE_CALLEES);
 
 describe("IPC channel coverage", () => {
@@ -139,7 +155,9 @@ describe("IPC channel coverage", () => {
   // while sitting on the trust boundary, so it fails here instead.
   it("names every endpoint through a direct IPC_ENDPOINTS reference", () => {
     const opaque = [...mainCalls, ...preloadCalls]
-      .filter((call) => !ENDPOINT_REFERENCE.test(call.argument))
+      .filter((call) =>
+        PRELOAD_GROUP_CALLEES.includes(call.callee) ? groupOf(call) === null : !ENDPOINT_REFERENCE.test(call.argument),
+      )
       .map((call) => `${call.file}: ${call.callee}(${call.argument})`)
       .filter((site) => !FORWARDED_CHANNEL_ARGUMENTS.includes(site))
       .sort();
@@ -151,9 +169,28 @@ describe("IPC channel coverage", () => {
   // A new helper wrapping an endpoint, or a reference sitting in a handler
   // body, would otherwise quietly shrink the compared sets rather than fail.
   it("reads every endpoint reference as the endpoint argument of a known call", () => {
-    const stray = [...strayReferences(mainSources, mainCalls), ...strayReferences(preloadSources, preloadCalls)];
+    const stray = [
+      ...strayReferences(mainSources, mainCalls),
+      ...strayReferences(preloadSources, preloadCalls),
+      ...strayGroupReferences(preloadSources, preloadCalls),
+    ];
 
     expect(stray).toEqual([]);
+  });
+
+  // A bridged group is reached through its decoder map, which the type checker holds to every
+  // endpoint of the group. A direct call beside it would give one endpoint a second method, and a
+  // second bridge a second object, so the preload names a group one way, once.
+  it("bridges a group whole or not at all", () => {
+    const bridged = preloadCalls.map(groupOf).filter((group) => group !== null);
+    const twice = bridged.filter((group, index) => bridged.indexOf(group) !== index);
+    const mixed = preloadCalls
+      .filter((call) => !PRELOAD_GROUP_CALLEES.includes(call.callee))
+      .map(channelOf)
+      .filter((channel) => channel !== null && bridgedGroups.includes(channel.slice(0, channel.indexOf("."))));
+
+    expect(twice).toEqual([]);
+    expect(mixed).toEqual([]);
   });
 
   // The main side of these three is now the type checker's: `registerIpcGroups` cannot compile
@@ -406,7 +443,8 @@ function collectCalls(files: readonly string[], skipped: readonly string[]): rea
     const source = readSource(file);
     for (const [callee, position] of CHANNEL_ARGUMENT_POSITION) {
       if (skipped.includes(callee)) continue;
-      const pattern = new RegExp(`(?<![A-Za-z0-9_$.])${callee.replaceAll(".", "\\.")}\\s*\\(`, "g");
+      // A spread (`...bridgeGroup(`) is a call; a member access (`other.listen(`) is not.
+      const pattern = new RegExp(`(?:(?<![A-Za-z0-9_$.])|(?<=\\.\\.\\.))${callee.replaceAll(".", "\\.")}\\s*\\(`, "g");
       for (const match of source.matchAll(pattern)) {
         if (/\bfunction\s*$/.test(source.slice(Math.max(0, match.index - 20), match.index))) continue;
         const span = argumentAt(source, match.index + match[0].length, position);
@@ -466,6 +504,31 @@ function channelOf(call: ChannelCall): string | null {
   return match ? `${match[1]}.${match[2]}` : null;
 }
 
+// The group a group callee names, or null when its argument is not a group of IPC_ENDPOINTS.
+function groupOf(call: ChannelCall): string | null {
+  if (!PRELOAD_GROUP_CALLEES.includes(call.callee)) return null;
+  const group = GROUP_REFERENCE.exec(call.argument)?.[1];
+  return group !== undefined && Object.hasOwn(IPC_ENDPOINTS, group) ? group : null;
+}
+
+function groupsCalledBy(calls: readonly ChannelCall[], callees: readonly string[]): readonly string[] {
+  const groups = new Set<string>();
+  for (const call of calls) {
+    const group = callees.includes(call.callee) ? groupOf(call) : null;
+    if (group !== null) groups.add(group);
+  }
+  return [...groups].sort();
+}
+
+// Every endpoint of one kind in the given groups, as `group.name`.
+function endpointsOf(groups: readonly string[], kind: IpcEndpoint["kind"]): readonly string[] {
+  return channelsOfKind(kind).filter((channel) => groups.includes(channel.slice(0, channel.indexOf("."))));
+}
+
+function union(first: readonly string[], second: readonly string[]): readonly string[] {
+  return [...new Set([...first, ...second])].sort();
+}
+
 function channelsCalledBy(calls: readonly ChannelCall[], callees: readonly string[]): readonly string[] {
   const channels = new Set<string>();
   for (const call of calls) {
@@ -485,6 +548,21 @@ function strayReferences(files: readonly string[], calls: readonly ChannelCall[]
     const source = readSource(file);
     const spans = calls.filter((call) => call.file === file);
     for (const match of source.matchAll(/IPC_ENDPOINTS\.[A-Za-z0-9_]+\.[A-Za-z0-9_]+/g)) {
+      const read = spans.some((span) => span.start <= match.index && match.index < span.end);
+      if (!read) stray.push(`${file}: ${match[0]}`);
+    }
+  }
+  return stray.sort();
+}
+
+// Every bare `IPC_ENDPOINTS.group` reference outside a group callee's argument. A group handed to
+// a helper the scan does not know would reach its endpoints unseen.
+function strayGroupReferences(files: readonly string[], calls: readonly ChannelCall[]): readonly string[] {
+  const stray: string[] = [];
+  for (const file of files) {
+    const source = readSource(file);
+    const spans = calls.filter((call) => call.file === file && PRELOAD_GROUP_CALLEES.includes(call.callee));
+    for (const match of source.matchAll(/IPC_ENDPOINTS\.[A-Za-z0-9_]+(?![A-Za-z0-9_.])/g)) {
       const read = spans.some((span) => span.start <= match.index && match.index < span.end);
       if (!read) stray.push(`${file}: ${match[0]}`);
     }
