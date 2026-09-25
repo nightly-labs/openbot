@@ -1,40 +1,8 @@
-import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentEvent } from "./ipc-agent-events";
-import type { AccountUsage } from "./ipc-agent-status";
-import type { AgentSummary } from "./ipc-agents";
 import type { CentralAuthState } from "./ipc-app-auth";
 import type { AttachmentImportEvent } from "./ipc-attachments";
 import type { BrowserBounds, BrowserLiveViewInput } from "./ipc-browser";
-import type {
-  ConversationPage,
-  ConversationReadState,
-  MarkConversationReadInput,
-  ReadConversationPageInput,
-  SendMessageInput,
-} from "./ipc-conversations";
 import type { GroupApi, Invoke, IPC_ENDPOINTS, IpcEndpoints, Subscribe } from "./ipc-endpoints";
-import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
-import type {
-  McpServerConfig,
-  McpTestResult,
-  RemoveMcpServerInput,
-  SaveMcpServerInput,
-  SetMcpServerEnabledInput,
-  TestMcpServerInput,
-} from "./ipc-mcp-servers";
-import type {
-  EditQueuedMessageInput,
-  QueuedMessageReceipt,
-  QueueSnapshot,
-  UpdateQueuedMessageInput,
-} from "./ipc-queue";
-import type {
-  ClearStorageInput,
-  DeleteStoredFileInput,
-  GetStorageUsageInput,
-  OpenStoredFileInput,
-  StorageUsage,
-} from "./ipc-storage";
 import type {
   CreateTeamInviteInput,
   DirectMessageRealtimeEvent,
@@ -45,93 +13,22 @@ import type {
   UpdateTeamMemberInput,
 } from "./ipc-team-host";
 
-export interface AgentDesktopApi {
-  listChannels: Invoke<typeof IPC_ENDPOINTS.agent.listChannels>;
-  readChannel: Invoke<typeof IPC_ENDPOINTS.agent.readChannel>;
-  channelCommand: Invoke<typeof IPC_ENDPOINTS.agent.channelCommand>;
-  deleteChannel: Invoke<typeof IPC_ENDPOINTS.agent.deleteChannel>;
-  getStatus: Invoke<typeof IPC_ENDPOINTS.agent.getStatus>;
-  getAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
-  getHostAnalytics: (input: HostAnalyticsInput, serverId: string) => Promise<HostAnalytics | null>;
-  getUsage: (agentId?: string) => Promise<AccountUsage>;
-  listModels: Invoke<typeof IPC_ENDPOINTS.agent.listModels>;
-  listAgents: (serverId?: string) => Promise<AgentSummary[]>;
-  listInstalledSkills: Invoke<typeof IPC_ENDPOINTS.agent.listInstalledSkills>;
-  getSidebarLayout: Invoke<typeof IPC_ENDPOINTS.agent.getSidebarLayout>;
-  mutateSidebarLayout: Invoke<typeof IPC_ENDPOINTS.agent.mutateSidebarLayout>;
-  generateProfile: Invoke<typeof IPC_ENDPOINTS.agent.generateProfile>;
-  saveProfile: Invoke<typeof IPC_ENDPOINTS.agent.saveProfile>;
-  createAgent: Invoke<typeof IPC_ENDPOINTS.agent.create>;
-  duplicateAgent: Invoke<typeof IPC_ENDPOINTS.agent.duplicate>;
-  updateAgent: Invoke<typeof IPC_ENDPOINTS.agent.update>;
-  setAvatar: Invoke<typeof IPC_ENDPOINTS.agent.setAvatar>;
-  deleteAgent: Invoke<typeof IPC_ENDPOINTS.agent.delete>;
-  listMemories: Invoke<typeof IPC_ENDPOINTS.agentMemories.listMemories>;
-  createMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.createMemory>;
-  updateMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.updateMemory>;
-  deleteMemory: Invoke<typeof IPC_ENDPOINTS.agentMemories.deleteMemory>;
-  clearMemories: Invoke<typeof IPC_ENDPOINTS.agentMemories.clearMemories>;
-  /**
-   * Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
-   * every table in the one shared database, and the user's delete is not owner-gated.
-   */
-  listTables: Invoke<typeof IPC_ENDPOINTS.sharedTables.listTables>;
-  deleteTable: Invoke<typeof IPC_ENDPOINTS.sharedTables.deleteTable>;
-  listRoutines: Invoke<typeof IPC_ENDPOINTS.agentRoutines.listRoutines>;
-  createRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.createRoutine>;
-  updateRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.updateRoutine>;
-  deleteRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.deleteRoutine>;
-  testRoutine: Invoke<typeof IPC_ENDPOINTS.agentRoutines.testRoutine>;
-  listRoutineRuns: Invoke<typeof IPC_ENDPOINTS.agentRoutines.listRoutineRuns>;
-  listChannelMemories: Invoke<typeof IPC_ENDPOINTS.channelMemories.listChannelMemories>;
-  createChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.createChannelMemory>;
-  updateChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.updateChannelMemory>;
-  deleteChannelMemory: Invoke<typeof IPC_ENDPOINTS.channelMemories.deleteChannelMemory>;
-  clearChannelMemories: Invoke<typeof IPC_ENDPOINTS.channelMemories.clearChannelMemories>;
-  listChannelRoutines: Invoke<typeof IPC_ENDPOINTS.channelRoutines.listChannelRoutines>;
-  createChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.createChannelRoutine>;
-  updateChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.updateChannelRoutine>;
-  deleteChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.deleteChannelRoutine>;
-  testChannelRoutine: Invoke<typeof IPC_ENDPOINTS.channelRoutines.testChannelRoutine>;
-  listChannelRoutineRuns: Invoke<typeof IPC_ENDPOINTS.channelRoutines.listChannelRoutineRuns>;
-  // Every MCP method names its server, because the settings modal can be open for a server the user
-  // has not switched to. Each mutation answers with the whole list, so the panel never merges.
-  listMcpServers: (serverId: string) => Promise<McpServerConfig[]>;
-  saveMcpServer: (input: SaveMcpServerInput, serverId: string) => Promise<McpServerConfig[]>;
-  removeMcpServer: (input: RemoveMcpServerInput, serverId: string) => Promise<McpServerConfig[]>;
-  setMcpServerEnabled: (input: SetMcpServerEnabledInput, serverId: string) => Promise<McpServerConfig[]>;
-  /** A test connects once and reports what it found. Nothing is stored, and no agent uses it. */
-  testMcpServer: (input: TestMcpServerInput, serverId: string) => Promise<McpTestResult>;
-  readConversation: Invoke<typeof IPC_ENDPOINTS.agent.readConversation>;
-  readConversationPage: (input: ReadConversationPageInput, serverId?: string) => Promise<ConversationPage>;
-  searchConversationMessages: Invoke<typeof IPC_ENDPOINTS.agent.searchConversationMessages>;
-  listConversationReads: Invoke<typeof IPC_ENDPOINTS.agent.listConversationReads>;
-  markConversationRead: (input: MarkConversationReadInput, serverId?: string) => Promise<ConversationReadState>;
-  chooseAttachments: Invoke<typeof IPC_ENDPOINTS.agentAttachments.chooseAttachments>;
+/**
+ * Every agent group, spread into one namespace. Each scoped method takes its server last; left out,
+ * it is the selected server. `onEvent` is `onScopedEvent` filtered to the selected server, and
+ * `onAttachmentImport` reports the files the preload imports from a drop or a paste.
+ */
+export interface AgentDesktopApi
+  extends GroupApi<IpcEndpoints["agent"]>,
+    GroupApi<IpcEndpoints["agentMemories"]>,
+    GroupApi<IpcEndpoints["sharedTables"]>,
+    GroupApi<IpcEndpoints["agentRoutines"]>,
+    GroupApi<IpcEndpoints["channelMemories"]>,
+    GroupApi<IpcEndpoints["channelRoutines"]>,
+    GroupApi<IpcEndpoints["mcpServers"]>,
+    GroupApi<IpcEndpoints["agentAttachments"]> {
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
-  discardDraftAttachment: (attachmentId: string, serverId?: string) => Promise<void>;
-  downloadAttachments: Invoke<typeof IPC_ENDPOINTS.agentAttachments.downloadAttachments>;
-  openAttachment: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openAttachment>;
-  openSharedFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openSharedFile>;
-  openWorkspaceFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.openWorkspaceFile>;
-  previewSharedFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.previewSharedFile>;
-  previewWorkspaceFile: Invoke<typeof IPC_ENDPOINTS.agentAttachments.previewWorkspaceFile>;
-  sendMessage: (input: SendMessageInput, serverId?: string) => Promise<QueuedMessageReceipt>;
-  setMessageReaction: Invoke<typeof IPC_ENDPOINTS.agent.setMessageReaction>;
-  listQueue: Invoke<typeof IPC_ENDPOINTS.agent.listQueue>;
-  acknowledgeFailedTurn: Invoke<typeof IPC_ENDPOINTS.agent.acknowledgeFailedTurn>;
-  cancelQueuedMessage: Invoke<typeof IPC_ENDPOINTS.agent.cancelQueuedMessage>;
-  steerQueuedMessage: Invoke<typeof IPC_ENDPOINTS.agent.steerQueuedMessage>;
-  editQueuedMessage: (input: EditQueuedMessageInput, serverId?: string) => Promise<QueueSnapshot>;
-  updateQueuedMessage: (input: UpdateQueuedMessageInput, serverId?: string) => Promise<void>;
-  reorderQueue: Invoke<typeof IPC_ENDPOINTS.agent.reorderQueue>;
-  interrupt: Invoke<typeof IPC_ENDPOINTS.agent.interrupt>;
-  respondToPrompt: Invoke<typeof IPC_ENDPOINTS.agent.respondToPrompt>;
-  respondToApproval: Invoke<typeof IPC_ENDPOINTS.agent.respondToApproval>;
-  respondToBrowserSecret: Invoke<typeof IPC_ENDPOINTS.agent.respondToBrowserSecret>;
-  respondToBrowserTakeover: Invoke<typeof IPC_ENDPOINTS.agent.respondToBrowserTakeover>;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
-  onScopedEvent: Subscribe<typeof IPC_ENDPOINTS.agent.event>;
 }
 
 export type AgentTemplatesDesktopApi = GroupApi<IpcEndpoints["agentTemplates"]>;
@@ -247,17 +144,10 @@ export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]>;
 
 /**
- * Storage and files of one host. Every method names its server, because the settings modal can be
- * open for a server the user has not switched to. A remote host without `storage-v1` answers null.
+ * Storage and files of one host. Every scoped method names its server, because the settings modal can
+ * be open for a server the user has not switched to. A remote host without `storage-v1` answers null.
  */
-export interface StorageDesktopApi {
-  getUsage: (input: GetStorageUsageInput, serverId: string) => Promise<StorageUsage | null>;
-  deleteFile: (input: DeleteStoredFileInput, serverId: string) => Promise<void>;
-  clear: (input: ClearStorageInput, serverId: string) => Promise<void>;
-  openFile: (input: OpenStoredFileInput, serverId: string) => Promise<void>;
-  /** Opens an agent workspace folder. Only the local host has a folder this computer can open. */
-  openLocation: Invoke<typeof IPC_ENDPOINTS.storage.openLocation>;
-}
+export type StorageDesktopApi = GroupApi<IpcEndpoints["storage"]>;
 
 /**
  * Agent import into the local host. `choose` opens the file dialog and answers null when the user

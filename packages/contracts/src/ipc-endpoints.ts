@@ -265,6 +265,7 @@ import type { AccountSession, MobileConnectedDevice, MobileConnectTicket } from 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
 declare const untypedBrand: unique symbol;
+declare const serverArgument: unique symbol;
 
 /**
  * The payload and result of an endpoint that has no types. The main binder and the preload accept
@@ -274,11 +275,32 @@ export interface Untyped {
   readonly [untypedBrand]: true;
 }
 
+/**
+ * How the preload scopes a request to a server. `payload` wraps the first argument as
+ * `AgentIpcRequest.payload`; `empty` sends a `null` payload. The server is the trailing argument, or
+ * the selected server when the caller leaves it out. An unscoped request has no `scope`.
+ */
+export type ServerScope = "payload" | "empty";
+
+/** Whether the renderer must name the server of a scoped request. It is a type only. */
+export type ServerArgument = "optional" | "required";
+
 export interface RequestEndpoint<Channel extends string = string, Payload = unknown, Result = unknown> {
   readonly kind: "request";
   readonly channel: Channel;
+  readonly scope?: ServerScope;
   readonly [payloadType]?: Payload;
   readonly [resultType]?: Result;
+}
+
+export interface ScopedRequestEndpoint<
+  Channel extends string = string,
+  Inner = unknown,
+  Result = unknown,
+  Server extends ServerArgument = ServerArgument,
+> extends RequestEndpoint<Channel, AgentIpcRequest<Inner>, Result> {
+  readonly scope: ServerScope;
+  readonly [serverArgument]?: Server;
 }
 
 export interface EventEndpoint<Channel extends string = string, Payload = unknown> {
@@ -293,10 +315,25 @@ export type IpcEndpointGroup = Readonly<Record<string, IpcEndpoint>>;
 // Curried, because explicit type arguments turn off inference for the rest: `request<P, R>(channel)`
 // would widen the channel to `string`, and the literal is what shows the wire value in the type.
 // A request with no payload takes `undefined`: main receives that when the preload sends nothing.
+// A server-scoped payload does not compile here: without `scope`, the preload would not wrap it.
 function request<Payload, Result>(): <Channel extends string>(
-  channel: Channel,
+  channel: Channel & ([Payload] extends [AgentIpcRequest<unknown>] ? never : unknown),
 ) => RequestEndpoint<Channel, Payload, Result> {
   return (channel) => ({ kind: "request", channel });
+}
+
+// Main receives `AgentIpcRequest<Inner>`; the renderer passes `Inner` and, last, a server.
+function scopedRequest<Inner, Result, Server extends ServerArgument = "optional">(): <Channel extends string>(
+  channel: Channel,
+) => ScopedRequestEndpoint<Channel, Inner, Result, Server> {
+  return (channel) => ({ kind: "request", channel, scope: "payload" });
+}
+
+// A scoped request that carries nothing but the server: main receives `AgentIpcRequest<null>`.
+function scopedQuery<Result, Server extends ServerArgument = "optional">(): <Channel extends string>(
+  channel: Channel,
+) => ScopedRequestEndpoint<Channel, null, Result, Server> {
+  return (channel) => ({ kind: "request", channel, scope: "empty" });
 }
 
 function event<Payload>(): <Channel extends string>(channel: Channel) => EventEndpoint<Channel, Payload> {
@@ -487,125 +524,103 @@ export const IPC_ENDPOINTS = {
     opened: event<NotificationOpenedEvent>()("notifications:opened-event"),
   },
   agent: {
-    getStatus: request<AgentIpcRequest<null>, AgentStatus>()("agent:get-status"),
-    getAnalytics: request<AgentIpcRequest<AgentAnalyticsInput>, AgentAnalytics | null>()("agent:get-analytics"),
-    getHostAnalytics: request<AgentIpcRequest<HostAnalyticsInput>, HostAnalytics | null>()("host:get-analytics"),
-    getUsage: request<AgentIpcRequest<string | undefined>, AccountUsage>()("agent:get-usage"),
-    listModels: request<AgentIpcRequest<null>, AgentModelOption[]>()("agent:list-models"),
-    list: request<AgentIpcRequest<null>, AgentSummary[]>()("agent:list"),
-    listInstalledSkills: request<AgentIpcRequest<string>, InstalledSkill[]>()("agent:list-installed-skills"),
-    listChannels: request<AgentIpcRequest<null>, ChannelSummary[]>()("agent:channels:list"),
-    readChannel: request<AgentIpcRequest<ChannelReadInput>, ChannelPage>()("agent:channels:read"),
-    channelCommand: request<AgentIpcRequest<ChannelCommand>, Channel>()("agent:channels:command"),
-    deleteChannel: request<AgentIpcRequest<string>, void>()("agent:channels:delete"),
-    getSidebarLayout: request<AgentIpcRequest<null>, SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
-    mutateSidebarLayout: request<AgentIpcRequest<SidebarLayoutAction>, SidebarLayoutSnapshot>()(
-      "agent:mutate-sidebar-layout",
-    ),
-    generateProfile: request<AgentIpcRequest<GenerateAgentProfileInput>, AgentProfileDraft>()("agent:generate-profile"),
-    saveProfile: request<AgentIpcRequest<SaveAgentProfileInput>, SaveAgentProfileResult>()("agent:save-profile"),
-    create: request<AgentIpcRequest<CreateAgentInput>, AgentSummary>()("agent:create"),
-    duplicate: request<AgentIpcRequest<string>, DuplicateAgentResult>()("agent:duplicate"),
-    update: request<AgentIpcRequest<UpdateAgentInput>, AgentSummary>()("agent:update"),
-    setAvatar: request<AgentIpcRequest<SetAgentAvatarInput>, AgentSummary>()("agent:set-avatar"),
-    delete: request<AgentIpcRequest<string>, void>()("agent:delete"),
-    readConversation: request<AgentIpcRequest<string>, ConversationWithReadState>()("agent:read-conversation"),
-    readConversationPage: request<AgentIpcRequest<ReadConversationPageInput>, ConversationPage>()(
-      "agent:read-conversation-page",
-    ),
-    searchConversationMessages: request<AgentIpcRequest<SearchConversationMessagesInput>, ConversationSearchPage>()(
+    getStatus: scopedQuery<AgentStatus>()("agent:get-status"),
+    getAnalytics: scopedRequest<AgentAnalyticsInput, AgentAnalytics | null, "required">()("agent:get-analytics"),
+    getHostAnalytics: scopedRequest<HostAnalyticsInput, HostAnalytics | null, "required">()("host:get-analytics"),
+    getUsage: scopedRequest<string | undefined, AccountUsage>()("agent:get-usage"),
+    listModels: scopedQuery<AgentModelOption[]>()("agent:list-models"),
+    listAgents: scopedQuery<AgentSummary[]>()("agent:list"),
+    listInstalledSkills: scopedRequest<string, InstalledSkill[]>()("agent:list-installed-skills"),
+    listChannels: scopedQuery<ChannelSummary[]>()("agent:channels:list"),
+    readChannel: scopedRequest<ChannelReadInput, ChannelPage>()("agent:channels:read"),
+    channelCommand: scopedRequest<ChannelCommand, Channel>()("agent:channels:command"),
+    deleteChannel: scopedRequest<string, void>()("agent:channels:delete"),
+    getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
+    mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
+    generateProfile: scopedRequest<GenerateAgentProfileInput, AgentProfileDraft>()("agent:generate-profile"),
+    saveProfile: scopedRequest<SaveAgentProfileInput, SaveAgentProfileResult>()("agent:save-profile"),
+    createAgent: scopedRequest<CreateAgentInput, AgentSummary>()("agent:create"),
+    duplicateAgent: scopedRequest<string, DuplicateAgentResult>()("agent:duplicate"),
+    updateAgent: scopedRequest<UpdateAgentInput, AgentSummary>()("agent:update"),
+    setAvatar: scopedRequest<SetAgentAvatarInput, AgentSummary>()("agent:set-avatar"),
+    deleteAgent: scopedRequest<string, void>()("agent:delete"),
+    readConversation: scopedRequest<string, ConversationWithReadState>()("agent:read-conversation"),
+    readConversationPage: scopedRequest<ReadConversationPageInput, ConversationPage>()("agent:read-conversation-page"),
+    searchConversationMessages: scopedRequest<SearchConversationMessagesInput, ConversationSearchPage>()(
       "agent:search-conversation-messages",
     ),
-    listConversationReads: request<AgentIpcRequest<null>, Record<string, ConversationReadState>>()(
-      "agent:list-conversation-reads",
-    ),
-    markConversationRead: request<AgentIpcRequest<MarkConversationReadInput>, ConversationReadState>()(
+    listConversationReads: scopedQuery<Record<string, ConversationReadState>>()("agent:list-conversation-reads"),
+    markConversationRead: scopedRequest<MarkConversationReadInput, ConversationReadState>()(
       "agent:mark-conversation-read",
     ),
-    sendMessage: request<AgentIpcRequest<SendMessageInput>, QueuedMessageReceipt>()("agent:send-message"),
-    setMessageReaction: request<AgentIpcRequest<SetMessageReactionInput>, void>()("agent:set-message-reaction"),
-    listQueue: request<AgentIpcRequest<string>, QueueSnapshot>()("agent:list-queue"),
-    acknowledgeFailedTurn: request<AgentIpcRequest<AcknowledgeFailedTurnInput>, void>()(
-      "agent:acknowledge-failed-turn",
-    ),
-    cancelQueuedMessage: request<AgentIpcRequest<CancelQueuedMessageInput>, void>()("agent:cancel-queued-message"),
-    steerQueuedMessage: request<AgentIpcRequest<SteerQueuedMessageInput>, void>()("agent:steer-queued-message"),
-    editQueuedMessage: request<AgentIpcRequest<EditQueuedMessageInput>, QueueSnapshot>()("agent:edit-queued-message"),
-    updateQueuedMessage: request<AgentIpcRequest<UpdateQueuedMessageInput>, void>()("agent:update-queued-message"),
-    reorderQueue: request<AgentIpcRequest<ReorderQueueInput>, void>()("agent:reorder-queue"),
-    interrupt: request<AgentIpcRequest<InterruptTurnInput>, void>()("agent:interrupt"),
-    respondToPrompt: request<AgentIpcRequest<RespondToPromptInput>, void>()("agent:respond-to-prompt"),
-    respondToApproval: request<AgentIpcRequest<RespondToApprovalInput>, void>()("agent:respond-to-approval"),
-    respondToBrowserSecret: request<AgentIpcRequest<RespondToBrowserSecretInput>, void>()(
-      "agent:respond-to-browser-secret",
-    ),
-    respondToBrowserTakeover: request<AgentIpcRequest<RespondToBrowserTakeoverInput>, void>()(
-      "agent:respond-to-browser-takeover",
-    ),
-    event: event<ScopedAgentEvent>()("agent:event"),
+    sendMessage: scopedRequest<SendMessageInput, QueuedMessageReceipt>()("agent:send-message"),
+    setMessageReaction: scopedRequest<SetMessageReactionInput, void>()("agent:set-message-reaction"),
+    listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
+    acknowledgeFailedTurn: scopedRequest<AcknowledgeFailedTurnInput, void>()("agent:acknowledge-failed-turn"),
+    cancelQueuedMessage: scopedRequest<CancelQueuedMessageInput, void>()("agent:cancel-queued-message"),
+    steerQueuedMessage: scopedRequest<SteerQueuedMessageInput, void>()("agent:steer-queued-message"),
+    editQueuedMessage: scopedRequest<EditQueuedMessageInput, QueueSnapshot>()("agent:edit-queued-message"),
+    updateQueuedMessage: scopedRequest<UpdateQueuedMessageInput, void>()("agent:update-queued-message"),
+    reorderQueue: scopedRequest<ReorderQueueInput, void>()("agent:reorder-queue"),
+    interrupt: scopedRequest<InterruptTurnInput, void>()("agent:interrupt"),
+    respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
+    respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
+    respondToBrowserSecret: scopedRequest<RespondToBrowserSecretInput, void>()("agent:respond-to-browser-secret"),
+    respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
+    scopedEvent: event<ScopedAgentEvent>()("agent:event"),
   },
   agentMemories: {
-    listMemories: request<AgentIpcRequest<string>, AgentMemory[]>()("agent:list-memories"),
-    createMemory: request<AgentIpcRequest<CreateAgentMemoryInput>, AgentMemory>()("agent:create-memory"),
-    updateMemory: request<AgentIpcRequest<UpdateAgentMemoryInput>, AgentMemory>()("agent:update-memory"),
-    deleteMemory: request<AgentIpcRequest<DeleteAgentMemoryInput>, void>()("agent:delete-memory"),
-    clearMemories: request<AgentIpcRequest<string>, void>()("agent:clear-memories"),
+    listMemories: scopedRequest<string, AgentMemory[]>()("agent:list-memories"),
+    createMemory: scopedRequest<CreateAgentMemoryInput, AgentMemory>()("agent:create-memory"),
+    updateMemory: scopedRequest<UpdateAgentMemoryInput, AgentMemory>()("agent:update-memory"),
+    deleteMemory: scopedRequest<DeleteAgentMemoryInput, void>()("agent:delete-memory"),
+    clearMemories: scopedRequest<string, void>()("agent:clear-memories"),
   },
   sharedTables: {
-    listTables: request<AgentIpcRequest<null>, SharedTable[]>()("shared:list-tables"),
-    deleteTable: request<AgentIpcRequest<DeleteSharedTableInput>, void>()("shared:delete-table"),
+    // Shared tables are not scoped to an agent: there is no `agentId` on either call. The list is
+    // every table in the one shared database, and the user's delete is not owner-gated.
+    listTables: scopedQuery<SharedTable[]>()("shared:list-tables"),
+    deleteTable: scopedRequest<DeleteSharedTableInput, void>()("shared:delete-table"),
   },
   agentRoutines: {
-    listRoutines: request<AgentIpcRequest<string>, Routine[]>()("agent:list-routines"),
-    createRoutine: request<AgentIpcRequest<CreateRoutineInput>, Routine>()("agent:create-routine"),
-    updateRoutine: request<AgentIpcRequest<UpdateRoutineInput>, Routine>()("agent:update-routine"),
-    deleteRoutine: request<AgentIpcRequest<DeleteRoutineInput>, void>()("agent:delete-routine"),
-    testRoutine: request<AgentIpcRequest<TestRoutineInput>, RoutineRun>()("agent:test-routine"),
-    listRoutineRuns: request<AgentIpcRequest<ListRoutineRunsInput>, RoutineRun[]>()("agent:list-routine-runs"),
+    listRoutines: scopedRequest<string, Routine[]>()("agent:list-routines"),
+    createRoutine: scopedRequest<CreateRoutineInput, Routine>()("agent:create-routine"),
+    updateRoutine: scopedRequest<UpdateRoutineInput, Routine>()("agent:update-routine"),
+    deleteRoutine: scopedRequest<DeleteRoutineInput, void>()("agent:delete-routine"),
+    testRoutine: scopedRequest<TestRoutineInput, RoutineRun>()("agent:test-routine"),
+    listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
   },
   channelMemories: {
-    listChannelMemories: request<AgentIpcRequest<string>, ChannelMemory[]>()("agent:channel-memories:list"),
-    createChannelMemory: request<AgentIpcRequest<CreateChannelMemoryInput>, ChannelMemory>()(
-      "agent:channel-memories:create",
-    ),
-    updateChannelMemory: request<AgentIpcRequest<UpdateChannelMemoryInput>, ChannelMemory>()(
-      "agent:channel-memories:update",
-    ),
-    deleteChannelMemory: request<AgentIpcRequest<DeleteChannelMemoryInput>, void>()("agent:channel-memories:delete"),
-    clearChannelMemories: request<AgentIpcRequest<string>, void>()("agent:channel-memories:clear"),
+    listChannelMemories: scopedRequest<string, ChannelMemory[]>()("agent:channel-memories:list"),
+    createChannelMemory: scopedRequest<CreateChannelMemoryInput, ChannelMemory>()("agent:channel-memories:create"),
+    updateChannelMemory: scopedRequest<UpdateChannelMemoryInput, ChannelMemory>()("agent:channel-memories:update"),
+    deleteChannelMemory: scopedRequest<DeleteChannelMemoryInput, void>()("agent:channel-memories:delete"),
+    clearChannelMemories: scopedRequest<string, void>()("agent:channel-memories:clear"),
   },
   channelRoutines: {
-    listChannelRoutines: request<AgentIpcRequest<string>, ChannelRoutine[]>()("agent:channel-routines:list"),
-    createChannelRoutine: request<AgentIpcRequest<CreateChannelRoutineInput>, ChannelRoutine>()(
-      "agent:channel-routines:create",
-    ),
-    updateChannelRoutine: request<AgentIpcRequest<UpdateChannelRoutineInput>, ChannelRoutine>()(
-      "agent:channel-routines:update",
-    ),
-    deleteChannelRoutine: request<AgentIpcRequest<DeleteChannelRoutineInput>, void>()("agent:channel-routines:delete"),
-    testChannelRoutine: request<AgentIpcRequest<TestChannelRoutineInput>, ChannelRoutineRun>()(
-      "agent:channel-routines:test",
-    ),
-    listChannelRoutineRuns: request<AgentIpcRequest<ListChannelRoutineRunsInput>, ChannelRoutineRun[]>()(
+    listChannelRoutines: scopedRequest<string, ChannelRoutine[]>()("agent:channel-routines:list"),
+    createChannelRoutine: scopedRequest<CreateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:create"),
+    updateChannelRoutine: scopedRequest<UpdateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:update"),
+    deleteChannelRoutine: scopedRequest<DeleteChannelRoutineInput, void>()("agent:channel-routines:delete"),
+    testChannelRoutine: scopedRequest<TestChannelRoutineInput, ChannelRoutineRun>()("agent:channel-routines:test"),
+    listChannelRoutineRuns: scopedRequest<ListChannelRoutineRunsInput, ChannelRoutineRun[]>()(
       "agent:channel-routines:runs",
     ),
   },
   agentAttachments: {
-    chooseAttachments: request<AgentIpcRequest<ChooseAttachmentsInput>, DraftAttachment[]>()(
-      "agent:choose-attachments",
-    ),
-    importAttachments: request<AgentIpcRequest<ImportAttachmentsInput>, DraftAttachment[]>()(
-      "agent:import-attachments",
-    ),
-    discardDraftAttachment: request<AgentIpcRequest<string>, void>()("agent:discard-draft-attachment"),
-    downloadAttachments: request<AgentIpcRequest<DownloadAttachmentsInput>, void>()("agent:download-attachments"),
-    openAttachment: request<AgentIpcRequest<OpenAttachmentInput>, void>()("agent:open-attachment"),
-    openSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, void>()("agent:open-shared-file"),
-    openWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, void>()("agent:open-workspace-file"),
-    previewSharedFile: request<AgentIpcRequest<OpenSharedFileInput>, FilePreview>()("agent:preview-shared-file"),
-    previewWorkspaceFile: request<AgentIpcRequest<OpenWorkspaceFileInput>, FilePreview>()(
-      "agent:preview-workspace-file",
-    ),
+    chooseAttachments: scopedRequest<ChooseAttachmentsInput, DraftAttachment[]>()("agent:choose-attachments"),
+    discardDraftAttachment: scopedRequest<string, void>()("agent:discard-draft-attachment"),
+    downloadAttachments: scopedRequest<DownloadAttachmentsInput, void>()("agent:download-attachments"),
+    openAttachment: scopedRequest<OpenAttachmentInput, void>()("agent:open-attachment"),
+    openSharedFile: scopedRequest<OpenSharedFileInput, void>()("agent:open-shared-file"),
+    openWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, void>()("agent:open-workspace-file"),
+    previewSharedFile: scopedRequest<OpenSharedFileInput, FilePreview>()("agent:preview-shared-file"),
+    previewWorkspaceFile: scopedRequest<OpenWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
+  },
+  // Not part of `agentAttachments`: the preload sends the paths of dropped and pasted files, and the
+  // renderer must never name a path to import. So this group is never bridged to the renderer.
+  attachmentImports: {
+    importAttachments: scopedRequest<ImportAttachmentsInput, DraftAttachment[]>()("agent:import-attachments"),
   },
   browser: {
     open: request<BrowserOpenInput, BrowserTab>()("browser:open"),
@@ -647,11 +662,11 @@ export const IPC_ENDPOINTS = {
     getPresenceFor: request<string, TeamPresenceSnapshot>()("servers:get-presence-for"),
     refreshIdentity: request<string, ServerSummary>()("servers:refresh-identity"),
     listMembers: request<string, TeamMemberSummary[]>()("servers:list-members"),
-    updateMember: request<AgentIpcRequest<UpdateTeamMemberInput>, TeamMemberSummary>()("servers:update-member"),
-    removeMember: request<AgentIpcRequest<string>, void>()("servers:remove-member"),
+    updateMember: scopedRequest<UpdateTeamMemberInput, TeamMemberSummary>()("servers:update-member"),
+    removeMember: scopedRequest<string, void>()("servers:remove-member"),
     listInvites: request<string, TeamInviteSummary[]>()("servers:list-invites"),
-    revokeInvite: request<AgentIpcRequest<string>, void>()("servers:revoke-invite"),
-    createInvite: request<AgentIpcRequest<CreateTeamInviteInput>, InviteSummary>()("servers:create-invite"),
+    revokeInvite: scopedRequest<string, void>()("servers:revoke-invite"),
+    createInvite: scopedRequest<CreateTeamInviteInput, InviteSummary>()("servers:create-invite"),
     setTyping: request<SetTeamTypingInput, void>()("servers:set-typing"),
     presence: event<ScopedTeamPresenceSnapshot>()("servers:presence"),
     listDirectThreads: request<undefined, DirectThreadSummary[]>()("servers:list-direct-threads"),
@@ -670,18 +685,23 @@ export const IPC_ENDPOINTS = {
   // A separate group, not part of `servers`: a group is what one registrar covers in full, and
   // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
   mcpServers: {
-    list: request<AgentIpcRequest<null>, McpServerConfig[]>()("servers:mcp:list"),
-    save: request<AgentIpcRequest<SaveMcpServerInput>, McpServerConfig[]>()("servers:mcp:save"),
-    remove: request<AgentIpcRequest<RemoveMcpServerInput>, McpServerConfig[]>()("servers:mcp:remove"),
-    setEnabled: request<AgentIpcRequest<SetMcpServerEnabledInput>, McpServerConfig[]>()("servers:mcp:set-enabled"),
-    test: request<AgentIpcRequest<TestMcpServerInput>, McpTestResult>()("servers:mcp:test"),
+    // Every MCP method names its server, because the settings modal can be open for a server the user
+    // has not switched to. Each mutation answers with the whole list, so the panel never merges.
+    listMcpServers: scopedQuery<McpServerConfig[], "required">()("servers:mcp:list"),
+    saveMcpServer: scopedRequest<SaveMcpServerInput, McpServerConfig[], "required">()("servers:mcp:save"),
+    removeMcpServer: scopedRequest<RemoveMcpServerInput, McpServerConfig[], "required">()("servers:mcp:remove"),
+    setMcpServerEnabled: scopedRequest<SetMcpServerEnabledInput, McpServerConfig[], "required">()(
+      "servers:mcp:set-enabled",
+    ),
+    // A test connects once and reports what it found. Nothing is stored, and no agent uses it.
+    testMcpServer: scopedRequest<TestMcpServerInput, McpTestResult, "required">()("servers:mcp:test"),
   },
   // Bound against the storage service, not `AgentService`, so it is its own group.
   storage: {
-    getUsage: request<AgentIpcRequest<GetStorageUsageInput>, StorageUsage | null>()("storage:get-usage"),
-    deleteFile: request<AgentIpcRequest<DeleteStoredFileInput>, void>()("storage:delete-file"),
-    clear: request<AgentIpcRequest<ClearStorageInput>, void>()("storage:clear"),
-    openFile: request<AgentIpcRequest<OpenStoredFileInput>, void>()("storage:open-file"),
+    getUsage: scopedRequest<GetStorageUsageInput, StorageUsage | null, "required">()("storage:get-usage"),
+    deleteFile: scopedRequest<DeleteStoredFileInput, void, "required">()("storage:delete-file"),
+    clear: scopedRequest<ClearStorageInput, void, "required">()("storage:clear"),
+    openFile: scopedRequest<OpenStoredFileInput, void, "required">()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
   },
   // Bound against the agent import service, which holds the staged archives.
@@ -741,31 +761,34 @@ export const IPC_ENDPOINTS = {
 
 export type IpcEndpoints = typeof IPC_ENDPOINTS;
 
-// What a typed endpoint looks like to the renderer. A server-scoped payload loses its scope, because
-// the preload adds the selected server; a scope that carries nothing takes no argument. A payload
-// that may be `undefined` is an optional argument.
+// What a typed endpoint looks like to the renderer. A payload that may be `undefined` is an optional
+// argument. A server-scoped payload loses its scope and takes the server last instead, because the
+// preload builds the scope; left out, it is the selected server. A scope that carries nothing takes
+// only the server.
 type OptionalArgs<Payload> = [Payload] extends [undefined]
   ? []
   : undefined extends Payload
     ? [input?: Exclude<Payload, undefined>]
     : [input: Payload];
 
-type ArgsOf<Payload> = [Payload] extends [AgentIpcRequest<infer Inner>]
-  ? [Inner] extends [null]
-    ? []
-    : OptionalArgs<Inner>
-  : OptionalArgs<Payload>;
+type ServerArgs<Server> = [Server] extends ["required"] ? [serverId: string] : [serverId?: string];
+
+type ScopedArgs<Inner, Server> = [Inner] extends [null]
+  ? ServerArgs<Server>
+  : [...OptionalArgs<Inner>, ...ServerArgs<Server>];
 
 /**
  * The `OpenBotDesktopApi` signature of a typed request, so a method that passes its input straight
  * through takes its types from the endpoint instead of repeating them. An untyped endpoint is `never`.
  */
 export type Invoke<Endpoint> =
-  Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
-    ? [Payload] extends [Untyped]
-      ? never
-      : (...args: ArgsOf<Payload>) => Promise<Result>
-    : never;
+  Endpoint extends ScopedRequestEndpoint<string, infer Inner, infer Result, infer Server>
+    ? (...args: ScopedArgs<Inner, Server>) => Promise<Result>
+    : Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
+      ? [Payload] extends [Untyped]
+        ? never
+        : (...args: OptionalArgs<Payload>) => Promise<Result>
+      : never;
 
 /** The `OpenBotDesktopApi` subscription to a typed event. It answers the unsubscribe call. */
 export type Subscribe<Endpoint> =

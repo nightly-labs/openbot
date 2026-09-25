@@ -14,9 +14,11 @@ renderer-to-main trust boundary. [Main-process rules](../main/AGENTS.md#trust-bo
   `dropInvalid(decode)` drops a value that answers null (for a deep-link id). A group is bridged
   whole or written by hand; do not add a direct call for one endpoint of a bridged group. A bridged
   method forwards only its first argument, so main still sees at most one payload. It also forwards
-  an argument that a no-payload method gets. Do not pass a bridged method by reference as an event
-  handler, such as `onClick={api.update.check}`: Electron cannot copy the DOM event, and the call rejects.
-- In a hand-written group, invoke through `invokeRequest`, `invokeAgent` or `invokeAgentForServer`.
+  an argument that a no-payload method gets. A scoped endpoint (`scopedRequest`, `scopedQuery`) is
+  sent as `AgentIpcRequest`: the server is the argument after the payload, or the selected server,
+  read at call time. Do not pass a bridged method by reference as an event handler, such as
+  `onClick={api.update.check}`: Electron cannot copy the DOM event, and the call rejects.
+- In a hand-written group, invoke through `invokeRequest` or `invokeAgentForServer`.
   Subscribe through `subscribe(endpoint, decode, listener)`; use `listen` only when the event has no
   payload or the handler checks the raw value itself. Do not call `ipcRenderer.on` directly.
 - Invoke only request endpoints from `IPC_ENDPOINTS`, and subscribe only to event endpoints.

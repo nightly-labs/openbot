@@ -146,7 +146,7 @@ export function agentIpcHandlers({
           remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, decodeAgentModelOptions),
         });
       }),
-      list: payloadHandler(agentScope, (parsed) => {
+      listAgents: payloadHandler(agentScope, (parsed) => {
         return routeToServer(parsed.serverId, {
           local: () => service.listAgents(),
           remote: (serverId) => remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
@@ -248,7 +248,7 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      create: payloadHandler(agentRequest(parseCreateAgent), (scoped) => {
+      createAgent: payloadHandler(agentRequest(parseCreateAgent), (scoped) => {
         const parsed = scoped.payload;
         return routeToServer(scoped.serverId, {
           local: () => service.createAgent(parsed),
@@ -259,11 +259,11 @@ export function agentIpcHandlers({
             }),
         });
       }),
-      duplicate: payloadHandler(agentRequest(parseAgentId), (scoped): Promise<DuplicateAgentResult> => {
+      duplicateAgent: payloadHandler(agentRequest(parseAgentId), (scoped): Promise<DuplicateAgentResult> => {
         const agentId = scoped.payload;
         return routeDuplicateAgent(service, sidebarLayout, remoteServers, scoped.serverId, agentId);
       }),
-      update: payloadHandler(agentRequest(parseUpdateAgent), (scoped) => {
+      updateAgent: payloadHandler(agentRequest(parseUpdateAgent), (scoped) => {
         return routeUpdateAgent(service, remoteServers, scoped.serverId, scoped.payload);
       }),
       setAvatar: payloadHandler(agentRequest(parseSetAgentAvatar), (scoped) => {
@@ -273,7 +273,7 @@ export function agentIpcHandlers({
           remote: (serverId) => remoteServers.setAgentAvatar(parsed.agentId, parsed.image, serverId),
         });
       }),
-      delete: payloadHandler(agentRequest(parseAgentId), (scoped) => {
+      deleteAgent: payloadHandler(agentRequest(parseAgentId), (scoped) => {
         const agentId = scoped.payload;
         return routeDeleteAgent(service, sidebarLayout, remoteServers, scoped.serverId, agentId);
       }),
