@@ -32,6 +32,12 @@ local command.
 adding Bun globals at the root. `remote/scripts/update.ts` drains and recreates the live coturn
 container, so its type coverage matters.
 
+`tsconfig.node.json` and `tsconfig.web.json` set `verbatimModuleSyntax`: a file compiles alone the
+same way under `tsc` and the bundler, because a type-only import must say `import type`. It had no
+findings when it was turned on. `exactOptionalPropertyTypes` is off: it had 193 findings in the Node
+project on 2026-09-25. Turn it on with the fix, not with a baseline; the lint ratchet counts only
+Biome rules.
+
 The Signal Dockerfile installs from a pruned checkout with one manifest copy per workspace.
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
 cover the workspace dependency graph; keep that check when changing workspace dependencies.
