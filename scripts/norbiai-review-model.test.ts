@@ -74,7 +74,11 @@ function resolve({ description = "", comment = "", fork = false, changedFiles = 
   };
 }
 
-const defaults = { model: job.env.DEFAULT_MODEL, effort: job.env.DEFAULT_EFFORT };
+const defaultIsClaude = job.env.CLAUDE_MODELS?.split(" ").includes(job.env.DEFAULT_MODEL ?? "");
+const defaults = {
+  model: job.env.DEFAULT_MODEL,
+  effort: defaultIsClaude ? job.env.CLAUDE_DEFAULT_EFFORT : job.env.DEFAULT_EFFORT,
+};
 
 describe("NorbiAI reviewer selection", () => {
   it("reviews on the defaults when the pull request asks for nothing", () => {
@@ -297,17 +301,17 @@ describe("NorbiAI reviewer selection", () => {
 
   // The shared default effort is the cheapest level, because the Codex model that reads it
   // may go no higher. A Claude review that asked for no effort would run at that level.
-  it("runs a Claude model on Claude Code, at the Claude default effort unless asked", () => {
-    expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5" })).toMatchObject({
+  it("reviews on Claude Code by default, at the Claude default effort unless asked", () => {
+    expect(resolve({ description: "Fixes a bug." })).toMatchObject({
       cli: "claude",
       effort: job.env.CLAUDE_DEFAULT_EFFORT,
       reviewer: `claude-opus-5-5, reasoning effort ${job.env.CLAUDE_DEFAULT_EFFORT}`,
     });
-    expect(resolve({ description: "NorbiAI-Model: claude-sonnet-5\nNorbiAI-Effort: low" })).toMatchObject({
+    expect(resolve({ description: "NorbiAI-Effort: low" })).toMatchObject({
       cli: "claude",
       effort: "low",
     });
-    expect(resolve({ description: "Fixes a bug." }).cli).toBe("codex");
+    expect(resolve({ description: "NorbiAI-Model: chatgpt-web/extra-high" }).cli).toBe("codex");
   });
 
   // The published review says what ran. Naming an effort beside a chatgpt-web slug described

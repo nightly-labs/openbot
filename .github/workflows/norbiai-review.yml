@@ -143,15 +143,16 @@ jobs:
       # What a pull request gets when it asks for nothing. Every other run is this pair
       # plus whatever the pull request or the review request overrode, and the override is
       # scoped to that one run: nothing here is written back, so the next pull request
-      # starts from these values again.
-      DEFAULT_MODEL: chatgpt-web/extra-high
+      # starts from these values again. A Claude model here runs at `CLAUDE_DEFAULT_EFFORT`.
+      # Name `chatgpt-web/extra-high` to review on Codex instead.
+      DEFAULT_MODEL: claude-opus-5-5
       # The default instead, when every changed file is documentation, a story, a test or a
       # message table. Has to be on `ALLOWED_MODELS`.
       LOW_RISK_MODEL: chatgpt-web/medium
-      # Only `gpt-6-astra` reads this. A `chatgpt-web/*` slug carries its own level — the
-      # `high` in `chatgpt-web/high` is the reasoning level, already chosen — so the effort
-      # passed alongside it is ignored, and the default stays at the cheapest value rather
-      # than implying a depth the bridge models never got.
+      # A Codex model that reads the effort gets this: only `gpt-6-astra`. A `chatgpt-web/*`
+      # slug carries its own level — the `high` in `chatgpt-web/high` is the reasoning level,
+      # already chosen — so the effort passed alongside it is ignored, and the default stays
+      # at the cheapest value rather than implying a depth the bridge models never got.
       DEFAULT_EFFORT: low
       # An override is untrusted free text, and it reaches a command line. Membership in
       # these lists is the whole validation: anything else is refused and the default runs
@@ -159,10 +160,11 @@ jobs:
       # list here to offer a new choice — space separated, exact match.
       ALLOWED_MODELS: >-
         chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro
-        gpt-6-astra claude-opus-5-5 claude-opus-5 claude-sonnet-5
+        gpt-6-astra claude-opus-5-5
       # The models Claude Code runs instead of Codex, through the Claude login on the runner
-      # mac. Each is also on `ALLOWED_MODELS` and `EFFORT_MODELS`.
-      CLAUDE_MODELS: claude-opus-5-5 claude-opus-5 claude-sonnet-5
+      # mac. Each is also on `ALLOWED_MODELS` and `EFFORT_MODELS`. Only Opus 5.5 is offered,
+      # by an explicit decision.
+      CLAUDE_MODELS: claude-opus-5-5
       # A Claude model reads the effort, and the shared `DEFAULT_EFFORT` is the cheapest
       # level because no Codex model that reads it may go higher. A Claude review asked
       # for without an effort gets this one instead.
@@ -182,7 +184,7 @@ jobs:
       # naming an effort beside one describes a setting that did nothing — which is what the
       # published review used to report. The list decides what that review says, and a model
       # added here has to be one that really takes the setting.
-      EFFORT_MODELS: gpt-6-astra claude-opus-5-5 claude-opus-5 claude-sonnet-5
+      EFFORT_MODELS: gpt-6-astra claude-opus-5-5
 
     steps:
       - name: Checkout repository
