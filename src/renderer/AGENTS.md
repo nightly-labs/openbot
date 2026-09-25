@@ -130,7 +130,7 @@ component. Needing either for logic means the logic is not separable from the DO
 | `await screen.findByText(...)` | Copy that is a product contract and has no accessible role of its own. |
 | `emitAgentEvent(...)` and the other `emit*` bridges — `app-test-harness.ts` | Driving a main-process event into the renderer. Await a `findBy*` after it; do not wait on the clock. |
 | `subscriberCounts()` — same file | Asserting a screen actually unsubscribed. This is how a leaked bridge subscription is caught. |
-| `installOpenbotStub()` | The whole `window.openbot` surface. Extend the stub rather than reaching around it. |
+| `installOpenbotStub()` | The whole `window.openbot` surface. Extend the stub rather than reaching around it. A group the preload bridges uses `stubGroup`: give only the members a test reaches; other requests reject as not stubbed. |
 | `vi.waitFor(() => expect(spy)...)` | A call that produces no visible change — an analytics event, an IPC invoke. |
 | `vi.useFakeTimers()` + `vi.advanceTimersByTime(n)` | A debounce or a poll interval. Advancing the clock is input, not waiting. |
 

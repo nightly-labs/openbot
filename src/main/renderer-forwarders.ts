@@ -104,7 +104,7 @@ export function createRendererForwarders({
       const current = getMainWindow();
       if (!current || current.isDestroyed()) return;
       showMainWindow(current);
-      sendToRenderer(current, IPC_ENDPOINTS.notifications.openedEvent, {
+      sendToRenderer(current, IPC_ENDPOINTS.notifications.opened, {
         serverId,
         agentId: content.agentId,
         threadId: content.threadId,

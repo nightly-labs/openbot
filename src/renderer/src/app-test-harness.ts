@@ -1,24 +1,28 @@
-import type {
-  AgentEvent,
-  AgentProviderId,
-  AgentStatus,
-  AgentSummary,
-  AttachmentImportEvent,
-  BrowserLiveViewEvent,
-  BrowserPictureInPictureEvent,
-  BrowserTab,
-  CentralAuthState,
-  ComputerUseState,
-  ConversationPage,
-  DirectMessageRealtimeEvent,
-  DirectTypingRealtimeEvent,
-  DynamicIslandAction,
-  OpenBotDesktopApi,
-  QueueDelivery,
-  ScopedAgentEvent,
-  ServerSummary,
-  TeamPresenceSnapshot,
-  UpdateStatus,
+import {
+  type AgentEvent,
+  type AgentProviderId,
+  type AgentStatus,
+  type AgentSummary,
+  type AttachmentImportEvent,
+  type BrowserLiveViewEvent,
+  type BrowserPictureInPictureEvent,
+  type BrowserTab,
+  type CentralAuthState,
+  type ComputerUseState,
+  type ConversationPage,
+  type DirectMessageRealtimeEvent,
+  type DirectTypingRealtimeEvent,
+  type DynamicIslandAction,
+  type GroupApi,
+  groupApiMethodName,
+  IPC_ENDPOINTS,
+  type IpcEndpointGroup,
+  type OpenBotDesktopApi,
+  type QueueDelivery,
+  type ScopedAgentEvent,
+  type ServerSummary,
+  type TeamPresenceSnapshot,
+  type UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { screen } from "@solidjs/testing-library";
 import { vi } from "vitest";
@@ -404,6 +408,40 @@ function notStubbed(name: string) {
   return vi.fn(() => Promise.reject(new Error(`window.openbot.${name} is not stubbed`)));
 }
 
+type StubMethod = (...args: never[]) => unknown;
+
+/**
+ * A group the preload builds whole with `bridgeGroup`, built here the same way from `IPC_ENDPOINTS`,
+ * so a new endpoint in it needs no line in this file. A request the test does not give is
+ * `notStubbed`, and an event it does not give is a subscription that never fires. `path` is the
+ * group's property on `window.openbot`, or null for a group spread into the top level.
+ *
+ * The typed signature is an overload for the reason `bridgeGroup` gives in the preload.
+ */
+function stubGroup<Group extends IpcEndpointGroup>(
+  group: Group,
+  path: string | null,
+  stubbed: NoInfer<Partial<GroupApi<Group>>>,
+): GroupApi<Group>;
+function stubGroup(
+  group: IpcEndpointGroup,
+  path: string | null,
+  stubbed: Readonly<Record<string, StubMethod | undefined>>,
+): object {
+  const api: Record<string, StubMethod> = {};
+  for (const [key, endpoint] of Object.entries(group)) {
+    const name = groupApiMethodName(key, endpoint);
+    const given = stubbed[name];
+    if (given !== undefined) api[name] = given;
+    else if (endpoint.kind === "event") api[name] = vi.fn(() => () => undefined);
+    else api[name] = notStubbed(path === null ? name : `${path}.${name}`);
+  }
+  for (const name of Object.keys(stubbed)) {
+    if (!Object.hasOwn(api, name)) throw new Error(`window.openbot${path === null ? "" : `.${path}`} has no ${name}`);
+  }
+  return api;
+}
+
 export function installOpenbotStub(): void {
   for (const bridge of Object.values(eventBridges)) bridge.reset();
   trackAnalytics.mockClear();
@@ -426,24 +464,68 @@ export function installOpenbotStub(): void {
     value: { getUserMedia: vi.fn().mockRejectedValue(new DOMException("Denied", "NotAllowedError")) },
   });
   const stub = {
-    getAppInfo: vi.fn().mockResolvedValue({
-      name: "OpenBot",
-      version: "0.1.0",
-      platform: "darwin",
-      variant: "production",
+    ...stubGroup(IPC_ENDPOINTS.app, null, {
+      getAppInfo: vi.fn().mockResolvedValue({
+        name: "OpenBot",
+        version: "0.1.0",
+        platform: "darwin",
+        variant: "production",
+      }),
+      getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
+      saveSetup: vi.fn().mockImplementation(async ({ preferredProvider }) => ({
+        completed: true,
+        preferredProvider,
+      })),
+      getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
+      setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
+      getApprovalAutomation: vi
+        .fn()
+        .mockResolvedValue({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} }),
+      setApprovalAutomation: vi.fn(async () => ({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} })),
+      getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
+      setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
+      openExternal: vi.fn().mockResolvedValue(undefined),
+      openUrl: vi.fn().mockResolvedValue(undefined),
     }),
-    getSetupState: vi.fn().mockResolvedValue({ completed: true, preferredProvider: "codex" }),
-    getAnalyticsPreference: vi.fn().mockResolvedValue({ enabled: true }),
-    setAnalyticsPreference: vi.fn(async ({ enabled }) => ({ enabled })),
-    getApprovalAutomation: vi
-      .fn()
-      .mockResolvedValue({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} }),
-    setApprovalAutomation: vi.fn(async () => ({ turbo: false, defaultAutoApprove: false, autoApproveOverrides: {} })),
-    getAppLanguagePreference: vi.fn().mockResolvedValue({ language: "system" }),
-    setAppLanguagePreference: vi.fn(async ({ language }) => ({ language })),
-    onAppLanguagePreference: vi.fn(() => () => undefined),
-    onOpenSettings: vi.fn(() => () => undefined),
-    dynamicIsland: {
+    ...stubGroup(IPC_ENDPOINTS.providers, null, {
+      // One channel, so the mock has to answer for whichever provider the caller names:
+      // each response marks that provider connecting and reports its own CLI version.
+      connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
+      refreshAgentProviders: vi.fn().mockResolvedValue({
+        phase: "ready",
+        cliVersion: "0.144.1",
+        auth: { kind: "chatgpt", email: "norbert@example.com" },
+        providers: [
+          {
+            id: "codex",
+            state: "available",
+            version: "0.144.1",
+            message: null,
+            email: "norbert@example.com",
+          },
+          {
+            id: "claude",
+            state: "available",
+            version: "2.1.231",
+            message: null,
+            email: "claude@example.com",
+          },
+        ],
+        capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
+        message: null,
+        fullAccess: true,
+      }),
+      // The code and the page it is typed on are all that come back. How the sign-in ends arrives
+      // in the agent status, so a test that drives it to an end emits that status itself.
+      startProviderCodeLogin: vi.fn(async () => ({
+        kind: "code" as const,
+        userCode: "KTQ4-B62MX",
+        verificationUrl: "https://auth.openai.com/codex/device",
+        expiresAt: Date.now() + 600_000,
+      })),
+      cancelProviderCodeLogin: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
+    }),
+    dynamicIsland: stubGroup(IPC_ENDPOINTS.dynamicIsland, "dynamicIsland", {
       getPreference: vi.fn().mockResolvedValue({
         enabled: true,
         hapticsEnabled: true,
@@ -455,113 +537,33 @@ export function installOpenbotStub(): void {
       setPreference: vi.fn(async (preference) => ({ ...preference })),
       publishPresentation: vi.fn().mockResolvedValue(undefined),
       getPresentation: vi.fn().mockResolvedValue(null),
-      onPreference: vi.fn().mockReturnValue(() => undefined),
-      onPresentation: vi.fn().mockReturnValue(() => undefined),
-      onGeometry: vi.fn().mockReturnValue(() => undefined),
       performAction: vi.fn().mockResolvedValue(undefined),
       performHaptic: vi.fn().mockResolvedValue(undefined),
       onAction: vi.fn(dynamicIslandActionBridge.subscribe),
       setInteractive: vi.fn().mockResolvedValue(undefined),
-    },
-    saveSetup: vi.fn().mockImplementation(async ({ preferredProvider }) => ({
-      completed: true,
-      preferredProvider,
-    })),
+    }),
     getComputerUseState: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
     openComputerUsePermissionPane: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
-    openExternal: vi.fn().mockResolvedValue(undefined),
-    // One channel, so the mock has to answer for whichever provider the caller names:
-    // each response marks that provider connecting and reports its own CLI version.
-    connectProvider: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
-    // The code and the page it is typed on are all that come back. How the sign-in ends arrives
-    // in the agent status, so a test that drives it to an end emits that status itself.
-    startProviderCodeLogin: vi.fn(async () => ({
-      kind: "code" as const,
-      userCode: "KTQ4-B62MX",
-      verificationUrl: "https://auth.openai.com/codex/device",
-      expiresAt: Date.now() + 600_000,
-    })),
-    cancelProviderCodeLogin: vi.fn(async (provider: AgentProviderId) => CONNECTING_STATUS[provider]),
-    refreshAgentProviders: vi.fn().mockResolvedValue({
-      phase: "ready",
-      cliVersion: "0.144.1",
-      auth: { kind: "chatgpt", email: "norbert@example.com" },
-      providers: [
-        {
-          id: "codex",
-          state: "available",
-          version: "0.144.1",
-          message: null,
-          email: "norbert@example.com",
-        },
-        {
-          id: "claude",
-          state: "available",
-          version: "2.1.231",
-          message: null,
-          email: "claude@example.com",
-        },
-      ],
-      capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
-      message: null,
-      fullAccess: true,
-    }),
-    openUrl: vi.fn().mockResolvedValue(undefined),
     closeComputerUsePermissionHelp: notStubbed("closeComputerUsePermissionHelp"),
     getComputerUsePermissionApp: notStubbed("getComputerUsePermissionApp"),
     startComputerUsePermissionAppDrag: notStubbed("startComputerUsePermissionAppDrag"),
     revealComputerUsePermissionApp: notStubbed("revealComputerUsePermissionApp"),
     onComputerUseHighlightPlacement: vi.fn(() => () => undefined),
-    updateProviderCli: notStubbed("updateProviderCli"),
-    setProviderApiKey: notStubbed("setProviderApiKey"),
-    clearProviderApiKey: notStubbed("clearProviderApiKey"),
-    getProviderApiKeyState: notStubbed("getProviderApiKeyState"),
-    skills: {
+    skills: stubGroup(IPC_ENDPOINTS.skills, "skills", {
       localList: vi.fn().mockResolvedValue([]),
-      localGet: notStubbed("skills.localGet"),
-      localCreate: notStubbed("skills.localCreate"),
-      localRevise: notStubbed("skills.localRevise"),
-      localInstall: notStubbed("skills.localInstall"),
       list: vi.fn().mockResolvedValue({ skills: [], nextCursor: null }),
-      get: notStubbed("skills.get"),
-      listMine: notStubbed("skills.listMine"),
-      choosePackage: notStubbed("skills.choosePackage"),
-      submit: notStubbed("skills.submit"),
       listInstalled: vi.fn().mockResolvedValue([]),
-      install: notStubbed("skills.install"),
-      uninstall: notStubbed("skills.uninstall"),
-      setEnabled: notStubbed("skills.setEnabled"),
-    },
-    hostedSites: {
-      list: notStubbed("hostedSites.list"),
-      chooseDirectory: notStubbed("hostedSites.chooseDirectory"),
-      publish: notStubbed("hostedSites.publish"),
-      replace: notStubbed("hostedSites.replace"),
-      delete: notStubbed("hostedSites.delete"),
-    },
-    marketplaceAgents: {
-      list: notStubbed("marketplaceAgents.list"),
-      get: notStubbed("marketplaceAgents.get"),
-      listMine: notStubbed("marketplaceAgents.listMine"),
-      preview: notStubbed("marketplaceAgents.preview"),
-      submit: notStubbed("marketplaceAgents.submit"),
-      install: notStubbed("marketplaceAgents.install"),
-    },
-    agentTemplates: {
-      preview: notStubbed("agentTemplates.preview"),
-      publish: notStubbed("agentTemplates.publish"),
-      unpublish: notStubbed("agentTemplates.unpublish"),
-      get: notStubbed("agentTemplates.get"),
-      install: notStubbed("agentTemplates.install"),
+    }),
+    hostedSites: stubGroup(IPC_ENDPOINTS.hostedSites, "hostedSites", {}),
+    marketplaceAgents: stubGroup(IPC_ENDPOINTS.marketplaceAgents, "marketplaceAgents", {}),
+    agentTemplates: stubGroup(IPC_ENDPOINTS.agentTemplates, "agentTemplates", {
       takePendingLink: vi.fn().mockResolvedValue(null),
-      onOpenLink: vi.fn().mockReturnValue(() => undefined),
-    },
-    voice: {
+    }),
+    voice: stubGroup(IPC_ENDPOINTS.voice, "voice", {
       getModelStatus: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       transcribe: vi.fn().mockResolvedValue({ text: "Voice transcript" }),
-      onModelStatus: vi.fn().mockReturnValue(() => undefined),
-    },
+    }),
     auth: {
       getState: vi.fn().mockResolvedValue({
         status: "signed_in",
@@ -869,7 +871,7 @@ export function installOpenbotStub(): void {
       hidePictureInPicture: vi.fn().mockResolvedValue(undefined),
       onPictureInPictureEvent: vi.fn(browserPictureInPictureBridge.subscribe),
     },
-    update: {
+    update: stubGroup(IPC_ENDPOINTS.update, "update", {
       getStatus: vi.fn().mockResolvedValue({
         phase: "idle",
         currentVersion: "0.1.0",
@@ -898,18 +900,17 @@ export function installOpenbotStub(): void {
       getPreference: vi.fn().mockResolvedValue({ autoDownload: true }),
       setPreference: vi.fn(async (input) => input),
       onEvent: vi.fn(updateStatusBridge.subscribe),
-    },
-    notifications: {
+    }),
+    notifications: stubGroup(IPC_ENDPOINTS.notifications, "notifications", {
       getPreference: vi.fn().mockResolvedValue({ desktopNotifications: true }),
       setPreference: vi.fn(async (input) => input),
       test: vi.fn().mockResolvedValue(undefined),
       openSettings: vi.fn().mockResolvedValue(undefined),
-      onOpened: vi.fn(() => () => undefined),
-    },
-    maintenance: {
+    }),
+    maintenance: stubGroup(IPC_ENDPOINTS.maintenance, "maintenance", {
       exportData: vi.fn().mockResolvedValue({ saved: true }),
       exportDiagnostics: vi.fn().mockResolvedValue({ saved: true }),
-    },
+    }),
     servers: {
       reorder: notStubbed("servers.reorder"),
       setMuted: vi
@@ -1027,11 +1028,11 @@ export function installOpenbotStub(): void {
       onEvent: vi.fn(serversBridge.subscribe),
       onInvite: vi.fn(inviteBridge.subscribe),
     },
-    plugins: {
+    plugins: stubGroup(IPC_ENDPOINTS.plugins, "plugins", {
       takePendingListing: vi.fn().mockResolvedValue(null),
       onOpenListing: vi.fn(pluginListingBridge.subscribe),
-    },
-    host: {
+    }),
+    host: stubGroup(IPC_ENDPOINTS.host, "host", {
       getStatus: vi.fn().mockResolvedValue({
         phase: "unconfigured",
         configured: false,
@@ -1062,18 +1063,13 @@ export function installOpenbotStub(): void {
       listInvites: vi.fn().mockResolvedValue([]),
       revokeInvite: vi.fn().mockResolvedValue(undefined),
       createInvite: vi.fn().mockResolvedValue(undefined),
-      onEvent: vi.fn(() => () => undefined),
-    },
-    remoteDesktop: {
-      checkSetup: notStubbed("remoteDesktop.checkSetup"),
-      openSetup: notStubbed("remoteDesktop.openSetup"),
-      test: notStubbed("remoteDesktop.test"),
+    }),
+    remoteDesktop: stubGroup(IPC_ENDPOINTS.remoteDesktop, "remoteDesktop", {
       list: vi.fn().mockResolvedValue([]),
       connect: vi.fn().mockResolvedValue(undefined),
       selectDisplay: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn().mockResolvedValue(undefined),
-      onEvent: vi.fn(() => () => undefined),
-    },
+    }),
     storage: {
       getUsage: vi.fn().mockResolvedValue(null),
       deleteFile: vi.fn().mockResolvedValue(undefined),
@@ -1081,19 +1077,13 @@ export function installOpenbotStub(): void {
       openFile: vi.fn().mockResolvedValue(undefined),
       openLocation: vi.fn().mockResolvedValue(undefined),
     },
-    agentImport: {
-      choose: notStubbed("agentImport.choose"),
-      apply: notStubbed("agentImport.apply"),
-      discard: notStubbed("agentImport.discard"),
-      readSkill: notStubbed("agentImport.readSkill"),
-      saveSkill: notStubbed("agentImport.saveSkill"),
-    },
+    agentImport: stubGroup(IPC_ENDPOINTS.agentImport, "agentImport", {}),
     // The custom providers context lists on mount, so every harnessed mount reaches this group.
-    customProviders: {
+    customProviders: stubGroup(IPC_ENDPOINTS.customProviders, "customProviders", {
       list: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
-    },
+    }),
     // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is
     // absent, and these tests cover that flow. A stub member switches every screen to downloads.
   } satisfies Omit<OpenBotDesktopApi, "providerRuntimes">;
