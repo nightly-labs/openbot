@@ -18,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
+import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
@@ -109,6 +110,7 @@ export function AgentListRow({
   const editMenu = useRef<MenuComponentRef>(null);
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const agentContextMenu = useAgentContextMenu(agent);
+  const agentChatPreview = useAgentChatPreview(agent);
   const isUnread = useAgentUnread(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const avatar = (
@@ -142,6 +144,7 @@ export function AgentListRow({
             : undefined
         }
         className="w-full"
+        onPressIn={enableActions ? agentChatPreview.onPressIn : undefined}
         onLongPress={enableActions && Platform.OS === "android" ? () => editMenu.current?.show() : undefined}
       >
         {({ pressed }) => (
@@ -178,6 +181,7 @@ export function AgentListRow({
                 </Typography.Paragraph>
               </View>
             </AgentRowTextReveal>
+            {enableActions ? agentChatPreview.measurer : null}
           </View>
         )}
       </ChatLinkPressable>
@@ -191,6 +195,7 @@ export function AgentListRow({
   const agentLink = enableActions ? (
     <Link href={href} asChild dismissTo={dismissToChat} onPress={handleOpen}>
       {linkTrigger}
+      {agentChatPreview.preview}
       {agentContextMenu}
     </Link>
   ) : (

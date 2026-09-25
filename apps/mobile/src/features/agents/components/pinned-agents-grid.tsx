@@ -11,6 +11,7 @@ import Animated, {
   LinearTransition,
   ReduceMotion,
 } from "react-native-reanimated";
+import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { useAgentContextMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
@@ -56,6 +57,7 @@ export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agent
 function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const [background, accent] = useThemeColor(["background", "accent"]);
   const agentContextMenu = useAgentContextMenu(agent);
+  const agentChatPreview = useAgentChatPreview(agent);
   const isUnread = useAgentUnread(agent.id);
 
   return (
@@ -66,6 +68,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
             accessibilityLabel={`Open pinned chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
             accessibilityRole="button"
             className="w-full items-center gap-2 px-1"
+            onPressIn={agentChatPreview.onPressIn}
             style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
           >
             <Link.AppleZoom>
@@ -101,8 +104,10 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
                 </Typography.Paragraph>
               ) : null}
             </View>
+            {agentChatPreview.measurer}
           </ChatLinkPressable>
         </Link.Trigger>
+        {agentChatPreview.preview}
         {agentContextMenu}
       </Link>
     </PinnedChatItem>
