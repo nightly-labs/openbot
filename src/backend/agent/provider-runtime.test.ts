@@ -28,7 +28,8 @@ import type { CustomProviderConfig } from "../opencode-config";
 import { getString } from "../protocol";
 import { DIAGNOSTIC_TEXT_LIMIT } from "../stderr-diagnostics";
 import { DrainScheduler } from "./drain-scheduler";
-import { isUsageLimitDiagnostic, PROVIDER_IDLE_RELEASE_MS, PROVIDER_UNASSIGNED_RELEASE_MS } from "./provider-runtime";
+import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import { PROVIDER_IDLE_RELEASE_MS, PROVIDER_UNASSIGNED_RELEASE_MS } from "./provider-runtime";
 
 let root: string;
 let service: AgentService | null = null;

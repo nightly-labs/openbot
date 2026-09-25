@@ -1,5 +1,4 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
   AgentEvent,
@@ -12,12 +11,7 @@ import type {
   CustomProviderRestart,
   ProviderCodeLoginStart,
 } from "@openbot/contracts/ipc";
-import {
-  agentProviderDescriptor,
-  isAgentProvider,
-  isFreeOpencodeModel,
-  isReasoningEffort,
-} from "@openbot/contracts/ipc";
+import { agentProviderDescriptor, isAgentProvider, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -53,6 +47,22 @@ import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
+  isBackgroundRefreshDiagnostic,
+  isMcpSubsystemDiagnostic,
+  isTelemetryExportDiagnostic,
+  isToolCallDiagnostic,
+  isUsageLimitDiagnostic,
+  LOG_TIMESTAMP_PREFIX,
+} from "./provider-diagnostics";
+import {
+  claudeModelName,
+  compareModelVersions,
+  FALLBACK_MODELS,
+  isOpencodeModelUnusableWithStoredKey,
+  modelDisplayName,
+  PREFERRED_MODEL_ORDER,
+} from "./provider-models";
+import {
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
@@ -80,103 +90,6 @@ const PROVIDER_IDLE_CHECK_MS = 60_000;
 function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   const now = Date.now() / 1_000;
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
-}
-
-/**
- * Whether a provider diagnostic is about an MCP server rather than about the agent's work.
- *
- * A CLI writes its MCP subsystem's failures to the same stderr as its own. OpenCode reads the user's
- * MCP list from their own files, so OpenBot neither owns those servers nor can act on them, and a
- * server that does not start leaves the turn running with fewer tools. Two of them arrive on every
- * restart, because a server spawns per session and OpenBot opens a short session to read the model
- * list. That belongs in the log, not in an error the user is asked to read.
- *
- * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app. So does a server this app configured - the user asked for it here, and the reason it
- * does not start is something only they can fix. `configuredNames` is what separates the two: a
- * server the user configured in their own provider files is still nobody's failure but theirs.
- */
-export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
-  if (/openbot/i.test(message)) return false;
-  if (configuredNames.some((name) => name && message.includes(name))) return false;
-  return /\b(mcp|rmcp)\b/i.test(message);
-}
-
-/**
- * Whether a provider diagnostic is about the CLI's own telemetry export rather than about the
- * agent's work.
- *
- * Grok's CLI carries an OpenTelemetry exporter that reports every failed flush on the same stderr as
- * the agent, so a computer that cannot reach its collector - one offline, behind a proxy, or with
- * that host blocked - writes `BatchSpanProcessor.ExporterError` while the turn runs correctly. The
- * user met it as a "Provider error" toast on switching a chat to Grok, with nothing failing and
- * nothing to do about it. No turn, model switch, or sign-in reads that export, so it belongs in the
- * log.
- *
- * Only the exporter's own subsystem names count. A message that names OpenBot, or a network failure
- * that does not name telemetry, is the provider's work and stays visible.
- */
-export function isTelemetryExportDiagnostic(message: string): boolean {
-  if (/openbot/i.test(message)) return false;
-  return /\b(?:batch(?:span|log|logrecord)processor|(?:span|log|logrecord|metric)exporter|opentelemetry|otlp|otel)\b/i.test(
-    message,
-  );
-}
-
-/**
- * Whether a provider diagnostic reports one failed tool call rather than a failure of the provider.
- *
- * Grok's CLI logs `tool_error: tool_output_error` on stderr each time a tool returns an error, such
- * as a browser click whose target is gone. The agent already reads that error as the tool's result
- * and can try again, and the chat marks the step as failed. The user met it as a "Provider error"
- * toast during an embedded-browser click, with nothing to do about it. It belongs in the log.
- *
- * Only Grok's per-call kinds count. Any other failure, the provider's own included, stays visible.
- */
-export function isToolCallDiagnostic(message: string): boolean {
-  return /\btool_error:\s*(?:tool_output_error|execution_failure|parse_failure)\b/.test(message);
-}
-
-/**
- * Whether a provider diagnostic reports a background refresh that the CLI retries by itself.
- *
- * Codex refreshes its model list and its remote settings on a timer, and logs each failed attempt
- * on stderr. A computer that wakes without internet access writes one line per attempt, and the user
- * met them as a stack of "Provider error" toasts to close one by one (#717). No turn reads either
- * refresh: OpenBot reads the model catalogue itself and reports that failure where it happens.
- *
- * Only these two refreshes count. Any other failure, a network failure included, stays visible.
- */
-export function isBackgroundRefreshDiagnostic(message: string): boolean {
-  if (/openbot/i.test(message)) return false;
-  return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
-}
-
-/**
- * The timestamp a CLI's log formatter writes before a record, as in
- * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
- * something to act on, and it makes every repeat of one failure a new message.
- */
-const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
-
-/**
- * Whether a provider says that the account's paid usage is exhausted.
- *
- * This is narrower than an HTTP status check. A 429 can be a short request-rate throttle, and a
- * 402 can describe a subscription problem that the usage notice cannot explain. The explicit
- * balance, credit and quota phrases below mean the provider's usage reading is the useful report.
- */
-export function isUsageLimitDiagnostic(message: string): boolean {
-  return (
-    /\binsufficient[_ -]?(?:quota|credits?)\b/iu.test(message) ||
-    /\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b.{0,80}\b(?:exhausted|depleted|exceeded|insufficient|reached|too low)\b/iu.test(
-      message,
-    ) ||
-    /\b(?:exhausted|depleted|exceeded|insufficient|reached)\b.{0,80}\b(?:quota|credits?|credit balance|usage balance|usage limits?)\b/iu.test(
-      message,
-    ) ||
-    /\bbilling hard limit (?:has been )?reached\b/iu.test(message)
-  );
 }
 
 interface PendingCodexLogin {
@@ -266,179 +179,6 @@ const INITIAL_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
-
-/**
- * A model name the contract guards accept. `isAgentModelOption` bounds the name, and both the IPC
- * and the Team API list decoders reject the whole array when one option fails, so a name that is one
- * character too long does not shorten a label - it empties the model picker.
- */
-function modelDisplayName(name: string): string {
-  return name.slice(0, INPUT_LIMITS.modelName);
-}
-
-/**
- * OpenCode models a stored key does not buy, dropped while OpenBot supplies the key.
- *
- * The stored key is an OpenCode Go key: it buys `opencode-go/` and the free tier, not OpenCode
- * Zen. OpenCode reports both products as one catalog although they are two products on two
- * endpoints -- `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1` -- so a stored key also lists
- * Zen models that answer every prompt with "Invalid API key.".
- *
- * The drop applies only while OpenBot is the one supplying the key. With no key stored, a Zen
- * model can only come from the user's own OpenCode sign-in, and that one does buy it.
- *
- * Free is decided by id and display name, after the name is resolved: `isFreeOpencodeModel`
- * is what the picker badges a model with, so the badge and the catalog cannot disagree about
- * what costs money.
- */
-function isOpencodeModelUnusableWithStoredKey(id: string, name: string): boolean {
-  const lower = id.toLowerCase();
-  if (lower.startsWith("opencode-go/")) return false;
-  return lower.startsWith("opencode/") && !isFreeOpencodeModel(id, name);
-}
-
-/**
- * Which OpenCode model a new agent runs, as the tier its catalog leads with.
- *
- * A provider with no `defaultProviderModel` falls back to the first model of its catalog, so list
- * position is the default. OpenCode reports the third-party services the user signed in to before
- * its own, so that fallback used to land on `openai/gpt-5.3-codex-spark` and the agent's first
- * message failed with "Token refresh failed: 401" although the free models needed no account.
- *
- * The order is free first, Muse ahead of the rest of the free tier, so nobody is billed for a model
- * they did not choose. Below the free tier come OpenCode's own paid models -- the `opencode-go/`
- * family the stored key buys, and any `opencode/` model behind the user's own OpenCode sign-in --
- * and last the models behind a separate sign-in, whose token OpenBot can neither see nor refresh. That tail matters only for a catalog with no free tier
- * at all; it is the difference between a bad default and an unusable one.
- * Inside one tier the newest version leads, which still keeps a free model first.
- */
-function opencodeModelRank(model: AgentModelOption): 0 | 1 | 2 | 3 {
-  // Names, not ids, because the price is a naming convention and `isFreeOpencodeModel` is what
-  // the picker badges a model with. An id reaches here as the name anyway when the CLI sends no
-  // display name, and both spellings carry the same two words.
-  if (isFreeOpencodeModel(model.id, model.name)) return /\bmuse\b/i.test(model.name) ? 0 : 1;
-  const id = model.id.toLowerCase();
-  return id.startsWith("opencode/") || id.startsWith("opencode-go/") ? 2 : 3;
-}
-
-const PREFERRED_MODEL_ORDER: ReadonlyMap<AgentProvider, (model: AgentModelOption) => number> = new Map([
-  ["opencode", opencodeModelRank],
-]);
-
-/** The first version number in a model name: `[5, 6]` for `GPT-5.6 Sol`, `null` for `gpt-reserve`. */
-function modelVersion(name: string): number[] | null {
-  const match = /\d+(?:\.\d+)*/u.exec(name);
-  return match ? match[0].split(".").map(Number) : null;
-}
-
-/**
- * Newest version first, so the picker leads with the latest model. A name with no version goes
- * last, and equal versions compare equal so the CLI's own order stays between them.
- */
-function compareModelVersions(left: AgentModelOption, right: AgentModelOption): number {
-  const a = modelVersion(left.name);
-  const b = modelVersion(right.name);
-  if (!a || !b) return Number(!a) - Number(!b);
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const difference = (b[index] ?? 0) - (a[index] ?? 0);
-    if (difference) return difference;
-  }
-  return 0;
-}
-
-/**
- * The product name of a Claude model, from its id, or `null` for an id that does not read as one.
- *
- * Claude Code lists a model by the part it plays in that CLI - "Default (recommended)", "Opus" -
- * so its display name says which pick it is there, not which model an agent runs here. The picker
- * puts all three providers side by side, and the other two name a model in full, so the same
- * sentence has to be true of this one: the id carries it, with a release stamp the picker has no
- * use for. `claude-haiku-4-5-20251001` is Claude Haiku 4.5, and `claude-fable-5-1[1m]` is the 1M
- * context window of Claude Fable 5.1.
- */
-function claudeModelName(id: string): string | null {
-  const parsed = /^([a-z0-9-]+?)(?:\[([a-z0-9]+)\])?$/u.exec(id.trim().toLowerCase());
-  if (!parsed) return null;
-  const [, base = "", variant] = parsed;
-  const parts = base.split("-");
-  if (parts.shift() !== "claude") return null;
-  const family = parts.shift();
-  if (!family || !/^[a-z]+$/u.test(family)) return null;
-  // Eight digits are the build date, which names a release of the model rather than the model.
-  const version = parts.filter((part) => !/^\d{8}$/u.test(part));
-  if (!version.length || version.some((part) => !/^\d+$/u.test(part))) return null;
-  const name = `Claude ${family[0]?.toUpperCase()}${family.slice(1)} ${version.join(".")}`;
-  return variant ? `${name} (${variant.toUpperCase()} context)` : name;
-}
-
-const FALLBACK_MODELS: AgentModelOption[] = [
-  {
-    provider: "codex",
-    id: "gpt-6-luna",
-    name: "GPT-6 Luna",
-    description: "Fast and efficient for everyday agent work.",
-    // `DEFAULT_REASONING_EFFORT`, not the `medium` the Codex CLI reports: this is the model a new
-    // agent starts on, and the two have to say the same thing.
-    defaultReasoningEffort: "low",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "codex",
-    id: "gpt-5.6-luna",
-    name: "GPT-5.6 Luna",
-    description: "Older fast and efficient model.",
-    defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "codex",
-    id: "gpt-5.6-terra",
-    name: "GPT-5.6 Terra",
-    description: "Balanced speed and capability for involved tasks.",
-    defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "codex",
-    id: "gpt-5.6-sol",
-    name: "GPT-5.6 Sol",
-    description: "Most capable for complex, long-running work.",
-    defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "claude",
-    id: "claude-opus-5-5",
-    name: "Claude Opus 5.5",
-    description: "Most capable Claude model for complex work.",
-    defaultReasoningEffort: "high",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "claude",
-    id: "claude-fable-5",
-    name: "Claude Fable 5",
-    description: "Fast Claude model for everyday agent work.",
-    defaultReasoningEffort: "high",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "claude",
-    id: "claude-opus-5",
-    name: "Claude Opus 5",
-    description: "Most capable Claude model for complex work.",
-    defaultReasoningEffort: "high",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-  {
-    provider: "claude",
-    id: "claude-sonnet-5",
-    name: "Claude Sonnet 5",
-    description: "Balanced Claude model for general agent work.",
-    defaultReasoningEffort: "high",
-    supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-  },
-];
 
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
