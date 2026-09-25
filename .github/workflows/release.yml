@@ -10,9 +10,14 @@ on:
 
 permissions: {}
 
+# All tag pushes share one queue and run in push order. With one group per tag, two tags pushed
+# close together publish in parallel: if the older one publishes last, `--latest` and the updater
+# manifests point users back to it. `queue: max` keeps every pending run; the default keeps only the
+# newest pending run and cancels the others. Manual signing checks use their own queue.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   validate:
