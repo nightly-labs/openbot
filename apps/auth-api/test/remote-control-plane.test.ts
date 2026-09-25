@@ -782,6 +782,73 @@ describe("RemoteControlPlane", () => {
       code: "invite_limit_reached",
     });
   });
+
+  it("answers a session end before Signal does and keeps the event for the retry", async () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec("PRAGMA foreign_keys = ON");
+      const migrations = new URL("../migrations/", import.meta.url);
+      for (const name of readdirSync(migrations)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()) {
+        database.exec(readFileSync(new URL(name, migrations), "utf8"));
+      }
+      database.exec(`
+        INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES ('owner', 'email:owner@example.com', 'owner@example.com', 1, 1);
+        INSERT INTO remote_hosts(host_id, owner_user_id, name, device_public_key, auth_epoch, created_at, updated_at) VALUES ('host-1', 'owner', 'Desktop', 'public-key', 1, 1, 1);
+        INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at) VALUES ('host-1:owner', 'host-1', 'owner', 'owner', 'active', 1, 1);
+        INSERT INTO auth_sessions(id, token_hash, user_id, created_at, last_used_at, expires_at) VALUES ('00000000-0000-4000-8000-000000000001', 'owner-auth', 'owner', 1, 1, 8640000000000000);
+      `);
+      const pair = await generateKeyPair("ES256", { extractable: true });
+      const privateJwk = await exportJWK(pair.privateKey);
+      const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "end-key", use: "sig", alg: "ES256" };
+      const now = 1_000_000;
+      const scheduled: Promise<void>[] = [];
+      let openGate: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        openGate = resolve;
+      });
+      const controlPlane = new RemoteControlPlane(
+        {
+          DB: sqliteD1(database),
+          REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "end-key", alg: "ES256" }),
+          REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [publicJwk] }),
+          REMOTE_TICKET_KEY_ID: "end-key",
+          REMOTE_AUTH_WEBHOOK_URL: "https://signal.example.test/internal/auth-events",
+          REMOTE_AUTH_WEBHOOK_SECRET: "s".repeat(32),
+        },
+        {
+          now: () => now,
+          schedule: (delivery) => {
+            scheduled.push(delivery);
+          },
+          // Signal answers only after the account has its answer, so an end that waited never returns.
+          fetch: async () => {
+            await gate;
+            throw new Error("Signal is unavailable.");
+          },
+        },
+      );
+      const session = await controlPlane.startSession("owner", "host-1", "owner-auth");
+      await controlPlane.endSession("owner", session.sessionId, "owner-auth");
+
+      expect(
+        database.prepare("SELECT ended_at FROM remote_sessions WHERE session_id = ?").get(session.sessionId),
+      ).toEqual({ ended_at: now });
+      expect(scheduled).toHaveLength(1);
+      openGate();
+      await scheduled[0];
+      expect(database.prepare("SELECT payload, attempts, next_attempt_at FROM remote_auth_events").all()).toEqual([
+        {
+          payload: JSON.stringify({ type: "remote-session-ended", hostId: "host-1", sessionId: session.sessionId }),
+          attempts: 1,
+          next_attempt_at: now + 60_000,
+        },
+      ]);
+    } finally {
+      database.close();
+    }
+  });
 });
 
 describe("permanent invitation links", () => {

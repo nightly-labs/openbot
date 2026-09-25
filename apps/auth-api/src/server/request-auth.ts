@@ -30,7 +30,10 @@ export function requestAuthService(): AuthService {
     repository: new D1AuthRepository(bindings.DB),
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings),
     exposeDevelopmentCode,
-    flushSessionRevocations: () => deliverPendingRemoteAuthEvents(bindings, Date.now()),
+    // The revocation is already written and the cron redelivers it, so the answer does not wait.
+    flushSessionRevocations: async () => {
+      waitUntil(deliverPendingRemoteAuthEvents(bindings, Date.now()));
+    },
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, waitUntil),
   });
 }
@@ -142,7 +145,7 @@ export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null
 }
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
-  return new RemoteControlPlane(requireWorkerBindings(env));
+  return new RemoteControlPlane(requireWorkerBindings(env), { schedule: waitUntil });
 }
 
 export function verifyRemoteServiceRequest(request: Request, body: string): Promise<boolean> {
