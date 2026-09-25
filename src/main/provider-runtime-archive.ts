@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
+const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
 
 /**
  * The archive checks a provider runtime shares. They are here rather than in the manager because

@@ -128,17 +128,10 @@ export function toCurrentAgentKeys(value: TeamProtocolV1JsonValue): TeamProtocol
   return walk(value, "toCurrent", "");
 }
 
-/** As {@link toWireAgentKeys}, but leaves the routes named in {@link isUntranslatedPath} alone. */
-export function toWireAgentKeysForPath(path: string, value: TeamProtocolV1JsonValue): TeamProtocolV1JsonValue {
-  return isUntranslatedPath(path) ? value : toWireAgentKeys(value);
-}
-
-/** As {@link toCurrentAgentKeys}, but leaves the routes named in {@link isUntranslatedPath} alone. */
-export function toCurrentAgentKeysForPath(path: string, value: TeamProtocolV1JsonValue): TeamProtocolV1JsonValue {
-  return isUntranslatedPath(path) ? value : toCurrentAgentKeys(value);
-}
-
-/** As {@link toCurrentAgentKeysForPath}, for the object-shaped results the HTTP adapters return. */
+/**
+ * As {@link toCurrentAgentKeys}, for the object-shaped results the HTTP adapters return, but leaves
+ * the routes named in {@link isUntranslatedPath} alone.
+ */
 export function toCurrentAgentKeysObjectForPath(
   path: string,
   value: TeamProtocolV1JsonObject,

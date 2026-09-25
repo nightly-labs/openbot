@@ -135,7 +135,7 @@ type ReleasedAcpThread = Pick<AcpThread, "cwd" | "developerInstructions" | "dyna
  * servers for each session and keeps them until the session closes, and the agent loads the same
  * session again from its own store, so an idle session costs only a slower first message.
  */
-export const ACP_SESSION_IDLE_RELEASE_MS = 10 * 60_000;
+const ACP_SESSION_IDLE_RELEASE_MS = 10 * 60_000;
 
 /**
  * How many idle sessions stay open before the timeout. Grok gives each session its own set of the

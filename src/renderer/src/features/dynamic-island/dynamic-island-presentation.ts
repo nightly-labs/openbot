@@ -34,7 +34,7 @@ export interface DynamicIslandPresentationInput {
   failedTurns: Record<string, string | undefined>;
 }
 
-export interface DynamicIslandAgentSource {
+interface DynamicIslandAgentSource {
   id: string;
   name: string;
   avatarSeed: string;

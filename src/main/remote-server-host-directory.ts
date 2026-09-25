@@ -36,7 +36,7 @@ export function watchRemoteHostDirectory(options: { isActive(): boolean; refresh
   return () => clearInterval(timer);
 }
 
-export interface HostKeyPin {
+interface HostKeyPin {
   readonly hostId: string;
   readonly publicKey: string;
 }

@@ -24,7 +24,7 @@ const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
 
-export interface RemoteViewerTransport {
+interface RemoteViewerTransport {
   sendDesktop(serverId: string, data: string | ArrayBuffer): Promise<void>;
   on(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
   off(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;

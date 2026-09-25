@@ -33,7 +33,7 @@ function selectModelRateLimits(
   return entries.filter(([id, limit]) => id === "codex" || limit.limitId === "codex");
 }
 
-export function normalizeAccountLimit(id: string, limit: AccountRateLimitResult): AccountUsageLimit {
+function normalizeAccountLimit(id: string, limit: AccountRateLimitResult): AccountUsageLimit {
   return {
     id: limit.limitId ?? id,
     primary: normalizeUsageWindow(limit.primary),
@@ -41,7 +41,7 @@ export function normalizeAccountLimit(id: string, limit: AccountRateLimitResult)
   };
 }
 
-export function normalizeUsageWindow(window: AccountRateLimitResult["primary"]): AccountUsageWindow | null {
+function normalizeUsageWindow(window: AccountRateLimitResult["primary"]): AccountUsageWindow | null {
   const usedPercent = finiteNumberOrNull(window?.usedPercent);
   if (usedPercent === null) return null;
   return {

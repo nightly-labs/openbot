@@ -53,7 +53,7 @@ export function hostedSiteEventDetails(site: HostedSiteSummary, siteId = site.id
   return details;
 }
 
-export function hostedSiteMarkerHostname(value: string): string | null {
+function hostedSiteMarkerHostname(value: string): string | null {
   if (!value || value.length > INPUT_LIMITS.hostname || value !== value.toLowerCase()) return null;
   try {
     const parsed = new URL(`https://${value}`);

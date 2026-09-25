@@ -35,7 +35,7 @@ export interface LatestReleaseContext {
  * block list, not an allow list: a new release is offered at once, and only a version named here is
  * held back. A list that cannot be read blocks nothing.
  */
-export const BLOCKED_VERSIONS_URL =
+const BLOCKED_VERSIONS_URL =
   "https://raw.githubusercontent.com/nightly-labs/openbot/main/provider-runtime-blocklist.json";
 
 const REQUEST_TIMEOUT_MS = 30_000;

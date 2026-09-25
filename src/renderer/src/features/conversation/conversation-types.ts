@@ -180,7 +180,7 @@ export interface ComposerDraft {
  * the main process reads; an attachment is named by its record, because its bytes arrive over
  * `previewUrl` and "open externally" goes through the attachment handler instead of a path.
  */
-export type SidebarFilePreviewSource =
+type SidebarFilePreviewSource =
   | { kind: "shared"; path: string }
   | { kind: "workspace"; path: string }
   | { kind: "attachment"; attachment: AttachmentSummary };

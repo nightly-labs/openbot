@@ -426,7 +426,7 @@ function latestAgentMessage(messages: readonly DynamicIslandMessageSource[]): Dy
   return undefined;
 }
 
-export function queueSnapshotsFromRuntimeWork(work: readonly AgentRuntimeWorkItem[]): Record<string, QueueSnapshot> {
+function queueSnapshotsFromRuntimeWork(work: readonly AgentRuntimeWorkItem[]): Record<string, QueueSnapshot> {
   const queues: Record<string, QueueSnapshot> = {};
   for (const item of work) {
     const queue = queues[item.agentId] ?? { agentId: item.agentId, deliveries: [] };

@@ -8,7 +8,7 @@ import { ConversationViewScopeContext, createConversationViewScope } from "./con
 import type { ConversationProps } from "./conversation-types";
 
 /** @internal Keeps file-drag state active while the pointer moves between conversation descendants. */
-export function isDragLeavingConversation(currentTarget: HTMLElement, relatedTarget: EventTarget | null): boolean {
+function isDragLeavingConversation(currentTarget: HTMLElement, relatedTarget: EventTarget | null): boolean {
   return !(relatedTarget instanceof Node && currentTarget.contains(relatedTarget));
 }
 

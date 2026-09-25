@@ -66,7 +66,7 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
   };
 }
 
-export function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
+function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
   snapshot.agents = snapshot.agents.map((agent) => ({ ...agent, preview: "", avatarUrl: null }));
@@ -121,7 +121,7 @@ export function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntime
   return snapshot;
 }
 
-export function runtimeSnapshotBytes(snapshot: AgentRuntimeSnapshot): number {
+function runtimeSnapshotBytes(snapshot: AgentRuntimeSnapshot): number {
   return Buffer.byteLength(JSON.stringify({ type: "runtime-snapshot", snapshot }));
 }
 

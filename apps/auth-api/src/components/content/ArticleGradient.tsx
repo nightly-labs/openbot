@@ -50,7 +50,7 @@ import { cx } from "../../lib/utils";
 // and drawing it again would spend a context and an image encode on every card.
 
 /** Where the build-time still for this frame was baked, when one was. */
-export interface ArticleGradientArt {
+interface ArticleGradientArt {
   /** The collection the article belongs to, which is half of its image path. */
   collection: ContentCollection;
   slug: string;

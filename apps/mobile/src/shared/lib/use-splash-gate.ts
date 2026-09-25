@@ -9,7 +9,7 @@ export interface SplashController {
 // Every image the backdrop puts on screen is worth waiting for before the
 // handoff: uncovering with the wallpaper but not the mark would blink the mark
 // out, because the native splash paints that mark and the backdrop has not yet.
-export const SPLASH_ARTWORK = ["wallpaper", "mark"] as const;
+const SPLASH_ARTWORK = ["wallpaper", "mark"] as const;
 export type SplashArtwork = (typeof SPLASH_ARTWORK)[number];
 
 export interface SplashLogoTarget {

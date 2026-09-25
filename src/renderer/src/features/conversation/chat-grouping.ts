@@ -8,7 +8,7 @@
  * How long a run of messages by one sender stays one block. Beyond it the time returns, because a
  * reply an hour later is a new turn of the conversation, not a continuation.
  */
-export const CHAT_GROUPING_WINDOW_MS = 5 * 60_000;
+const CHAT_GROUPING_WINDOW_MS = 5 * 60_000;
 
 /** A row of a transcript, as the two fields the grouping rule reads. */
 export interface SenderRunRow {

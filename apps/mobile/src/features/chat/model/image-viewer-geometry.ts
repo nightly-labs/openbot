@@ -80,7 +80,7 @@ export function focalTranslation(focal: number, offset: number, fromScale: numbe
 }
 
 /** How far a released drag must be heading, flick included, to close the viewer. */
-export const DISMISS_DISTANCE = 110;
+const DISMISS_DISTANCE = 110;
 
 /**
  * Whether a released vertical drag closes the viewer. It reads where the image was heading, so a

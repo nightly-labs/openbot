@@ -8,8 +8,8 @@ import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from 
 const sql = z.string().min(1).max(AGENT_DATABASE_LIMITS.maxSqlLength);
 const params = z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional();
 
-export const tableNameSchema = z.object({ name: z.string().min(1).max(INPUT_LIMITS.sharedTableName) }).strict();
-export const dataStatementSchema = z.object({ sql, params }).strict();
+const tableNameSchema = z.object({ name: z.string().min(1).max(INPUT_LIMITS.sharedTableName) }).strict();
+const dataStatementSchema = z.object({ sql, params }).strict();
 
 export const DATA_TOOL_DEFINITIONS = [
   {

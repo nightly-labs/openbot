@@ -127,7 +127,7 @@ function scheduleIdle(callback: () => void) {
  * It used to open on `thinking`, which draws its own body, so a working agent on the phone turned
  * into a column of dots for most of the cycle. Both poses here keep the agent's silhouette.
  */
-export function cycleEngine(geometry: Geometry, seconds: number, looping: boolean) {
+function cycleEngine(geometry: Geometry, seconds: number, looping: boolean) {
   const engine = new BotEngine(100, WORKING_STATE, geometry.radii, geometry.expression);
   if (looping) engine.reset(WORKING_STATE, -LEAD);
   if (seconds >= FOCUS) engine.setState("wide", FOCUS);

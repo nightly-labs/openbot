@@ -87,7 +87,7 @@ export function collectionIndexUrl(collection: ContentCollection, siteUrl = OPEN
   return new URL(collection.indexRoute, siteUrl).toString();
 }
 
-export function collectionFeedPath(collection: ContentCollection): string {
+function collectionFeedPath(collection: ContentCollection): string {
   return `${collection.indexRoute}/rss.xml`;
 }
 

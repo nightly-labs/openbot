@@ -24,10 +24,10 @@ import {
 } from "./site-metadata";
 
 /** The generated social cards. Matches what `content-images.ts` writes. */
-export const OG_IMAGE_WIDTH = 1200;
-export const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
-export function articleOgImageAlt(title: string): string {
+function articleOgImageAlt(title: string): string {
   return `${title} — OpenBot`;
 }
 
@@ -151,7 +151,7 @@ export function articleStructuredData(collection: ContentCollection, article: Co
   };
 }
 
-export function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
+function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
   return {
     "@context": "https://schema.org",
     "@type": "Blog",

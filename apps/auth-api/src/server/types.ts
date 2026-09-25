@@ -32,7 +32,7 @@ export interface WorkerBindings {
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
 }
 
-export function isWorkerBindings(value: unknown): value is WorkerBindings {
+function isWorkerBindings(value: unknown): value is WorkerBindings {
   if (!isDynamicRecord(value)) return false;
   const database = value.DB;
   const avatars = value.AVATARS;

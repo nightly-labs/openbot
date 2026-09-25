@@ -47,7 +47,7 @@ import type { UpdateService } from "./update-service";
  * `ApplicationServices`: keeping it structural is what lets the composition root import this
  * module without this module importing it back.
  */
-export interface MainWindowApplicationServices {
+interface MainWindowApplicationServices {
   service: AgentService;
   browser: BrowserHost;
   remoteServers: RemoteServerManager;

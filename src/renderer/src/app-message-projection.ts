@@ -318,7 +318,7 @@ function cleanPreview(preview: string): string {
   return cleaned || "No messages yet";
 }
 
-export function formatTime(value: string): string {
+function formatTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "now";
   return new Intl.DateTimeFormat(undefined, {

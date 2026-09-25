@@ -71,7 +71,7 @@ function selectForm(message: PluralMessage, count: number, locale: string): stri
 }
 
 /** What a placeholder can be filled with. A count is read from `count` on the same object. */
-export type MessageValue = string | number;
+type MessageValue = string | number;
 
 function interpolate(text: string, values: ReadonlyMap<string, MessageValue>): string {
   return text.replace(/\{(\w+)\}/g, (placeholder, name: string) => {

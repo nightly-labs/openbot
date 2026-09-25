@@ -53,7 +53,7 @@ function appendDraftLine(draft: ComposerDraft, line: string): ComposerDraft {
 }
 
 export const QUEUE_EDIT_STORAGE_KEY = "openbot:queue-edit";
-export type StoredQueueSave = Extract<QueueEditRequest, { action: "save" }>;
+type StoredQueueSave = Extract<QueueEditRequest, { action: "save" }>;
 export interface StoredQueueEdit {
   agentId: string;
   serverId: string;

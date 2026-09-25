@@ -19,7 +19,7 @@ export interface BrowserTakeoverResolutionState {
   messageMarker: string | null;
 }
 
-export function canonicalBrowserUrl(url: string): string {
+function canonicalBrowserUrl(url: string): string {
   try {
     return new URL(url).toString();
   } catch {
@@ -45,7 +45,7 @@ function browserAddressUrl(value: string): string {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
-export interface BrowserPanels {
+interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode) => void;
 }
@@ -426,5 +426,3 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     navigateBrowserTab,
   };
 }
-
-export type BrowserStore = ReturnType<typeof createBrowserStore>;

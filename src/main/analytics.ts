@@ -12,8 +12,8 @@ import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } f
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 
-export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
+const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
+const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 // Node fetch sends no Origin, and OpenPanel answers 401 to a client with no allowed origin or
 // secret. The SDK drops a 401 in silence. Send the renderer's origin, which the project allows.
 const OPENPANEL_ORIGIN = "openbot-app://app";
