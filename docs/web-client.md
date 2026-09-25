@@ -69,6 +69,9 @@ mock. The separate web preview implements the browser runtime with that same moc
   result require closing the form and refreshing before another attempt.
 - The browser-view transport uses the existing host stream and input protocol. The shared
   panel is available only when the host advertises browser control and browser view.
+  Tabs, back, forward, reload, and the address bar use the same Team API routes as a desktop
+  client of a remote host. Picture in Picture is desktop only. The expanded live view is a card
+  with the shape of the host frame.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 

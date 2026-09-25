@@ -25,6 +25,8 @@ interface BrowserLiveViewProps {
   tabId: string;
   /** False while the panel is closed: a view nobody is looking at still costs the host a screencast. */
   active: boolean;
+  /** The pixel size of the frame on the canvas, so the panel can take the page's shape. */
+  onFrameSize?: (size: { width: number; height: number }) => void;
 }
 
 /**
@@ -141,6 +143,13 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         .startLiveView(tabId)
         .catch((error: unknown) => setState(() => ({ live: false, message: errorMessage(error) })));
       onCleanup(() => void runtime.stopLiveView().catch(() => undefined));
+    },
+  );
+
+  createEffect(
+    () => ({ drawn: frame(), onFrameSize: props.onFrameSize }),
+    ({ drawn, onFrameSize }) => {
+      if (drawn) onFrameSize?.({ width: drawn.width, height: drawn.height });
     },
   );
 

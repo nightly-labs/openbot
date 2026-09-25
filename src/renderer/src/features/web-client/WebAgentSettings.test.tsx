@@ -48,6 +48,12 @@ function runtimeFixture(
       onLiveViewEvent: () => () => {},
     },
     browserTabs: async () => [],
+    openBrowserTab: async () => {
+      throw new Error("unused");
+    },
+    navigateBrowserTab: async () => {},
+    reloadBrowserTab: async () => {},
+    closeBrowserTab: async () => {},
     respondToTakeover: async () => {},
     listHosts: async () => [],
     previewInvite: async () => {

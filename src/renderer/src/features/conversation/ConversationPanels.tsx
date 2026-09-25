@@ -194,8 +194,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
             setActiveRightPanel("browser-expanded");
           }}
-          onCloseTab={props.runtime ? undefined : (tabId) => void closeBrowserTab(tabId)}
-          onNewTab={props.runtime ? undefined : () => void openBrowserAddress("https://www.google.com", true)}
+          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+          onNewTab={() => void openBrowserAddress("https://www.google.com", true)}
           onCollapse={hideBrowserPanel}
         />
       </Show>
@@ -214,14 +214,12 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
             controllerForTab={browserControllerForTab}
             onAddressChange={setBrowserAddress}
             onAddressEditingChange={setBrowserAddressEditing}
-            onOpenAddress={
-              props.runtime ? undefined : (address) => void openBrowserAddress(address, address !== undefined)
-            }
-            onNavigate={props.runtime ? undefined : (tabId, direction) => void navigateBrowserTab(tabId, direction)}
-            onReload={props.runtime ? undefined : (tabId) => void reloadBrowserTab(tabId)}
+            onOpenAddress={(address) => void openBrowserAddress(address, address !== undefined)}
+            onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
+            onReload={(tabId) => void reloadBrowserTab(tabId)}
             onActivateTab={activateBrowserTab}
             onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-            canCloseTabs={!props.runtime}
+            canEnterPip={!props.runtime}
             onSurface={setBrowserSurfaceElement}
             liveViewTabId={
               props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")
