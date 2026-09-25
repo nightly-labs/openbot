@@ -1,14 +1,19 @@
 import { createOpenBotAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
-import { For, onSettled, Show } from "solid-js";
+import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import { agentTemplatePath } from "../../lib/agent-template-path";
 import { landingAnalytics } from "../../lib/analytics";
-import { ArticleGradient } from "../content/ArticleGradient";
 import { ContentHeader } from "../content/ContentHeader";
 import { LandingFooter } from "../landing/LandingFooter";
 import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
 import { PluginRow, PluginSection } from "../plugins/PluginPage";
+
+// The Bloub avatar uses browser-only APIs as soon as its module loads, so the Worker must never
+// import it. The page loads it in the browser after hydration.
+const AgentAvatar = lazy(() =>
+  import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
+);
 
 export interface AgentTemplatePageProps {
   template: AgentTemplateDetail;
@@ -22,7 +27,12 @@ export interface AgentTemplatePageProps {
  * shown in full, because they are what the agent will do.
  */
 export function AgentTemplatePage(props: AgentTemplatePageProps) {
-  onSettled(() => landingAnalytics.start(document, window.location.hostname, agentTemplatePath(props.template.id)));
+  // The Worker renders an empty box of the avatar's size, and the browser fills it in.
+  const [mounted, setMounted] = createSignal(false);
+  onSettled(() => {
+    setMounted(true);
+    return landingAnalytics.start(document, window.location.hostname, agentTemplatePath(props.template.id));
+  });
 
   return (
     <div class="landing-page post-article">
@@ -33,14 +43,16 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
           <header class="post-article-header" data-enter="post-copy">
             <div class="plugin-hero-row">
               <div class="plugin-hero-heading">
-                <div class="plugin-hero-mark">
-                  <Show
-                    when={props.template.avatarUrl}
-                    fallback={<ArticleGradient title={props.template.name} mode="live" />}
-                  >
-                    {(url) => <img class="plugin-hero-mark-icon" src={url()} alt="" />}
-                  </Show>
-                </div>
+                {/* The avatar the agent has in the app: its photo, or the Bloub its seed and hue draw. */}
+                <Show when={mounted()} fallback={<span class="agent-template-hero-avatar" aria-hidden="true" />}>
+                  <AgentAvatar
+                    seed={props.template.avatarSeed}
+                    hue={props.template.avatarHue}
+                    url={props.template.avatarUrl}
+                    motion="idle"
+                    class="agent-template-hero-avatar"
+                  />
+                </Show>
                 <div class="plugin-hero-text">
                   <h1 class="post-article-title">{props.template.name}</h1>
                   <p class="post-article-standfirst plugin-hero-standfirst">By {props.template.creatorName}</p>
@@ -59,9 +71,6 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
               <p class="plugin-description">{props.template.title}</p>
             </Show>
             <p class="plugin-description agent-template-instructions">{props.template.description}</p>
-            <p class="agent-template-notice" role="note">
-              This agent was made by another OpenBot user. It can act on your behalf after you add it.
-            </p>
 
             <Show when={props.template.skills.length > 0}>
               <PluginSection id="agent-skills-title" title="Skills" count={props.template.skills.length}>

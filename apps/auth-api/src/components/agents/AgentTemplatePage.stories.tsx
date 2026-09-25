@@ -4,6 +4,8 @@ import { createRootRoute, createRoute, createRouter, RouterContextProvider } fro
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 // The site's stylesheet, loaded only when a site story opens. See `ArticleMedia.stories.tsx`.
 import "../../styles.css";
+// Stands in for a photo the owner uploaded as the agent's avatar.
+import samplePhoto from "../../../public/icon-512x512.png";
 import { AgentTemplatePage } from "./AgentTemplatePage";
 
 const TEMPLATE: AgentTemplateDetail = {
@@ -82,6 +84,11 @@ type Story = StoryObj<typeof meta>;
 
 /** What `openbot.run/agents/<id>` shows. "Add to OpenBot" opens `openbot://agents/<id>`. */
 export const SharedAgent: Story = {};
+
+/** The owner uploaded a photo for the agent, so the page shows it instead of the generated avatar. */
+export const WithPhoto: Story = {
+  args: { template: { ...TEMPLATE, avatarUrl: samplePhoto } },
+};
 
 export const InstructionsOnly: Story = {
   args: { template: { ...TEMPLATE, title: "", skills: [], routines: [] } },

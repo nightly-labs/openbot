@@ -2995,15 +2995,37 @@ a {
   white-space: pre-wrap;
 }
 
-.agent-template-notice {
-  margin: 24px 0 0;
-  padding: 12px 16px;
-  border: 1px solid var(--openbot-glass-border);
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-glass-surface);
-  color: var(--openbot-text-secondary);
-  font-size: 14px;
-  line-height: 1.5;
+/* The agent's own avatar from `@openbot/ui`, at the size of the plugin page's mark. The app's
+   `.agent-avatar` rules are in its own stylesheet, so the few this page needs are here. */
+.agent-template-hero-avatar {
+  --agent-template-hero-avatar-size: clamp(56px, 6vw, 76px);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--agent-template-hero-avatar-size);
+  height: var(--agent-template-hero-avatar-size);
+  border-radius: var(--openbot-radius-pill);
+}
+
+/* The Bloub sits low in its drawing, so it is lifted by the share of its size the app uses. */
+.agent-template-hero-avatar > svg {
+  display: block;
+  width: 128%;
+  height: 128%;
+  overflow: visible;
+  translate: 0 calc(var(--agent-template-hero-avatar-size) * -0.14);
+}
+
+.agent-template-hero-avatar.agent-avatar-custom {
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--openbot-glass-border);
+}
+
+.agent-template-hero-avatar.agent-avatar-custom img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* The heading the app's plugin detail sets, rather than the uppercase eyebrow this
