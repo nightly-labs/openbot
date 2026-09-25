@@ -1,45 +1,68 @@
+import type { BrowserTarget } from "@openbot/contracts/ipc";
 import type { WebContents } from "electron";
-
-/**
- * Owns the wait for a tab's main-frame navigation, for the browser host and the CDP engine. It
- * listens to `WebContents` events only, never to CDP, so both callers see the same settle rules and
- * the same error text. It never imports the host or the engine.
- */
 
 const NAVIGATION_TIMED_OUT = "Navigation timed out.";
 const TAB_CLOSED = "Browser tab was closed during navigation.";
 
-function navigationFailed(code: number, description: string): Error {
-  return new Error(`Navigation failed (${code}): ${description}`);
-}
-
 /**
- * Starts a navigation and waits until the main frame loads, navigates in place, or fails.
- * `initiate` answers `false` when there is nothing to navigate to, such as no history entry.
- * At the timeout the load is stopped and the wait rejects when that stop arrives.
+ * Starts a navigation and settles when the main frame finishes it. `initiate` returns `false` when
+ * there is nowhere to go, `true` when the navigation started synchronously, or the promise of an
+ * API such as `loadURL`.
  */
 export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
   timeoutMs = 10_000,
 ): Promise<void> {
-  return waitForNavigation(contents, timeoutMs, initiate);
+  return watchNavigation(contents, initiate, timeoutMs);
 }
 
-/** Waits for a load that something else started, such as `Page.navigate`. */
+/** Waits for a load that already started, such as one from CDP `Page.navigate`. */
 export function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {
   if (!contents.isLoading()) return Promise.resolve();
-  return waitForNavigation(contents, timeoutMs);
+  return watchNavigation(contents, undefined, timeoutMs);
 }
 
-function waitForNavigation(
+export function stopLoadingAndWait(contents: WebContents): Promise<void> {
+  if (!contents.isLoading()) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      contents.off("did-stop-loading", stopped);
+      contents.off("destroyed", destroyed);
+    };
+    const stopped = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const destroyed = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(TAB_CLOSED));
+    };
+    contents.once("did-stop-loading", stopped);
+    contents.once("destroyed", destroyed);
+    try {
+      contents.stop();
+      if (!contents.isLoading()) setImmediate(stopped);
+    } catch (error) {
+      settled = true;
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+/** Without `initiate`, the load in progress counts as a started cross-document navigation. */
+function watchNavigation(
   contents: WebContents,
+  initiate: (() => boolean | Promise<unknown>) | undefined,
   timeoutMs: number,
-  initiate?: () => boolean | Promise<unknown>,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    // A load already in progress is a full-document load: the first main-frame stop or failure
-    // settles it, whatever navigation starts after it.
     let started = initiate === undefined;
     let inPlace = false;
     let settled = false;
@@ -66,8 +89,9 @@ function waitForNavigation(
     };
     const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
       if (!isMainFrame) return;
+      // A page that calls `pushState` while it loads must not end the wait for that load.
+      inPlace = started ? inPlace && isInPlace : isInPlace;
       started = true;
-      inPlace = isInPlace;
     };
     const didStopLoading = () => {
       if (started && !inPlace) complete();
@@ -77,12 +101,12 @@ function waitForNavigation(
     };
     const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
       if (!started || !isMainFrame) return;
-      finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : navigationFailed(code, description));
+      finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
     };
     const destroyed = () => {
       finish(new Error(TAB_CLOSED));
     };
-    if (initiate) contents.on("did-start-navigation", didStartNavigation);
+    contents.on("did-start-navigation", didStartNavigation);
     contents.on("did-stop-loading", didStopLoading);
     contents.on("did-navigate-in-page", didNavigateInPage);
     contents.on("did-fail-load", didFailLoad);
@@ -122,36 +146,17 @@ function waitForNavigation(
   });
 }
 
-/** Stops the current load and waits for its stop event, so the next navigation starts clean. */
-export function stopLoadingAndWait(contents: WebContents): Promise<void> {
-  if (!contents.isLoading()) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const cleanup = () => {
-      contents.off("did-stop-loading", stopped);
-      contents.off("destroyed", destroyed);
-    };
-    const stopped = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve();
-    };
-    const destroyed = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error(TAB_CLOSED));
-    };
-    contents.once("did-stop-loading", stopped);
-    contents.once("destroyed", destroyed);
-    try {
-      contents.stop();
-      if (!contents.isLoading()) setImmediate(stopped);
-    } catch (error) {
-      settled = true;
-      cleanup();
-      reject(error);
-    }
-  });
+export function describeBrowserTarget(target: BrowserTarget): string {
+  switch (target.kind) {
+    case "ref":
+      return `ref ${target.ref}@${target.revision}`;
+    case "role":
+      return `role ${target.role}${target.name ? ` “${target.name}”` : ""}`;
+    case "text":
+      return `text “${target.text}”`;
+    case "css":
+      return `css ${target.selector}`;
+    case "point":
+      return `point ${target.x},${target.y}`;
+  }
 }

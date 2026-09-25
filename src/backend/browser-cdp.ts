@@ -12,9 +12,8 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
-import { stopLoadingAndWait, waitForLoading } from "./browser-navigation";
+import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
-import { describeBrowserTarget } from "./browser-target";
 
 async function dispatchMouseClick(
   send: SendCommand,
