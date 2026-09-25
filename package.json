@@ -201,6 +201,7 @@
     "desktop:typecheck": "bun run --parallel typecheck:node typecheck:renderer typecheck:contracts typecheck:brand typecheck:storybook",
     "api:build:check": "CLOUDFLARE_ENV=preview bun run api:build",
     "check:ui": "bun scripts/ui-foundation-check.ts",
+    "check:assets": "bun scripts/check-image-assets.ts",
     "package": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --dir --mac --arm64 --config.mac.identity=null --config.mac.notarize=false",
     "verify:package": "bun scripts/verify-macos-package.ts",
     "package:verify": "bun run package && bun run verify:package",
