@@ -50,10 +50,16 @@ reads the whole tree, not only the pull request diff, so it gives the same resul
 `src/backend/transfer-budget.test.ts` runs two turns with a fake provider. It counts the SQL
 statements of each turn and of one conversation read, and the JSON bytes of that read and of the
 events that one turn sends to the renderer. Each value has a hard cap about 30% above the value
-measured when the cap was set. The test writes the values and caps to
-`.openbot-build/transfer-budget.json`, and the desktop test job uploads that file. A red budget
-means a change made a turn or a read do more work: make the change cheaper, or raise the cap and
-give the reason in the pull request.
+measured when the cap was set. `src/main/team-api-transfer-budget.test.ts` runs the same two turns
+and measures the response bytes of the Team API conversation routes at the current protocol. Each
+test writes its values and caps to a file in `.openbot-build/transfer-budget/`, and the desktop
+test jobs upload that directory. A red budget means a change made a turn or a read do more work:
+make the change cheaper, or raise the cap and give the reason in the pull request.
+
+After CI completes for a pull request, `.github/workflows/budget-report.yml` adds one comment that
+compares these values with the reports of the last green `main` CI run
+(`scripts/transfer-budget-report.ts`). It runs from `main` and reads the pull request reports only
+as data, so it can write the comment without running pull request code.
 
 The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
 `bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
