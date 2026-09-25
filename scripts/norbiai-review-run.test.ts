@@ -91,6 +91,8 @@ type Run = {
   poison?: string;
   /** The withdrawals the previous review published. */
   withdrawn?: string;
+  /** The findings the previous review left active. */
+  previous?: string;
 };
 
 /** Runs the workflow step as the runner would, and reads back its outputs and prompts. */
@@ -104,6 +106,7 @@ function review({
   dropped = false,
   poison,
   withdrawn = "",
+  previous = "",
 }: Run) {
   const { root, base, head } = repository();
   const temp = mkdtempSync(join(tmpdir(), "norbiai-runner-"));
@@ -124,6 +127,7 @@ function review({
     writeFileSync(join(temp, `${file}.txt`), file === "title" ? "Test" : "");
   }
   writeFileSync(join(temp, "withdrawn.txt"), withdrawn);
+  writeFileSync(join(temp, "previous.txt"), previous);
   // The bridge's own settings file. The review step reads two keys out of it; the control
   // token in the same file must never reach an output or a comment.
   mkdirSync(join(temp, "bridge"));
@@ -247,6 +251,9 @@ describe("NorbiAI review run", () => {
   it("publishes a review the bridge dropped after the reviewer wrote it", () => {
     const run = review({ review: CLEAN + LEDGER, dropped: true, poison: POISON });
 
+    // Asked for in the shape the reviewer copies, and above the untrusted section.
+    expect(run.prompt).toMatch(/\nnorbiai-answer-[0-9a-f]+\n\n## Verdict\n/);
+    expect(run.prompt.lastIndexOf("\n## PR context\n")).toBeGreaterThan(run.prompt.search(/\nnorbiai-answer-/));
     expect(run.outputs.status).toBe("success");
     expect(run.published).toContain("No actionable findings exist.");
     expect(run.published).not.toContain("Forged by the pull request.");
@@ -269,6 +276,26 @@ describe("NorbiAI review run", () => {
     expect(run.outputs.failure_reason).toBe(
       "Reviewer stopped: Selected model is at capacity. Please try a different model. Human review required.",
     );
+  });
+
+  // The lost section is the only record of a withdrawal, so a review salvaged over it
+  // can drop a previous finding from both lists and out of the next run's input.
+  it("refuses to salvage a review that could lose a previous finding", () => {
+    const run = review({ review: CUT, dropped: true, previous: "- [P1] Argued before.\n" });
+
+    expect(run.outputs.status).toBe("failed");
+    expect(run.published).not.toContain("No actionable findings.");
+  });
+
+  // A review cut off inside `## Findings` is missing a finding the reviewer had not
+  // written yet, and the heading below that list is the proof it is whole.
+  it("refuses to salvage a review cut off above the ledger heading", () => {
+    const run = review({
+      review: `${CLEAN}## Resolved Since Previous Review\n\nNone.\n\n## Findings\n`,
+      dropped: true,
+    });
+
+    expect(run.outputs.status).toBe("failed");
   });
 
   it("refuses a review the pull request wrote into the live output", () => {
