@@ -3012,27 +3012,27 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
+  gap: 16px;
   width: 100%;
-  padding: clamp(36px, 8vh, 88px) 16px 72px;
+  padding: clamp(12px, 3vh, 40px) 16px 24px;
 }
 
 .agent-share-card {
-  width: min(100%, 560px);
+  width: min(100%, 520px);
   overflow: hidden;
   border: 1px solid var(--openbot-glass-border);
-  border-radius: 32px;
+  border-radius: 28px;
   background: var(--openbot-bg-surface);
   box-shadow: 0 40px 120px -40px color-mix(in srgb, var(--agent-share-accent) 45%, transparent);
 }
 
 /* The agent's colour as light on a dark field, with a soft grain, the way a product shot sits on a
-   coloured backdrop. */
+   coloured backdrop. It shrinks with the window's height, so the whole card fits a 13-inch laptop. */
 .agent-share-hero {
   position: relative;
   display: grid;
   place-items: center;
-  height: clamp(200px, 34vw, 260px);
+  height: clamp(160px, 26vh, 236px);
   overflow: hidden;
   background:
     radial-gradient(70% 90% at 18% 0%, color-mix(in srgb, var(--agent-share-accent) 30%, transparent), transparent 70%),
@@ -3059,10 +3059,10 @@ a {
   pointer-events: none;
 }
 
-/* The agent's own avatar from `@openbot/ui`. The app's `.agent-avatar` rules live in its own
-   stylesheet, so the few this page needs are here. */
-.agent-share-avatar {
-  --agent-share-avatar-size: clamp(104px, 18vw, 136px);
+/* The agent's own avatar from `@openbot/ui`. The hero in the selector outranks the generic
+   `.agent-avatar` size rule, which loads with the avatar's own code after this stylesheet. */
+.agent-share-hero .agent-share-avatar {
+  --agent-share-avatar-size: clamp(100px, 16vh, 140px);
   position: relative;
   z-index: 1;
   display: grid;
@@ -3074,7 +3074,7 @@ a {
 }
 
 /* The Bloub sits low in its drawing, so it is lifted by the share of its size the app uses. */
-.agent-share-avatar > svg {
+.agent-share-hero .agent-share-avatar > svg {
   display: block;
   width: 128%;
   height: 128%;
@@ -3082,12 +3082,12 @@ a {
   translate: 0 calc(var(--agent-share-avatar-size) * -0.14);
 }
 
-.agent-share-avatar.agent-avatar-custom {
+.agent-share-hero .agent-share-avatar.agent-avatar-custom {
   overflow: hidden;
   box-shadow: 0 0 0 4px color-mix(in srgb, #ffffff 12%, transparent);
 }
 
-.agent-share-avatar.agent-avatar-custom img {
+.agent-share-hero .agent-share-avatar.agent-avatar-custom img {
   display: block;
   width: 100%;
   height: 100%;
@@ -3098,14 +3098,14 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px clamp(24px, 6vw, 48px) 36px;
+  padding: 22px clamp(20px, 5vw, 40px) 26px;
   text-align: center;
 }
 
 .agent-share-name {
   margin: 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(28px, 5vw, 36px);
+  font-size: clamp(26px, 4vw, 30px);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
@@ -3113,19 +3113,35 @@ a {
 }
 
 .agent-share-creator {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--openbot-text-secondary);
-  font-size: 16px;
+  font-size: 15px;
 }
 
-.agent-share-role {
-  margin: 14px 0 0;
-  padding: 4px 12px;
-  border: 1px solid color-mix(in srgb, var(--agent-share-accent) 40%, transparent);
+/* The role and what the agent brings, as one row of small tags. */
+.agent-share-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-share-tags > li {
+  padding: 3px 10px;
+  border: 1px solid var(--openbot-border-grouped);
   border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+}
+
+.agent-share-tags > .agent-share-role {
+  border-color: color-mix(in srgb, var(--agent-share-accent) 40%, transparent);
   background: color-mix(in srgb, var(--agent-share-accent) 12%, transparent);
   color: var(--openbot-text-primary);
-  font-size: 13px;
   font-weight: 500;
 }
 
@@ -3133,14 +3149,14 @@ a {
    Opened, they keep their line breaks: they are what the agent will do. */
 .agent-share-description {
   display: -webkit-box;
-  margin: 20px 0 0;
+  margin: 14px 0 0;
   overflow: hidden;
   color: var(--openbot-text-secondary);
-  font-size: 18px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 6;
-  line-clamp: 6;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
 .agent-share-description[data-expanded] {
@@ -3151,14 +3167,14 @@ a {
 }
 
 .agent-share-more {
-  margin-top: 8px;
-  padding: 4px 8px;
+  margin-top: 4px;
+  padding: 2px 8px;
   border: 0;
   border-radius: var(--openbot-radius-sm);
   background: none;
   color: var(--openbot-text-muted);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -3168,42 +3184,23 @@ a {
   color: var(--openbot-text-primary);
 }
 
-.agent-share-counts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.agent-share-counts > li {
-  padding: 4px 12px;
-  border: 1px solid var(--openbot-border-grouped);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-control-active);
-  color: var(--openbot-text-secondary);
-  font-size: 13px;
-}
-
 .agent-share-divider {
   width: 100%;
   height: 1px;
-  margin: 28px 0 0;
+  margin: 18px 0 0;
   border: 0;
   background: var(--openbot-border-grouped);
 }
 
 .agent-share-notice {
-  margin: 20px 0 0;
+  margin: 12px 0 0;
   color: var(--openbot-text-dim);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .agent-share-action {
-  margin-top: 24px;
+  margin-top: 14px;
 }
 
 .agent-share-action .plugin-actions-row {
@@ -3213,7 +3210,7 @@ a {
 .agent-share-fallback {
   margin: 0;
   color: var(--openbot-text-muted);
-  font-size: 15px;
+  font-size: 14px;
   text-align: center;
 }
 

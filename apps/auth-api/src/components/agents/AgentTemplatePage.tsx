@@ -72,8 +72,14 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
               {props.template.name}
             </h1>
             <p class="agent-share-creator">by {props.template.creatorName}</p>
-            <Show when={props.template.title}>
-              <p class="agent-share-role">{props.template.title}</p>
+
+            <Show when={props.template.title || counts().length > 0}>
+              <ul class="agent-share-tags" aria-label="About this agent">
+                <Show when={props.template.title}>
+                  <li class="agent-share-role">{props.template.title}</li>
+                </Show>
+                <For each={counts()}>{(label) => <li>{label}</li>}</For>
+              </ul>
             </Show>
 
             <p ref={description} class="agent-share-description" data-expanded={expanded() ? "" : undefined}>
@@ -85,16 +91,8 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
               </button>
             </Show>
 
-            <Show when={counts().length > 0}>
-              <ul class="agent-share-counts" aria-label="What this agent brings">
-                <For each={counts()}>{(label) => <li>{label}</li>}</For>
-              </ul>
-            </Show>
-
             <hr class="agent-share-divider" />
-            <p class="agent-share-notice">
-              Made by another OpenBot user, not by OpenBot. It can act on your behalf after you add it.
-            </p>
+            <p class="agent-share-notice">Made by another OpenBot user. It can act on your behalf once added.</p>
             <div class="agent-share-action">
               <PluginOpenButtons
                 href={openUrl()}
