@@ -122,8 +122,11 @@ export class TraceFile {
   }
 
   async summarize(): Promise<TraceSummary[]> {
-    await this.flush();
-    const text = (await Promise.all([`${this.#path}.1`, this.#path].map(readOptional))).join("");
+    void this.flush();
+    // The reads join the write chain, so no rotation runs between the read of `.1` and the current file.
+    const files = this.#writes.then(() => Promise.all([`${this.#path}.1`, this.#path].map(readOptional)));
+    this.#writes = files.then(() => undefined);
+    const text = (await files).join("");
     const groups = new Map<
       string,
       { kind: string; name: string; durations: number[]; outcomes: Record<string, number> }
