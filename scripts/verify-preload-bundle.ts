@@ -53,14 +53,15 @@ const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
   remoteDesktop: "remoteDesktop",
 };
 
-// Methods that `src/preload/index.ts` writes by hand. Each one narrows a bridged event.
-const HAND_WRITTEN_METHODS = [
-  "agent.onAttachmentImport",
-  "agent.onEvent",
-  "servers.onPresence",
-  "servers.onDirectMessage",
-  "servers.onDirectTyping",
-];
+// Methods that `src/preload/index.ts` writes by hand. Each one narrows a scoped event and must
+// subscribe to its channel. `onAttachmentImport` has no channel: the preload's own handlers call it.
+const HAND_WRITTEN_METHODS: ReadonlyMap<string, IpcEndpoint | null> = new Map<string, IpcEndpoint | null>([
+  ["agent.onAttachmentImport", null],
+  ["agent.onEvent", IPC_ENDPOINTS.agent.scopedEvent],
+  ["servers.onPresence", IPC_ENDPOINTS.servers.scopedPresence],
+  ["servers.onDirectMessage", IPC_ENDPOINTS.servers.scopedDirectMessage],
+  ["servers.onDirectTyping", IPC_ENDPOINTS.servers.scopedDirectTyping],
+]);
 
 // The modules that Electron gives a sandboxed preload. The VM gets the Node module for each one
 // except `electron`, which is the fake below.
@@ -92,6 +93,9 @@ const failures: string[] = [];
 
 const main = runPreload("index.cjs");
 const expected = expectedMethods();
+for (const [path, endpoint] of HAND_WRITTEN_METHODS) {
+  if (endpoint !== null) expected.set(path, { channel: endpoint.channel, kind: endpoint.kind });
+}
 const exposed = new Map<string, BridgeMethod>();
 for (const world of main.worlds.keys()) {
   if (world !== "openbot") failures.push(`index.cjs exposes window.${world}; only window.openbot is allowed.`);
@@ -99,11 +103,11 @@ for (const world of main.worlds.keys()) {
 if (main.worlds.has("openbot")) collectMethods(main.worlds.get("openbot"), "", exposed);
 else failures.push("index.cjs does not expose window.openbot.");
 for (const path of exposed.keys()) {
-  if (!expected.has(path) && !HAND_WRITTEN_METHODS.includes(path)) {
+  if (!expected.has(path) && !HAND_WRITTEN_METHODS.has(path)) {
     failures.push(`window.openbot.${path} is exposed, but no endpoint names it.`);
   }
 }
-for (const path of [...expected.keys(), ...HAND_WRITTEN_METHODS]) {
+for (const path of [...expected.keys(), ...HAND_WRITTEN_METHODS.keys()]) {
   if (!exposed.has(path)) failures.push(`window.openbot.${path} is not exposed.`);
 }
 for (const [path, endpoint] of expected) {
