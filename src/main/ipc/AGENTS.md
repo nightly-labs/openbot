@@ -16,7 +16,8 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
    `Invoke<typeof IPC_ENDPOINTS.group.name>` (or `Subscribe<...>` for an event).
 3. Run `bun run typecheck:node`, then `bun run typecheck:renderer`. The errors name the file to
    change and the key to add.
-4. Add the handler here and the method in `src/renderer/src/preview/mock-openbot.ts`. In the preload,
+4. Add the handler here and the method in `src/renderer/src/preview/mock-openbot.ts`, or in the
+   `mock-*.ts` module there that owns the group, such as `mock-team.ts`. In the preload,
    a bridged group needs one decoder in its `bridgeGroup` map (`TS2741` names it). A hand-written group
    needs the call (`invokeAgentForServer` for a server-scoped payload, `ipcRenderer.invoke` for the
    untyped endpoint, or `listen` for an event). The decoder comes from a preload decoding
