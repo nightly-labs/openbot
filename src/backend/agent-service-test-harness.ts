@@ -492,8 +492,8 @@ export function nextRoutinesChanged(agentService: AgentService, agentId: string)
 
 /**
  * Waits for a queue of one agent to pass `check`, without polling. It checks the queue now and then
- * on each `queue-changed` event, so it also proves that the renderer was told of the change: a
- * status that the service writes without an event times out here.
+ * on each `queue-changed` event. A change after the call that the service writes without an event
+ * times out here. A change before the call passes the first check and needs no event.
  */
 export function waitForQueue(
   agentService: AgentService,
