@@ -6,12 +6,12 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-naviga
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
 import { HeroUINativeProvider } from "heroui-native/provider";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { useReducedMotion } from "react-native-reanimated";
-import { useUniwind, withUniwind } from "uniwind";
+import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
@@ -137,6 +137,9 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const { theme: colorScheme } = useUniwind();
+  const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
+  // React Navigation paints its near-black dark background behind screens during transitions.
+  const darkTheme = useMemo(() => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas } }), [canvas]);
   useEffect(() => {
     void loadAppearance().catch(() => undefined);
     void loadHapticsPreference().catch(() => undefined);
@@ -148,7 +151,7 @@ export default function RootLayout() {
       <KeyboardProvider preload={false}>
         <QueryClientProvider client={queryClient}>
           <HeroUINativeProvider>
-            <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+            <ThemeProvider value={colorScheme === "dark" ? darkTheme : DefaultTheme}>
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
               <BloubAnimationProvider>
                 <MobileSessionProvider>
