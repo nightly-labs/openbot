@@ -4,7 +4,8 @@
     "target": "ES2022",
     "jsx": "preserve",
     "jsxImportSource": "@solidjs/web",
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "verbatimModuleSyntax": true
   },
   "include": [
     "src/renderer/**/*.ts",
