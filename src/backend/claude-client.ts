@@ -433,15 +433,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   async #resumeThread(threadId: string, config: ThreadConfig): Promise<void> {
-    // A turn may be opening a released thread again: that query is the one to compare, not a second.
-    await this.#threads.opened(threadId);
-    const current = this.#threads.get(threadId);
-    if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
-      if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
-      await this.#threads.close(current);
-    }
-    if (!this.#threads.has(threadId)) {
-      await this.#threads.opening(threadId, () => this.#startThread(threadId, config, true));
+    // A turn can open a released thread again at each await here: that query is the one to
+    // compare, not a second one, so the check runs again until this resume opens the thread.
+    for (;;) {
+      await this.#threads.opened(threadId);
+      const current = this.#threads.get(threadId);
+      if (current && JSON.stringify(current.config) === JSON.stringify(config)) return;
+      if (current) {
+        if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
+        await this.#threads.close(current);
+        continue;
+      }
+      if (await this.#threads.opening(threadId, () => this.#startThread(threadId, config, true))) return;
     }
   }
 

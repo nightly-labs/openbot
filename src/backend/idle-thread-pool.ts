@@ -138,14 +138,17 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
 
   /**
    * Runs `open`, which must `add` the thread before it settles, as the one open of that thread:
-   * `wake` waits for it rather than opening the thread a second time.
+   * `wake` waits for it rather than opening the thread a second time. Returns `false`, and does not
+   * run `open`, when another open of the thread is in flight.
    */
-  async opening(threadId: string, open: () => Promise<unknown>): Promise<void> {
+  async opening(threadId: string, open: () => Promise<unknown>): Promise<boolean> {
+    if (this.#waking.has(threadId)) return false;
     const opening = open().finally(() => {
       if (this.#waking.get(threadId) === opening) this.#waking.delete(threadId);
     });
     this.#waking.set(threadId, opening);
     await opening;
+    return true;
   }
 
   #arm(thread: Thread): void {
