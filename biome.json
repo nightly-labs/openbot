@@ -189,6 +189,71 @@
       }
     },
     {
+      "includes": ["packages/contracts/src/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "electron",
+                      "electron/**",
+                      "solid-js",
+                      "solid-js/**",
+                      "@solidjs/**",
+                      "cloudflare:*",
+                      "@cloudflare/**",
+                      "@anthropic-ai/**",
+                      "@openai/**",
+                      "openai",
+                      "**/src/main/**",
+                      "**/src/backend/**",
+                      "**/src/preload/**",
+                      "**/src/renderer/**",
+                      "**/apps/**"
+                    ],
+                    "message": "Contracts are shared by every surface. Keep them free of Electron, SolidJS, provider, Cloudflare and application code."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/auth-api/src/server/**/*.ts", "apps/auth-api/src/worker-entry.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "electron",
+                      "electron/**",
+                      "@openbot/renderer-preview",
+                      "@openbot/renderer-web",
+                      "**/src/main/**",
+                      "**/src/backend/**",
+                      "**/src/preload/**",
+                      "**/src/renderer/**"
+                    ],
+                    "message": "The account server does not import desktop implementation files. Share the type through packages/contracts."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/*.test.ts", "**/*.test.tsx"],
       "plugins": [
         "./tools/biome/anti-slop/rules/no-class-assertions.grit",

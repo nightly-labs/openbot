@@ -55,6 +55,11 @@ renderer ──► @openbot/contracts ◄── preload ◄── main ──►
   can import renderer UI through the explicit preview and web aliases. These entry points do not
   load Electron, preload, setup, or updater providers.
 
+`noRestrictedImports` overrides in `biome.json` enforce the import rules above: renderer and shared
+UI to main, backend, and preload; main, backend, and preload to renderer; contracts to Electron,
+SolidJS, provider, Cloudflare, and application code; and the account server to desktop code.
+`noNodejsModules` keeps Node.js out of contracts and the team client.
+
 ## Browser client
 
 `apps/auth-api` serves `/app`. Its lazy route mounts the interactive client after browser startup.
