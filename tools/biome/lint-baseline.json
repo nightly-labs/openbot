@@ -1,0 +1,8 @@
+{
+  "nursery/noFloatingPromises": {
+    "src/main/ipc/browser-handlers.ts": 1,
+    "src/main/remote-server-manager.test.ts": 3,
+    "src/renderer/src/features/conversation/conversation-scope.ts": 1,
+    "src/renderer/src/features/conversation/stores/composer-actions.ts": 1
+  }
+}

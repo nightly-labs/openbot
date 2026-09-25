@@ -206,6 +206,18 @@ It rejects direct `window.openbot` and `globalThis.openbot` access, including op
 literal indexed forms. Browser APIs, comments, and string documentation remain valid.
 Its positive and negative fixtures run in `scripts/ui-foundation-check.test.ts`.
 
+### Lint debt ratchet
+
+`bun run lint:ratchet` runs the Biome rules in `tools/biome/lint-baseline.json` and compares the
+findings of each file to the baseline. A higher count fails, so a rule stops new debt before the old
+debt is fixed. A lower count also fails until `--write` lowers the baseline: this keeps the baseline
+tight. The script never raises a count; a higher count is a hand edit that a reviewer sees. When a
+rule has no findings left, turn it on in `biome.json` and remove it from the baseline.
+
+`nursery/noFloatingPromises` is the first rule. `nursery/noMisusedPromises` was rejected: its 37
+findings were all `if (cachedPromise)` presence checks. Biome cannot select a GritQL plugin with
+`--only`, so the ratchet holds only built-in Biome rules. A new GritQL rule must start clean.
+
 ### Removed rules and their limits
 
 - `no-runtime-typeof` could not distinguish valid narrowing of `unknown` at a trust boundary from
