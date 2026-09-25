@@ -2,7 +2,7 @@ import { createOpenBotAgentTemplateUrl } from "@openbot/contracts/agent-template
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { For, onSettled, Show } from "solid-js";
-import { agentTemplatePath } from "../../lib/agent-templates";
+import { agentTemplatePath } from "../../lib/agent-template-path";
 import { landingAnalytics } from "../../lib/analytics";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { ContentHeader } from "../content/ContentHeader";

@@ -19,7 +19,3 @@ export const readAgentTemplate = createServerFn({ method: "GET" })
       throw error;
     }
   });
-
-export function agentTemplatePath(id: string): string {
-  return `/agents/${id}`;
-}

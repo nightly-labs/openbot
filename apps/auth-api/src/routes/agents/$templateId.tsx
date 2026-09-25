@@ -1,7 +1,8 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { createFileRoute, notFound } from "@tanstack/solid-router";
 import { AgentTemplatePage } from "../../components/agents/AgentTemplatePage";
-import { agentTemplatePath, readAgentTemplate } from "../../lib/agent-templates";
+import { agentTemplatePath } from "../../lib/agent-template-path";
+import { readAgentTemplate } from "../../lib/agent-templates";
 import { OPENBOT_SOCIAL_IMAGE_ALT, OPENBOT_SOCIAL_IMAGE_URL } from "../../lib/site-metadata";
 
 export async function loadAgentTemplate(templateId: string): Promise<AgentTemplateDetail> {
