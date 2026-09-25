@@ -23,6 +23,7 @@ import { redactText } from "@openbot/logging";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
+import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   acpMcpServers,
@@ -32,6 +33,7 @@ import {
   type McpToolRuntimeSource,
   usableMcpServers,
 } from "./mcp-provider-shapes";
+import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -96,11 +98,6 @@ interface ProcessEnd {
   detail: string | null;
 }
 
-interface PendingServerRequest {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-}
-
 interface AcpTurn {
   id: string;
   itemId: string;
@@ -126,11 +123,7 @@ interface AcpThread {
   dynamicTools: DynamicToolNamespace[];
   workspaceRoots: string[];
   idleRelease: ReturnType<typeof setTimeout> | null;
-  /**
-   * When the session last finished a turn or was loaded only for a read, so the longest idle session
-   * is the first to close. `0` for a session that is open for a turn that has not started yet: only
-   * the timeout closes it.
-   */
+  /** Also set when the session was loaded only for a read. */
   idleSince: number;
 }
 
@@ -209,11 +202,34 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #cli: AgentCliInfo;
   readonly #requestTimeoutMs: number;
   readonly #bridge = new LocalMcpBridge();
-  readonly #threads = new Map<string, AcpThread>();
+  readonly #threads = new IdleThreadPool<AcpThread, ReleasedAcpThread>({
+    releaseAfterMs: ACP_SESSION_IDLE_RELEASE_MS,
+    idleLimit: ACP_IDLE_SESSION_LIMIT,
+    // An agent that cannot close a session and load it again would keep its MCP servers or lose it.
+    canRelease: () =>
+      this.#loadsSessions && Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close),
+    snapshot: ({ cwd, developerInstructions, dynamicTools, workspaceRoots, turns }) => ({
+      cwd,
+      developerInstructions,
+      dynamicTools,
+      workspaceRoots,
+      turns,
+    }),
+    dispose: (thread) => this.#closeSession(thread),
+    reopen: (threadId, released) =>
+      this.#startThread(
+        {
+          threadId,
+          cwd: released.cwd,
+          developerInstructions: released.developerInstructions,
+          dynamicTools: released.dynamicTools,
+          runtimeWorkspaceRoots: released.workspaceRoots,
+        },
+        true,
+      ),
+  });
   readonly #startingThreads = new Map<string, Promise<{ thread: { id: string } }>>();
-  readonly #releasedThreads = new Map<string, ReleasedAcpThread>();
-  readonly #startingTurns = new Set<string>();
-  readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
+  readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
   /** How the current process ended, and its last stderr line, once its output is read to the end. */
@@ -297,15 +313,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#process = null;
     this.#connection = null;
     this.#initialized = null;
-    for (const thread of this.#threads.values()) {
-      if (thread.idleRelease) clearTimeout(thread.idleRelease);
-      thread.mcp.close();
-    }
-    this.#threads.clear();
-    this.#releasedThreads.clear();
+    for (const thread of this.#threads.clear()) thread.mcp.close();
     this.#startingThreads.clear();
-    for (const pending of this.#pendingServerRequests.values()) pending.reject(new Error("ACP session stopped."));
-    this.#pendingServerRequests.clear();
+    this.#serverRequests.rejectAll("ACP session stopped.");
     await this.#bridge.close();
     if (!child || child.exitCode !== null) return;
     child.stdin.end();
@@ -328,16 +338,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * ignored: the session is already replaced on this side.
    */
   async releaseThread(sessionId: string): Promise<void> {
-    this.#releasedThreads.delete(sessionId);
+    this.#threads.forget(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
-    await this.#closeSession(thread);
+    await this.#threads.close(thread);
   }
 
   async #closeSession(thread: AcpThread): Promise<void> {
-    this.#threads.delete(thread.id);
-    if (thread.idleRelease) clearTimeout(thread.idleRelease);
-    thread.idleRelease = null;
     thread.mcp.close();
     await this.#connection?.closeSession({ sessionId: thread.id }).catch(() => undefined);
   }
@@ -424,7 +431,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const threadId = requiredString(params, "threadId");
         // A closed idle session answers from the turns it kept, so a read does not start its MCP
         // servers again.
-        const released = this.#threads.has(threadId) ? undefined : this.#releasedThreads.get(threadId);
+        const released = this.#threads.has(threadId) ? undefined : this.#threads.released(threadId);
         const thread = released ?? (await this.#readableThread(threadId, params));
         return decoder({ thread: { id: threadId, turns: thread?.turns ?? [] } });
       }
@@ -435,7 +442,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       case "turn/interrupt": {
         const threadId = requiredString(params, "threadId");
         // A closed idle session has no turn to stop.
-        if (this.#releasedThreads.has(threadId) && !this.#threads.has(threadId)) return decoder({});
+        if (this.#threads.isReleased(threadId)) return decoder({});
         const thread = this.#requireThread(threadId);
         this.#requireConnection().cancel({ sessionId: thread.id });
         return decoder({});
@@ -452,17 +459,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
-    const pending = this.#pendingServerRequests.get(id);
-    if (!pending) return;
-    this.#pendingServerRequests.delete(id);
-    pending.resolve(result);
+    this.#serverRequests.resolve(id, result);
   }
 
   respondError(id: RequestId, error: RpcError): void {
-    const pending = this.#pendingServerRequests.get(id);
-    if (!pending) return;
-    this.#pendingServerRequests.delete(id);
-    pending.reject(new Error(error.message));
+    this.#serverRequests.reject(id, error);
   }
 
   async #ensureInitialized(): Promise<void> {
@@ -649,10 +650,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // Boot recovery reads every stored session, and each loaded session holds its own set of the
     // user's MCP servers. A session loaded only for a read is idle from the start, so the idle limit
     // counts it and keeps only the most recent ones warm for a first turn.
-    if (thread && !resuming && thread.idleSince === 0 && !thread.activeTurn) {
-      thread.idleSince = Date.now();
-      this.#releaseIdleThreadsOverLimit();
-    }
+    if (thread && !resuming && thread.idleSince === 0 && !thread.activeTurn) this.#threads.markIdle(thread);
     return thread;
   }
 
@@ -746,16 +744,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         currentModelId,
         mcp,
         activeTurn: null,
-        turns: this.#releasedThreads.get(id)?.turns ?? [],
+        turns: this.#threads.released(id)?.turns ?? [],
         dynamicTools,
         workspaceRoots: additionalDirectories,
         idleRelease: null,
         idleSince: 0,
       };
       threadRef = thread;
-      this.#threads.set(id, thread);
-      this.#releasedThreads.delete(id);
-      this.#armIdleRelease(thread);
+      this.#threads.add(thread);
       await this.#applyConfig(thread, getString(params, "model"), getString(params, "effort"));
       return { thread: { id } };
     } catch (error) {
@@ -814,73 +810,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  /** Closes the session once it has had no turn for `ACP_SESSION_IDLE_RELEASE_MS`. */
-  #armIdleRelease(thread: AcpThread): void {
-    if (thread.idleRelease) clearTimeout(thread.idleRelease);
-    thread.idleRelease = null;
-    // An agent that cannot close a session and load it again would keep its MCP servers or lose it.
-    const capabilities = this.#initialization?.agentCapabilities;
-    if (!this.#loadsSessions || !capabilities?.sessionCapabilities?.close) return;
-    thread.idleRelease = setTimeout(() => {
-      thread.idleRelease = null;
-      if (this.#threads.get(thread.id) !== thread || thread.activeTurn || this.#startingTurns.has(thread.id)) return;
-      this.#releaseIdleThread(thread);
-    }, ACP_SESSION_IDLE_RELEASE_MS);
-    thread.idleRelease.unref?.();
-  }
-
-  /** An armed release timer marks a session that is idle and can be loaded again. */
-  #releaseIdleThreadsOverLimit(): void {
-    const idle = [...this.#threads.values()]
-      .filter(
-        (thread) =>
-          thread.idleRelease !== null &&
-          thread.idleSince > 0 &&
-          !thread.activeTurn &&
-          !this.#startingTurns.has(thread.id),
-      )
-      .sort((left, right) => left.idleSince - right.idleSince);
-    for (const thread of idle.slice(0, Math.max(0, idle.length - ACP_IDLE_SESSION_LIMIT))) {
-      this.#releaseIdleThread(thread);
-    }
-  }
-
-  #releaseIdleThread(thread: AcpThread): void {
-    const { cwd, developerInstructions, dynamicTools, workspaceRoots, turns } = thread;
-    this.#releasedThreads.set(thread.id, { cwd, developerInstructions, dynamicTools, workspaceRoots, turns });
-    void this.#closeSession(thread);
-  }
-
-  /** The session of a thread, loaded again when it was closed for being idle. */
-  async #wakeThread(threadId: string): Promise<AcpThread> {
-    const released = this.#releasedThreads.get(threadId);
-    if (released && !this.#threads.has(threadId)) {
-      await this.#startThread(
-        {
-          threadId,
-          cwd: released.cwd,
-          developerInstructions: released.developerInstructions,
-          dynamicTools: released.dynamicTools,
-          runtimeWorkspaceRoots: released.workspaceRoots,
-        },
-        true,
-      );
-    }
-    return this.#requireThread(threadId);
-  }
-
   async #startTurn(
     params: unknown,
     steer: boolean,
   ): Promise<{ turn: { id: string; status: string }; turnId?: string }> {
     const threadId = requiredString(params, "threadId");
-    // Loading the session yields, and another session going idle in that gap must not close this one.
-    this.#startingTurns.add(threadId);
-    try {
-      return await this.#openTurn(threadId, params, steer);
-    } finally {
-      this.#startingTurns.delete(threadId);
-    }
+    return this.#threads.startTurn(threadId, () => this.#openTurn(threadId, params, steer));
   }
 
   async #openTurn(
@@ -888,7 +823,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
     steer: boolean,
   ): Promise<{ turn: { id: string; status: string }; turnId?: string }> {
-    const thread = await this.#wakeThread(threadId);
+    await this.#threads.wake(threadId);
+    const thread = this.#requireThread(threadId);
     if (!steer && thread.activeTurn) throw new Error("The ACP thread already has an active turn.");
     if (steer && !thread.activeTurn) throw new Error("The ACP thread has no active turn to steer.");
     await this.#applyConfig(thread, getString(params, "model"), getString(params, "effort"));
@@ -923,8 +859,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
-    if (thread.idleRelease) clearTimeout(thread.idleRelease);
-    thread.idleRelease = null;
+    this.#threads.holdForTurn(thread);
     this.emit("notification", {
       method: "turn/started",
       params: { threadId: thread.id, turn: { id: turn.id, status: "inProgress" } },
@@ -1093,9 +1028,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.turns.push({ id: turn.id, status, items: turn.messages });
     thread.activeTurn = null;
-    thread.idleSince = Date.now();
-    this.#armIdleRelease(thread);
-    this.#releaseIdleThreadsOverLimit();
+    this.#threads.markIdle(thread);
   }
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -1109,7 +1042,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? "file-change"
           : "permissions";
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
-    const result = await this.#callServerRequest(
+    const result = await this.#serverRequests.call(
       `item/${kind === "command" ? "commandExecution" : kind === "file-change" ? "fileChange" : "permissions"}/requestApproval`,
       {
         threadId: params.sessionId,
@@ -1132,9 +1065,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   async #requestUserInput(method: string, params: DynamicRecord): Promise<DynamicRecord> {
-    const sessionId = getString(params, "sessionId") ?? [...this.#threads.keys()][0];
+    const sessionId = getString(params, "sessionId") ?? [...this.#threads.ids()][0];
     const thread = sessionId ? this.#threads.get(sessionId) : undefined;
-    const result = await this.#callServerRequest("item/tool/requestUserInput", {
+    const result = await this.#serverRequests.call("item/tool/requestUserInput", {
       ...params,
       threadId: sessionId,
       turnId: thread?.activeTurn?.id ?? randomUUID(),
@@ -1188,17 +1121,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     tool: string;
     arguments: unknown;
   }): Promise<DynamicToolResult> {
-    const result = await this.#callServerRequest("item/tool/call", params);
+    const result = await this.#serverRequests.call("item/tool/call", params);
     if (!isDynamicToolResult(result)) throw new Error("OpenBot returned an invalid dynamic tool result.");
     return result;
-  }
-
-  #callServerRequest(method: string, params: unknown): Promise<unknown> {
-    const id = randomUUID();
-    return new Promise((resolve, reject) => {
-      this.#pendingServerRequests.set(id, { resolve, reject });
-      this.emit("request", { id, method, params });
-    });
   }
 
   #requireThread(id: string): AcpThread {
