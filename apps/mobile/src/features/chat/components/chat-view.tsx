@@ -182,7 +182,8 @@ export function ChatView({
     () =>
       new Set(
         queue?.deliveries
-          .filter((item) => item.status === "queued" || item.status === "cancelled")
+          // Like desktop, a routine instruction stays in the chat below its marker.
+          .filter((item) => (item.status === "queued" || item.status === "cancelled") && item.sender.kind !== "routine")
           .map((item) => item.id) ?? [],
       ),
     [queue?.deliveries],

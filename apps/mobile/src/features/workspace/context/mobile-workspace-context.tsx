@@ -922,6 +922,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       deleteAgentRoutine: async (agentId, routineId, serverId) => {
         await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
       },
+      testAgentRoutine: async (agentId, routineId, serverId) => {
+        await request(
+          "POST",
+          TEAM_API_ROUTES.agent.routineTest(agentId, routineId),
+          ignoreResponse,
+          undefined,
+          serverId,
+        );
+      },
       loadAgentModels: (serverId) =>
         request(
           "GET",

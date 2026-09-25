@@ -185,6 +185,7 @@ const workspace = {
   createAgentRoutine: vi.fn(async () => {}),
   updateAgentRoutine: vi.fn(async () => {}),
   deleteAgentRoutine: vi.fn(async () => {}),
+  testAgentRoutine: vi.fn(async () => {}),
   loadAgentModels: vi.fn(async () => [
     {
       provider: "codex",

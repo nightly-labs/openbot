@@ -410,6 +410,7 @@ it("instruments message commands without sending their contents or changing the 
     createAgentRoutine: unexpected,
     updateAgentRoutine: unexpected,
     deleteAgentRoutine: unexpected,
+    testAgentRoutine: unexpected,
     loadAgentModels: unexpected,
     loadAgentMemories: unexpected,
     loadAgentRoutines: unexpected,

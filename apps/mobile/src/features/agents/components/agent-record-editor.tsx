@@ -33,7 +33,7 @@ function useRecordDraftGuard(dirty: boolean, pending: boolean) {
   });
 }
 
-function useRecordAction(invalidate: QueryKey = ["agent-info"]) {
+function useRecordAction(invalidate: QueryKey = ["agent-info"], failure = "Could not save changes. Try again.") {
   const client = useQueryClient();
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
@@ -48,7 +48,7 @@ function useRecordAction(invalidate: QueryKey = ["agent-info"]) {
       done?.();
       void client.invalidateQueries({ queryKey: invalidate });
     } catch (cause) {
-      setError(userErrorMessage(cause, "Could not save changes. Try again."));
+      setError(userErrorMessage(cause, failure));
     } finally {
       lock.current = false;
       setPending(false);
@@ -162,12 +162,15 @@ export function RoutineEditor({
     create(input: Omit<CreateRoutineInput, "agentId">): Promise<void>;
     update(input: Omit<UpdateRoutineInput, "agentId">): Promise<void>;
     delete(id: string): Promise<void>;
+    test(id: string): Promise<void>;
     queryKey: QueryKey;
   };
 }) {
   const workspace = useMobileWorkspace();
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
+  const testRun = useRecordAction(port?.queryKey, "Could not start the test run.");
+  const [testStarted, setTestStarted] = useState(false);
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
   useEffect(() => {
     if (routine?.active === activeOverride) setActiveOverride(null);
@@ -252,6 +255,7 @@ export function RoutineEditor({
       <SheetFormField
         appearance="soft"
         label="Routine name"
+        placeholder="Morning brief"
         value={name}
         editable={!disabled}
         maxLength={INPUT_LIMITS.routineName}
@@ -260,6 +264,7 @@ export function RoutineEditor({
       <SheetFormField
         appearance="soft"
         label="Routine instructions"
+        placeholder={`Describe what this ${port ? "channel" : "agent"} should do.`}
         multiline
         value={instruction}
         editable={!disabled}
@@ -425,6 +430,21 @@ export function RoutineEditor({
           </SettingsRow>
           <SettingsRow
             disclosure={false}
+            disabled={disabled || dirty || testRun.pending}
+            onPress={() => {
+              setTestStarted(false);
+              void testRun.run(
+                () => (port ? port.test(routine.id) : workspace.testAgentRoutine(agent.id, routine.id, agent.serverId)),
+                () => setTestStarted(true),
+              );
+            }}
+          >
+            <Typography.Paragraph className="text-accent">
+              {testRun.pending ? "Starting…" : "Test run"}
+            </Typography.Paragraph>
+          </SettingsRow>
+          <SettingsRow
+            disclosure={false}
             disabled={disabled}
             onPress={() =>
               Alert.alert("Delete routine?", "This routine will be removed.", [
@@ -447,6 +467,16 @@ export function RoutineEditor({
             <Typography.Paragraph className="text-danger-text">Delete routine</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
+      ) : null}
+      {testStarted ? (
+        <Typography.Paragraph accessibilityLiveRegion="polite">
+          The test run started. The result shows in the chat.
+        </Typography.Paragraph>
+      ) : null}
+      {testRun.error ? (
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+          {testRun.error}
+        </Typography.Paragraph>
       ) : null}
       {toggle.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
