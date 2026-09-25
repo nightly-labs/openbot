@@ -272,6 +272,18 @@ The workflow:
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.
 
+Before a tag, run the release path without publishing:
+
+```sh
+gh workflow run release.yml --ref <branch> -f mode=dry-run
+```
+
+The dry run runs the tag validation (without the tag and `main` checks), the Windows and Linux
+builds, and all their verification steps. It does not run the macOS job or the publish job, and it
+makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive, and an
+attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
+tag ref to check the macOS Host signing keychain.
+
 Installed OpenBot builds check for updates shortly after launch and every four minutes. New versions
 download automatically while **Automatically download updates** is on, which is the default and is
 persisted per user in `openbot-update-preference-v1.json`; with the setting off, a download starts
