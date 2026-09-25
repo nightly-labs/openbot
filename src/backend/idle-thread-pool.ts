@@ -49,10 +49,6 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
     return this.#threads.has(threadId);
   }
 
-  values(): IterableIterator<Thread> {
-    return this.#threads.values();
-  }
-
   ids(): IterableIterator<string> {
     return this.#threads.keys();
   }
