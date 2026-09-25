@@ -18,7 +18,11 @@ export function SettingsContent({ children }: PropsWithChildren) {
   );
 }
 
-export function SettingsSection({ title, children }: PropsWithChildren<{ title?: string }>) {
+export function SettingsSection({
+  title,
+  footer,
+  children,
+}: PropsWithChildren<{ title?: string; footer?: ReactNode }>) {
   return (
     <View className="gap-2">
       {title ? (
@@ -36,6 +40,11 @@ export function SettingsSection({ title, children }: PropsWithChildren<{ title?:
           ) : null,
         )}
       </ListGroup>
+      {footer ? (
+        <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
+          {footer}
+        </Typography.Paragraph>
+      ) : null}
     </View>
   );
 }

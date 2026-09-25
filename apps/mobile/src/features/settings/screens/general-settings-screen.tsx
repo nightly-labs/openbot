@@ -5,12 +5,7 @@ import { useEffect, useState } from "react";
 import { useUniwind } from "uniwind";
 import { saveAnalyticsPreference, useAnalyticsPreference } from "@/features/analytics/preference";
 import { dictationLanguageOptions } from "@/features/chat/model/voice-dictation";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import {
   AUTOMATIC_DICTATION_LANGUAGE,
@@ -42,7 +37,13 @@ function DictationSection({ dark }: { dark: boolean }) {
   const automatic = language.value === AUTOMATIC_DICTATION_LANGUAGE;
   const options = dictationLanguageOptions(supported, automatic ? null : language.value);
   return (
-    <SettingsSection title="Dictation">
+    <SettingsSection
+      title="Dictation"
+      footer={
+        error ??
+        "The language you speak when you dictate a message. Automatic uses the first language in your phone settings that speech recognition supports."
+      }
+    >
       <SettingsRow
         trailing={
           <Host matchContents colorScheme={dark ? "dark" : "light"}>
@@ -62,12 +63,8 @@ function DictationSection({ dark }: { dark: boolean }) {
           </Host>
         }
       >
-        <Typography.Paragraph type="body-sm">Language</Typography.Paragraph>
+        <Typography.Paragraph>Language</Typography.Paragraph>
       </SettingsRow>
-      <SettingsNote>
-        {error ??
-          "The language you speak when you dictate a message. Automatic uses the first language in your phone settings that speech recognition supports."}
-      </SettingsNote>
     </SettingsSection>
   );
 }
@@ -98,7 +95,7 @@ export function GeneralSettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   return (
     <SettingsContent>
-      <SettingsSection title="Appearance">
+      <SettingsSection title="Appearance" footer={error || "System follows your device’s appearance."}>
         <SettingsRow
           trailing={
             <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
@@ -117,12 +114,14 @@ export function GeneralSettingsScreen() {
             </Host>
           }
         >
-          <Typography.Paragraph type="body-sm">Theme</Typography.Paragraph>
+          <Typography.Paragraph>Theme</Typography.Paragraph>
         </SettingsRow>
-        <SettingsNote>{error || "System follows your device’s appearance."}</SettingsNote>
       </SettingsSection>
       <DictationSection dark={theme === "dark"} />
-      <SettingsSection title="Feedback">
+      <SettingsSection
+        title="Feedback"
+        footer={hapticsError ?? "Touch feedback for actions in the app on this device."}
+      >
         <SettingsRow>
           <Host
             matchContents={{ vertical: true }}
@@ -143,12 +142,17 @@ export function GeneralSettingsScreen() {
             disclosure={false}
             onPress={() => saveHaptics(hapticsPreference.enabled)}
           >
-            <Typography.Paragraph type="body-sm">Retry saving haptics setting</Typography.Paragraph>
+            <Typography.Paragraph>Retry saving haptics setting</Typography.Paragraph>
           </SettingsRow>
         ) : null}
-        <SettingsNote>{hapticsError ?? "Touch feedback for actions in the app on this device."}</SettingsNote>
       </SettingsSection>
-      <SettingsSection title="Privacy">
+      <SettingsSection
+        title="Privacy"
+        footer={
+          analyticsError ??
+          "Share feature use and connection results from this phone. Message contents and files are not sent."
+        }
+      >
         <SettingsRow>
           <Host
             matchContents={{ vertical: true }}
@@ -169,26 +173,18 @@ export function GeneralSettingsScreen() {
             disclosure={false}
             onPress={() => saveAnalytics(retryAnalyticsValue)}
           >
-            <Typography.Paragraph type="body-sm">Retry saving privacy setting</Typography.Paragraph>
+            <Typography.Paragraph>Retry saving privacy setting</Typography.Paragraph>
           </SettingsRow>
         ) : null}
-        <SettingsNote>
-          {analyticsError ??
-            "Share feature use and connection results from this phone. Message contents and files are not sent."}
-        </SettingsNote>
       </SettingsSection>
       <SettingsSection title="Conversations">
-        <SettingsRow
-          onPress={() => router.push("/settings/hidden-chats")}
-          supportingText="Show conversations you have hidden"
-        >
-          <Typography.Paragraph type="body-sm">Hidden chats</Typography.Paragraph>
+        <SettingsRow onPress={() => router.push("/settings/hidden-chats")}>
+          <Typography.Paragraph>Hidden chats</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow
           onPress={() => router.push({ pathname: "/settings/deleted-chats", params: { serverId: activeServer.id } })}
-          supportingText="Preview channels you have deleted"
         >
-          <Typography.Paragraph type="body-sm">Deleted channels</Typography.Paragraph>
+          <Typography.Paragraph>Deleted channels</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
     </SettingsContent>
