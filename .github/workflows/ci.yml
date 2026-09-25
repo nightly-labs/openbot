@@ -227,17 +227,20 @@ jobs:
           OPENBOT_STORYBOOK_CHECK: "true"
 
   preview:
-    name: Cloudflare preview
+    # This job builds the pull request's Worker with no secrets and no write token. The trusted
+    # `cloudflare-preview.yml` workflow uploads the build and comments on the pull request after
+    # this run completes; it runs code from `main` only. Forks get no preview.
+    name: Cloudflare preview build
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: cloudflare-preview
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
@@ -247,50 +250,15 @@ jobs:
         env:
           CLOUDFLARE_ENV: preview
 
-      - name: Upload preview version
-        id: deploy-preview
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+      - name: Upload preview build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_PREVIEW_DEPLOY_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/auth-api
-          packageManager: bun
-          command: versions upload --config dist/server/wrangler.json --preview-alias pr-${{ github.event.pull_request.number }}
-
-      - name: Read stable preview URL
-        id: preview-url
-        shell: bash
-        env:
-          WRANGLER_OUTPUT: ${{ steps.deploy-preview.outputs.command-output }}
-        run: |
-          preview_url="$(printf '%s\n' "$WRANGLER_OUTPUT" | sed -n 's/^Version Preview Alias URL: //p' | tail -n 1)"
-          if [[ ! "$preview_url" =~ ^https://[a-z0-9.-]+\.workers\.dev/?$ ]]; then
-            echo "Wrangler did not return a valid preview alias URL." >&2
-            exit 1
-          fi
-          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
-
-      - name: Add preview comment
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREVIEW_URL: ${{ steps.preview-url.outputs.url }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          marker='<!-- openbot-cloudflare-preview -->'
-          body="${marker}
-          ## Cloudflare preview
-
-          [Open the landing preview](${PREVIEW_URL})
-
-          Updated for commit \`${GITHUB_SHA}\`."
-          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
-            --jq 'map(select(.body | contains("<!-- openbot-cloudflare-preview -->")))[0].id // empty')"
-          if [[ -n "$comment_id" ]]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
-          fi
+          name: cloudflare-preview
+          path: apps/auth-api/dist
+          # The build writes `.assetsignore`, which keeps the config out of the public assets.
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
 
   deploy-production:
     name: Deploy Cloudflare production
