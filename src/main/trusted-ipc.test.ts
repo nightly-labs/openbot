@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from "vitest";
-import { handleTrusted, handleTrustedWithEvent } from "./trusted-ipc";
+import { handleTrusted, handleTrustedWithEvent, type IpcCallRecord, setIpcCallObserver } from "./trusted-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
 // electron cannot be imported outside an Electron process, and ipcMain is the
@@ -147,5 +147,36 @@ describe("trusted IPC wrappers", () => {
       "Rejected Dynamic Island IPC request outside the main renderer.",
     );
     expect(order).toEqual(["authorize"]);
+  });
+});
+
+// The observer feeds the local trace file. It must not change what the renderer receives, and it
+// sees the channel name only: a payload or a result could carry a secret into the file.
+describe("trusted IPC call observer", () => {
+  it("records the channel and outcome and returns the handler's own result or rejection", async () => {
+    const calls: IpcCallRecord[] = [];
+    setIpcCallObserver((call) => calls.push(call));
+    handleTrusted(
+      "test:observed",
+      (value) => String(value),
+      (payload) =>
+        payload === "fail" ? Promise.reject(new Error("Handler failed.")) : Promise.resolve(`ok:${payload}`),
+    );
+    handleTrusted("test:observed-untrusted", () => "never");
+
+    await expect(registrations.get("test:observed")?.(TRUSTED_EVENT, "apiKey=sk-secret-value")).resolves.toBe(
+      "ok:apiKey=sk-secret-value",
+    );
+    await expect(registrations.get("test:observed")?.(TRUSTED_EVENT, "fail")).rejects.toThrow("Handler failed.");
+    expect(() => registrations.get("test:observed-untrusted")?.(UNTRUSTED_EVENT)).toThrow(
+      "Rejected IPC request from an untrusted renderer.",
+    );
+    setIpcCallObserver(null);
+
+    expect(calls.map(({ name, outcome }) => ({ name, outcome }))).toEqual([
+      { name: "test:observed", outcome: "ok" },
+      { name: "test:observed", outcome: "error" },
+    ]);
+    expect(Object.keys(calls[0] ?? {}).sort()).toEqual(["durationMs", "name", "outcome"]);
   });
 });

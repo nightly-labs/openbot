@@ -9,6 +9,7 @@ import { app, type BrowserWindow, dialog } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import type { MailboxStore } from "../backend/mailbox-store";
+import type { TraceFile } from "./trace-file";
 import type { UpdateService } from "./update-service";
 
 const execFileAsync = promisify(execFile);
@@ -18,6 +19,7 @@ interface MaintenanceContext {
   browser: BrowserHost;
   mailbox: MailboxStore;
   updater: UpdateService;
+  trace: TraceFile;
   parentWindow: BrowserWindow | null;
 }
 
@@ -95,7 +97,7 @@ function powerShellLiteral(value: string): string {
 }
 
 export async function exportDiagnostics(
-  context: Pick<MaintenanceContext, "service" | "browser" | "updater" | "parentWindow">,
+  context: Pick<MaintenanceContext, "service" | "browser" | "updater" | "trace" | "parentWindow">,
 ): Promise<ExportResult> {
   const destination = await chooseExportDestination(
     context.parentWindow,
@@ -168,6 +170,8 @@ export async function exportDiagnostics(
       errorCode: update.errorCode,
       history: context.updater.getDiagnostics(),
     },
+    // IPC channels and turn origins with counts, outcomes and durations, from the local trace file.
+    trace: await context.trace.summarize(),
     privacy:
       "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
   };
