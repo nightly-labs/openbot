@@ -722,6 +722,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   async verifyEmailCode(challengeId: string, code: string): Promise<CentralAuthState> {
     const challenge = this.#state.status === "code_sent" ? this.#state : null;
     if (challenge) this.#setState({ ...challenge, issue: undefined });
+    let sessionApplied = false;
     try {
       const session = await this.#request(
         "/v1/auth/email/verify",
@@ -738,13 +739,17 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         this.#teamHostTokens.clear();
       }
       this.#sessionToken = session.sessionToken;
+      sessionApplied = true;
       await this.#writeStoredSession();
       return this.#setState({
         status: "signed_in",
         user: this.#resolveUserAvatar(session.user),
       });
     } catch (error) {
-      await this.#clearStoredSession();
+      // A wrong code or a failed request for a challenge leaves the stored session as it was: the
+      // user can still be signed in to another account, or have a session that only a startup
+      // check failed on.
+      if (sessionApplied || !challenge) await this.#clearStoredSession();
       if (challenge) {
         return this.#setState({
           ...challenge,

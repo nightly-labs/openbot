@@ -146,6 +146,17 @@ describe("ProviderCredentialStore", () => {
     expect(reopened.get("codex")).toBe("codex-key-value");
   });
 
+  it("keeps both keys when two providers save at the same time", async () => {
+    const { path, store } = await createStore();
+    // Each provider's save runs in its own provider queue, so two saves can overlap here.
+    await Promise.all([store.set("opencode", "zen-key-value"), store.set("codex", "codex-key-value")]);
+
+    const reopened = new ProviderCredentialStore(path, cipher);
+    await reopened.load();
+    expect(reopened.get("opencode")).toBe("zen-key-value");
+    expect(reopened.get("codex")).toBe("codex-key-value");
+  });
+
   it("refuses to report a key before it is loaded", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbot-provider-credentials-"));
     const store = new ProviderCredentialStore(join(root, "credentials.json"), cipher);

@@ -55,6 +55,9 @@ interface BridgeRoute {
 export class LocalMcpBridge {
   #server: HttpServer | null = null;
   #port: number | null = null;
+  #listening: Promise<void> | null = null;
+  /** Counts the closes, so a session asked for before a close does not register after it. */
+  #closes = 0;
   readonly #routes = new Map<string, BridgeRoute>();
 
   async createSession(
@@ -63,7 +66,9 @@ export class LocalMcpBridge {
     activeTurnId: () => string | null,
     call: BridgeRoute["call"],
   ): Promise<LocalMcpSession> {
+    const closes = this.#closes;
     await this.#listen();
+    if (closes !== this.#closes) throw new Error("The local OpenBot MCP bridge closed.");
     const tokens: string[] = [];
     const servers = namespaces.map((namespace) => {
       const token = randomBytes(32).toString("base64url");
@@ -91,7 +96,12 @@ export class LocalMcpBridge {
   }
 
   async close(): Promise<void> {
+    this.#closes += 1;
     this.#routes.clear();
+    // A bind still in flight sets the server when it ends, so it is awaited before the close.
+    const listening = this.#listening;
+    this.#listening = null;
+    await listening?.catch(() => undefined);
     const server = this.#server;
     this.#server = null;
     this.#port = null;
@@ -99,8 +109,19 @@ export class LocalMcpBridge {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 
-  async #listen(): Promise<void> {
-    if (this.#server) return;
+  /** One bind, however many sessions ask for it at once: a second would leave a server listening. */
+  #listen(): Promise<void> {
+    if (!this.#listening) {
+      const listening = this.#bind();
+      this.#listening = listening;
+      listening.catch(() => {
+        if (this.#listening === listening) this.#listening = null;
+      });
+    }
+    return this.#listening;
+  }
+
+  async #bind(): Promise<void> {
     const server = createServer((request, response) => void this.#handle(request, response));
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);

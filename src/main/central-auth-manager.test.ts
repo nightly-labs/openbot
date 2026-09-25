@@ -995,6 +995,58 @@ describe("CentralAuthManager", () => {
     expect(stored).not.toContain("machine-token-for-the-first-account");
   });
 
+  it("keeps the stored session and host credential when a code for another account is wrong", async () => {
+    const root = await createRoot();
+    const storagePath = join(root, "session.bin");
+    let verifications = 0;
+    const manager = new CentralAuthManager({
+      apiUrl: "https://api.openbot.run",
+      storagePath,
+      encrypt: (value) => Buffer.from(value),
+      decrypt: (value) => value.toString(),
+      fetch: vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(input.toString());
+        if (url.pathname.endsWith("/start")) {
+          return Response.json({ challengeId: "challenge-1", expiresAt: 10_000 });
+        }
+        if (url.pathname.endsWith("/verify")) {
+          verifications += 1;
+          if (verifications > 1) {
+            return Response.json(
+              { error: { code: "invalid_sign_in_code", message: "The sign-in code is incorrect." } },
+              { status: 401 },
+            );
+          }
+          return Response.json({
+            sessionToken: "session-one",
+            user: { id: "user-1", email: "person1@example.com", name: null, avatarUrl: null },
+          });
+        }
+        return Response.json({
+          hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+          name: "Studio Mac",
+          membershipId: "member-1",
+          authEpoch: 1,
+          machineToken: "machine-token-for-the-first-account-0001",
+        });
+      }),
+    });
+    await manager.requestEmailCode("person1@example.com");
+    await manager.verifyEmailCode("challenge-1", "ABCD-EFGH");
+    await manager.registerRemoteHost({
+      hostId: "8f1c1f2e-1d9a-4a1a-9d1e-2f7c6b5a4d3c",
+      name: "Studio Mac",
+      ownerMembershipId: "member-1",
+    });
+
+    await manager.requestEmailCode("person2@example.com");
+    await manager.verifyEmailCode("challenge-1", "AAAA-AAAA");
+
+    const stored = Buffer.from(await readFile(storagePath, "utf8"), "base64").toString();
+    expect(stored).toContain("session-one");
+    expect(stored).toContain("machine-token-for-the-first-account");
+  });
+
   it("updates the signed-in account name", async () => {
     const root = await createRoot();
     const requests: Request[] = [];

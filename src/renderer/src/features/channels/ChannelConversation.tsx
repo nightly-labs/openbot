@@ -413,7 +413,6 @@ export function ChannelConversation() {
     if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
     if (unreadVisibilityFrame !== undefined) cancelAnimationFrame(unreadVisibilityFrame);
   });
-  const messageElements = new Map<string, HTMLElement>();
   const name = (id: string | null) => agentList().find((agent) => agent.id === id)?.name ?? "Unassigned";
   /**
    * The work that waits for the reader: one entry for each stopped run, not for each stopped task.
@@ -584,10 +583,7 @@ export function ChannelConversation() {
                       <div
                         data-index={virtualRow.index}
                         data-grouped={entry()?.showAuthor === false ? "sender" : undefined}
-                        ref={(element) => {
-                          messageElements.set(initialEntry.id, element);
-                          messageVirtualizer.measureElement(element);
-                        }}
+                        ref={(element) => messageVirtualizer.measureElement(element)}
                         class="virtual-chat-row"
                         style={{
                           transform: messageVirtualizer.isVirtualized()

@@ -75,6 +75,8 @@ export function appIpcHandlers({
   getMainWindow,
   setAnalyticsTrackingEnabled,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
+  // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
+  let analyticsPreferenceWrite: Promise<unknown> = Promise.resolve();
   return {
     app: {
       getAppInfo: handler((): AppInfo => {
@@ -86,10 +88,14 @@ export function appIpcHandlers({
       }),
       getSetupState: handler(() => readSetupState(setupFile)),
       getAnalyticsPreference: handler(() => readAnalyticsPreference(analyticsPreferenceFile)),
-      setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, async (parsed) => {
-        const preference = await writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled);
-        setAnalyticsTrackingEnabled(preference.enabled);
-        return preference;
+      setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) => {
+        const write = analyticsPreferenceWrite.then(async () => {
+          const preference = await writeAnalyticsPreference(analyticsPreferenceFile, parsed.enabled);
+          setAnalyticsTrackingEnabled(preference.enabled);
+          return preference;
+        });
+        analyticsPreferenceWrite = write.catch(() => undefined);
+        return write;
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       setApprovalAutomation: payloadHandler(parseApprovalAutomation, (parsed) => approvalAutomation.set(parsed)),

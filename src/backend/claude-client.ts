@@ -166,6 +166,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
+  /** Resumes of one thread run one after another: two at once would leave a query nobody closes. */
+  readonly #threadResumes = new Map<string, Promise<void>>();
   #running = false;
 
   constructor(
@@ -251,13 +253,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "thread/resume": {
         const threadId = requiredString(params, "threadId");
         const config = readThreadConfig(params);
-        const current = this.#threads.get(threadId);
-        if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
-          if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
-          await this.#threads.close(current);
-        }
-        if (!this.#threads.has(threadId)) {
-          await this.#startThread(threadId, config, true);
+        const previous = this.#threadResumes.get(threadId) ?? Promise.resolve();
+        const resume = previous.catch(() => undefined).then(() => this.#resumeThread(threadId, config));
+        this.#threadResumes.set(threadId, resume);
+        try {
+          await resume;
+        } finally {
+          if (this.#threadResumes.get(threadId) === resume) this.#threadResumes.delete(threadId);
         }
         return decoder({ thread: { id: threadId } });
       }
@@ -430,6 +432,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
+  async #resumeThread(threadId: string, config: ThreadConfig): Promise<void> {
+    // A turn may be opening a released thread again: that query is the one to compare, not a second.
+    await this.#threads.opened(threadId);
+    const current = this.#threads.get(threadId);
+    if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
+      if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
+      await this.#threads.close(current);
+    }
+    if (!this.#threads.has(threadId)) {
+      await this.#threads.opening(threadId, () => this.#startThread(threadId, config, true));
+    }
+  }
+
   async #startThread(threadId: string, config: ThreadConfig, resume: boolean): Promise<void> {
     const input = new AsyncMessageQueue();
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
@@ -446,6 +461,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const handoff = config.profileGeneration
       ? null
       : claudeMcpServers(await usableMcpServers(this.#mcpServers(), this.#mcpToolRuntimes?.(), this.#mcpAuthorization));
+    // `stop()` may have run during the await: a query created now would outlive the client.
+    if (!this.#running) throw new Error("Claude Agent SDK is not running.");
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
     const mcpServers = handoff ? { ...handoff.servers, ...this.#createOpenBotServers(threadId) } : {};
     const claudeQuery = this.#createQuery({
@@ -510,7 +527,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     await this.#threads.wake(threadId);
     const runtime = this.#requireThread(threadId);
     if (runtime.activeTurn) throw new Error("The Claude thread already has an active turn.");
-    this.#threads.holdForTurn(runtime);
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -550,6 +566,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       toolCalls: new Map<string, string>(),
     };
     runtime.activeTurn = activeTurn;
+    // Only now: a model or effort change that fails above leaves the idle timer armed, so the
+    // pool can still release the thread.
+    this.#threads.holdForTurn(runtime);
     this.emit("notification", {
       method: "turn/started",
       params: { threadId, turn: { id: turnId, status: "inProgress" } },

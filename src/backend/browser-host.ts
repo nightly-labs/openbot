@@ -83,7 +83,7 @@ import {
 import { isMissingFileError } from "./file-errors";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
-import { withTimeout } from "./with-timeout";
+import { TimeoutError, withTimeout } from "./with-timeout";
 
 interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
@@ -1798,7 +1798,9 @@ export class BrowserHost {
         Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
         timeoutMessage,
       ).catch(async (error) => {
-        if (!isTimeoutError(error)) throw error;
+        // Only the backstop itself: an operation that failed on its own deadline has already
+        // finished, and detaching the debugger under it would only end the live view and frames.
+        if (!(error instanceof TimeoutError)) throw error;
         cancellationConfirmed = tab.engine.cancelPendingCommands();
         if (dispatched && !cancellationConfirmed) await operationCompletion;
         throw error;

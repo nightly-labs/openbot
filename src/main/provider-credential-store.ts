@@ -39,6 +39,7 @@ export class ProviderCredentialStore {
   #loaded = false;
   /** Why the file on disk could not be read. Until the user saves or removes a key, it is kept. */
   #loadError: Error | null = null;
+  #writeChain: Promise<void> = Promise.resolve();
 
   constructor(path: string, cipher: SecretCipher) {
     this.#path = path;
@@ -77,16 +78,32 @@ export class ProviderCredentialStore {
   }
 
   async set(provider: AgentProviderId, key: string): Promise<void> {
-    const next = this.#editableKeys();
-    next.set(provider, key);
-    await this.#commit(next);
+    await this.#edit((keys) => {
+      keys.set(provider, key);
+      return true;
+    });
   }
 
   async clear(provider: AgentProviderId): Promise<void> {
-    if (this.status(provider) === "missing") return;
-    const next = this.#editableKeys();
-    next.delete(provider);
-    await this.#commit(next);
+    await this.#edit((keys) => {
+      if (this.status(provider) === "missing") return false;
+      keys.delete(provider);
+      return true;
+    });
+  }
+
+  /**
+   * Runs one save or removal after the previous one. Each provider has its own command queue, so
+   * two providers can change their keys at the same time; each edit must start from the keys the
+   * previous edit committed, or the last write drops the other provider's key.
+   */
+  async #edit(change: (keys: Map<string, string>) => boolean): Promise<void> {
+    const operation = this.#writeChain.then(async () => {
+      const next = this.#editableKeys();
+      if (change(next)) await this.#commit(next);
+    });
+    this.#writeChain = operation.catch(() => undefined);
+    await operation;
   }
 
   /**
