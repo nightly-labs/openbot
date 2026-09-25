@@ -315,6 +315,11 @@
       },
     },
   },
+  "trustedDependencies": [
+    "esbuild",
+    "electron-winstaller",
+    "workerd",
+  ],
   "patchedDependencies": {
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
