@@ -1,7 +1,7 @@
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
 export type MobileSearchCategory = "all" | "messages" | "agents" | "files" | "routines";
-export type MobileSearchResultCategory = Exclude<MobileSearchCategory, "all">;
+type MobileSearchResultCategory = Exclude<MobileSearchCategory, "all">;
 
 export interface MobileSearchFilterOption {
   id: MobileSearchCategory;

@@ -3,7 +3,7 @@ interface Reveal {
   skip: () => void;
 }
 
-export const STREAM_WORD_INTERVAL_MS = 32;
+const STREAM_WORD_INTERVAL_MS = 32;
 
 /** Bounds native animated nodes; bursts catch up instead of delaying the answer. */
 export function createStreamRevealPool(limit = 4) {

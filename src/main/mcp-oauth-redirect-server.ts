@@ -110,7 +110,7 @@ interface Answer {
  * What one request gets back. Separated from the listener so a test states a request rather than
  * making one, and so every refusal below is one `return`.
  */
-export function respondTo(
+function respondTo(
   method: string | undefined,
   target: string | undefined,
   host: string | undefined,

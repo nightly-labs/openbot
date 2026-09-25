@@ -258,8 +258,6 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   };
 }
 
-export type PanelsStore = ReturnType<typeof createPanelsStore>;
-
 function filePreviewError(error: unknown, path: string): string {
   let decodedPath = path;
   try {

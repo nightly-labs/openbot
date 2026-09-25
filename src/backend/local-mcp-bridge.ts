@@ -13,7 +13,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import type { DynamicToolResult } from "./protocol";
 
-export interface DynamicToolDefinition {
+interface DynamicToolDefinition {
   type: "function";
   name: string;
   description?: string;

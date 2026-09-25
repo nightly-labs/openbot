@@ -35,7 +35,7 @@ import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 
 // A socket the event stream can drive: `readyState` tracks `close()`, and `close` is a spy so a test
 // can name the code the stream chose to close with.
-export class FakeEventSocket extends EventTarget {
+class FakeEventSocket extends EventTarget {
   static readonly OPEN = 1;
   static readonly CLOSED = 3;
 
@@ -239,7 +239,7 @@ export async function waitForServer(
   });
 }
 
-export interface TeamFetchCall {
+interface TeamFetchCall {
   readonly url: URL;
   readonly path: string;
   readonly headers: Headers;
@@ -247,9 +247,9 @@ export interface TeamFetchCall {
   readonly body: DynamicRecord | undefined;
 }
 
-export type TeamFetchHandler = (call: TeamFetchCall) => Response | Promise<Response>;
+type TeamFetchHandler = (call: TeamFetchCall) => Response | Promise<Response>;
 
-export interface HostHandshake {
+interface HostHandshake {
   readonly appVersion?: string;
   readonly protocol?: { minimum: number; maximum: number };
   readonly capabilities?: readonly string[];

@@ -51,7 +51,7 @@ function opencodeEnv(cli: AgentCliInfo, credentials: ProviderClientContext): Rec
  * provider that simply had nothing to spawn would have opened a ChatGPT login. The union makes each
  * answer say what it is, and a new arm is a compile error at both sites rather than a wrong login.
  */
-export type ProviderSignIn =
+type ProviderSignIn =
   /** The provider's own protocol hands back a URL for OpenBot to open. */
   | { kind: "browser" }
   /** OpenBot spawns the provider's CLI and waits for the process to exit. */
@@ -237,7 +237,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
 ] as const;
 
-export const PROVIDER_DRIVERS = new Map(BUILT_IN_PROVIDER_DRIVERS.map((driver) => [driver.id, driver]));
+const PROVIDER_DRIVERS = new Map(BUILT_IN_PROVIDER_DRIVERS.map((driver) => [driver.id, driver]));
 
 export function requireProviderDriver(provider: AgentProviderId): BuiltInProviderDriver {
   const driver = PROVIDER_DRIVERS.get(provider);

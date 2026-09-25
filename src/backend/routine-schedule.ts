@@ -87,27 +87,6 @@ export function normalizeRoutineSchedule(schedule: RoutineSchedule, now = new Da
   return { ...schedule, anchorAt: anchor };
 }
 
-export function routineScheduleSummary(schedule: RoutineSchedule): string {
-  switch (schedule.kind) {
-    case "hourly":
-      return schedule.minute === 0 ? "Every hour" : `Every hour at :${String(schedule.minute).padStart(2, "0")}`;
-    case "daily":
-      return `Every day at ${displayTime(schedule.time)}`;
-    case "weekdays":
-      return `Weekdays at ${displayTime(schedule.time)}`;
-    case "weekly":
-      return `Every ${WEEKDAYS[schedule.weekday]} at ${displayTime(schedule.time)}`;
-    case "monthly":
-      return `Monthly on day ${schedule.day} at ${displayTime(schedule.time)}`;
-    case "interval":
-      return `Every ${schedule.amount} ${schedule.unit}`;
-    case "advanced":
-      return "Advanced schedule";
-    case "custom":
-      return schedule.expression;
-  }
-}
-
 function scheduleCronSpec(schedule: Exclude<RoutineSchedule, { kind: "interval" }>): CronSpec {
   switch (schedule.kind) {
     case "hourly":
@@ -361,14 +340,6 @@ function intervalMilliseconds(amount: number, unit: RoutineIntervalUnit): number
   return amount * unitMs;
 }
 
-function displayTime(time: string): string {
-  const [hour, minute] = parseTime(time);
-  const period = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
-}
-
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 /**

@@ -120,7 +120,7 @@ export interface DevelopmentRemoteServerConnection {
   sessionToken: string;
 }
 
-export const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #store: RemoteServerStore;
   readonly #connections: RemoteServerConnections;

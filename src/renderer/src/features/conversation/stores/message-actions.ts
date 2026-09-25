@@ -123,5 +123,3 @@ export function createMessageActions(deps: MessageActionsDeps) {
     draftAttachmentIds,
   };
 }
-
-export type MessageActions = ReturnType<typeof createMessageActions>;

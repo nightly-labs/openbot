@@ -3,13 +3,13 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type DatabaseCore, deleteOrphanReceipts } from "./database-core";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
 
-export interface MailboxProjectionAttachment {
+interface MailboxProjectionAttachment {
   id: string;
   name: string;
   path: string;
 }
 
-export interface MailboxProjectionMessage {
+interface MailboxProjectionMessage {
   id: string;
   sender: {
     kind: string;
@@ -25,7 +25,7 @@ export interface MailboxProjectionMessage {
   attachments: MailboxProjectionAttachment[];
 }
 
-export interface MailboxProjectionDelivery {
+interface MailboxProjectionDelivery {
   id: string;
   messageId: string;
   recipientAgentId: string;
@@ -35,11 +35,11 @@ export interface MailboxProjectionDelivery {
   createdAt: string;
 }
 
-export interface MailboxProjectionDraft extends MailboxProjectionAttachment {
+interface MailboxProjectionDraft extends MailboxProjectionAttachment {
   createdAt: string;
 }
 
-export interface MailboxProjectionGeneratedAttachment extends MailboxProjectionAttachment {
+interface MailboxProjectionGeneratedAttachment extends MailboxProjectionAttachment {
   size: number;
   kind: string;
   mimeType: string;
@@ -48,7 +48,7 @@ export interface MailboxProjectionGeneratedAttachment extends MailboxProjectionA
   sha256: string;
 }
 
-export interface MailboxProjectionReaction {
+interface MailboxProjectionReaction {
   agentId: string;
   messageId: string;
   emoji: string;

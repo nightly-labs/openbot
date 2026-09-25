@@ -14,7 +14,9 @@ function loaderAppearance() {
   return { color, radii, idleMorph };
 }
 
-export const { color: LOADER_COLOR, radii: LOADER_RADII, idleMorph: IDLE_MORPH_SECONDS } = loaderAppearance();
+const { color, radii: LOADER_RADII, idleMorph } = loaderAppearance();
+export const LOADER_COLOR = color;
+export const IDLE_MORPH_SECONDS = idleMorph;
 
 function nativeFrame(frame: BotFrame) {
   return {

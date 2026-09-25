@@ -10,6 +10,14 @@ function compileCss(text: string): string {
 
 const config: KnipConfig = {
   compilers: { css: compileCss },
+  // A released Team API protocol keeps its whole frozen codec, including the parts that no current
+  // code uses (packages/contracts/AGENTS.md).
+  ignoreIssues: {
+    "packages/contracts/src/team-protocol/v*.ts": ["exports", "types"],
+    "packages/contracts/src/team-protocol/*-v*.ts": ["exports", "types"],
+    // A generator writes this file, and `build-plugin-catalog.test.ts` requires its exact output.
+    "apps/auth-api/src/lib/plugin-catalog.generated.ts": ["exports", "types"],
+  },
   // Host tools that scripts and tests call. They are not npm packages.
   ignoreBinaries: [
     // Builds whisper.cpp and the remote desktop runtime.

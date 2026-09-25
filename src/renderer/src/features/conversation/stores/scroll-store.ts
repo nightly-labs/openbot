@@ -20,13 +20,13 @@ import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeRoutineRunMessages } from "../routine-run-timeline";
 
-export interface ScrollElements {
+interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
   virtualRoot: () => HTMLDivElement | undefined;
   unreadMessagesDivider: () => HTMLDivElement | undefined;
 }
 
-export interface ScrollStickyState {
+interface ScrollStickyState {
   getStickToLatest: () => boolean;
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
@@ -235,5 +235,3 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToLatestMessage,
   };
 }
-
-export type ScrollStore = ReturnType<typeof createScrollStore>;

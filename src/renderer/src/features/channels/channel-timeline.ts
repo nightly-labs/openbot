@@ -40,7 +40,7 @@ function hasContent(entry: ChannelMessage): boolean {
  * feedback about how the work was shared, so it carries no bubble, no author face and no message
  * actions, and it does not count as a new message.
  */
-export function channelRoutingMarker(entry: ChannelMessage): ChatActionMarkerModel | null {
+function channelRoutingMarker(entry: ChannelMessage): ChatActionMarkerModel | null {
   const event = channelRoutingConversationEvent(entry.message);
   return event ? { ...event, kind: "channel-routing", timestamp: entry.message.createdAt } : null;
 }

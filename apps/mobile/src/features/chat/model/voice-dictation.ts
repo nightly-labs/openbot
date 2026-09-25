@@ -65,7 +65,7 @@ export function pickRecognitionLocale(preferred: readonly string[], supported: r
 }
 
 /** A locale by name, such as "Polish (Poland)", so a speaker can find it. */
-export function recognitionLocaleLabel(locale: string): string {
+function recognitionLocaleLabel(locale: string): string {
   return localeName(locale) ?? locale;
 }
 

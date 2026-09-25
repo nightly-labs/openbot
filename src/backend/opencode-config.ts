@@ -45,7 +45,7 @@ export interface OpenCodeProviderEntry {
 }
 
 /** One rule per tool pattern, which is all OpenBot sends under `permission`. */
-export type OpenCodePermissionLayer = Readonly<Record<string, "allow" | "ask" | "deny">>;
+type OpenCodePermissionLayer = Readonly<Record<string, "allow" | "ask" | "deny">>;
 
 /** The config layer OpenBot owns on `OPENCODE_CONFIG_CONTENT`. The user's own file is untouched. */
 export interface OpenCodeConfig {

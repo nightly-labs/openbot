@@ -1616,6 +1616,6 @@ function randomBase32(length: number): string {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
-export async function sourceIpHash(secret: string, value: string, deduplicationWindow: number): Promise<string> {
+async function sourceIpHash(secret: string, value: string, deduplicationWindow: number): Promise<string> {
   return hmacSha256(secret, `${deduplicationWindow}\0${value}`);
 }

@@ -17,7 +17,7 @@ export const AGENT_IMPORT_MANIFEST = "openbot-import.json";
 const FORMAT = "openbot-agent-import";
 const VERSION = 1;
 
-export interface ImportRoutine {
+interface ImportRoutine {
   name: string;
   instruction: string;
   active: boolean;

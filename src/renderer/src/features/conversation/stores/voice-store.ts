@@ -9,7 +9,7 @@ import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
 
-export interface VoiceSubmitHooks {
+interface VoiceSubmitHooks {
   saveEdit: (
     draftOverride?: ComposerDraft,
     target?: ConversationTarget & { deliveryId: string; originalAttachmentIds: string[] },
@@ -236,5 +236,3 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     stopVoiceElapsedTimer,
   };
 }
-
-export type VoiceStore = ReturnType<typeof createVoiceStore>;

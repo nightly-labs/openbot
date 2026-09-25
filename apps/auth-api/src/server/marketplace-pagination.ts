@@ -1,8 +1,8 @@
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
-export const MARKETPLACE_DEFAULT_PAGE_SIZE = 24;
-export const MARKETPLACE_MAX_PAGE_SIZE = 50;
-export const MARKETPLACE_MAX_QUERY_LENGTH = 100;
+const MARKETPLACE_DEFAULT_PAGE_SIZE = 24;
+const MARKETPLACE_MAX_PAGE_SIZE = 50;
+const MARKETPLACE_MAX_QUERY_LENGTH = 100;
 const MAX_CURSOR_LENGTH = 512;
 
 export type MarketplaceSort = "updated" | "installs";

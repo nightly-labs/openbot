@@ -343,7 +343,7 @@ export function notification(method: string, params: unknown): AppServerNotifica
   return { method, params };
 }
 
-export function stringParam(value: unknown, key: string): string {
+function stringParam(value: unknown, key: string): string {
   if (!isDynamicRecord(value)) throw new Error(`${key} is missing.`);
   const result = value[key];
   if (!isString(result)) throw new Error(`${key} is missing.`);

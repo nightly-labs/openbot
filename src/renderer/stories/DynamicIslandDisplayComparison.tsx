@@ -3,7 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { BatteryFull, Bot, Wifi } from "lucide-solid";
 import { type Accessor, createSignal, untrack } from "solid-js";
 
-export interface DynamicIslandStoryPreviewContext {
+interface DynamicIslandStoryPreviewContext {
   displayMode: "notch" | "island";
   state: Accessor<DynamicIslandViewState>;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;

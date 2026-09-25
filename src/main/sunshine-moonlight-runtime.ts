@@ -72,7 +72,7 @@ export function sunshineHttpsPortForBase(basePort: number): number {
   return basePort + 1;
 }
 
-export function sunshinePortFamilyForBase(basePort: number): { min: number; max: number } {
+function sunshinePortFamilyForBase(basePort: number): { min: number; max: number } {
   return {
     min: basePort + SUNSHINE_PORT_FAMILY_MIN_OFFSET,
     max: basePort + SUNSHINE_PORT_FAMILY_MAX_OFFSET,

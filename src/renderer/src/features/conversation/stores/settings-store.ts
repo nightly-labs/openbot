@@ -179,5 +179,3 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     selectAndConfirmReasoning,
   };
 }
-
-export type SettingsStore = ReturnType<typeof createSettingsStore>;

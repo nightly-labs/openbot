@@ -1123,7 +1123,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
   };
 }
 
-export function serverLogoUrl(version: string): string {
+function serverLogoUrl(version: string): string {
   return `openbot-server-logo://local/logo?v=${encodeURIComponent(version)}`;
 }
 

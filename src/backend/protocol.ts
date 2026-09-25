@@ -3,13 +3,13 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } fr
 
 export type RequestId = string | number;
 
-export interface RpcRequest {
+interface RpcRequest {
   method: string;
   id: RequestId;
   params?: unknown;
 }
 
-export interface RpcNotification {
+interface RpcNotification {
   method: string;
   params?: unknown;
 }
@@ -20,7 +20,7 @@ export interface RpcError {
   data?: unknown;
 }
 
-export interface RpcResponse {
+interface RpcResponse {
   id: RequestId;
   result?: unknown;
   error?: RpcError;
@@ -118,14 +118,14 @@ export interface ThreadItem {
   [key: string]: unknown;
 }
 
-export interface TurnRecord {
+interface TurnRecord {
   id: string;
   status?: string;
   startedAt?: number;
   items?: ThreadItem[];
 }
 
-export interface ThreadRecord {
+interface ThreadRecord {
   id: string;
   turns?: TurnRecord[];
 }

@@ -5,8 +5,6 @@ import { useCSSVariable } from "uniwind";
 
 import { type AppLogoAnimation, useAppLogoMotion } from "@/features/auth/components/use-app-logo-motion";
 
-export type { AppLogoAnimation } from "@/features/auth/components/use-app-logo-motion";
-
 export interface AppLogoProps {
   animation?: AppLogoAnimation;
   followDeviceOrientation?: boolean;

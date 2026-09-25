@@ -18,7 +18,7 @@ import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("dynamic-island-window");
 
-export const DYNAMIC_ISLAND_WINDOW_SIZE = { width: 614, height: 380 } as const;
+const DYNAMIC_ISLAND_WINDOW_SIZE = { width: 614, height: 380 } as const;
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HEIGHT = 50;
 // Room below the compact island for its hover growth and hit band, which the window must not clip.
 const DYNAMIC_ISLAND_COMPACT_WINDOW_HOVER_ROOM = 18;
@@ -365,7 +365,7 @@ function criticalActionKey(
   return [action.type, action.serverId, action.agentId, String(action.requestId)].join("\u0000");
 }
 
-export function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {
+function dynamicIslandWindowBounds(display: Pick<Display, "bounds">): Rectangle {
   return {
     x: Math.round(display.bounds.x + (display.bounds.width - DYNAMIC_ISLAND_WINDOW_SIZE.width) / 2),
     y: display.bounds.y,

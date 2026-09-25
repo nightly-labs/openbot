@@ -2,7 +2,7 @@
 
 import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
 
-export interface RoutineSaveInput {
+interface RoutineSaveInput {
   routineId: string | null;
   name: string;
   instruction: string;

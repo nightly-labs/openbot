@@ -76,5 +76,3 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
     deleteCustomProvider,
   };
 }
-
-export type CustomProvidersStore = ReturnType<typeof createCustomProvidersStore>;

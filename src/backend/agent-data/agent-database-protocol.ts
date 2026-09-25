@@ -45,7 +45,7 @@ export interface AgentDatabaseStatement {
 }
 
 /** Close the handles for one file so the main process can unlink or move it. */
-export interface AgentDatabaseClose {
+interface AgentDatabaseClose {
   kind: "close";
   id: number;
   databasePath: string;

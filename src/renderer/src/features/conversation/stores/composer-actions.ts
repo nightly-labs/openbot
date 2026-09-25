@@ -586,5 +586,3 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     sendSelectionInstruction,
   };
 }
-
-export type ComposerActions = ReturnType<typeof createComposerActions>;

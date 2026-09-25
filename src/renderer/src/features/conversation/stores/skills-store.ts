@@ -76,5 +76,3 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     installedSkills,
   };
 }
-
-export type SkillsStore = ReturnType<typeof createSkillsStore>;

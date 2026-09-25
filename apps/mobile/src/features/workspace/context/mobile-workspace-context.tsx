@@ -110,10 +110,7 @@ export type {
   MobileAgent,
   MobileServer,
   MobileServerDirectoryState,
-  MobileServerKind,
-  MobileServerState,
   MobileWorkspaceContextValue,
-  ToggleAgentPinResult,
 } from "@/features/workspace/model/workspace-types";
 
 type RemoteAgent = Pick<

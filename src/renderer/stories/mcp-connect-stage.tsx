@@ -45,7 +45,7 @@ export function keyFlowFor(entry: MarketplacePluginApp): McpKeyFlow {
 }
 
 /** The key the story server accepts. Anything else is a key the server refuses. */
-export const GOOD_KEY = "good-key";
+const GOOD_KEY = "good-key";
 
 /** What the server does with this attempt. Every state of the dialog is one of these answers. */
 export type ConnectOutcome = "connects" | "refuses" | "unreachable" | "never answers";
