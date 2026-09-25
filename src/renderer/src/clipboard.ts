@@ -12,15 +12,20 @@ export async function writeClipboardText(text: string): Promise<void> {
   } catch {
     // The copy command below is the fallback.
   }
+  // Inside the open dialog, if there is one: a modal traps the focus, and a text area outside it would
+  // make the trap pull the focus back, which moves the focus ring.
+  const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const host = previous?.closest<HTMLElement>("[role='dialog']") ?? document.body;
   const input = document.createElement("textarea");
   input.value = text;
   input.style.position = "fixed";
   input.style.opacity = "0";
-  document.body.append(input);
+  host.append(input);
   try {
     input.select();
     if (!document.execCommand("copy")) throw new Error("Could not copy the text.");
   } finally {
     input.remove();
+    previous?.focus({ preventScroll: true });
   }
 }

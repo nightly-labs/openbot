@@ -1,4 +1,5 @@
 import type { AgentProviderId, AgentSummary, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import { onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
@@ -115,8 +116,18 @@ const ServerSelection = createSimpleContext({
       }
     }
 
+    /**
+     * Never rejects: the agent is installed by now, and a failure to open it must not read as a failed
+     * install, or the user would add it a second time. Both the marketplace and a shared-agent link
+     * call this after their install.
+     */
     async function openInstalledMarketplaceAgent(agent: AgentSummary): Promise<void> {
-      if (!(await selectServer("local", false))) return;
+      try {
+        if (!(await selectServer("local", false))) return;
+      } catch {
+        toast.error(`Could not open ${agent.name}. Find it in the sidebar.`);
+        return;
+      }
       // Published rather than called: if this was a switch, the navigation
       // domain that owns `selectAgent` has already been replaced by the one in
       // the new scope, and that is the one that has to run it.

@@ -345,6 +345,7 @@ export type DeepLink = { kind: "invite"; url: string } | { kind: "plugin"; slug:
 | --- | --- | --- |
 | `invite` | `openbot://join?…` | Opens the join dialog, as today. |
 | `plugin` | `openbot://plugins/<slug>` | Opens the marketplace listing. |
+| `agent-template` | `openbot://agents/<id>` | Opens the agent template preview. See [ARCHITECTURE.md](ARCHITECTURE.md#agent-templates). |
 | other | — | The URL is dropped without a message, as today. |
 
 The invite parser runs first, so an invite URL never reaches the plugin parser. `src/main/index.ts`

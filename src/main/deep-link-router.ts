@@ -18,12 +18,14 @@
  * front of a link kind it has never heard of.
  */
 
+import { parseAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
 import { type InviteLinkOptions, parseInviteUrl } from "@openbot/contracts/invite-links";
 import { parsePluginUrl } from "@openbot/contracts/plugin-links";
 
 export type DeepLink =
   | { kind: "invite"; url: string }
   | { kind: "plugin"; slug: string }
+  | { kind: "agent-template"; id: string }
   | { kind: "mcp-auth"; state: string; code: string };
 
 /**
@@ -50,6 +52,12 @@ export function parseDeepLink(value: string, options: InviteLinkOptions = {}): D
     return { kind: "plugin", slug: parsePluginUrl(value) };
   } catch {
     // Not a plugin listing. A plugin link carries no query, so it can never be the link below.
+  }
+
+  try {
+    return { kind: "agent-template", id: parseAgentTemplateUrl(value) };
+  } catch {
+    // Not an agent template. It carries no query either, so it can never be a sign-in grant.
   }
 
   return parseMcpAuthUrl(value);

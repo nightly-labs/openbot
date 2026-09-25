@@ -1,5 +1,6 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
+import { AgentTemplates } from "./agent-templates";
 import { AuthService, AuthServiceError } from "./auth-service";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
@@ -50,6 +51,10 @@ export function requestSkillMarketplace(): SkillMarketplace {
 
 export function requestAgentMarketplace(): AgentMarketplace {
   return new AgentMarketplace(requireWorkerBindings(env));
+}
+
+export function requestAgentTemplates(): AgentTemplates {
+  return new AgentTemplates(requireWorkerBindings(env));
 }
 
 export function requestHostedSiteService(): HostedSiteService {

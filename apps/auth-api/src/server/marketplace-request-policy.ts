@@ -40,6 +40,9 @@ export async function enforceMarketplaceMutation(
 
 function isMarketplacePath(pathname: string): boolean {
   return (
-    pathname === "/v1/skills" || pathname.startsWith("/v1/skills/") || pathname.startsWith("/v1/marketplace/agents")
+    pathname === "/v1/skills" ||
+    pathname.startsWith("/v1/skills/") ||
+    pathname.startsWith("/v1/marketplace/agents") ||
+    pathname.startsWith("/v1/agent-templates")
   );
 }
