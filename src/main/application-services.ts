@@ -124,6 +124,7 @@ import { TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
+import { TraceFile } from "./trace-file";
 import { readUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
@@ -193,6 +194,8 @@ const TEARDOWN_ORDER = {
   teamWebRtcBridge: 100,
   mcpOAuthRedirect: 105,
   service: 110,
+  // Last, so the turns that end while the services stop are still written.
+  trace: 120,
 } as const;
 
 export interface ApplicationServiceContext {
@@ -256,6 +259,7 @@ export interface ApplicationServices {
   computerUseHighlight: ComputerUseHighlightController;
   computerUsePermissionHelp: ComputerUsePermissionHelpWindowController;
   analytics: HostAnalytics;
+  trace: TraceFile;
   teamStore: TeamStore;
   /**
    * The account state this function read part-way through, and bound the local host to. The
@@ -990,6 +994,8 @@ export async function createApplicationServices({
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.
   analytics.flushPending();
+  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
+  teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => trace.flush());
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
     {
@@ -1216,6 +1222,7 @@ export async function createApplicationServices({
     computerUseHighlight,
     computerUsePermissionHelp,
     analytics,
+    trace,
     teamStore,
     appliedAccount: signedInState,
     centralAuthInitialization,

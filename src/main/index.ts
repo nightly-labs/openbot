@@ -59,6 +59,7 @@ import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { TeardownRegistry } from "./teardown-registry";
+import { setIpcCallObserver } from "./trusted-ipc";
 
 const logger = createOpenBotLogger("main");
 
@@ -335,6 +336,7 @@ function registerIpcHandlers({
   computerUsePermissionHelp,
   analytics,
   storageUsage,
+  trace,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
   // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
@@ -357,6 +359,7 @@ function registerIpcHandlers({
       appVariant,
       getMainWindow,
       setAnalyticsTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+      trace,
     }),
     ...dynamicIslandIpcHandlers({ dynamicIsland }),
     ...computerUseIpcHandlers({
@@ -685,8 +688,11 @@ if (!hasSingleInstanceLock) {
         dynamicIsland,
         teamStore,
         language,
+        trace,
       } = built;
 
+      setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
+      service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
       host.on("changed", forwardHostStatus);

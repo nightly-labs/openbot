@@ -44,6 +44,7 @@ export const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string> = {
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
+import type { TraceFile } from "../trace-file";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 
 export interface AppIpcDependencies {
@@ -59,6 +60,7 @@ export interface AppIpcDependencies {
   appVariant: AppVariant;
   getMainWindow: () => BrowserWindow | null;
   setAnalyticsTrackingEnabled: (enabled: boolean) => void;
+  trace: TraceFile;
 }
 
 export function appIpcHandlers({
@@ -74,6 +76,7 @@ export function appIpcHandlers({
   appVariant,
   getMainWindow,
   setAnalyticsTrackingEnabled,
+  trace,
 }: AppIpcDependencies): Pick<IpcGroupHandlers, "app" | "maintenance"> {
   // One write at a time, so two quick toggles leave the file and the tracker at the last choice.
   let analyticsPreferenceWrite: Promise<unknown> = Promise.resolve();
@@ -120,7 +123,9 @@ export function appIpcHandlers({
     },
     maintenance: {
       exportData: handler(() => exportOpenBotData({ service, mailbox, parentWindow: getMainWindow() })),
-      exportDiagnostics: handler(() => exportDiagnostics({ service, browser, updater, parentWindow: getMainWindow() })),
+      exportDiagnostics: handler(() =>
+        exportDiagnostics({ service, browser, updater, trace, parentWindow: getMainWindow() }),
+      ),
     },
   };
 }

@@ -53,6 +53,45 @@ type TrustedEventRegistration =
       handler: (event: IpcMainInvokeEvent, payload: unknown) => unknown,
     ];
 
+/** What the trace file records for one IPC call: the channel, never the payload or the result. */
+export interface IpcCallRecord {
+  name: string;
+  durationMs: number;
+  outcome: "ok" | "error";
+}
+
+let ipcCallObserver: ((call: IpcCallRecord) => void) | null = null;
+
+/** Times every trusted call after the sender check. A rejected sender is not recorded. */
+export function setIpcCallObserver(observer: ((call: IpcCallRecord) => void) | null): void {
+  ipcCallObserver = observer;
+}
+
+function observeCall<Result>(channel: string, run: () => Result): Result {
+  const observer = ipcCallObserver;
+  if (!observer) return run();
+  const startedAt = performance.now();
+  const finish = (outcome: IpcCallRecord["outcome"]) =>
+    observer({ name: channel, durationMs: performance.now() - startedAt, outcome });
+  let result: Result;
+  try {
+    result = run();
+  } catch (error) {
+    finish("error");
+    throw error;
+  }
+  if (!(result instanceof Promise)) {
+    finish("ok");
+    return result;
+  }
+  // The same promise goes back to ipcMain, so the renderer sees the same value or rejection.
+  void result.then(
+    () => finish("ok"),
+    () => finish("error"),
+  );
+  return result;
+}
+
 export function handleTrusted<Handler extends () => unknown>(
   channel: string,
   handler: Handler & TakesNoArguments<Handler>,
@@ -70,9 +109,11 @@ export function handleTrusted(channel: string, ...registration: TrustedRegistrat
     if (!isTrustedRendererUrl(event.senderFrame?.url)) {
       throw new Error("Rejected IPC request from an untrusted renderer.");
     }
-    if (registration.length === 1) return registration[0]();
-    const [decode, handler] = registration;
-    return handler(decode(payload));
+    return observeCall(channel, () => {
+      if (registration.length === 1) return registration[0]();
+      const [decode, handler] = registration;
+      return handler(decode(payload));
+    });
   });
 }
 
@@ -100,13 +141,15 @@ export function handleTrustedWithEvent(channel: string, ...registration: Trusted
     if (!isTrustedRendererUrl(event.senderFrame?.url)) {
       throw new Error("Rejected IPC request from an untrusted renderer.");
     }
-    if (registration.length === 1) return registration[0](event);
-    if (registration.length === 2) {
-      const [decode, handler] = registration;
+    return observeCall(channel, () => {
+      if (registration.length === 1) return registration[0](event);
+      if (registration.length === 2) {
+        const [decode, handler] = registration;
+        return handler(event, decode(payload));
+      }
+      const [authorize, decode, handler] = registration;
+      authorize(event);
       return handler(event, decode(payload));
-    }
-    const [authorize, decode, handler] = registration;
-    authorize(event);
-    return handler(event, decode(payload));
+    });
   });
 }
