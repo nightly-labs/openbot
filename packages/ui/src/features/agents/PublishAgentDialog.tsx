@@ -31,7 +31,7 @@ export interface PublishAgentDialogProps {
 }
 
 type View = "summary" | "context" | "routines";
-type Pending = "publish" | "unpublish" | "copy" | null;
+type Pending = "publish" | "unpublish" | null;
 
 /**
  * Publishes one agent as a link-only template: its instructions, skills and routines. Files and
@@ -47,11 +47,13 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
   let primaryButton: HTMLButtonElement | undefined;
 
   /**
-   * A pending action disables its button, and a disabled button drops the focus to the page. The
-   * focus trap would then pull it back and the focus ring would jump, which reads as a blink. So the
-   * panel holds the focus while the action runs, and the main button takes it back afterwards.
+   * Only the button of the running action is disabled; the others stay as they are and ignore clicks
+   * until it ends, so no button dims and comes back for nothing. A disabled button drops the focus to
+   * the page, and the focus trap would pull it back and move the focus ring, so the panel holds the
+   * focus while the action runs and the main button takes it back afterwards.
    */
   async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
+    if (pending()) return;
     content?.focus({ preventScroll: true });
     setPending(kind);
     try {
@@ -64,6 +66,16 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
         if (!content?.contains(document.activeElement) || document.activeElement === content)
           (primaryButton?.isConnected ? primaryButton : closeButton)?.focus({ preventScroll: true });
       });
+    }
+  }
+
+  /** A copy takes no time and changes nothing, so it has no pending state that could dim the buttons. */
+  async function copyLink(): Promise<void> {
+    if (pending()) return;
+    try {
+      await props.onCopyLink();
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not copy the link."));
     }
   }
 
@@ -102,7 +114,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                 <IconButton
                   label={pending() === "unpublish" ? "Unpublishing…" : "Unpublish"}
                   variant="ghost"
-                  disabled={pending() !== null}
+                  disabled={pending() === "unpublish"}
                   onClick={() => void run("unpublish", props.onUnpublish, "Could not unpublish the agent.")}
                 >
                   <Link2Off />
@@ -174,7 +186,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                           ref={primaryButton}
                           type="button"
                           variant="default"
-                          disabled={pending() !== null}
+                          disabled={pending() === "publish"}
                           onClick={() => void run("publish", props.onPublish, "Could not publish the agent.")}
                         >
                           {pending() === "publish" ? "Publishing…" : "Publish"}
@@ -185,8 +197,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                         type="button"
                         variant="outline"
                         class="agent-template-copy"
-                        disabled={pending() !== null}
-                        onClick={() => void run("copy", props.onCopyLink, "Could not copy the link.")}
+                        onClick={() => void copyLink()}
                       >
                         <Copy class="size-4" aria-hidden="true" />
                         Copy link
@@ -195,7 +206,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                         ref={primaryButton}
                         type="button"
                         variant="default"
-                        disabled={pending() !== null}
+                        disabled={pending() === "publish"}
                         onClick={() => void run("publish", props.onPublish, "Could not update the agent.")}
                       >
                         {pending() === "publish" ? "Updating…" : "Update"}
