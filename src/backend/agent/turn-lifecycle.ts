@@ -27,7 +27,8 @@ import type { DeltaBuffer } from "./delta-buffer";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
-import { isUsageLimitDiagnostic, type ProviderRuntime } from "./provider-runtime";
+import { isUsageLimitDiagnostic } from "./provider-diagnostics";
+import type { ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
