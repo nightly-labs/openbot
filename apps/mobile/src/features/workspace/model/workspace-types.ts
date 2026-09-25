@@ -92,7 +92,10 @@ export interface MobileWorkspaceContextValue {
   editQueue: (agentId: string, serverId: string, input: QueueEditRequest) => Promise<QueueSnapshot>;
   interruptTurn: (agentId: string, turnId: string, serverId?: string) => Promise<void>;
   channelStore: MobileChannelStore;
+  /** Local host first, then remote servers in the order saved on this device. */
   servers: MobileServer[];
+  /** Saves the order of remote server IDs on this device. Returns false and keeps the old order on failure. */
+  reorderServers: (serverIds: string[]) => boolean;
   teamDirectory: RemoteTeamDirectoryClient;
   serverDirectoryState: MobileServerDirectoryState;
   serverDirectoryError: string | null;
