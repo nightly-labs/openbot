@@ -128,7 +128,8 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail(
   );
 });
 
-const AvatarThumbnail = memo(function AvatarThumbnail({
+// Draws the idle pose without the photo lookup, for pickers that never show a photo.
+export const AvatarThumbnail = memo(function AvatarThumbnail({
   seed,
   hue,
   size = 48,

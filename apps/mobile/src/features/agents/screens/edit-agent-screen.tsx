@@ -1,10 +1,12 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { UpdateAgentInput } from "@openbot/contracts/ipc";
+import type { AvatarHue, UpdateAgentInput } from "@openbot/contracts/ipc";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { useRef, useState } from "react";
+import { useThemeColor } from "heroui-native/hooks";
+import { Pencil } from "lucide-react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentInformation } from "@/features/agents/components/agent-information";
@@ -60,6 +62,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
   const { updateAgent, setAgentAvatar } = useMobileWorkspace();
   const navigation = useNavigation();
   const [edits, setEdits] = useState<AgentEdits>({});
+  const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
   const [pickingPhoto, setPickingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -100,6 +103,30 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     setEdits((current) => ({ ...current, ...value }));
     setError(null);
   }
+  // Stable handlers let the memoized face and color choices skip unrelated renders.
+  const changeAvatarSeed = useCallback((avatarSeed: string) => {
+    setEdits((current) => ({ ...current, avatarSeed }));
+    setError(null);
+  }, []);
+  const changeAvatarHue = useCallback((avatarHue: AvatarHue | null) => {
+    setEdits((current) => ({ ...current, avatarHue }));
+    setError(null);
+  }, []);
+  const hasPhoto = photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo);
+  const photoField = useMemo(
+    () => (
+      <AgentPhotoPicker
+        hasPhoto={hasPhoto}
+        disabled={saving || pickingPhoto}
+        onChange={(value) => {
+          setPhoto(value);
+          setError(null);
+        }}
+        onBusyChange={setPickingPhoto}
+      />
+    ),
+    [hasPhoto, saving, pickingPhoto],
+  );
 
   async function submit(): Promise<void> {
     if (!valid || !dirty || !available || pickingPhoto || pending.current) return;
@@ -144,9 +171,9 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     >
       {page === "info" ? (
         <>
-          <View className="gap-3">
+          <View className="gap-6">
             <Pressable
-              className="items-center gap-2 self-center"
+              className="self-center"
               accessibilityRole="button"
               accessibilityLabel="Edit appearance"
               onPress={() =>
@@ -163,15 +190,13 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 hue={avatarHue}
                 size={112}
               />
-              <Typography type="body-xs" className="text-center text-grouped-secondary">
-                Edit appearance
-              </Typography>
+              <View className="absolute right-3 bottom-3 size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped">
+                <Pencil color={foreground} size={14} />
+              </View>
             </Pressable>
             <SheetFormField
               label="Name"
-              hideLabel
               appearance="soft"
-              textAlign="center"
               autoCapitalize="words"
               maxLength={INPUT_LIMITS.agentName}
               value={name}
@@ -209,21 +234,11 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           hue={avatarHue}
           name={name}
           nameField={null}
-          showFaces={photo === undefined ? !agent.avatarUrl : !photo}
-          photoField={
-            <AgentPhotoPicker
-              hasPhoto={photo === undefined ? Boolean(agent.avatarUrl) : Boolean(photo)}
-              disabled={saving || pickingPhoto}
-              onChange={(value) => {
-                setPhoto(value);
-                setError(null);
-              }}
-              onBusyChange={setPickingPhoto}
-            />
-          }
+          showFaces={!hasPhoto}
+          photoField={photoField}
           disabled={saving || pickingPhoto}
-          onSeedChange={(value) => change({ avatarSeed: value })}
-          onHueChange={(value) => change({ avatarHue: value })}
+          onSeedChange={changeAvatarSeed}
+          onHueChange={changeAvatarHue}
         />
       ) : null}
       {page === "runtime" ? (
