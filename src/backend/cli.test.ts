@@ -164,7 +164,7 @@ describe("login shell discovery", () => {
     expect(loginShellCommand("linux", { SHELL: "/bin/sh" })).toEqual({ command: "/bin/sh", args: ["-lc"] });
   });
 
-  it("runs the shell in a process group of its own", async () => {
+  it.runIf(process.platform !== "win32")("runs the shell in a process group of its own", async () => {
     // An interactive bash in OpenBot's group stops the whole group with SIGTTIN when another
     // lookup holds the terminal (#766).
     const shell = { command: "/bin/sh", args: ["-c"] };
