@@ -36,6 +36,9 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      - name: Check unused files and dependencies
+        run: bun run knip:check
+
       - name: Check desktop application
         run: bun run check:desktop:static
 
