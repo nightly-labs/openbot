@@ -36,6 +36,11 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 // A burst of IPC calls becomes one append rather than one write for each call.
 const FLUSH_DELAY_MS = 1_000;
 const MAX_PENDING_LINES = 256;
+// Lines waiting for a write plus lines in writes that have not finished. When the disk stalls, new
+// spans are dropped at this limit rather than kept in memory.
+const MAX_BUFFERED_LINES = 4_096;
+// A provider can report any status string, which can hold a path or an error text.
+const TURN_STATUSES = new Set(["completed", "failed", "interrupted", "cancelled"]);
 // A turn whose completion never arrives must not keep its start time forever.
 const MAX_OPEN_TURNS = 256;
 
@@ -51,6 +56,7 @@ export class TraceFile {
   #pending: string[] = [];
   #timer: NodeJS.Timeout | null = null;
   #writes: Promise<void> = Promise.resolve();
+  #writingLines = 0;
 
   constructor(options: TraceFileOptions) {
     this.#directory = options.directory;
@@ -58,6 +64,7 @@ export class TraceFile {
   }
 
   record(span: TraceSpan): void {
+    if (this.#pending.length + this.#writingLines >= MAX_BUFFERED_LINES) return;
     const line = redactValue({
       at: new Date().toISOString(),
       kind: span.kind,
@@ -93,7 +100,7 @@ export class TraceFile {
       kind: "turn",
       name: event.origin && event.origin !== "unknown" ? event.origin : started.origin,
       durationMs: performance.now() - started.startedAt,
-      outcome: event.status,
+      outcome: TURN_STATUSES.has(event.status) ? event.status : "other",
     });
   }
 
@@ -104,7 +111,13 @@ export class TraceFile {
     const lines = this.#pending;
     this.#pending = [];
     if (lines.length === 0) return this.#writes;
-    this.#writes = this.#writes.then(() => this.#append(lines)).catch(() => undefined);
+    this.#writingLines += lines.length;
+    this.#writes = this.#writes
+      .then(() => this.#append(lines))
+      .catch(() => undefined)
+      .then(() => {
+        this.#writingLines -= lines.length;
+      });
     return this.#writes;
   }
 
