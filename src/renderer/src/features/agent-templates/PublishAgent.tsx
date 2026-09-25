@@ -1,4 +1,3 @@
-import { createAgentTemplateShareUrl } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplatePreview } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
@@ -57,11 +56,11 @@ export function createPublishAgent() {
     void load(agentId);
   }
 
-  /** Built from the id rather than read from `shareUrl`, so what is copied is what the route answers. */
+  /** The preload rebuilt `shareUrl` from the id, on `openbot.run` or, in development, the local Worker. */
   async function copyShareLink(): Promise<boolean> {
     const publication = state.preview?.publication;
     if (!publication) return false;
-    return writeClipboardText(createAgentTemplateShareUrl(publication.templateId)).then(
+    return writeClipboardText(publication.shareUrl).then(
       () => true,
       () => false,
     );

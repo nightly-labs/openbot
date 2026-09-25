@@ -3,7 +3,11 @@
 // Each decoder checks every field the contract type requires and keeps each optional field it
 // carries, so a value the renderer reads always has the shape its type says.
 
-import { createAgentTemplateShareUrl, isAgentTemplateId } from "@openbot/contracts/agent-template-links";
+import {
+  createAgentTemplateShareUrl,
+  isAgentTemplateId,
+  isAgentTemplateShareOrigin,
+} from "@openbot/contracts/agent-template-links";
 import {
   type AgentPublicationPreview,
   type AgentSubmission,
@@ -297,10 +301,18 @@ export function decodeAgentTemplatePublication(value: unknown): AgentTemplatePub
   const item = decodeRecord(value, "agent template publication");
   const templateId = requiredString(item, "templateId");
   if (!isAgentTemplateId(templateId)) throw new Error("Invalid templateId.");
+  // Rebuilt from the id on the origin main names, which must be `openbot.run` or the local Worker, so
+  // main cannot put a foreign address behind the link the dialog copies.
+  let origin: string;
+  try {
+    origin = new URL(requiredString(item, "shareUrl")).origin;
+  } catch {
+    throw new Error("Invalid shareUrl.");
+  }
+  if (!isAgentTemplateShareOrigin(origin)) throw new Error("Invalid shareUrl.");
   return {
     templateId,
-    // Rebuilt from the id, so main cannot put a foreign address behind the link the dialog copies.
-    shareUrl: createAgentTemplateShareUrl(templateId),
+    shareUrl: createAgentTemplateShareUrl(templateId, origin),
     publishedAt: requiredString(item, "publishedAt"),
   };
 }

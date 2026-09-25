@@ -23,9 +23,36 @@ export function isAgentTemplateId(value: string): boolean {
   return AGENT_TEMPLATE_ID_PATTERN.test(value);
 }
 
-export function createAgentTemplateShareUrl(id: string): string {
+/**
+ * The site a share link names: `openbot.run`, or a loopback origin while a developer runs the Account
+ * Worker on this computer. Nothing else passes, so a configured address cannot turn the copied link
+ * into another site.
+ */
+export function isAgentTemplateShareOrigin(origin: string): boolean {
+  if (origin === OPENBOT_AGENT_TEMPLATE_ORIGIN) return true;
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      url.origin === origin
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The share origin for an Account Worker: the local Worker in development, `openbot.run` otherwise. */
+export function agentTemplateShareOrigin(apiOrigin: string): string {
+  return apiOrigin !== OPENBOT_AGENT_TEMPLATE_ORIGIN && isAgentTemplateShareOrigin(apiOrigin)
+    ? apiOrigin
+    : OPENBOT_AGENT_TEMPLATE_ORIGIN;
+}
+
+export function createAgentTemplateShareUrl(id: string, origin: string = OPENBOT_AGENT_TEMPLATE_ORIGIN): string {
   assertAgentTemplateId(id);
-  return `${OPENBOT_AGENT_TEMPLATE_ORIGIN}${OPENBOT_AGENT_TEMPLATE_PATH_PREFIX}${id}`;
+  if (!isAgentTemplateShareOrigin(origin)) throw new Error("The OpenBot agent link origin is invalid.");
+  return `${origin}${OPENBOT_AGENT_TEMPLATE_PATH_PREFIX}${id}`;
 }
 
 export function createOpenBotAgentTemplateUrl(id: string): string {

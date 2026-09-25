@@ -7,7 +7,11 @@
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createAgentTemplateShareUrl, isAgentTemplateId } from "@openbot/contracts/agent-template-links";
+import {
+  agentTemplateShareOrigin,
+  createAgentTemplateShareUrl,
+  isAgentTemplateId,
+} from "@openbot/contracts/agent-template-links";
 import {
   type AgentSummary,
   type AgentTemplateDetail,
@@ -103,7 +107,7 @@ export class AgentTemplateService {
       avatarUrl: agent.avatarUrl,
       avatarImage: await this.readAvatar(agentId),
       updatedAt: agent.updatedAt,
-      publication: owned ? publication(owned) : null,
+      publication: owned ? this.publication(owned) : null,
     };
   }
 
@@ -127,7 +131,7 @@ export class AgentTemplateService {
       decodeOwnedTemplate,
       30_000,
     );
-    return publication(owned);
+    return this.publication(owned);
   }
 
   async unpublish(agentId: string): Promise<void> {
@@ -268,6 +272,16 @@ export class AgentTemplateService {
     return mine.find((template) => template.sourceAgentId === agentId) ?? null;
   }
 
+  /** A share link on the Worker this app uses, so a development publish opens the local page. */
+  private publication(owned: OwnedTemplate): AgentTemplatePublication {
+    const origin = agentTemplateShareOrigin(new URL(this.auth.resolveApiUrl("/")).origin);
+    return {
+      templateId: owned.id,
+      shareUrl: createAgentTemplateShareUrl(owned.id, origin),
+      publishedAt: owned.updatedAt,
+    };
+  }
+
   private requireAgent(agentId: string): AgentSummary {
     const agent = this.agents.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error("Choose a local agent first.");
@@ -302,10 +316,6 @@ function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
 
 function skillArchive(markdown: string): Uint8Array {
   return zipSync({ "SKILL.md": new TextEncoder().encode(markdown) });
-}
-
-function publication(owned: OwnedTemplate): AgentTemplatePublication {
-  return { templateId: owned.id, shareUrl: createAgentTemplateShareUrl(owned.id), publishedAt: owned.updatedAt };
 }
 
 function isOwnedTemplate(value: unknown): value is OwnedTemplate {

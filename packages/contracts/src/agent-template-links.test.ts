@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentTemplateShareOrigin,
   createAgentTemplateShareUrl,
   createOpenBotAgentTemplateUrl,
+  isAgentTemplateShareOrigin,
   parseAgentTemplateUrl,
 } from "./agent-template-links";
 import { createPluginShareUrl } from "./plugin-links";
@@ -14,6 +16,23 @@ describe("OpenBot agent template links", () => {
     expect(createOpenBotAgentTemplateUrl(id)).toBe(`openbot://agents/${id}`);
     expect(parseAgentTemplateUrl(createAgentTemplateShareUrl(id))).toBe(id);
     expect(parseAgentTemplateUrl(createOpenBotAgentTemplateUrl(id))).toBe(id);
+  });
+
+  it("uses a local Worker in development and openbot.run otherwise", () => {
+    expect(agentTemplateShareOrigin("http://127.0.0.1:3100")).toBe("http://127.0.0.1:3100");
+    expect(agentTemplateShareOrigin("https://api.openbot.run")).toBe("https://openbot.run");
+    expect(createAgentTemplateShareUrl(id, "http://localhost:3100")).toBe(`http://localhost:3100/agents/${id}`);
+  });
+
+  it.each([
+    "https://evil.example",
+    "http://openbot.run",
+    "http://127.0.0.1.evil.example:3100",
+    "https://127.0.0.1:3100",
+    "http://127.0.0.1:3100/path",
+  ])("refuses the share origin %s", (origin) => {
+    expect(isAgentTemplateShareOrigin(origin)).toBe(false);
+    expect(() => createAgentTemplateShareUrl(id, origin)).toThrow();
   });
 
   it.each([
