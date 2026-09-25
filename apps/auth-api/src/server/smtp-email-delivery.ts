@@ -309,7 +309,8 @@ class SmtpResponseReader {
 
 // Plain text first and HTML last: a client shows the last part it can render. Both parts are
 // quoted-printable, so the message is 7-bit clean and no line passes the 998-octet limit, whatever
-// the relay supports.
+// the relay supports. `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress` (Exchange and
+// Outlook) stop vacation and out-of-office replies to the sending mailbox.
 function createMimeMessage(from: string, message: PreparedEmailMessage): string {
   const boundary = `openbot-${crypto.randomUUID()}`;
   return dotStuff(
@@ -319,6 +320,8 @@ function createMimeMessage(from: string, message: PreparedEmailMessage): string 
       `Subject: ${encodeHeaderValue(message.content.subject)}`,
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: <${crypto.randomUUID()}@openbot.run>`,
+      "Auto-Submitted: auto-generated",
+      "X-Auto-Response-Suppress: All",
       "MIME-Version: 1.0",
       "Content-Type: multipart/alternative;",
       ` boundary="${boundary}"`,
