@@ -21,6 +21,7 @@ import { providerKeyApi } from "./features/settings/provider-key-api";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import {
+  AgentTemplateInstall,
   GlobalSearch,
   InitialSetup,
   JoinServerDialog,
@@ -55,6 +56,7 @@ export function WorkspaceOverlays(props: AccountProps) {
     <>
       <PermissionsReview account={props.account} />
       <SkillsMarketplace />
+      <SharedAgentInstall />
       <JoinServer account={props.account} />
       <ServerSettings />
       <AppSettings account={props.account} />
@@ -159,6 +161,24 @@ function SkillsMarketplace() {
                 }
               : undefined
           }
+        />
+      </Loading>
+    </Show>
+  );
+}
+
+/** A shared agent from an `openbot://agents/<id>` link, which installs on this machine. */
+function SharedAgentInstall() {
+  const { pendingAgentTemplateId, setPendingAgentTemplateId } = useSettings();
+  const { openInstalledMarketplaceAgent } = useServerSelection();
+
+  return (
+    <Show when={pendingAgentTemplateId()}>
+      <Loading>
+        <AgentTemplateInstall
+          templateId={pendingAgentTemplateId()}
+          onClose={() => setPendingAgentTemplateId(null)}
+          onInstalled={openInstalledMarketplaceAgent}
         />
       </Loading>
     </Show>

@@ -1204,6 +1204,29 @@ A plugin is one developer's bundle: an MCP server, shown as an app, the skills t
 
 See [plugin distribution and sharing](plugin-distribution.md) for the catalog shape, the fetch and cache rules, the install and uninstall order, the deep-link parser rules, and the security review. Two parts of that design run today. The Plugins tab installs the listing's pinned skills into the chosen agent and saves its app as a host-global MCP server. The links work: `openbot.run/plugins` and `openbot.run/plugins/<slug>` are pages on the public site, and `openbot://plugins/<slug>` opens that listing in the app, which is the second kind `src/main/deep-link-router.ts` recognises beside an invitation. Both sides read one catalog, the literal in `packages/contracts/src/plugin-catalog.ts`, because a listing that said one thing on the page and another in the app would be two catalogs. The catalog files, the Worker routes that serve them, the cache in the main process, and uninstall are still design.
 
+## Agent templates
+
+An agent template is a link-only copy of one local agent: the name, title and instructions, the
+avatar, the routines, marketplace skills as references to approved versions, and local skills as
+their `SKILL.md` text. It has no workspace files and no memories. The Publish button in the chat
+header opens `PublishAgentDialog`; `src/main/agent-template-service.ts` builds the snapshot, stops
+when a text field looks like a secret, and posts it to the Account Worker. The Worker keeps one row
+per account and local agent in D1 `agent_templates`, so a second publish updates the same link.
+Unpublish clears the row's content and images and sets `unpublished_at`, but keeps the row, so the
+same agent published again gets the same link. An account can have up to 5 published agents; the
+Worker checks this in the statement that writes the row, so a client or two requests at once cannot
+pass it, and unpublished rows do not count.
+There is no review and no marketplace listing. Before a publish, the renderer draws a 1200×630 share
+card (`agent-template-card.tsx`) with the agent's avatar and text. It draws it there because the
+avatar and its fonts are there, and it uses a `data:` URL because the Content Security Policy
+refuses `blob:` images. The Worker accepts only a PNG of that size, stores it in R2, and serves it
+as the page's `og:image`, so a post on X shows the agent. `openbot.run/agents/<id>` is a public
+card page, tinted with the avatar colour. The Bloub library uses browser-only APIs when its module
+loads, so the page loads the avatar and its colour in the browser after hydration. Its button opens
+`openbot://agents/<id>`, the third renderer link kind in
+`src/main/deep-link-router.ts`. The app then shows the template in `AgentTemplateInstallDialog`;
+like a plugin link, the link itself installs nothing.
+
 ## macOS Host Manager
 
 `scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.

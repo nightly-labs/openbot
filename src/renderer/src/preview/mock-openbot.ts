@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentSubmission,
   AgentSummary,
+  AgentTemplatePublication,
   AnalyticsPreference,
   AppInfo,
   AppLanguagePreference,
@@ -90,6 +91,11 @@ import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-im
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
 import { toggleChannelMember } from "../features/channels/channels-draft";
+import {
+  STORY_AGENT_TEMPLATE_DETAIL,
+  STORY_AGENT_TEMPLATE_PUBLICATION,
+  storyAgentTemplatePreview,
+} from "./agent-template-fixtures";
 import {
   STORY_AGENT_STATUS,
   STORY_AGENT_SUBMISSIONS,
@@ -361,6 +367,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     ],
   );
   let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
+  const agentTemplatePublications = new Map<string, AgentTemplatePublication>();
   let messageCounter = 10;
   let directMessageCounter = 10;
 
@@ -1067,6 +1074,48 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         customProviders = customProviders.filter((provider) => provider.id !== id);
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
         return { providers: clone(customProviders), restart: "restarted" };
+      },
+    },
+    agentTemplates: {
+      // One published template per local agent. The preview shows the agent's own identity with the
+      // fixture skills and routines, so every state of the dialog has content.
+      preview: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Choose a local agent first.");
+        return clone({
+          ...storyAgentTemplatePreview(agent.id, agentTemplatePublications.get(agent.id) ?? null),
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          updatedAt: agent.updatedAt,
+        });
+      },
+      publish: async ({ agentId }) => {
+        if (!agents.some((candidate) => candidate.id === agentId)) throw new Error("Choose a local agent first.");
+        const publication = { ...STORY_AGENT_TEMPLATE_PUBLICATION, publishedAt: new Date().toISOString() };
+        agentTemplatePublications.set(agentId, publication);
+        return clone(publication);
+      },
+      unpublish: async (agentId) => {
+        agentTemplatePublications.delete(agentId);
+      },
+      get: async (templateId) => {
+        if (templateId !== STORY_AGENT_TEMPLATE_DETAIL.id) throw new Error("This shared agent is no longer published.");
+        return clone(STORY_AGENT_TEMPLATE_DETAIL);
+      },
+      install: async () => {
+        const agent = agents[0];
+        if (!agent) throw new Error("Agent not found");
+        return clone({ agent });
+      },
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingLink: async () => null,
+      onOpenLink: (listener) => {
+        void listener;
+        return () => undefined;
       },
     },
     marketplaceAgents: {

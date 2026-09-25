@@ -7,6 +7,7 @@ import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { createMemo } from "solid-js";
 import { useI18n } from "../../i18n-context";
+import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverHasStorage } from "../files/storage-usage";
 
 /** @internal Stable HMR boundary for conversation header. */
@@ -43,66 +44,80 @@ export function ConversationHeader() {
       });
     };
   });
+  const publishAgent = createPublishAgent();
   return (
-    <SharedConversationHeader
-      agent={props.agent}
-      onSettingsIntent={() => void loadAgentSettingsPanel()}
-      onOpenSettings={() => setActiveRightPanel("settings")}
-      modelPicker={{
-        provider: settingsProvider(),
-        value: settingsModel(),
-        reasoningEffort: settingsReasoning(),
-        modelOptions: props.modelOptions,
-        agentStatus: props.agentStatus,
-        runtimeStatuses: props.providerRuntimeStatuses,
-        customProviders: props.customProviders,
-        onDownloadProvider: props.onDownloadProvider,
-        onCancelProviderDownload: props.onCancelProviderDownload,
-        onConnectProvider: props.onConnectProvider,
-        modelChangesDisabled: agentActivity() === "Working",
-        disabledReason:
-          agentActivity() === "Working"
-            ? "Wait for the current work to finish before changing models."
-            : "Models are available after an agent CLI connects.",
-        onChange: (model, provider) => void selectAndConfirmModel(model, provider),
-        onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
-        autoApprove: props.agentAutoApproves,
-        agentName: props.agent?.name,
-        autoApproveLocked: props.agentAutoApproveLocked,
-        onAutoApproveChange: changeAutoApprove(),
-      }}
-      remoteControl={
-        props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
-          ? {
-              enabled: Boolean(props.remoteDesktopSessionActive || props.server.state === "online"),
-              active: Boolean(props.remoteDesktopSessionActive),
-              visible: Boolean(props.remoteDesktopVisible),
-              onOpen: (trigger) => {
-                if (props.server) void props.onOpenRemoteDesktop(props.server.id, trigger);
-              },
-            }
-          : undefined
-      }
-      files={
-        // The web client has no storage methods, and a chat without a thread has no files to list.
-        !props.runtime && props.agent?.threadId && serverHasStorage(props.server)
-          ? { open: filesOpen(), onToggle: toggleFilesPanel }
-          : undefined
-      }
-      browser={
-        props.browserEnabled !== false
-          ? {
-              acting: Boolean(actingBrowserControl()),
-              agentName: browserControlAgent()?.name,
-              open: screenOpen(),
-              disabled: props.browserVisibilitySuspended,
-              onToggle: () => {
-                if (screenOpen()) hideBrowserPanel();
-                else showBrowserPanel();
-              },
-            }
-          : undefined
-      }
-    />
+    <>
+      <SharedConversationHeader
+        agent={props.agent}
+        onSettingsIntent={() => void loadAgentSettingsPanel()}
+        onOpenSettings={() => setActiveRightPanel("settings")}
+        modelPicker={{
+          provider: settingsProvider(),
+          value: settingsModel(),
+          reasoningEffort: settingsReasoning(),
+          modelOptions: props.modelOptions,
+          agentStatus: props.agentStatus,
+          runtimeStatuses: props.providerRuntimeStatuses,
+          customProviders: props.customProviders,
+          onDownloadProvider: props.onDownloadProvider,
+          onCancelProviderDownload: props.onCancelProviderDownload,
+          onConnectProvider: props.onConnectProvider,
+          modelChangesDisabled: agentActivity() === "Working",
+          disabledReason:
+            agentActivity() === "Working"
+              ? "Wait for the current work to finish before changing models."
+              : "Models are available after an agent CLI connects.",
+          onChange: (model, provider) => void selectAndConfirmModel(model, provider),
+          onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
+          autoApprove: props.agentAutoApproves,
+          agentName: props.agent?.name,
+          autoApproveLocked: props.agentAutoApproveLocked,
+          onAutoApproveChange: changeAutoApprove(),
+        }}
+        remoteControl={
+          props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
+            ? {
+                enabled: Boolean(props.remoteDesktopSessionActive || props.server.state === "online"),
+                active: Boolean(props.remoteDesktopSessionActive),
+                visible: Boolean(props.remoteDesktopVisible),
+                onOpen: (trigger) => {
+                  if (props.server) void props.onOpenRemoteDesktop(props.server.id, trigger);
+                },
+              }
+            : undefined
+        }
+        files={
+          // The web client has no storage methods, and a chat without a thread has no files to list.
+          !props.runtime && props.agent?.threadId && serverHasStorage(props.server)
+            ? { open: filesOpen(), onToggle: toggleFilesPanel }
+            : undefined
+        }
+        publish={
+          // Only an agent on this computer can be published: main reads its skills from the workspace.
+          !props.runtime && props.server?.kind === "local" && props.agent
+            ? {
+                onOpen: () => {
+                  if (props.agent) publishAgent.open(props.agent.id);
+                },
+              }
+            : undefined
+        }
+        browser={
+          props.browserEnabled !== false
+            ? {
+                acting: Boolean(actingBrowserControl()),
+                agentName: browserControlAgent()?.name,
+                open: screenOpen(),
+                disabled: props.browserVisibilitySuspended,
+                onToggle: () => {
+                  if (screenOpen()) hideBrowserPanel();
+                  else showBrowserPanel();
+                },
+              }
+            : undefined
+        }
+      />
+      {publishAgent.dialog()}
+    </>
   );
 }

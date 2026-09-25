@@ -1,19 +1,21 @@
-import { createOpenBotPluginUrl } from "@openbot/contracts/plugin-links";
 import { Portal } from "@solidjs/web";
 import { createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { DOWNLOAD_PLATFORMS, detectDownloadPlatform } from "../../lib/download-platforms";
 import { Button } from "../ui/button";
 
 export interface PluginOpenButtonsProps {
-  slug: string;
-  name: string;
+  /** An `openbot://` link, built by a shared helper from contracts. */
+  href: string;
+  label: string;
+  /** What the download offer says after the app did not open. */
+  downloadCopy: string;
 }
 
 /** How long the app is given to take over before the page offers the download instead. */
 const DOWNLOAD_HINT_DELAY_MS = 1200;
 
 /**
- * `Open in OpenBot`, and the download offer that appears only after it is pressed.
+ * `Open in OpenBot` (or the label the page gives), and the download offer that appears only after it is pressed.
  *
  * The page cannot ask whether the app is installed, and it must not try: a hidden frame that probes
  * the scheme is a fingerprint. So the offer is a reveal on a timer, cancelled when the tab is hidden
@@ -26,8 +28,8 @@ const DOWNLOAD_HINT_DELAY_MS = 1200;
  * focus, holds it, closes on Escape and gives the focus back to the button, none of which this file
  * has to write or keep true.
  *
- * The address is built from the slug through the shared helper, never read from catalog data, so a
- * listing cannot put another link behind this button.
+ * The caller builds the address from an id through the shared helper, never from listing data, so
+ * a listing cannot put another link behind this button. The plugin and shared agent pages use it.
  */
 export function PluginOpenButtons(props: PluginOpenButtonsProps) {
   const [showDownload, setShowDownload] = createSignal(false);
@@ -86,14 +88,8 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
   return (
     <div>
       <div class="plugin-actions-row">
-        <Button
-          href={createOpenBotPluginUrl(props.slug)}
-          variant="primary"
-          size="lg"
-          icon="open"
-          onClick={armDownloadHint}
-        >
-          Open in OpenBot
+        <Button href={props.href} variant="primary" size="lg" icon="open" onClick={armDownloadHint}>
+          {props.label}
         </Button>
       </div>
 
@@ -110,9 +106,7 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
             <h2 class="plugin-dialog-title" id={titleId}>
               Nothing opened?
             </h2>
-            <p class="plugin-dialog-copy">
-              {props.name} installs from inside OpenBot. Get the app, then open this plugin from its Plugins tab.
-            </p>
+            <p class="plugin-dialog-copy">{props.downloadCopy}</p>
             <div class="plugin-dialog-actions">
               <button class="plugin-dialog-dismiss" type="button" onClick={() => dialog?.close()}>
                 Not now

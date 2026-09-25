@@ -1,3 +1,4 @@
+import { createAgentTemplateShareUrl, createOpenBotAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
 import { createInviteUrl } from "@openbot/contracts/invite-links";
 import { createOpenBotPluginUrl, createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { describe, expect, it } from "vitest";
@@ -19,6 +20,14 @@ describe("the deep link router", () => {
   it("reads a plugin link in both of its forms", () => {
     expect(parseDeepLink(createOpenBotPluginUrl("aave"))).toEqual({ kind: "plugin", slug: "aave" });
     expect(parseDeepLink(createPluginShareUrl("aave"))).toEqual({ kind: "plugin", slug: "aave" });
+  });
+
+  it("reads an agent template link in both of its forms", () => {
+    const id = "Ab3_-xYz0123456789abcd";
+    expect(parseDeepLink(createOpenBotAgentTemplateUrl(id))).toEqual({ kind: "agent-template", id });
+    expect(parseDeepLink(createAgentTemplateShareUrl(id))).toEqual({ kind: "agent-template", id });
+    expect(parseDeepLink(`${createOpenBotAgentTemplateUrl(id)}?code=grant-abc&state=run-xyz`)).toBeNull();
+    expect(parseDeepLink("openbot://agents/short")).toBeNull();
   });
 
   it.each([

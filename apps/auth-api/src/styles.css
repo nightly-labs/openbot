@@ -2989,6 +2989,234 @@ a {
   margin-top: clamp(32px, 4vw, 48px);
 }
 
+/* A shared agent, as one card: the page a link on X opens. `--agent-share-accent` is the agent's
+   avatar colour, set on the page, so every shared agent is tinted as itself. */
+/* Registered, so the tint fades in when the avatar colour arrives after hydration. */
+@property --agent-share-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8a8f98;
+}
+
+.agent-share-page {
+  transition: --agent-share-accent 600ms ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--openbot-bg-canvas);
+}
+
+.agent-share-main {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: clamp(12px, 3vh, 40px) 16px 24px;
+}
+
+.agent-share-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  overflow: hidden;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: 28px;
+  background: var(--openbot-bg-surface);
+  box-shadow: 0 40px 120px -40px color-mix(in srgb, var(--agent-share-accent) 45%, transparent);
+}
+
+/* The agent's colour as light on a dark field, with a soft grain, the way a product shot sits on a
+   coloured backdrop. It shrinks with the window's height, so the whole card fits a 13-inch laptop. */
+.agent-share-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: clamp(160px, 26vh, 236px);
+  overflow: hidden;
+  background:
+    radial-gradient(70% 90% at 18% 0%, color-mix(in srgb, var(--agent-share-accent) 30%, transparent), transparent 70%),
+    radial-gradient(
+      60% 80% at 85% 100%,
+      color-mix(in srgb, var(--agent-share-accent) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(45% 60% at 50% 55%, color-mix(in srgb, var(--agent-share-accent) 40%, transparent), transparent 75%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--agent-share-accent) 18%, #101012),
+      color-mix(in srgb, var(--agent-share-accent) 34%, #141416)
+    );
+}
+
+.agent-share-hero::after {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  content: "";
+  mix-blend-mode: overlay;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* The agent's own avatar from `@openbot/ui`. The hero in the selector outranks the generic
+   `.agent-avatar` size rule, which loads with the avatar's own code after this stylesheet. */
+.agent-share-hero .agent-share-avatar {
+  --agent-share-avatar-size: clamp(100px, 16vh, 140px);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--agent-share-avatar-size);
+  height: var(--agent-share-avatar-size);
+  border-radius: var(--openbot-radius-pill);
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.35));
+}
+
+/* The Bloub sits low in its drawing, so it is lifted by the share of its size the app uses. */
+.agent-share-hero .agent-share-avatar > svg {
+  display: block;
+  width: 128%;
+  height: 128%;
+  overflow: visible;
+  translate: 0 calc(var(--agent-share-avatar-size) * -0.14);
+}
+
+.agent-share-hero .agent-share-avatar.agent-avatar-custom {
+  overflow: hidden;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #ffffff 12%, transparent);
+}
+
+.agent-share-hero .agent-share-avatar.agent-avatar-custom img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-share-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px clamp(20px, 5vw, 40px) 26px;
+  text-align: center;
+}
+
+.agent-share-name {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: clamp(26px, 4vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.agent-share-creator {
+  margin: 4px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+}
+
+/* What the agent brings, as one row of small tags. */
+.agent-share-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-share-tags > li {
+  padding: 3px 10px;
+  border: 1px solid var(--openbot-border-grouped);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: 12px;
+}
+
+/* Clamped, the instructions read as one paragraph, so the ellipsis never lands on a blank line.
+   Opened, they keep their line breaks: they are what the agent will do. */
+.agent-share-description {
+  display: -webkit-box;
+  margin: 14px 0 0;
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.agent-share-description[data-expanded] {
+  display: block;
+  white-space: pre-wrap;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.agent-share-more {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: none;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.agent-share-more:hover {
+  color: var(--openbot-text-primary);
+}
+
+.agent-share-divider {
+  width: 100%;
+  height: 1px;
+  margin: 18px 0 0;
+  border: 0;
+  background: var(--openbot-border-grouped);
+}
+
+.agent-share-notice {
+  margin: 12px 0 0;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.agent-share-action {
+  margin-top: 14px;
+}
+
+.agent-share-action .plugin-actions-row {
+  justify-content: center;
+}
+
+.agent-share-fallback {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.agent-share-fallback a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* The heading the app's plugin detail sets, rather than the uppercase eyebrow this
    page used: the section's name at reading size, with its count in a box beside it. */
 .plugin-section-title {

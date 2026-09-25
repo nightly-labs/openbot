@@ -8,6 +8,7 @@ export * from "./ipc-agent-memories";
 export * from "./ipc-agent-profile";
 export * from "./ipc-agent-runtime";
 export * from "./ipc-agent-status";
+export * from "./ipc-agent-templates";
 export * from "./ipc-agents";
 export * from "./ipc-app-auth";
 export * from "./ipc-approvals";

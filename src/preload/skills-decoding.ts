@@ -4,11 +4,23 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import {
+  createAgentTemplateShareUrl,
+  isAgentTemplateId,
+  isAgentTemplateShareOrigin,
+} from "@openbot/contracts/agent-template-links";
+import {
   type AgentPublicationPreview,
   type AgentSubmission,
+  type AgentTemplateDetail,
+  type AgentTemplatePreview,
+  type AgentTemplatePublication,
+  type AvatarImageInput,
   INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   type InstallMarketplaceAgentResult,
+  isAgentTemplateDetail,
+  isAgentTemplateRoutine,
+  isAgentTemplateSkill,
   isAvatarHue,
   isAvatarSeed,
   isRoutineSchedule,
@@ -22,6 +34,7 @@ import {
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
+  toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -281,5 +294,79 @@ export function decodeAgentPublicationPreview(value: unknown): AgentPublicationP
     avatarUrl: detail.avatarUrl,
     skills: detail.skills,
     routines: detail.routines,
+  };
+}
+
+export function decodeAgentTemplatePublication(value: unknown): AgentTemplatePublication {
+  const item = decodeRecord(value, "agent template publication");
+  const templateId = requiredString(item, "templateId");
+  if (!isAgentTemplateId(templateId)) throw new Error("Invalid templateId.");
+  // Rebuilt from the id on the origin main names, which must be `openbot.run` or the local Worker, so
+  // main cannot put a foreign address behind the link the dialog copies.
+  let origin: string;
+  try {
+    origin = new URL(requiredString(item, "shareUrl")).origin;
+  } catch {
+    throw new Error("Invalid shareUrl.");
+  }
+  if (!isAgentTemplateShareOrigin(origin)) throw new Error("Invalid shareUrl.");
+  return {
+    templateId,
+    shareUrl: createAgentTemplateShareUrl(templateId, origin),
+    publishedAt: requiredString(item, "publishedAt"),
+  };
+}
+
+/** A preview may have empty instructions: publishing refuses that, not the dialog that shows it. */
+export function decodeAgentTemplatePreview(value: unknown): AgentTemplatePreview {
+  const item = decodeRecord(value, "agent template preview");
+  if (
+    !isAvatarSeed(item.avatarSeed) ||
+    (item.avatarHue !== null && !isAvatarHue(item.avatarHue)) ||
+    !Array.isArray(item.skills) ||
+    !item.skills.every(isAgentTemplateSkill) ||
+    !Array.isArray(item.routines) ||
+    !item.routines.every(isAgentTemplateRoutine)
+  )
+    throw new Error("Invalid agent template preview.");
+  const snapshot = toAgentTemplateSnapshot({
+    name: requiredString(item, "name"),
+    title: requiredString(item, "title"),
+    description: requiredString(item, "description"),
+    avatarSeed: item.avatarSeed,
+    avatarHue: item.avatarHue,
+    skills: item.skills,
+    routines: item.routines,
+  });
+  return {
+    ...snapshot,
+    agentId: requiredString(item, "agentId"),
+    avatarUrl: nullableString(item, "avatarUrl"),
+    avatarImage: decodePreviewAvatarImage(item.avatarImage),
+    updatedAt: nullableString(item, "updatedAt"),
+    publication: item.publication === null ? null : decodeAgentTemplatePublication(item.publication),
+    skillsError: nullableString(item, "skillsError"),
+  };
+}
+
+function decodePreviewAvatarImage(value: unknown): AvatarImageInput | null {
+  if (value === null) return null;
+  if (
+    !isDynamicRecord(value) ||
+    !isOneOf(["image/png", "image/jpeg", "image/webp"] as const, value.mimeType) ||
+    !(value.bytes instanceof Uint8Array)
+  )
+    throw new Error("Invalid agent template avatar.");
+  return { mimeType: value.mimeType, bytes: value.bytes };
+}
+
+export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {
+  if (!isAgentTemplateDetail(value) || !isAgentTemplateId(value.id)) throw new Error("Invalid agent template.");
+  return {
+    ...toAgentTemplateSnapshot(value),
+    id: value.id,
+    avatarUrl: value.avatarUrl,
+    creatorName: value.creatorName,
+    updatedAt: value.updatedAt,
   };
 }

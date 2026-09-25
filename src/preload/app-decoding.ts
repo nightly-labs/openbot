@@ -4,6 +4,7 @@
 // Each decoder checks every field the contract type requires and keeps each optional field it
 // carries, so a value the renderer reads always has the shape its type says.
 
+import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import {
   type AccountSession,
   type AnalyticsPreference,
@@ -229,6 +230,11 @@ export function decodeExportResult(value: unknown): ExportResult {
 // in a URL a web page chose, and this is the last point before the renderer looks it up.
 export function decodePendingListing(value: unknown): string | null {
   return typeof value === "string" && isPluginSlug(value) ? value : null;
+}
+
+// The same check for an agent link: the id began in a URL a web page chose.
+export function decodePendingAgentTemplate(value: unknown): string | null {
+  return typeof value === "string" && isAgentTemplateId(value) ? value : null;
 }
 
 /** The export skill's text, shown for the user to copy. It is Markdown, never markup. */
