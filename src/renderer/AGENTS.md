@@ -4,7 +4,9 @@ The UI stack sits on prerelease channels your training data does not cover: `sol
 with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
 here), plus patched `lucide-solid` and `solid-sonner`. `@solidjs/signals` is patched to dispose the
 children of a memo run that a list-row removal interrupts. `src/renderer/src/solid-disposal.test.ts`
-guards the patch, so keep the test when you upgrade Solid. Do not trust your memory of these APIs —
+guards the patch, so keep the test when you upgrade Solid. `@solidjs/web` has the rc.9 event
+delegation fix backported: a delegated event stops when its target leaves the DOM. Drop the patch
+when you upgrade to rc.9 or later. Do not trust your memory of these APIs —
 check `package.json` for what is actually installed, and load the reference that matches the work:
 
 - `node_modules/solid-js/CHEATSHEET.md` — the source of truth for core Solid APIs. Read it before

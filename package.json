@@ -285,6 +285,7 @@
     "react-native-keyboard-controller@1.21.9": "patches/react-native-keyboard-controller@1.21.9.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch",
-    "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch"
+    "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
+    "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch"
   }
 }
