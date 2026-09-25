@@ -2,3 +2,15 @@
 exact = true
 # Keep one physical copy of native Expo modules across workspace peer contexts.
 linker = "hoisted"
+# Do not resolve a version that is less than 3 days old (259200 seconds). Most
+# malicious releases are found and removed from the registry in that time.
+minimumReleaseAge = 259200
+
+# `trustedDependencies` in package.json replaces the default Bun trust list.
+# Only these packages can run install scripts. Each one downloads or selects
+# its platform binary:
+# - electron-winstaller: selects the 7-Zip binary for the host architecture.
+# - esbuild: installs the platform binary that Vite and electron-vite use.
+# - workerd: installs the Cloudflare Workers runtime that Wrangler uses.
+# `@shopify/react-native-skia` stays untrusted. The root postinstall runs
+# `apps/mobile setup:skia`, which installs its binaries.

@@ -154,6 +154,11 @@ explicit threat-model note in the pull request.
 Prefer the platform and existing dependencies. A new runtime dependency should remove more
 complexity than it adds, have a compatible open-source license, and be justified in the pull request.
 
+Bun does not resolve a version that is less than 3 days old (`minimumReleaseAge` in `bunfig.toml`),
+and Dependabot waits the same time. Only the packages in `trustedDependencies` in `package.json` can
+run install scripts. If a new dependency needs its install script, add it to that list and give the
+reason in the `bunfig.toml` comment. `bun pm untrusted` shows the blocked scripts.
+
 ## Licensing
 
 By submitting a contribution, you agree that it is your original work (or that you have the right to
