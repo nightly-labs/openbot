@@ -110,12 +110,23 @@ interface RemotePublicJwks {
 export class RemoteTicketSigner {
   readonly #keyId: string;
   readonly #publicJwks: RemotePublicJwks;
-  readonly #key: ReturnType<typeof importJWK>;
+  readonly #privateJwk: JWK;
+  #key: Awaited<ReturnType<typeof importJWK>> | null = null;
 
   constructor(config: TicketSignerConfig) {
     this.#keyId = requiredIdentifier(config.keyId, "ticket key ID");
     this.#publicJwks = parseJwks(config.publicJwks, this.#keyId);
-    this.#key = importJWK(parseJwk(config.privateJwk), "ES256");
+    this.#privateJwk = parseJwk(config.privateJwk);
+  }
+
+  /**
+   * Every request in the isolate shares this signer, so only the resolved key is kept: the runtime
+   * refuses a promise that another request made. Two requests that race import the key twice, which
+   * costs one import and leaves the same key behind.
+   */
+  async #signingKey(): Promise<Awaited<ReturnType<typeof importJWK>>> {
+    this.#key ??= await importJWK(this.#privateJwk, "ES256");
+    return this.#key;
   }
 
   publicJwks(): RemotePublicJwks {
@@ -154,20 +165,26 @@ export class RemoteTicketSigner {
       .setIssuedAt(issuedAt)
       .setExpirationTime(expiresAt)
       .setAudience(REMOTE_TICKET_AUDIENCE)
-      .sign(await this.#key);
+      .sign(await this.#signingKey());
     return { ticket, expiresAt: expiresAt * 1_000 };
   }
 }
 
-/** One signer for each key set: the JWKS parse and `importJWK` are too costly for every request. */
-const ticketSigners = new Map<string, RemoteTicketSigner>();
+/** One signer for each key: the JWKS parse and the key import are too costly for every request. */
+const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
 
+/**
+ * Keyed by the key ID so the map holds one entry for each key, and checked against the material so
+ * a key ID that another configuration reuses -- a test, or a rotation that keeps the name -- still
+ * gets its own signer.
+ */
 function sharedTicketSigner(config: TicketSignerConfig): RemoteTicketSigner {
-  const cacheKey = JSON.stringify([config.keyId, config.privateJwk, config.publicJwks]);
-  const cached = ticketSigners.get(cacheKey);
-  if (cached) return cached;
+  const cached = ticketSigners.get(config.keyId);
+  if (cached && cached.config.privateJwk === config.privateJwk && cached.config.publicJwks === config.publicJwks) {
+    return cached.signer;
+  }
   const signer = new RemoteTicketSigner(config);
-  ticketSigners.set(cacheKey, signer);
+  ticketSigners.set(config.keyId, { config, signer });
   return signer;
 }
 
