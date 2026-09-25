@@ -42,6 +42,7 @@
     "expo-glass-effect": "~57.0.3",
     "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",
+    "expo-image-manipulator": "~57.0.20",
     "expo-image-picker": "~57.0.19",
     "expo-linking": "~57.0.10",
     "expo-localization": "~57.0.2",

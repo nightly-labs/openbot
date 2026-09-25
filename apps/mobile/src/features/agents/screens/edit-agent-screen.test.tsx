@@ -56,10 +56,17 @@ vi.mock("react-native-svg", () => ({
   Image: () => null,
 }));
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: (...args: unknown[]) => mocks.choosePhoto(...args) }));
+vi.mock("expo-image-manipulator", () => {
+  const image = { width: 1200, height: 800, saveAsync: async () => ({ uri: "file:///avatar.jpg" }) };
+  const context = { crop: () => context, resize: () => context, renderAsync: async () => image };
+  return { ImageManipulator: { manipulate: () => context }, SaveFormat: { JPEG: "jpeg" } };
+});
+vi.mock("@/shared/lib/avatar-crop-request", () => ({
+  requestAvatarCrop: async () => ({ originX: 200, originY: 0, width: 800, height: 800 }),
+}));
 vi.mock("expo-file-system", () => ({
   File: class {
-    name = "photo.png";
-    type = "image/png";
+    name = "avatar.jpg";
     get size() {
       return mocks.fileSize;
     }
@@ -1638,7 +1645,7 @@ it("keeps a selected avatar draft after a failed upload and retries on its origi
   await click("Save changes");
   expect(workspace.setAgentAvatar).toHaveBeenLastCalledWith(
     original.id,
-    expect.objectContaining({ mimeType: "image/png", base64: "iVBORw0KGgo=" }),
+    expect.objectContaining({ mimeType: "image/jpeg", base64: "iVBORw0KGgo=" }),
     host.id,
   );
   expect(workspace.updateAgent).not.toHaveBeenCalled();
@@ -1663,7 +1670,7 @@ it("keeps the form unchanged when photo selection is canceled or the file is too
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   mocks.fileSize = 600_000;
   await click("Add photo");
-  expect(screen.getByText("Choose a photo smaller than 512 KB.")).toBeTruthy();
+  expect(screen.getByText("OpenBot could not make this photo small enough. Choose a simpler photo.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   expect(workspace.setAgentAvatar).not.toHaveBeenCalled();
 });

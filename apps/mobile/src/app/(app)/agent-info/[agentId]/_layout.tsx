@@ -29,6 +29,7 @@ export default function AgentInfoLayout() {
       <Stack.Screen name="memory" options={{ title: "Memory" }} />
       <Stack.Screen name="routine" options={{ title: "Routine" }} />
       <Stack.Screen name="runtime" options={{ title: "Runtime" }} />
+      <Stack.Screen name="crop-photo" options={{ title: "Move and Scale" }} />
     </Stack>
   );
 }
