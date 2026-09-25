@@ -1,0 +1,260 @@
+import type { AgentTemplatePreview, MarketplaceAgentRoutine } from "@openbot/contracts/ipc";
+import {
+  ArrowLeft,
+  Badge,
+  Button,
+  ChevronRight,
+  Copy,
+  Dialog,
+  Heading,
+  IconButton,
+  ItemGroup,
+  Text,
+  X,
+} from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
+import { createSignal, Show } from "solid-js";
+import { AgentAvatar } from "./AgentAvatar";
+import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentTemplateSections";
+
+export interface PublishAgentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** The agent as it would be published, with its current publication. Null while it loads. */
+  preview: AgentTemplatePreview | null;
+  loading: boolean;
+  /** A failure to load the preview. Action failures are shown by the dialog itself. */
+  error: string | null;
+  onPublish: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
+  onCopyLink: () => Promise<void>;
+}
+
+type View = "summary" | "context" | "routines";
+type Pending = "publish" | "unpublish" | "copy" | null;
+
+/**
+ * Publishes one agent as a link-only template: its instructions, skills and routines. Files and
+ * memories stay on this computer. After a publish the same dialog shows the link and can update or
+ * remove it.
+ */
+export function PublishAgentDialog(props: PublishAgentDialogProps) {
+  const [view, setView] = createSignal<View>("summary");
+  const [pending, setPending] = createSignal<Pending>(null);
+  const [actionError, setActionError] = createSignal<string | null>(null);
+  const [copied, setCopied] = createSignal(false);
+  const published = () => props.preview?.publication ?? null;
+
+  async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
+    setPending(kind);
+    setActionError(null);
+    try {
+      await action();
+      setCopied(kind !== "unpublish");
+    } catch (error) {
+      setCopied(false);
+      setActionError(errorMessage(error, fallback));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  function changeOpen(open: boolean): void {
+    if (!open) {
+      setView("summary");
+      setActionError(null);
+      setCopied(false);
+    }
+    props.onOpenChange(open);
+  }
+
+  return (
+    <Dialog.Root open={props.open} onOpenChange={changeOpen}>
+      <Dialog.Portal>
+        <Dialog.Overlay class="agent-template-backdrop">
+          <Dialog.Content as="section" class="agent-template-dialog" aria-busy={pending() ? "true" : undefined}>
+            <Dialog.Title class="sr-only">Publish {props.preview?.name ?? "agent"}</Dialog.Title>
+            <Dialog.Description class="sr-only">
+              Share this agent as a template. Its instructions, skills and routines are published. Files and memories
+              are not.
+            </Dialog.Description>
+            <IconButton class="agent-template-close" label="Close" variant="ghost" onClick={() => changeOpen(false)}>
+              <X />
+            </IconButton>
+
+            <Show
+              when={props.preview}
+              fallback={
+                <div class="agent-template-body">
+                  <Text tone={props.error ? "danger" : "muted"} role={props.error ? "alert" : "status"}>
+                    {props.error ?? (props.loading ? "Loading agent…" : "")}
+                  </Text>
+                </div>
+              }
+            >
+              {(preview) => (
+                <Show
+                  when={view() === "summary"}
+                  fallback={
+                    <TemplateDetailView
+                      view={view() === "context" ? "context" : "routines"}
+                      preview={preview()}
+                      onBack={() => setView("summary")}
+                    />
+                  }
+                >
+                  <div class="agent-template-body">
+                    <header class="agent-template-identity">
+                      <AgentAvatar agent={preview()} motion="idle" class="agent-template-avatar" />
+                      <Heading as="h2" size="md" class="agent-template-name">
+                        {preview().name}
+                      </Heading>
+                      <Show when={published()}>
+                        <Badge variant="success-light">Published</Badge>
+                      </Show>
+                      <Show when={preview().updatedAt}>
+                        {(updatedAt) => (
+                          <Text tone="muted" variant="caption">
+                            Last updated {formatShortDate(updatedAt())}
+                          </Text>
+                        )}
+                      </Show>
+                      <Text tone="secondary" class="agent-template-description">
+                        {preview().description}
+                      </Text>
+                    </header>
+
+                    <ItemGroup surface="subtle" class="agent-template-rows">
+                      <TemplateRow
+                        title="Context"
+                        detail={preview().skills.length > 0 ? "Instructions and skills" : "Instructions"}
+                        onClick={() => setView("context")}
+                      />
+                      <TemplateRow
+                        title="Routines"
+                        detail={routinesSummary(preview().routines)}
+                        onClick={() => setView("routines")}
+                      />
+                    </ItemGroup>
+
+                    <Show when={published()}>
+                      {(publication) => (
+                        <Text tone="muted" variant="caption" class="agent-template-link" truncate>
+                          {publication().shareUrl}
+                        </Text>
+                      )}
+                    </Show>
+                    <Show when={actionError()}>
+                      {(message) => (
+                        <Text tone="danger" variant="caption" role="alert">
+                          {message()}
+                        </Text>
+                      )}
+                    </Show>
+                  </div>
+
+                  <footer class="agent-template-actions">
+                    <Show
+                      when={published()}
+                      fallback={
+                        <Button
+                          type="button"
+                          variant="default"
+                          disabled={pending() !== null}
+                          onClick={() => void run("publish", props.onPublish, "Could not publish the agent.")}
+                        >
+                          {pending() === "publish" ? "Publishing…" : "Publish"}
+                        </Button>
+                      }
+                    >
+                      <Button
+                        type="button"
+                        variant="destructive-ghost"
+                        class="agent-template-unpublish"
+                        disabled={pending() !== null}
+                        onClick={() => void run("unpublish", props.onUnpublish, "Could not unpublish the agent.")}
+                      >
+                        {pending() === "unpublish" ? "Unpublishing…" : "Unpublish"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={pending() !== null}
+                        onClick={() => void run("copy", props.onCopyLink, "Could not copy the link.")}
+                      >
+                        <Copy aria-hidden="true" />
+                        {copied() && pending() === null ? "Link copied" : "Copy link"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="default"
+                        disabled={pending() !== null}
+                        onClick={() => void run("publish", props.onPublish, "Could not update the agent.")}
+                      >
+                        {pending() === "publish" ? "Updating…" : "Update"}
+                      </Button>
+                    </Show>
+                  </footer>
+                </Show>
+              )}
+            </Show>
+          </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function TemplateRow(props: { title: string; detail: string; onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" class="agent-template-row" onClick={props.onClick}>
+      <span class="agent-template-row-copy">
+        <span class="agent-template-row-title">{props.title}</span>
+        <span class="agent-template-row-detail">{props.detail}</span>
+      </span>
+      <ChevronRight aria-hidden="true" />
+    </Button>
+  );
+}
+
+function TemplateDetailView(props: {
+  view: "context" | "routines";
+  preview: AgentTemplatePreview;
+  onBack: () => void;
+}) {
+  return (
+    <div class="agent-template-body">
+      <header class="agent-template-detail-header">
+        <IconButton label="Back" variant="ghost" onClick={props.onBack}>
+          <ArrowLeft />
+        </IconButton>
+        <Heading as="h3" size="sm">
+          {props.view === "context" ? "Context" : "Routines"}
+        </Heading>
+      </header>
+      <div class="agent-template-detail">
+        <Show when={props.view === "context"} fallback={<TemplateRoutines routines={props.preview.routines} />}>
+          <TemplateInstructions title={props.preview.title} description={props.preview.description} />
+          <TemplateSkills skills={props.preview.skills} />
+          <Text tone="muted" variant="caption">
+            Files and memories are not published.
+          </Text>
+        </Show>
+      </div>
+    </div>
+  );
+}
+
+function routinesSummary(routines: readonly MarketplaceAgentRoutine[]): string {
+  const first = routines[0];
+  if (!first) return "No routines";
+  const others = routines.length - 1;
+  if (others === 0) return first.name;
+  return `${first.name} and ${others} ${others === 1 ? "other" : "others"}`;
+}
+
+function formatShortDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+}

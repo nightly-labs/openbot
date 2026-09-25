@@ -19,7 +19,8 @@ import { useSettings } from "./features/settings/settings-context";
  * window.
  *
  * A plugin link is the same problem with a shorter answer: it opens the
- * marketplace on one listing, and installs nothing.
+ * marketplace on one listing, and installs nothing. An agent link is the same:
+ * it opens the install dialog on one template, and installs nothing by itself.
  *
  * The MCP notice below belongs here for the same reason: the MCP list is
  * machine-scoped, the notice is owed once per computer and not once per
@@ -29,7 +30,7 @@ export function AppBootstrap() {
   const { centralAuth } = useAuth();
   const { setupState, pendingInviteUrl, setPendingInviteUrl } = useSetup();
   const { setJoinServerOpen } = useServers();
-  const { setPendingPluginSlug, setSkillsMarketplaceOpen } = useSettings();
+  const { setPendingAgentTemplateId, setPendingPluginSlug, setSkillsMarketplaceOpen } = useSettings();
 
   onSettled(() => {
     const receiveInvite = (inviteUrl: string) => {
@@ -50,8 +51,14 @@ export function AppBootstrap() {
     const unsubscribePlugin = appPort().plugins.onOpenListing((slug) => {
       receivePluginSlug(slug);
     });
-    // Both subscriptions are in place before either link is asked for, because the first of these
-    // two requests is what tells main that a window is listening.
+    const receiveAgentTemplate = (id: string) => {
+      flush(() => setPendingAgentTemplateId(id));
+    };
+    const unsubscribeAgentTemplate = appPort().agentTemplates.onOpenLink((id) => {
+      receiveAgentTemplate(id);
+    });
+    // Every subscription is in place before any link is asked for, because the first of these
+    // requests is what tells main that a window is listening.
     void appPort()
       .servers.takePendingInvite()
       .then((inviteUrl) => inviteUrl && receiveInvite(inviteUrl))
@@ -60,9 +67,14 @@ export function AppBootstrap() {
       .plugins.takePendingListing()
       .then((slug) => slug && receivePluginSlug(slug))
       .catch(() => undefined);
+    void appPort()
+      .agentTemplates.takePendingLink()
+      .then((id) => id && receiveAgentTemplate(id))
+      .catch(() => undefined);
     return () => {
       unsubscribeInvite();
       unsubscribePlugin();
+      unsubscribeAgentTemplate();
     };
   });
 

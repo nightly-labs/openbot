@@ -1,3 +1,4 @@
+import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import {
   type AgentIpcRequest,
   type AttachmentImportEvent,
@@ -66,6 +67,7 @@ import {
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
   decodeNullablePath,
+  decodePendingAgentTemplate,
   decodePendingListing,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
@@ -114,6 +116,9 @@ import {
   decodeAgentPublicationPreview,
   decodeAgentSubmission,
   decodeAgentSubmissions,
+  decodeAgentTemplateDetail,
+  decodeAgentTemplatePreview,
+  decodeAgentTemplatePublication,
   decodeInstalledSkill,
   decodeInstalledSkillsFromMain,
   decodeMarketplaceAgentDetail,
@@ -415,6 +420,18 @@ const openbotApi: OpenBotDesktopApi = {
       invokeRequest(IPC_ENDPOINTS.marketplaceAgents.preview, decodeAgentPublicationPreview, agentId),
     submit: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.submit, decodeAgentSubmission, input),
     install: (input) => invokeRequest(IPC_ENDPOINTS.marketplaceAgents.install, decodeAgentInstallation, input),
+  },
+  agentTemplates: {
+    preview: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.preview, decodeAgentTemplatePreview, agentId),
+    publish: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.publish, decodeAgentTemplatePublication, agentId),
+    unpublish: (agentId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.unpublish, decodeVoid, agentId),
+    get: (templateId) => invokeRequest(IPC_ENDPOINTS.agentTemplates.get, decodeAgentTemplateDetail, templateId),
+    install: (input) => invokeRequest(IPC_ENDPOINTS.agentTemplates.install, decodeAgentInstallation, input),
+    takePendingLink: () => invokeRequest(IPC_ENDPOINTS.agentTemplates.takePendingLink, decodePendingAgentTemplate),
+    onOpenLink: (listener) =>
+      listen(IPC_ENDPOINTS.agentTemplates.openLink, (id) => {
+        if (typeof id === "string" && isAgentTemplateId(id)) listener(id);
+      }),
   },
   agent: {
     getStatus: () => invokeAgent(IPC_ENDPOINTS.agent.getStatus, null, decodeAgentStatusFromMain),

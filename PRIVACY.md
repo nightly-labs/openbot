@@ -143,6 +143,11 @@ The service stores:
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.
 - optional host logo files and their content types when the owner uploads a logo.
+- published agent templates: the agent name, title, instructions, avatar, routine names, schedules
+  and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
+  agent ID, and creation and update times. Anyone with the link can read a template. Unpublish
+  removes it. Templates do not include workspace files, memories, conversations, or integration
+  credentials.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -359,6 +364,10 @@ request does not include conversation history, saved memories, or workspace file
 The draft is reviewed before OpenBot saves it; generating a draft does not create
 an OpenBot conversation or change an existing agent. The provider's own data and
 CLI retention policies still apply.
+
+Publishing an agent template from the chat makes its instructions, skills, and routines public to
+anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
+stops the publish when a text field looks like a secret. Workspace files and memories are not sent.
 
 Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 

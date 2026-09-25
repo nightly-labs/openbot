@@ -3,12 +3,19 @@
 // Each decoder checks every field the contract type requires and keeps each optional field it
 // carries, so a value the renderer reads always has the shape its type says.
 
+import { createAgentTemplateShareUrl, isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import {
   type AgentPublicationPreview,
   type AgentSubmission,
+  type AgentTemplateDetail,
+  type AgentTemplatePreview,
+  type AgentTemplatePublication,
   INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   type InstallMarketplaceAgentResult,
+  isAgentTemplateDetail,
+  isAgentTemplateRoutine,
+  isAgentTemplateSkill,
   isAvatarHue,
   isAvatarSeed,
   isRoutineSchedule,
@@ -22,6 +29,7 @@ import {
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
+  toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
 import {
   decodeRecord,
@@ -281,5 +289,58 @@ export function decodeAgentPublicationPreview(value: unknown): AgentPublicationP
     avatarUrl: detail.avatarUrl,
     skills: detail.skills,
     routines: detail.routines,
+  };
+}
+
+export function decodeAgentTemplatePublication(value: unknown): AgentTemplatePublication {
+  const item = decodeRecord(value, "agent template publication");
+  const templateId = requiredString(item, "templateId");
+  if (!isAgentTemplateId(templateId)) throw new Error("Invalid templateId.");
+  return {
+    templateId,
+    // Rebuilt from the id, so main cannot put a foreign address behind the link the dialog copies.
+    shareUrl: createAgentTemplateShareUrl(templateId),
+    publishedAt: requiredString(item, "publishedAt"),
+  };
+}
+
+/** A preview may have empty instructions: publishing refuses that, not the dialog that shows it. */
+export function decodeAgentTemplatePreview(value: unknown): AgentTemplatePreview {
+  const item = decodeRecord(value, "agent template preview");
+  if (
+    !isAvatarSeed(item.avatarSeed) ||
+    (item.avatarHue !== null && !isAvatarHue(item.avatarHue)) ||
+    !Array.isArray(item.skills) ||
+    !item.skills.every(isAgentTemplateSkill) ||
+    !Array.isArray(item.routines) ||
+    !item.routines.every(isAgentTemplateRoutine)
+  )
+    throw new Error("Invalid agent template preview.");
+  const snapshot = toAgentTemplateSnapshot({
+    name: requiredString(item, "name"),
+    title: requiredString(item, "title"),
+    description: requiredString(item, "description"),
+    avatarSeed: item.avatarSeed,
+    avatarHue: item.avatarHue,
+    skills: item.skills,
+    routines: item.routines,
+  });
+  return {
+    ...snapshot,
+    agentId: requiredString(item, "agentId"),
+    avatarUrl: nullableString(item, "avatarUrl"),
+    updatedAt: nullableString(item, "updatedAt"),
+    publication: item.publication === null ? null : decodeAgentTemplatePublication(item.publication),
+  };
+}
+
+export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {
+  if (!isAgentTemplateDetail(value) || !isAgentTemplateId(value.id)) throw new Error("Invalid agent template.");
+  return {
+    ...toAgentTemplateSnapshot(value),
+    id: value.id,
+    avatarUrl: value.avatarUrl,
+    creatorName: value.creatorName,
+    updatedAt: value.updatedAt,
   };
 }

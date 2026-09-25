@@ -1,3 +1,4 @@
+import { createOpenBotPluginUrl } from "@openbot/contracts/plugin-links";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
@@ -26,7 +27,7 @@ import { PluginOpenButtons } from "./PluginOpenButtons";
  * are different amounts of information, and a reader who hears the page rather than sees it is
  * owed the same number.
  */
-function PluginSection(props: { id: string; title: string; count: number; children: JSX.Element }) {
+export function PluginSection(props: { id: string; title: string; count: number; children: JSX.Element }) {
   return (
     <section class="plugin-section" aria-labelledby={props.id}>
       <h2 class="plugin-section-title" id={props.id}>
@@ -43,7 +44,7 @@ function PluginSection(props: { id: string; title: string; count: number; childr
  * own, served from this origin by `src/server/plugin-icon.ts`; the glyph stands in for a thing the
  * catalog gives no icon, which is every skill and any app that has not published one.
  */
-function PluginRow(props: { icon: LandingIconName; title: string; description: string; media?: JSX.Element }) {
+export function PluginRow(props: { icon: LandingIconName; title: string; description: string; media?: JSX.Element }) {
   return (
     <li class="plugin-row">
       <span class="plugin-row-icon">{props.media ?? <LandingIcon name={props.icon} />}</span>
@@ -121,7 +122,11 @@ export function PluginPage(props: PluginPageProps) {
                   <p class="post-article-standfirst plugin-hero-standfirst">{props.plugin.tagline}</p>
                 </div>
               </div>
-              <PluginOpenButtons slug={props.plugin.slug} name={props.plugin.name} />
+              <PluginOpenButtons
+                href={createOpenBotPluginUrl(props.plugin.slug)}
+                label="Open in OpenBot"
+                downloadCopy={`${props.plugin.name} installs from inside OpenBot. Get the app, then open this plugin from its Plugins tab.`}
+              />
             </div>
           </header>
 

@@ -41,6 +41,13 @@ import type {
   SetProviderApiKeyInput,
 } from "./ipc-agent-status";
 import type {
+  AgentTemplateDetail,
+  AgentTemplatePreview,
+  AgentTemplatePublication,
+  InstallAgentTemplateInput,
+  InstallAgentTemplateResult,
+} from "./ipc-agent-templates";
+import type {
   AgentSummary,
   AvatarImageInput,
   CreateAgentInput,
@@ -412,6 +419,17 @@ export const IPC_ENDPOINTS = {
     preview: request<string, AgentPublicationPreview>()("marketplace-agents:preview"),
     submit: request<SubmitMarketplaceAgentInput, AgentSubmission>()("marketplace-agents:submit"),
     install: request<InstallMarketplaceAgentInput, InstallMarketplaceAgentResult>()("marketplace-agents:install"),
+  },
+  // Link-only agent templates. `takePendingLink` and `openLink` carry an id from an
+  // `openbot://agents/<id>` link; there is no endpoint that installs from a link without the dialog.
+  agentTemplates: {
+    preview: request<string, AgentTemplatePreview>()("agent-templates:preview"),
+    publish: request<string, AgentTemplatePublication>()("agent-templates:publish"),
+    unpublish: request<string, void>()("agent-templates:unpublish"),
+    get: request<string, AgentTemplateDetail>()("agent-templates:get"),
+    install: request<InstallAgentTemplateInput, InstallAgentTemplateResult>()("agent-templates:install"),
+    takePendingLink: request<undefined, string | null>()("agent-templates:take-pending-link"),
+    openLink: event<string>()("agent-templates:open-link"),
   },
   auth: {
     getState: request<undefined, CentralAuthState>()("auth:get-state"),

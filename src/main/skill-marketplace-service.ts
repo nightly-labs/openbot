@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentSummary,
+  AgentTemplateSkill,
   InstalledSkill,
   InstallSkillInput,
   MarketplaceAgentSkill,
@@ -17,8 +18,9 @@ import type {
   SubmitSkillInput,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
-import { isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
+import { AGENT_TEMPLATE_LIMITS, isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CentralAuthManager } from "./central-auth-manager";
@@ -217,26 +219,52 @@ export class SkillMarketplaceService {
       if (entry.enabled === false) continue;
       if (entry.skillId.startsWith("local-skill-"))
         throw new Error("Publish local skills separately before publishing this agent.");
-      const state = await installedState(agent.workspacePath, entry);
-      if (state !== "installed") throw new Error(`${entry.name} has local changes or needs repair before publishing.`);
-      let versionId = entry.versionId;
-      if (!versionId) {
-        const detail = await this.get(entry.skillId);
-        if (detail.version !== entry.version)
-          throw new Error(
-            `${entry.name} was installed before exact-version tracking. Update or repair it before publishing.`,
-          );
-        versionId = detail.versionId;
-      }
-      result.push({
-        skillId: entry.skillId,
-        versionId,
-        slug: entry.slug,
-        name: entry.name,
-        version: entry.version,
-      });
+      result.push(await this.publishedReference(agent, entry));
     }
     return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * The skills an agent template carries. A marketplace skill is a reference to its exact version;
+   * a local or workspace skill is its `SKILL.md` text only, never its other files.
+   */
+  async listTemplateSkills(agentId: string): Promise<AgentTemplateSkill[]> {
+    const agent = this.requireAgent(agentId);
+    const lock = await readLock(agent.workspacePath);
+    const result: AgentTemplateSkill[] = [];
+    for (const entry of Object.values(lock.skills)) {
+      if (entry.enabled === false) continue;
+      if (entry.skillId.startsWith("local-skill-")) {
+        const [directory] = targetDirectories(agent.workspacePath, entry.slug);
+        result.push(await embeddedSkill(join(directory, "SKILL.md"), entry.name));
+      } else result.push({ kind: "marketplace", ...(await this.publishedReference(agent, entry)) });
+    }
+    for (const skill of await listFolderSkills(agent, lockedSlugs(lock))) {
+      if (skill.problem || !skill.location) continue;
+      result.push(await embeddedSkill(join(agent.workspacePath, skill.location, "SKILL.md"), skill.name));
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private async publishedReference(agent: AgentSummary, entry: LockEntry): Promise<MarketplaceAgentSkill> {
+    const state = await installedState(agent.workspacePath, entry);
+    if (state !== "installed") throw new Error(`${entry.name} has local changes or needs repair before publishing.`);
+    let versionId = entry.versionId;
+    if (!versionId) {
+      const detail = await this.get(entry.skillId);
+      if (detail.version !== entry.version)
+        throw new Error(
+          `${entry.name} was installed before exact-version tracking. Update or repair it before publishing.`,
+        );
+      versionId = detail.versionId;
+    }
+    return {
+      skillId: entry.skillId,
+      versionId,
+      slug: entry.slug,
+      name: entry.name,
+      version: entry.version,
+    };
   }
 
   private serialize<T>(agentId: string, write: () => Promise<T>): Promise<T> {
@@ -596,6 +624,24 @@ async function installedState(workspace: string, entry: LockEntry): Promise<"ins
   }
   const expected = entry.enabled === false ? 1 : 2;
   return complete === expected && !missing ? "installed" : "needs-repair";
+}
+
+/**
+ * One skill's `SKILL.md` as a template carries it. The slug and name are what an install derives
+ * from the same text, so a folder name that is not a valid slug does not travel.
+ */
+async function embeddedSkill(path: string, label: string): Promise<AgentTemplateSkill> {
+  const tooLarge = `${label}: SKILL.md is larger than 64 KB. Shorten it before publishing.`;
+  if ((await stat(path)).size > AGENT_TEMPLATE_LIMITS.skillMarkdown) throw new Error(tooLarge);
+  const markdown = await readFile(path, "utf8");
+  if (markdown.length > AGENT_TEMPLATE_LIMITS.skillMarkdown) throw new Error(tooLarge);
+  let info: { slug: string; name: string };
+  try {
+    info = inspectArchive(zipSync({ "SKILL.md": new TextEncoder().encode(markdown) }));
+  } catch (error) {
+    throw new Error(`${label}: ${error instanceof Error ? error.message : "SKILL.md is invalid."}`);
+  }
+  return { kind: "embedded", slug: info.slug, name: info.name, markdown };
 }
 
 function lockedSlugs(lock: SkillsLock): Set<string> {

@@ -1,0 +1,107 @@
+import { createAgentTemplateShareUrl } from "@openbot/contracts/agent-template-links";
+import type { AgentTemplatePreview } from "@openbot/contracts/ipc";
+import { errorMessage } from "@openbot/ui/error-message";
+import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
+import { createStore } from "solid-js";
+import { writeClipboardText } from "../../clipboard";
+import { agentTemplatesPort } from "./agent-templates-port";
+
+interface PublishState {
+  open: boolean;
+  agentId: string | null;
+  preview: AgentTemplatePreview | null;
+  loading: boolean;
+  error: string | null;
+}
+
+/**
+ * The publish dialog of the conversation header, and the calls behind it. `open` is what the header
+ * button runs; `dialog` is mounted once beside the header.
+ */
+export function createPublishAgent() {
+  const [state, setState] = createStore<PublishState>({
+    open: false,
+    agentId: null,
+    preview: null,
+    loading: false,
+    error: null,
+  });
+
+  async function load(agentId: string): Promise<void> {
+    try {
+      const preview = await agentTemplatesPort().agentTemplates.preview(agentId);
+      if (state.agentId !== agentId) return;
+      setState((draft) => {
+        draft.preview = preview;
+        draft.loading = false;
+      });
+    } catch (error) {
+      if (state.agentId !== agentId) return;
+      setState((draft) => {
+        draft.error = errorMessage(error, "Could not read the agent.");
+        draft.loading = false;
+      });
+    }
+  }
+
+  function open(agentId: string): void {
+    setState((draft) => {
+      draft.open = true;
+      draft.agentId = agentId;
+      draft.preview = null;
+      draft.loading = true;
+      draft.error = null;
+    });
+    void load(agentId);
+  }
+
+  /** Built from the id rather than read from `shareUrl`, so what is copied is what the route answers. */
+  async function copyLink(): Promise<void> {
+    const publication = state.preview?.publication;
+    if (!publication) return;
+    await writeClipboardText(createAgentTemplateShareUrl(publication.templateId)).catch(() => {
+      throw new Error("Could not copy the link.");
+    });
+  }
+
+  async function publish(): Promise<void> {
+    const agentId = state.agentId;
+    if (!agentId) return;
+    const publication = await agentTemplatesPort().agentTemplates.publish(agentId);
+    if (state.agentId !== agentId) return;
+    setState((draft) => {
+      if (draft.preview) draft.preview.publication = publication;
+    });
+    await copyLink();
+  }
+
+  async function unpublish(): Promise<void> {
+    const agentId = state.agentId;
+    if (!agentId) return;
+    await agentTemplatesPort().agentTemplates.unpublish(agentId);
+    if (state.agentId !== agentId) return;
+    setState((draft) => {
+      if (draft.preview) draft.preview.publication = null;
+    });
+  }
+
+  const dialog = () => (
+    <PublishAgentDialog
+      open={state.open}
+      onOpenChange={(next) =>
+        setState((draft) => {
+          draft.open = next;
+          if (!next) draft.agentId = null;
+        })
+      }
+      preview={state.preview}
+      loading={state.loading}
+      error={state.error}
+      onPublish={publish}
+      onUnpublish={unpublish}
+      onCopyLink={copyLink}
+    />
+  );
+
+  return { open, dialog };
+}

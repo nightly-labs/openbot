@@ -2989,6 +2989,23 @@ a {
   margin-top: clamp(32px, 4vw, 48px);
 }
 
+/* A shared agent's instructions keep their line breaks: they are what the agent will do. */
+.agent-template-instructions {
+  margin-top: 16px;
+  white-space: pre-wrap;
+}
+
+.agent-template-notice {
+  margin: 24px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--openbot-glass-border);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-glass-surface);
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* The heading the app's plugin detail sets, rather than the uppercase eyebrow this
    page used: the section's name at reading size, with its count in a box beside it. */
 .plugin-section-title {
