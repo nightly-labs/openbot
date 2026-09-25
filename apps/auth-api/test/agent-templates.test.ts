@@ -191,7 +191,19 @@ function d1(database: DatabaseSync): D1Database {
   };
   return {
     prepare: (query) => statement(database, query),
-    batch: unused,
+    // D1 runs a batch as one transaction; so does this.
+    async batch<T>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+      database.exec("BEGIN");
+      try {
+        const results: D1Result<T>[] = [];
+        for (const prepared of statements) results.push(await prepared.all<T>());
+        database.exec("COMMIT");
+        return results;
+      } catch (error) {
+        database.exec("ROLLBACK");
+        throw error;
+      }
+    },
     exec: unused,
     withSession: unused,
     dump: unused,

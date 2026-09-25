@@ -65,7 +65,13 @@ export function AgentTemplateInstall(props: {
     });
     props.onClose();
     toast.success(`${agent.name} added`, { description: "Its instructions, skills and routines are ready." });
-    await props.onInstalled(agent);
+    // The agent exists now. A failure to open it must not read as a failed install, or the user would
+    // add it a second time.
+    try {
+      await props.onInstalled(agent);
+    } catch (error) {
+      toast.error(errorMessage(error, `Could not open ${agent.name}. Find it in the sidebar.`));
+    }
   }
 
   return (

@@ -8,6 +8,7 @@ import {
   isAgentTemplateSnapshot,
   toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { AgentMarketplaceError } from "./agent-marketplace";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -61,10 +62,10 @@ export class AgentTemplates {
 
     // The row of an unpublished agent is found too: publishing it again gives it back the same id.
     const existing = await this.bindings.DB.prepare(
-      "SELECT id, avatar_key, card_key, unpublished_at FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
+      "SELECT id, unpublished_at FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
     )
       .bind(input.user.id, sourceAgentId)
-      .first<{ id: string; avatar_key: string | null; card_key: string | null; unpublished_at: number | null }>();
+      .first<{ id: string; unpublished_at: number | null }>();
     if (!existing || existing.unpublished_at !== null) {
       const count = await this.bindings.DB.prepare(
         "SELECT count(*) AS count FROM agent_templates WHERE owner_user_id = ? AND unpublished_at IS NULL",
@@ -90,30 +91,38 @@ export class AgentTemplates {
       await this.bindings.SKILLS.put(cardKey, card, { httpMetadata: { contentType: "image/png" } });
     }
     let publishedId = id;
+    let previous: StoredImages = { avatarKey: null, cardKey: null };
     try {
-      // One statement: two first publishes of one agent at once meet here, not in a constraint error.
-      const row = await this.bindings.DB.prepare(
-        `INSERT INTO agent_templates(
-           id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, unpublished_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
-         ON CONFLICT(owner_user_id, source_agent_id) DO UPDATE SET
-           snapshot_json = excluded.snapshot_json,
-           avatar_key = excluded.avatar_key,
-           card_key = excluded.card_key,
-           unpublished_at = NULL,
-           updated_at = excluded.updated_at
-         RETURNING id`,
-      )
-        .bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now)
-        .first<{ id: string }>();
-      if (row) publishedId = row.id;
+      // One transaction reads the image keys the row has and writes the new row, so the keys this
+      // publish replaces are the ones it deletes, even when two publishes of one agent run at once.
+      // The upsert means two first publishes meet here, not in a constraint error.
+      const [before, written] = await this.bindings.DB.batch([
+        this.bindings.DB.prepare(
+          "SELECT avatar_key, card_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
+        ).bind(input.user.id, sourceAgentId),
+        this.bindings.DB.prepare(
+          `INSERT INTO agent_templates(
+             id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, unpublished_at, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
+           ON CONFLICT(owner_user_id, source_agent_id) DO UPDATE SET
+             snapshot_json = excluded.snapshot_json,
+             avatar_key = excluded.avatar_key,
+             card_key = excluded.card_key,
+             unpublished_at = NULL,
+             updated_at = excluded.updated_at
+           RETURNING id`,
+        ).bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now),
+      ]);
+      previous = storedImages(before?.results?.[0]);
+      const returned = written?.results?.[0];
+      if (isDynamicRecord(returned) && typeof returned.id === "string") publishedId = returned.id;
     } catch (error) {
       if (avatarKey) await this.bindings.SKILLS.delete(avatarKey);
       if (cardKey) await this.bindings.SKILLS.delete(cardKey);
       throw error;
     }
-    if (existing?.avatar_key) await this.bindings.SKILLS.delete(existing.avatar_key);
-    if (existing?.card_key) await this.bindings.SKILLS.delete(existing.card_key);
+    if (previous.avatarKey && previous.avatarKey !== avatarKey) await this.bindings.SKILLS.delete(previous.avatarKey);
+    if (previous.cardKey && previous.cardKey !== cardKey) await this.bindings.SKILLS.delete(previous.cardKey);
     return { id: publishedId, sourceAgentId, updatedAt: new Date(now).toISOString() };
   }
 
@@ -168,21 +177,23 @@ export class AgentTemplates {
    * id, the owner and the local agent, so publishing the same agent again gives back the same link.
    */
   async unpublish(userId: string, id: string): Promise<void> {
-    const row = await this.bindings.DB.prepare(
-      "SELECT avatar_key, card_key FROM agent_templates WHERE id = ? AND owner_user_id = ? AND unpublished_at IS NULL",
-    )
-      .bind(id, userId)
-      .first<{ avatar_key: string | null; card_key: string | null }>();
-    if (!row) throw notFound();
     const now = Date.now();
-    await this.bindings.DB.prepare(
-      `UPDATE agent_templates SET snapshot_json = '{}', avatar_key = NULL, card_key = NULL, unpublished_at = ?, updated_at = ?
-       WHERE id = ? AND owner_user_id = ?`,
-    )
-      .bind(now, now, id, userId)
-      .run();
-    if (row.avatar_key) await this.bindings.SKILLS.delete(row.avatar_key);
-    if (row.card_key) await this.bindings.SKILLS.delete(row.card_key);
+    // One transaction reads the image keys and clears them, so a republish racing this unpublish
+    // cannot leave an image that no row names.
+    const [before] = await this.bindings.DB.batch([
+      this.bindings.DB.prepare(
+        "SELECT avatar_key, card_key FROM agent_templates WHERE id = ? AND owner_user_id = ? AND unpublished_at IS NULL",
+      ).bind(id, userId),
+      this.bindings.DB.prepare(
+        `UPDATE agent_templates SET snapshot_json = '{}', avatar_key = NULL, card_key = NULL, unpublished_at = ?, updated_at = ?
+         WHERE id = ? AND owner_user_id = ? AND unpublished_at IS NULL`,
+      ).bind(now, now, id, userId),
+    ]);
+    const row = before?.results?.[0];
+    if (!row) throw notFound();
+    const images = storedImages(row);
+    if (images.avatarKey) await this.bindings.SKILLS.delete(images.avatarKey);
+    if (images.cardKey) await this.bindings.SKILLS.delete(images.cardKey);
   }
 
   private row(id: string) {
@@ -212,6 +223,19 @@ export class AgentTemplates {
         throw new AgentMarketplaceError(400, "invalid_skill", `The skill ${skill.name} is not an approved version.`);
     }
   }
+}
+
+interface StoredImages {
+  avatarKey: string | null;
+  cardKey: string | null;
+}
+
+function storedImages(row: unknown): StoredImages {
+  if (!isDynamicRecord(row)) return { avatarKey: null, cardKey: null };
+  return {
+    avatarKey: typeof row.avatar_key === "string" ? row.avatar_key : null,
+    cardKey: typeof row.card_key === "string" ? row.card_key : null,
+  };
 }
 
 function notFound(): AgentMarketplaceError {
