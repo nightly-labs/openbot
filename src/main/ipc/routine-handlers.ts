@@ -6,7 +6,6 @@ import { decodeRoutine, decodeRoutineRun, decodeRoutineRuns, decodeRoutines } fr
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  agentRequest,
   parseAgentId,
   parseCreateRoutine,
   parseDeleteRoutine,
@@ -14,8 +13,8 @@ import {
   parseTestRoutine,
   parseUpdateRoutine,
 } from "./agent-inputs";
-import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { routeToServer } from "./route-to-server";
+import type { IpcGroupHandlers } from "./define-ipc-group";
+import { scopedHandler } from "./scoped-handler";
 
 interface RoutineIpcDependencies {
   service: AgentService;
@@ -28,80 +27,57 @@ export function routineIpcHandlers({
 }: RoutineIpcDependencies): Pick<IpcGroupHandlers, "agentRoutines"> {
   return {
     agentRoutines: {
-      listRoutines: payloadHandler(agentRequest(parseAgentId), (scoped) => {
-        const agentId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.listRoutines(agentId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
-        });
+      listRoutines: scopedHandler(parseAgentId, {
+        local: (agentId) => service.listRoutines(agentId),
+        remote: (agentId, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
       }),
-      createRoutine: payloadHandler(agentRequest(parseCreateRoutine), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.createRoutine(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
-              method: "POST",
+      createRoutine: scopedHandler(parseCreateRoutine, {
+        local: (parsed) => service.createRoutine(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
+            method: "POST",
+            body: parsed,
+          }),
+      }),
+      updateRoutine: scopedHandler(parseUpdateRoutine, {
+        local: (parsed) => service.updateRoutine(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(
+            serverId,
+            TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
+            decodeRoutine,
+            {
+              method: "PATCH",
               body: parsed,
-            }),
-        });
+            },
+          ),
       }),
-      updateRoutine: payloadHandler(agentRequest(parseUpdateRoutine), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.updateRoutine(parsed),
-          remote: (serverId) =>
-            remoteServers.request(
-              serverId,
-              TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
-              decodeRoutine,
-              {
-                method: "PATCH",
-                body: parsed,
-              },
-            ),
-        });
+      deleteRoutine: scopedHandler(parseDeleteRoutine, {
+        local: (parsed) => service.deleteRoutine(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeVoid, {
+            method: "DELETE",
+          }),
       }),
-      deleteRoutine: payloadHandler(agentRequest(parseDeleteRoutine), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.deleteRoutine(parsed),
-          remote: (serverId) =>
-            remoteServers.request(
-              serverId,
-              TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId),
-              decodeVoid,
-              {
-                method: "DELETE",
-              },
-            ),
-        });
+      testRoutine: scopedHandler(parseTestRoutine, {
+        local: (parsed) => service.testRoutine(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(
+            serverId,
+            TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
+            decodeRoutineRun,
+            { method: "POST" },
+          ),
       }),
-      testRoutine: payloadHandler(agentRequest(parseTestRoutine), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.testRoutine(parsed),
-          remote: (serverId) =>
-            remoteServers.request(
-              serverId,
-              TEAM_API_ROUTES.agent.routineTest(parsed.agentId, parsed.routineId),
-              decodeRoutineRun,
-              { method: "POST" },
-            ),
-        });
-      }),
-      listRoutineRuns: payloadHandler(agentRequest(parseListRoutineRuns), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.listRoutineRuns(parsed),
-          remote: (serverId) =>
-            remoteServers.request(
-              serverId,
-              `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
-              decodeRoutineRuns,
-            ),
-        });
+      listRoutineRuns: scopedHandler(parseListRoutineRuns, {
+        local: (parsed) => service.listRoutineRuns(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(
+            serverId,
+            `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
+            decodeRoutineRuns,
+          ),
       }),
     },
   };

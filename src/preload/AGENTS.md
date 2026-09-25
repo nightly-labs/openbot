@@ -18,9 +18,9 @@ renderer-to-main trust boundary. [Main-process rules](../main/AGENTS.md#trust-bo
   sent as `AgentIpcRequest`: the server is the argument after the payload, or the selected server,
   read at call time. Do not pass a bridged method by reference as an event handler, such as
   `onClick={api.update.check}`: Electron cannot copy the DOM event, and the call rejects.
-- In a hand-written group, invoke through `invokeRequest` or `invokeAgentForServer`.
-  Subscribe through `subscribe(endpoint, decode, listener)`; use `listen` only when the event has no
-  payload or the handler checks the raw value itself. Do not call `ipcRenderer.on` directly.
+- Only `attachmentImports` and the untyped `browserInput` are written by hand. Invoke through
+  `invokeAgentForServer`, or `ipcRenderer.invoke` for the untyped endpoint. Subscribe through
+  `listen` and decode the raw value in the handler. Do not call `ipcRenderer.on` directly.
 - Invoke only request endpoints from `IPC_ENDPOINTS`, and subscribe only to event endpoints.
   `src/main/ipc-channel-coverage.test.ts` reads these sources and fails on an unused or extra channel.
 - Do not expose `ipcRenderer`, Electron objects, or Node APIs to the page. `team-webrtc.ts` gives

@@ -363,7 +363,7 @@ describe("OpenBot connected desktop shell", () => {
     await fireEvent.input(await screen.findByRole("textbox", { name: "One-time code" }), {
       target: { value: "ABCD-EFGH" },
     });
-    expect(window.openbot.auth.verifyEmailCode).toHaveBeenCalledWith("challenge-1", "ABCD-EFGH");
+    expect(window.openbot.auth.verifyEmailCode).toHaveBeenCalledWith({ challengeId: "challenge-1", code: "ABCD-EFGH" });
     expect(trackAnalytics).toHaveBeenCalledWith("account_sign_in_started", { result: "code_sent" });
     expect(trackAnalytics).toHaveBeenCalledWith("account_sign_in_completed", { result: "succeeded" });
     expect(await screen.findByText("Verified. Opening OpenBot…")).toBeInTheDocument();

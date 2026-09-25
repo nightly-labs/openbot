@@ -90,8 +90,8 @@ function bind(options: {
     },
   };
   bound.clear();
-  const { browser: endpoints } = browserIpcHandlers(dependencies);
-  for (const [name, register] of Object.entries(endpoints)) register(name);
+  const { browser: endpoints, browserInput } = browserIpcHandlers(dependencies);
+  for (const [name, register] of Object.entries({ ...endpoints, ...browserInput })) register(name);
   return { calls, liveView };
 }
 

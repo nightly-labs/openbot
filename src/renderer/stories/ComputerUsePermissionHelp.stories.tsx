@@ -20,9 +20,9 @@ function MockedHelp(props: {
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
-  mock.api.getComputerUseState = async () => state(props.granted ?? []);
+  mock.api.computerUse.getState = async () => state(props.granted ?? []);
   const name = props.app === undefined ? "Electron" : props.app;
-  mock.api.getComputerUsePermissionApp = async () => (name ? { name, iconDataUrl: null } : null);
+  mock.api.computerUse.getPermissionApp = async () => (name ? { name, iconDataUrl: null } : null);
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();

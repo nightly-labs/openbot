@@ -70,7 +70,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     setLoading(true);
     setError(null);
     try {
-      const next = await computerUsePort().getComputerUseState();
+      const next = await computerUsePort().computerUse.getState();
       if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not check Computer Use."));
@@ -84,7 +84,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     setBusyPermission(permission);
     setError(null);
     try {
-      const next = await computerUsePort().openComputerUsePermissionPane(permission);
+      const next = await computerUsePort().computerUse.openPermissionPane(permission);
       if (!disposed) setState(next);
     } catch (cause) {
       if (!disposed) setError(errorMessage(cause, "OpenBot could not open System Settings."));

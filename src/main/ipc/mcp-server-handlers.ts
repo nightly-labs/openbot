@@ -22,10 +22,9 @@ import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
-import { agentRequest, agentScope } from "./agent-inputs";
-import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import type { IpcGroupHandlers } from "./define-ipc-group";
 import { parseRemoveMcpServer, parseSaveMcpServer, parseSetMcpServerEnabled, parseTestMcpServer } from "./mcp-inputs";
-import { routeToServer } from "./route-to-server";
+import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The AgentService members this registrar reaches, and nothing else. */
 export interface McpServerService {
@@ -133,68 +132,54 @@ export function mcpServerIpcHandlers({
 
   return {
     mcpServers: {
-      listMcpServers: payloadHandler(agentScope, (scoped) =>
-        routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => service.listMcpServers(),
-          // The one read route, and the only one the host answers to a GET.
-          remote: (serverId) => {
-            requireRemoteSupport(serverId);
-            return remoteServers.request(serverId, MCP_ROUTES.list, decodeMcpServerConfigs);
-          },
-        }),
-      ),
-      saveMcpServer: payloadHandler(agentRequest(parseSaveMcpServer), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => {
-            startToolRuntimes();
-            return service.saveMcpServer(parsed);
-          },
-          remote: (serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
-        });
+      listMcpServers: scopedQueryHandler({
+        local: () => service.listMcpServers(),
+        // The one read route, and the only one the host answers to a GET.
+        remote: (serverId) => {
+          requireRemoteSupport(serverId);
+          return remoteServers.request(serverId, MCP_ROUTES.list, decodeMcpServerConfigs);
+        },
       }),
-      removeMcpServer: payloadHandler(agentRequest(parseRemoveMcpServer), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => service.removeMcpServer(parsed),
-          remote: (serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
-        });
+      saveMcpServer: scopedHandler(parseSaveMcpServer, {
+        local: (parsed) => {
+          startToolRuntimes();
+          return service.saveMcpServer(parsed);
+        },
+        remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.save, parsed),
       }),
-      setMcpServerEnabled: payloadHandler(agentRequest(parseSetMcpServerEnabled), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<McpServerConfig[]>(scoped.serverId, {
-          local: () => {
-            if (parsed.enabled) startToolRuntimes();
-            return service.setMcpServerEnabled(parsed);
-          },
-          remote: (serverId) => remoteList(serverId, MCP_ROUTES.toggle, parsed),
-        });
+      removeMcpServer: scopedHandler(parseRemoveMcpServer, {
+        local: (parsed) => service.removeMcpServer(parsed),
+        remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.remove, parsed),
+      }),
+      setMcpServerEnabled: scopedHandler(parseSetMcpServerEnabled, {
+        local: (parsed) => {
+          if (parsed.enabled) startToolRuntimes();
+          return service.setMcpServerEnabled(parsed);
+        },
+        remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.toggle, parsed),
       }),
       // The machine that holds the configuration is the machine that must make the connection, so a
       // test against a remote server runs on that host and not here.
-      testMcpServer: payloadHandler(agentRequest(parseTestMcpServer), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<McpTestResult>(scoped.serverId, {
-          // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
-          // remote branch below carries no such flag; the route it reaches spends the host's stored
-          // credentials instead, and still opens nothing.
-          local: async () => {
-            await prepareToolRuntimeForTest(parsed.config, {
-              startToolRuntimes,
-              ensureToolRuntimesReady,
-              toolRuntimes,
-            });
-            return service.testMcpServer(parsed, { interactive: true });
-          },
-          remote: (serverId) => {
-            requireRemoteSupport(serverId);
-            return remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {
-              method: "POST",
-              body: parsed,
-              timeoutMs: REMOTE_TEST_TIMEOUT_MS,
-            });
-          },
-        });
+      testMcpServer: scopedHandler(parseTestMcpServer, {
+        // Interactive: the user pressed Test and is in front of the browser a sign-in opens. The
+        // remote branch below carries no such flag; the route it reaches spends the host's stored
+        // credentials instead, and still opens nothing.
+        local: async (parsed) => {
+          await prepareToolRuntimeForTest(parsed.config, {
+            startToolRuntimes,
+            ensureToolRuntimesReady,
+            toolRuntimes,
+          });
+          return service.testMcpServer(parsed, { interactive: true });
+        },
+        remote: (parsed, serverId) => {
+          requireRemoteSupport(serverId);
+          return remoteServers.request(serverId, MCP_ROUTES.test, decodeMcpTestResult, {
+            method: "POST",
+            body: parsed,
+            timeoutMs: REMOTE_TEST_TIMEOUT_MS,
+          });
+        },
       }),
     },
   };

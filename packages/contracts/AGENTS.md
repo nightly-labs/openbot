@@ -34,7 +34,7 @@ Two files still mirror the list, and they are not enforced the same way.
 | Mirror | What it is | What holds it |
 | --- | --- | --- |
 | `src/preload/index.ts`, bridged groups | one `bridgeGroup(IPC_ENDPOINTS.group, decoders)` per group; the decoder map is keyed by every endpoint | `tsc` (`TS2741` / `TS2353`), and the coverage test for the group reference |
-| `src/preload/index.ts`, hand-written groups | the `invokeRequest` and `subscribe` calls the renderer actually reaches | `src/main/ipc-channel-coverage.test.ts` |
+| `src/preload/index.ts`, hand-written groups | the `invokeAgentForServer`, `ipcRenderer.invoke` and `listen` calls | `src/main/ipc-channel-coverage.test.ts` |
 | `src/renderer/src/preview/mock-openbot.ts` | the second implementation Storybook and the preview run against | `tsc`, against `OpenBotDesktopApi` |
 
 The main process is no longer one of them. `registerIpcGroups` in `src/main/ipc/define-ipc-group.ts`
@@ -53,17 +53,19 @@ preload and the mock without a second edit. Declare a server-scoped endpoint wit
 caller names none. Pass `"required"` as the last type argument when a caller must always name the
 server, such as a settings panel that can show a server the user has not switched to. Write the
 signature by hand only when the method reshapes its arguments or reads preload state, or for
-`browser.sendLiveViewInput`, the one untyped endpoint.
+`browserInput.sendLiveViewInput`, the one untyped endpoint.
 
 A group whose methods all pass straight through is generated whole: `GroupApi<IpcEndpoints["group"]>`
 gives its interface, a request keeps its key, and an event is `on` and the key (`voice.modelStatus`
 is `onModelStatus`). The preload builds it with `bridgeGroup` and the test harness with `stubGroup`,
 so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `app` and `providers` are spread into
-the top level. There are no per-method overrides: a group that needs one is written by hand. These
-stay by hand: `computerUse` (renamed top-level members), `browser` (the untyped endpoint and renamed
-members), `auth` (`verifyEmailCode` reshapes its arguments), `servers` (preload state, and member and
-invite calls that take the server first), and `attachmentImports`, which only the preload calls with
-the paths of dropped files and which the renderer must never reach. The eight agent groups are spread
+the top level. There are no per-method overrides in `bridgeGroup`. When a method must read or set
+preload state, bridge the group into a const outside the API object, spread it, and write only that
+method next to the spread. `agent` and `servers` do this: the server list calls record the selected
+server, and `onPresence`, `onDirectMessage` and `onDirectTyping` narrow the `onScoped*` events to
+one server. The untyped endpoint has its own group, `browserInput`, so `browser` can be bridged.
+Only `attachmentImports` stays by hand: only the preload calls it, with the paths of dropped files,
+and the renderer must never reach it. The eight agent groups are spread
 into `agent`, so their keys are the renderer names (`agent.listAgents`, `mcpServers.saveMcpServer`).
 
 In a hand-written group the preload is still the link no type pairs with an endpoint. Its API object

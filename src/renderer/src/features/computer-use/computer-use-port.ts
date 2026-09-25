@@ -6,13 +6,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
  * module.
  */
 export interface ComputerUsePort {
-  closeComputerUsePermissionHelp: OpenBotDesktopApi["closeComputerUsePermissionHelp"];
-  getComputerUsePermissionApp: OpenBotDesktopApi["getComputerUsePermissionApp"];
-  getComputerUseState: OpenBotDesktopApi["getComputerUseState"];
-  onComputerUseHighlightPlacement: OpenBotDesktopApi["onComputerUseHighlightPlacement"];
-  openComputerUsePermissionPane: OpenBotDesktopApi["openComputerUsePermissionPane"];
-  revealComputerUsePermissionApp: OpenBotDesktopApi["revealComputerUsePermissionApp"];
-  startComputerUsePermissionAppDrag: OpenBotDesktopApi["startComputerUsePermissionAppDrag"];
+  computerUse: OpenBotDesktopApi["computerUse"];
   remoteDesktop: Pick<OpenBotDesktopApi["remoteDesktop"], "checkSetup">;
 }
 

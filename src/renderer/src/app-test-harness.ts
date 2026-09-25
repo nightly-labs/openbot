@@ -542,13 +542,10 @@ export function installOpenbotStub(): void {
       onAction: vi.fn(dynamicIslandActionBridge.subscribe),
       setInteractive: vi.fn().mockResolvedValue(undefined),
     }),
-    getComputerUseState: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
-    openComputerUsePermissionPane: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
-    closeComputerUsePermissionHelp: notStubbed("closeComputerUsePermissionHelp"),
-    getComputerUsePermissionApp: notStubbed("getComputerUsePermissionApp"),
-    startComputerUsePermissionAppDrag: notStubbed("startComputerUsePermissionAppDrag"),
-    revealComputerUsePermissionApp: notStubbed("revealComputerUsePermissionApp"),
-    onComputerUseHighlightPlacement: vi.fn(() => () => undefined),
+    computerUse: stubGroup(IPC_ENDPOINTS.computerUse, "computerUse", {
+      getState: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
+      openPermissionPane: vi.fn().mockResolvedValue(COMPUTER_USE_STATE),
+    }),
     skills: stubGroup(IPC_ENDPOINTS.skills, "skills", {
       localList: vi.fn().mockResolvedValue([]),
       list: vi.fn().mockResolvedValue({ skills: [], nextCursor: null }),
@@ -564,7 +561,7 @@ export function installOpenbotStub(): void {
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       transcribe: vi.fn().mockResolvedValue({ text: "Voice transcript" }),
     }),
-    auth: {
+    auth: stubGroup(IPC_ENDPOINTS.auth, "auth", {
       getState: vi.fn().mockResolvedValue({
         status: "signed_in",
         user: { id: "user-1", email: "person@example.com", name: null, avatarUrl: null },
@@ -591,12 +588,7 @@ export function installOpenbotStub(): void {
       }),
       logout: vi.fn().mockResolvedValue({ status: "signed_out" }),
       onEvent: vi.fn(authBridge.subscribe),
-      createMobileConnect: notStubbed("auth.createMobileConnect"),
-      listMobileConnectedDevices: notStubbed("auth.listMobileConnectedDevices"),
-      listAccountSessions: notStubbed("auth.listAccountSessions"),
-      revokeAccountSession: notStubbed("auth.revokeAccountSession"),
-      revokeMobileConnectedDevice: notStubbed("auth.revokeMobileConnectedDevice"),
-    },
+    }),
     agent: {
       ...createMockChannels(
         (event) => emitAgentEvent?.(event),
@@ -1025,6 +1017,10 @@ export function installOpenbotStub(): void {
       setDirectTyping: vi.fn().mockResolvedValue(undefined),
       onDirectMessage: vi.fn(directMessageBridge.subscribe),
       onDirectTyping: vi.fn(directTypingBridge.subscribe),
+      // The preload narrows these to one server as `onPresence` and the two above. The app reads only those.
+      onScopedPresence: vi.fn(() => () => undefined),
+      onScopedDirectMessage: vi.fn(() => () => undefined),
+      onScopedDirectTyping: vi.fn(() => () => undefined),
       onEvent: vi.fn(serversBridge.subscribe),
       onInvite: vi.fn(inviteBridge.subscribe),
     },

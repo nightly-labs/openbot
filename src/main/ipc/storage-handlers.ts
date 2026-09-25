@@ -13,7 +13,6 @@ import {
   parseOpenStorageLocationInput,
   parseOpenStoredFileInput,
   STORAGE_CAPABILITY,
-  type StorageUsage,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
@@ -24,7 +23,7 @@ import type { RemoteRequestInit } from "../remote-server-client";
 import { agentRequest } from "./agent-inputs";
 import { type OpenAttachmentDependencies, openAttachmentForServer } from "./attachment-handlers";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { routeToServer } from "./route-to-server";
+import { scopedHandler } from "./scoped-handler";
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
 export interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
@@ -62,33 +61,24 @@ export function storageIpcHandlers({
 
   return {
     storage: {
-      getUsage: payloadHandler(agentRequest(parseGetStorageUsageInput), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<StorageUsage | null>(scoped.serverId, {
-          local: () => storage.usage(parsed),
-          remote: async (serverId) => {
-            if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY)) return null;
-            const usage = await remoteServers.request(serverId, STORAGE_ROUTES.usage, decodeStorageUsage, {
-              method: "POST",
-              body: parsed,
-            });
-            return assertStorageUsageScope(usage, parsed);
-          },
-        });
+      getUsage: scopedHandler(parseGetStorageUsageInput, {
+        local: (parsed) => storage.usage(parsed),
+        remote: async (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY)) return null;
+          const usage = await remoteServers.request(serverId, STORAGE_ROUTES.usage, decodeStorageUsage, {
+            method: "POST",
+            body: parsed,
+          });
+          return assertStorageUsageScope(usage, parsed);
+        },
       }),
-      deleteFile: payloadHandler(agentRequest(parseDeleteStoredFileInput), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<void>(scoped.serverId, {
-          local: () => storage.deleteFile(parsed.fileId),
-          remote: (serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
-        });
+      deleteFile: scopedHandler(parseDeleteStoredFileInput, {
+        local: (parsed) => storage.deleteFile(parsed.fileId),
+        remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
       }),
-      clear: payloadHandler(agentRequest(parseClearStorageInput), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<void>(scoped.serverId, {
-          local: () => storage.clear(parsed.category),
-          remote: (serverId) => remoteChange(serverId, STORAGE_ROUTES.clear, parsed),
-        });
+      clear: scopedHandler(parseClearStorageInput, {
+        local: (parsed) => storage.clear(parsed.category),
+        remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.clear, parsed),
       }),
       // A stored file is a sent or generated attachment, so the chat's open path serves it.
       openFile: payloadHandler(agentRequest(parseOpenStoredFileInput), (scoped) => {

@@ -663,24 +663,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
     },
-    getComputerUseState: async () => computerUseState(),
-    // The preview grants the permission the pane was opened for, because the panel's whole job is
-    // to show the answer changing. A mock that always reported the same state would make every
-    // story of this panel look identical.
-    openComputerUsePermissionPane: async (permission) => {
-      grantedComputerUsePermissions.add(permission);
-      return computerUseState();
+    computerUse: {
+      getState: async () => computerUseState(),
+      // The preview grants the permission the pane was opened for, because the panel's whole job is
+      // to show the answer changing. A mock that always reported the same state would make every
+      // story of this panel look identical.
+      openPermissionPane: async (permission) => {
+        grantedComputerUsePermissions.add(permission);
+        return computerUseState();
+      },
+      // The help window belongs to the desktop app. The preview has no second window to close, and
+      // the panel never waits on the answer.
+      closePermissionHelp: async () => undefined,
+      // No bundle to drag in a browser, so the window draws its steps and nothing else.
+      getPermissionApp: async () => null,
+      startPermissionAppDrag: async () => undefined,
+      revealPermissionApp: async () => undefined,
+      // The rim is drawn over another application's window, which the preview has none of, so this
+      // subscribes to a stream that never carries anything.
+      onHighlightPlacement: () => () => undefined,
     },
-    // The help window belongs to the desktop app. The preview has no second window to close, and
-    // the panel never waits on the answer.
-    closeComputerUsePermissionHelp: async () => undefined,
-    // No bundle to drag in a browser, so the window draws its steps and nothing else.
-    getComputerUsePermissionApp: async () => null,
-    startComputerUsePermissionAppDrag: async () => undefined,
-    revealComputerUsePermissionApp: async () => undefined,
-    // The rim is drawn over another application's window, which the preview has none of, so this
-    // subscribes to a stream that never carries anything.
-    onComputerUseHighlightPlacement: () => () => undefined,
     openExternal: async () => undefined,
     connectProvider: async () => clone(agentStatus),
     updateProviderCli: async () => clone(agentStatus),
@@ -787,7 +789,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
         return clone(authState);
       },
-      verifyEmailCode: async (_challengeId, _code) => {
+      verifyEmailCode: async () => {
         const email = authState.status === "code_sent" ? authState.email : "person@example.com";
         const user: CentralAuthUser = {
           id: "user-1",
@@ -2055,21 +2057,21 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(server);
       },
       listMembers: async () => clone(teamMembers),
-      updateMember: async (_serverId, input: UpdateTeamMemberInput) => {
+      updateMember: async (input: UpdateTeamMemberInput) => {
         const member = teamMembers.find((candidate) => candidate.id === input.memberId);
         if (!member) throw new Error("Member not found");
         const updated = { ...member, ...input };
         teamMembers = teamMembers.map((candidate) => (candidate.id === updated.id ? updated : candidate));
         return clone(updated);
       },
-      removeMember: async (_serverId, memberId) => {
+      removeMember: async (memberId) => {
         teamMembers = teamMembers.filter((member) => member.id !== memberId);
       },
       listInvites: async () => clone(invites),
-      revokeInvite: async (_serverId, inviteId) => {
+      revokeInvite: async (inviteId) => {
         invites = invites.filter((invite) => invite.id !== inviteId);
       },
-      createInvite: async (_serverId, input: CreateTeamInviteInput): Promise<InviteSummary> => ({
+      createInvite: async (input: CreateTeamInviteInput): Promise<InviteSummary> => ({
         id: `invite-${invites.length + 1}`,
         inviteUrl: "https://team.example.com/invite/story-invite",
         expiresAt: "2026-09-19T10:00:00.000Z",
@@ -2164,6 +2166,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         directTypingListeners.add(listener);
         return () => directTypingListeners.delete(listener);
       },
+      // The unfiltered streams the preload narrows to one server. The preview sends only the narrowed ones.
+      onScopedPresence: () => () => undefined,
+      onScopedDirectMessage: () => () => undefined,
+      onScopedDirectTyping: () => () => undefined,
       onEvent: (listener) => {
         void listener;
         return () => undefined;

@@ -5,15 +5,9 @@ import type { AgentService } from "../../backend/agent-service";
 import { decodeAgentMemories, decodeAgentMemory } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
-import {
-  agentRequest,
-  parseAgentId,
-  parseCreateAgentMemory,
-  parseDeleteAgentMemory,
-  parseUpdateAgentMemory,
-} from "./agent-inputs";
-import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { routeToServer } from "./route-to-server";
+import { parseAgentId, parseCreateAgentMemory, parseDeleteAgentMemory, parseUpdateAgentMemory } from "./agent-inputs";
+import type { IpcGroupHandlers } from "./define-ipc-group";
+import { scopedHandler } from "./scoped-handler";
 
 interface MemoryIpcDependencies {
   service: AgentService;
@@ -26,58 +20,43 @@ export function memoryIpcHandlers({
 }: MemoryIpcDependencies): Pick<IpcGroupHandlers, "agentMemories"> {
   return {
     agentMemories: {
-      listMemories: payloadHandler(agentRequest(parseAgentId), (scoped) => {
-        const agentId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.listMemories(agentId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeAgentMemories),
-        });
+      listMemories: scopedHandler(parseAgentId, {
+        local: (agentId) => service.listMemories(agentId),
+        remote: (agentId, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeAgentMemories),
       }),
-      createMemory: payloadHandler(agentRequest(parseCreateAgentMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.createMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(parsed.agentId), decodeAgentMemory, {
-              method: "POST",
+      createMemory: scopedHandler(parseCreateAgentMemory, {
+        local: (parsed) => service.createMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(parsed.agentId), decodeAgentMemory, {
+            method: "POST",
+            body: { text: parsed.text },
+          }),
+      }),
+      updateMemory: scopedHandler(parseUpdateAgentMemory, {
+        local: (parsed) => service.updateMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(
+            serverId,
+            TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId),
+            decodeAgentMemory,
+            {
+              method: "PATCH",
               body: { text: parsed.text },
-            }),
-        });
+            },
+          ),
       }),
-      updateMemory: payloadHandler(agentRequest(parseUpdateAgentMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.updateMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(
-              serverId,
-              TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId),
-              decodeAgentMemory,
-              {
-                method: "PATCH",
-                body: { text: parsed.text },
-              },
-            ),
-        });
+      deleteMemory: scopedHandler(parseDeleteAgentMemory, {
+        local: (parsed) => service.deleteMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId), decodeVoid, {
+            method: "DELETE",
+          }),
       }),
-      deleteMemory: payloadHandler(agentRequest(parseDeleteAgentMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.deleteMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memory(parsed.agentId, parsed.memoryId), decodeVoid, {
-              method: "DELETE",
-            }),
-        });
-      }),
-      clearMemories: payloadHandler(agentRequest(parseAgentId), (scoped) => {
-        const agentId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.clearMemories(agentId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeVoid, { method: "DELETE" }),
-        });
+      clearMemories: scopedHandler(parseAgentId, {
+        local: (agentId) => service.clearMemories(agentId),
+        remote: (agentId, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.agent.memories(agentId), decodeVoid, { method: "DELETE" }),
       }),
     },
   };

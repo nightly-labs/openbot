@@ -8,7 +8,7 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 
 1. Add the endpoint to a group in `packages/contracts/src/ipc-endpoints.ts`, as
    `request<Payload, Result>()("group:wire-name")` or `event<Payload>()("group:wire-name")`. All
-   endpoints are typed except `browser.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
+   endpoints are typed except `browserInput.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
    and main decodes the different wire `BrowserViewInput`. Do not add another `untypedRequest(...)`.
 2. In a group the preload builds with `bridgeGroup` (the `GroupApi` aliases in
    `packages/contracts/src/ipc-desktop-apis.ts`), skip this step: the method exists already. In a
@@ -18,8 +18,8 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
    change and the key to add.
 4. Add the handler here and the method in `src/renderer/src/preview/mock-openbot.ts`. In the preload,
    a bridged group needs one decoder in its `bridgeGroup` map (`TS2741` names it). A hand-written group
-   needs the call (`invokeRequest(IPC_ENDPOINTS.group.name, decode, input)`, `invokeAgentForServer` for a
-   server-scoped payload, or `subscribe` for an event). The decoder comes from a preload decoding
+   needs the call (`invokeAgentForServer` for a server-scoped payload, `ipcRenderer.invoke` for the
+   untyped endpoint, or `listen` for an event). The decoder comes from a preload decoding
    module, such as `src/preload/team-decoding.ts`, or is `decodeVoid`.
 
 Step 3 is the point. In a bridged group every step announces itself. In a hand-written group, a
@@ -75,3 +75,8 @@ A handler that takes a `serverId` serves two backends — the local `AgentServic
 server over HTTP — and picks with `routeToServer(serverId, { local, remote })` from
 `./route-to-server.ts`. Write the branch out by hand and you have written the fifty-fifth copy of the
 same ternary.
+
+When the whole handler is that one route, bind it with `scopedHandler(decode, { local, remote })`, or
+`scopedQueryHandler({ local, remote })` for a `scopedQuery` endpoint, from `./scoped-handler.ts`.
+Each branch gets the decoded payload, and `remote` also gets the server. Use `payloadHandler` with
+`agentRequest(decode)` only when the handler does work outside the route.

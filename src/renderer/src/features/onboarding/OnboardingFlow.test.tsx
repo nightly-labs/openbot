@@ -85,7 +85,7 @@ describe("OnboardingFlow", () => {
 
   it("requests optional macOS permissions before continuing", async () => {
     const view = renderFlow();
-    const openPermission = vi.spyOn(activeMock?.api ?? window.openbot, "openComputerUsePermissionPane");
+    const openPermission = vi.spyOn((activeMock?.api ?? window.openbot).computerUse, "openPermissionPane");
     await fireEvent.click(view.getByRole("button", { name: "Next" }));
     expect(await view.findByRole("heading", { name: "OpenBot might control your computer" })).toBeInTheDocument();
     await waitFor(() => expect(view.getByRole("button", { name: "Grant Screen Recording" })).toBeInTheDocument());
