@@ -21,6 +21,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "../agent-service-test-harness";
 import type { AgentStore } from "../agent-store";
 import { McpServerStore } from "../mcp-server-store";
@@ -1444,7 +1445,9 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
 
     // The chat is on Grok and still runs a turn: the export failed, the agent's work did not.
     await service.sendMessage({ agentId: "chief", text: "Continue on Grok." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     expect(service.listAgents().find((agent) => agent.id === "chief")?.provider).toBe("grok");
   });
 

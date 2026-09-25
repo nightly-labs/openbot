@@ -25,6 +25,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "./agent-service-test-harness";
 import { MailboxStore } from "./mailbox-store";
 import { getString } from "./protocol";
@@ -663,13 +664,13 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
 
     await service.sendMessage({ agentId: "chief", text: "First request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
 
     await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
     expect(service.listAgents().find((agent) => agent.id === "chief")?.threadId).toBe(publicThreadId);
     await service.sendMessage({ agentId: "chief", text: "Second request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     const grokInput = clients.get("grok")?.requests.find((request) => request.method === "turn/start")?.params;
     expect(firstInputText(grokInput)).toContain("CODEX_DONE");
@@ -678,13 +679,13 @@ describe.sequential("AgentService: queue", () => {
 
     await service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" });
     await service.sendMessage({ agentId: "chief", text: "Third request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[2]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[2]?.status === "completed");
     const claudeInput = clients.get("claude")?.requests.find((request) => request.method === "turn/start")?.params;
     expect(firstInputText(claudeInput)).toContain("GROK_DONE");
 
     await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
     await service.sendMessage({ agentId: "chief", text: "Fourth request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[3]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[3]?.status === "completed");
     const grokTurns = clients.get("grok")?.requests.filter((request) => request.method === "turn/start") ?? [];
     expect(firstInputText(grokTurns[1]?.params)).toContain("CLAUDE_DONE");
     expect(store.activeProviderSession("chief")?.externalSessionId).not.toBe(firstGrokSessionId);
@@ -729,7 +730,7 @@ describe.sequential("AgentService: queue", () => {
     await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
 
     await service.sendMessage({ agentId: "chief", text: "Recover this request" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
 
     expect(grokClient?.requests.filter((request) => request.method === "thread/start")).toHaveLength(1);
     expect(grokClient?.requests.filter((request) => request.method === "thread/resume")).toHaveLength(1);
@@ -778,7 +779,7 @@ describe.sequential("AgentService: queue", () => {
         model: target === "grok" ? "grok-4.5" : "opencode/example-model",
       });
       await service.sendMessage({ agentId: "chief", text: "First provider request" });
-      await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
       const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
       const originalSessionId = store.activeProviderSession("chief")?.externalSessionId;
       if (!publicThreadId || !originalSessionId) throw new Error("The first provider session was not created.");
@@ -786,7 +787,7 @@ describe.sequential("AgentService: queue", () => {
       rejectResume = true;
       await service.updateAgent({ agentId: "chief", description: "Force the provider session to reload." });
       await service.sendMessage({ agentId: "chief", text: "Continue after recovery" });
-      await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "completed");
+      await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
       const sessions = store.database.listProviderSessions(publicThreadId);
       expect(sessions).toMatchObject([
@@ -822,12 +823,12 @@ describe.sequential("AgentService: queue", () => {
     });
     service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Create a long result" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const publicThreadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
 
     await service.updateAgent({ agentId: "chief", provider: "claude", model: "claude-sonnet-5" });
     await service.sendMessage({ agentId: "chief", text: "Continue from the result" });
-    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
 
     const claudeTurn = clients.get("claude")?.requests.find((request) => request.method === "turn/start")?.params;
     expect(firstInputText(claudeTurn)).toContain("oldest visible history was summarized");
@@ -965,7 +966,7 @@ describe.sequential("AgentService: queue", () => {
     expect((await protocolMessages(logPath)).some((message) => message.method === "turn/steer")).toBe(false);
 
     await service.interrupt("chief", active.turnId);
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
 
     await waitFor(
       async () => (await protocolMessages(logPath)).filter((item) => item.method === "turn/start").length === 2,
@@ -1412,7 +1413,7 @@ describe.sequential("AgentService: queue", () => {
     await waitFor(() => service?.channels.store.assignments("channel-1").some((item) => item.deliveryId));
     await service.sendMessage({ agentId: "chief", text: "Read the report" });
     await service.sendMessage({ agentId: "chief", text: "Send the summary" });
-    await waitFor(() => service?.listQueue("chief").deliveries.length === 2);
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.length === 2);
 
     // The queue the user reads holds the two normal messages alone, so the order it sends can name
     // no more than those two, while the mailbox still holds the channel delivery in the same queue.
@@ -1468,7 +1469,7 @@ describe.sequential("AgentService: queue", () => {
 
     // The channel turn runs on its own thread, so nothing in this agent's own chat reports it.
     await service.sendMessage({ agentId: "chief", text: "Read the report" });
-    await waitFor(() => service?.listQueue("chief").hold !== undefined);
+    await waitForQueue(service, "chief", (queue) => queue.hold !== undefined);
 
     const held = service.listQueue("chief");
     expect(held.hold).toEqual({
@@ -1512,7 +1513,7 @@ describe.sequential("AgentService: queue", () => {
     service = agentService;
 
     await service.sendMessage({ agentId: "chief", text: "Stop during startup" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "starting");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "starting");
     await service.stop();
 
     // The drain ends before `stop` returns: the provider confirmed the turn, or the stop failed it.
@@ -1538,8 +1539,8 @@ describe.sequential("AgentService: queue", () => {
       const messages = await protocolMessages(logPath);
       return messages.some((message) => message.id === "agent-tool-1" && message.result);
     });
-    await waitFor(() => service?.listQueue("sales-outbound").deliveries.length === 1);
-    await waitFor(() => service?.listQueue("inbox-manager").deliveries.length === 1);
+    await waitForQueue(service, "sales-outbound", (queue) => queue.deliveries.length === 1);
+    await waitForQueue(service, "inbox-manager", (queue) => queue.deliveries.length === 1);
 
     const sales = service.listQueue("sales-outbound").deliveries[0];
     const inbox = service.listQueue("inbox-manager").deliveries[0];

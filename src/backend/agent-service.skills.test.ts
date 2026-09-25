@@ -12,6 +12,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "./agent-service-test-harness";
 
 let root: string;
@@ -146,7 +147,9 @@ describe.sequential("local skill provider tools", () => {
         { action: "revised", skillId: skill.id, revision: 2, skillName: skill.name },
         { action: "installed", skillId: skill.id, revision: 2, skillName: skill.name },
       ]);
-      await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.every((delivery) => delivery.status === "completed"),
+      );
       const actor = { id: "human", name: "Alex" };
       await service.channels.command(
         {

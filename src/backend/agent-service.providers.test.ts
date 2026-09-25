@@ -31,6 +31,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "./agent-service-test-harness";
 import { loginShellPath, type McpToolRuntimes, NO_MCP_TOOL_RUNTIMES } from "./mcp-provider-shapes";
 import type { DynamicToolCallParams } from "./protocol";
@@ -67,7 +68,9 @@ describe.sequential("AgentService: providers", () => {
     });
     service = agentService;
     await service.sendMessage({ agentId: "chief", text: "This is my normal conversation." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const agent = service.listAgents().find((item) => item.id === "chief");
     if (!agent?.threadId) throw new Error("Normal conversation did not start.");
     const normalSession = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -281,7 +284,9 @@ describe.sequential("AgentService: providers", () => {
     };
     service = await startService();
     await service.sendMessage({ agentId: "chief", text: "Remember that my researchers cover tennis and football." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const original = service.listAgents().find((agent) => agent.id === "chief");
     const originalSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!original || !originalSession) throw new Error("The original session did not start.");
@@ -294,7 +299,7 @@ describe.sequential("AgentService: providers", () => {
     rejectTurn = true;
     service = await startService();
     await service.sendMessage({ agentId: "chief", text: "Group my researchers." });
-    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     await service.stop();
     rejectTurn = false;
     service = await startService();
@@ -352,7 +357,9 @@ describe.sequential("AgentService: providers", () => {
     };
     service = await startService();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     expect(paramsRecord(client.requests.find((request) => request.method === "thread/start")?.params)?.config).toBe(
       undefined,
@@ -417,7 +424,9 @@ describe.sequential("AgentService: providers", () => {
     });
 
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const reported = events.filter((event) => event.type === "error" && event.code === "mcp_server_not_started");
     expect(reported).toHaveLength(1);
     expect(reported[0]).toMatchObject({
@@ -430,7 +439,9 @@ describe.sequential("AgentService: providers", () => {
     expect(paramsRecord(starts.at(-1)?.params)?.config).toBe(undefined);
 
     await service.sendMessage({ agentId: "chief", text: "Again." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     expect(events.filter((event) => event.type === "error" && event.code === "mcp_server_not_started")).toHaveLength(1);
   });
 
@@ -480,7 +491,7 @@ describe.sequential("AgentService: providers", () => {
     });
 
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "failed"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.every((delivery) => delivery.status === "failed"));
 
     const starts = client.requests.filter((request) => request.method === "thread/start");
     expect(paramsRecord(starts.at(-1)?.params)?.config).toEqual({
@@ -509,7 +520,9 @@ describe.sequential("AgentService: providers", () => {
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!firstSession) throw new Error("The Codex session did not start.");
     await writeFile(
@@ -566,7 +579,9 @@ describe.sequential("AgentService: providers", () => {
     });
 
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!firstSession) throw new Error("The Codex session did not start.");
     // No runtime yet, so the server is dropped from the session while the stored row stays.
@@ -606,7 +621,9 @@ describe.sequential("AgentService: providers", () => {
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!firstSession) throw new Error("The Codex session did not start.");
 
@@ -678,7 +695,9 @@ describe.sequential("AgentService: providers", () => {
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
     service.saveMcpServer({
@@ -762,7 +781,9 @@ describe.sequential("AgentService: providers", () => {
 
     expect(service.enabledMcpServers().map((entry) => entry.name)).toEqual([COMPUTER_USE_MCP_SERVER_NAME]);
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const [start] = client.requests.filter((request) => request.method === "thread/start");
     expect(paramsRecord(start?.params)?.config).toEqual({
       mcp_servers: {
@@ -820,7 +841,9 @@ describe.sequential("AgentService: providers", () => {
       },
     });
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     if (!firstSession) throw new Error("The Codex session did not start.");
     const starts = () => client.requests.filter((request) => request.method === "thread/start");
@@ -881,7 +904,7 @@ describe.sequential("AgentService: providers", () => {
     });
 
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     const failed = service.listQueue("chief").deliveries.find((delivery) => delivery.status === "failed");
     expect(failed?.error).toBe("Rejected ••• from Filesystem.");
   });
@@ -919,7 +942,9 @@ describe.sequential("AgentService: providers", () => {
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
     await service.sendMessage({ agentId: "chief", text: "Continue." });
@@ -973,7 +998,9 @@ describe.sequential("AgentService: providers", () => {
 
     await service.sendMessage({ agentId: "chief", text: "Start." });
     // Completed, not left running: the turn that was starting still owns its routing.
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
     expect(client.releasedThreads).toEqual([]);
 
@@ -1039,7 +1066,9 @@ describe.sequential("AgentService: providers", () => {
       notification("turn/completed", { threadId: session, turn: { id: turnId, status: "completed" } }),
     );
 
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
   });
 
   // The manifest is the only record that survives a restart, and the in-memory refresh mark does
@@ -1079,7 +1108,9 @@ describe.sequential("AgentService: providers", () => {
     };
     service = await start();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const firstSession = store.activeProviderSession("chief")?.externalSessionId;
 
     // The restart drops the held refresh, so the manifest alone decides whether the session is kept.
@@ -1106,7 +1137,9 @@ describe.sequential("AgentService: providers", () => {
     service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const session = store.activeProviderSession("chief")?.externalSessionId;
     if (!session) throw new Error("The Codex session did not start.");
     const removeFiles = store.deleteAgent.bind(store);
@@ -1139,7 +1172,9 @@ describe.sequential("AgentService: providers", () => {
     };
     service = await start();
     await service.sendMessage({ agentId: "chief", text: "Private conversation to remove with this agent." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const manifests = join(store.database.userDataPath, "provider-toolsets");
     const handoffs = join(store.database.userDataPath, "provider-handoffs");
     rejectTurn = true;
@@ -1176,7 +1211,9 @@ describe.sequential("AgentService: providers", () => {
     });
     service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Private history for the replacement session." });
-    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
     const original = store.activeProviderSession("chief")?.externalSessionId;
     const manifests = join(store.database.userDataPath, "provider-toolsets");
     const recorded = await readdir(manifests);
@@ -1186,7 +1223,9 @@ describe.sequential("AgentService: providers", () => {
     });
     try {
       await service.sendMessage({ agentId: "chief", text: "Continue with new tools." });
-      await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+      await waitForQueue(service, "chief", (queue) =>
+        queue.deliveries.some((delivery) => delivery.status === "failed"),
+      );
       expect(store.activeProviderSession("chief")?.externalSessionId).toBe(original);
       expect(await readdir(join(store.database.userDataPath, "provider-handoffs"))).toEqual([]);
       expect(await readdir(manifests)).toEqual(recorded);
@@ -1367,7 +1406,7 @@ describe.sequential("AgentService: providers", () => {
     // The running OpenCode process still serves the removed endpoint, with the credentials it
     // started with, so a later message must not reach it.
     await service.sendMessage({ agentId: "chief", text: "Keep working" });
-    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     expect(service.listQueue("chief").deliveries.at(-1)?.error).toBe(
       "The endpoint this agent used was removed. Choose another model for it.",
     );
@@ -1676,7 +1715,7 @@ describe.sequential("AgentService: providers", () => {
     await service.removeCustomProvider("lmstudio", async () => undefined);
     releasePreparing();
 
-    await waitFor(() => service?.listQueue("chief").deliveries.some((delivery) => delivery.status === "failed"));
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
     expect(service.listQueue("chief").deliveries.at(-1)?.error).toBe(
       "The endpoint this agent used was removed. Choose another model for it.",
     );
