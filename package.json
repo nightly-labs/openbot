@@ -159,6 +159,7 @@
     "typecheck": "bun run --parallel 'typecheck:*'",
     "lint": "biome check --max-diagnostics=none .",
     "lint:ratchet": "bun scripts/lint-ratchet.ts",
+    "types:ratchet": "bun scripts/type-ratchet.ts",
     "format": "biome check --write --max-diagnostics=none .",
     "knip:check": "knip",
     "check:staged": "biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched",

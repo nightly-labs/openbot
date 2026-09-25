@@ -48,6 +48,9 @@ jobs:
       - name: Check ratcheted lint rules
         run: bun run lint:ratchet
 
+      - name: Check ratcheted TypeScript options
+        run: bun run types:ratchet
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
