@@ -19,6 +19,7 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import type { AgentProvider } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
+import { IdleThreadPool } from "./idle-thread-pool";
 import {
   claudeMcpServers,
   type McpAuthorizationSource,
@@ -28,6 +29,7 @@ import {
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { OPENBOT_TOOL_DEFINITIONS } from "./openbot-tools";
+import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
   type AccountRateLimitWindowResult,
@@ -97,10 +99,6 @@ interface ThreadRuntime {
   activeTurn: ActiveTurn | null;
   consume: Promise<void>;
   idleRelease: ReturnType<typeof setTimeout> | null;
-  /**
-   * When the thread last finished a turn, so the longest idle process is the first to go. `0` for a
-   * thread that is open for a turn that has not started yet: only the timeout closes it.
-   */
   idleSince: number;
 }
 
@@ -116,11 +114,6 @@ export const CLAUDE_THREAD_IDLE_RELEASE_MS = 10 * 60_000;
  * each of five agents otherwise holds five processes of about 140 MB each for ten minutes.
  */
 export const CLAUDE_IDLE_THREAD_LIMIT = 2;
-
-interface PendingServerRequest {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-}
 
 interface ClaudeStreamMessage {
   type: string;
@@ -160,12 +153,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #reportMcpDrops: McpDropReporter | undefined;
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
-  readonly #threads = new Map<string, ThreadRuntime>();
-  /** Threads whose process was closed for being idle, with the config that resumes them. */
-  readonly #releasedThreads = new Map<string, ThreadConfig>();
-  readonly #waking = new Map<string, Promise<void>>();
-  readonly #startingTurns = new Set<string>();
-  readonly #pendingServerRequests = new Map<RequestId, PendingServerRequest>();
+  /** Threads whose process was closed for being idle keep the config that resumes them. */
+  readonly #threads = new IdleThreadPool<ThreadRuntime, ThreadConfig>({
+    releaseAfterMs: CLAUDE_THREAD_IDLE_RELEASE_MS,
+    idleLimit: CLAUDE_IDLE_THREAD_LIMIT,
+    // A session that is not persisted has nothing on disk to resume from.
+    canRelease: (runtime) => runtime.config.persistSession,
+    snapshot: (runtime) => runtime.config,
+    dispose: (runtime) => this.#closeRuntime(runtime),
+    reopen: (threadId, config) => this.#startThread(threadId, config, true),
+  });
+  readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
   #running = false;
@@ -201,18 +199,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   async stop(): Promise<void> {
     this.#running = false;
-    this.#releasedThreads.clear();
-    for (const runtime of this.#threads.values()) {
-      if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
+    const runtimes = this.#threads.clear();
+    for (const runtime of runtimes) {
       runtime.input.close();
       runtime.query.close();
     }
-    await Promise.allSettled([...this.#threads.values()].map((runtime) => runtime.consume));
-    this.#threads.clear();
-    for (const pending of this.#pendingServerRequests.values()) {
-      pending.reject(new Error("Claude session stopped."));
-    }
-    this.#pendingServerRequests.clear();
+    await Promise.allSettled(runtimes.map((runtime) => runtime.consume));
+    this.#serverRequests.rejectAll("Claude session stopped.");
   }
 
   /**
@@ -221,15 +214,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * thread: a turn that still runs would end with the query that carries it.
    */
   async releaseThread(threadId: string): Promise<void> {
-    this.#releasedThreads.delete(threadId);
+    this.#threads.forget(threadId);
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
-    await this.#closeRuntime(runtime);
+    await this.#threads.close(runtime);
   }
 
   async #closeRuntime(runtime: ThreadRuntime): Promise<void> {
-    this.#threads.delete(runtime.id);
-    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
     runtime.input.close();
     runtime.query.close();
     // The consumer rejects when the query ends in the middle of a turn. The runtime is already gone
@@ -263,11 +254,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const current = this.#threads.get(threadId);
         if (current && JSON.stringify(current.config) !== JSON.stringify(config)) {
           if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
-          this.#threads.delete(threadId);
-          if (current.idleRelease) clearTimeout(current.idleRelease);
-          current.input.close();
-          current.query.close();
-          await current.consume;
+          await this.#threads.close(current);
         }
         if (!this.#threads.has(threadId)) {
           await this.#startThread(threadId, config, true);
@@ -283,7 +270,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       case "turn/interrupt": {
         const threadId = requiredString(params, "threadId");
         // A released thread has no turn to stop.
-        if (this.#releasedThreads.has(threadId) && !this.#threads.has(threadId)) return decoder({});
+        if (this.#threads.isReleased(threadId)) return decoder({});
         const runtime = this.#requireThread(threadId);
         await runtime.query.interrupt();
         return decoder({});
@@ -301,17 +288,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   respond(id: RequestId, result: unknown): void {
-    const pending = this.#pendingServerRequests.get(id);
-    if (!pending) return;
-    this.#pendingServerRequests.delete(id);
-    pending.resolve(result);
+    this.#serverRequests.resolve(id, result);
   }
 
   respondError(id: RequestId, error: RpcError): void {
-    const pending = this.#pendingServerRequests.get(id);
-    if (!pending) return;
-    this.#pendingServerRequests.delete(id);
-    pending.reject(new Error(error.message));
+    this.#serverRequests.reject(id, error);
   }
 
   /**
@@ -517,77 +498,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       idleSince: 0,
     };
     runtime.consume = this.#consume(runtime);
-    this.#threads.set(threadId, runtime);
-    this.#releasedThreads.delete(threadId);
-    this.#armIdleRelease(runtime);
-  }
-
-  /** Closes the thread's process once it has had no turn for `CLAUDE_THREAD_IDLE_RELEASE_MS`. */
-  #armIdleRelease(runtime: ThreadRuntime): void {
-    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
-    runtime.idleRelease = null;
-    // A session that is not persisted has nothing on disk to resume from.
-    if (!runtime.config.persistSession) return;
-    runtime.idleRelease = setTimeout(() => {
-      runtime.idleRelease = null;
-      if (this.#threads.get(runtime.id) !== runtime || runtime.activeTurn) return;
-      this.#releaseThread(runtime);
-    }, CLAUDE_THREAD_IDLE_RELEASE_MS);
-    runtime.idleRelease.unref?.();
-  }
-
-  /** An armed release timer marks a thread that is idle and can be resumed from its session. */
-  #releaseIdleThreadsOverLimit(): void {
-    const idle = [...this.#threads.values()]
-      .filter(
-        (runtime) =>
-          runtime.idleRelease !== null &&
-          runtime.idleSince > 0 &&
-          !runtime.activeTurn &&
-          !this.#startingTurns.has(runtime.id),
-      )
-      .sort((left, right) => left.idleSince - right.idleSince);
-    for (const runtime of idle.slice(0, Math.max(0, idle.length - CLAUDE_IDLE_THREAD_LIMIT))) {
-      this.#releaseThread(runtime);
-    }
-  }
-
-  #releaseThread(runtime: ThreadRuntime): void {
-    this.#releasedThreads.set(runtime.id, runtime.config);
-    void this.#closeRuntime(runtime);
-  }
-
-  /** The runtime of a thread, started again from its session when it was released for being idle. */
-  async #wakeThread(threadId: string): Promise<ThreadRuntime> {
-    const config = this.#releasedThreads.get(threadId);
-    if (config && !this.#threads.has(threadId)) {
-      let waking = this.#waking.get(threadId);
-      if (!waking) {
-        waking = this.#startThread(threadId, config, true).finally(() => this.#waking.delete(threadId));
-        this.#waking.set(threadId, waking);
-      }
-      await waking;
-    }
-    return this.#requireThread(threadId);
+    this.#threads.add(runtime);
   }
 
   async #startTurn(params: unknown): Promise<TurnResponse> {
     const threadId = requiredString(params, "threadId");
-    // Waking the thread yields before its idle timer is cleared, and another thread going idle in
-    // that gap must not release this one.
-    this.#startingTurns.add(threadId);
-    try {
-      return await this.#openTurn(threadId, params);
-    } finally {
-      this.#startingTurns.delete(threadId);
-    }
+    return this.#threads.startTurn(threadId, () => this.#openTurn(threadId, params));
   }
 
   async #openTurn(threadId: string, params: unknown): Promise<TurnResponse> {
-    const runtime = await this.#wakeThread(threadId);
+    await this.#threads.wake(threadId);
+    const runtime = this.#requireThread(threadId);
     if (runtime.activeTurn) throw new Error("The Claude thread already has an active turn.");
-    if (runtime.idleRelease) clearTimeout(runtime.idleRelease);
-    runtime.idleRelease = null;
+    this.#threads.holdForTurn(runtime);
 
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
@@ -950,13 +873,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       params: { threadId: runtime.id, turn: { id: turn.id, status } },
     });
     runtime.activeTurn = null;
-    runtime.idleSince = Date.now();
-    this.#armIdleRelease(runtime);
-    this.#releaseIdleThreadsOverLimit();
+    this.#threads.markIdle(runtime);
   }
 
   async #readThread(threadId: string): Promise<ThreadResponse> {
-    const cwd = this.#threads.get(threadId)?.config.cwd ?? this.#releasedThreads.get(threadId)?.cwd;
+    const cwd = this.#threads.get(threadId)?.config.cwd ?? this.#threads.released(threadId)?.cwd;
     const messages = await this.#readSessionMessages(threadId, cwd ? { dir: cwd } : undefined);
     const turns: NonNullable<ThreadResponse["thread"]["turns"]> = [];
     let current: (typeof turns)[number] | null = null;
@@ -1072,7 +993,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   async #callDynamicTool(threadId: string, namespace: string, name: string, args: unknown): Promise<CallToolResult> {
     const runtime = this.#requireThread(threadId);
-    const result = await this.#callServerRequest("item/tool/call", {
+    const result = await this.#serverRequests.call("item/tool/call", {
       threadId,
       turnId: runtime.activeTurn?.id ?? randomUUID(),
       callId: randomUUID(),
@@ -1097,7 +1018,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       question: isString(question.question) ? question.question : "Claude needs more information.",
       options: Array.isArray(question.options) ? question.options : undefined,
     }));
-    const result = await this.#callServerRequest("item/tool/requestUserInput", {
+    const result = await this.#serverRequests.call("item/tool/requestUserInput", {
       threadId,
       turnId: runtime.activeTurn?.id ?? randomUUID(),
       itemId: toolUseId,
@@ -1112,14 +1033,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }),
     );
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
-  }
-
-  #callServerRequest(method: string, params: unknown): Promise<unknown> {
-    const id = randomUUID();
-    return new Promise((resolve, reject) => {
-      this.#pendingServerRequests.set(id, { resolve, reject });
-      this.emit("request", { id, method, params });
-    });
   }
 
   #requireThread(threadId: string): ThreadRuntime {
