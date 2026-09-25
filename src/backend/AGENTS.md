@@ -46,7 +46,8 @@ offers, in order of preference:
 
 | Barrier | Use it for |
 | --- | --- |
-| `waitFor(predicate)` — `agent-service-test-harness.ts` | Anything driven by the fake provider process. Polls to a deadline and fails naming *the predicate that never held*, printing the source of the check. |
+| `waitForQueue(service, agentId, check)` — `agent-service-test-harness.ts` | A queue state, such as a delivery that completed. It checks on each `queue-changed` event, not on a timer, so it also fails when the service changes a status and does not tell the renderer. |
+| `waitFor(predicate)` — same file | Anything else driven by the fake provider process. Polls to a deadline and fails naming *the predicate that never held*, printing the source of the check. |
 | `nextRoutinesChanged(service, agentId)` — same file | One named `AgentEvent`. Resolves on the event; the pattern generalizes to any other event you need. |
 | `callOpenBotTool(...)` / `expectOpenBotToolError(...)` | A tool round trip. Both already contain the wait. |
 | `await service.someMethod()` | A promise the code under test already returns. Prefer it over observing a side effect of the same call. |

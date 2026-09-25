@@ -16,6 +16,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "./agent-service-test-harness";
 import { ChannelStore } from "./channel-store";
 import { getString } from "./protocol";
@@ -53,7 +54,7 @@ describe.sequential("AgentService: restart", () => {
     });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Reply to this" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const snapshot = await service.readConversation("chief");
     const boundary = snapshot.messages.at(-1)?.id;
     if (!boundary) throw new Error("The reply is missing");
@@ -83,7 +84,7 @@ describe.sequential("AgentService: restart", () => {
     service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Remember this" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     const threadId = (await store.getOrCreate("chief")).threadId;
     await service.stop();
 
@@ -119,7 +120,7 @@ describe.sequential("AgentService: restart", () => {
     const initialized = service.initialize();
     await waitFor(() => service?.getStatus().phase === "ready");
     await service.sendMessage({ agentId: "chief", text: "Start before startup finished" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     releaseModels();
     await initialized;
@@ -132,11 +133,11 @@ describe.sequential("AgentService: restart", () => {
     const { service: agentService, client } = await startService(root, { provider: "codex", autoComplete: false });
     service = agentService;
     await service.sendMessage({ agentId: "chief", text: "Work that the crash cuts short" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     client.emit("exit", new Error("Codex exited."));
 
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
   });
 
   it("expires a persisted question prompt after restart", async () => {
@@ -144,7 +145,7 @@ describe.sequential("AgentService: restart", () => {
     service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Start a recoverable turn" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     const agent = await store.getOrCreate("chief");
     await service.stop();
     const snapshot = store.database.readConversation("chief", agent.threadId);
@@ -398,7 +399,7 @@ describe.sequential("AgentService: restart", () => {
     service = createService();
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Remember this" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const before = await service.readConversation("chief");
     await service.stop();
 
@@ -426,7 +427,7 @@ describe.sequential("AgentService: restart", () => {
     service.on("event", (event) => events.push(event));
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Remember this" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     await store.getOrCreate("chief");
     const externalThreadId = store.activeProviderSession("chief")?.externalSessionId;
     await service.stop();
@@ -435,7 +436,7 @@ describe.sequential("AgentService: restart", () => {
     service.on("event", (event) => events.push(event));
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Continue" });
-    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "running");
 
     const requests = await protocolMessages(logPath);
     expect(requests).toEqual(
@@ -517,7 +518,7 @@ describe.sequential("AgentService: restart", () => {
     ).toMatchObject({ count: 0 });
 
     await service.sendMessage({ agentId: "chief", text: "Keep working" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     await expect(service.deleteAgent("chief")).rejects.toThrow(
       "Stop the agent and cancel its queued messages before deleting it.",
     );

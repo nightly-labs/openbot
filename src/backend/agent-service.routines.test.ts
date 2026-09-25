@@ -18,6 +18,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "./agent-service-test-harness";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import { ChannelStore } from "./channel-store";
@@ -392,7 +393,7 @@ describe.sequential("AgentService: routines", () => {
     });
     await service.initialize();
     const receipt = await service.sendMessage({ agentId: "chief", text: "The launch is approved." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -447,7 +448,7 @@ describe.sequential("AgentService: routines", () => {
       },
     });
     await service.initialize();
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -481,7 +482,7 @@ describe.sequential("AgentService: routines", () => {
     const screenshot = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4]);
     await writeFile(screenshotPath, screenshot);
     await service.sendMessage({ agentId: "chief", text: "Send me a screenshot." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -613,7 +614,7 @@ describe.sequential("AgentService: routines", () => {
     const screenshotPath = join(store.sharedRoot, "concurrent-screenshot.png");
     await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     await service.sendMessage({ agentId: "chief", text: "Send the screenshot once." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -689,7 +690,7 @@ describe.sequential("AgentService: routines", () => {
     const screenshotPath = join(store.sharedRoot, "retry-screenshot.png");
     await writeFile(screenshotPath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     await service.sendMessage({ agentId: "chief", text: "Send the screenshot safely." });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
 
     const client = clients.get("codex");
     const threadId = store.activeProviderSession("chief")?.externalSessionId;
@@ -757,7 +758,7 @@ describe.sequential("AgentService: routines", () => {
     await store.getOrCreate("research", "Research", "Research partner");
     await service.sendMessage({ agentId: "chief", text: "Ask the design agent." });
 
-    await waitFor(() => service?.listQueue("design").deliveries.length === 1);
+    await waitForQueue(service, "design", (queue) => queue.deliveries.length === 1);
     expect(service.listQueue("research").deliveries).toHaveLength(0);
     expect(service.listQueue("design").deliveries[0]?.sender).toEqual({ kind: "agent", agentId: "chief" });
   });
@@ -779,7 +780,7 @@ describe.sequential("AgentService: routines", () => {
     await store.getOrCreate("design", "Design Studio", "Product design");
     await service.sendMessage({ agentId: "chief", text: "Tell design where the proposal is." });
 
-    await waitFor(() => service?.listQueue("design").deliveries.length === 1);
+    await waitForQueue(service, "design", (queue) => queue.deliveries.length === 1);
     expect(service.listQueue("design").deliveries[0]).toMatchObject({ expectsReply: false });
   });
 
@@ -863,7 +864,7 @@ describe.sequential("AgentService: routines", () => {
     });
 
     await service.initialize();
-    await waitFor(() => service?.listQueue("chief").deliveries.length === 1);
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.length === 1);
 
     expect(service.listQueue("chief").deliveries).toEqual([
       expect.objectContaining({
@@ -914,13 +915,13 @@ describe.sequential("AgentService: routines", () => {
     service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "First turn" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
     const firstTurnId = service.listQueue("chief").deliveries[0]?.turnId;
     if (!firstTurnId) throw new Error("First turn did not start.");
     await service.interrupt("chief", firstTurnId);
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "interrupted");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
     await service.sendMessage({ agentId: "chief", text: "New live turn" });
-    await waitFor(() => service?.listQueue("chief").deliveries[1]?.status === "running");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "running");
 
     const snapshot = await service.readConversation("chief");
     expect(snapshot.activeTurnId).toBe(service.listQueue("chief").deliveries[1]?.turnId);
@@ -943,7 +944,7 @@ describe.sequential("AgentService: routines", () => {
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     await waitFor(() => events.some((event) => event.type === "error" && event.code === "delivery_start_unconfirmed"));
 
     expect(service.listQueue("chief").deliveries[0]).toMatchObject({
@@ -962,7 +963,7 @@ describe.sequential("AgentService: routines", () => {
     await service.initialize();
 
     await service.sendMessage({ agentId: "chief", text: "Run exactly once" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
     const deliveryId = service.listQueue("chief").deliveries[0]?.id;
 
     // The fake answers `turn/start` on a delay, so a second completed turn is the

@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentEvent, BrowserControlState, BrowserTab } from "@openbot/contracts/ipc";
+import type { AgentEvent, BrowserControlState, BrowserTab, QueueSnapshot } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { expect, vi } from "vitest";
 import type { BrowserUploadHooks } from "./agent/browser-uploads";
@@ -486,6 +486,40 @@ export function nextRoutinesChanged(agentService: AgentService, agentId: string)
       agentService.off("event", listener);
       resolve();
     };
+    agentService.on("event", listener);
+  });
+}
+
+/**
+ * Waits for a queue of one agent to pass `check`, without polling. It checks the queue now and then
+ * on each `queue-changed` event, so it also proves that the renderer was told of the change: a
+ * status that the service writes without an event times out here.
+ */
+export function waitForQueue(
+  agentService: AgentService,
+  agentId: string,
+  check: (queue: QueueSnapshot) => boolean,
+): Promise<void> {
+  if (check(agentService.listQueue(agentId))) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const listener = (event: AgentEvent) => {
+      if (event.type !== "queue-changed" || event.snapshot.agentId !== agentId || !check(event.snapshot)) return;
+      clearTimeout(timeout);
+      agentService.off("event", listener);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      agentService.off("event", listener);
+      const statuses = agentService
+        .listQueue(agentId)
+        .deliveries.map((delivery) => delivery.status)
+        .join(", ");
+      reject(
+        new Error(
+          `Timed out after ${HARNESS_WAIT_TIMEOUT_MS}ms waiting for the queue of ${agentId}: ${check.toString()}. Statuses: ${statuses || "none"}.`,
+        ),
+      );
+    }, HARNESS_WAIT_TIMEOUT_MS);
     agentService.on("event", listener);
   });
 }

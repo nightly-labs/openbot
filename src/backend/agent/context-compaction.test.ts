@@ -9,6 +9,7 @@ import {
   stopAgentTestFixture,
   stores,
   waitFor,
+  waitForQueue,
 } from "../agent-service-test-harness";
 
 let root: string;
@@ -56,7 +57,7 @@ describe.sequential("ContextCompaction: pressure, threshold and failure", () => 
     service = createTestService({ store, mailbox });
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "Normal task" });
-    await waitFor(() => service?.listQueue("chief").deliveries[0]?.status === "completed");
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
 
     expect((await protocolMessages(logPath)).some((message) => message.method === "thread/compact/start")).toBe(false);
   });
