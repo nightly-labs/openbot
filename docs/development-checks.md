@@ -50,7 +50,7 @@ reads the whole tree, not only the pull request diff, so it gives the same resul
 The pre-commit hook in `.githooks/pre-commit` runs `check:staged`, then `check:ui` and
 `bun run typecheck`. The last two run only when the commit stages code, style, JSON, GritQL or
 `bun.lock` files, so a commit of only text is fast. In CI, `check:desktop:static` (the UI check,
-lint, desktop typecheck and build) takes about a minute, and each other typecheck takes a few
+lint, desktop typecheck, build and preload check) takes about a minute, and each other typecheck takes a few
 seconds. When `openbot-database-schema.ts`, `channel-schema.ts`, `mcp-schema.ts`, the parity test or
 `openbot-database-schema-history.json` is staged, the hook also runs `src/backend/openbot-database-schema-parity.test.ts`.
 
@@ -81,8 +81,16 @@ All of these jobs gate Cloudflare production deployment on `main`. Surfaces was 
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
+`verify:preload` reads `out/preload` after the build. TypeScript checks the preload source, but
+the renderer gets the bundle. The script runs each bundle in a `node:vm` context with a fake
+Electron and checks that `window.openbot` has exactly one function for each endpoint that
+`IPC_ENDPOINTS` names, and that each function uses the channel of its endpoint. It also rejects
+`import()` and a `require` of a module that a sandboxed preload cannot load. It takes less than one
+second.
+
 `bun run check:desktop` still runs everything: it is `check:desktop:static`, which holds the UI
-check, the lint, the desktop typecheck and the build, followed by the browser smoke test. CI is
+check, the lint, the desktop typecheck, the build and `verify:preload`, followed by the browser
+smoke test. CI is
 the only caller that splits them. The smoke test starts the real Electron binary, so it runs under
 xvfb on Ubuntu rather than on a macOS runner, and reads nothing the build writes, so the order
 between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner,

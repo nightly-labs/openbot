@@ -30,5 +30,9 @@ renderer-to-main trust boundary. [Main-process rules](../main/AGENTS.md#trust-bo
 - Keep the sandbox and context isolation. The remote browser session has no preload and no
   `window.openbot`.
 
+- `scripts/verify-preload-bundle.ts` runs the built bundle and compares `window.openbot` with
+  `IPC_ENDPOINTS`. A new endpoint group needs a place in its `GROUP_PATHS`, and a method written by
+  hand needs an entry in `HAND_WRITTEN_METHODS`. CI runs it after the build in `check:desktop:static`.
+
 Run one test file: `bun run test:desktop -- src/preload/<name>.test.ts`. For a channel change, also
 run `bun run test:desktop -- src/main/ipc-channel-coverage.test.ts`.
