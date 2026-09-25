@@ -85,10 +85,6 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                       <TemplateRoutines routines={detail().routines} labelled />
                     </div>
                   </div>
-                  {/* The same quiet line the share page shows above its button, right where the choice is made. */}
-                  <Text variant="caption" tone="muted" class="agent-template-notice" role="note">
-                    Made by another OpenBot user. It can act on your behalf once added.
-                  </Text>
                   <footer class="agent-template-actions">
                     <Button type="button" variant="ghost" disabled={installing()} onClick={() => changeOpen(false)}>
                       Cancel

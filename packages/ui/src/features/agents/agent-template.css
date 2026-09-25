@@ -195,19 +195,3 @@
   font-size: var(--openbot-text-sm);
   white-space: pre-wrap;
 }
-
-/* The share page's notice: one quiet line above the buttons, with the divider above it. */
-.agent-template-notice {
-  flex-shrink: 0;
-  border-top: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-3) var(--openbot-space-2) 0;
-  color: var(--openbot-text-dim);
-  font-size: var(--openbot-text-sm);
-  text-align: center;
-  text-wrap: balance;
-}
-
-.agent-template-notice + .agent-template-actions {
-  border-top: 0;
-  padding-top: var(--openbot-space-2);
-}
