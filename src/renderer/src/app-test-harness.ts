@@ -547,6 +547,15 @@ export function installOpenbotStub(): void {
       submit: notStubbed("marketplaceAgents.submit"),
       install: notStubbed("marketplaceAgents.install"),
     },
+    agentTemplates: {
+      preview: notStubbed("agentTemplates.preview"),
+      publish: notStubbed("agentTemplates.publish"),
+      unpublish: notStubbed("agentTemplates.unpublish"),
+      get: notStubbed("agentTemplates.get"),
+      install: notStubbed("agentTemplates.install"),
+      takePendingLink: vi.fn().mockResolvedValue(null),
+      onOpenLink: vi.fn().mockReturnValue(() => undefined),
+    },
     voice: {
       getModelStatus: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),
       prepareModel: vi.fn().mockResolvedValue({ phase: "ready", progress: 100, message: null }),

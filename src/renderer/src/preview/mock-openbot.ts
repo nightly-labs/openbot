@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentSubmission,
   AgentSummary,
+  AgentTemplatePublication,
   AnalyticsPreference,
   AppInfo,
   AppLanguagePreference,
@@ -89,6 +90,12 @@ import {
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
+import { toggleChannelMember } from "../features/channels/channels-draft";
+import {
+  STORY_AGENT_TEMPLATE_DETAIL,
+  STORY_AGENT_TEMPLATE_PUBLICATION,
+  storyAgentTemplatePreview,
+} from "./agent-template-fixtures";
 import {
   STORY_AGENT_STATUS,
   STORY_AGENT_SUBMISSIONS,
@@ -360,6 +367,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     ],
   );
   let marketplaceAgentSubmissions = clone(STORY_AGENT_SUBMISSIONS);
+  const agentTemplatePublications = new Map<string, AgentTemplatePublication>();
   let messageCounter = 10;
   let directMessageCounter = 10;
 
@@ -594,6 +602,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updatedAt: now,
     };
   }
+
+  const mockChannels = createMockChannels(
+    emitAgentEvent,
+    (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId,
+  );
 
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
@@ -1063,6 +1076,48 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return { providers: clone(customProviders), restart: "restarted" };
       },
     },
+    agentTemplates: {
+      // One published template per local agent. The preview shows the agent's own identity with the
+      // fixture skills and routines, so every state of the dialog has content.
+      preview: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Choose a local agent first.");
+        return clone({
+          ...storyAgentTemplatePreview(agent.id, agentTemplatePublications.get(agent.id) ?? null),
+          name: agent.name,
+          title: agent.title,
+          description: agent.description,
+          avatarSeed: agent.avatarSeed,
+          avatarHue: agent.avatarHue,
+          avatarUrl: agent.avatarUrl,
+          updatedAt: agent.updatedAt,
+        });
+      },
+      publish: async ({ agentId }) => {
+        if (!agents.some((candidate) => candidate.id === agentId)) throw new Error("Choose a local agent first.");
+        const publication = { ...STORY_AGENT_TEMPLATE_PUBLICATION, publishedAt: new Date().toISOString() };
+        agentTemplatePublications.set(agentId, publication);
+        return clone(publication);
+      },
+      unpublish: async (agentId) => {
+        agentTemplatePublications.delete(agentId);
+      },
+      get: async (templateId) => {
+        if (templateId !== STORY_AGENT_TEMPLATE_DETAIL.id) throw new Error("This shared agent is no longer published.");
+        return clone(STORY_AGENT_TEMPLATE_DETAIL);
+      },
+      install: async () => {
+        const agent = agents[0];
+        if (!agent) throw new Error("Agent not found");
+        return clone({ agent });
+      },
+      // The preview is never opened by a link, so there is nothing pending and nothing to push.
+      takePendingLink: async () => null,
+      onOpenLink: (listener) => {
+        void listener;
+        return () => undefined;
+      },
+    },
     marketplaceAgents: {
       list: async (query) => {
         const matches = STORY_MARKETPLACE_AGENTS.filter(
@@ -1231,7 +1286,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
-      ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
+      ...mockChannels,
       listMcpServers: async () => clone(mcpServers),
       saveMcpServer: async ({ config }) => {
         const normalized = normalizeMcpConfig(config);
@@ -1399,6 +1454,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         queues.delete(agentId);
         memories.delete(agentId);
         routines.delete(agentId);
+        // The host takes a deleted agent out of every channel it was a member of.
+        for (const channel of await mockChannels.listChannels()) {
+          if (!channel.members.some((member) => member.agentId === agentId)) continue;
+          const draft = {
+            name: channel.name,
+            title: channel.title,
+            instructions: channel.instructions,
+            members: channel.members,
+            leadAgentId: channel.leadAgentId,
+          };
+          toggleChannelMember(draft, agentId, false);
+          await mockChannels.channelCommand({
+            type: "save",
+            operationId: crypto.randomUUID(),
+            channelId: channel.id,
+            draft,
+            update: true,
+          });
+        }
         emitAgentEvent({ type: "agents-changed", agents });
       },
       listMemories: async (agentId) => clone(memories.get(agentId) ?? []),

@@ -1,7 +1,20 @@
 import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import { CornerUpRight, X } from "lucide-react-native";
+import {
+  CalendarClock,
+  CalendarPlus,
+  CalendarX2,
+  CircleCheck,
+  CirclePause,
+  CircleX,
+  Clock3,
+  CornerUpRight,
+  LoaderCircle,
+  type LucideIcon,
+  TriangleAlert,
+  X,
+} from "lucide-react-native";
 import {
   type ComponentProps,
   createContext,
@@ -35,7 +48,7 @@ import { useActivityPresence } from "@/features/chat/components/use-activity-pre
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
-import { type ChatMessage, indexChatMessages } from "@/features/chat/model/chat-messages";
+import { type ChatMessage, indexChatMessages, type RoutineMarkerEvent } from "@/features/chat/model/chat-messages";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -250,6 +263,51 @@ interface MessageRowShared {
   };
 }
 
+const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
+  created: CalendarPlus,
+  updated: CalendarClock,
+  deleted: CalendarX2,
+  queued: Clock3,
+  running: LoaderCircle,
+  "needs-attention": TriangleAlert,
+  succeeded: CircleCheck,
+  failed: CircleX,
+  interrupted: CirclePause,
+  cancelled: CirclePause,
+};
+
+function RoutineMarkerRow({
+  message,
+  muted,
+}: {
+  message: Extract<ChatMessage, { kind: "routine" }>;
+  muted: ViewStyle["backgroundColor"];
+}) {
+  const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
+  const Icon = ROUTINE_MARKER_ICONS[message.event];
+  const color =
+    message.event === "succeeded"
+      ? String(success)
+      : message.event === "failed" || message.event === "needs-attention"
+        ? String(danger)
+        : String(muted);
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${message.label}, ${message.routineName}`}
+      className="flex-row flex-wrap items-center justify-center gap-1.5 py-2"
+    >
+      <Icon size={16} color={color} strokeWidth={1.75} />
+      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+        {message.label}
+      </Typography.Paragraph>
+      <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
+        {message.routineName}
+      </Typography.Paragraph>
+    </View>
+  );
+}
+
 function playbackEligible(message: VisibleMessage) {
   return (
     message.kind === "message" &&
@@ -339,7 +397,9 @@ const MessageRow = memo(function MessageRow({
   const waiting = awaitingFirstWord(message, shared);
   const speaker = message.kind === "message" && message.speaker ? agentsById.get(message.speaker.id) : undefined;
   const rendered =
-    message.kind === "exchange" || message.kind === "channel-routing" ? (
+    message.kind === "routine" ? (
+      <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+    ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
       <View key={message.id} className="flex-row flex-wrap items-center justify-center gap-2 py-2">
         <Typography.Paragraph type="body-sm" style={{ color: muted }}>
           {message.kind === "channel-routing"

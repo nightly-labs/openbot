@@ -55,6 +55,7 @@ import { TeamChatStore } from "../backend/team-chat-store";
 import { AgentImportService } from "./agent-import-service";
 import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
+import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
@@ -247,6 +248,7 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
   marketplaceAgents: AgentMarketplaceService;
+  agentTemplates: AgentTemplateService;
   agentImport: AgentImportService;
   voice: VoiceTranscriptionService;
   dynamicIsland: DynamicIslandWindowController;
@@ -827,6 +829,12 @@ export async function createApplicationServices({
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
   const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
+  const agentTemplates = new AgentTemplateService(centralAuth, service, {
+    listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
+    installVersion: (input) => skills.installVersion(input),
+    library: () => skills.requireLocalLibrary(),
+    installLocal: (input) => skills.installLocal(input),
+  });
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_FILE_V2),
     join(app.getPath("userData"), TEAM_FILE),
@@ -1200,6 +1208,7 @@ export async function createApplicationServices({
     hostedSites,
     customProviders,
     marketplaceAgents,
+    agentTemplates,
     agentImport,
     voice,
     dynamicIsland,

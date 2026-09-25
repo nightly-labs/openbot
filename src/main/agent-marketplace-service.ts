@@ -272,11 +272,11 @@ export class AgentMarketplaceService {
   }
 }
 
-function localSchedule(schedule: RoutineSchedule): RoutineSchedule {
+export function localSchedule(schedule: RoutineSchedule): RoutineSchedule {
   return schedule.kind === "interval" ? { ...schedule, anchorAt: new Date().toISOString() } : structuredClone(schedule);
 }
 
-function validTimezone(value: string): boolean {
+export function validTimezone(value: string): boolean {
   try {
     new Intl.DateTimeFormat("en", { timeZone: value }).format();
     return true;
@@ -285,7 +285,7 @@ function validTimezone(value: string): boolean {
   }
 }
 
-function imageMimeType(bytes: Uint8Array): AvatarImageInput["mimeType"] | null {
+export function imageMimeType(bytes: Uint8Array): AvatarImageInput["mimeType"] | null {
   if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
   if (String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP")
@@ -440,6 +440,6 @@ function isRoutine(value: unknown): value is MarketplaceAgentRoutine {
   );
 }
 
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return Uint8Array.from(bytes).buffer;
 }

@@ -21,6 +21,7 @@ import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
+import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
 import { appIpcHandlers } from "./ipc/app-handlers";
 import { attachmentIpcHandlers } from "./ipc/attachment-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
@@ -326,6 +327,7 @@ function registerIpcHandlers({
   hostedSites,
   customProviders,
   marketplaceAgents,
+  agentTemplates,
   agentImport,
   voice,
   dynamicIsland,
@@ -369,6 +371,10 @@ function registerIpcHandlers({
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
     ...customProviderIpcHandlers({ service, customProviders }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
+    ...agentTemplateIpcHandlers({
+      agentTemplates,
+      takePendingLink: () => takePendingDeepLink("agent-template"),
+    }),
     ...agentImportIpcHandlers({
       agentImport,
       getMainWindow,
@@ -530,20 +536,22 @@ function acceptDeepLink(link: DeepLink): void {
   const delivered =
     link.kind === "invite"
       ? sendToRenderer(window, IPC_ENDPOINTS.servers.invite, link.url)
-      : sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug);
+      : link.kind === "plugin"
+        ? sendToRenderer(window, IPC_ENDPOINTS.plugins.openListing, link.slug)
+        : sendToRenderer(window, IPC_ENDPOINTS.agentTemplates.openLink, link.id);
   if (delivered) pendingDeepLink = null;
 }
 
 /**
- * The pending link, if it is the kind that asked. Either request marks the receiver ready, because
- * the renderer subscribes to both before it asks for either.
+ * The pending link, if it is the kind that asked. Any request marks the receiver ready, because
+ * the renderer subscribes to every kind before it asks for any.
  */
 function takePendingDeepLink(kind: RendererDeepLink["kind"]): string | null {
   deepLinkReceiverReady = true;
   const link = pendingDeepLink;
   if (link?.kind !== kind) return null;
   pendingDeepLink = null;
-  return link.kind === "invite" ? link.url : link.slug;
+  return link.kind === "invite" ? link.url : link.kind === "plugin" ? link.slug : link.id;
 }
 
 /** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */

@@ -17,6 +17,7 @@ import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './routes/[.]well-known/apple-app-site-association'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
+import { Route as AgentsTemplateIdRouteImport } from './routes/agents/$templateId'
 import { Route as DownloadLinuxRouteImport } from './routes/download/linux'
 import { Route as DownloadMacosRouteImport } from './routes/download/macos'
 import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
@@ -33,6 +34,9 @@ import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
 import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug'
+import { Route as V1AgentTemplatesIndexRouteImport } from './routes/v1/agent-templates/index'
+import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agent-templates/$templateId'
+import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-templates/mine'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
@@ -52,6 +56,8 @@ import { Route as V1TeamAuthTicketRouteImport } from './routes/v1/team-auth/tick
 import { Route as V1TeamHostsIceServersRouteImport } from './routes/v1/team-hosts/ice-servers'
 import { Route as V1TeamInvitationsEmailRouteImport } from './routes/v1/team-invitations/email'
 import { Route as V1TeamTunnelsProvisionRouteImport } from './routes/v1/team-tunnels/provision'
+import { Route as V1AgentTemplatesTemplateIdAvatarRouteImport } from './routes/v1/agent-templates/$templateId/avatar'
+import { Route as V1AgentTemplatesTemplateIdCardRouteImport } from './routes/v1/agent-templates/$templateId/card'
 import { Route as V1AuthEmailStartRouteImport } from './routes/v1/auth/email/start'
 import { Route as V1AuthEmailVerifyRouteImport } from './routes/v1/auth/email/verify'
 import { Route as V1MarketplaceAgentsIndexRouteImport } from './routes/v1/marketplace/agents/index'
@@ -128,6 +134,11 @@ const DotwellKnownAppleAppSiteAssociationRoute =
 const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
   id: '/.well-known/jwks.json',
   path: '/.well-known/jwks.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsTemplateIdRoute = AgentsTemplateIdRouteImport.update({
+  id: '/agents/$templateId',
+  path: '/agents/$templateId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadLinuxRoute = DownloadLinuxRouteImport.update({
@@ -208,6 +219,22 @@ const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
 const PluginsIconSlugRoute = PluginsIconSlugRouteImport.update({
   id: '/plugins/icon/$slug',
   path: '/plugins/icon/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1AgentTemplatesIndexRoute = V1AgentTemplatesIndexRouteImport.update({
+  id: '/v1/agent-templates/',
+  path: '/v1/agent-templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1AgentTemplatesTemplateIdRoute =
+  V1AgentTemplatesTemplateIdRouteImport.update({
+    id: '/v1/agent-templates/$templateId',
+    path: '/v1/agent-templates/$templateId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V1AgentTemplatesMineRoute = V1AgentTemplatesMineRouteImport.update({
+  id: '/v1/agent-templates/mine',
+  path: '/v1/agent-templates/mine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1AuthLogoutRoute = V1AuthLogoutRouteImport.update({
@@ -305,6 +332,18 @@ const V1TeamTunnelsProvisionRoute = V1TeamTunnelsProvisionRouteImport.update({
   path: '/v1/team-tunnels/provision',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1AgentTemplatesTemplateIdAvatarRoute =
+  V1AgentTemplatesTemplateIdAvatarRouteImport.update({
+    id: '/avatar',
+    path: '/avatar',
+    getParentRoute: () => V1AgentTemplatesTemplateIdRoute,
+  } as any)
+const V1AgentTemplatesTemplateIdCardRoute =
+  V1AgentTemplatesTemplateIdCardRouteImport.update({
+    id: '/card',
+    path: '/card',
+    getParentRoute: () => V1AgentTemplatesTemplateIdRoute,
+  } as any)
 const V1AuthEmailStartRoute = V1AuthEmailStartRouteImport.update({
   id: '/v1/auth/email/start',
   path: '/v1/auth/email/start',
@@ -516,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -532,6 +572,8 @@ export interface FileRoutesByFullPath {
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
+  '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
+  '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -549,8 +591,11 @@ export interface FileRoutesByFullPath {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v1/agent-templates/': typeof V1AgentTemplatesIndexRoute
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
+  '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -597,6 +642,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -613,6 +659,8 @@ export interface FileRoutesByTo {
   '/plugins': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
+  '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
+  '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -630,8 +678,11 @@ export interface FileRoutesByTo {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v1/agent-templates': typeof V1AgentTemplatesIndexRoute
   '/v1/sites': typeof V1SitesIndexRoute
   '/v1/skills': typeof V1SkillsIndexRoute
+  '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -679,6 +730,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
+  '/agents/$templateId': typeof AgentsTemplateIdRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -695,6 +747,8 @@ export interface FileRoutesById {
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
+  '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
+  '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -712,8 +766,11 @@ export interface FileRoutesById {
   '/v1/team-hosts/ice-servers': typeof V1TeamHostsIceServersRoute
   '/v1/team-invitations/email': typeof V1TeamInvitationsEmailRoute
   '/v1/team-tunnels/provision': typeof V1TeamTunnelsProvisionRoute
+  '/v1/agent-templates/': typeof V1AgentTemplatesIndexRoute
   '/v1/sites/': typeof V1SitesIndexRoute
   '/v1/skills/': typeof V1SkillsIndexRoute
+  '/v1/agent-templates/$templateId/avatar': typeof V1AgentTemplatesTemplateIdAvatarRoute
+  '/v1/agent-templates/$templateId/card': typeof V1AgentTemplatesTemplateIdCardRoute
   '/v1/auth/email/start': typeof V1AuthEmailStartRoute
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
@@ -762,6 +819,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/agents/$templateId'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -778,6 +836,8 @@ export interface FileRouteTypes {
     | '/plugins/'
     | '/api/browser/$'
     | '/plugins/icon/$slug'
+    | '/v1/agent-templates/$templateId'
+    | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -795,8 +855,11 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v1/agent-templates/'
     | '/v1/sites/'
     | '/v1/skills/'
+    | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -843,6 +906,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/agents/$templateId'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -859,6 +923,8 @@ export interface FileRouteTypes {
     | '/plugins'
     | '/api/browser/$'
     | '/plugins/icon/$slug'
+    | '/v1/agent-templates/$templateId'
+    | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -876,8 +942,11 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v1/agent-templates'
     | '/v1/sites'
     | '/v1/skills'
+    | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -924,6 +993,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
+    | '/agents/$templateId'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -940,6 +1010,8 @@ export interface FileRouteTypes {
     | '/plugins/'
     | '/api/browser/$'
     | '/plugins/icon/$slug'
+    | '/v1/agent-templates/$templateId'
+    | '/v1/agent-templates/mine'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/me/avatar'
@@ -957,8 +1029,11 @@ export interface FileRouteTypes {
     | '/v1/team-hosts/ice-servers'
     | '/v1/team-invitations/email'
     | '/v1/team-tunnels/provision'
+    | '/v1/agent-templates/'
     | '/v1/sites/'
     | '/v1/skills/'
+    | '/v1/agent-templates/$templateId/avatar'
+    | '/v1/agent-templates/$templateId/card'
     | '/v1/auth/email/start'
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
@@ -1006,6 +1081,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DotwellKnownAppleAppSiteAssociationRoute: typeof DotwellKnownAppleAppSiteAssociationRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
+  AgentsTemplateIdRoute: typeof AgentsTemplateIdRoute
   DownloadLinuxRoute: typeof DownloadLinuxRoute
   DownloadMacosRoute: typeof DownloadMacosRoute
   DownloadWindowsRoute: typeof DownloadWindowsRoute
@@ -1022,6 +1098,8 @@ export interface RootRouteChildren {
   PluginsIndexRoute: typeof PluginsIndexRoute
   ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
   PluginsIconSlugRoute: typeof PluginsIconSlugRoute
+  V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
+  V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
@@ -1037,6 +1115,7 @@ export interface RootRouteChildren {
   V1TeamHostsIceServersRoute: typeof V1TeamHostsIceServersRoute
   V1TeamInvitationsEmailRoute: typeof V1TeamInvitationsEmailRoute
   V1TeamTunnelsProvisionRoute: typeof V1TeamTunnelsProvisionRoute
+  V1AgentTemplatesIndexRoute: typeof V1AgentTemplatesIndexRoute
   V1SitesIndexRoute: typeof V1SitesIndexRoute
   V1SkillsIndexRoute: typeof V1SkillsIndexRoute
   V1AuthEmailStartRoute: typeof V1AuthEmailStartRoute
@@ -1123,6 +1202,13 @@ declare module '@tanstack/solid-router' {
       path: '/.well-known/jwks.json'
       fullPath: '/.well-known/jwks.json'
       preLoaderRoute: typeof DotwellKnownJwksDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/$templateId': {
+      id: '/agents/$templateId'
+      path: '/agents/$templateId'
+      fullPath: '/agents/$templateId'
+      preLoaderRoute: typeof AgentsTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download/linux': {
@@ -1235,6 +1321,27 @@ declare module '@tanstack/solid-router' {
       path: '/plugins/icon/$slug'
       fullPath: '/plugins/icon/$slug'
       preLoaderRoute: typeof PluginsIconSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/agent-templates/': {
+      id: '/v1/agent-templates/'
+      path: '/v1/agent-templates'
+      fullPath: '/v1/agent-templates/'
+      preLoaderRoute: typeof V1AgentTemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/agent-templates/$templateId': {
+      id: '/v1/agent-templates/$templateId'
+      path: '/v1/agent-templates/$templateId'
+      fullPath: '/v1/agent-templates/$templateId'
+      preLoaderRoute: typeof V1AgentTemplatesTemplateIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/agent-templates/mine': {
+      id: '/v1/agent-templates/mine'
+      path: '/v1/agent-templates/mine'
+      fullPath: '/v1/agent-templates/mine'
+      preLoaderRoute: typeof V1AgentTemplatesMineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/auth/logout': {
@@ -1369,6 +1476,20 @@ declare module '@tanstack/solid-router' {
       fullPath: '/v1/team-tunnels/provision'
       preLoaderRoute: typeof V1TeamTunnelsProvisionRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/v1/agent-templates/$templateId/avatar': {
+      id: '/v1/agent-templates/$templateId/avatar'
+      path: '/avatar'
+      fullPath: '/v1/agent-templates/$templateId/avatar'
+      preLoaderRoute: typeof V1AgentTemplatesTemplateIdAvatarRouteImport
+      parentRoute: typeof V1AgentTemplatesTemplateIdRoute
+    }
+    '/v1/agent-templates/$templateId/card': {
+      id: '/v1/agent-templates/$templateId/card'
+      path: '/card'
+      fullPath: '/v1/agent-templates/$templateId/card'
+      preLoaderRoute: typeof V1AgentTemplatesTemplateIdCardRouteImport
+      parentRoute: typeof V1AgentTemplatesTemplateIdRoute
     }
     '/v1/auth/email/start': {
       id: '/v1/auth/email/start'
@@ -1637,6 +1758,23 @@ const V1MeRouteChildren: V1MeRouteChildren = {
 
 const V1MeRouteWithChildren = V1MeRoute._addFileChildren(V1MeRouteChildren)
 
+interface V1AgentTemplatesTemplateIdRouteChildren {
+  V1AgentTemplatesTemplateIdAvatarRoute: typeof V1AgentTemplatesTemplateIdAvatarRoute
+  V1AgentTemplatesTemplateIdCardRoute: typeof V1AgentTemplatesTemplateIdCardRoute
+}
+
+const V1AgentTemplatesTemplateIdRouteChildren: V1AgentTemplatesTemplateIdRouteChildren =
+  {
+    V1AgentTemplatesTemplateIdAvatarRoute:
+      V1AgentTemplatesTemplateIdAvatarRoute,
+    V1AgentTemplatesTemplateIdCardRoute: V1AgentTemplatesTemplateIdCardRoute,
+  }
+
+const V1AgentTemplatesTemplateIdRouteWithChildren =
+  V1AgentTemplatesTemplateIdRoute._addFileChildren(
+    V1AgentTemplatesTemplateIdRouteChildren,
+  )
+
 interface V1MobileAuthDevicesRouteChildren {
   V1MobileAuthDevicesSessionIdRoute: typeof V1MobileAuthDevicesSessionIdRoute
 }
@@ -1740,6 +1878,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownAppleAppSiteAssociationRoute:
     DotwellKnownAppleAppSiteAssociationRoute,
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
+  AgentsTemplateIdRoute: AgentsTemplateIdRoute,
   DownloadLinuxRoute: DownloadLinuxRoute,
   DownloadMacosRoute: DownloadMacosRoute,
   DownloadWindowsRoute: DownloadWindowsRoute,
@@ -1756,6 +1895,8 @@ const rootRouteChildren: RootRouteChildren = {
   PluginsIndexRoute: PluginsIndexRoute,
   ApiBrowserSplatRoute: ApiBrowserSplatRoute,
   PluginsIconSlugRoute: PluginsIconSlugRoute,
+  V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,
+  V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
@@ -1771,6 +1912,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1TeamHostsIceServersRoute: V1TeamHostsIceServersRoute,
   V1TeamInvitationsEmailRoute: V1TeamInvitationsEmailRoute,
   V1TeamTunnelsProvisionRoute: V1TeamTunnelsProvisionRoute,
+  V1AgentTemplatesIndexRoute: V1AgentTemplatesIndexRoute,
   V1SitesIndexRoute: V1SitesIndexRoute,
   V1SkillsIndexRoute: V1SkillsIndexRoute,
   V1AuthEmailStartRoute: V1AuthEmailStartRoute,

@@ -1,265 +1,163 @@
-import { Host, Text as NativeText, TextInput, type TextInputRef, useNativeState } from "@expo/ui";
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { validateProfileName } from "@openbot/contracts/validation";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
-import { File } from "expo-file-system";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Pencil } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react-native";
+import { useRef, useState } from "react";
 import { Alert, Keyboard, Pressable, View } from "react-native";
-import { useResolveClassNames, useUniwind } from "uniwind";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 
 export function ProfileSettingsScreen() {
   const { session, updateProfile, signOut } = useMobileSession();
-  const savedName = session ? mobileUserName(session.user) : "";
-  const [name, setName] = useState(savedName);
-  const [editingName, setEditingName] = useState(false);
-  const nativeName = useNativeState(name);
-  const nameInput = useRef<TextInputRef>(null);
-  const [nameWidth, setNameWidth] = useState(160);
-  const [nameRowWidth, setNameRowWidth] = useState(320);
-  const { theme } = useUniwind();
   const foreground = useThemeColor("foreground");
-  const muted = useThemeColor("muted");
-  const nameTextStyle = useResolveClassNames("text-title font-semibold");
-  useEffect(() => {
-    if (!editingName) {
-      nativeName.value = savedName;
-      setName(savedName);
-    }
-  }, [editingName, nativeName, savedName]);
-  const [busy, setBusy] = useState(false);
+  const savedName = session ? mobileUserName(session.user) : "";
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<"name" | "photo" | "sign-out" | null>(null);
   const locked = useRef(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!session) return null;
+  const busy = pendingAction !== null;
+  const name = draftName ?? savedName;
   const validatedName = validateProfileName(name);
   const nameChanged = name.trim() !== savedName;
-  const profileError =
-    error ||
-    (editingName && nameChanged && validatedName.error
+  const nameError =
+    nameChanged && validatedName.error
       ? validatedName.error === "unsafe"
         ? "Remove line breaks and control characters from your name."
         : "Use 3–20 characters for your display name."
-      : null);
+      : null;
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
 
-  async function perform(operation: () => Promise<void>, success: string): Promise<void> {
+  async function perform(action: "name" | "photo" | "sign-out", operation: () => Promise<void>): Promise<void> {
     if (locked.current) return;
     locked.current = true;
-    setBusy(true);
+    setPendingAction(action);
     setError(null);
-    setMessage(null);
     try {
       await operation();
-      setMessage(success);
     } catch (cause) {
       setError(errorMessage(cause, "Could not save changes. Try again."));
     } finally {
       locked.current = false;
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
   async function saveName(): Promise<void> {
     if (!nameChanged || validatedName.error) return;
-    await perform(async () => {
+    await perform("name", async () => {
       await updateProfile({ name: validatedName.name });
-      setName(validatedName.name);
-      setEditingName(false);
+      setDraftName(null);
       Keyboard.dismiss();
-    }, "Name saved.");
+    });
   }
 
   async function choosePhoto(): Promise<void> {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.3,
-    });
-    if (result.canceled) return;
-    const [asset] = result.assets;
-    if (!asset) throw new Error("Could not open this photo. Try again.");
-    const file = new File(asset.uri);
-    const mime = isAvatarMimeType(file.type) ? file.type : asset.mimeType || "";
-    if (!isAvatarMimeType(mime)) throw new Error("Choose a JPEG, PNG, or WebP photo.");
-    if (file.size > AVATAR_IMAGE_LIMITS.storedBytes) throw new Error("Choose a photo smaller than 512 KB.");
-    const avatar = { bytes: await file.bytes(), mimeType: mime };
+    const photo = await pickAvatarPhoto("/settings/crop-photo");
+    if (!photo) return;
+    const avatar = { bytes: photo.bytes, mimeType: photo.mimeType };
     await updateProfile({ avatar });
   }
 
+  function editPhoto(): void {
+    if (!avatarUrl) {
+      void perform("photo", choosePhoto);
+      return;
+    }
+    Alert.alert("Profile photo", undefined, [
+      { text: "Change photo", onPress: () => void perform("photo", choosePhoto) },
+      {
+        text: "Remove photo",
+        style: "destructive",
+        onPress: () => void perform("photo", () => updateProfile({ avatar: null })),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   return (
-    <SettingsContent>
+    <SheetScrollView
+      className="bg-sheet"
+      contentContainerClassName="gap-5 px-5 pb-safe-offset-5"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+    >
       <SheetSaveAction
-        dirty={editingName && nameChanged}
+        dirty={nameChanged}
         canSave={!busy && !validatedName.error}
-        pending={busy && editingName && nameChanged}
+        pending={pendingAction === "name"}
         label="Save name"
         onSave={() => void saveName()}
       />
-      <View>
-        <View className="items-center gap-3 py-3">
-          <ProfileAvatar neutral name={savedName} imageUrl={avatarUrl} size={72} />
-          <View className="w-full items-center gap-0">
-            <View
-              className="w-full flex-row items-center justify-center"
-              onLayout={(event) => setNameRowWidth(event.nativeEvent.layout.width)}
-            >
-              {/* Measure with the input's native text engine so its font metrics match. */}
-              <Host
-                matchContents
-                ignoreSafeArea="all"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                pointerEvents="none"
-                style={{ position: "absolute", opacity: 0, maxWidth: Math.max(44, nameRowWidth - 56) }}
-                onLayoutContent={(event) => setNameWidth(Math.ceil(event.nativeEvent.width))}
-              >
-                <NativeText
-                  numberOfLines={1}
-                  textStyle={{
-                    fontSize: nameTextStyle.fontSize,
-                    lineHeight: nameTextStyle.lineHeight,
-                    fontWeight: "600",
-                  }}
-                >
-                  {name || "Add your name"}
-                </NativeText>
-              </Host>
-              <View className="w-7" />
-              <Host
-                colorScheme={theme === "dark" ? "dark" : "light"}
-                ignoreSafeArea="all"
-                style={{
-                  height: 44,
-                  width: editingName
-                    ? Math.max(44, nameRowWidth - 56)
-                    : Math.min(nameWidth + 12, Math.max(44, nameRowWidth - 56)),
-                }}
-              >
-                <TextInput
-                  ref={nameInput}
-                  value={nativeName}
-                  placeholder="Add your name"
-                  editable={!busy}
-                  textAlign="center"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  selectTextOnFocus
-                  returnKeyType="done"
-                  onFocus={() => {
-                    setEditingName(true);
-                    setMessage(null);
-                    setError(null);
-                  }}
-                  onChangeText={setName}
-                  onSubmitEditing={() => {
-                    if (nameChanged) void saveName();
-                    else {
-                      setEditingName(false);
-                      Keyboard.dismiss();
-                    }
-                  }}
-                  style={{ height: 44, paddingHorizontal: 6 }}
-                  textStyle={{
-                    color: foreground,
-                    fontSize: nameTextStyle.fontSize,
-                    lineHeight: nameTextStyle.lineHeight,
-                    fontWeight: "600",
-                  }}
-                />
-              </Host>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Edit display name"
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                onPress={() => nameInput.current?.focus()}
-                hitSlop={8}
-                className="h-11 w-7 items-center justify-center"
-              >
-                <Pencil size={16} strokeWidth={1.5} color={muted} />
-              </Pressable>
-            </View>
-            <Typography.Paragraph type="body-xs" align="center" className="text-grouped-secondary" selectable>
-              {session.user.email}
-            </Typography.Paragraph>
+      <View className="gap-6">
+        <Pressable
+          className="self-center"
+          accessibilityRole="button"
+          accessibilityLabel={avatarUrl ? "Edit profile photo" : "Add profile photo"}
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onPress={editPhoto}
+        >
+          <ProfileAvatar neutral name={savedName} imageUrl={avatarUrl} size={112} />
+          <View className="absolute right-0 bottom-0 size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped">
+            <Camera color={foreground} size={14} />
           </View>
-        </View>
-        <View className="h-12 flex-row items-center justify-center gap-6">
-          {editingName ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Cancel name edit"
-              disabled={busy}
-              onPress={() => {
-                setName(savedName);
-                nativeName.value = savedName;
-                setEditingName(false);
-                setError(null);
-                Keyboard.dismiss();
-              }}
-              className="min-h-11 justify-center px-3"
-            >
-              <Typography.Paragraph className="text-grouped-secondary">Cancel</Typography.Paragraph>
-            </Pressable>
-          ) : null}
-        </View>
-        <SettingsSection title="Profile photo">
-          <SettingsRow disclosure={false} disabled={busy} onPress={() => void perform(choosePhoto, "")}>
-            <Typography.Paragraph type="body-sm">{avatarUrl ? "Change photo" : "Add photo"}</Typography.Paragraph>
-          </SettingsRow>
-          {avatarUrl ? (
-            <SettingsRow
-              disclosure={false}
-              disabled={busy}
-              onPress={() => void perform(() => updateProfile({ avatar: null }), "Photo removed.")}
-            >
-              <Typography.Paragraph type="body-sm" className="text-danger-text">
-                Remove photo
-              </Typography.Paragraph>
-            </SettingsRow>
-          ) : null}
-        </SettingsSection>
+        </Pressable>
+        <SheetFormField
+          label="Name"
+          appearance="soft"
+          placeholder="Add your name"
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="done"
+          value={name}
+          editable={!busy}
+          onChangeText={(value) => {
+            setDraftName(value);
+            setError(null);
+          }}
+          onSubmitEditing={() => void saveName()}
+        />
       </View>
-      <SettingsSection title="Security">
-        <SettingsRow disabled={busy} onPress={() => router.push("/settings/sessions")}>
-          <Typography.Paragraph type="body-sm">Account sessions</Typography.Paragraph>
+      {nameError || error ? (
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+          {nameError ?? error}
+        </Typography.Paragraph>
+      ) : null}
+      <SettingsSection title="Email">
+        <SettingsRow>
+          <Typography.Paragraph selectable className="text-grouped-secondary">
+            {session.user.email}
+          </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-
-      <View className="gap-3">
-        {profileError ? (
-          <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-            {profileError}
-          </Typography.Paragraph>
-        ) : null}
-        {message ? <Typography.Paragraph accessibilityLiveRegion="polite">{message}</Typography.Paragraph> : null}
-        <SettingsSection>
-          <SettingsRow
-            disclosure={false}
-            disabled={busy}
-            onPress={() =>
-              Alert.alert("Sign out?", "Reconnect by scanning a new code from OpenBot on your desktop.", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Sign out", style: "destructive", onPress: () => void perform(signOut, "") },
-              ])
-            }
-          >
-            <Typography.Paragraph className="text-danger-text">Sign out</Typography.Paragraph>
-          </SettingsRow>
-        </SettingsSection>
-      </View>
-    </SettingsContent>
+      <SettingsSection title="Security">
+        <SettingsRow disabled={busy} onPress={() => router.push("/settings/sessions")}>
+          <Typography.Paragraph>Account sessions</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection>
+        <SettingsRow
+          disclosure={false}
+          disabled={busy}
+          onPress={() =>
+            Alert.alert("Sign out?", "Reconnect by scanning a new code from OpenBot on your desktop.", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Sign out", style: "destructive", onPress: () => void perform("sign-out", signOut) },
+            ])
+          }
+        >
+          <Typography.Paragraph className="text-danger-text">Sign out</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+    </SheetScrollView>
   );
 }

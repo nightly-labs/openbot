@@ -43,6 +43,11 @@ const Settings = createSimpleContext({
      * slug and never a listing, so the link cannot describe what the user is about to install.
      */
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
+    /**
+     * The template an `openbot://agents/<id>` link named. The install dialog reads the template by
+     * this id and installs only after the user presses Add agent.
+     */
+    const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
@@ -318,6 +323,8 @@ const Settings = createSimpleContext({
       setSkillsMarketplaceOpen,
       pendingPluginSlug,
       setPendingPluginSlug,
+      pendingAgentTemplateId,
+      setPendingAgentTemplateId,
     };
   },
 });

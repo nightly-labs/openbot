@@ -128,7 +128,8 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail(
   );
 });
 
-const AvatarThumbnail = memo(function AvatarThumbnail({
+// Draws the idle pose without the photo lookup, for pickers that never show a photo.
+export const AvatarThumbnail = memo(function AvatarThumbnail({
   seed,
   hue,
   size = 48,
@@ -168,7 +169,7 @@ export function getBloubAvatarColor(seed: string, hue: AvatarHue | null): string
   return COLOR_BY_ID.get(profile.color)?.hex ?? "#8b5cf6";
 }
 
-function thumbnailColor(color: string, disconnected: boolean) {
+export function thumbnailColor(color: string, disconnected: boolean) {
   if (!disconnected) return color;
   const r = Number.parseInt(color.slice(1, 3), 16);
   const g = Number.parseInt(color.slice(3, 5), 16);

@@ -41,3 +41,6 @@ export const OfflineHost: Story = {
 export const AgentUsingBrowser: Story = {
   args: { browser: { acting: true, agentName: STORY_AGENT.name, open: true, onToggle: fn() } },
 };
+export const FilesAndPublish: Story = {
+  args: { files: { open: false, onToggle: fn() }, publish: { onOpen: fn() } },
+};

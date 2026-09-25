@@ -38,7 +38,7 @@ export const MOBILE_EVENTS = {
   agent_action: { ...outcome, ...agent, action: ["create", "update", "duplicate", "delete"] },
   routine_action: {
     ...outcome,
-    action: ["create", "update", "delete"],
+    action: ["create", "update", "delete", "test"],
     trigger_type: ["hourly", "daily", "weekdays", "weekly", "monthly", "interval", "advanced", "custom"],
   },
   memory_action: { ...outcome, action: ["create", "update", "delete"] },

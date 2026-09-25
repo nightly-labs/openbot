@@ -5,6 +5,37 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-09-25
+
+### Added
+
+- Publish an agent as a template that other people can add. Press Publish in the agent chat header.
+  OpenBot sends the instructions, the routines and the skills to openbot.run. Files and memories are
+  not sent, and a field that looks like a secret stops the publish. The link opens a page at
+  `openbot.run/agents/<id>`. Add to OpenBot shows the template in the app, and OpenBot adds the agent
+  only when you click Add agent. Unpublish removes the template. A new publish keeps the same link.
+- Edit a routine schedule with chips in the routine panel and in the routine card in the chat.
+
+### Changed
+
+- Show the account profile name and avatar in the browser client.
+- Show that a sign-in server does not accept OpenBot when it refuses the registration, for example
+  Figma. Before, OpenBot showed a credentials error. The Figma listing tells you to use the local MCP
+  server of the Figma desktop app.
+- Get faster answers from the account server.
+
+### Fixed
+
+- Delete an agent on Windows. Before, deletion failed with EBUSY because a provider session kept the
+  agent workspace open.
+- Remove a deleted agent from its channels. Before, the channel showed an Unavailable member.
+  OpenBot also removes these members at startup.
+- Start OpenBot on Linux from a terminal. Before, the window could freeze at startup.
+- Send a steer message with the same framing as a new turn.
+- Redact each line of remote diagnostic logs.
+- Show an error when the copy of a channel message or a plugin link fails.
+- Use the fallback name for a download with a bad file name.
+
 ## [0.21.0] - 2026-09-24
 
 ### Added

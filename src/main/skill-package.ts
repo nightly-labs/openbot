@@ -31,6 +31,11 @@ export async function archiveDirectory(root: string): Promise<Uint8Array> {
   return bytes;
 }
 
+/** One `SKILL.md` on its own, as an agent template carries it; publish and install both read it here. */
+export function inspectSkillMarkdown(markdown: string): Omit<SkillPackagePreview, "draftId" | "size"> {
+  return inspectArchive(zipSync({ "SKILL.md": new TextEncoder().encode(markdown) }));
+}
+
 export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "draftId" | "size"> {
   const files = normalizedFiles(bytes);
   const skillFile = files["SKILL.md"];

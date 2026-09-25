@@ -73,6 +73,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             create: (input) => store.createRoutine(serverId, { ...input, channelId }),
             update: (input) => store.updateRoutine(serverId, { ...input, channelId }),
             delete: (id) => store.deleteRoutine(serverId, channelId, id),
+            test: (id) => store.testRoutine(serverId, channelId, id),
           }}
         />
       ) : (

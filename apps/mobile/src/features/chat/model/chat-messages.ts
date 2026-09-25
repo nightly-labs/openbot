@@ -7,8 +7,16 @@ import type {
   ConversationMessage,
   ConversationQuestionPrompt,
   ImageGenerationInfo,
+  RoutineConversationEventAction,
+  RoutineRunStatus,
 } from "@openbot/contracts/ipc";
-import { channelRoutingConversationEvent } from "@openbot/contracts/ipc";
+import {
+  channelRoutingConversationEvent,
+  routineConversationEvent,
+  routineRunConversationEvent,
+} from "@openbot/contracts/ipc";
+
+export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
 
 export type ChatMessage =
   | {
@@ -23,6 +31,8 @@ export type ChatMessage =
           };
     }
   | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
+  /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
+  | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: string; routineName: string }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
       id: string;
@@ -88,6 +98,61 @@ export function presentChatMessages(
 const projectedBubbles = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
+
+const ROUTINE_RUN_LABELS: Record<RoutineRunStatus, string> = {
+  queued: "Invoked routine",
+  running: "Running routine",
+  "needs-attention": "Routine needs attention",
+  succeeded: "Completed routine",
+  failed: "Routine failed",
+  interrupted: "Routine interrupted",
+  cancelled: "Cancelled routine",
+};
+
+/** The routine marker of a host message. A run has one marker per state; `runId` groups them. */
+function routineMarker(message: ConversationMessage) {
+  const lifecycle = routineConversationEvent(message);
+  if (lifecycle) {
+    const label = { created: "Created routine", updated: "Updated routine", deleted: "Deleted routine" }[
+      lifecycle.action
+    ];
+    return { runId: null, event: lifecycle.action, label, routineName: lifecycle.routineName };
+  }
+  const run = routineRunConversationEvent(message);
+  if (run)
+    return { runId: run.runId, event: run.status, label: ROUTINE_RUN_LABELS[run.status], routineName: run.routineName };
+  if (message.routine)
+    return {
+      runId: message.routine.runId,
+      event: "queued" as const,
+      label: ROUTINE_RUN_LABELS.queued,
+      routineName: message.routine.name,
+    };
+  return null;
+}
+
+/** Like desktop, a run shows only its latest state. Returns the ID of the latest message of each run. */
+function latestRoutineRunMessages(messages: readonly ConversationMessage[]) {
+  const latest = new Map<string, string>();
+  for (const message of messages) {
+    const runId = routineMarker(message)?.runId;
+    if (runId) latest.set(runId, message.id);
+  }
+  return new Set(latest.values());
+}
+
+function projectRoutineMarker(message: ConversationMessage, latestRuns: ReadonlySet<string>): ChatMessage | null {
+  const marker = routineMarker(message);
+  if (!marker || (marker.runId && !latestRuns.has(message.id))) return null;
+  return projectedMarker(projectedRoutines, message, () => ({
+    id: `routine:${message.id}`,
+    kind: "routine",
+    event: marker.event,
+    label: marker.label,
+    routineName: marker.routineName,
+  }));
+}
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 
 /** Reuse the item projected from the same host message, so memoized rows skip unchanged items. */
@@ -131,8 +196,14 @@ function sortedConversationMessages(messages: readonly ConversationMessage[]) {
 export function projectChatMessages(messages: ConversationMessage[]): ChatMessage[] {
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
-  for (const message of sortedConversationMessages(messages)) {
-    if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
+  const sorted = sortedConversationMessages(messages);
+  const latestRuns = latestRoutineRunMessages(sorted);
+  for (const message of sorted) {
+    // Routine events are system messages, skipped below. A routine instruction keeps its bubble below its marker.
+    const routine = projectRoutineMarker(message, latestRuns);
+    if (routine) result.push(routine);
+    if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine)
+      continue;
     if (message.exchange) {
       const { exchange } = message;
       result.push(
@@ -204,9 +275,27 @@ export function latestReadableMessage(messages: ConversationMessage[]) {
   );
 }
 
-const projectedChannelMessages = new WeakMap<ChannelMessage, { self: boolean; message: ChatMessage }>();
+const projectedChannelMessages = new WeakMap<
+  ChannelMessage,
+  { self: boolean; latest: boolean; message: ChatMessage | null }
+>();
 
-function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessage {
+function projectChannelMessage(
+  entry: ChannelMessage,
+  self: boolean,
+  latestRuns: ReadonlySet<string>,
+): ChatMessage | null {
+  const routine = entry.message.routine ? null : routineMarker(entry.message);
+  if (routine) {
+    if (routine.runId && !latestRuns.has(entry.message.id)) return null;
+    return {
+      id: entry.id,
+      kind: "routine",
+      event: routine.event,
+      label: routine.label,
+      routineName: routine.routineName,
+    };
+  }
   if (entry.message.questionPrompt) {
     return {
       id: entry.id,
@@ -263,6 +352,7 @@ function projectChannelMessage(entry: ChannelMessage, self: boolean): ChatMessag
 
 /** Keep channel authors explicit: another human member is not the current user. */
 export function projectChannelMessages(messages: ChannelMessage[], memberId: string | null): ChatMessage[] {
+  const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
   return messages
     .filter(
       (entry) =>
@@ -271,13 +361,14 @@ export function projectChannelMessages(messages: ChannelMessage[], memberId: str
         entry.message.text.trim() ||
         entry.message.attachments?.length,
     )
-    .map((entry) => {
+    .flatMap((entry) => {
       const self = entry.author.kind === "member" && entry.author.id === memberId;
       const cached = projectedChannelMessages.get(entry);
-      if (cached && cached.self === self) return cached.message;
-      const message = projectChannelMessage(entry, self);
-      projectedChannelMessages.set(entry, { self, message });
-      return message;
+      const latest = latestRuns.has(entry.message.id);
+      if (cached && cached.self === self && cached.latest === latest) return cached.message ?? [];
+      const message = projectChannelMessage(entry, self, latestRuns);
+      projectedChannelMessages.set(entry, { self, latest, message });
+      return message ?? [];
     });
 }
 

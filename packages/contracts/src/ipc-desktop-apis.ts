@@ -136,6 +136,16 @@ export interface AgentDesktopApi {
   onScopedEvent: Subscribe<typeof IPC_ENDPOINTS.agent.event>;
 }
 
+export interface AgentTemplatesDesktopApi {
+  preview: Invoke<typeof IPC_ENDPOINTS.agentTemplates.preview>;
+  publish: Invoke<typeof IPC_ENDPOINTS.agentTemplates.publish>;
+  unpublish: Invoke<typeof IPC_ENDPOINTS.agentTemplates.unpublish>;
+  get: Invoke<typeof IPC_ENDPOINTS.agentTemplates.get>;
+  install: Invoke<typeof IPC_ENDPOINTS.agentTemplates.install>;
+  takePendingLink: Invoke<typeof IPC_ENDPOINTS.agentTemplates.takePendingLink>;
+  onOpenLink: Subscribe<typeof IPC_ENDPOINTS.agentTemplates.openLink>;
+}
+
 export interface MarketplaceAgentsDesktopApi {
   list: (query?: MarketplaceAgentQuery) => Promise<MarketplaceAgentPage>;
   get: Invoke<typeof IPC_ENDPOINTS.marketplaceAgents.get>;
@@ -449,6 +459,7 @@ export interface OpenBotDesktopApi {
   agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
+  agentTemplates: AgentTemplatesDesktopApi;
   auth: CentralAuthDesktopApi;
   agent: AgentDesktopApi;
   browser: BrowserDesktopApi;

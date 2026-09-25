@@ -1,0 +1,197 @@
+/* The publish dialog and the install dialog of an agent template. Both are one centred card: the
+ * agent's identity on top, its content below, and the actions in a footer on the right. */
+
+.agent-template-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+}
+
+.agent-template-dialog {
+  position: relative;
+  display: flex;
+  width: min(420px, 100%);
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.agent-template-status {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
+}
+
+.agent-template-corner-actions {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  gap: var(--openbot-space-1);
+  inset-block-start: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
+
+.agent-template-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  padding: var(--openbot-space-6) var(--openbot-space-4) var(--openbot-space-4);
+}
+
+.agent-template-scroll {
+  overflow-y: auto;
+}
+
+.agent-template-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  text-align: center;
+}
+
+.agent-template-avatar {
+  width: 72px;
+  height: 72px;
+  margin-block-end: var(--openbot-space-3);
+}
+
+.agent-template-name {
+  overflow-wrap: anywhere;
+}
+
+.agent-template-description {
+  display: -webkit-box;
+  margin-block-start: var(--openbot-space-1);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.agent-template-rows {
+  display: grid;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-grouped);
+}
+
+.agent-template-row {
+  display: grid;
+  width: 100%;
+  height: auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  border-radius: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  text-align: start;
+  color: var(--openbot-text-muted);
+}
+
+.agent-template-row + .agent-template-row {
+  border-top: 1px solid var(--openbot-border-grouped);
+}
+
+.agent-template-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-0-5);
+}
+
+.agent-template-row-title {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.agent-template-row-detail {
+  overflow: hidden;
+  color: var(--openbot-text-grouped-secondary);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-template-actions {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: var(--openbot-space-2);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.agent-template-copy {
+  margin-inline-end: auto;
+}
+
+.agent-template-detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-block-start: calc(var(--openbot-space-2) * -1);
+}
+
+.agent-template-detail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+}
+
+.agent-template-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+}
+
+.agent-template-prose {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-template-list > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+}
+
+.agent-template-skill-toggle {
+  justify-content: flex-start;
+  align-self: flex-start;
+  gap: var(--openbot-space-1);
+  margin-inline-start: calc(var(--openbot-space-2) * -1);
+}
+
+.agent-template-skill-text {
+  max-height: 240px;
+  margin: var(--openbot-space-1) 0 0;
+  overflow: auto;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding: var(--openbot-space-3);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  white-space: pre-wrap;
+}

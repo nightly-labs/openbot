@@ -110,12 +110,23 @@ interface RemotePublicJwks {
 export class RemoteTicketSigner {
   readonly #keyId: string;
   readonly #publicJwks: RemotePublicJwks;
-  readonly #key: ReturnType<typeof importJWK>;
+  readonly #privateJwk: JWK;
+  #key: Awaited<ReturnType<typeof importJWK>> | null = null;
 
   constructor(config: TicketSignerConfig) {
     this.#keyId = requiredIdentifier(config.keyId, "ticket key ID");
     this.#publicJwks = parseJwks(config.publicJwks, this.#keyId);
-    this.#key = importJWK(parseJwk(config.privateJwk), "ES256");
+    this.#privateJwk = parseJwk(config.privateJwk);
+  }
+
+  /**
+   * Every request in the isolate shares this signer, so only the resolved key is kept: the runtime
+   * refuses a promise that another request made. Two requests that race import the key twice, which
+   * costs one import and leaves the same key behind.
+   */
+  async #signingKey(): Promise<Awaited<ReturnType<typeof importJWK>>> {
+    this.#key ??= await importJWK(this.#privateJwk, "ES256");
+    return this.#key;
   }
 
   publicJwks(): RemotePublicJwks {
@@ -154,9 +165,27 @@ export class RemoteTicketSigner {
       .setIssuedAt(issuedAt)
       .setExpirationTime(expiresAt)
       .setAudience(REMOTE_TICKET_AUDIENCE)
-      .sign(await this.#key);
+      .sign(await this.#signingKey());
     return { ticket, expiresAt: expiresAt * 1_000 };
   }
+}
+
+/** One signer for each key: the JWKS parse and the key import are too costly for every request. */
+const ticketSigners = new Map<string, { config: TicketSignerConfig; signer: RemoteTicketSigner }>();
+
+/**
+ * Keyed by the key ID so the map holds one entry for each key, and checked against the material so
+ * a key ID that another configuration reuses -- a test, or a rotation that keeps the name -- still
+ * gets its own signer.
+ */
+function sharedTicketSigner(config: TicketSignerConfig): RemoteTicketSigner {
+  const cached = ticketSigners.get(config.keyId);
+  if (cached && cached.config.privateJwk === config.privateJwk && cached.config.publicJwks === config.publicJwks) {
+    return cached.signer;
+  }
+  const signer = new RemoteTicketSigner(config);
+  ticketSigners.set(config.keyId, { config, signer });
+  return signer;
 }
 
 export class RemoteControlPlane {
@@ -166,6 +195,7 @@ export class RemoteControlPlane {
   readonly #webhookSecret: string | null;
   readonly #fetch: RemoteFetch;
   readonly #now: () => number;
+  readonly #schedule: ((delivery: Promise<void>) => void) | null;
 
   constructor(
     bindings: Pick<
@@ -177,13 +207,13 @@ export class RemoteControlPlane {
       | "REMOTE_AUTH_WEBHOOK_URL"
       | "REMOTE_AUTH_WEBHOOK_SECRET"
     >,
-    options: { fetch?: RemoteFetch; now?: () => number } = {},
+    options: { fetch?: RemoteFetch; now?: () => number; schedule?: (delivery: Promise<void>) => void } = {},
   ) {
     if (!bindings.REMOTE_TICKET_PRIVATE_JWK || !bindings.REMOTE_TICKET_PUBLIC_JWKS || !bindings.REMOTE_TICKET_KEY_ID) {
       throw new RemoteControlPlaneError(503, "remote_not_configured", "Remote ticket signing is not configured.");
     }
     this.#database = bindings.DB;
-    this.#signer = new RemoteTicketSigner({
+    this.#signer = sharedTicketSigner({
       privateJwk: bindings.REMOTE_TICKET_PRIVATE_JWK,
       publicJwks: bindings.REMOTE_TICKET_PUBLIC_JWKS,
       keyId: bindings.REMOTE_TICKET_KEY_ID,
@@ -192,6 +222,7 @@ export class RemoteControlPlane {
     this.#webhookSecret = bindings.REMOTE_AUTH_WEBHOOK_SECRET?.trim() || null;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
+    this.#schedule = options.schedule ?? null;
   }
 
   publicJwks(): RemotePublicJwks {
@@ -734,54 +765,67 @@ export class RemoteControlPlane {
   }
 
   async startSession(userId: string, hostId: string, authSessionHash: string) {
-    const membership = await this.#requireRole(hostId, userId, ["owner", "admin", "member"]);
     const now = this.#now();
-    await this.#database
-      .prepare(
-        "UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND expires_at <= ?",
-      )
-      .bind(now, hostId, userId, now)
-      .run();
-    const existing = await this.#database
-      .prepare(
-        `SELECT session_id, expires_at FROM remote_sessions
-         WHERE host_id = ? AND user_id = ? AND membership_id = ? AND ended_at IS NULL AND expires_at > ?
-           AND auth_session_hash = ?
-           AND EXISTS(
-             SELECT 1 FROM auth_sessions
-              WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
-           )
-         ORDER BY started_at DESC LIMIT 1`,
-      )
-      .bind(hostId, userId, membership.membership_id, now, authSessionHash, authSessionHash, userId, now)
-      .first<{ session_id: string; expires_at: number }>();
-    if (existing) return { sessionId: existing.session_id, hostId, expiresAt: existing.expires_at };
+    // The role check and the reusable session are one row, so the common answer costs one read.
+    const membership = this.#assertRole(
+      await this.#database
+        .prepare(
+          `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status,
+                  s.session_id AS active_session_id, s.expires_at AS active_expires_at
+           FROM remote_memberships m
+           LEFT JOIN remote_sessions s
+             ON s.host_id = m.host_id AND s.user_id = m.user_id AND s.membership_id = m.membership_id
+            AND s.ended_at IS NULL AND s.expires_at > ? AND s.auth_session_hash = ?
+            AND EXISTS(
+              SELECT 1 FROM auth_sessions
+               WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
+            )
+           WHERE m.host_id = ? AND m.user_id = ? AND m.status = 'active'
+           ORDER BY s.started_at DESC LIMIT 1`,
+        )
+        .bind(now, authSessionHash, authSessionHash, userId, now, hostId, userId)
+        .first<RemoteMembershipRow & { active_session_id: string | null; active_expires_at: number | null }>(),
+      ["owner", "admin", "member"],
+    );
+    if (membership.active_session_id !== null && membership.active_expires_at !== null) {
+      return { sessionId: membership.active_session_id, hostId, expiresAt: membership.active_expires_at };
+    }
     const sessionId = crypto.randomUUID();
     // Deliberate product policy: device sessions do not expire with time. Logout
     // or explicit revocation ends only this credential's sessions, not other phones.
     const expiresAt = PERSISTENT_SESSION_EXPIRES_AT;
-    await this.#database
-      .prepare(
-        `INSERT OR IGNORE INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at, auth_session_hash)
-         SELECT ?, ?, ?, ?, ?, ?, ?
-          WHERE EXISTS(
-            SELECT 1 FROM auth_sessions
-             WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
-          )`,
-      )
-      .bind(
-        sessionId,
-        hostId,
-        userId,
-        membership.membership_id,
-        now,
-        expiresAt,
-        authSessionHash,
-        authSessionHash,
-        userId,
-        now,
-      )
-      .run();
+    // The sweep frees the one-active-session slot, so it has to run before the insert.
+    const [, insert] = await this.#database.batch([
+      this.#database
+        .prepare(
+          "UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL AND expires_at <= ?",
+        )
+        .bind(now, hostId, userId, now),
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at, auth_session_hash)
+           SELECT ?, ?, ?, ?, ?, ?, ?
+            WHERE EXISTS(
+              SELECT 1 FROM auth_sessions
+               WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?
+            )`,
+        )
+        .bind(
+          sessionId,
+          hostId,
+          userId,
+          membership.membership_id,
+          now,
+          expiresAt,
+          authSessionHash,
+          authSessionHash,
+          userId,
+          now,
+        ),
+    ]);
+    // The insert carries the same live-account-session guard as the read below, so one written row
+    // already proves the session may start. Only a row the insert ignored needs the read.
+    if (insert?.meta.changes === 1) return { sessionId, hostId, expiresAt };
     const active = await this.#database
       .prepare(
         `SELECT session_id, expires_at FROM remote_sessions
@@ -951,13 +995,19 @@ export class RemoteControlPlane {
   }
 
   async #requireRole(hostId: string, userId: string, roles: RemoteMemberRole[]): Promise<RemoteMembershipRow> {
-    const membership = await this.#database
-      .prepare(
-        `SELECT membership_id, host_id, user_id, role, status
-         FROM remote_memberships WHERE host_id = ? AND user_id = ? AND status = 'active' LIMIT 1`,
-      )
-      .bind(hostId, userId)
-      .first<RemoteMembershipRow>();
+    return this.#assertRole(
+      await this.#database
+        .prepare(
+          `SELECT membership_id, host_id, user_id, role, status
+           FROM remote_memberships WHERE host_id = ? AND user_id = ? AND status = 'active' LIMIT 1`,
+        )
+        .bind(hostId, userId)
+        .first<RemoteMembershipRow>(),
+      roles,
+    );
+  }
+
+  #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
     if (!membership || !roles.includes(membership.role)) {
       throw new RemoteControlPlaneError(
         403,
@@ -992,14 +1042,21 @@ export class RemoteControlPlane {
       .bind(crypto.randomUUID(), now, now, hostId, ownerUserId ?? null, ownerUserId ?? null);
   }
 
+  /**
+   * The event is already in D1 next to the state it reports, and the cron redelivers it, so the
+   * answer must not wait for Signal. `schedule` is the Worker's `waitUntil`; without it the caller
+   * awaits the delivery, which is what the tests and any script outside a request need.
+   */
   async #flushAuthEvents(): Promise<void> {
-    await deliverRemoteAuthEvents({
+    const delivery = deliverRemoteAuthEvents({
       database: this.#database,
       webhookUrl: this.#webhookUrl,
       webhookSecret: this.#webhookSecret,
       fetch: this.#fetch,
       now: this.#now(),
     });
+    if (!this.#schedule) return delivery;
+    this.#schedule(delivery);
   }
 }
 

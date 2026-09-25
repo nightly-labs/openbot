@@ -51,6 +51,9 @@ export const AVATAR_HUE_OPTIONS: ReadonlyArray<{
   { hue: 320, label: "Magenta" },
 ];
 
+// Hues 100 and 280 stay valid for stored agents, but draw the same color as 150 and 245.
+export const AVATAR_HUE_CHOICES = AVATAR_HUE_OPTIONS.filter((option) => option.hue !== 100 && option.hue !== 280);
+
 export function bloubAvatarProfile(seed: string, hue: AvatarHue | null): BloubAvatarProfile {
   const storedSilhouette = requiredItem(SHAPES, stableIndex(`${seed}:shape`, SHAPES.length)).id;
   const silhouette =
