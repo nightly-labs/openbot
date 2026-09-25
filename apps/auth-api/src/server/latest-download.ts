@@ -56,7 +56,11 @@ export async function latestDownloadResponse(
   const manifestUrl = `${RELEASES_BASE_URL}/latest/download/${config.manifest}`;
 
   try {
-    const response = await fetcher(manifestUrl, { headers: { accept: "text/yaml, text/plain" } });
+    const response = await fetcher(manifestUrl, {
+      headers: { accept: "text/yaml, text/plain" },
+      // A slow release host must not hold the Worker request open; the releases page is the answer.
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) return fallbackToReleases(platform, `manifest status ${response.status}`);
 
     const installer = findInstaller(await response.text(), config.extension);

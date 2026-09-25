@@ -17,7 +17,7 @@ describe("latest download", () => {
 
     expect(fetcher).toHaveBeenCalledWith(
       `https://github.com/nightly-labs/openbot/releases/latest/download/${manifest}`,
-      { headers: { accept: "text/yaml, text/plain" } },
+      { headers: { accept: "text/yaml, text/plain" }, signal: expect.any(AbortSignal) },
     );
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(

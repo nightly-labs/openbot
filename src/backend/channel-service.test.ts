@@ -282,6 +282,20 @@ describe("shared channel coordination", () => {
       ),
     ).rejects.toThrow("A channel member is unavailable.");
   });
+  it("removes deleted agents from the members and moves the lead to a member that stays", () => {
+    const revision = service.store.get("channel-1").revision;
+    changed.mockClear();
+    service.removeDeletedMembers(new Set(["agent-a", "agent-b"]));
+    expect(service.store.get("channel-1").revision).toBe(revision);
+    expect(changed).not.toHaveBeenCalled();
+
+    service.removeDeletedMembers(new Set(["agent-b"]));
+    expect(service.store.get("channel-1")).toMatchObject({ members: [{ agentId: "agent-b" }], leadAgentId: "agent-b" });
+    expect(changed).toHaveBeenCalledWith("channel-1", revision + 1);
+
+    service.removeDeletedMembers(new Set());
+    expect(service.store.get("channel-1")).toMatchObject({ members: [], leadAgentId: null });
+  });
   it("summarizes a channel from the read cursor without reading its history", () => {
     const message = (id: string, author: ChannelMessage["author"]): ChannelMessage => ({
       id,

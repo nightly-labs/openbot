@@ -55,7 +55,12 @@ export async function pluginIconResponse(slug: string, appId: string | null): Pr
 
   let upstream: Response;
   try {
-    upstream = await fetch(url, { headers: { Accept: "image/*" }, redirect: "follow" });
+    upstream = await fetch(url, {
+      headers: { Accept: "image/*" },
+      redirect: "follow",
+      // The developer's server is not this origin's to wait on.
+      signal: AbortSignal.timeout(5_000),
+    });
   } catch {
     return notFound();
   }
