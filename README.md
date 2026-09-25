@@ -261,6 +261,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run check:ui` | Check the renderer against the design system: shared primitives, Kobalte and Lucide confined to `@openbot/ui`, palette tokens instead of colour, size, radius and transition literals. Checks renderer and shared UI source. |
 | `bun run check:assets` | Fail when a tracked image or video file is outside the product asset directories. Pull request screenshots go in the pull request body. |
 | `bun run verify:preload` | After `bun run build`, run the built preload with a fake Electron. Fail when it loads a module that a sandboxed preload cannot load, uses `import()`, or exposes a method that `IPC_ENDPOINTS` does not name. |
+| `bun run types:ratchet` | Hold each TypeScript option in `tools/typescript/type-baseline.json` to its error count per file in every project that extends `tsconfig.base.json`. A new error fails. `--write` and `--add=<option>` work as in `lint:ratchet`. |
 | `bun run lint:ratchet` | Hold each Biome rule in `tools/biome/lint-baseline.json` to its finding count per file. A new finding fails. Add `--write` after a fix to lower the baseline, or `--add=<rule>` to start a rule at its current counts. |
 | `bun run test:backend` | Run backend tests only. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |

@@ -34,9 +34,9 @@ container, so its type coverage matters.
 
 `tsconfig.node.json` and `tsconfig.web.json` set `verbatimModuleSyntax`: a file compiles alone the
 same way under `tsc` and the bundler, because a type-only import must say `import type`. It had no
-findings when it was turned on. `exactOptionalPropertyTypes` is off: it had 193 findings in the Node
-project on 2026-09-25. Turn it on with the fix, not with a baseline; the lint ratchet counts only
-Biome rules.
+findings when it was turned on. `exactOptionalPropertyTypes` is not on yet: it had 481 errors in 226
+files of the projects that extend `tsconfig.base.json` on 2026-09-26. The type ratchet holds it to
+those counts.
 
 The Signal Dockerfile installs from a pruned checkout with one manifest copy per workspace.
 CI does not build that image. `scripts/dependency-catalog.test.ts` checks that the copied manifests
@@ -76,7 +76,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:assets`, `bun run check:desktop:static`, `bun run lint:ratchet`, `bun run types:ratchet` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
@@ -228,6 +228,18 @@ rule has no findings left, turn it on in `biome.json` and remove it from the bas
 `nursery/noFloatingPromises` is the first rule. `nursery/noMisusedPromises` was rejected: its 37
 findings were all `if (cachedPromise)` presence checks. Biome cannot select a GritQL plugin with
 `--only`, so the ratchet holds only built-in Biome rules. A new GritQL rule must start clean.
+
+### Type debt ratchet
+
+`bun run types:ratchet` does the same for TypeScript options. For each option in
+`tools/typescript/type-baseline.json`, it runs `tsc` with the option on for every project that
+extends `tsconfig.base.json` (listed in `scripts/type-ratchet.ts`), and compares the errors of each
+file to the baseline. An error that two projects report counts once. `apps/mobile` extends the Expo
+base config, so the ratchet does not check it. The rules for `--write` and `--add=<option>` are the
+same as for the lint ratchet: `scripts/debt-ratchet.ts` holds them for both. The run takes about 4
+seconds. When an option has no errors left, turn it on in
+`tsconfig.base.json` and remove it from the baseline. Do not name the script `typecheck:*`:
+`bun run typecheck` runs every script that matches that pattern.
 
 ### Removed rules and their limits
 
