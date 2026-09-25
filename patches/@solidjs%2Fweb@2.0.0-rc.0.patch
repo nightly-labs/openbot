@@ -1,0 +1,84 @@
+diff --git a/dist/dev.cjs b/dist/dev.cjs
+index cd93011712d1eede7a1e49e2e006b5ef4598b385..6f7ec7bfcec1136d6ebb967703713417fe357019 100644
+--- a/dist/dev.cjs
++++ b/dist/dev.cjs
+@@ -1422,6 +1422,7 @@ function eventHandler(e, container, state) {
+   }
+   const owner = state && (state.owners.size === 1 && state.owners.has(container) ? container : findOwner(e.target, state)?.owner);
+   if (state && !owner) return;
++  if (owner && owner === resumeNode) return;
+   e[$$EVENT_OWNER] = owner || true;
+   let node = resumeNode || e.target;
+   const key = `$$${e.type}`;
+@@ -1442,7 +1443,7 @@ function eventHandler(e, container, state) {
+     return true;
+   };
+   const walkUpTree = () => {
+-    while (handleNode()) {
++    while (node && handleNode()) {
+       if (node === boundary || node.parentNode === boundary) break;
+       node = node._$host || node.parentNode || node.host;
+     }
+diff --git a/dist/dev.js b/dist/dev.js
+index c8ecb2dee61b4ff98f51cd72b510de3aeb5eeefc..01564d1b464777018467eb2052cc3b7b8b837deb 100644
+--- a/dist/dev.js
++++ b/dist/dev.js
+@@ -1421,6 +1421,7 @@ function eventHandler(e, container, state) {
+   }
+   const owner = state && (state.owners.size === 1 && state.owners.has(container) ? container : findOwner(e.target, state)?.owner);
+   if (state && !owner) return;
++  if (owner && owner === resumeNode) return;
+   e[$$EVENT_OWNER] = owner || true;
+   let node = resumeNode || e.target;
+   const key = `$$${e.type}`;
+@@ -1441,7 +1442,7 @@ function eventHandler(e, container, state) {
+     return true;
+   };
+   const walkUpTree = () => {
+-    while (handleNode()) {
++    while (node && handleNode()) {
+       if (node === boundary || node.parentNode === boundary) break;
+       node = node._$host || node.parentNode || node.host;
+     }
+diff --git a/dist/web.cjs b/dist/web.cjs
+index 85a7bc193c44cbe467b4e02a8ca7d0ad2446e087..6f9db024acd4353c46570da627d72260ac042da4 100644
+--- a/dist/web.cjs
++++ b/dist/web.cjs
+@@ -1361,6 +1361,7 @@ function eventHandler(e, container, state) {
+   }
+   const owner = state && (state.owners.size === 1 && state.owners.has(container) ? container : findOwner(e.target, state)?.owner);
+   if (state && !owner) return;
++  if (owner && owner === resumeNode) return;
+   e[$$EVENT_OWNER] = owner || true;
+   let node = resumeNode || e.target;
+   const key = `$$${e.type}`;
+@@ -1381,7 +1382,7 @@ function eventHandler(e, container, state) {
+     return true;
+   };
+   const walkUpTree = () => {
+-    while (handleNode()) {
++    while (node && handleNode()) {
+       if (node === boundary || node.parentNode === boundary) break;
+       node = node._$host || node.parentNode || node.host;
+     }
+diff --git a/dist/web.js b/dist/web.js
+index baf594d01795b0278b6851736a138fdd8166bbb6..4fa961cf35a51e17ce5ce5b6770c427bbb2e31cc 100644
+--- a/dist/web.js
++++ b/dist/web.js
+@@ -1360,6 +1360,7 @@ function eventHandler(e, container, state) {
+   }
+   const owner = state && (state.owners.size === 1 && state.owners.has(container) ? container : findOwner(e.target, state)?.owner);
+   if (state && !owner) return;
++  if (owner && owner === resumeNode) return;
+   e[$$EVENT_OWNER] = owner || true;
+   let node = resumeNode || e.target;
+   const key = `$$${e.type}`;
+@@ -1380,7 +1381,7 @@ function eventHandler(e, container, state) {
+     return true;
+   };
+   const walkUpTree = () => {
+-    while (handleNode()) {
++    while (node && handleNode()) {
+       if (node === boundary || node.parentNode === boundary) break;
+       node = node._$host || node.parentNode || node.host;
+     }
