@@ -1,4 +1,4 @@
-import type { CentralAuthState } from "@openbot/contracts/ipc";
+import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Toaster } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
@@ -9,13 +9,9 @@ import type { WebRuntimeFactory } from "./web-client-context";
 /** A sign-in refusal that the login form already shows. */
 class SignInIssueShown extends Error {}
 
-interface BrowserAccount {
-  id: string;
-  email: string;
-}
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [state, setState] = createStore<{
-    account: BrowserAccount | null;
+    account: CentralAuthUser | null;
     loaded: boolean;
     login: CentralAuthState;
     resendAt: number;
@@ -102,7 +98,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       throw error;
     }
   }
-  function accountFrom(value: unknown): BrowserAccount {
+  function accountFrom(value: unknown): CentralAuthUser {
     if (
       !isDynamicRecord(value) ||
       !isDynamicRecord(value.user) ||
@@ -110,7 +106,12 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       !isString(value.user.email)
     )
       throw new Error("The account response is invalid.");
-    return { id: value.user.id, email: value.user.email };
+    return {
+      id: value.user.id,
+      email: value.user.email,
+      name: isString(value.user.name) ? value.user.name : null,
+      avatarUrl: isString(value.user.avatarUrl) ? value.user.avatarUrl : null,
+    };
   }
   async function checkSession() {
     const generation = sessionGeneration;
@@ -236,6 +237,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
               <WebWorkspace
                 accountId={accountId}
                 accountEmail={state.account?.email ?? ""}
+                accountName={state.account?.name ?? null}
+                accountAvatarUrl={state.account?.avatarUrl ?? null}
                 accountFetch={accountFetch}
                 onSessionCheck={checkSession}
                 onLogout={() => action(logout)}
