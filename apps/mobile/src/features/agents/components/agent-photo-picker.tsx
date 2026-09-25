@@ -5,13 +5,15 @@ import { userErrorMessage } from "@openbot/user-errors";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { Button, Typography } from "heroui-native";
+import { useThemeColor } from "heroui-native/hooks";
+import { ImagePlus, Trash2 } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { View } from "react-native";
 
 export interface AgentPhotoDraft extends RemoteFileUpload {
   uri: string;
 }
 
+// Renders inline icon buttons, so the parent row places them beside the other choices.
 export function AgentPhotoPicker({
   hasPhoto,
   disabled,
@@ -23,6 +25,7 @@ export function AgentPhotoPicker({
   onChange: (photo: AgentPhotoDraft | null) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const foreground = useThemeColor("foreground");
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   async function choose() {
@@ -55,27 +58,35 @@ export function AgentPhotoPicker({
     }
   }
   return (
-    <View className="gap-2">
-      <Button variant="ghost" isDisabled={disabled} onPress={() => void choose()}>
-        <Button.Label>{hasPhoto ? "Change photo" : "Add photo"}</Button.Label>
+    <>
+      <Button
+        isIconOnly
+        variant="ghost"
+        accessibilityLabel={hasPhoto ? "Change photo" : "Add photo"}
+        isDisabled={disabled}
+        onPress={() => void choose()}
+      >
+        <ImagePlus color={foreground} size={20} />
       </Button>
       {hasPhoto ? (
         <Button
+          isIconOnly
           variant="ghost"
+          accessibilityLabel="Remove photo"
           isDisabled={disabled}
           onPress={() => {
             setError(null);
             onChange(null);
           }}
         >
-          <Button.Label>Remove photo</Button.Label>
+          <Trash2 color={foreground} size={20} />
         </Button>
       ) : null}
       {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+        <Typography.Paragraph accessibilityRole="alert" align="center" className="w-full text-danger-text">
           {error}
         </Typography.Paragraph>
       ) : null}
-    </View>
+    </>
   );
 }

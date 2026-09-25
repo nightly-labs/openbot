@@ -392,6 +392,7 @@ vi.mock("@/features/agents/components/bloub-avatar", () => ({
   BloubAvatar: () => null,
   BloubAvatarPreview: () => null,
   BloubAvatarThumbnail: () => null,
+  AvatarThumbnail: () => null,
 }));
 vi.mock("@/features/agents/components/agent-pin-avatar", () => ({
   AgentPinAvatar: ({ children }: PropsWithChildren) => children,
@@ -496,6 +497,9 @@ vi.mock("lucide-react-native", () => ({
   Eye: () => null,
   TriangleAlert: () => null,
   Trash2: () => null,
+  Shuffle: () => null,
+  ImagePlus: () => null,
+  Pencil: () => null,
 }));
 vi.mock("@/features/chat/components/attachment-preview", () => ({
   AttachmentThumbnail: () => null,
