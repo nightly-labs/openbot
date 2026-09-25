@@ -167,7 +167,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                     <ItemGroup surface="subtle" class="agent-template-rows">
                       <TemplateRow
                         title="Context"
-                        detail={preview().skills.length > 0 ? "Instructions and skills" : "Instructions"}
+                        detail={contextSummary(preview())}
                         onClick={() => setView("context")}
                       />
                       <TemplateRow
@@ -254,6 +254,13 @@ function TemplateDetailView(props: {
         <Show when={props.view === "context"} fallback={<TemplateRoutines routines={props.preview.routines} />}>
           <TemplateInstructions title={props.preview.title} description={props.preview.description} />
           <TemplateSkills skills={props.preview.skills} />
+          <Show when={props.preview.skillsError}>
+            {(error) => (
+              <Text tone="danger" variant="caption" role="alert">
+                The skills cannot be published: {error()}
+              </Text>
+            )}
+          </Show>
           <Text tone="muted" variant="caption">
             Files and memories are not published.
           </Text>
@@ -261,6 +268,11 @@ function TemplateDetailView(props: {
       </div>
     </div>
   );
+}
+
+function contextSummary(preview: AgentTemplatePreview) {
+  if (preview.skillsError) return "Skills need attention";
+  return preview.skills.length > 0 ? "Instructions and skills" : "Instructions";
 }
 
 function routinesSummary(routines: readonly MarketplaceAgentRoutine[]): string {

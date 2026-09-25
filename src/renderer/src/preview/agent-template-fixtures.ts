@@ -65,6 +65,7 @@ export function storyAgentTemplatePreview(
     avatarImage: null,
     updatedAt: "2026-09-25T09:06:00.000Z",
     publication,
+    skillsError: null,
   };
 }
 

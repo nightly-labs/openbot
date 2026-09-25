@@ -345,6 +345,7 @@ export function decodeAgentTemplatePreview(value: unknown): AgentTemplatePreview
     avatarImage: decodePreviewAvatarImage(item.avatarImage),
     updatedAt: nullableString(item, "updatedAt"),
     publication: item.publication === null ? null : decodeAgentTemplatePublication(item.publication),
+    skillsError: nullableString(item, "skillsError"),
   };
 }
 

@@ -101,13 +101,23 @@ export class AgentTemplateService {
     const agent = this.requireAgent(agentId);
     // Signed out or offline, the agent still previews; it reads as not published.
     const owned = await this.owned(agentId).catch(() => null);
+    // A skill that cannot be published must not hide the dialog: it is where a published agent is
+    // unpublished. The preview shows the error, and publishing refuses with it.
+    let skills: AgentTemplateSkill[] = [];
+    let skillsError: string | null = null;
+    try {
+      skills = await this.skills.listTemplateSkills(agentId);
+    } catch (error) {
+      skillsError = message(error);
+    }
     return {
-      ...(await this.snapshot(agent)),
+      ...this.profile(agent, skills),
       agentId,
       avatarUrl: agent.avatarUrl,
       avatarImage: await this.readAvatar(agentId),
       updatedAt: agent.updatedAt,
       publication: owned ? this.publication(owned) : null,
+      skillsError,
     };
   }
 
@@ -245,13 +255,17 @@ export class AgentTemplateService {
   }
 
   private async snapshot(agent: AgentSummary): Promise<AgentTemplateSnapshot> {
+    return this.profile(agent, await this.skills.listTemplateSkills(agent.id));
+  }
+
+  private profile(agent: AgentSummary, skills: AgentTemplateSkill[]): AgentTemplateSnapshot {
     return toAgentTemplateSnapshot({
       name: agent.name,
       title: agent.title,
       description: agent.description,
       avatarSeed: agent.avatarSeed,
       avatarHue: agent.avatarHue,
-      skills: await this.skills.listTemplateSkills(agent.id),
+      skills,
       routines: this.agents.listRoutines(agent.id).map(({ name, instruction, active, trigger }) => ({
         name,
         instruction,
@@ -346,4 +360,8 @@ function decodeTemplateDetail(value: unknown): AgentTemplateDetail {
 function decodeDeleted(value: unknown): { deleted: true } {
   if (!isDynamicRecord(value) || value.deleted !== true) throw new Error("Invalid agent template response.");
   return { deleted: true };
+}
+
+function message(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "The skills could not be read.";
 }

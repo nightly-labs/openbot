@@ -42,6 +42,17 @@ export const NoRoutinesOrSkills: Story = {
   args: { preview: { ...storyAgentTemplatePreview("dr-eggbot"), skills: [], routines: [] } },
 };
 
+/** A published agent whose skill has local changes: it can still be unpublished. */
+export const SkillsNeedAttention: Story = {
+  args: {
+    preview: {
+      ...storyAgentTemplatePreview("dr-eggbot", STORY_AGENT_TEMPLATE_PUBLICATION),
+      skills: [],
+      skillsError: "Linear triage has local changes or needs repair before publishing.",
+    },
+  },
+};
+
 export const Loading: Story = { args: { preview: null, loading: true } };
 
 export const PublishFails: Story = {

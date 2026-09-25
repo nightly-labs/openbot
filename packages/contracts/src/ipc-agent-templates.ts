@@ -47,6 +47,11 @@ export interface AgentTemplatePreview extends AgentTemplateSnapshot {
   avatarImage: AvatarImageInput | null;
   updatedAt: string | null;
   publication: AgentTemplatePublication | null;
+  /**
+   * Why the skills could not be read, such as a marketplace skill with local changes. The preview
+   * still opens, so a published agent can be unpublished; publishing refuses with this error.
+   */
+  skillsError: string | null;
 }
 
 export interface PublishAgentTemplateInput {
