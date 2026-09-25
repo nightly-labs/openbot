@@ -6,14 +6,13 @@ import type { AgentService } from "../../backend/agent-service";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
 import {
-  agentRequest,
   parseChannelId,
   parseCreateChannelMemory,
   parseDeleteChannelMemory,
   parseUpdateChannelMemory,
 } from "./agent-inputs";
-import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
-import { routeToServer } from "./route-to-server";
+import type { IpcGroupHandlers } from "./define-ipc-group";
+import { scopedHandler } from "./scoped-handler";
 
 interface ChannelMemoryIpcDependencies {
   service: AgentService;
@@ -26,60 +25,45 @@ export function channelMemoryIpcHandlers({
 }: ChannelMemoryIpcDependencies): Pick<IpcGroupHandlers, "channelMemories"> {
   return {
     channelMemories: {
-      listChannelMemories: payloadHandler(agentRequest(parseChannelId), (scoped) => {
-        const channelId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.listChannelMemories(channelId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
-              method: "POST",
-              body: { channelId },
-            }),
-        });
+      listChannelMemories: scopedHandler(parseChannelId, {
+        local: (channelId) => service.listChannelMemories(channelId),
+        remote: (channelId, serverId) =>
+          remoteServers.request(serverId, CHANNEL_ROUTES.memories, decodeChannelMemories, {
+            method: "POST",
+            body: { channelId },
+          }),
       }),
-      createChannelMemory: payloadHandler(agentRequest(parseCreateChannelMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.createChannelMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
-              method: "POST",
-              body: parsed,
-            }),
-        });
+      createChannelMemory: scopedHandler(parseCreateChannelMemory, {
+        local: (parsed) => service.createChannelMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, CHANNEL_ROUTES.memoryCreate, decodeChannelMemory, {
+            method: "POST",
+            body: parsed,
+          }),
       }),
-      updateChannelMemory: payloadHandler(agentRequest(parseUpdateChannelMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.updateChannelMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
-              method: "POST",
-              body: parsed,
-            }),
-        });
+      updateChannelMemory: scopedHandler(parseUpdateChannelMemory, {
+        local: (parsed) => service.updateChannelMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, CHANNEL_ROUTES.memoryUpdate, decodeChannelMemory, {
+            method: "POST",
+            body: parsed,
+          }),
       }),
-      deleteChannelMemory: payloadHandler(agentRequest(parseDeleteChannelMemory), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.deleteChannelMemory(parsed),
-          remote: (serverId) =>
-            remoteServers.request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
-              method: "POST",
-              body: parsed,
-            }),
-        });
+      deleteChannelMemory: scopedHandler(parseDeleteChannelMemory, {
+        local: (parsed) => service.deleteChannelMemory(parsed),
+        remote: (parsed, serverId) =>
+          remoteServers.request(serverId, CHANNEL_ROUTES.memoryDelete, decodeVoid, {
+            method: "POST",
+            body: parsed,
+          }),
       }),
-      clearChannelMemories: payloadHandler(agentRequest(parseChannelId), (scoped) => {
-        const channelId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.clearChannelMemories(channelId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
-              method: "POST",
-              body: { channelId },
-            }),
-        });
+      clearChannelMemories: scopedHandler(parseChannelId, {
+        local: (channelId) => service.clearChannelMemories(channelId),
+        remote: (channelId, serverId) =>
+          remoteServers.request(serverId, CHANNEL_ROUTES.memoryClear, decodeVoid, {
+            method: "POST",
+            body: { channelId },
+          }),
       }),
     },
   };

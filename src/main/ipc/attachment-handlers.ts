@@ -14,7 +14,6 @@ import {
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type DownloadAttachmentsInput,
-  type FilePreview,
   type ImportAttachmentsInput,
   LOCAL_SERVER_ID,
   type OpenAttachmentInput,
@@ -43,6 +42,7 @@ import {
 } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
+import { scopedHandler } from "./scoped-handler";
 
 export interface AttachmentIpcDependencies {
   service: Pick<
@@ -74,12 +74,9 @@ export function attachmentIpcHandlers({
 }: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments" | "attachmentImports"> {
   return {
     attachmentImports: {
-      importAttachments: payloadHandler(agentRequest(parseImportAttachments), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.prepareImportedAttachments(parsed.paths, parsed.data),
-          remote: (serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
-        });
+      importAttachments: scopedHandler(parseImportAttachments, {
+        local: (parsed) => service.prepareImportedAttachments(parsed.paths, parsed.data),
+        remote: (parsed, serverId) => uploadRemoteImports(remoteServers, serverId, parsed),
       }),
     },
     agentAttachments: {
@@ -114,13 +111,10 @@ export function attachmentIpcHandlers({
           remote: (target) => uploadRemotePaths(remoteServers, target, result.filePaths),
         });
       }),
-      discardDraftAttachment: payloadHandler(agentRequest(parseAttachmentId), (scoped) => {
-        const attachmentId = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: () => service.discardDraftAttachment(attachmentId),
-          remote: (serverId) =>
-            remoteServers.request(serverId, TEAM_API_ROUTES.attachment(attachmentId), decodeVoid, { method: "DELETE" }),
-        });
+      discardDraftAttachment: scopedHandler(parseAttachmentId, {
+        local: (attachmentId) => service.discardDraftAttachment(attachmentId),
+        remote: (attachmentId, serverId) =>
+          remoteServers.request(serverId, TEAM_API_ROUTES.attachment(attachmentId), decodeVoid, { method: "DELETE" }),
       }),
       downloadAttachments: payloadHandler(agentRequest(parseDownloadAttachments), async (scoped) => {
         const parsed = scoped.payload;
@@ -143,60 +137,48 @@ export function attachmentIpcHandlers({
       openAttachment: payloadHandler(agentRequest(parseOpenAttachment), (scoped) =>
         openAttachmentForServer({ mailbox, remoteServers, getMainWindow }, scoped.serverId, scoped.payload),
       ),
-      openSharedFile: payloadHandler(agentRequest(parseOpenSharedFile), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<void>(scoped.serverId, {
-          local: async () => {
-            const sharedFile = await service.resolveSharedFile(parsed.path);
-            await openPath(sharedFile.path);
-          },
-          remote: async (serverId) => {
-            const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
-            const target = await cacheRemoteFile("remote-shared-files", `${serverId}:${parsed.path}`, downloaded);
-            await openPath(target);
-          },
-        });
+      openSharedFile: scopedHandler(parseOpenSharedFile, {
+        local: async (parsed) => {
+          const sharedFile = await service.resolveSharedFile(parsed.path);
+          await openPath(sharedFile.path);
+        },
+        remote: async (parsed, serverId) => {
+          const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
+          const target = await cacheRemoteFile("remote-shared-files", `${serverId}:${parsed.path}`, downloaded);
+          await openPath(target);
+        },
       }),
-      openWorkspaceFile: payloadHandler(agentRequest(parseOpenWorkspaceFile), (scoped) => {
-        const parsed = scoped.payload;
-        return routeToServer<void>(scoped.serverId, {
-          local: async () => {
-            const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
-            await openPath(workspaceFile.path);
-          },
-          remote: async (serverId) => {
-            const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
-            const key = `${serverId}:${parsed.agentId}:${parsed.path}`;
-            const target = await cacheRemoteFile("remote-workspace-files", key, downloaded);
-            await openPath(target);
-          },
-        });
+      openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
+        local: async (parsed) => {
+          const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
+          await openPath(workspaceFile.path);
+        },
+        remote: async (parsed, serverId) => {
+          const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
+          const key = `${serverId}:${parsed.agentId}:${parsed.path}`;
+          const target = await cacheRemoteFile("remote-workspace-files", key, downloaded);
+          await openPath(target);
+        },
       }),
-      previewSharedFile: payloadHandler(agentRequest(parseOpenSharedFile), (scoped): Promise<FilePreview> => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: async () => {
-            const sharedFile = await service.resolveSharedFile(parsed.path);
-            return localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size);
-          },
-          remote: async (serverId) => {
-            const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
-            return filePreviewFromBytes(downloaded.name, downloaded.bytes);
-          },
-        });
+      previewSharedFile: scopedHandler(parseOpenSharedFile, {
+        local: async (parsed) => {
+          const sharedFile = await service.resolveSharedFile(parsed.path);
+          return localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size);
+        },
+        remote: async (parsed, serverId) => {
+          const downloaded = await remoteServers.downloadSharedFile(parsed.path, serverId);
+          return filePreviewFromBytes(downloaded.name, downloaded.bytes);
+        },
       }),
-      previewWorkspaceFile: payloadHandler(agentRequest(parseOpenWorkspaceFile), (scoped): Promise<FilePreview> => {
-        const parsed = scoped.payload;
-        return routeToServer(scoped.serverId, {
-          local: async () => {
-            const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
-            return localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size);
-          },
-          remote: async (serverId) => {
-            const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
-            return filePreviewFromBytes(downloaded.name, downloaded.bytes);
-          },
-        });
+      previewWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
+        local: async (parsed) => {
+          const workspaceFile = await service.resolveWorkspaceFile(parsed.agentId, parsed.path);
+          return localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size);
+        },
+        remote: async (parsed, serverId) => {
+          const downloaded = await remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId);
+          return filePreviewFromBytes(downloaded.name, downloaded.bytes);
+        },
       }),
     },
   };

@@ -61,9 +61,9 @@ is `onModelStatus`). The preload builds it with `bridgeGroup` and the test harne
 so a new endpoint in it needs no line in `ipc-desktop-apis.ts`. `app` and `providers` are spread into
 the top level. There are no per-method overrides: a group that needs one is written by hand. These
 stay by hand: `computerUse` (renamed top-level members), `browser` (the untyped endpoint and renamed
-members), `auth` (`verifyEmailCode` reshapes its arguments), `servers` (preload state, and member and
-invite calls that take the server first), and `attachmentImports`, which only the preload calls with
-the paths of dropped files and which the renderer must never reach. The eight agent groups are spread
+members), `servers` (preload state, and member and invite calls that take the server first), and
+`attachmentImports`, which only the preload calls with the paths of dropped files and which the
+renderer must never reach. The eight agent groups are spread
 into `agent`, so their keys are the renderer names (`agent.listAgents`, `mcpServers.saveMcpServer`).
 
 In a hand-written group the preload is still the link no type pairs with an endpoint. Its API object

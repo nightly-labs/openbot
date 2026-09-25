@@ -75,3 +75,8 @@ A handler that takes a `serverId` serves two backends — the local `AgentServic
 server over HTTP — and picks with `routeToServer(serverId, { local, remote })` from
 `./route-to-server.ts`. Write the branch out by hand and you have written the fifty-fifth copy of the
 same ternary.
+
+When the whole handler is that one route, bind it with `scopedHandler(decode, { local, remote })`, or
+`scopedQueryHandler({ local, remote })` for a `scopedQuery` endpoint, from `./scoped-handler.ts`.
+Each branch gets the decoded payload, and `remote` also gets the server. Use `payloadHandler` with
+`agentRequest(decode)` only when the handler does work outside the route.
