@@ -292,7 +292,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.emit("directoryInvalidated");
   }
 
-  /** Without app focus, an offline host retries rarely; with focus, it retries at once and then normally. */
+  /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   setAppFocused(focused: boolean): void {
     this.#events.setAppFocused(focused);
   }

@@ -46,9 +46,11 @@ const REMOTE_EVENT_RECONNECT_BASE_MS = 1_000;
 const REMOTE_EVENT_RECONNECT_MAX_MS = 60_000;
 const REMOTE_EVENT_RECONNECT_JITTER = 0.2;
 // Signal said the host is not connected. The account directory keeps hosts that went away for good,
-// so a one-minute retry ran all day against them. This wait applies only while no app window has
-// focus: while the user looks at the app, the normal retry stays, and focus retries at once.
-const REMOTE_HOST_OFFLINE_RETRY_MS = 15 * 60_000;
+// so a one-minute retry ran all day against them, and each retry spent a Signal ticket. An offline
+// host retries each five minutes while an app window has focus, and each fifteen minutes without
+// focus. Focus and a manual retry still retry at once.
+const REMOTE_HOST_OFFLINE_RETRY_MS = 5 * 60_000;
+const REMOTE_HOST_OFFLINE_UNFOCUSED_RETRY_MS = 15 * 60_000;
 const REMOTE_EVENT_HEALTHY_MS = 30_000;
 const REMOTE_EVENT_PAYLOAD_LIMIT = 1024 * 1024;
 const REMOTE_EVENT_INITIAL_BUFFER_LIMIT = 1_000;
@@ -203,10 +205,9 @@ export class RemoteEventStream {
     this.#offlineHosts.delete(serverId);
   }
 
-  /** Without app focus, the next retry for this host waits the long offline delay, also over a shorter one already set. */
+  /** The next retry for this host waits the offline delay, also over a shorter one already set. */
   markHostOffline(serverId: string): void {
     this.#offlineHosts.set(serverId, Date.now());
-    if (this.#appFocused) return;
     const reconnectTimer = this.#reconnectTimers.get(serverId);
     if (!reconnectTimer) return;
     clearTimeout(reconnectTimer);
@@ -214,7 +215,7 @@ export class RemoteEventStream {
     this.scheduleReconnect(serverId);
   }
 
-  /** Focus makes an offline host retry at once and then keep the normal retry. */
+  /** Focus makes an offline host retry at once. */
   setAppFocused(focused: boolean): void {
     this.#appFocused = focused;
     if (focused) this.retryOfflineHosts();
@@ -315,10 +316,11 @@ export class RemoteEventStream {
     if (this.#authenticationPaused.has(serverId)) return;
     const attempt = (this.#reconnectAttempts.get(serverId) ?? 0) + 1;
     this.#reconnectAttempts.set(serverId, attempt);
-    const hostOffline = !this.#appFocused && this.#offlineHosts.has(serverId);
-    const maximumDelay = hostOffline ? REMOTE_HOST_OFFLINE_RETRY_MS : REMOTE_EVENT_RECONNECT_MAX_MS;
+    const hostOffline = this.#offlineHosts.has(serverId);
+    const offlineDelay = this.#appFocused ? REMOTE_HOST_OFFLINE_RETRY_MS : REMOTE_HOST_OFFLINE_UNFOCUSED_RETRY_MS;
+    const maximumDelay = hostOffline ? offlineDelay : REMOTE_EVENT_RECONNECT_MAX_MS;
     const exponentialDelay = hostOffline
-      ? REMOTE_HOST_OFFLINE_RETRY_MS
+      ? offlineDelay
       : Math.min(REMOTE_EVENT_RECONNECT_MAX_MS, REMOTE_EVENT_RECONNECT_BASE_MS * 2 ** (attempt - 1));
     const jitter = exponentialDelay * REMOTE_EVENT_RECONNECT_JITTER * (Math.random() * 2 - 1);
     const delay = Math.min(
@@ -327,6 +329,9 @@ export class RemoteEventStream {
     );
     const timer = setTimeout(() => {
       this.#reconnectTimers.delete(serverId);
+      // Only the attempt that follows was delayed. When it fails for another reason, for example
+      // while the host starts again, the normal retry applies.
+      this.#offlineHosts.delete(serverId);
       this.ensure(serverId);
     }, delay);
     this.#reconnectTimers.set(serverId, timer);

@@ -182,7 +182,7 @@ describe("remote event connections", () => {
     expect(sockets).toHaveLength(1);
   });
 
-  it("retries a WebRTC host that Signal reports offline normally with focus, and rarely without it", async () => {
+  it("retries a WebRTC host that Signal reports offline each 5 minutes with focus, and each 15 without it", async () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const hostId = "00000000-0000-4000-8000-0000000000fa";
@@ -208,17 +208,21 @@ describe("remote event connections", () => {
 
     fixture.manager.startEventConnections();
     await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
-    // While the user looks at the app, a host that comes back shows up within the normal retry.
-    await vi.advanceTimersByTimeAsync(1_000);
+    // Each retry costs a Worker request and a Signal ticket, and a host that went away for good stays
+    // listed, so an open window does not retry each minute.
+    await vi.advanceTimersByTimeAsync(4 * 60_000);
+    expect(connect).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(connect).toHaveBeenCalledTimes(2);
 
-    // Without focus, each retry costs a Worker request, and a host that went away for good stays listed.
+    // Without focus, the retry waits longer. The retry set with focus still runs first.
     fixture.manager.setAppFocused(false);
-    await vi.advanceTimersByTimeAsync(2_000);
-    const unfocusedCalls = connect.mock.calls.length;
     await vi.advanceTimersByTimeAsync(5 * 60_000);
+    const unfocusedCalls = connect.mock.calls.length;
+    expect(unfocusedCalls).toBe(3);
+    await vi.advanceTimersByTimeAsync(14 * 60_000);
     expect(connect).toHaveBeenCalledTimes(unfocusedCalls);
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(connect).toHaveBeenCalledTimes(unfocusedCalls + 1);
 
     await vi.advanceTimersByTimeAsync(60_000);
