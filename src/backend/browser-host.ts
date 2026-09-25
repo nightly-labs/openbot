@@ -1,13 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   BrowserBounds,
-  BrowserControlAction,
-  BrowserControlDetailAction,
   BrowserControlSession,
   BrowserControlState,
   BrowserEnvironment,
@@ -25,7 +22,6 @@ import type {
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
-  app,
   BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
@@ -45,9 +41,19 @@ import {
   type BrowserViewportInput,
   type SnapshotReadResult,
 } from "./browser-cdp";
+import { browserControlAction, browserControlDetailAction, controlSessionId } from "./browser-control";
 import { BrowserDiagnostics } from "./browser-diagnostics";
-import { applySiteIdentity } from "./browser-identity";
 import { describeBrowserTarget, navigateAndWait } from "./browser-navigation";
+import {
+  browserLoadOptions,
+  browserRequestHeaders,
+  diagnosticUrl,
+  isAllowedBrowserPermission,
+  isAllowedMainUrl,
+  logUrlHost,
+  normalizeBrowserUrl,
+  preferredBrowserLanguageCodes,
+} from "./browser-policy";
 import { BrowserRecorder } from "./browser-recorder";
 import {
   browserContextMenuItems,
@@ -61,12 +67,11 @@ import {
   type BrowserTabOwner,
   defaultBrowserEnvironment,
   isPersistableBrowserUrl,
-  isSafeViewportSize,
-  MAX_PHYSICAL_VIEWPORT_PIXELS,
   persistentBrowserUrl,
+  readBrowserState,
   reownStoredBrowserTab,
-  type StoredBrowserTab,
-  storedBrowserTab,
+  resolveEnvironment,
+  type StoredBrowserStateV2,
 } from "./browser-state";
 import {
   type BrowserDynamicToolHooks,
@@ -80,7 +85,6 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
-import { isMissingFileError } from "./file-errors";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import { TimeoutError, withTimeout } from "./with-timeout";
@@ -189,16 +193,6 @@ export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
   submit(secret: string): Promise<"submitted" | "takeover">;
   cancel(): void;
-}
-
-/**
- * The file is always rewritten as v2. A v1 file is still read -- `storedBrowserTab` accepts both owner
- * spellings, and a tab that arrives without an environment is given the default rather than dropped.
- */
-interface StoredBrowserStateV2 {
-  version: 2;
-  activeTabId: string | null;
-  tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
 
 type BrowserAction = BrowserToolArguments<"act">["action"];
@@ -2198,10 +2192,6 @@ export class BrowserHost {
   }
 }
 
-function controlSessionId(threadId: string, turnId: string): string {
-  return `${threadId}:${turnId}`;
-}
-
 function restoreWebContentsFocus(previous: WebContents | null, controlled: WebContents): void {
   const current = webContents.getFocusedWebContents();
   if (current && current !== controlled) return;
@@ -2209,202 +2199,6 @@ function restoreWebContentsFocus(previous: WebContents | null, controlled: WebCo
     const window = BrowserWindow.fromWebContents(previous);
     if (window && !window.isDestroyed()) window.focus();
     previous.focus();
-  }
-}
-
-function browserControlAction(call: BrowserToolCall): BrowserControlAction {
-  switch (call.tool) {
-    case "open":
-      return "open";
-    case "list_tabs":
-      return "list-tabs";
-    case "snapshot":
-      return "snapshot";
-    case "screenshot":
-      return "screenshot";
-    case "close_tab":
-      return "close-tab";
-    case "status":
-      return "list-tabs";
-    case "navigate":
-      if (call.args.direction === "back") return "back";
-      if (call.args.direction === "forward") return "forward";
-      if (call.args.direction === "reload") return "reload";
-      return "open";
-    case "click":
-      return "click";
-    case "type":
-      return "type";
-    case "press":
-      return "key";
-    case "hover":
-      return "click";
-    case "scroll":
-      return "scroll";
-    case "select_option":
-      return "click";
-    case "set_checked":
-      return "click";
-    case "drag":
-      return "click";
-    case "upload_files":
-      return "type";
-    case "wait_for":
-      return "snapshot";
-    case "evaluate":
-      return "snapshot";
-    case "set_environment":
-      return "snapshot";
-    case "recording_start":
-      return "screenshot";
-    case "recording_stop":
-      return "screenshot";
-    case "act":
-      return call.args.action.type;
-    default:
-      return "snapshot";
-  }
-}
-
-function browserControlDetailAction(tool: string): BrowserControlDetailAction | undefined {
-  switch (tool) {
-    case "status":
-    case "navigate":
-    case "press":
-    case "hover":
-    case "drag":
-      return tool;
-    case "select_option":
-      return "select-option";
-    case "set_checked":
-      return "set-checked";
-    case "upload_files":
-      return "upload-files";
-    case "wait_for":
-      return "wait-for";
-    case "evaluate":
-      return "evaluate";
-    case "set_environment":
-      return "set-environment";
-    case "recording_start":
-      return "recording-start";
-    case "recording_stop":
-      return "recording-stop";
-    default:
-      return undefined;
-  }
-}
-
-function normalizeBrowserUrl(input: string): string {
-  const value = input.trim();
-  if (!value) throw new Error("A browser URL is required.");
-  if (value.length > INPUT_LIMITS.browserUrl) throw new Error("The browser URL is too long.");
-  const withProtocol = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
-  const url = new URL(withProtocol);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Only HTTP(S) browser URLs are allowed.");
-  }
-  return url.toString();
-}
-
-function browserLoadOptions(): { extraHeaders: string } {
-  return { extraHeaders: "Cache-Control: no-cache\nPragma: no-cache" };
-}
-
-function browserRequestHeaders(url: string, requestHeaders: Record<string, string>): Record<string, string> {
-  const headers = applySiteIdentity(url, requestHeaders);
-  setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
-  return headers;
-}
-
-function preferredBrowserLanguages(): string {
-  return preferredBrowserLanguageCodes()
-    .split(",")
-    .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
-    .join(",");
-}
-
-function preferredBrowserLanguageCodes(): string {
-  const languages = app.getPreferredSystemLanguages();
-  return (languages.length > 0 ? languages : [app.getLocale()]).join(",");
-}
-
-function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {
-  const existingName = Object.keys(headers).find((candidate) => candidate.toLowerCase() === name.toLowerCase());
-  if (existingName && existingName !== name) delete headers[existingName];
-  headers[name] = value;
-}
-
-async function readBrowserState(path: string): Promise<StoredBrowserStateV2> {
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
-    if (!isRecord(parsed) || (parsed.version !== 1 && parsed.version !== 2)) {
-      return { version: 2, activeTabId: null, tabs: [] };
-    }
-    const tabs = Array.isArray(parsed.tabs)
-      ? parsed.tabs
-          .map(storedBrowserTab)
-          .filter((tab) => tab !== null)
-          .map((tab) => ({
-            ...tab,
-            url: persistentBrowserUrl(tab.url),
-            // A v1 file never wrote an environment, so anything sitting under that key in one is not
-            // ours to trust -- the tab starts from the default instead.
-            environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
-          }))
-      : [];
-    return {
-      version: 2,
-      activeTabId: isString(parsed.activeTabId) ? parsed.activeTabId : null,
-      tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
-    };
-  } catch (error) {
-    if (isMissingFileError(error) || error instanceof SyntaxError) {
-      return { version: 2, activeTabId: null, tabs: [] };
-    }
-    throw error;
-  }
-}
-
-function isAllowedMainUrl(value: string): boolean {
-  return value === "about:blank" || isPersistableBrowserUrl(value);
-}
-
-/**
- * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
- * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
- * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
- * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
- * else, so camera, microphone, location and notifications are unchanged.
- */
-function isAllowedBrowserPermission(permission: string): boolean {
-  return permission === "clipboard-sanitized-write";
-}
-
-/**
- * The host of a tab's URL, for a log line. `diagnosticUrl` below keeps the path, which is right for a
- * diagnostic the user reads back in the app but wrong for a log: a path carries tokens often enough
- * (`/reset/<secret>`, `/invite/<secret>`) that writing one to disk breaks the redaction rule. The host
- * is enough to tell which tab an agent closed.
- */
-function logUrlHost(value: string): string | undefined {
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return undefined;
-  }
-}
-
-function diagnosticUrl(value: string): string | undefined {
-  try {
-    const url = new URL(value);
-    url.username = "";
-    url.password = "";
-    url.search = "";
-    url.hash = "";
-    return url.toString().slice(0, INPUT_LIMITS.browserUrl);
-  } catch {
-    return undefined;
   }
 }
 
@@ -2492,68 +2286,6 @@ function readConsoleMessage(args: unknown[]): BrowserConsoleMessageDetails | nul
   };
 }
 
-function resolveEnvironment(
-  value: BrowserToolArguments<"set_environment">,
-  current: BrowserEnvironment,
-  bounds: BrowserBounds,
-): BrowserEnvironment {
-  const preset = value.preset;
-  const presetSize = presetDimensions(preset);
-  const explicitScale = value.deviceScaleFactor !== undefined;
-  const scaleConvertsFill =
-    explicitScale && (preset === "fill" || (preset === undefined && current.viewport.mode === "fill"));
-  const requestedWidth =
-    value.width ??
-    presetSize?.width ??
-    (preset === "fill" || scaleConvertsFill ? bounds.width : current.viewport.width);
-  const requestedHeight =
-    value.height ??
-    presetSize?.height ??
-    (preset === "fill" || scaleConvertsFill ? bounds.height : current.viewport.height);
-  const width = Math.round(requestedWidth);
-  const height = Math.round(requestedHeight);
-  const mode =
-    preset === "fill" && !explicitScale
-      ? "fill"
-      : preset || value.width !== undefined || value.height !== undefined || explicitScale
-        ? "custom"
-        : current.viewport.mode;
-  const minimumWidth = mode === "fill" ? 1 : 320;
-  const minimumHeight = mode === "fill" ? 1 : 240;
-  if (
-    width < minimumWidth ||
-    width > INPUT_LIMITS.browserDimension ||
-    height < minimumHeight ||
-    height > INPUT_LIMITS.browserDimension
-  ) {
-    throw new Error("Viewport dimensions are outside the supported range.");
-  }
-  // Fill clears the device metrics override, so it cannot inherit a custom emulation scale.
-  const scale =
-    mode === "fill" ? 1 : (value.deviceScaleFactor ?? presetSize?.scale ?? current.viewport.deviceScaleFactor);
-  if (scale < 0.5 || scale > 4) throw new Error("deviceScaleFactor must be between 0.5 and 4.");
-  if (!isSafeViewportSize(width, height, scale)) {
-    throw new Error(`The physical viewport must not exceed ${MAX_PHYSICAL_VIEWPORT_PIXELS.toLocaleString()} pixels.`);
-  }
-  const resolvedPreset =
-    preset === "desktop" || preset === "tablet" || preset === "mobile"
-      ? preset
-      : preset === "custom" || preset === "fill"
-        ? null
-        : current.viewport.preset;
-  return {
-    viewport: {
-      mode,
-      width,
-      height,
-      deviceScaleFactor: scale,
-      preset: resolvedPreset,
-    },
-    colorScheme: value.colorScheme ?? current.colorScheme,
-    reducedMotion: value.reducedMotion ?? current.reducedMotion,
-  };
-}
-
 function boundedCaptureDataUrl(image: NativeImage): string {
   const size = image.getSize();
   if (size.width <= 0 || size.height <= 0) throw new Error("Browser screenshot is empty.");
@@ -2567,19 +2299,6 @@ function boundedCaptureDataUrl(image: NativeImage): string {
       quality: "good",
     })
     .toDataURL();
-}
-
-function presetDimensions(preset: "fill" | "desktop" | "tablet" | "mobile" | "custom" | undefined) {
-  switch (preset) {
-    case "desktop":
-      return { width: 1440, height: 900, scale: 1 };
-    case "tablet":
-      return { width: 820, height: 1180, scale: 2 };
-    case "mobile":
-      return { width: 390, height: 844, scale: 3 };
-    default:
-      return null;
-  }
 }
 
 function navigateHistory(contents: WebContents, direction: BrowserNavigationDirection): boolean {
