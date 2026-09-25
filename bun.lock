@@ -325,6 +325,7 @@
     "@norbert_bodziony/bloub@0.3.0": "patches/@norbert_bodziony%2Fbloub@0.3.0.patch",
     "@solidjs/signals@2.0.0-rc.0": "patches/@solidjs%2Fsignals@2.0.0-rc.0.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
+    "@solidjs/web@2.0.0-rc.0": "patches/@solidjs%2Fweb@2.0.0-rc.0.patch",
   },
   "catalog": {
     "@cloudflare/workers-types": "5.20260815.1",
