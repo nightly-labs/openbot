@@ -81,6 +81,8 @@ describe("transfer budget", () => {
 
     await mkdir(join(REPORT_PATH, ".."), { recursive: true });
     await writeFile(REPORT_PATH, `${JSON.stringify({ measured, budgets: BUDGETS }, null, 2)}\n`);
+    // A zero means that the spies or the event capture stopped counting, not that the turn is free.
+    for (const [name, value] of Object.entries(measured)) expect(value, name).toBeGreaterThan(0);
     expect(measured.firstTurnStatements).toBeLessThanOrEqual(BUDGETS.firstTurnStatements);
     expect(measured.laterTurnStatements).toBeLessThanOrEqual(BUDGETS.laterTurnStatements);
     expect(measured.readConversationStatements).toBeLessThanOrEqual(BUDGETS.readConversationStatements);
