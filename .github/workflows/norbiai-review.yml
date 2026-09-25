@@ -649,6 +649,7 @@ jobs:
 
           prompt_file="$RUNNER_TEMP/norbiai-prompt.txt"
           live_file="$RUNNER_TEMP/norbiai-live.txt"
+          error_file="$RUNNER_TEMP/norbiai-codex-stderr.txt"
           last_message_file="$RUNNER_TEMP/norbiai-last-message.txt"
           review_file="$RUNNER_TEMP/norbiai-review.txt"
           salvage_file="$RUNNER_TEMP/norbiai-salvaged-review.txt"
@@ -958,8 +959,11 @@ jobs:
                 --config "model_reasoning_effort=\"${EFFORT}\"" \
                 --color never \
                 --output-last-message "$last_message_file" \
-                - < "$prompt_file" 2>&1 | tee "$live_file"
+                - < "$prompt_file" 2>"$error_file" | tee "$live_file"
               exit_code=${PIPESTATUS[0]}
+              # Every check below reads one merged stream, as it did when both streams were
+              # merged here. Only the failure reason reads the error stream on its own.
+              tee -a "$live_file" < "$error_file"
               # Only an error line counts: the output starts with the prompt, and a diff that
               # holds these words made every failed run wait and try again.
               if [ "$exit_code" -eq 0 ] || [ "$attempt" -eq 3 ] ||
@@ -1008,9 +1012,19 @@ jobs:
           # that list invents nothing. With previous findings the lost section is the only
           # record of a withdrawal, and a finding withdrawn there would appear in neither
           # list and disappear from the next run. Salvage only what the output proves.
+          # `## Findings` of a clean review is not empty: it holds `No actionable findings.`
+          # Reading that as an active finding would block the salvage on almost every pull
+          # request. Any other content keeps the block, including a shape this step does not
+          # recognise, because a finding it cannot read must not be dropped either.
+          previous_findings=true
+          if [ ! -s "$PREVIOUS_FILE" ] ||
+            ! grep -qvE '^[[:space:]]*(No actionable findings\.)?[[:space:]]*$' "$PREVIOUS_FILE"; then
+            previous_findings=false
+          fi
+
           salvaged=false
           if [ "$exit_code" -ne 0 ] && [ ! -s "$last_message_file" ] &&
-            [ "${marker_hits:-0}" -ge 2 ] && [ ! -s "$PREVIOUS_FILE" ]; then
+            [ "${marker_hits:-0}" -ge 2 ] && [ "$previous_findings" = false ]; then
             # The bridge prints its reconnection notices, and Codex its token count, below
             # the answer. Neither belongs in the published review.
             tail -n "+$(( marker_line + 1 ))" "$live_file" |
@@ -1086,16 +1100,28 @@ jobs:
               # The exit code named no cause, so a capacity refusal, a dropped stream and a
               # crash all published the same sentence and only the logs told them apart.
               # A pull request can write `ERROR:` in its title, its body or a file the
-              # reviewer prints, and all of that reaches the live output, so only failures
-              # the bridge itself reports are named, and only from the end of the stream,
-              # where the line that stopped the run is. The reconnection notices come first
-              # and name nothing. Kept to one sanitised line, because the value goes on to
+              # reviewer prints, and all of that reaches the merged output. Codex reports its
+              # own failure on its error stream, which a pull request cannot write, so the
+              # reason is read only from there. The reconnection notices come first and name
+              # nothing. Kept to one sanitised line, because the value goes on to
               # `$GITHUB_OUTPUT` and into a comment.
               bridge_error=$(
-                { tail -n 40 "$live_file" |
-                  grep -E '^ERROR: (stream disconnected before completion:|Selected model is at capacity|You.ve hit your usage limit|Too many requests|Rate limit|unexpected status )' || true; } |
+                { grep -E '^ERROR: (stream disconnected before completion:|Selected model is at capacity|You.ve hit your usage limit|Too many requests|Rate limit|unexpected status )' "$error_file" || true; } |
                   tail -1 | sed 's/^ERROR: //' | tr -d '\r\n' | tr -c 'A-Za-z0-9 .,:;/()-' ' ' | cut -c 1-200
               )
+              if [ -z "$bridge_error" ]; then
+                # Logged, never published: the merged output holds the echoed prompt and
+                # every file the reviewer printed. A bridge that reports on its output stream
+                # instead is then visible on the first failure, and nothing is published on
+                # the word of a pull request meanwhile.
+                unverified=$(
+                  { tail -n 12 "$live_file" | grep -E '^ERROR: [A-Za-z]' || true; } |
+                    tail -1 | tr -d '\r\n' | tr -c 'A-Za-z0-9 .,:;/()-' ' ' | cut -c 1-200
+                )
+                if [ -n "$unverified" ]; then
+                  echo "::notice title=NorbiAI unverified error line::Not published, the source is not the error stream: ${unverified}"
+                fi
+              fi
               if [ -n "$bridge_error" ]; then
                 reason="Reviewer stopped: ${bridge_error} Human review required."
               else
