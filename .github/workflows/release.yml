@@ -438,7 +438,11 @@ jobs:
       - name: Run Windows checks
         run: bun run lint && bun run typecheck && bunx vitest run src/backend/cli.test.ts
 
+      # Without a token, the GitHub API rate limit for the runner's address can refuse the release
+      # lookup with HTTP 403.
       - name: Install and verify remote desktop runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bun scripts/install-remote-desktop-runtime.ts win32 x64 && bun run verify:remote-desktop-runtime --windows
 
       - name: Install and verify provider control artifacts
