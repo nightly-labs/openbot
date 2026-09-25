@@ -15,14 +15,15 @@ import type {
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
+  TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
-import type { SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage } from "../conversation/conversation-merge";
+import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createWebWorkspaceRuntime, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
 
@@ -58,10 +59,10 @@ interface WebWorkspaceState {
   busy: boolean;
   uploading: boolean;
   hiddenIds: string[];
-  pinnedIds: string[];
+  /** The team member this connection signs in as, once the host has answered. */
+  memberId: string | null;
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
-  sidebarCollapsedSectionIds: string[];
 }
 export type WebRuntimeFactory = (
   accountId: string,
@@ -106,10 +107,9 @@ export function createWebWorkspace(
     busy: false,
     uploading: false,
     hiddenIds: [],
-    pinnedIds: [],
+    memberId: null,
     duplicatingAgentIds: [],
     sidebarLayout: defaultSidebarLayout(),
-    sidebarCollapsedSectionIds: [],
   });
   let generation = 0;
   let selectedId: string | null = null;
@@ -122,6 +122,7 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -139,7 +140,6 @@ export function createWebWorkspace(
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
-            draft.sidebarCollapsedSectionIds = [];
             draft.duplicatingAgentIds = [];
           }
         });
@@ -161,7 +161,6 @@ export function createWebWorkspace(
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
-            draft.sidebarCollapsedSectionIds = [];
             draft.capabilities = [];
             draft.presence = null;
             draft.duplicatingAgentIds = [];
@@ -190,6 +189,7 @@ export function createWebWorkspace(
       },
       event(id, event) {
         if (disposed || id !== hostId) return;
+        for (const listener of hostEventListeners) listener(event);
         if (event.type === "team-presence")
           setState((draft) => {
             draft.presence = event.snapshot;
@@ -288,6 +288,9 @@ export function createWebWorkspace(
     },
     props.accountFetch,
   );
+  const preferences = createSidebarPreferences({
+    scope: () => (state.host ? `${props.accountId}:${state.host.hostId}` : ""),
+  });
   const profiles = createMemo(() => state.agents.map(toAgentProfile));
   const selected = createMemo(() => profiles().find((agent) => agent.id === state.selectedId));
   const conversation = createMemo(() => (state.selectedId ? state.conversations[state.selectedId] : undefined));
@@ -335,15 +338,16 @@ export function createWebWorkspace(
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
-      draft.pinnedIds = draft.pinnedIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) delete draft.conversations[id];
       if (nextSelected === null) draft.selectedId = null;
+      // The layout also orders channels, so only the agents that left may be dropped from it.
+      const gone = new Set(removed);
       draft.sidebarLayout = {
         ...draft.sidebarLayout,
-        agentOrder: draft.sidebarLayout.agentOrder.filter((id) => ids.has(id)),
+        agentOrder: draft.sidebarLayout.agentOrder.filter((id) => !gone.has(id)),
         agentAssignments: Object.fromEntries(
-          Object.entries(draft.sidebarLayout.agentAssignments).filter(([id]) => ids.has(id)),
+          Object.entries(draft.sidebarLayout.agentAssignments).filter(([id]) => !gone.has(id)),
         ),
       };
     });
@@ -369,6 +373,7 @@ export function createWebWorkspace(
           selectedId = null;
           setState((draft) => {
             draft.host = null;
+            draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
             draft.conversations = {};
@@ -379,7 +384,6 @@ export function createWebWorkspace(
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
-            draft.sidebarCollapsedSectionIds = [];
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
@@ -456,13 +460,12 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.host = host;
       draft.status = "connecting";
+      draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
       draft.selectedId = null;
       if (!sameHost) {
         draft.conversations = {};
         draft.hiddenIds = [];
-        draft.pinnedIds = [];
-        draft.sidebarCollapsedSectionIds = [];
       } else {
         for (const item of Object.values(draft.conversations)) {
           if (item.sending) {
@@ -503,6 +506,16 @@ export function createWebWorkspace(
         draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
+      preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
+      void runtime
+        .currentMemberId?.()
+        .then((memberId) => {
+          if (!disposed && current === generation)
+            setState((draft) => {
+              draft.memberId = memberId;
+            });
+        })
+        .catch(() => undefined);
       // Presence only names people. A host that does not answer leaves the list empty.
       void runtime.admin?.team.getPresence().then(
         (presence) => {
@@ -708,6 +721,14 @@ export function createWebWorkspace(
     selected,
     conversation,
     runtime,
+    preferences,
+    /** Every event of the connected host. Returns the unsubscribe function. */
+    onHostEvent(listener: (event: AgentEvent | TeamRealtimeEvent) => void) {
+      hostEventListeners.add(listener);
+      return () => {
+        hostEventListeners.delete(listener);
+      };
+    },
     run,
     refreshHosts,
     retryHosts,
@@ -765,6 +786,7 @@ export function createWebWorkspace(
       const wasSelected = selectedId === agentId;
       try {
         await runtime.deleteAgent(agentId);
+        preferences.removePinnedSidebarItemEverywhere({ kind: "agent", id: agentId });
         if (disposed || current !== generation) return;
         const agents = await runtime.listAgents();
         const sidebarLayout = await readSidebarLayout(
@@ -781,24 +803,6 @@ export function createWebWorkspace(
         if (current === generation) report(error);
         throw error;
       }
-    },
-    toggleSidebarSection(sectionId: string) {
-      setState((draft) => {
-        const sections = new Set(draft.sidebarCollapsedSectionIds);
-        if (sections.has(sectionId)) sections.delete(sectionId);
-        else sections.add(sectionId);
-        draft.sidebarCollapsedSectionIds = [...sections];
-      });
-    },
-    reorderPinnedSidebarItems(items: SidebarPinnedItem[]) {
-      const seen = new Set<string>();
-      setState((draft) => {
-        draft.pinnedIds = items.flatMap((item) => {
-          if (item.kind !== "agent" || seen.has(item.id)) return [];
-          seen.add(item.id);
-          return [item.id];
-        });
-      });
     },
     async answer(input: RespondToPromptInput) {
       const current = generation;
@@ -911,14 +915,6 @@ export function createWebWorkspace(
         draft.hiddenIds = draft.hiddenIds.includes(id)
           ? draft.hiddenIds.filter((value) => value !== id)
           : [...draft.hiddenIds, id];
-        draft.pinnedIds = draft.pinnedIds.filter((value) => value !== id);
-      });
-    },
-    togglePinned(id: string) {
-      setState((draft) => {
-        draft.pinnedIds = draft.pinnedIds.includes(id)
-          ? draft.pinnedIds.filter((value) => value !== id)
-          : [...draft.pinnedIds, id];
       });
     },
     toggleNotifications: () =>

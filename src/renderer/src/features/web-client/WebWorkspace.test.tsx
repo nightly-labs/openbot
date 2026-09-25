@@ -1,6 +1,7 @@
 import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
 import { render, waitFor } from "@solidjs/testing-library";
-import { assert, describe, expect, it, vi } from "vitest";
+import { flush } from "solid-js";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_AGENT_SUMMARIES } from "../../preview/fixtures";
 import { createWebWorkspace } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
@@ -15,6 +16,9 @@ const page: ConversationPage = {
   references: {},
   pageInfo: { hasOlder: false, olderCursor: null },
 };
+beforeEach(() => {
+  localStorage.clear();
+});
 function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
   let events: WebRuntimeEvents | undefined;
   const runtime: WebWorkspaceRuntime = {
@@ -217,15 +221,27 @@ describe("web workspace state", () => {
       deleteAgent: vi.fn().mockResolvedValue(undefined),
     });
     const workspace = await connected(app);
-    workspace.togglePinned("chief");
+    workspace.preferences.pinSidebarItem({ kind: "agent", id: "chief" });
+    workspace.preferences.pinSidebarItem({ kind: "channel", id: "channel-launch" });
     workspace.toggleHidden("chief");
+    app.events().event("host", {
+      type: "sidebar-layout-changed",
+      layout: {
+        revision: 1,
+        sections: [],
+        order: ["people", "unassigned"],
+        agentAssignments: {},
+        agentOrder: ["chief", "channel-launch", "research"],
+      },
+    });
     await workspace.deleteAgent("chief");
     expect(app.runtime.deleteAgent).toHaveBeenCalledWith("chief");
     expect(workspace.state.agents.map((agent) => agent.id)).toEqual(["research"]);
     expect(workspace.state.selectedId).toBe("research");
-    expect(workspace.state.pinnedIds).toEqual([]);
+    expect(workspace.preferences.pinnedSidebarItems()).toEqual([{ kind: "channel", id: "channel-launch" }]);
     expect(workspace.state.hiddenIds).toEqual([]);
     expect(workspace.state.conversations.chief).toBeUndefined();
+    expect(workspace.state.sidebarLayout.agentOrder).toEqual(["channel-launch", "research"]);
   });
 
   it("cancels a batch without attaching late results or uploading the next file", async () => {
@@ -591,11 +607,15 @@ describe("web workspace state", () => {
   it("supports pin and hide reverse actions without deleting conversations", async () => {
     const app = harness();
     const workspace = await connected(app);
-    workspace.togglePinned("chief");
-    workspace.togglePinned("chief");
+    workspace.preferences.pinSidebarItem({ kind: "agent", id: "chief" });
+    workspace.preferences.pinSidebarItem({ kind: "agent", id: "chief" });
+    flush();
+    expect(workspace.preferences.pinnedSidebarItems()).toEqual([{ kind: "agent", id: "chief" }]);
+    workspace.preferences.unpinSidebarItem({ kind: "agent", id: "chief" });
     workspace.toggleHidden("chief");
     workspace.toggleHidden("chief");
-    expect(workspace.state.pinnedIds).toEqual([]);
+    flush();
+    expect(workspace.preferences.pinnedSidebarItems()).toEqual([]);
     expect(workspace.state.hiddenIds).toEqual([]);
     expect(app.runtime.updateAgent).not.toHaveBeenCalled();
   });
