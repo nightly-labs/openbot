@@ -231,6 +231,10 @@ jobs:
         run: |
           bun run voice:prepare-runtime
           bun run build
+          # The runner's XProtect can hold the new disk image, and hdiutil then fails with
+          # "Device not configured" (actions/runner-images#7522).
+          sudo pkill -9 XProtect >/dev/null || true
+          while pgrep XProtect >/dev/null; do sleep 3; done
           bun x electron-builder --mac --arm64 --publish never \
             --config.mac.provisioningProfile="$OPENBOT_PROVISIONING_PROFILE"
 
