@@ -35,6 +35,8 @@ const CONNECTING_STATUS: AgentStatus = {
 export function WebWorkspace(props: {
   accountId: string;
   accountEmail?: string;
+  accountName?: string | null;
+  accountAvatarUrl?: string | null;
   accountFetch: typeof fetch;
   onSessionCheck: () => Promise<void>;
   onLogout: () => Promise<void>;
@@ -274,7 +276,12 @@ export function WebWorkspace(props: {
         />
         <AccountDock
           remoteClient
-          account={{ id: props.accountId, email: props.accountEmail ?? "", name: null, avatarUrl: null }}
+          account={{
+            id: props.accountId,
+            email: props.accountEmail ?? "",
+            name: props.accountName ?? null,
+            avatarUrl: props.accountAvatarUrl ?? null,
+          }}
           appInfo={{ name: "OpenBot", version: "web", platform: "darwin", variant: "production" }}
           agentStatus={status()}
           accountUsage={accountUsage()}

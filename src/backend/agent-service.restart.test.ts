@@ -17,6 +17,7 @@ import {
   stores,
   waitFor,
 } from "./agent-service-test-harness";
+import { ChannelStore } from "./channel-store";
 import { getString } from "./protocol";
 
 const browserTab = (id: string, ownerAgentId: string | null, ownerThreadId: string | null): BrowserTab => ({
@@ -794,6 +795,39 @@ describe.sequential("AgentService: restart", () => {
     await service.deleteAgent(deleted.id);
 
     expect(closed).toEqual(["tab-owned", "tab-legacy"]);
+  });
+
+  it("removes deleted agents from channel members at startup and on deletion", async () => {
+    const { store } = stores(root);
+    await store.initialize();
+    await store.getOrCreate("member-a");
+    await store.getOrCreate("member-b");
+    // An older version kept deleted agents in the channel, the lead among them.
+    const channels = new ChannelStore(store.database);
+    channels.update(
+      channels.create("channel-1", {
+        name: "Project",
+        title: "",
+        instructions: "",
+        members: [{ agentId: "gone-1" }, { agentId: "member-a" }, { agentId: "gone-2" }, { agentId: "member-b" }],
+        leadAgentId: "gone-1",
+      }),
+    );
+    store.database.close();
+
+    const restored = stores(root);
+    service = createTestService({ store: restored.store, mailbox: restored.mailbox });
+    await service.initialize();
+    expect(service.channels.store.get("channel-1")).toMatchObject({
+      members: [{ agentId: "member-a" }, { agentId: "member-b" }],
+      leadAgentId: "member-a",
+    });
+
+    await service.deleteAgent("member-a");
+    expect(service.channels.store.get("channel-1")).toMatchObject({
+      members: [{ agentId: "member-b" }],
+      leadAgentId: "member-b",
+    });
   });
 
   it("still deletes the agent when closing one of its browser tabs fails", async () => {

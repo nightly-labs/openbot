@@ -10,8 +10,13 @@
     "enabled": true,
     "cross_version_cache": false
   },
+  "observability": {
+    "enabled": true
+  },
+  // The outbox and the hosted-site cleanup are both retry paths: the request path schedules the
+  // first attempt itself. A run each minute only repeated empty reads.
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["*/5 * * * *"]
   },
   "routes": [
     {

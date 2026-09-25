@@ -90,6 +90,7 @@ import {
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { filePreviewForPath } from "../../stories/file-previews";
+import { toggleChannelMember } from "../features/channels/channels-draft";
 import {
   STORY_AGENT_TEMPLATE_DETAIL,
   STORY_AGENT_TEMPLATE_PUBLICATION,
@@ -601,6 +602,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updatedAt: now,
     };
   }
+
+  const mockChannels = createMockChannels(
+    emitAgentEvent,
+    (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId,
+  );
 
   const api: OpenBotDesktopApi = {
     getAppInfo: async () => clone(appInfo),
@@ -1280,7 +1286,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listModels: async () => clone([...models, ...customProviders.flatMap(mockCustomProviderModels)]),
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
-      ...createMockChannels(emitAgentEvent, (agentId) => agents.find((entry) => entry.id === agentId)?.name ?? agentId),
+      ...mockChannels,
       listMcpServers: async () => clone(mcpServers),
       saveMcpServer: async ({ config }) => {
         const normalized = normalizeMcpConfig(config);
@@ -1448,6 +1454,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         queues.delete(agentId);
         memories.delete(agentId);
         routines.delete(agentId);
+        // The host takes a deleted agent out of every channel it was a member of.
+        for (const channel of await mockChannels.listChannels()) {
+          if (!channel.members.some((member) => member.agentId === agentId)) continue;
+          const draft = {
+            name: channel.name,
+            title: channel.title,
+            instructions: channel.instructions,
+            members: channel.members,
+            leadAgentId: channel.leadAgentId,
+          };
+          toggleChannelMember(draft, agentId, false);
+          await mockChannels.channelCommand({
+            type: "save",
+            operationId: crypto.randomUUID(),
+            channelId: channel.id,
+            draft,
+            update: true,
+          });
+        }
         emitAgentEvent({ type: "agents-changed", agents });
       },
       listMemories: async (agentId) => clone(memories.get(agentId) ?? []),
