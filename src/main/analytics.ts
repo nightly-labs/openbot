@@ -14,6 +14,9 @@ import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 export const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
+// Node fetch sends no Origin, and OpenPanel answers 401 to a client with no allowed origin or
+// secret. The SDK drops a 401 in silence. Send the renderer's origin, which the project allows.
+const OPENPANEL_ORIGIN = "openbot-app://app";
 // Provider CLI events are named `<provider>_diagnostic`, `_exited` and `_start_failed`. The list
 // comes from the registry so a new provider's events keep their own name instead of collapsing to
 // `unknown` the moment it ships.
@@ -37,6 +40,12 @@ type HostEventName =
   | "hosted_site_action";
 export type HostOpenPanelClient = Pick<OpenPanelBase, "setGlobalProperties" | "track" | "identify" | "clear">;
 type ClientFactory = (options: OpenPanelOptions) => HostOpenPanelClient;
+
+function createOpenPanelClient(options: OpenPanelOptions): HostOpenPanelClient {
+  const client = new OpenPanelBase(options);
+  client.api.addHeader("origin", OPENPANEL_ORIGIN);
+  return client;
+}
 
 export interface HostAnalyticsOptions {
   enabled: boolean;
@@ -87,10 +96,7 @@ export class HostAnalytics {
   readonly #hostedSiteTerminalOperations = new Set<string>();
   readonly #operationQueue: AnalyticsOperationQueue = { active: false, operations: [] };
 
-  constructor(
-    options: HostAnalyticsOptions,
-    createClient: ClientFactory = (clientOptions) => new OpenPanelBase(clientOptions),
-  ) {
+  constructor(options: HostAnalyticsOptions, createClient: ClientFactory = createOpenPanelClient) {
     this.#resolveOwner = options.resolveOwner;
     this.#resolveAgent = options.resolveAgent;
     this.#trackingEnabled = options.trackingEnabled ?? true;
