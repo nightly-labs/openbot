@@ -45,6 +45,9 @@ jobs:
       - name: Check desktop application
         run: bun run check:desktop:static
 
+      - name: Check ratcheted lint rules
+        run: bun run lint:ratchet
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where

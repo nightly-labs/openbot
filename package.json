@@ -158,6 +158,7 @@
     "typecheck:remote": "bun run --cwd remote/api typecheck",
     "typecheck": "bun run --parallel 'typecheck:*'",
     "lint": "biome check --max-diagnostics=none .",
+    "lint:ratchet": "bun scripts/lint-ratchet.ts",
     "format": "biome check --write --max-diagnostics=none .",
     "knip": "knip",
     "knip:check": "knip --exclude exports,types",
