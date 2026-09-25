@@ -38,9 +38,9 @@ export interface AgentRemovalOptions {
 }
 
 /**
- * Owns the deletion of an agent: the set of agents being deleted, the removal of its provider
- * files, mailbox data, files and record, in that order, and the release of everything the running
- * app still holds for it, its browser tabs included.
+ * Owns the deletion of an agent: the set of agents being deleted, the close of its provider
+ * sessions and the removal of its provider files, mailbox data, files and record, in that order,
+ * and the release of everything the running app still holds for it, its browser tabs included.
  *
  * It never imports the agent service facade.
  */
@@ -121,6 +121,8 @@ export class AgentRemoval {
 
   async #removeAgentData(agent: Pick<AgentSummary, "id" | "threadId">): Promise<void> {
     const providerSessions = agent.threadId ? this.#store.database.listProviderSessions(agent.threadId) : [];
+    // An open session keeps a provider process in the workspace, which Windows then cannot remove.
+    await this.#threads.releaseAgentSessions(agent.id);
     let stage = "provider-files";
     try {
       // Keep session records available if private file removal needs a retry.

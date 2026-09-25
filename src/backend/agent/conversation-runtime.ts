@@ -269,6 +269,16 @@ export class ConversationRuntime {
     }
   }
 
+  /** Every loaded provider session of this agent, its channel threads included, with its client. */
+  loadedAgentThreads(agentId: string): Array<[externalThreadId: string, client: AgentClient]> {
+    const loaded: Array<[string, AgentClient]> = [];
+    for (const [externalThreadId, owner] of this.#threadToAgent) {
+      const client = owner === agentId ? this.#loadedThreads.get(externalThreadId) : undefined;
+      if (client) loaded.push([externalThreadId, client]);
+    }
+    return loaded;
+  }
+
   forgetExecutionThread(threadId: string): void {
     this.#forgottenExecutionThreads.add(threadId);
     this.#executionSnapshots.delete(threadId);
