@@ -125,6 +125,7 @@ export interface MobileWorkspaceContextValue {
   createAgentRoutine: (input: CreateRoutineInput, serverId: string) => Promise<void>;
   updateAgentRoutine: (input: UpdateRoutineInput, serverId: string) => Promise<void>;
   deleteAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
+  testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   loadAgentModels: (serverId: string) => Promise<AgentModelOption[]>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;

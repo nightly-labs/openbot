@@ -64,6 +64,8 @@ export function trackWorkspaceActions(workspace: MobileWorkspaceContextValue): M
       ),
     deleteAgentRoutine: (id, routine, server) =>
       run("routine_action", { action: "delete" }, () => workspace.deleteAgentRoutine(id, routine, server)),
+    testAgentRoutine: (id, routine, server) =>
+      run("routine_action", { action: "test" }, () => workspace.testAgentRoutine(id, routine, server)),
     addRemoteServer: (input) =>
       run("team_action", { action: "server_joined", server_kind: "remote" }, () => workspace.addRemoteServer(input)),
     leaveServer: (id) =>

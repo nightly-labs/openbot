@@ -443,6 +443,9 @@ export class MobileChannelStore {
   async deleteRoutine(serverId: string, channelId: string, routineId: string) {
     await this.request("POST", CHANNEL_ROUTES.routineDelete, () => undefined, { channelId, routineId }, serverId);
   }
+  async testRoutine(serverId: string, channelId: string, routineId: string) {
+    await this.request("POST", CHANNEL_ROUTES.routineTest, () => undefined, { channelId, routineId }, serverId);
+  }
   async upload(serverId: string, input: RemoteFileUpload, onProgress?: (fraction: number) => void) {
     const query = new URLSearchParams({ name: input.name, mime: input.mimeType });
     return this.request(
