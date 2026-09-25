@@ -85,8 +85,10 @@ migration is needed. See [web client delivery](web-client.md) for the seven revi
 commands, and release checks.
 
 Browser chat pages, drafts, file bytes, and chat visibility preferences stay in memory. A protected
-cookie holds the account credential. Local storage holds account-scoped trusted host public keys
-and the shared file panel's width, not chat content. A Web Lock permits one live tab per account
+cookie holds the account credential. Local storage holds account-scoped trusted host public keys,
+the shared file panel's width, and for each account and host the pinned item ids, collapsed section
+ids and selected channel id, not chat content. The channel UI takes a `ChannelsPort` runtime; its
+desktop default is the preload API. A Web Lock permits one live tab per account
 and host because the existing control plane reuses that credential's logical host session.
 Host switches discard the prior host's chat state. Temporary connection loss keeps drafts;
 uncertain sends require an explicit user check before another send. BroadcastChannel, account

@@ -63,6 +63,8 @@ import {
   interruptAgentTurn,
   respondToBrowserSecret,
   respondToBrowserTakeover,
+  type TeamChannelsApi,
+  teamChannelsApi,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
@@ -75,6 +77,10 @@ export interface WebWorkspaceRuntime {
   respondToBrowserSecret?: (input: RespondToBrowserSecretInput) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
+  /** The host's channel routes. A channel page arrives without host file URLs. */
+  channels?: TeamChannelsApi;
+  /** The team member this connection signs in as, which is how the host names this reader's messages. */
+  currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
   listHosts(): Promise<RemoteTeamHost[]>;
   previewInvite(url: string): Promise<InvitePreview>;
@@ -224,6 +230,7 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     return decode(await request(method, path, body, upload));
   }
+  const channels = teamChannelsApi(teamApi);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -307,6 +314,33 @@ export function createWebWorkspaceRuntime(
       const value = await request("POST", TEAM_API_ROUTES.sidebarLayout.actions, { ...action });
       if (!isSidebarLayoutSnapshot(value)) throw new Error("The host returned an invalid sidebar layout.");
       return value;
+    },
+    channels: {
+      ...channels,
+      async readChannel(input) {
+        const page = await channels.readChannel(input);
+        // A host file URL must not reach the browser; attachments are downloaded through the host.
+        return {
+          ...page,
+          messages: page.messages.map((entry) => ({
+            ...entry,
+            message: {
+              ...entry.message,
+              attachments: entry.message.attachments?.map((attachment) => ({ ...attachment, previewUrl: null })),
+            },
+          })),
+        };
+      },
+      async channelCommand(command) {
+        const channel = await channels.channelCommand(command);
+        if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
+        return channel;
+      },
+    },
+    async currentMemberId() {
+      const value = await request("GET", TEAM_API_ROUTES.me);
+      if (!isDynamicRecord(value)) throw new Error("The host returned an invalid team member.");
+      return requiredString(value, "id");
     },
     respondToBrowserSecret: (input) => respondToBrowserSecret(teamApi, input),
     respondToTakeover: (input) => respondToBrowserTakeover(teamApi, input),

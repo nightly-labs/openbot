@@ -1,10 +1,4 @@
 import type { ServerSummary, SidebarLayoutAction, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import {
-  normalizeSidebarPinnedItems,
-  reownSidebarPinnedItems,
-  type SidebarPinnedItem,
-  sidebarPinnedItemKey,
-} from "@openbot/ui/features/sidebar/sidebar-pins";
 import { createMemo, createSignal } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
@@ -15,10 +9,9 @@ import {
   type SidebarPeopleOrderByServer,
   writeSidebarPeopleOrder,
 } from "./sidebar-people-order";
-import { readSidebarPins, type SidebarPinsByServer, writeSidebarPins } from "./sidebar-pins-storage";
 import { sidebarPort } from "./sidebar-port";
+import { createSidebarPreferences } from "./sidebar-preferences";
 import { defaultSidebarLayout } from "./sidebar-sections";
-import { readSidebarCollapsed, type SidebarCollapsedByServer, writeSidebarCollapsed } from "./sidebar-sections-storage";
 
 /**
  * The shape of the agent list: the host's own section layout, plus the three
@@ -43,17 +36,12 @@ const Sidebar = createSimpleContext({
     const { activeServerId, activeServerSupportsCapability } = useServers();
 
     const [sidebarLayout, setSidebarLayout] = createSignal<SidebarLayoutSnapshot>(defaultSidebarLayout());
-    const [sidebarPinsByServer, setSidebarPinsByServer] = createSignal<SidebarPinsByServer>(readSidebarPins());
     const [sidebarPeopleOrderByServer, setSidebarPeopleOrderByServer] = createSignal<SidebarPeopleOrderByServer>(
       readSidebarPeopleOrder(),
     );
-    const [sidebarCollapsedByServer, setSidebarCollapsedByServer] = createSignal<SidebarCollapsedByServer>(
-      readSidebarCollapsed(),
-    );
+    const preferences = createSidebarPreferences({ scope: activeServerId });
 
-    const pinnedSidebarItems = createMemo(() => sidebarPinsByServer()[activeServerId()] ?? []);
     const sidebarPeopleOrder = createMemo(() => sidebarPeopleOrderByServer()[activeServerId()] ?? []);
-    const collapsedSidebarSectionIds = createMemo(() => sidebarCollapsedByServer()[activeServerId()] ?? []);
 
     /** The layout read for a server load, answering the default where the host has no layout to give. */
     function loadLayout(server: ServerSummary | undefined): Promise<SidebarLayoutSnapshot> {
@@ -70,70 +58,6 @@ const Sidebar = createSimpleContext({
       setSidebarLayout(layout);
     }
 
-    function toggleSidebarSection(sectionId: string): void {
-      const serverId = activeServerId();
-      setSidebarCollapsedByServer((current) => {
-        const values = new Set(current[serverId] ?? []);
-        if (values.has(sectionId)) values.delete(sectionId);
-        else values.add(sectionId);
-        const next = { ...current };
-        if (values.size > 0) next[serverId] = [...values];
-        else delete next[serverId];
-        writeSidebarCollapsed(next);
-        return next;
-      });
-    }
-
-    function updateActiveServerPins(update: (items: SidebarPinnedItem[]) => SidebarPinnedItem[]): void {
-      const serverId = activeServerId();
-      setSidebarPinsByServer((current) => {
-        const items = normalizeSidebarPinnedItems(update(current[serverId] ?? []));
-        const next = { ...current };
-        if (items.length > 0) next[serverId] = items;
-        else delete next[serverId];
-        writeSidebarPins(next);
-        return next;
-      });
-    }
-
-    /**
-     * Brings this server's pins up to date with the roster it just sent. Nothing else rewrites them: the
-     * pins are in browser storage, and the id migration ran inside the host's database.
-     */
-    function reconcileActiveServerPins(agentIds: readonly string[]): void {
-      const roster = new Set(agentIds);
-      const serverId = activeServerId();
-      setSidebarPinsByServer((current) => {
-        const items = current[serverId];
-        if (!items) return current;
-        const reowned = reownSidebarPinnedItems(items, roster);
-        if (reowned.length === items.length && reowned.every((item, index) => item.id === items[index]?.id))
-          return current;
-        const next = { ...current };
-        if (reowned.length > 0) next[serverId] = reowned;
-        else delete next[serverId];
-        writeSidebarPins(next);
-        return next;
-      });
-    }
-
-    function pinSidebarItem(item: SidebarPinnedItem): void {
-      updateActiveServerPins((items) =>
-        items.some((candidate) => sidebarPinnedItemKey(candidate) === sidebarPinnedItemKey(item))
-          ? items
-          : [...items, item],
-      );
-    }
-
-    function unpinSidebarItem(item: SidebarPinnedItem): void {
-      const key = sidebarPinnedItemKey(item);
-      updateActiveServerPins((items) => items.filter((candidate) => sidebarPinnedItemKey(candidate) !== key));
-    }
-
-    function reorderPinnedSidebarItems(items: SidebarPinnedItem[]): void {
-      updateActiveServerPins(() => items);
-    }
-
     function reorderSidebarPeople(memberIds: string[]): void {
       const serverId = activeServerId();
       setSidebarPeopleOrderByServer((current) => {
@@ -146,33 +70,12 @@ const Sidebar = createSimpleContext({
       });
     }
 
-    function removePinnedSidebarItemEverywhere(item: SidebarPinnedItem): void {
-      const key = sidebarPinnedItemKey(item);
-      setSidebarPinsByServer((current) => {
-        const next = Object.fromEntries(
-          Object.entries(current).flatMap(([serverId, items]) => {
-            const filtered = items.filter((candidate) => sidebarPinnedItemKey(candidate) !== key);
-            return filtered.length > 0 ? [[serverId, filtered]] : [];
-          }),
-        );
-        writeSidebarPins(next);
-        return next;
-      });
-    }
-
     return {
       sidebarLayout,
       setSidebarLayout,
       loadLayout,
       mutateSidebarLayout,
-      collapsedSidebarSectionIds,
-      toggleSidebarSection,
-      pinnedSidebarItems,
-      reconcileActiveServerPins,
-      pinSidebarItem,
-      unpinSidebarItem,
-      reorderPinnedSidebarItems,
-      removePinnedSidebarItemEverywhere,
+      ...preferences,
       sidebarPeopleOrder,
       reorderSidebarPeople,
     };

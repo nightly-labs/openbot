@@ -1,4 +1,13 @@
-import type { AccountUsage, AgentEvent, AgentModelOption, AgentStatus, ServerSummary } from "@openbot/contracts/ipc";
+import {
+  type AccountUsage,
+  type AgentApproval,
+  type AgentEvent,
+  type AgentModelOption,
+  type AgentStatus,
+  type BrowserTakeoverRequest,
+  CHANNEL_CHATS_CAPABILITY,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
 import {
   Alert,
   AlertActions,
@@ -15,12 +24,19 @@ import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog"
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
+import { ChannelConversation } from "../channels/ChannelConversation";
+import { ChannelCreateDialog } from "../channels/ChannelCreateDialog";
+import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
+import { isOwnChannelAuthor } from "../channels/channel-timeline";
+import { ChannelsControllerProvider } from "../channels/channels-context";
+import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
+import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 
@@ -93,6 +109,47 @@ export function WebWorkspace(props: {
     })),
   );
   const server = createMemo(() => servers().find((item) => item.active));
+  const channelsPort = createWebChannelsPort(workspace.runtime, workspace.onHostEvent);
+  const channelsSupported = () =>
+    workspace.state.status === "online" &&
+    workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY) &&
+    Boolean(workspace.runtime.channels);
+  const channels = createChannelsController({
+    port: () => channelsPort,
+    agents: workspace.profiles,
+    // A host switch, a revoked session and a finished connection each start the list again.
+    scopeKey: () =>
+      `${workspace.state.host?.hostId ?? ""}:${workspace.state.revocationRevision}:${channelsSupported()}`,
+    readSelection: () => {
+      const hostId = workspace.state.host?.hostId;
+      return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
+    },
+    writeSelection: (channelId) => {
+      const hostId = workspace.state.host?.hostId;
+      if (hostId) writeChannelSelection(props.accountId, hostId, channelId);
+    },
+    supported: channelsSupported,
+    deletionSupported: () => workspace.state.host?.role === "owner" || workspace.state.host?.role === "admin",
+    beforeOpen: () => setCreating(false),
+    // On a small screen the sidebar pane covers the channel, and a covered message was not seen.
+    canMarkRead: () => document.hasFocus() && mobilePane() === "conversation",
+  });
+  onCleanup(
+    workspace.onHostEvent((event) => {
+      if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+    }),
+  );
+  const channelOpen = () => channels.state.selectedId !== null;
+  const channelApprovals = createMemo(() => {
+    const approvals: Record<string, AgentApproval | undefined> = {};
+    for (const approval of workspace.state.approvals) approvals[approval.agentId] = approval;
+    return approvals;
+  });
+  const channelTakeovers = createMemo(() => {
+    const takeovers: Record<string, BrowserTakeoverRequest | undefined> = {};
+    for (const request of workspace.state.takeovers) takeovers[request.agentId] = request;
+    return takeovers;
+  });
   const sidebarActivity = createMemo(() => ({
     agentIds: workspace.state.agents.map((agent) => agent.id),
     activeTurns: Object.fromEntries(
@@ -202,6 +259,7 @@ export function WebWorkspace(props: {
   }
   async function select(id: string) {
     setCreating(false);
+    channels.close();
     await workspace.select(id);
   }
   const unavailable = async (): Promise<never> => {
@@ -209,114 +267,131 @@ export function WebWorkspace(props: {
   };
   return (
     <ConversationControllerProvider controller={controller}>
-      <div
-        class="app-frame app-frame-with-server-rail web-app-frame"
-        data-web-mobile-pane={mobilePane()}
-        style="--left-panel-width: 280px"
-      >
-        <ServerRail
-          servers={servers()}
-          onSelect={(id) => {
-            const host = workspace.state.hosts.find((item) => item.hostId === id);
-            if (host) void workspace.connect(host);
-          }}
-          onReorder={() => {}}
-          onAdd={() => setJoinOpen(true)}
-        />
-        <Sidebar
-          serverName={workspace.state.host?.name ?? "OpenBot"}
-          agents={workspace.profiles()}
-          activeAgentId={workspace.state.selectedId ?? ""}
-          people={[]}
-          directThreads={[]}
-          activeDirectMemberId={null}
-          agentStates={sidebarAgentStates()}
-          agentMoods={sidebarAgentMoods()}
-          layout={workspace.state.sidebarLayout}
-          layoutMutable={workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")}
-          collapsedSectionIds={workspace.state.sidebarCollapsedSectionIds}
-          onMutateLayout={workspace.mutateSidebarLayout}
-          onToggleSection={workspace.toggleSidebarSection}
-          pinnedItems={workspace.state.pinnedIds.map((id) => ({ kind: "agent", id }))}
-          peopleOrder={[]}
-          onPin={(item) => workspace.togglePinned(item.id)}
-          onUnpin={(item) => workspace.togglePinned(item.id)}
-          onReorderPinned={workspace.reorderPinnedSidebarItems}
-          onReorderPeople={() => {}}
-          onSelectAgent={(id) => {
-            setMobilePane("conversation");
-            void select(id);
-          }}
-          onSelectPerson={() => {}}
-          onCreateAgent={() => {
-            setMobilePane("conversation");
-            setCreating(true);
-          }}
-          createSupported={workspace.state.status === "online" && workspace.state.host !== null}
-          onEditAgent={(id) => {
-            setMobilePane("conversation");
-            void select(id);
-            setSettingsRequest({ agentId: id, nonce: Date.now() });
-          }}
-          duplicateSupported={
-            workspace.state.status === "online" && workspace.state.capabilities.includes("agent-duplication")
-          }
-          duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
-          onDuplicateAgent={workspace.duplicateAgent}
-          deleteSupported={
-            workspace.state.status === "online" &&
-            Boolean(workspace.state.host) &&
-            workspace.state.host?.role !== "member"
-          }
-          marketplaceSupported={false}
-          onDeleteAgent={workspace.deleteAgent}
-          compact={false}
-          onExpand={() => {}}
-          onOpenMarketplace={() => {}}
-        />
-        <AccountDock
-          remoteClient
-          account={{
-            id: props.accountId,
-            email: props.accountEmail ?? "",
-            name: props.accountName ?? null,
-            avatarUrl: props.accountAvatarUrl ?? null,
-          }}
-          appInfo={{ name: "OpenBot", version: "web", platform: "darwin", variant: "production" }}
-          agentStatus={status()}
-          accountUsage={accountUsage()}
-          usageProvider={workspace.selected()?.provider ?? null}
-          usageTargetKey={
-            workspace.runtime.accountUsage && workspace.state.status === "online"
-              ? (workspace.state.host?.hostId ?? null)
-              : null
-          }
-          usageRefreshRevision={0}
-          usageReady={workspace.state.status === "online"}
-          updateStatus={{
-            phase: "unsupported",
-            currentVersion: "web",
-            availableVersion: null,
-            progress: null,
-            checkedAt: null,
-            message: null,
-            errorCode: null,
-          }}
-          compact={false}
-          withServerRail
-          onRefreshUsage={refreshUsage}
-          onUpdateAction={unavailable}
-          onLogout={props.onLogout}
-          onOpenExternal={unavailable}
-          onOpenPermissions={() => {}}
-          onOpenSettings={() => {}}
-          onOpenSkills={() => {}}
-        />
-        <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
-        <div class="usage-workspace-content">
-          <Show
-            when={!creating()}
-            fallback={
+      <ChannelsControllerProvider controller={channels}>
+        <div
+          class="app-frame app-frame-with-server-rail web-app-frame"
+          data-web-mobile-pane={mobilePane()}
+          style="--left-panel-width: 280px"
+        >
+          <ServerRail
+            servers={servers()}
+            onSelect={(id) => {
+              const host = workspace.state.hosts.find((item) => item.hostId === id);
+              if (host) void workspace.connect(host);
+            }}
+            onReorder={() => {}}
+            onAdd={() => setJoinOpen(true)}
+          />
+          <Sidebar
+            channels={channelsSupported() ? channels.state.channels.filter((channel) => !channel.archived) : []}
+            deletedChannels={channelsSupported() ? channels.state.channels.filter((channel) => channel.archived) : []}
+            activeChannelId={channels.state.selectedId}
+            onSelectChannel={(id) => {
+              setMobilePane("conversation");
+              void channels.open(id);
+            }}
+            onEditChannel={(id) => {
+              setMobilePane("conversation");
+              void channels.editChannel(id);
+            }}
+            onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
+            showingArchivedChannels={channels.state.archived}
+            onToggleArchivedChannels={channelsSupported() ? channels.toggleArchived : undefined}
+            onCreateChannel={channelsSupported() ? channels.create : undefined}
+            serverName={workspace.state.host?.name ?? "OpenBot"}
+            agents={workspace.profiles()}
+            activeAgentId={channelOpen() ? "" : (workspace.state.selectedId ?? "")}
+            people={[]}
+            directThreads={[]}
+            activeDirectMemberId={null}
+            agentStates={sidebarAgentStates()}
+            agentMoods={sidebarAgentMoods()}
+            layout={workspace.state.sidebarLayout}
+            layoutMutable={
+              workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")
+            }
+            collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
+            onMutateLayout={workspace.mutateSidebarLayout}
+            onToggleSection={workspace.preferences.toggleSidebarSection}
+            pinnedItems={workspace.preferences.pinnedSidebarItems()}
+            peopleOrder={[]}
+            onPin={workspace.preferences.pinSidebarItem}
+            onUnpin={workspace.preferences.unpinSidebarItem}
+            onReorderPinned={workspace.preferences.reorderPinnedSidebarItems}
+            onReorderPeople={() => {}}
+            onSelectAgent={(id) => {
+              setMobilePane("conversation");
+              void select(id);
+            }}
+            onSelectPerson={() => {}}
+            onCreateAgent={() => {
+              setMobilePane("conversation");
+              channels.close();
+              setCreating(true);
+            }}
+            createSupported={workspace.state.status === "online" && workspace.state.host !== null}
+            onEditAgent={(id) => {
+              setMobilePane("conversation");
+              void select(id);
+              setSettingsRequest({ agentId: id, nonce: Date.now() });
+            }}
+            duplicateSupported={
+              workspace.state.status === "online" && workspace.state.capabilities.includes("agent-duplication")
+            }
+            duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
+            onDuplicateAgent={workspace.duplicateAgent}
+            deleteSupported={
+              workspace.state.status === "online" &&
+              Boolean(workspace.state.host) &&
+              workspace.state.host?.role !== "member"
+            }
+            marketplaceSupported={false}
+            onDeleteAgent={workspace.deleteAgent}
+            compact={false}
+            onExpand={() => {}}
+            onOpenMarketplace={() => {}}
+          />
+          <AccountDock
+            remoteClient
+            account={{
+              id: props.accountId,
+              email: props.accountEmail ?? "",
+              name: props.accountName ?? null,
+              avatarUrl: props.accountAvatarUrl ?? null,
+            }}
+            appInfo={{ name: "OpenBot", version: "web", platform: "darwin", variant: "production" }}
+            agentStatus={status()}
+            accountUsage={accountUsage()}
+            usageProvider={workspace.selected()?.provider ?? null}
+            usageTargetKey={
+              workspace.runtime.accountUsage && workspace.state.status === "online"
+                ? (workspace.state.host?.hostId ?? null)
+                : null
+            }
+            usageRefreshRevision={0}
+            usageReady={workspace.state.status === "online"}
+            updateStatus={{
+              phase: "unsupported",
+              currentVersion: "web",
+              availableVersion: null,
+              progress: null,
+              checkedAt: null,
+              message: null,
+              errorCode: null,
+            }}
+            compact={false}
+            withServerRail
+            onRefreshUsage={refreshUsage}
+            onUpdateAction={unavailable}
+            onLogout={props.onLogout}
+            onOpenExternal={unavailable}
+            onOpenPermissions={() => {}}
+            onOpenSettings={() => {}}
+            onOpenSkills={() => {}}
+          />
+          <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
+          <div class="usage-workspace-content">
+            <Show when={creating()}>
               <WebAgentSettings
                 runtime={workspace.runtime}
                 capabilities={workspace.state.capabilities}
@@ -326,206 +401,229 @@ export function WebWorkspace(props: {
                   setCreating(false);
                 }}
               />
-            }
-          >
-            <Conversation
-              runtime={runtime}
-              notice={
-                <>
-                  <Show when={workspace.state.status !== "online"}>
-                    <Alert class="web-connection-notice" role="status">
-                      <AlertContent>
-                        <AlertTitle>
-                          {workspace.state.host
-                            ? workspace.state.status === "connecting"
-                              ? "Connecting to your computer"
-                              : "Your computer is disconnected"
-                            : workspace.state.hostsLoading
-                              ? "Finding your computers"
-                              : workspace.state.hostsError
-                                ? "Could not load your computers"
-                                : "Connect your computer"}
-                        </AlertTitle>
-                        <AlertDescription>
-                          {workspace.state.host
-                            ? (workspace.state.error ??
-                              "Keep OpenBot open on your computer. Your draft stays here while you reconnect.")
-                            : (workspace.state.hostsError ??
-                              "Install and open OpenBot on your computer, then sign in with the same email and enable remote access. You can also join a computer with an invitation.")}
-                        </AlertDescription>
-                        <AlertActions>
-                          <Show when={!workspace.state.host}>
-                            <a
-                              class={buttonVariants({ variant: "outline", size: "sm" })}
-                              href="/#download"
-                              target="_blank"
-                              rel="noreferrer"
+            </Show>
+            <Show when={!creating() && channelOpen()}>
+              <ChannelConversation
+                isOwnMessage={(authorId) =>
+                  isOwnChannelAuthor(authorId, {
+                    memberId: workspace.state.memberId,
+                    accountUserId: props.accountId,
+                    onOwnComputer: false,
+                  })
+                }
+                pendingApprovals={channelApprovals()}
+                pendingTakeovers={channelTakeovers()}
+                browserTabs={workspace.state.browserTabs}
+                onSelectAgent={(id) => {
+                  setMobilePane("conversation");
+                  void select(id);
+                }}
+              />
+            </Show>
+            <Show when={!creating() && !channelOpen()}>
+              <Conversation
+                runtime={runtime}
+                notice={
+                  <>
+                    <Show when={workspace.state.status !== "online"}>
+                      <Alert class="web-connection-notice" role="status">
+                        <AlertContent>
+                          <AlertTitle>
+                            {workspace.state.host
+                              ? workspace.state.status === "connecting"
+                                ? "Connecting to your computer"
+                                : "Your computer is disconnected"
+                              : workspace.state.hostsLoading
+                                ? "Finding your computers"
+                                : workspace.state.hostsError
+                                  ? "Could not load your computers"
+                                  : "Connect your computer"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            {workspace.state.host
+                              ? (workspace.state.error ??
+                                "Keep OpenBot open on your computer. Your draft stays here while you reconnect.")
+                              : (workspace.state.hostsError ??
+                                "Install and open OpenBot on your computer, then sign in with the same email and enable remote access. You can also join a computer with an invitation.")}
+                          </AlertDescription>
+                          <AlertActions>
+                            <Show when={!workspace.state.host}>
+                              <a
+                                class={buttonVariants({ variant: "outline", size: "sm" })}
+                                href="/#download"
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Download OpenBot
+                              </a>
+                              <Button variant="outline" size="sm" onClick={() => setJoinOpen(true)}>
+                                Join with invitation
+                              </Button>
+                            </Show>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={workspace.state.hostsLoading || workspace.state.status === "connecting"}
+                              onClick={() =>
+                                void workspace.run(async () => {
+                                  if (workspace.state.host) await workspace.connect(workspace.state.host);
+                                  else await workspace.refreshHosts();
+                                })
+                              }
                             >
-                              Download OpenBot
-                            </a>
-                            <Button variant="outline" size="sm" onClick={() => setJoinOpen(true)}>
-                              Join with invitation
+                              {workspace.state.host ? "Reconnect" : "Refresh hosts"}
                             </Button>
-                          </Show>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={workspace.state.hostsLoading || workspace.state.status === "connecting"}
-                            onClick={() =>
-                              void workspace.run(async () => {
-                                if (workspace.state.host) await workspace.connect(workspace.state.host);
-                                else await workspace.refreshHosts();
-                              })
-                            }
-                          >
-                            {workspace.state.host ? "Reconnect" : "Refresh hosts"}
-                          </Button>
-                        </AlertActions>
-                      </AlertContent>
-                    </Alert>
-                  </Show>
-                  <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
-                    <Alert class="web-connection-notice" tone="warning" role="status">
-                      <AlertContent>
-                        <AlertTitle>Check whether your message arrived</AlertTitle>
-                        <AlertDescription>
-                          The connection ended before delivery was confirmed. Refresh and check the conversation before
-                          sending again. Your message will not be sent again automatically.
-                        </AlertDescription>
-                        <AlertActions>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={workspace.state.busy}
-                            onClick={() => void workspace.run(workspace.refresh)}
-                          >
-                            Refresh conversation
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={workspace.state.busy}
-                            onClick={() => {
-                              workspace.acknowledgeSend();
-                              const key = `${server()?.id}:${workspace.state.selectedId}`;
-                              controller.setComposerErrors((current) => {
-                                const next = { ...current };
-                                delete next[key];
-                                return next;
-                              });
-                            }}
-                          >
-                            I checked the conversation
-                          </Button>
-                        </AlertActions>
-                      </AlertContent>
-                    </Alert>
-                  </Show>
-                </>
-              }
-              agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
-              agent={workspace.selected()}
-              agents={workspace.profiles()}
-              modelOptions={models()}
-              messages={messages()}
-              unreadCount={0}
-              firstUnreadMessageId={null}
-              loaded={Boolean(workspace.conversation()?.page)}
-              hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
-              loadingOlder={workspace.conversation()?.loading}
-              activeTurnId={workspace.conversation()?.page?.activeTurnId}
-              globalOverlayOpen={joinOpen()}
-              settingsRequest={settingsRequest()}
-              messageFocusRequest={null}
-              queue={undefined}
-              browserRuntime={workspace.runtime.browser}
-              browserTabs={workspace.state.browserTabs}
-              activeBrowserTabId={workspace.state.activeBrowserTabId}
-              browserVisibilitySuspended={workspace.state.status !== "online"}
-              browserControlState={workspace.state.browserControlState}
-              server={server()}
-              presence={{ serverId: server()?.id ?? null, members: [], updatedAt: "" }}
-              currentUserEmail={props.accountEmail ?? ""}
-              browserEnabled={browserEnabled()}
-              remoteDesktopEnabled={false}
-              remoteDesktopSessionActive={false}
-              remoteDesktopVisible={false}
-              prompt={prompt()}
-              approval={approval()}
-              browserTakeover={browserTakeover()}
-              onSelectAgent={(id) => {
-                setMobilePane("conversation");
-                void select(id);
-              }}
-              onUpdateAgent={async (agentId, updates) => {
-                await workspace.runtime.updateAgent({ agentId, ...updates });
-                await workspace.refresh();
-              }}
-              onSetAgentAvatar={async (agentId, image) => {
-                await workspace.runtime.setAvatar(agentId, image);
-                await workspace.refresh();
-              }}
-              onSendMessage={async (text, attachments, replyTo, target) => {
-                const id = target?.agentId ?? workspace.state.selectedId;
-                if (!id || (target && target.serverId !== server()?.id) || id !== workspace.state.selectedId)
-                  return false;
-                const sent = await workspace.send(text, attachments, replyTo);
-                if (!sent)
-                  controller.setComposerErrors((current) => ({
-                    ...current,
-                    [`${server()?.id}:${id}`]: workspace.state.error ?? "Check the conversation before sending again.",
-                  }));
-                return sent;
-              }}
-              onMarkRead={async () => {}}
-              onLoadOlder={() => void workspace.older()}
-              onLoadLatest={workspace.refresh}
-              onSearchMessages={async (query) => {
-                const id = workspace.state.selectedId;
-                if (!id) return { messageIds: [], total: 0 };
-                const result = await workspace.runtime.search(id, query);
-                return { messageIds: result.results.map((item) => item.message.id), total: result.total };
-              }}
-              onOpenSearchMessage={(messageId) => workspace.run(() => workspace.openSearchMessage(messageId))}
-              onTypingChange={() => {}}
-              onAnswerPrompt={async (answers) => {
-                const question = prompt();
-                if (!question) return false;
-                await workspace.answer({ requestId: question.requestId, answers });
-                return true;
-              }}
-              onRespondToApproval={async (decision) => {
-                const item = approval();
-                if (!item) return false;
-                await workspace.approve({ requestId: item.requestId, decision });
-                return true;
-              }}
-              onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
-              onCancelQueuedMessage={() => {}}
-              onSteerQueuedMessage={() => {}}
-              onUpdateQueuedMessage={unavailable}
-              onReorderQueue={() => {}}
-              onActivateBrowserTab={workspace.activateBrowserTab}
-              onCloseBrowserTab={() => {}}
-              onOpenRemoteDesktop={unavailable}
-              onStop={() => {
-                const page = workspace.conversation()?.page;
-                if (page?.activeTurnId)
-                  void workspace.run(() => workspace.runtime.stop(page.agentId, page.activeTurnId ?? ""));
-              }}
+                          </AlertActions>
+                        </AlertContent>
+                      </Alert>
+                    </Show>
+                    <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
+                      <Alert class="web-connection-notice" tone="warning" role="status">
+                        <AlertContent>
+                          <AlertTitle>Check whether your message arrived</AlertTitle>
+                          <AlertDescription>
+                            The connection ended before delivery was confirmed. Refresh and check the conversation
+                            before sending again. Your message will not be sent again automatically.
+                          </AlertDescription>
+                          <AlertActions>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={workspace.state.busy}
+                              onClick={() => void workspace.run(workspace.refresh)}
+                            >
+                              Refresh conversation
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={workspace.state.busy}
+                              onClick={() => {
+                                workspace.acknowledgeSend();
+                                const key = `${server()?.id}:${workspace.state.selectedId}`;
+                                controller.setComposerErrors((current) => {
+                                  const next = { ...current };
+                                  delete next[key];
+                                  return next;
+                                });
+                              }}
+                            >
+                              I checked the conversation
+                            </Button>
+                          </AlertActions>
+                        </AlertContent>
+                      </Alert>
+                    </Show>
+                  </>
+                }
+                agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
+                agent={workspace.selected()}
+                agents={workspace.profiles()}
+                modelOptions={models()}
+                messages={messages()}
+                unreadCount={0}
+                firstUnreadMessageId={null}
+                loaded={Boolean(workspace.conversation()?.page)}
+                hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
+                loadingOlder={workspace.conversation()?.loading}
+                activeTurnId={workspace.conversation()?.page?.activeTurnId}
+                globalOverlayOpen={joinOpen()}
+                settingsRequest={settingsRequest()}
+                messageFocusRequest={null}
+                queue={undefined}
+                browserRuntime={workspace.runtime.browser}
+                browserTabs={workspace.state.browserTabs}
+                activeBrowserTabId={workspace.state.activeBrowserTabId}
+                browserVisibilitySuspended={workspace.state.status !== "online"}
+                browserControlState={workspace.state.browserControlState}
+                server={server()}
+                presence={{ serverId: server()?.id ?? null, members: [], updatedAt: "" }}
+                currentUserEmail={props.accountEmail ?? ""}
+                browserEnabled={browserEnabled()}
+                remoteDesktopEnabled={false}
+                remoteDesktopSessionActive={false}
+                remoteDesktopVisible={false}
+                prompt={prompt()}
+                approval={approval()}
+                browserTakeover={browserTakeover()}
+                onSelectAgent={(id) => {
+                  setMobilePane("conversation");
+                  void select(id);
+                }}
+                onUpdateAgent={async (agentId, updates) => {
+                  await workspace.runtime.updateAgent({ agentId, ...updates });
+                  await workspace.refresh();
+                }}
+                onSetAgentAvatar={async (agentId, image) => {
+                  await workspace.runtime.setAvatar(agentId, image);
+                  await workspace.refresh();
+                }}
+                onSendMessage={async (text, attachments, replyTo, target) => {
+                  const id = target?.agentId ?? workspace.state.selectedId;
+                  if (!id || (target && target.serverId !== server()?.id) || id !== workspace.state.selectedId)
+                    return false;
+                  const sent = await workspace.send(text, attachments, replyTo);
+                  if (!sent)
+                    controller.setComposerErrors((current) => ({
+                      ...current,
+                      [`${server()?.id}:${id}`]:
+                        workspace.state.error ?? "Check the conversation before sending again.",
+                    }));
+                  return sent;
+                }}
+                onMarkRead={async () => {}}
+                onLoadOlder={() => void workspace.older()}
+                onLoadLatest={workspace.refresh}
+                onSearchMessages={async (query) => {
+                  const id = workspace.state.selectedId;
+                  if (!id) return { messageIds: [], total: 0 };
+                  const result = await workspace.runtime.search(id, query);
+                  return { messageIds: result.results.map((item) => item.message.id), total: result.total };
+                }}
+                onOpenSearchMessage={(messageId) => workspace.run(() => workspace.openSearchMessage(messageId))}
+                onTypingChange={() => {}}
+                onAnswerPrompt={async (answers) => {
+                  const question = prompt();
+                  if (!question) return false;
+                  await workspace.answer({ requestId: question.requestId, answers });
+                  return true;
+                }}
+                onRespondToApproval={async (decision) => {
+                  const item = approval();
+                  if (!item) return false;
+                  await workspace.approve({ requestId: item.requestId, decision });
+                  return true;
+                }}
+                onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
+                onCancelQueuedMessage={() => {}}
+                onSteerQueuedMessage={() => {}}
+                onUpdateQueuedMessage={unavailable}
+                onReorderQueue={() => {}}
+                onActivateBrowserTab={workspace.activateBrowserTab}
+                onCloseBrowserTab={() => {}}
+                onOpenRemoteDesktop={unavailable}
+                onStop={() => {
+                  const page = workspace.conversation()?.page;
+                  if (page?.activeTurnId)
+                    void workspace.run(() => workspace.runtime.stop(page.agentId, page.activeTurnId ?? ""));
+                }}
+              />
+            </Show>
+          </div>
+          <Show when={joinOpen()}>
+            <JoinServerDialog
+              inviteUrl=""
+              accountEmail={props.accountEmail ?? ""}
+              onClose={() => setJoinOpen(false)}
+              onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
+              onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
             />
           </Show>
+          <Show when={channels.state.editing === "create"}>
+            <ChannelCreateDialog />
+          </Show>
         </div>
-        <Show when={joinOpen()}>
-          <JoinServerDialog
-            inviteUrl=""
-            accountEmail={props.accountEmail ?? ""}
-            onClose={() => setJoinOpen(false)}
-            onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
-            onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
-          />
-        </Show>
-      </div>
+      </ChannelsControllerProvider>
     </ConversationControllerProvider>
   );
 }

@@ -14,6 +14,8 @@ their browser. The host must stay online.
 Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.
 Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
 local storage separately for each account. The shared file preview can also store its panel width.
+The sidebar stores pinned agent and channel ids, collapsed section ids, and the selected channel id
+for each account and host. It stores no message content.
 Signing out revokes that credential's remote sessions and tells other open tabs to clear private
 state. Host identity pins remain so a later sign-in cannot silently trust a replacement host key.
 The web client adds no chat or account analytics events. It does not send email codes, credentials,

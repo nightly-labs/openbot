@@ -4,9 +4,9 @@ import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
-import { ChannelConversation } from "./features/channels/ChannelConversation";
 import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
+import { WorkspaceChannelConversation } from "./features/channels/WorkspaceChannelConversation";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
@@ -105,7 +105,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           <WorkspaceConversation account={props.account} />
         </Show>
         <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
-          <ChannelConversation />
+          <WorkspaceChannelConversation />
         </Show>
       </div>
       <Show when={usage.state.serverId}>

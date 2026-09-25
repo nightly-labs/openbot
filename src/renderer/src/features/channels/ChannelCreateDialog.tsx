@@ -15,7 +15,6 @@ import {
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
-import { useAgents } from "../agents/agents-context";
 import { useChannels } from "./channels-context";
 import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
 
@@ -27,7 +26,7 @@ import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
  */
 export function ChannelCreateDialog() {
   const channels = useChannels();
-  const { agentList } = useAgents();
+  const agentList = channels.agents;
   const channelId = crypto.randomUUID();
   const [draft, setDraft] = createStore<ChannelDraft>(emptyChannelDraft());
   const [view, setView] = createStore({ search: "" });
