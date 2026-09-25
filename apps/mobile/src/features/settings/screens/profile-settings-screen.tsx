@@ -148,7 +148,9 @@ export function ProfileSettingsScreen() {
       ) : null}
       <SettingsSection title="Email">
         <SettingsRow>
-          <Typography.Paragraph selectable>{session.user.email}</Typography.Paragraph>
+          <Typography.Paragraph selectable className="text-grouped-secondary">
+            {session.user.email}
+          </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SettingsSection title="Security">
