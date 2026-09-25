@@ -923,9 +923,9 @@ jobs:
             mcp_args=()
           fi
 
-          # Which mac ran this, which bridge it has, and whether Bigger Context is on. Four
-          # runners share one bridge and one account, so a failed review could not be tied to
-          # a machine or to a bridge version without the jobs API and a person at the mac.
+          # Which bridge version ran this, and whether Bigger Context was on. The runners are
+          # directories on one mac and share this file, so the runner name tells nothing; the
+          # bridge is updated in place, and a failure could not be tied to a version later.
           # Two keys only: the same file holds the bridge's control token.
           bridge_config="${CODEX_CHATGPT_WEB_HOME:-${HOME:-}/.codex-chatgpt-web}/config.json"
           bridge_version=unknown
@@ -941,8 +941,7 @@ jobs:
             bigger_context=$(printf '%s\n' "$bridge_facts" | sed -n 2p)
             [ -n "$bridge_version" ] || bridge_version=unknown
           fi
-          runner_name=$(printf '%s' "${RUNNER_NAME:-unknown}" | tr -c 'A-Za-z0-9._-' ' ' | cut -c 1-60)
-          echo "Runner ${runner_name}, bridge ${bridge_version}, Bigger Context ${bigger_context}"
+          echo "Bridge ${bridge_version}, Bigger Context ${bigger_context}"
 
           run_reviewer() {
             # The runners share one bridge, which allows 5 browser turns at a time, and a
@@ -1128,7 +1127,6 @@ jobs:
             echo "status=$status"
             echo "exit_code=$exit_code"
             echo "salvaged=$salvaged"
-            echo "runner_name=$runner_name"
             echo "bridge_version=$bridge_version"
             echo "bigger_context=$bigger_context"
             echo "files_changed=$files_changed"
@@ -1166,7 +1164,6 @@ jobs:
           REVIEW_SECONDS: ${{ steps.review.outputs.review_seconds }}
           TOKENS_USED: ${{ steps.review.outputs.tokens_used }}
           SALVAGED: ${{ steps.review.outputs.salvaged }}
-          RUNNER_LABEL: ${{ steps.review.outputs.runner_name }}
           BRIDGE_VERSION: ${{ steps.review.outputs.bridge_version }}
           BIGGER_CONTEXT: ${{ steps.review.outputs.bigger_context }}
           REVIEWED_SINCE: ${{ steps.review.outputs.reviewed_since }}
@@ -1192,9 +1189,9 @@ jobs:
           if [ "${SALVAGED:-false}" = "true" ]; then
             cost_line="${cost_line}, read back after the bridge dropped the stream"
           fi
-          # On the failure comment as well: which mac and which bridge version failed is the
-          # first question every bridge outage asked, and the logs were the only answer.
-          host_line="Runner: ${RUNNER_LABEL:-unknown}, bridge ${BRIDGE_VERSION:-unknown}, Bigger Context ${BIGGER_CONTEXT:-unknown}"
+          # On the failure comment as well: which bridge version failed is the first question
+          # every bridge outage asked, and the logs were the only answer.
+          host_line="Bridge ${BRIDGE_VERSION:-unknown}, Bigger Context ${BIGGER_CONTEXT:-unknown}"
 
           review_ids=$(
             gh api --paginate \

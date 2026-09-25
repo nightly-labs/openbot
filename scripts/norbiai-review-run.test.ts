@@ -147,7 +147,6 @@ function review({
       PATH: `${bin}:${process.env.PATH}`,
       FAKE_DIR: temp,
       RUNNER_TEMP: temp,
-      RUNNER_NAME: "alpha-mac",
       CODEX_CHATGPT_WEB_HOME: join(temp, "bridge"),
       GITHUB_OUTPUT: join(temp, "output.txt"),
       PR_NUMBER: "1",
@@ -239,10 +238,9 @@ describe("NorbiAI review run", () => {
   // The bridge drops the stream after the reviewer answered, which leaves the last message
   // file empty and threw a finished review away. The answer is read back from the live
   // output, where the prompt and every file the reviewer printed also are.
-  it("records the runner, the bridge version and the Bigger Context switch", () => {
+  it("records the bridge version and the Bigger Context switch", () => {
     const run = review({ review: CLEAN + LEDGER });
 
-    expect(run.outputs.runner_name).toBe("alpha-mac");
     expect(run.outputs.bridge_version).toBe("6.1.0");
     expect(run.outputs.bigger_context).toBe("on");
     expect(JSON.stringify(run.outputs)).not.toContain("secret-token");
