@@ -50,9 +50,11 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
             <Dialog.Description class="sr-only">
               Read the instructions, skills and routines of this shared agent before you add it.
             </Dialog.Description>
-            <IconButton class="agent-template-close" label="Close" variant="ghost" onClick={() => changeOpen(false)}>
-              <X />
-            </IconButton>
+            <div class="agent-template-corner-actions">
+              <IconButton label="Close" variant="ghost" onClick={() => changeOpen(false)}>
+                <X />
+              </IconButton>
+            </div>
 
             <Show
               when={props.detail}

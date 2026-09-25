@@ -9,6 +9,7 @@ import {
   Heading,
   IconButton,
   ItemGroup,
+  Link2Off,
   Text,
   X,
 } from "@openbot/ui";
@@ -44,6 +45,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
   const [actionError, setActionError] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
   const published = () => props.preview?.publication ?? null;
+  let closeButton: HTMLButtonElement | undefined;
 
   async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
     setPending(kind);
@@ -72,15 +74,41 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
     <Dialog.Root open={props.open} onOpenChange={changeOpen}>
       <Dialog.Portal>
         <Dialog.Overlay class="agent-template-backdrop">
-          <Dialog.Content as="section" class="agent-template-dialog" aria-busy={pending() ? "true" : undefined}>
+          <Dialog.Content
+            as="section"
+            class="agent-template-dialog"
+            aria-busy={pending() ? "true" : undefined}
+            onOpenAutoFocus={(event) => {
+              // Unpublish is the first control in the corner; the first focus must not land on it.
+              event.preventDefault();
+              closeButton?.focus({ preventScroll: true });
+            }}
+          >
             <Dialog.Title class="sr-only">Publish {props.preview?.name ?? "agent"}</Dialog.Title>
             <Dialog.Description class="sr-only">
               Share this agent as a template. Its instructions, skills and routines are published. Files and memories
               are not.
             </Dialog.Description>
-            <IconButton class="agent-template-close" label="Close" variant="ghost" onClick={() => changeOpen(false)}>
-              <X />
-            </IconButton>
+            <Show when={published() && view() === "summary"}>
+              <Badge variant="success-light" class="agent-template-status">
+                Published
+              </Badge>
+            </Show>
+            <div class="agent-template-corner-actions">
+              <Show when={published() && view() === "summary"}>
+                <IconButton
+                  label={pending() === "unpublish" ? "Unpublishing…" : "Unpublish"}
+                  variant="ghost"
+                  disabled={pending() !== null}
+                  onClick={() => void run("unpublish", props.onUnpublish, "Could not unpublish the agent.")}
+                >
+                  <Link2Off />
+                </IconButton>
+              </Show>
+              <IconButton ref={closeButton} label="Close" variant="ghost" onClick={() => changeOpen(false)}>
+                <X />
+              </IconButton>
+            </div>
 
             <Show
               when={props.preview}
@@ -109,9 +137,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                       <Heading as="h2" size="md" class="agent-template-name">
                         {preview().name}
                       </Heading>
-                      <Show when={published()}>
-                        <Badge variant="success-light">Published</Badge>
-                      </Show>
                       <Show when={preview().updatedAt}>
                         {(updatedAt) => (
                           <Text tone="muted" variant="caption">
@@ -137,13 +162,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                       />
                     </ItemGroup>
 
-                    <Show when={published()}>
-                      {(publication) => (
-                        <Text tone="muted" variant="caption" class="agent-template-link" truncate>
-                          {publication().shareUrl}
-                        </Text>
-                      )}
-                    </Show>
                     <Show when={actionError()}>
                       {(message) => (
                         <Text tone="danger" variant="caption" role="alert">
@@ -169,20 +187,12 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                     >
                       <Button
                         type="button"
-                        variant="destructive-ghost"
-                        class="agent-template-unpublish"
-                        disabled={pending() !== null}
-                        onClick={() => void run("unpublish", props.onUnpublish, "Could not unpublish the agent.")}
-                      >
-                        {pending() === "unpublish" ? "Unpublishing…" : "Unpublish"}
-                      </Button>
-                      <Button
-                        type="button"
                         variant="outline"
+                        class="agent-template-copy"
                         disabled={pending() !== null}
                         onClick={() => void run("copy", props.onCopyLink, "Could not copy the link.")}
                       >
-                        <Copy aria-hidden="true" />
+                        <Copy class="size-4" aria-hidden="true" />
                         {copied() && pending() === null ? "Link copied" : "Copy link"}
                       </Button>
                       <Button

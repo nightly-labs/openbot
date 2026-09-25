@@ -24,8 +24,18 @@
   color: var(--openbot-text-primary);
 }
 
-.agent-template-close {
+.agent-template-status {
   position: absolute;
+  z-index: 1;
+  inset-block-start: var(--openbot-space-3);
+  inset-inline-start: var(--openbot-space-3);
+}
+
+.agent-template-corner-actions {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  gap: var(--openbot-space-1);
   inset-block-start: var(--openbot-space-2);
   inset-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-muted);
@@ -113,10 +123,6 @@
   white-space: nowrap;
 }
 
-.agent-template-link {
-  text-align: center;
-}
-
 .agent-template-actions {
   display: flex;
   flex-shrink: 0;
@@ -126,7 +132,7 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-.agent-template-unpublish {
+.agent-template-copy {
   margin-inline-end: auto;
 }
 
