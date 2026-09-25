@@ -10,7 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { Button, Field, Input, Textarea } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
-import { AVATAR_HUE_OPTIONS, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
+import { AVATAR_HUE_CHOICES, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
 import { AgentAvatar } from "./AgentAvatar";
 
@@ -55,7 +55,6 @@ export interface FirstAgentSetupProps {
 }
 
 export const FIRST_AGENT_AVATAR_SEEDS = avatarCandidateSeeds("first-bot", "first-bot", 0);
-const FIRST_AGENT_HUE_OPTIONS = AVATAR_HUE_OPTIONS.filter((option) => option.hue !== 100 && option.hue !== 280);
 
 const SUGGESTION_MOMENTUM_FRICTION = 0.88;
 const SUGGESTION_MOMENTUM_MINIMUM = 0.01;
@@ -368,7 +367,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                   style={{ background: avatarHeadColor(props.value.avatarSeed, null) }}
                 />
               </Button>
-              <For each={FIRST_AGENT_HUE_OPTIONS}>
+              <For each={AVATAR_HUE_CHOICES}>
                 {(option) => (
                   <Button
                     variant="ghost"

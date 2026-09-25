@@ -1,4 +1,4 @@
-import { AVATAR_HUE_OPTIONS, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
+import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -136,20 +136,24 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
       accessibilityRole="radiogroup"
       accessibilityLabel="Avatar color"
     >
-      {AVATAR_HUE_OPTIONS.map((option) => (
-        <Button
-          key={option.hue}
-          isIconOnly
-          variant={hue === option.hue ? "secondary" : "ghost"}
-          accessibilityRole="radio"
-          accessibilityLabel={option.label}
-          accessibilityState={{ checked: hue === option.hue, disabled }}
-          isDisabled={disabled}
-          onPress={() => onHueChange(option.hue)}
-        >
-          <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
-        </Button>
-      ))}
+      {AVATAR_HUE_CHOICES.map((option) => {
+        // A stored hue 100 or 280 shows as its same-color choice.
+        const checked = hue !== null && avatarHueSwatch(hue) === avatarHueSwatch(option.hue);
+        return (
+          <Button
+            key={option.hue}
+            isIconOnly
+            variant={checked ? "secondary" : "ghost"}
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked, disabled }}
+            isDisabled={disabled}
+            onPress={() => onHueChange(option.hue)}
+          >
+            <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
+          </Button>
+        );
+      })}
       <Button
         isIconOnly
         variant={hue === null ? "secondary" : "ghost"}

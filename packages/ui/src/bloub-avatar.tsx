@@ -11,6 +11,7 @@ import { flush } from "solid-js";
  */
 export type AvatarMotion = "hover" | "always" | "idle";
 export {
+  AVATAR_HUE_CHOICES,
   AVATAR_HUE_OPTIONS,
   avatarCandidateSeeds,
   avatarHeadColor,
