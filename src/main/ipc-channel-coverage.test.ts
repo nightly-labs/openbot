@@ -178,10 +178,6 @@ describe("IPC channel coverage", () => {
     expect(stray).toEqual([]);
   });
 
-  // The main side of these three is now the type checker's: `registerIpcGroups` cannot compile
-  // unless every request endpoint has exactly one handler behind it. What no type reaches is the
-  // preload, whose API object is shaped for the renderer, and the event senders, which are
-  // ordinary calls scattered wherever the event happens.
   // A bridged group is reached through its decoder map, which the type checker holds to every
   // endpoint of the group. A direct call beside it would give one endpoint a second method, and a
   // second bridge a second object, so the preload names a group one way, once.
@@ -197,6 +193,10 @@ describe("IPC channel coverage", () => {
     expect(mixed).toEqual([]);
   });
 
+  // The main side of these three is now the type checker's: `registerIpcGroups` cannot compile
+  // unless every request endpoint has exactly one handler behind it. What no type reaches is the
+  // preload, whose API object is shaped for the renderer, and the event senders, which are
+  // ordinary calls scattered wherever the event happens.
   it("invokes exactly the request endpoints from the preload", () => {
     expect(invoked).toEqual(requestChannels);
   });

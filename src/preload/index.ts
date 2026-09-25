@@ -257,6 +257,8 @@ function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, 
     const decode = decoders[key];
     if (decode === undefined) throw new Error(`The preload has no decoder for ${endpoint.channel}.`);
     const name = groupApiMethodName(key, endpoint);
+    // Event `x` and request `onX` share one name, and the second would silently replace the first.
+    if (Object.hasOwn(api, name)) throw new Error(`The preload has two methods named ${name}.`);
     if (endpoint.kind === "request") {
       if (typeof decode !== "function") throw new Error(`The preload cannot drop the result of ${endpoint.channel}.`);
       // Main takes at most one payload, so nothing past it reaches the channel. The types erase which
