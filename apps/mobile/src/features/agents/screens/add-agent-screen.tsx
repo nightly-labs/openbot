@@ -99,9 +99,7 @@ export function AddAgentScreen() {
             editable={!saving}
             autoCapitalize="words"
             label="Name"
-            hideLabel
             appearance="soft"
-            textAlign="center"
             maxLength={INPUT_LIMITS.agentName}
             placeholder="Name your agent"
             value={name}
