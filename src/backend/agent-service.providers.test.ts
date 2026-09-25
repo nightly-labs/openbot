@@ -1098,6 +1098,29 @@ describe.sequential("AgentService: providers", () => {
     });
   });
 
+  // Windows cannot remove a workspace that a live provider process still uses (`EBUSY`), so the
+  // deletion closes the agent's sessions before it removes any file.
+  it("closes the agent's provider sessions before it removes the agent's files", async () => {
+    const { store, mailbox } = stores(root);
+    const client = new FakeAgentClient("codex");
+    service = createTestService({ store, mailbox, preferredProvider: "codex", clientFactory: () => client });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Start." });
+    await waitFor(() => service?.listQueue("chief").deliveries.every((delivery) => delivery.status === "completed"));
+    const session = store.activeProviderSession("chief")?.externalSessionId;
+    if (!session) throw new Error("The Codex session did not start.");
+    const removeFiles = store.deleteAgent.bind(store);
+    let releasedAtRemoval: string[] = [];
+    vi.spyOn(store, "deleteAgent").mockImplementationOnce(async (id) => {
+      releasedAtRemoval = [...client.releasedThreads];
+      return removeFiles(id);
+    });
+
+    await service.deleteAgent("chief");
+    expect(releasedAtRemoval).toEqual([session]);
+    expect(service.listAgents().some((agent) => agent.id === "chief")).toBe(false);
+  });
+
   it("deletes unloaded pending handoffs for active and retired sessions with their agent", async () => {
     const { store, mailbox } = stores(root);
     let rejectTurn = false;

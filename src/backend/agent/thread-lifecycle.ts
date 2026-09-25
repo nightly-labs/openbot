@@ -159,6 +159,26 @@ export class ThreadLifecycle {
     this.#pendingHandoffs.delete(threadId);
   }
 
+  /**
+   * Closes every provider session of an agent that is about to be deleted, and waits for the close.
+   * A session keeps its provider process running in the agent's workspace, and Windows refuses to
+   * remove a directory that a live process uses (`EBUSY`). A failed close is logged: the removal
+   * that follows reports whether the files could go. Each session is also unloaded, so the next turn
+   * of an agent whose deletion failed opens the session again.
+   */
+  async releaseAgentSessions(agentId: string): Promise<void> {
+    await Promise.all(
+      this.#conversation.loadedAgentThreads(agentId).map(async ([externalThreadId, client]) => {
+        try {
+          await client.releaseThread?.(externalThreadId);
+        } catch (error) {
+          this.#hooks.logReleaseFailure(client.provider, error);
+        }
+        this.#conversation.unloadThread(externalThreadId);
+      }),
+    );
+  }
+
   async deleteProviderSessionFiles(sessionId: string): Promise<void> {
     // Deletion also covers retired sessions and handoffs not loaded this run.
     await rm(this.handoffPath(sessionId), { force: true });

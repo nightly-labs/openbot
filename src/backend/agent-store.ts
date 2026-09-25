@@ -113,6 +113,11 @@ const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
+// Windows answers `EBUSY` or `EPERM` while a file in the tree is still open: a provider process that
+// is exiting after its session closed, an antivirus scan or the search indexer. Node retries these
+// codes with a growing delay, about 1.5 seconds in total, before the deletion reports a failure.
+const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 5 } as const;
+
 export class AgentStore {
   readonly #statePath: string;
   readonly #agentsRoot: string;
@@ -629,7 +634,7 @@ export class AgentStore {
       join(this.#agentsRoot, id),
       `${join(this.#agentsRoot, id)}.openbot-stage`,
     ]) {
-      await rm(path, { recursive: true, force: true });
+      await rm(path, AGENT_FILES_REMOVAL);
     }
     await rm(this.#duplicationMarkerPath(id), { force: true });
     // A workspace that could not follow the rename legitimately sits under the pre-rename root, and deleting
@@ -646,7 +651,7 @@ export class AgentStore {
     if (legacyId !== null) {
       legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
     }
-    for (const path of legacyPaths) await rm(path, { recursive: true, force: true });
+    for (const path of legacyPaths) await rm(path, AGENT_FILES_REMOVAL);
     // Keep the record for retry until every managed path is removed. Publish the new
     // in-memory list only after the database transaction succeeds.
     const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
