@@ -100,6 +100,10 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
       return await open();
     } finally {
       this.#startingTurns.delete(threadId);
+      // A timer that fired while the turn was starting found the thread busy and did nothing. If the
+      // turn then failed to start, nothing else would arm it again, and the thread would stay open.
+      const thread = this.#threads.get(threadId);
+      if (thread && !thread.activeTurn && thread.idleRelease === null) this.#arm(thread);
     }
   }
 
@@ -119,12 +123,32 @@ export class IdleThreadPool<Thread extends IdleThread, Released> {
   async wake(threadId: string): Promise<void> {
     const released = this.#released.get(threadId);
     if (released === undefined || this.#threads.has(threadId)) return;
-    let waking = this.#waking.get(threadId);
-    if (!waking) {
-      waking = this.#options.reopen(threadId, released).finally(() => this.#waking.delete(threadId));
-      this.#waking.set(threadId, waking);
+    const waking = this.#waking.get(threadId);
+    if (waking) {
+      await waking;
+      return;
     }
-    await waking;
+    await this.opening(threadId, () => this.#options.reopen(threadId, released));
+  }
+
+  /** Waits for an open of the thread that is in flight, whether it succeeds or not. */
+  async opened(threadId: string): Promise<void> {
+    await this.#waking.get(threadId)?.catch(() => undefined);
+  }
+
+  /**
+   * Runs `open`, which must `add` the thread before it settles, as the one open of that thread:
+   * `wake` waits for it rather than opening the thread a second time. Returns `false`, and does not
+   * run `open`, when another open of the thread is in flight.
+   */
+  async opening(threadId: string, open: () => Promise<unknown>): Promise<boolean> {
+    if (this.#waking.has(threadId)) return false;
+    const opening = open().finally(() => {
+      if (this.#waking.get(threadId) === opening) this.#waking.delete(threadId);
+    });
+    this.#waking.set(threadId, opening);
+    await opening;
+    return true;
   }
 
   #arm(thread: Thread): void {

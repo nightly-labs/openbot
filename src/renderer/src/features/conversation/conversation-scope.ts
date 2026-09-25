@@ -825,6 +825,8 @@ export function createConversationViewScope(props: ConversationProps) {
   createEffect(
     () => ({
       agentId: props.agent?.id,
+      // Tracked, so a switch to a server with no browser tears down the last view's observers.
+      browserEnabled: props.browserEnabled !== false,
       surface: browserSurface(),
       visible:
         browserExpandedOpen() &&
@@ -833,8 +835,7 @@ export function createConversationViewScope(props: ConversationProps) {
         !props.globalOverlayOpen &&
         !props.remoteDesktopVisible,
     }),
-    ({ agentId, visible, surface }) => {
-      if (props.browserEnabled === false) return;
+    ({ agentId, browserEnabled, visible, surface }) => {
       const generation = ++browserVisibilityGeneration;
       if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
       browserResizeObserver?.disconnect();
@@ -843,6 +844,7 @@ export function createConversationViewScope(props: ConversationProps) {
       browserWindowResizeHandler = undefined;
       if (browserBoundsFrame !== undefined) cancelAnimationFrame(browserBoundsFrame);
       browserBoundsFrame = undefined;
+      if (!browserEnabled) return;
       if (!visible) {
         void conversationRuntime(props).browser.setVisible({ visible: false });
         return;

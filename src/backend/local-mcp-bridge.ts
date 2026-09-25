@@ -55,6 +55,10 @@ interface BridgeRoute {
 export class LocalMcpBridge {
   #server: HttpServer | null = null;
   #port: number | null = null;
+  #listening: Promise<void> | null = null;
+  /** Counts the closes, so a session asked for before a close does not register after it. */
+  #closes = 0;
+  #closing: Promise<void> | null = null;
   readonly #routes = new Map<string, BridgeRoute>();
 
   async createSession(
@@ -63,7 +67,10 @@ export class LocalMcpBridge {
     activeTurnId: () => string | null,
     call: BridgeRoute["call"],
   ): Promise<LocalMcpSession> {
+    const closes = this.#closes;
+    if (this.#closing) throw new Error("The local OpenBot MCP bridge closed.");
     await this.#listen();
+    if (closes !== this.#closes) throw new Error("The local OpenBot MCP bridge closed.");
     const tokens: string[] = [];
     const servers = namespaces.map((namespace) => {
       const token = randomBytes(32).toString("base64url");
@@ -91,16 +98,41 @@ export class LocalMcpBridge {
   }
 
   async close(): Promise<void> {
+    this.#closes += 1;
     this.#routes.clear();
+    const closing = this.#shutDown();
+    this.#closing = closing;
+    try {
+      await closing;
+    } finally {
+      if (this.#closing === closing) this.#closing = null;
+    }
+  }
+
+  /** Until the server is closed, no session may start a second bind: that server would stay open. */
+  async #shutDown(): Promise<void> {
+    // A bind still in flight sets the server when it ends, so it is awaited before the close.
+    await this.#listening?.catch(() => undefined);
     const server = this.#server;
     this.#server = null;
     this.#port = null;
-    if (!server) return;
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+    this.#listening = null;
   }
 
-  async #listen(): Promise<void> {
-    if (this.#server) return;
+  /** One bind, however many sessions ask for it at once: a second would leave a server listening. */
+  #listen(): Promise<void> {
+    if (!this.#listening) {
+      const listening = this.#bind();
+      this.#listening = listening;
+      listening.catch(() => {
+        if (this.#listening === listening) this.#listening = null;
+      });
+    }
+    return this.#listening;
+  }
+
+  async #bind(): Promise<void> {
     const server = createServer((request, response) => void this.#handle(request, response));
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);

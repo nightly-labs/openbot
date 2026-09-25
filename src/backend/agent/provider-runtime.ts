@@ -513,8 +513,11 @@ export class ProviderRuntime implements ProviderPort {
    * is ignored by the callers that read it.
    */
   #preferredModel: AgentModelId | null;
-  #restartAttempts = 0;
-  #restartTimer: NodeJS.Timeout | null = null;
+  /** Per provider: one provider that exits must not delay, or take the retries of, another. */
+  readonly #restartAttempts = new Map<AgentProvider, number>();
+  readonly #restartTimers = new Map<AgentProvider, NodeJS.Timeout>();
+  /** Counts `dispose()` calls, so a start from before one cannot add its client after it. */
+  #disposals = 0;
   #models = structuredClone(FALLBACK_MODELS);
 
   constructor(options: {
@@ -1047,8 +1050,9 @@ export class ProviderRuntime implements ProviderPort {
    * stop() interleaves that wait with the mailbox and image-generation teardown.
    */
   dispose(): AgentClient[] {
-    if (this.#restartTimer) clearTimeout(this.#restartTimer);
-    this.#restartTimer = null;
+    this.#disposals += 1;
+    for (const timer of this.#restartTimers.values()) clearTimeout(timer);
+    this.#restartTimers.clear();
     if (this.#idleCheck) clearInterval(this.#idleCheck);
     this.#idleCheck = null;
     this.#released.clear();
@@ -1680,6 +1684,8 @@ export class ProviderRuntime implements ProviderPort {
     requestedProviders: readonly AgentProvider[],
     options: { preserveCheckErrors?: boolean; refreshRuntimeInBackground?: boolean; notifyReady?: boolean } = {},
   ): Promise<void> {
+    const disposals = this.#disposals;
+    const disposed = () => this.#hooks.isStopping() || disposals !== this.#disposals;
     const hadClients = this.#clients.size > 0 || this.#released.size > 0;
     const providerStatuses: AgentProviderStatus[] = structuredClone(
       this.#status.providers ?? INITIAL_STATUS.providers ?? [],
@@ -1750,6 +1756,11 @@ export class ProviderRuntime implements ProviderPort {
             return message;
           }
           driver.validateAccount(account.account);
+          // `stop()` does not wait for a start: a client added after its `dispose()` would run on.
+          if (disposed()) {
+            await client.stop().catch(() => undefined);
+            return null;
+          }
           this.#cli.set(provider, cli);
           this.#clients.set(provider, client);
           this.#accounts.set(provider, account.account);
@@ -1781,6 +1792,7 @@ export class ProviderRuntime implements ProviderPort {
         }
       }),
     );
+    if (disposed()) return;
     for (const provider of requestedProviders) this.#released.delete(provider);
     const failures = results.filter((message): message is string => message !== null);
     const finalProviderStatuses = structuredClone(this.#status.providers ?? providerStatuses);
@@ -1809,7 +1821,7 @@ export class ProviderRuntime implements ProviderPort {
         : this.#clients.keys().next().value;
     if (!primaryProvider) throw new Error("No agent provider is ready.");
     const primaryAccount = this.#accounts.get(primaryProvider);
-    this.#restartAttempts = 0;
+    for (const provider of activated) this.#restartAttempts.delete(provider);
     this.#setStatus({
       phase: "ready",
       cliVersion: this.#cli.get(primaryProvider)?.version ?? null,
@@ -1898,8 +1910,9 @@ export class ProviderRuntime implements ProviderPort {
       message: this.#redactMcp(error.message),
     });
     const anotherProviderIsReady = this.#clients.size > 0 || this.#released.size > 0;
+    const attempts = this.#restartAttempts.get(client.provider) ?? 0;
 
-    if (this.#restartAttempts >= 3) {
+    if (attempts >= 3) {
       this.#setStatus(
         anotherProviderIsReady
           ? {
@@ -1918,8 +1931,8 @@ export class ProviderRuntime implements ProviderPort {
       return;
     }
 
-    const delayMs = 500 * 2 ** this.#restartAttempts;
-    this.#restartAttempts += 1;
+    const delayMs = 500 * 2 ** attempts;
+    this.#restartAttempts.set(client.provider, attempts + 1);
     this.#setStatus(
       anotherProviderIsReady
         ? {
@@ -1932,13 +1945,36 @@ export class ProviderRuntime implements ProviderPort {
             phase: "restarting",
             providers,
             capabilities: { ...this.#status.capabilities, chat: "unavailable" },
-            message: `${providerLabel(client.provider)} stopped. Retrying (${this.#restartAttempts}/3)…`,
+            message: `${providerLabel(client.provider)} stopped. Retrying (${attempts + 1}/3)…`,
           },
     );
-    this.#restartTimer = setTimeout(() => {
-      this.#restartTimer = null;
-      void this.#connect("restarting", [client.provider]);
-    }, delayMs);
+    const provider = client.provider;
+    clearTimeout(this.#restartTimers.get(provider));
+    this.#restartTimers.set(
+      provider,
+      setTimeout(() => {
+        this.#restartTimers.delete(provider);
+        void this.#restart(provider);
+      }, delayMs),
+    );
+  }
+
+  async #restart(provider: AgentProvider): Promise<void> {
+    const disposals = this.#disposals;
+    // A turn in the backoff may have started the provider already: a second connect would replace
+    // that client and leave it running. That start can also end with no client, when the client it
+    // added exits before the start ends, so the retry waits for it rather than being dropped.
+    for (let pending = this.#providerStarts.get(provider); pending; pending = this.#providerStarts.get(provider)) {
+      await pending.catch(() => undefined);
+    }
+    if (this.#hooks.isStopping() || disposals !== this.#disposals || this.#clients.has(provider)) return;
+    const start = this.#connect("restarting", [provider])
+      .catch((error) => this.#emitError(`${provider}_restart_failed`, error))
+      .finally(() => {
+        this.#providerStarts.delete(provider);
+      });
+    this.#providerStarts.set(provider, start);
+    recordRestartActivity();
   }
 
   /**

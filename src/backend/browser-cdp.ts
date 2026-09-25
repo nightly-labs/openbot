@@ -785,15 +785,32 @@ export class BrowserCdpEngine {
         };
         debuggerClient.on("message", listener);
       });
-      assertBeforeDeadline(deadline);
-      onDispatch?.();
-      await send("Input.setInterceptDrags", { enabled: true }, sessionId);
-      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y }, sessionId);
-      await send(
-        "Input.dispatchMouseEvent",
-        { type: "mousePressed", x: from.x, y: from.y, button: "left", clickCount: 1 },
-        sessionId,
-      );
+      let pressSent = false;
+      try {
+        assertBeforeDeadline(deadline);
+        onDispatch?.();
+        await send("Input.setInterceptDrags", { enabled: true }, sessionId);
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y }, sessionId);
+        pressSent = true;
+        await send(
+          "Input.dispatchMouseEvent",
+          { type: "mousePressed", x: from.x, y: from.y, button: "left", clickCount: 1 },
+          sessionId,
+        );
+      } catch (error) {
+        // The listener and the drag intercept would otherwise outlive a drag that never started.
+        stopWaitingForIntercept();
+        await send("Input.setInterceptDrags", { enabled: false }, sessionId).catch(() => undefined);
+        // The press can reach the page even when its reply fails, and a held button breaks later input.
+        if (pressSent) {
+          await send(
+            "Input.dispatchMouseEvent",
+            { type: "mouseReleased", x: from.x, y: from.y, button: "left", clickCount: 1 },
+            sessionId,
+          ).catch(() => undefined);
+        }
+        throw error;
+      }
       let released = false;
       try {
         const activationX = from.x + Math.sign(to.x - from.x) * 4;
@@ -1017,9 +1034,13 @@ export class BrowserCdpEngine {
     options: BrowserScreencastOptions,
     onFrame: (frame: BrowserScreencastFrame) => void,
   ): Promise<() => Promise<void>> {
+    let stopRequested = false;
     let stop = (): void => undefined;
     const stopped = new Promise<void>((resolve) => {
-      stop = () => resolve();
+      stop = () => {
+        stopRequested = true;
+        resolve();
+      };
     });
     let started = (): void => undefined;
     let failed = (_error: unknown): void => undefined;
@@ -1054,24 +1075,39 @@ export class BrowserCdpEngine {
         height: Math.max(1, Math.round(numberValue(metadata?.deviceHeight))),
       });
     };
-    const running = this.#lease(async (send) => {
-      this.#contents.debugger.on("message", listener);
+    // A stalled agent operation can detach the debugger under the stream, which ends the screencast
+    // without a word. The stream then starts again on a new lease, so the view does not freeze.
+    const running = (async () => {
       try {
-        await send("Page.startScreencast", {
-          format: "jpeg",
-          quality: options.quality,
-          maxWidth: options.maxWidth,
-          maxHeight: options.maxHeight,
-          everyNthFrame: 1,
-        });
-        started();
-        await stopped;
+        while (!stopRequested) {
+          let onDetach = (): void => undefined;
+          const detached = new Promise<void>((resolve) => {
+            onDetach = () => resolve();
+          });
+          await this.#lease(async (send) => {
+            this.#contents.debugger.on("message", listener);
+            this.#contents.debugger.on("detach", onDetach);
+            try {
+              await send("Page.startScreencast", {
+                format: "jpeg",
+                quality: options.quality,
+                maxWidth: options.maxWidth,
+                maxHeight: options.maxHeight,
+                everyNthFrame: 1,
+              });
+              started();
+              await Promise.race([stopped, detached]);
+            } finally {
+              this.#contents.debugger.off("message", listener);
+              this.#contents.debugger.off("detach", onDetach);
+              if (stopRequested) await send("Page.stopScreencast").catch(() => undefined);
+            }
+          }, false);
+        }
       } finally {
-        this.#contents.debugger.off("message", listener);
         pacer.stop();
-        await send("Page.stopScreencast").catch(() => undefined);
       }
-    }, false);
+    })();
     void running.catch((error: unknown) => failed(error));
     await ready;
     return async () => {
