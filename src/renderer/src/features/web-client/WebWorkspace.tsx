@@ -506,7 +506,7 @@ export function WebWorkspace(props: {
               onUpdateQueuedMessage={unavailable}
               onReorderQueue={() => {}}
               onActivateBrowserTab={workspace.activateBrowserTab}
-              onCloseBrowserTab={() => {}}
+              onCloseBrowserTab={(tabId) => workspace.runtime.closeBrowserTab(tabId)}
               onOpenRemoteDesktop={unavailable}
               onStop={() => {
                 const page = workspace.conversation()?.page;
