@@ -968,7 +968,9 @@ jobs:
           # leaves no MCP server. The tools only read. Read, Grep and Glob are refused outside
           # the checkout, and Bash runs only the read commands below; the run is not
           # interactive, so every other command is refused. The deny rules close the options
-          # of those commands that write a file or read one outside the repository.
+          # of those commands that write a file or read one outside the repository. A `*`
+          # matches anywhere in the command: on Claude Code 2.1.282, `git diff --output=<file>`
+          # and `git diff --no-index /etc/hosts /dev/null` were both refused.
           # `git grep` and `git blame` are left out: `-O` runs a program and `--contents`
           # reads any file, and the Grep tool does the same search.
           claude_allowed=('Bash(git diff:*)' 'Bash(git show:*)' 'Bash(git log:*)' 'Bash(git ls-files:*)')
