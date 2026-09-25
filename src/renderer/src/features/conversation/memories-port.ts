@@ -4,7 +4,7 @@
 // words of copy are not. They live here, so `AgentMemoriesModal` names no owner at all.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { MemoryEntry } from "@openbot/contracts/ipc";
+import type { MemoryEntry, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 export interface MemoriesPort {
   ownerId: string;
@@ -44,23 +44,38 @@ export function agentMemoriesPort(agentId: string, agentName: string): MemoriesP
   };
 }
 
-export function channelMemoriesPort(channelId: string, channelName: string): MemoriesPort {
+/** The host calls a channel's memories make. The desktop sends them through preload. */
+export type ChannelMemoriesApi = Pick<
+  OpenBotDesktopApi["agent"],
+  | "listChannelMemories"
+  | "createChannelMemory"
+  | "updateChannelMemory"
+  | "deleteChannelMemory"
+  | "clearChannelMemories"
+  | "onEvent"
+>;
+
+export function channelMemoriesPort(
+  channelId: string,
+  channelName: string,
+  api: ChannelMemoriesApi = window.openbot.agent,
+): MemoriesPort {
   return {
     ownerId: channelId,
     ownerLabel: channelName,
     ownerNoun: "channel",
     limit: INPUT_LIMITS.channelMemories,
-    list: () => window.openbot.agent.listChannelMemories(channelId),
+    list: () => api.listChannelMemories(channelId),
     create: async (text) => {
-      await window.openbot.agent.createChannelMemory({ channelId, text });
+      await api.createChannelMemory({ channelId, text });
     },
     update: async (memoryId, text) => {
-      await window.openbot.agent.updateChannelMemory({ channelId, memoryId, text });
+      await api.updateChannelMemory({ channelId, memoryId, text });
     },
-    remove: (memoryId) => window.openbot.agent.deleteChannelMemory({ channelId, memoryId }),
-    clear: () => window.openbot.agent.clearChannelMemories(channelId),
+    remove: (memoryId) => api.deleteChannelMemory({ channelId, memoryId }),
+    clear: () => api.clearChannelMemories(channelId),
     subscribe: (reload) =>
-      window.openbot.agent.onEvent((event) => {
+      api.onEvent((event) => {
         if (event.type === "channel-memories-changed" && event.channelId === channelId) reload();
       }),
   };

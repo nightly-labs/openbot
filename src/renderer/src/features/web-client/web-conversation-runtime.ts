@@ -1,12 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AttachmentImportEvent, type AttachmentSummary, filePreviewKindForFile } from "@openbot/contracts/ipc";
+import type { AttachmentImportEvent, AttachmentSummary } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
+import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId: () => string): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const urls = new Set<string>();
+  const files = createWebAttachmentFiles(remote);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
     if (!importing) return;
@@ -23,19 +24,8 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  async function download(id: string) {
-    const file = await remote.download(id);
-    const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
-    urls.add(url);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    link.click();
-  }
   onCleanup(() => {
     void cancelImportFiles();
-    for (const url of urls) URL.revokeObjectURL(url);
   });
   return {
     agent: {
@@ -50,7 +40,7 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
           listeners.delete(listener);
         };
       },
-      openAttachment: ({ attachmentId }) => download(attachmentId),
+      openAttachment: ({ attachmentId }) => files.download(attachmentId),
       openSharedFile: unavailable,
       openWorkspaceFile: unavailable,
       previewSharedFile: unavailable,
@@ -71,21 +61,8 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
       setVisible: async () => {},
     },
     voice: { onModelStatus: () => () => {}, prepareModel: unavailable, transcribe: unavailable },
-    async openUrl(value) {
-      const url = new URL(value);
-      if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("This link cannot be opened.");
-      window.open(url.href, "_blank", "noopener,noreferrer");
-    },
-    async previewAttachment(attachment) {
-      const file = await remote.download(attachment.id);
-      return {
-        name: file.name,
-        size: attachment.size,
-        mimeType: file.mimeType,
-        previewKind: filePreviewKindForFile(file.name, file.mimeType),
-        bytes: Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0)),
-      };
-    },
+    openUrl: openWebLink,
+    previewAttachment: files.preview,
     async importFiles(files) {
       if (importing || files.length === 0) return;
       const serverId = hostId();

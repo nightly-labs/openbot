@@ -1,6 +1,6 @@
 // The routines twin of `memories-port.ts`: one settings panel, two owners.
 
-import type { RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
+import type { OpenBotDesktopApi, RoutineFields, RoutineRunFields, RoutineSchedule } from "@openbot/contracts/ipc";
 
 export interface RoutineSaveInput {
   routineId: string | null;
@@ -44,22 +44,34 @@ export function agentRoutinesPort(agentId: string): RoutinesPort {
   };
 }
 
-export function channelRoutinesPort(channelId: string): RoutinesPort {
+/** The host calls a channel's routines make. The desktop sends them through preload. */
+export type ChannelRoutinesApi = Pick<
+  OpenBotDesktopApi["agent"],
+  | "listChannelRoutines"
+  | "listChannelRoutineRuns"
+  | "createChannelRoutine"
+  | "updateChannelRoutine"
+  | "deleteChannelRoutine"
+  | "testChannelRoutine"
+  | "onEvent"
+>;
+
+export function channelRoutinesPort(channelId: string, api: ChannelRoutinesApi = window.openbot.agent): RoutinesPort {
   return {
     ownerId: channelId,
     ownerNoun: "channel",
-    list: () => window.openbot.agent.listChannelRoutines(channelId),
-    listRuns: (routineId, limit) => window.openbot.agent.listChannelRoutineRuns({ channelId, routineId, limit }),
+    list: () => api.listChannelRoutines(channelId),
+    listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),
     save: ({ routineId, name, instruction, active, timezone, schedule }) =>
       routineId
-        ? window.openbot.agent.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule })
-        : window.openbot.agent.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule }),
-    remove: (routineId) => window.openbot.agent.deleteChannelRoutine({ channelId, routineId }),
+        ? api.updateChannelRoutine({ channelId, routineId, name, instruction, active, schedule })
+        : api.createChannelRoutine({ channelId, name, instruction, active, timezone, schedule }),
+    remove: (routineId) => api.deleteChannelRoutine({ channelId, routineId }),
     test: async (routineId) => {
-      await window.openbot.agent.testChannelRoutine({ channelId, routineId });
+      await api.testChannelRoutine({ channelId, routineId });
     },
     subscribe: (reload) =>
-      window.openbot.agent.onEvent((event) => {
+      api.onEvent((event) => {
         if (event.type === "channel-routines-changed" && event.channelId === channelId) reload();
       }),
   };

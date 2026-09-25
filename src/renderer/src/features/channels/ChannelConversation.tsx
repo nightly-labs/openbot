@@ -1,7 +1,10 @@
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import {
+  type AgentApproval,
   type AttachmentSummary,
+  type BrowserTab,
+  type BrowserTakeoverRequest,
   canPreviewAttachment,
   type DraftAttachment,
   type FilePreview,
@@ -52,42 +55,36 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { appPort } from "../../app-port";
 import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
-import { useNavigation } from "../../navigation";
-import { useTurns } from "../../turns";
-import { useAuth } from "../account/account-context";
-import { useAgents } from "../agents/agents-context";
-import { useBrowserTabs } from "../browser/browser-context";
 import { AgentMemoriesModal } from "../conversation/AgentMemoriesModal";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import { attachmentFilePreview } from "../conversation/attachment-preview";
 import { channelMemoriesPort } from "../conversation/memories-port";
 import { channelRoutinesPort } from "../conversation/routines-port";
-import { useServers } from "../servers/servers-context";
-import { usePresence } from "../team/team-context";
 import { ChannelEditor } from "./ChannelEditor";
-import { channelTimelineEntries, firstUnreadChannelMessageId, isOwnChannelAuthor } from "./channel-timeline";
+import { channelTimelineEntries, firstUnreadChannelMessageId } from "./channel-timeline";
 import { useChannels } from "./channels-context";
-import { channelsPort } from "./channels-port";
 
 const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
-export function ChannelConversation() {
+/** What the open channel reads from the client around it. The channel itself comes from `useChannels()`. */
+export interface ChannelConversationProps {
+  isOwnMessage: (authorId: string) => boolean;
+  /** Keyed by agent id. */
+  pendingApprovals: Record<string, AgentApproval | undefined>;
+  /** Keyed by agent id. */
+  pendingTakeovers: Record<string, BrowserTakeoverRequest | undefined>;
+  browserTabs: BrowserTab[];
+  onSelectAgent: (agentId: string) => void;
+}
+
+export function ChannelConversation(props: ChannelConversationProps) {
   const channels = useChannels();
-  const { selectAgent } = useNavigation();
-  const { centralAuth } = useAuth();
-  const { currentTeamMember } = usePresence();
-  const { activeServer } = useServers();
-  const isOwnMessage = (authorId: string) => {
-    const auth = centralAuth();
-    return isOwnChannelAuthor(authorId, {
-      memberId: currentTeamMember()?.id ?? null,
-      accountUserId: auth.status === "signed_in" ? auth.user.id : null,
-      onOwnComputer: activeServer()?.kind === "local",
-    });
-  };
+  const runtime = () => channels.port();
+  const agentList = channels.agents;
+  const isOwnMessage = (authorId: string) => props.isOwnMessage(authorId);
+  const selectAgent = (agentId: string) => props.onSelectAgent(agentId);
   /**
    * Memories and routines live here rather than in `ChannelEditor`, because the routines view
    * covers the whole panel - its own header replaces the panel header, the way the agent settings
@@ -118,11 +115,11 @@ export function ChannelConversation() {
   // its event subscription each time a message arrives.
   const memoriesPort = createMemo(() => {
     const id = channelId();
-    return id ? channelMemoriesPort(id, channelName()) : null;
+    return id ? channelMemoriesPort(id, channelName(), runtime().agent) : null;
   });
   const routinesPort = createMemo(() => {
     const id = channelId();
-    return id ? channelRoutinesPort(id) : null;
+    return id ? channelRoutinesPort(id, runtime().agent) : null;
   });
   // The settings row reads both counts before either view opens, so it cannot take them from the
   // view that renders the list. It loads them here and follows the events those views follow.
@@ -156,9 +153,6 @@ export function ChannelConversation() {
       onCleanup(port.subscribe(load));
     },
   );
-  const { pendingApprovals, pendingPrompts } = useTurns();
-  const { browserTabs } = useBrowserTabs();
-  const { agentList } = useAgents();
   const [composer, setComposer] = createStore<{
     text: string;
     reply: string | null;
@@ -199,17 +193,27 @@ export function ChannelConversation() {
   const [filePreview, setFilePreview] = createSignal<ChannelFilePreview | null>(null);
   const previewChannelAttachment = async (attachment: AttachmentSummary) => {
     if (!canPreviewAttachment(attachment)) {
-      void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
+      void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action: "open" }));
       return;
     }
     channels.closeEditor();
     await channels.perform(async (): Promise<void> => {
-      const preview = await attachmentFilePreview(attachment);
+      const preview = await (runtime().previewAttachment ?? attachmentFilePreview)(attachment);
       setFilePreview({ attachment, preview });
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
-    void channels.perform(() => channelsPort().agent.openAttachment({ attachmentId: attachment.id, action }));
+    void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action }));
+  };
+  /** Absent where the runtime saves files one at a time, so the row offers no bulk download. */
+  const downloadAttachments = () => {
+    const agent = runtime().agent;
+    if (!agent.downloadAttachments) return undefined;
+    return async (attachments: AttachmentSummary[]) => {
+      await channels.perform(async () => {
+        await agent.downloadAttachments?.({ attachments: attachments.map(({ id, name }) => ({ id, name })) });
+      });
+    };
   };
   // The preview belongs to the channel it was opened from, and the settings panel takes the slot back.
   createEffect(
@@ -633,16 +637,10 @@ export function ChannelConversation() {
                               selectAgent(id);
                             }}
                             onOpenLink={(url) => {
-                              void appPort().openUrl(url);
+                              void runtime().openUrl(url);
                             }}
                             onPreview={(attachment) => void previewChannelAttachment(attachment)}
-                            onDownloadAttachments={async (attachments) => {
-                              await channels.perform(() =>
-                                channelsPort().agent.downloadAttachments({
-                                  attachments: attachments.map(({ id, name }) => ({ id, name })),
-                                }),
-                              );
-                            }}
+                            onDownloadAttachments={downloadAttachments()}
                             onAttachmentAction={channelAttachmentAction}
                             actions={
                               <MessageActions
@@ -683,7 +681,7 @@ export function ChannelConversation() {
                                     page().channel.archived
                                       ? Promise.resolve(false)
                                       : channels.perform(() =>
-                                          channelsPort().agent.respondToPrompt({
+                                          runtime().agent.respondToPrompt({
                                             requestId: prompt().requestId,
                                             answers,
                                           }),
@@ -710,7 +708,7 @@ export function ChannelConversation() {
                     when={
                       !page().channel.archived &&
                       page().tasks.some((task) => task.ownerAgentId === member.agentId && task.state === "running") &&
-                      pendingApprovals()[member.agentId]
+                      props.pendingApprovals[member.agentId]
                     }
                   >
                     {(approval) => (
@@ -718,7 +716,7 @@ export function ChannelConversation() {
                         approval={approval()}
                         onApprove={() =>
                           channels.perform(() =>
-                            channelsPort().agent.respondToApproval({
+                            runtime().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "accept",
                             }),
@@ -726,7 +724,7 @@ export function ChannelConversation() {
                         }
                         onReject={() =>
                           channels.perform(() =>
-                            channelsPort().agent.respondToApproval({
+                            runtime().agent.respondToApproval({
                               requestId: approval().requestId,
                               decision: "decline",
                             }),
@@ -740,11 +738,10 @@ export function ChannelConversation() {
               <For each={page().channel.members}>
                 {(member) => {
                   const takeover = () => {
-                    const event = pendingPrompts()[member.agentId];
+                    const request = props.pendingTakeovers[member.agentId];
                     return !page().channel.archived &&
-                      event?.type === "browser-takeover-requested" &&
                       page().tasks.some((task) => task.ownerAgentId === member.agentId && task.state === "running")
-                      ? event.request
+                      ? request
                       : undefined;
                   };
                   return (
@@ -753,12 +750,12 @@ export function ChannelConversation() {
                         <BrowserTakeoverCard
                           request={request()}
                           agentName={name(member.agentId)}
-                          tab={browserTabs().find((tab) => tab.id === request().tabId)}
+                          tab={props.browserTabs.find((tab) => tab.id === request().tabId)}
                           preview={null}
                           previewStatus="idle"
                           onComplete={() =>
                             channels.perform(() =>
-                              channelsPort().agent.respondToBrowserTakeover({
+                              runtime().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "complete",
                               }),
@@ -766,16 +763,16 @@ export function ChannelConversation() {
                           }
                           onCancel={() =>
                             channels.perform(() =>
-                              channelsPort().agent.respondToBrowserTakeover({
+                              runtime().agent.respondToBrowserTakeover({
                                 requestId: request().requestId,
                                 decision: "cancel",
                               }),
                             )
                           }
                           browserSecret={{
-                            loadPreview: channelsPort().browser.capturePreview,
+                            loadPreview: runtime().browser.capturePreview,
                             onRespond: async (input) => {
-                              await channels.perform(() => channelsPort().agent.respondToBrowserSecret(input));
+                              await channels.perform(() => runtime().agent.respondToBrowserSecret(input));
                             },
                           }}
                         />
@@ -882,7 +879,7 @@ export function ChannelConversation() {
                       onClick={() =>
                         void channels.perform(async () => {
                           const selectedId = channels.state.selectedId;
-                          const attachments = await channelsPort().agent.chooseAttachments({ filter: "all" });
+                          const attachments = await runtime().agent.chooseAttachments({ filter: "all" });
                           if (selectedId === channels.state.selectedId)
                             setComposer((state) => {
                               state.attachments = [...state.attachments, ...attachments];
@@ -917,7 +914,7 @@ export function ChannelConversation() {
                     maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
                     onWidthChange={setPanelWidth}
                     onOpenLink={(url) => {
-                      void appPort().openUrl(url);
+                      void runtime().openUrl(url);
                     }}
                     /* A channel transcript has no agent workspace of its own, so a path in a
                        previewed file cannot be resolved here. Only attachments open in this slot. */
@@ -926,7 +923,11 @@ export function ChannelConversation() {
                     sourceUrl={file().attachment.previewUrl}
                     onOpenExternally={() => channelAttachmentAction(file().attachment, "open")}
                     onDownload={() => channelAttachmentAction(file().attachment, "download")}
-                    onReveal={() => channelAttachmentAction(file().attachment, "reveal")}
+                    onReveal={
+                      runtime().fileActions === "native"
+                        ? () => channelAttachmentAction(file().attachment, "reveal")
+                        : undefined
+                    }
                     onClose={() => setFilePreview(null)}
                   />
                 </Loading>

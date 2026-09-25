@@ -61,8 +61,9 @@ mock. The separate web preview implements the browser runtime with that same moc
 - Attachment previews use downloaded bytes and the shared preview panel. Host filesystem paths
   and host preview URLs are not used as browser attachment links. Blob URLs are released when the
   preview closes, the host changes, or the workspace unmounts.
-- Pin/unpin preferences are in-memory and specific to the selected host. They do
-  not delete conversations. Notification changes use the host's existing settings and include
+- Pinned agents and channels and collapsed sections are kept in local storage for each account and
+  host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
+  conversations. Notification changes use the host's existing settings and include
   mute and unmute. Search queries are not persisted. The separate hide/show toolbar was removed.
 - Reconnect reads authoritative state. It never resends uncertain messages. A user must check
   the conversation and acknowledge the uncertain result. New-agent requests with an unknown
@@ -255,8 +256,8 @@ The browser now passes the host's `sidebar-layout` snapshot and mutation action 
 shared Sidebar. This enables its native drag controls, section menus, and grouping without a
 second web implementation. Layout changes remain on the host and follow its capability gate;
 older hosts keep a read-only default layout. Late responses from a previous host, and lower
-layout revisions after a newer event, cannot replace the current layout. Pin order and collapsed
-sections remain in browser memory and clear with host state.
+layout revisions after a newer event, cannot replace the current layout. Pins and collapsed
+sections use the desktop's `createSidebarPreferences`, scoped to the account and host.
 
 The existing shared AccountDock now shows its usage indicator and provider popover in the web
 client. Usage comes from the existing host Team API, with the same contract validation, refresh
@@ -267,7 +268,22 @@ Local checks covered provider usage display/refresh, drag-to-pin/unpin, creating
 assigning an agent, saved assignment after reload, collapse/expand, and deleting the temporary
 section without deleting its agent. Native dragging between sections was attempted but no
 move was observed through the browser harness; the shared desktop drag implementation is
-unchanged. Channels, people, and desktop-only settings remain outside the implemented web controls.
+unchanged. People and desktop-only settings remain outside the implemented web controls.
+
+### Channels
+
+The browser uses the desktop channel UI: the sidebar rows and menus, `ChannelCreateDialog`,
+`ChannelConversation`, and channel settings with memories and routines. `createChannelsController`
+holds the channel logic for both clients. Each client gives it a `ChannelsEnvironment` and a
+`ChannelsPort` runtime: the desktop uses preload, and the browser uses `createWebChannelsPort`
+over the host connection. The Team API calls come from `teamChannelsApi` in
+`packages/team-client`, which has the same method types as the desktop IPC calls.
+
+Channels need the host's `channel-chats-v1` capability. Deletion is shown to owners and admins;
+the host also enforces the role. Channel pages reach the browser without host preview URLs. Files
+are chosen with the browser's file chooser, uploaded as drafts, and downloaded through the host.
+The browser cannot reveal a file or download several files at once. The selected channel is kept in
+local storage for each account and host, as on desktop.
 
 
 ### Agent action parity
