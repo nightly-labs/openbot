@@ -20,14 +20,13 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_TEMPLATE_LIMITS, isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
-import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { listManagedSkillsForChat } from "./managed-skill-service";
 import { listFolderSkills } from "./skill-folder-discovery";
-import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
+import { archiveDirectory, inspectArchive, inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
 
@@ -242,6 +241,14 @@ export class SkillMarketplaceService {
     for (const skill of await listFolderSkills(agent, lockedSlugs(lock))) {
       if (skill.problem || !skill.location) continue;
       result.push(await embeddedSkill(join(agent.workspacePath, skill.location, "SKILL.md"), skill.name));
+    }
+    // An install writes each skill to a folder named by its slug, so two skills with one slug would
+    // make every install of the template fail.
+    const slugs = new Set<string>();
+    for (const skill of result) {
+      if (slugs.has(skill.slug))
+        throw new Error(`Two skills are named "${skill.slug}". Rename one of them before publishing.`);
+      slugs.add(skill.slug);
     }
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -637,7 +644,7 @@ async function embeddedSkill(path: string, label: string): Promise<AgentTemplate
   if (markdown.length > AGENT_TEMPLATE_LIMITS.skillMarkdown) throw new Error(tooLarge);
   let info: { slug: string; name: string };
   try {
-    info = inspectArchive(zipSync({ "SKILL.md": new TextEncoder().encode(markdown) }));
+    info = inspectSkillMarkdown(markdown);
   } catch (error) {
     throw new Error(`${label}: ${error instanceof Error ? error.message : "SKILL.md is invalid."}`);
   }

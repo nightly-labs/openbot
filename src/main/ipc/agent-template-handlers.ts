@@ -40,6 +40,7 @@ function parseInstallAgentTemplate(input: unknown): InstallAgentTemplateInput {
   return {
     templateId: requireString(input.templateId, "templateId"),
     timezone: requireString(input.timezone, "timezone", 255),
+    expectedUpdatedAt: requireString(input.expectedUpdatedAt, "expectedUpdatedAt", 64),
   };
 }
 

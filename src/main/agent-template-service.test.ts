@@ -35,18 +35,34 @@ function service(
           { id: "Ab3_-xYz0123456789abcd", sourceAgentId: agent.id, updatedAt: "2026-09-25T09:00:00.000Z" },
         ]);
       if (options.published && init.method === "DELETE") return decode({ deleted: true });
+      if (options.published && path === "/v1/agent-templates/Ab3_-xYz0123456789abcd")
+        return decode({
+          id: "Ab3_-xYz0123456789abcd",
+          name: "Writer",
+          title: "",
+          description: "Now does something else.",
+          avatarSeed: "agent-writer",
+          avatarHue: null,
+          avatarUrl: null,
+          cardUrl: null,
+          creatorName: "Sam Rivera",
+          updatedAt: "2026-09-25T10:00:00.000Z",
+          skills: [],
+          routines: [],
+        });
       throw new Error("No request is expected.");
     },
     downloadAuthorized: vi.fn(async () => new Uint8Array()),
     resolveApiUrl: (path: string) => new URL(path, "https://api.openbot.run").toString(),
   };
+  const createAgentProfile = vi.fn(async () => agent);
   const templates = new AgentTemplateService(
     auth,
     {
       listAgents: () => [{ ...agent, description }],
       listRoutines: () => [],
       resolveAvatar: () => null,
-      createAgentProfile: vi.fn(async () => agent),
+      createAgentProfile,
       setAvatar: vi.fn(async () => agent),
       createRoutine: vi.fn(() => ({ id: "routine" })),
       deleteAgent: vi.fn(async () => undefined),
@@ -63,7 +79,7 @@ function service(
       installLocal: vi.fn(async () => undefined),
     },
   );
-  return { templates, requests };
+  return { templates, requests, createAgentProfile };
 }
 
 // A template is public to anyone with its link, so a secret must stop publishing before any request.
@@ -97,5 +113,21 @@ describe("a published agent with a skill that cannot be published", () => {
     await templates.unpublish(agent.id);
     expect(requests).toContainEqual({ path: "/v1/agent-templates/Ab3_-xYz0123456789abcd", method: "DELETE" });
     await expect(templates.publish({ agentId: agent.id, card: null })).rejects.toThrow("local changes");
+  });
+});
+
+// A link must install what the user read: a version republished while the dialog was open is refused.
+describe("installing an agent template", () => {
+  it("refuses a template that changed after the user reviewed it and creates no agent", async () => {
+    const { templates, createAgentProfile } = service("Drafts product writing.", undefined, { published: true });
+
+    await expect(
+      templates.install({
+        templateId: "Ab3_-xYz0123456789abcd",
+        timezone: "Europe/Warsaw",
+        expectedUpdatedAt: "2026-09-25T09:00:00.000Z",
+      }),
+    ).rejects.toThrow("This agent changed after you opened it.");
+    expect(createAgentProfile).not.toHaveBeenCalled();
   });
 });

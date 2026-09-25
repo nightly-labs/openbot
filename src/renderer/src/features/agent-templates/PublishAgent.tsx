@@ -1,4 +1,4 @@
-import type { AgentTemplatePreview } from "@openbot/contracts/ipc";
+import { type AgentTemplatePreview, isAgentTemplateCardPng } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
@@ -76,8 +76,10 @@ export function createPublishAgent() {
     const preview = state.preview;
     if (!agentId || !preview) return;
     const update = preview.publication !== null;
-    // The card is only the link preview image: when it cannot be drawn, the agent is published without it.
-    const card = await renderAgentTemplateCard(preview).catch(() => null);
+    // The card is only the link preview image: when it cannot be drawn, or is too large for the
+    // Worker to accept, the agent is published without it.
+    const drawn = await renderAgentTemplateCard(preview).catch(() => null);
+    const card = drawn && isAgentTemplateCardPng(drawn) ? drawn : null;
     const publication = await agentTemplatesPort().agentTemplates.publish({ agentId, card });
     if (state.agentId !== agentId) return;
     setState((draft) => {

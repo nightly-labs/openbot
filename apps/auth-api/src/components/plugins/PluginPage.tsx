@@ -27,7 +27,7 @@ import { PluginOpenButtons } from "./PluginOpenButtons";
  * are different amounts of information, and a reader who hears the page rather than sees it is
  * owed the same number.
  */
-export function PluginSection(props: { id: string; title: string; count: number; children: JSX.Element }) {
+function PluginSection(props: { id: string; title: string; count: number; children: JSX.Element }) {
   return (
     <section class="plugin-section" aria-labelledby={props.id}>
       <h2 class="plugin-section-title" id={props.id}>
@@ -44,7 +44,7 @@ export function PluginSection(props: { id: string; title: string; count: number;
  * own, served from this origin by `src/server/plugin-icon.ts`; the glyph stands in for a thing the
  * catalog gives no icon, which is every skill and any app that has not published one.
  */
-export function PluginRow(props: { icon: LandingIconName; title: string; description: string; media?: JSX.Element }) {
+function PluginRow(props: { icon: LandingIconName; title: string; description: string; media?: JSX.Element }) {
   return (
     <li class="plugin-row">
       <span class="plugin-row-icon">{props.media ?? <LandingIcon name={props.icon} />}</span>

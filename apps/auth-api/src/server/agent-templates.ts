@@ -89,22 +89,24 @@ export class AgentTemplates {
       cardKey = `agent-templates/${id}/${crypto.randomUUID()}.card.png`;
       await this.bindings.SKILLS.put(cardKey, card, { httpMetadata: { contentType: "image/png" } });
     }
+    let publishedId = id;
     try {
-      if (existing) {
-        await this.bindings.DB.prepare(
-          `UPDATE agent_templates SET snapshot_json = ?, avatar_key = ?, card_key = ?, unpublished_at = NULL, updated_at = ?
-           WHERE id = ? AND owner_user_id = ?`,
-        )
-          .bind(JSON.stringify(snapshot), avatarKey, cardKey, now, id, input.user.id)
-          .run();
-      } else {
-        await this.bindings.DB.prepare(
-          `INSERT INTO agent_templates(id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-          .bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now)
-          .run();
-      }
+      // One statement: two first publishes of one agent at once meet here, not in a constraint error.
+      const row = await this.bindings.DB.prepare(
+        `INSERT INTO agent_templates(
+           id, owner_user_id, source_agent_id, snapshot_json, avatar_key, card_key, unpublished_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
+         ON CONFLICT(owner_user_id, source_agent_id) DO UPDATE SET
+           snapshot_json = excluded.snapshot_json,
+           avatar_key = excluded.avatar_key,
+           card_key = excluded.card_key,
+           unpublished_at = NULL,
+           updated_at = excluded.updated_at
+         RETURNING id`,
+      )
+        .bind(id, input.user.id, sourceAgentId, JSON.stringify(snapshot), avatarKey, cardKey, now, now)
+        .first<{ id: string }>();
+      if (row) publishedId = row.id;
     } catch (error) {
       if (avatarKey) await this.bindings.SKILLS.delete(avatarKey);
       if (cardKey) await this.bindings.SKILLS.delete(cardKey);
@@ -112,7 +114,7 @@ export class AgentTemplates {
     }
     if (existing?.avatar_key) await this.bindings.SKILLS.delete(existing.avatar_key);
     if (existing?.card_key) await this.bindings.SKILLS.delete(existing.card_key);
-    return { id, sourceAgentId, updatedAt: new Date(now).toISOString() };
+    return { id: publishedId, sourceAgentId, updatedAt: new Date(now).toISOString() };
   }
 
   async listMine(userId: string): Promise<OwnedAgentTemplate[]> {

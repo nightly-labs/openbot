@@ -58,7 +58,8 @@ function agentTemplateHead(template: AgentTemplateDetail, siteUrl: string) {
 export const Route = createFileRoute("/agents/$templateId")({
   loader: ({ params }) => loadAgentTemplate(params.templateId),
   head: ({ loaderData, match }) => (loaderData ? agentTemplateHead(loaderData, match.context.siteUrl) : {}),
-  headers: () => ({ "X-Robots-Tag": "noindex, nofollow" }),
+  // Not cached: the page shows the instructions, which an unpublish must take back at once.
+  headers: () => ({ "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "private, no-store" }),
   component: AgentTemplateRoute,
 });
 

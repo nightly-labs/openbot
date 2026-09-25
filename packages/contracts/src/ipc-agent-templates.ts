@@ -63,6 +63,8 @@ export interface PublishAgentTemplateInput {
 export interface InstallAgentTemplateInput {
   templateId: string;
   timezone: string;
+  /** The `updatedAt` of the template the user reviewed; a newer version is refused, not installed. */
+  expectedUpdatedAt: string;
 }
 
 export interface InstallAgentTemplateResult {
@@ -96,6 +98,8 @@ export const AGENT_TEMPLATE_LIMITS = {
   skillMarkdown: 65_536,
   skillName: 80,
   skillSlug: 64,
+  /** The JSON of the whole template, well under the Worker's row and request limits. */
+  snapshotBytes: 1_000_000,
 } as const;
 
 const SKILL_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
@@ -156,7 +160,8 @@ export function isAgentTemplateSnapshot(value: unknown): value is AgentTemplateS
     value.skills.filter((skill) => skill.kind === "embedded").length <= AGENT_TEMPLATE_LIMITS.embeddedSkills &&
     Array.isArray(value.routines) &&
     value.routines.length <= INPUT_LIMITS.agentRoutines &&
-    value.routines.every(isAgentTemplateRoutine)
+    value.routines.every(isAgentTemplateRoutine) &&
+    new TextEncoder().encode(JSON.stringify(value)).byteLength <= AGENT_TEMPLATE_LIMITS.snapshotBytes
   );
 }
 

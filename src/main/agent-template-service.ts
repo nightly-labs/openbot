@@ -31,10 +31,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { redactText } from "@openbot/logging";
-import { zipSync } from "fflate";
 import { imageMimeType, localSchedule, toArrayBuffer, validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
-import { inspectArchive, normalizedFiles } from "./skill-package";
+import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
 /** Embedded skills are written here in the new agent's workspace, added to the library, and removed. */
 const SKILL_STAGING = ".openbot/template-skills";
@@ -100,21 +99,23 @@ export class AgentTemplateService {
   async preview(agentId: string): Promise<AgentTemplatePreview> {
     const agent = this.requireAgent(agentId);
     // Signed out or offline, the agent still previews; it reads as not published.
-    const owned = await this.owned(agentId).catch(() => null);
     // A skill that cannot be published must not hide the dialog: it is where a published agent is
-    // unpublished. The preview shows the error, and publishing refuses with it.
-    let skills: AgentTemplateSkill[] = [];
-    let skillsError: string | null = null;
-    try {
-      skills = await this.skills.listTemplateSkills(agentId);
-    } catch (error) {
-      skillsError = message(error);
-    }
+    // unpublished. The preview shows the error, and publishing refuses with it. The three reads do
+    // not depend on each other, so they run together.
+    const [owned, skills, avatarImage] = await Promise.all([
+      this.owned(agentId).catch(() => null),
+      this.skills.listTemplateSkills(agentId).then(
+        (value) => ({ value, error: null }),
+        (error: unknown) => ({ value: [], error: message(error) }),
+      ),
+      this.readAvatar(agentId),
+    ]);
+    const skillsError = skills.error;
     return {
-      ...this.profile(agent, skills),
+      ...this.profile(agent, skills.value),
       agentId,
       avatarUrl: agent.avatarUrl,
-      avatarImage: await this.readAvatar(agentId),
+      avatarImage,
       updatedAt: agent.updatedAt,
       publication: owned ? this.publication(owned) : null,
       skillsError,
@@ -173,6 +174,9 @@ export class AgentTemplateService {
   async install(input: InstallAgentTemplateInput): Promise<InstallAgentTemplateResult> {
     if (!validTimezone(input.timezone)) throw new Error("The local timezone is invalid.");
     const detail = await this.get(input.templateId);
+    // The owner can republish while the dialog is open; only the version the user read is installed.
+    if (detail.updatedAt !== input.expectedUpdatedAt)
+      throw new Error("This agent changed after you opened it. Open the link again to review the new version.");
     // Every embedded skill is checked before the agent exists, so a bad one creates nothing. A local
     // skill with the same name is reused only when its text is the same: a template never revises a
     // skill the user already has.
@@ -181,7 +185,7 @@ export class AgentTemplateService {
     const reused = new Map<string, { id: string; revision: number }>();
     for (const skill of detail.skills) {
       if (skill.kind !== "embedded") continue;
-      const { slug } = inspectArchive(skillArchive(skill.markdown));
+      const { slug } = inspectSkillMarkdown(skill.markdown);
       const current = localSkills.find((candidate) => candidate.slug === slug);
       if (!current) continue;
       const text = new TextDecoder().decode(
@@ -215,7 +219,7 @@ export class AgentTemplateService {
           await this.skills.installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId });
           continue;
         }
-        const existing = reused.get(inspectArchive(skillArchive(skill.markdown)).slug);
+        const existing = reused.get(inspectSkillMarkdown(skill.markdown).slug);
         if (existing) {
           await this.skills.installLocal({ agentId: agent.id, skillId: existing.id, revision: existing.revision });
           continue;
@@ -326,10 +330,6 @@ function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
   for (const [field, text] of fields)
     if (redactText(text) !== text)
       throw new Error(`Remove the secret or email address from ${field} before publishing.`);
-}
-
-function skillArchive(markdown: string): Uint8Array {
-  return zipSync({ "SKILL.md": new TextEncoder().encode(markdown) });
 }
 
 function isOwnedTemplate(value: unknown): value is OwnedTemplate {

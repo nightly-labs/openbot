@@ -56,10 +56,12 @@ export function AgentTemplateInstall(props: {
 
   async function install(): Promise<void> {
     const templateId = props.templateId;
-    if (!templateId) return;
+    const reviewed = state.detail;
+    if (!templateId || !reviewed) return;
     const { agent } = await agentTemplatesPort().agentTemplates.install({
       templateId,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      expectedUpdatedAt: reviewed.updatedAt,
     });
     props.onClose();
     toast.success(`${agent.name} added`, { description: "Its instructions, skills and routines are ready." });

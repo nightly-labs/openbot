@@ -4,7 +4,6 @@ import {
   enforceMarketplaceMutationRateLimit,
   json,
   marketplaceErrorResponse,
-  publicMarketplaceJson,
   requestAgentTemplates,
   requestUser,
 } from "../../../server/request-auth";
@@ -14,7 +13,8 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId")({
     handlers: {
       GET: async ({ params }) => {
         try {
-          return publicMarketplaceJson(await requestAgentTemplates().get(params.templateId));
+          // Not cached: after an unpublish no copy may still show the instructions.
+          return json(await requestAgentTemplates().get(params.templateId));
         } catch (error) {
           return marketplaceErrorResponse(error);
         }
