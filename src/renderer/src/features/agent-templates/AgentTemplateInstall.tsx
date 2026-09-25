@@ -62,6 +62,7 @@ export function AgentTemplateInstall(props: {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
     props.onClose();
+    toast.success(`${agent.name} added`, { description: "Its instructions, skills and routines are ready." });
     await props.onInstalled(agent);
   }
 

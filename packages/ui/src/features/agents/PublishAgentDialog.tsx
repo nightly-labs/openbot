@@ -36,33 +36,39 @@ type Pending = "publish" | "unpublish" | "copy" | null;
 /**
  * Publishes one agent as a link-only template: its instructions, skills and routines. Files and
  * memories stay on this computer. After a publish the same dialog can copy, update or remove the
- * link. A failed action is reported in a toast.
+ * link. The caller reports a finished action in a toast; a failed one is reported here.
  */
 export function PublishAgentDialog(props: PublishAgentDialogProps) {
   const [view, setView] = createSignal<View>("summary");
   const [pending, setPending] = createSignal<Pending>(null);
-  const [copied, setCopied] = createSignal(false);
   const published = () => props.preview?.publication ?? null;
+  let content: HTMLElement | undefined;
   let closeButton: HTMLButtonElement | undefined;
+  let primaryButton: HTMLButtonElement | undefined;
 
+  /**
+   * A pending action disables its button, and a disabled button drops the focus to the page. The
+   * focus trap would then pull it back and the focus ring would jump, which reads as a blink. So the
+   * panel holds the focus while the action runs, and the main button takes it back afterwards.
+   */
   async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
+    content?.focus({ preventScroll: true });
     setPending(kind);
     try {
       await action();
-      setCopied(kind !== "unpublish");
     } catch (error) {
-      setCopied(false);
       toast.error(errorMessage(error, fallback));
     } finally {
       setPending(null);
+      queueMicrotask(() => {
+        if (!content?.contains(document.activeElement) || document.activeElement === content)
+          (primaryButton?.isConnected ? primaryButton : closeButton)?.focus({ preventScroll: true });
+      });
     }
   }
 
   function changeOpen(open: boolean): void {
-    if (!open) {
-      setView("summary");
-      setCopied(false);
-    }
+    if (!open) setView("summary");
     props.onOpenChange(open);
   }
 
@@ -71,6 +77,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="agent-template-backdrop">
           <Dialog.Content
+            ref={content}
             as="section"
             class="agent-template-dialog"
             aria-busy={pending() ? "true" : undefined}
@@ -164,6 +171,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                       when={published()}
                       fallback={
                         <Button
+                          ref={primaryButton}
                           type="button"
                           variant="default"
                           disabled={pending() !== null}
@@ -181,9 +189,10 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                         onClick={() => void run("copy", props.onCopyLink, "Could not copy the link.")}
                       >
                         <Copy class="size-4" aria-hidden="true" />
-                        {copied() && pending() === null ? "Link copied" : "Copy link"}
+                        Copy link
                       </Button>
                       <Button
+                        ref={primaryButton}
                         type="button"
                         variant="default"
                         disabled={pending() !== null}

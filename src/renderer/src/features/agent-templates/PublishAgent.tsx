@@ -58,18 +58,25 @@ export function createPublishAgent() {
   }
 
   /** Built from the id rather than read from `shareUrl`, so what is copied is what the route answers. */
-  async function copyLink(): Promise<void> {
+  async function copyShareLink(): Promise<boolean> {
     const publication = state.preview?.publication;
-    if (!publication) return;
-    await writeClipboardText(createAgentTemplateShareUrl(publication.templateId)).catch(() => {
-      throw new Error("Could not copy the link.");
-    });
+    if (!publication) return false;
+    return writeClipboardText(createAgentTemplateShareUrl(publication.templateId)).then(
+      () => true,
+      () => false,
+    );
+  }
+
+  async function copyLink(): Promise<void> {
+    if (!(await copyShareLink())) throw new Error("Could not copy the link.");
+    toast.success("Link copied");
   }
 
   async function publish(): Promise<void> {
     const agentId = state.agentId;
     const preview = state.preview;
     if (!agentId || !preview) return;
+    const update = preview.publication !== null;
     // The card is only the link preview image: when it cannot be drawn, the agent is published without it.
     const card = await renderAgentTemplateCard(preview).catch(() => null);
     const publication = await agentTemplatesPort().agentTemplates.publish({ agentId, card });
@@ -77,7 +84,11 @@ export function createPublishAgent() {
     setState((draft) => {
       if (draft.preview) draft.preview.publication = publication;
     });
-    await copyLink();
+    // The agent is published even when the copy fails, so that is said, not reported as a failure.
+    const copied = await copyShareLink();
+    toast.success(update ? "Agent updated" : "Agent published", {
+      description: copied ? "The link is copied." : "Use Copy link to share it.",
+    });
   }
 
   async function unpublish(): Promise<void> {
@@ -88,6 +99,7 @@ export function createPublishAgent() {
     setState((draft) => {
       if (draft.preview) draft.preview.publication = null;
     });
+    toast.success("Agent unpublished", { description: "The link no longer works." });
   }
 
   const dialog = () => (

@@ -3003,12 +3003,12 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background:
-    radial-gradient(60% 45% at 50% 30%, color-mix(in srgb, var(--agent-share-accent) 14%, transparent), transparent 70%),
-    var(--openbot-bg-canvas);
+  background: var(--openbot-bg-canvas);
 }
 
 .agent-share-main {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3018,6 +3018,8 @@ a {
 }
 
 .agent-share-card {
+  position: relative;
+  z-index: 1;
   width: min(100%, 520px);
   overflow: hidden;
   border: 1px solid var(--openbot-glass-border);
@@ -3201,6 +3203,8 @@ a {
 }
 
 .agent-share-fallback {
+  position: relative;
+  z-index: 1;
   margin: 0;
   color: var(--openbot-text-muted);
   font-size: 14px;

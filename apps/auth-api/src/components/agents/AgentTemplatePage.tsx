@@ -54,6 +54,8 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
       <ContentHeader />
 
       <main class="agent-share-main">
+        {/* The landing page's grid, so a shared agent sits on the same backdrop as the product. */}
+        <div class="landing-hero-grid" aria-hidden="true" />
         <article class="agent-share-card" aria-labelledby="agent-share-name">
           <div class="agent-share-hero" aria-hidden="true">
             <Show when={mounted()} fallback={<span class="agent-share-avatar" />}>
