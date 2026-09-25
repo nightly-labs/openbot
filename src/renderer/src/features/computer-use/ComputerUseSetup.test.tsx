@@ -32,7 +32,7 @@ describe("ComputerUseSetup", () => {
   it("opens the pane for the permission whose button was pressed", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
-    const openPane = vi.spyOn(mock.api, "openComputerUsePermissionPane");
+    const openPane = vi.spyOn(mock.api.computerUse, "openPermissionPane");
     const view = render(() => <ComputerUseSetup variant="settings" />);
 
     const section = (await view.findByRole("heading", { name: "System permissions" })).closest("section");
@@ -45,7 +45,7 @@ describe("ComputerUseSetup", () => {
 
   it("keeps the way back to System Settings on a permission already granted", async () => {
     mock = createMockOpenBot();
-    mock.api.getComputerUseState = vi.fn().mockResolvedValue(
+    mock.api.computerUse.getState = vi.fn().mockResolvedValue(
       state({
         permissions: [
           { id: "screen-recording", granted: true },
@@ -71,7 +71,7 @@ describe("ComputerUseSetup", () => {
       .fn()
       .mockResolvedValueOnce(state({}))
       .mockResolvedValue(state({ status: "ready", permissions: [{ id: "screen-recording", granted: true }] }));
-    mock.api.getComputerUseState = read;
+    mock.api.computerUse.getState = read;
     window.openbot = mock.api;
     const view = render(() => <ComputerUseSetup variant="compact" />);
 
@@ -88,7 +88,7 @@ describe("ComputerUseSetup", () => {
   // user installs by hand. The panel must name no command, on any desktop.
   it("reports a build with no driver as a fault, and offers no command to run", async () => {
     mock = createMockOpenBot();
-    mock.api.getComputerUseState = vi
+    mock.api.computerUse.getState = vi
       .fn()
       .mockResolvedValue(
         state({ status: "driver-missing", message: "This build of OpenBot carries no Computer Use driver." }),
@@ -106,7 +106,7 @@ describe("ComputerUseSetup", () => {
   // ready, and must draw no row naming a macOS setting the user cannot find.
   it("reports ready without permission rows where the system grants none", async () => {
     mock = createMockOpenBot();
-    mock.api.getComputerUseState = vi.fn().mockResolvedValue(state({ status: "ready", permissions: [] }));
+    mock.api.computerUse.getState = vi.fn().mockResolvedValue(state({ status: "ready", permissions: [] }));
     window.openbot = mock.api;
     const view = render(() => <ComputerUseSetup variant="settings" />);
 
@@ -120,9 +120,9 @@ describe("Sunshine permission help", () => {
   it("reads Sunshine permissions and shows its bundle instead of the Computer Use application", async () => {
     mock = createMockOpenBot();
     window.openbot = mock.api;
-    mock.api.getComputerUsePermissionApp = async () => ({ name: "Sunshine", iconDataUrl: null });
+    mock.api.computerUse.getPermissionApp = async () => ({ name: "Sunshine", iconDataUrl: null });
     const readSunshine = vi.spyOn(mock.api.remoteDesktop, "checkSetup");
-    const readComputerUse = vi.spyOn(mock.api, "getComputerUseState");
+    const readComputerUse = vi.spyOn(mock.api.computerUse, "getState");
     const view = render(() => <ComputerUsePermissionHelp permission="accessibility" sunshine />);
     expect(
       await view.findByRole("button", { name: "Drag Sunshine into System Settings, or press to show it in Finder" }),

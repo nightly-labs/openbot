@@ -8,7 +8,7 @@ here registers anything: `index.ts` spreads them all into `registerIpcGroups`, w
 
 1. Add the endpoint to a group in `packages/contracts/src/ipc-endpoints.ts`, as
    `request<Payload, Result>()("group:wire-name")` or `event<Payload>()("group:wire-name")`. All
-   endpoints are typed except `browser.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
+   endpoints are typed except `browserInput.sendLiveViewInput`: the renderer sends `BrowserLiveViewInput`
    and main decodes the different wire `BrowserViewInput`. Do not add another `untypedRequest(...)`.
 2. In a group the preload builds with `bridgeGroup` (the `GroupApi` aliases in
    `packages/contracts/src/ipc-desktop-apis.ts`), skip this step: the method exists already. In a

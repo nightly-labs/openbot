@@ -48,7 +48,7 @@ const placement = {
 it("delivers a placement and refuses one that is not a placement", () => {
   if (!bridge.api.current) throw new Error("The preload API was not exposed.");
   const drawn = vi.fn();
-  const stop = bridge.api.current.onComputerUseHighlightPlacement(drawn);
+  const stop = bridge.api.current.computerUse.onHighlightPlacement(drawn);
 
   send(placement);
   expect(drawn).toHaveBeenCalledWith(placement);

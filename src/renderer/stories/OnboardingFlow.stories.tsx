@@ -92,7 +92,7 @@ function MockedOnboardingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
   if (props.permissions) {
-    mock.api.getComputerUseState = async () => ({
+    mock.api.computerUse.getState = async () => ({
       status: "permissions-required",
       permissions: [
         { id: "screen-recording", granted: false },

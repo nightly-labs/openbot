@@ -115,7 +115,7 @@ export function createRendererForwarders({
 
   function forwardBrowserDisplayState(state: BrowserDisplayState): void {
     for (const window of BrowserWindow.getAllWindows()) {
-      sendToRenderer(window, IPC_ENDPOINTS.browser.displayStateEvent, state);
+      sendToRenderer(window, IPC_ENDPOINTS.browser.displayState, state);
     }
   }
 
@@ -170,7 +170,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_ENDPOINTS.servers.presence, { serverId, snapshot });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.scopedPresence, { serverId, snapshot });
   }
 
   function forwardDirectMessage(
@@ -179,7 +179,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_ENDPOINTS.servers.directMessage, { serverId, event });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.scopedDirectMessage, { serverId, event });
   }
 
   function forwardDirectTyping(
@@ -188,7 +188,7 @@ export function createRendererForwarders({
   ): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
-    sendToRenderer(window, IPC_ENDPOINTS.servers.directTyping, { serverId, event });
+    sendToRenderer(window, IPC_ENDPOINTS.servers.scopedDirectTyping, { serverId, event });
   }
 
   return {

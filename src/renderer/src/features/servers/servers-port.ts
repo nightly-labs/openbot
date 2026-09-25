@@ -64,10 +64,10 @@ export function serverAdminPort(server: Pick<ServerSummary, "id" | "kind">): Ser
     getPresence: () => window.openbot.servers.getPresenceFor(serverId),
     listMembers: () => window.openbot.servers.listMembers(serverId),
     listInvites: () => window.openbot.servers.listInvites(serverId),
-    createInvite: (input) => window.openbot.servers.createInvite(serverId, input),
-    updateMember: (input) => window.openbot.servers.updateMember(serverId, input),
-    removeMember: (memberId) => window.openbot.servers.removeMember(serverId, memberId),
-    revokeInvite: (inviteId) => window.openbot.servers.revokeInvite(serverId, inviteId),
+    createInvite: (input) => window.openbot.servers.createInvite(input, serverId),
+    updateMember: (input) => window.openbot.servers.updateMember(input, serverId),
+    removeMember: (memberId) => window.openbot.servers.removeMember(memberId, serverId),
+    revokeInvite: (inviteId) => window.openbot.servers.revokeInvite(inviteId, serverId),
   };
 }
 
