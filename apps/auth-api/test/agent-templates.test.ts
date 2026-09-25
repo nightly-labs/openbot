@@ -91,23 +91,34 @@ describe("agent templates", () => {
     await expect(templates.unpublish(owner.id, id)).rejects.toMatchObject({ status: 404 });
   });
 
-  it("stops a 21st published agent in the write itself and leaves no images behind", async () => {
+  it("stops a 6th published agent in the write itself, and counts only published ones", async () => {
     const { templates, bucket } = setup();
-    for (let index = 0; index < 20; index++)
+    for (let index = 0; index < 5; index++)
       await templates.publish({ user: owner, sourceAgentId: `agent-${index}`, snapshot: snapshot(), avatar: null });
 
     await expect(
       templates.publish({
         user: owner,
-        sourceAgentId: "agent-20",
+        sourceAgentId: "agent-5",
         snapshot: snapshot(),
         avatar: { bytes: png, mimeType: "image/png" },
       }),
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 409, code: "template_limit" });
     expect(bucket.size).toBe(0);
     await expect(
       templates.publish({ user: owner, sourceAgentId: "agent-0", snapshot: snapshot({ name: "Again" }), avatar: null }),
     ).resolves.toMatchObject({ sourceAgentId: "agent-0" });
+
+    // Another account has its own limit, and an unpublish frees a place.
+    await expect(
+      templates.publish({ user: intruder, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null }),
+    ).resolves.toMatchObject({ sourceAgentId: "agent-5" });
+    const [first] = await templates.listMine(owner.id);
+    if (!first) throw new Error("The owner has published agents.");
+    await templates.unpublish(owner.id, first.id);
+    await expect(
+      templates.publish({ user: owner, sourceAgentId: "agent-5", snapshot: snapshot(), avatar: null }),
+    ).resolves.toMatchObject({ sourceAgentId: "agent-5" });
   });
 
   it("gives an agent published again after an unpublish the same link", async () => {

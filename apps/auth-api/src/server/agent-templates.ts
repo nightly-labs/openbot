@@ -12,7 +12,12 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { AgentMarketplaceError } from "./agent-marketplace";
 import type { AuthUser, WorkerBindings } from "./types";
 
-const MAX_TEMPLATES_PER_USER = 20;
+/**
+ * Published templates for one account. Unpublished rows do not count. The Worker enforces it in the
+ * statement that writes the row, so no client, and no two requests at once, can pass it.
+ */
+const MAX_TEMPLATES_PER_USER = 5;
+const TEMPLATE_LIMIT_MESSAGE = `You can publish up to ${MAX_TEMPLATES_PER_USER} agents. Unpublish one to publish another.`;
 
 /** What the owner's app reads to show whether one of its agents is published. */
 export interface OwnedAgentTemplate {
@@ -73,7 +78,7 @@ export class AgentTemplates {
         .bind(input.user.id)
         .first<{ count: number }>();
       if ((count?.count ?? 0) >= MAX_TEMPLATES_PER_USER)
-        throw new AgentMarketplaceError(409, "template_limit", "You can publish up to 20 agents.");
+        throw new AgentMarketplaceError(409, "template_limit", TEMPLATE_LIMIT_MESSAGE);
     }
 
     const id = existing?.id ?? newTemplateId();
@@ -95,7 +100,7 @@ export class AgentTemplates {
     // One transaction reads the image keys the row has and writes the new row, so the keys this
     // publish replaces are the ones it deletes, even when two publishes of one agent run at once.
     // The upsert means two first publishes meet here, not in a constraint error. The limit is
-    // checked in the same statement: the row is written only while the owner has fewer than 20
+    // checked in the same statement: the row is written only while the owner has fewer than the limit of
     // published agents, or when this agent is already one of them.
     const written = await this.bindings.DB.batch([
       this.bindings.DB.prepare(
@@ -138,7 +143,7 @@ export class AgentTemplates {
     if (!isDynamicRecord(returned) || typeof returned.id !== "string") {
       // Nothing was written: the limit stopped it, so the new images are not named by any row.
       await this.deleteImages([avatarKey, cardKey]);
-      throw new AgentMarketplaceError(409, "template_limit", "You can publish up to 20 agents.");
+      throw new AgentMarketplaceError(409, "template_limit", TEMPLATE_LIMIT_MESSAGE);
     }
     // The publish has succeeded; the old images are removed on a best-effort basis.
     await this.deleteImages([previous.avatarKey, previous.cardKey]);
