@@ -20,6 +20,7 @@ import {
   type AgentTemplateSkill,
   type AgentTemplateSnapshot,
   type AvatarImageInput,
+  agentTemplateSnapshotProblem,
   type InstallAgentTemplateInput,
   type InstallAgentTemplateResult,
   isAgentTemplateCardPng,
@@ -108,7 +109,8 @@ export class AgentTemplateService {
         (value) => ({ value, error: null }),
         (error: unknown) => ({ value: [], error: message(error) }),
       ),
-      this.readAvatar(agentId),
+      // An avatar file that cannot be read is shown as no avatar: it must not hide the dialog.
+      this.readAvatar(agentId).catch(() => null),
     ]);
     const skillsError = skills.error;
     return {
@@ -126,9 +128,10 @@ export class AgentTemplateService {
     if (card && !isAgentTemplateCardPng(card)) throw new Error("The share card is invalid.");
     const agent = this.requireAgent(agentId);
     const snapshot = await this.snapshot(agent);
-    if (!snapshot.description) throw new Error("Add instructions to this agent before publishing it.");
-    if (!isAgentTemplateSnapshot(snapshot))
-      throw new Error("This agent is too large to publish. Shorten its instructions, skills or routines.");
+    // The first real cause, so the owner knows what to change.
+    const problem = agentTemplateSnapshotProblem(snapshot);
+    if (problem) throw new Error(problem);
+    if (!isAgentTemplateSnapshot(snapshot)) throw new Error("This agent cannot be published.");
     assertNoSecrets(snapshot);
     const form = new FormData();
     form.set("snapshot", JSON.stringify(snapshot));

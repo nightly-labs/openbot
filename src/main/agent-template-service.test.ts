@@ -23,7 +23,7 @@ const agent: AgentSummary = {
 function service(
   description: string,
   markdown = "---\nname: Notes\ndescription: Take notes.\n---\nWrite notes.",
-  options: { published?: boolean; skillsFail?: boolean } = {},
+  options: { published?: boolean; skillsFail?: boolean; avatarUnreadable?: boolean } = {},
 ) {
   const requests: Array<{ path: string; method: string | undefined }> = [];
   const auth = {
@@ -61,7 +61,8 @@ function service(
     {
       listAgents: () => [{ ...agent, description }],
       listRoutines: () => [],
-      resolveAvatar: () => null,
+      resolveAvatar: () =>
+        options.avatarUnreadable ? { path: "/nonexistent/openbot-avatar.png", mimeType: "image/png" as const } : null,
       createAgentProfile,
       setAvatar: vi.fn(async () => agent),
       createRoutine: vi.fn(() => ({ id: "routine" })),
@@ -113,6 +114,18 @@ describe("a published agent with a skill that cannot be published", () => {
     await templates.unpublish(agent.id);
     expect(requests).toContainEqual({ path: "/v1/agent-templates/Ab3_-xYz0123456789abcd", method: "DELETE" });
     await expect(templates.publish({ agentId: agent.id, card: null })).rejects.toThrow("local changes");
+  });
+});
+
+// The dialog is where a published agent is unpublished, so an avatar file that cannot be read must
+// not keep it from opening.
+describe("a published agent whose avatar file cannot be read", () => {
+  it("still previews as published, without the avatar", async () => {
+    const { templates } = service("Drafts product writing.", undefined, { published: true, avatarUnreadable: true });
+
+    const preview = await templates.preview(agent.id);
+    expect(preview.publication?.templateId).toBe("Ab3_-xYz0123456789abcd");
+    expect(preview.avatarImage).toBeNull();
   });
 });
 
