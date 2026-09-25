@@ -59,14 +59,15 @@ export class AgentTemplates {
     if (card && !isAgentTemplateCardPng(card))
       throw new AgentMarketplaceError(400, "invalid_card", "The share card must be a 1200×630 PNG.");
 
+    // The row of an unpublished agent is found too: publishing it again gives it back the same id.
     const existing = await this.bindings.DB.prepare(
-      "SELECT id, avatar_key, card_key FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
+      "SELECT id, avatar_key, card_key, unpublished_at FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
     )
       .bind(input.user.id, sourceAgentId)
-      .first<{ id: string; avatar_key: string | null; card_key: string | null }>();
-    if (!existing) {
+      .first<{ id: string; avatar_key: string | null; card_key: string | null; unpublished_at: number | null }>();
+    if (!existing || existing.unpublished_at !== null) {
       const count = await this.bindings.DB.prepare(
-        "SELECT count(*) AS count FROM agent_templates WHERE owner_user_id = ?",
+        "SELECT count(*) AS count FROM agent_templates WHERE owner_user_id = ? AND unpublished_at IS NULL",
       )
         .bind(input.user.id)
         .first<{ count: number }>();
@@ -91,7 +92,8 @@ export class AgentTemplates {
     try {
       if (existing) {
         await this.bindings.DB.prepare(
-          "UPDATE agent_templates SET snapshot_json = ?, avatar_key = ?, card_key = ?, updated_at = ? WHERE id = ? AND owner_user_id = ?",
+          `UPDATE agent_templates SET snapshot_json = ?, avatar_key = ?, card_key = ?, unpublished_at = NULL, updated_at = ?
+           WHERE id = ? AND owner_user_id = ?`,
         )
           .bind(JSON.stringify(snapshot), avatarKey, cardKey, now, id, input.user.id)
           .run();
@@ -115,7 +117,8 @@ export class AgentTemplates {
 
   async listMine(userId: string): Promise<OwnedAgentTemplate[]> {
     const result = await this.bindings.DB.prepare(
-      "SELECT id, source_agent_id, updated_at FROM agent_templates WHERE owner_user_id = ? ORDER BY updated_at DESC",
+      `SELECT id, source_agent_id, updated_at FROM agent_templates
+       WHERE owner_user_id = ? AND unpublished_at IS NULL ORDER BY updated_at DESC`,
     )
       .bind(userId)
       .all<Pick<TemplateRow, "id" | "source_agent_id" | "updated_at">>();
@@ -158,15 +161,23 @@ export class AgentTemplates {
     return object;
   }
 
+  /**
+   * Removes everything the link shows: the snapshot, the avatar and the card. The row keeps only its
+   * id, the owner and the local agent, so publishing the same agent again gives back the same link.
+   */
   async unpublish(userId: string, id: string): Promise<void> {
     const row = await this.bindings.DB.prepare(
-      "SELECT avatar_key, card_key FROM agent_templates WHERE id = ? AND owner_user_id = ?",
+      "SELECT avatar_key, card_key FROM agent_templates WHERE id = ? AND owner_user_id = ? AND unpublished_at IS NULL",
     )
       .bind(id, userId)
       .first<{ avatar_key: string | null; card_key: string | null }>();
     if (!row) throw notFound();
-    await this.bindings.DB.prepare("DELETE FROM agent_templates WHERE id = ? AND owner_user_id = ?")
-      .bind(id, userId)
+    const now = Date.now();
+    await this.bindings.DB.prepare(
+      `UPDATE agent_templates SET snapshot_json = '{}', avatar_key = NULL, card_key = NULL, unpublished_at = ?, updated_at = ?
+       WHERE id = ? AND owner_user_id = ?`,
+    )
+      .bind(now, now, id, userId)
       .run();
     if (row.avatar_key) await this.bindings.SKILLS.delete(row.avatar_key);
     if (row.card_key) await this.bindings.SKILLS.delete(row.card_key);
@@ -178,7 +189,7 @@ export class AgentTemplates {
       `SELECT templates.id, templates.source_agent_id, templates.snapshot_json, templates.avatar_key,
               templates.card_key, templates.updated_at, users.name AS creator_name
        FROM agent_templates templates JOIN users ON users.id = templates.owner_user_id
-       WHERE templates.id = ?`,
+       WHERE templates.id = ? AND templates.unpublished_at IS NULL`,
     )
       .bind(id)
       .first<TemplateRow>();

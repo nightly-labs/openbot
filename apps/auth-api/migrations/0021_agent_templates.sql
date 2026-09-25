@@ -5,6 +5,7 @@ CREATE TABLE agent_templates (
   snapshot_json TEXT NOT NULL CHECK(json_valid(snapshot_json)),
   avatar_key TEXT,
   card_key TEXT,
+  unpublished_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   UNIQUE(owner_user_id, source_agent_id)

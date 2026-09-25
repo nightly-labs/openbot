@@ -147,8 +147,10 @@ The service stores:
   and instructions, marketplace skill references, the `SKILL.md` text of local skills, the local
   agent ID, a share card image made from these fields, and creation and update times. Anyone
   with the link can read a template, and sites such as X show the share card when the link is
-  posted. Unpublish removes the template and its images. Templates do not include workspace files, memories, conversations, or integration
-  credentials.
+  posted. Unpublish removes the template content and its images. The service keeps the link ID,
+  the account ID, the local agent ID and the unpublish time, so publishing the same agent again
+  gives back the same link. Deleting the account removes them. Templates do not include
+  workspace files, memories, conversations, or integration credentials.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop

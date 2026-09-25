@@ -87,6 +87,23 @@ describe("agent templates", () => {
 
     await templates.unpublish(owner.id, id);
     await expect(templates.get(id)).rejects.toMatchObject({ status: 404 });
+    expect(await templates.listMine(owner.id)).toEqual([]);
+    await expect(templates.unpublish(owner.id, id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("gives an agent published again after an unpublish the same link", async () => {
+    const { templates } = setup();
+    const first = await templates.publish({ user: owner, sourceAgentId: "a", snapshot: snapshot(), avatar: null });
+    await templates.unpublish(owner.id, first.id);
+
+    const again = await templates.publish({
+      user: owner,
+      sourceAgentId: "a",
+      snapshot: snapshot({ name: "Writer again" }),
+      avatar: null,
+    });
+    expect(again.id).toBe(first.id);
+    expect((await templates.get(first.id)).name).toBe("Writer again");
   });
 
   it.each<[string, Partial<AgentTemplateSnapshot>]>([

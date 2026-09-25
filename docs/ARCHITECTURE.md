@@ -1212,6 +1212,8 @@ their `SKILL.md` text. It has no workspace files and no memories. The Publish bu
 header opens `PublishAgentDialog`; `src/main/agent-template-service.ts` builds the snapshot, stops
 when a text field looks like a secret, and posts it to the Account Worker. The Worker keeps one row
 per account and local agent in D1 `agent_templates`, so a second publish updates the same link.
+Unpublish clears the row's content and images and sets `unpublished_at`, but keeps the row, so the
+same agent published again gets the same link.
 There is no review and no marketplace listing. Before a publish, the renderer draws a 1200×630 share
 card (`agent-template-card.tsx`) with the agent's avatar and text. It draws it there because the
 avatar and its fonts are there, and it uses a `data:` URL because the Content Security Policy
