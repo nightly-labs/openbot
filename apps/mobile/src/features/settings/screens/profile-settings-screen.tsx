@@ -1,9 +1,5 @@
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import { validateProfileName } from "@openbot/contracts/validation";
 import { userErrorMessage as errorMessage } from "@openbot/user-errors";
-import { File } from "expo-file-system";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -17,6 +13,7 @@ import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 
 export function ProfileSettingsScreen() {
   const { session, updateProfile, signOut } = useMobileSession();
@@ -64,20 +61,9 @@ export function ProfileSettingsScreen() {
   }
 
   async function choosePhoto(): Promise<void> {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.3,
-    });
-    if (result.canceled) return;
-    const [asset] = result.assets;
-    if (!asset) throw new Error("Could not open this photo. Try again.");
-    const file = new File(asset.uri);
-    const mime = isAvatarMimeType(file.type) ? file.type : asset.mimeType || "";
-    if (!isAvatarMimeType(mime)) throw new Error("Choose a JPEG, PNG, or WebP photo.");
-    if (file.size > AVATAR_IMAGE_LIMITS.storedBytes) throw new Error("Choose a photo smaller than 512 KB.");
-    const avatar = { bytes: await file.bytes(), mimeType: mime };
+    const photo = await pickAvatarPhoto("/settings/crop-photo");
+    if (!photo) return;
+    const avatar = { bytes: photo.bytes, mimeType: photo.mimeType };
     await updateProfile({ avatar });
   }
 

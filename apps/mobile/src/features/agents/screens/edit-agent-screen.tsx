@@ -117,6 +117,10 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
     () => (
       <AgentPhotoPicker
         hasPhoto={hasPhoto}
+        cropRoute={{
+          pathname: "/agent-info/[agentId]/crop-photo",
+          params: { agentId: agent.id, serverId: agent.serverId },
+        }}
         disabled={saving || pickingPhoto}
         onChange={(value) => {
           setPhoto(value);
@@ -125,7 +129,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         onBusyChange={setPickingPhoto}
       />
     ),
-    [hasPhoto, saving, pickingPhoto],
+    [hasPhoto, agent.id, agent.serverId, saving, pickingPhoto],
   );
 
   async function submit(): Promise<void> {
@@ -190,7 +194,10 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 hue={avatarHue}
                 size={112}
               />
-              <View className="absolute right-3 bottom-3 size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped">
+              {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
+              <View
+                className={`absolute size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped ${agent.avatarUrl ? "right-0 bottom-0" : "right-3 bottom-3"}`}
+              >
                 <Pencil color={foreground} size={14} />
               </View>
             </Pressable>
