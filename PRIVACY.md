@@ -222,7 +222,9 @@ only when you send the message. OpenBot does not store or send the audio.
 OpenBot sends sign-in and team invitation messages through the configured SMTP provider. The
 provider receives the recipient address and the message content. A sign-in message contains the
 one-time code and its expiration time. A team invitation can contain the inviter address, team name,
-role, and invite URL.
+role, and invite URL. The HTML version of a message loads the OpenBot logo from `openbot.run` when
+the mail client shows images. The image address is the same in every message and identifies no
+recipient.
 
 Cloudflare processes account and configuration API requests. It does not carry Team API, file,
 message, command, Remote Desktop media, or Remote Desktop input traffic. Cloudflare and the email

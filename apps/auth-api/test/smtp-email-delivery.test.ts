@@ -60,6 +60,61 @@ describe("Private Email SMTP delivery", () => {
     expect(writes[7]).toContain("https://openbot.run/join?");
   });
 
+  it("sends plain text and HTML that decode back without markup from the server name", async () => {
+    const writes: string[] = [];
+    const connector: SmtpConnector = () => ({
+      opened: Promise.resolve(),
+      readable: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`${SUCCESS_RESPONSES}\r\n`));
+          controller.close();
+        },
+      }),
+      writable: new WritableStream({
+        write(chunk) {
+          writes.push(new TextDecoder().decode(chunk));
+        },
+      }),
+      close() {},
+    });
+    const serverName = "Zespół <a href=//x.pl>Kraków";
+
+    await sendPrivateTeamInvite(
+      {
+        host: "mail.privateemail.com",
+        port: 465,
+        username: "hello@openbot.run",
+        password: "app-password-value",
+        from: "hello@openbot.run",
+      },
+      {
+        email: "alice@example.com",
+        inviterEmail: "owner@example.com",
+        serverName,
+        inviteUrl:
+          "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        role: "member",
+      },
+      connector,
+    );
+
+    const message = (writes[7] ?? "").replace(/\r\n\.\r\n$/u, "").replaceAll("\r\n..", "\r\n.");
+    expect(message.split("\r\n").every((line) => line.length <= 998 && /^[\x20-\x7e]*$/u.test(line))).toBe(true);
+    const subject = /^Subject: (.*(?:\r\n .*)*)$/mu.exec(message)?.[1] ?? "";
+    expect(decodeEncodedWords(subject)).toBe(`Join ${serverName} on OpenBot`);
+
+    const boundary = /boundary="([^"]+)"/u.exec(message)?.[1] ?? "";
+    const parts = message.split(`--${boundary}`).slice(1, -1);
+    const [text, html] = parts.map((part) => decodeQuotedPrintable(part.split("\r\n\r\n").slice(1).join("\r\n\r\n")));
+    expect(parts.map((part) => /Content-Type: ([^;]+)/u.exec(part)?.[1])).toEqual(["text/plain", "text/html"]);
+    expect(text).toContain(`owner@example.com invited you to join ${serverName} on OpenBot.`);
+    expect(html).toContain("Zespół &lt;a href=//x.pl&gt;Kraków");
+    expect(html).not.toContain("<a href=//x.pl>");
+    expect(html).toContain(
+      'href="https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&amp;server=',
+    );
+  });
+
   it("uses TLS on port 465 and sends the code without SMTP injection", async () => {
     const writes: string[] = [];
     const addresses: unknown[] = [];
@@ -649,3 +704,22 @@ describe("Private Email SMTP delivery", () => {
     ).toBeNull();
   });
 });
+
+function decodeQuotedPrintable(value: string): string {
+  const bytes = value
+    .replace(/=\r\n/gu, "")
+    .replace(/\r\n$/u, "")
+    .replace(/=([0-9A-F]{2})/gu, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+  return new TextDecoder().decode(Uint8Array.from(bytes, (character) => character.charCodeAt(0)));
+}
+
+function decodeEncodedWords(value: string): string {
+  return value
+    .split("\r\n ")
+    .map((word) => {
+      const encoded = /^=\?UTF-8\?B\?(.*)\?=$/u.exec(word)?.[1];
+      if (!encoded) return word;
+      return new TextDecoder().decode(Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0)));
+    })
+    .join("");
+}

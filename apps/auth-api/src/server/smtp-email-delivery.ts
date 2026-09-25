@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isCanonicalInviteUrl } from "@openbot/contracts/invite-links";
 import { isValidHostname as isSharedValidHostname } from "@openbot/contracts/validation";
+import { type RenderedEmail, renderSignInCodeEmail, renderTeamInviteEmail } from "./email-templates";
 
 export interface SmtpEmailConfig {
   host: string;
@@ -26,8 +27,7 @@ export interface SmtpTeamInviteMessage {
 
 interface PreparedEmailMessage {
   email: string;
-  subject: string;
-  body: string;
+  content: RenderedEmail;
 }
 
 interface SmtpAttemptState {
@@ -89,8 +89,10 @@ export async function sendPrivateEmailCode(
     config,
     {
       email: message.email,
-      subject: "Your OpenBot sign-in code",
-      body: createCodeBody(message),
+      content: renderSignInCodeEmail({
+        code: message.code,
+        expiresInMinutes: Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000)),
+      }),
     },
     connector,
   );
@@ -117,17 +119,12 @@ export function sendPrivateTeamInvite(
     config,
     {
       email: message.email,
-      subject: `Join ${message.serverName.trim()} on OpenBot`,
-      body: [
-        `${message.inviterEmail} invited you to join ${message.serverName.trim()} on OpenBot.`,
-        "",
-        `Access: ${message.role}`,
-        "",
-        "Open this one-time invitation link:",
-        message.inviteUrl,
-        "",
-        "The invitation expires after 24 hours. Sign in with this email address to accept it.",
-      ].join("\r\n"),
+      content: renderTeamInviteEmail({
+        inviterEmail: message.inviterEmail,
+        serverName: message.serverName,
+        inviteUrl: message.inviteUrl,
+        role: message.role,
+      }),
     },
     connector,
   );
@@ -140,7 +137,8 @@ async function sendPrivateEmail(
 ): Promise<void> {
   validateConfig(config);
   validateEmail(message.email, "recipient");
-  if (!message.subject || message.subject.length > 160 || hasHeaderBreak(message.subject)) {
+  const { subject } = message.content;
+  if (!subject || subject.length > 160 || hasHeaderBreak(subject)) {
     throw new Error("smtp_invalid_subject");
   }
   const connect =
@@ -309,31 +307,85 @@ class SmtpResponseReader {
   }
 }
 
-function createCodeBody(message: SmtpEmailMessage): string {
-  const expiresInMinutes = Math.max(1, Math.ceil((message.expiresAt - Date.now()) / 60_000));
-  return [
-    "Use this code to sign in to OpenBot:",
-    "",
-    message.code,
-    "",
-    `This code expires in ${expiresInMinutes} minutes.`,
-    "If you did not request this code, ignore this email.",
-  ].join("\r\n");
+// Plain text first and HTML last: a client shows the last part it can render. Both parts are
+// quoted-printable, so the message is 7-bit clean and no line passes the 998-octet limit, whatever
+// the relay supports.
+function createMimeMessage(from: string, message: PreparedEmailMessage): string {
+  const boundary = `openbot-${crypto.randomUUID()}`;
+  return dotStuff(
+    [
+      `From: OpenBot <${from}>`,
+      `To: <${message.email}>`,
+      `Subject: ${encodeHeaderValue(message.content.subject)}`,
+      `Date: ${new Date().toUTCString()}`,
+      `Message-ID: <${crypto.randomUUID()}@openbot.run>`,
+      "MIME-Version: 1.0",
+      "Content-Type: multipart/alternative;",
+      ` boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: quoted-printable",
+      "",
+      encodeQuotedPrintable(message.content.text),
+      `--${boundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: quoted-printable",
+      "",
+      encodeQuotedPrintable(message.content.html),
+      `--${boundary}--`,
+    ].join("\r\n"),
+  );
 }
 
-function createMimeMessage(from: string, message: PreparedEmailMessage): string {
-  return [
-    `From: OpenBot <${from}>`,
-    `To: <${message.email}>`,
-    `Subject: ${message.subject}`,
-    `Date: ${new Date().toUTCString()}`,
-    `Message-ID: <${crypto.randomUUID()}@openbot.run>`,
-    "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    dotStuff(message.body),
-  ].join("\r\n");
+// RFC 2047 encoded words for a subject with non-ASCII text, such as a server name in Polish. Each
+// word holds whole characters and stays under the 75-character limit.
+function encodeHeaderValue(value: string): string {
+  if (/^[\x20-\x7e]*$/u.test(value)) return value;
+  const words: string[] = [];
+  let chunk = "";
+  for (const character of value) {
+    if (new TextEncoder().encode(chunk + character).length > 45) {
+      words.push(chunk);
+      chunk = "";
+    }
+    chunk += character;
+  }
+  if (chunk) words.push(chunk);
+  return words.map((word) => `=?UTF-8?B?${encodeBase64(word)}?=`).join("\r\n ");
+}
+
+// RFC 2045 quoted-printable over UTF-8, with lines of at most 76 characters.
+function encodeQuotedPrintable(value: string): string {
+  return value
+    .replace(/\r?\n/gu, "\n")
+    .split("\n")
+    .map((line) => {
+      const bytes = new TextEncoder().encode(line);
+      const tokens: string[] = [];
+      bytes.forEach((byte, index) => {
+        const isLast = index === bytes.length - 1;
+        const printable = byte >= 33 && byte <= 126 && byte !== 61;
+        const trailingSpace = (byte === 32 || byte === 9) && isLast;
+        tokens.push(
+          printable || ((byte === 32 || byte === 9) && !trailingSpace)
+            ? String.fromCharCode(byte)
+            : `=${byte.toString(16).toUpperCase().padStart(2, "0")}`,
+        );
+      });
+      const lines: string[] = [];
+      let current = "";
+      for (const token of tokens) {
+        if (current.length + token.length > 75) {
+          lines.push(`${current}=`);
+          current = "";
+        }
+        current += token;
+      }
+      lines.push(current);
+      return lines.join("\r\n");
+    })
+    .join("\r\n");
 }
 
 function dotStuff(value: string): string {
