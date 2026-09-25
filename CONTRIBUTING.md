@@ -96,7 +96,7 @@ needs a closer read than a large copy change.
 | Diff touches | Directive |
 | --- | --- |
 | Only documentation, comments, localization strings, Storybook stories, or tests with no production change | none (the workflow picks `chatgpt-web/medium` itself) |
-| Ordinary product code, IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | none (the default, `chatgpt-web/extra-high`) |
+| Ordinary product code, IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | none (the default, `claude-opus-5-5` at `high`) |
 | A [non-negotiable](AGENTS.md#non-negotiable) area: migrations, a released Team API wire protocol, the renderer-to-main trust boundary, secret redaction, or licensing | `NorbiAI-Model: chatgpt-web/pro` |
 
 When unsure between two rows, take the higher one. Do not lower the level to get a faster result on
@@ -114,10 +114,17 @@ The first review, a review after a rebase or a merge of the base branch, and a r
 the `norbiai` label read the whole pull request. Add the label when a change since the last review
 needs the whole pull request read again.
 
-`NorbiAI-Effort` reaches `gpt-6-astra` only. A `chatgpt-web/*` slug carries its own level — the
-`high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair the effort with
-`gpt-6-astra` or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking for more is
-answered with a warning and the run goes ahead at `low`.
+`NorbiAI-Effort` reaches `gpt-6-astra` and `claude-opus-5-5` only. A `chatgpt-web/*` slug carries
+its own level — the `high` in `chatgpt-web/high` is the reasoning level, already chosen — so pair
+the effort with another model or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking
+for more is answered with a warning and the run goes ahead at `low`.
+
+The default, `claude-opus-5-5`, runs on Claude Code with the Claude login on the runner mac. It
+runs at `high` without `NorbiAI-Effort`. Every other model runs on Codex: name
+`chatgpt-web/extra-high` for a second opinion from Codex. Both use the same prompt, merge block and
+findings list. Claude Code can only read: it gets the Read, Grep and Glob tools and the `git diff`,
+`git show`, `git log` and `git ls-files` commands. It does not load the pull request's own settings,
+hooks, `CLAUDE.md` or MCP servers.
 
 The same two directives work in a `/norbiai review` comment, where they override the description for
 that one run. On a pull request from a fork only the comment is read: the description belongs to

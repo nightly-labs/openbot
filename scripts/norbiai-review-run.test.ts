@@ -56,6 +56,36 @@ if [ -f "$FAKE_DIR/reads" ]; then printf 'exec\\n/bin/bash -lc "git diff"\\n'; f
 cat "$out"
 `;
 
+// Writes events as Claude Code's \`stream-json\` does: a tool call when the reviewer reads,
+// then the result, which carries the review or, with an \`error\` file, that error.
+const FAKE_CLAUDE = `#!/usr/bin/env bun
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+const dir = process.env.FAKE_DIR;
+if (process.argv[2] === "--version") {
+  console.log("2.1.282 (Claude Code)");
+  process.exit(0);
+}
+const calls = (existsSync(dir + "/calls") ? Number(readFileSync(dir + "/calls", "utf8")) : 0) + 1;
+writeFileSync(dir + "/calls", String(calls));
+writeFileSync(dir + "/claude-args.txt", process.argv.slice(2).join("\\n"));
+const prompt = await Bun.stdin.text();
+writeFileSync(dir + "/prompt-" + calls + ".txt", prompt);
+const emit = (event) => console.log(JSON.stringify(event));
+emit({ type: "system", subtype: "init" });
+if (existsSync(dir + "/reads")) {
+  emit({ type: "assistant", message: { content: [{ type: "tool_use", name: "Bash", input: { command: "git diff" } }] } });
+}
+const usage = { input_tokens: 10, cache_read_input_tokens: 1000, output_tokens: 200 };
+if (existsSync(dir + "/error")) {
+  const error = readFileSync(dir + "/error", "utf8");
+  emit({ type: "result", subtype: "success", is_error: true, api_error_status: 429, result: error, usage });
+  process.exit(1);
+}
+const marker = prompt.match(/norbiai-answer-[0-9a-f]+/g).at(-1);
+const answer = marker + "\\n\\n" + readFileSync(dir + "/review.txt", "utf8");
+emit({ type: "result", subtype: "success", is_error: false, result: answer, usage });
+`;
+
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
@@ -93,6 +123,8 @@ type Run = {
   withdrawn?: string;
   /** The findings the previous review left active. */
   previous?: string;
+  /** Review with a Claude model, which runs on Claude Code instead of Codex. */
+  claude?: boolean;
 };
 
 /** Runs the workflow step as the runner would, and reads back its outputs and prompts. */
@@ -107,17 +139,19 @@ function review({
   poison,
   withdrawn = "",
   previous = "",
+  claude = false,
 }: Run) {
   const { root, base, head } = repository();
   const temp = mkdtempSync(join(tmpdir(), "norbiai-runner-"));
   const bin = join(temp, "bin");
   mkdirSync(bin);
   writeFileSync(join(bin, "codex"), FAKE_CODEX);
+  writeFileSync(join(bin, "claude"), FAKE_CLAUDE);
   // macOS has no `timeout`, the fake reviewer never runs long, and a busy bridge need
   // not be waited for.
   writeFileSync(join(bin, "timeout"), '#!/usr/bin/env bash\nshift\nexec "$@"\n');
   writeFileSync(join(bin, "sleep"), "#!/usr/bin/env bash\n");
-  for (const tool of ["codex", "timeout", "sleep"]) chmodSync(join(bin, tool), 0o755);
+  for (const tool of ["codex", "claude", "timeout", "sleep"]) chmodSync(join(bin, tool), 0o755);
   writeFileSync(join(temp, "review.txt"), review);
   if (reads) writeFileSync(join(temp, "reads"), "");
   if (error) writeFileSync(join(temp, "error"), error);
@@ -157,8 +191,9 @@ function review({
       PREVIOUS_FILE: join(temp, "previous.txt"),
       WITHDRAWN_FILE: join(temp, "withdrawn.txt"),
       RESPONSES_FILE: join(temp, "responses.txt"),
-      MODEL: "chatgpt-web/pro",
-      EFFORT: "low",
+      MODEL: claude ? "claude-opus-5-5" : "chatgpt-web/pro",
+      REVIEWER_CLI: claude ? "claude" : "codex",
+      EFFORT: claude ? "high" : "low",
       REVIEWED_SHA: "",
       FULL_REVIEW: "false",
       INLINE_DIFF_MAX_BYTES: String(inlineLimit ?? step?.env?.INLINE_DIFF_MAX_BYTES),
@@ -177,7 +212,9 @@ function review({
   const prompt = readFileSync(join(temp, "prompt-1.txt"), "utf8");
   const reviewFile = outputs.review_file;
   const published = reviewFile && existsSync(reviewFile) ? readFileSync(reviewFile, "utf8") : "";
-  return { outputs, calls, prompt, published };
+  const argsPath = join(temp, "claude-args.txt");
+  const claudeArgs = existsSync(argsPath) ? readFileSync(argsPath, "utf8").split("\n") : [];
+  return { outputs, calls, prompt, published, claudeArgs };
 }
 
 describe("NorbiAI review run", () => {
@@ -310,6 +347,40 @@ describe("NorbiAI review run", () => {
 
     expect(run.outputs.status).toBe("failed");
     expect(run.published).not.toContain("Forged by the pull request.");
+  });
+});
+
+// The Claude reviewer runs in the pull request's checkout. What the pull request put there
+// must not configure it, and its tools must not change anything.
+describe("NorbiAI review run on Claude Code", () => {
+  it("reviews read-only, without the checkout's settings, and publishes the result event", () => {
+    const run = review({ claude: true, review: CLEAN + LEDGER, reads: true, inlineLimit: 2_000, partialLimit: 2_000 });
+
+    expect(run.outputs.status).toBe("success");
+    expect(run.published).toContain("No actionable findings exist.");
+    expect(run.published).not.toContain("norbiai-answer-");
+    expect(run.outputs.tokens_used).toBe("1210");
+    expect(run.outputs.claude_version).toBe("2.1.282");
+    const args = run.claudeArgs.join(" ");
+    expect(args).toContain("--setting-sources user --strict-mcp-config");
+    expect(args).toContain("--tools Read,Grep,Glob,Bash --allowedTools");
+    expect(args).toContain("--disallowedTools Bash(*--output*) Bash(*--no-index*)");
+    expect(args).not.toMatch(/dangerously|bypassPermissions|--add-dir|--mcp-config/);
+  });
+
+  it("fails a review that made no tool call for the diff left out of the prompt", () => {
+    const run = review({ claude: true, review: CLEAN + LEDGER, inlineLimit: 2_000, partialLimit: 2_000 });
+
+    expect(run.outputs.status).toBe("failed");
+    expect(run.outputs.failure_reason).toBe("Reviewer did not read the code it had to review. Human review required.");
+  });
+
+  it("names the error from Claude Code's result event", () => {
+    const run = review({ claude: true, error: "Claude usage limit reached.\nTry again later." });
+
+    expect(run.outputs.failure_reason).toBe(
+      "Reviewer exited with code 1. Claude Code reported: API status 429: Claude usage limit reached. Human review required.",
+    );
   });
 });
 
