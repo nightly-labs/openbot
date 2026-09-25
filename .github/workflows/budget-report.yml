@@ -119,8 +119,11 @@ jobs:
           main_source="${MAIN_RUN:+CI run ${MAIN_RUN}}"
           body="$(printf '%s\n## Transfer budget\n\n%s\n\nCompared with the last green main CI run (%s). Updated for commit `%s`.\n' \
             "$marker" "$(cat "$RUNNER_TEMP/budget-table.md")" "${main_source:-none found}" "$HEAD_SHA")"
-          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
-            --jq 'map(select(.body | contains("<!-- openbot-transfer-budget -->")))[0].id // empty')"
+          # Search every page, and only comments of this workflow's bot: a user comment can hold
+          # the marker too.
+          comment_id="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- openbot-transfer-budget -->"))) | .id' \
+            | sed -n 1p)"
           if [[ -n "$comment_id" ]]; then
             gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="$body" >/dev/null
           else
