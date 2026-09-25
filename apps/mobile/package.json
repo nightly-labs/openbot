@@ -15,7 +15,6 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@expo/ui": "~57.0.19",
-    "@hookform/resolvers": "^5.9.1",
     "@norbert_bodziony/bloub": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
@@ -64,7 +63,6 @@
     "marked": "catalog:",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-hook-form": "^7.87.0",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-keyboard-controller": "1.21.9",

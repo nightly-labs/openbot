@@ -63,7 +63,7 @@ Its main jobs are:
 
 | Job | Runner | Commands |
 | --- | --- | --- |
-| Check | `ubuntu-latest` | `bun run check:desktop:static` |
+| Check | `ubuntu-latest` | `bun run knip:check`, `bun run check:desktop:static` |
 | Browser smoke | `ubuntu-latest` | `xvfb-run -a bun run test:browser` |
 | Tests (desktop 1/2, 2/2) | `ubuntu-latest` | `bun run test:desktop -- --shard=<n>/2` |
 | Tests (sites) | `ubuntu-latest` | `bun run test:sites` |
@@ -82,6 +82,14 @@ the only caller that splits them. The smoke test starts the real Electron binary
 xvfb on Ubuntu rather than on a macOS runner, and reads nothing the build writes, so the order
 between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner,
 where it checks the machine that builds the release.
+
+`bun run knip:check` fails on unused files, unused or unlisted dependencies, unresolved imports and
+unlisted binaries in every workspace. It takes about 6 seconds. `knip.config.ts` names the entry
+points that knip cannot find by itself: the electron-vite inputs, the modules that the renderer HTML
+pages load, the Metro shims, and every command in `scripts/`. Each ignore entry states its reason.
+Stylesheets go through a small compiler so that `@import "<package>"` counts as a use. Unused
+exports and exported types are not in the gate yet: `bun run knip` lists them (131 at the start).
+Remove them in their own changes, then drop `--exclude exports,types` from `knip:check`.
 
 `setup-bun` restores the Bun package store before installing. The key falls back through
 `restore-keys`, so a lockfile change re-downloads only what moved. The Electron download is
