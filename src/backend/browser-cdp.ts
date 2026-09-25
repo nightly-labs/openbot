@@ -12,7 +12,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { NativeImage, WebContents } from "electron";
+import { stopLoadingAndWait, waitForLoading } from "./browser-navigation";
 import { createFramePacer } from "./browser-screencast-pacing";
+import { describeBrowserTarget } from "./browser-target";
 
 async function dispatchMouseClick(
   send: SendCommand,
@@ -1410,7 +1412,7 @@ export class BrowserCdpEngine {
       throw new Error("Page navigated during semantic target collection. Take a fresh snapshot.");
     }
     const [found] = candidates;
-    if (!found) throw new Error(`No element matches ${describeTarget(target)}.`);
+    if (!found) throw new Error(`No element matches ${describeBrowserTarget(target)}.`);
     if (candidates.length > 1) {
       const sample = candidates
         .slice(0, 5)
@@ -2633,80 +2635,6 @@ async function isNodeOrDescendant(
   }
 }
 
-function waitForLoading(contents: WebContents, timeoutMs: number): Promise<void> {
-  if (!contents.isLoading()) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        contents.stop();
-      } catch (error) {
-        cleanup();
-        reject(error);
-      }
-    }, timeoutMs);
-    timer.unref();
-    const stopped = () => {
-      cleanup();
-      if (timedOut) reject(new Error("Navigation timed out."));
-      else resolve();
-    };
-    const failed = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-      if (!isMainFrame) return;
-      cleanup();
-      if (timedOut) reject(new Error("Navigation timed out."));
-      else reject(new Error(`Navigation failed (${code}): ${description}`));
-    };
-    const destroyed = () => {
-      cleanup();
-      reject(new Error("Browser tab was closed during navigation."));
-    };
-    const cleanup = () => {
-      clearTimeout(timer);
-      contents.off("did-stop-loading", stopped);
-      contents.off("did-fail-load", failed);
-      contents.off("destroyed", destroyed);
-    };
-    contents.once("did-stop-loading", stopped);
-    contents.on("did-fail-load", failed);
-    contents.once("destroyed", destroyed);
-  });
-}
-
-function stopLoadingAndWait(contents: WebContents): Promise<void> {
-  if (!contents.isLoading()) return Promise.resolve();
-  return new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const cleanup = () => {
-      contents.off("did-stop-loading", stopped);
-      contents.off("destroyed", destroyed);
-    };
-    const stopped = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve();
-    };
-    const destroyed = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error("Browser tab was closed during navigation."));
-    };
-    contents.once("did-stop-loading", stopped);
-    contents.once("destroyed", destroyed);
-    try {
-      contents.stop();
-      if (!contents.isLoading()) setImmediate(stopped);
-    } catch (error) {
-      settled = true;
-      cleanup();
-      reject(error);
-    }
-  });
-}
-
 async function waitForDomQuietAcrossTargets(
   send: SendCommand,
   captures: SnapshotTarget[],
@@ -2905,12 +2833,6 @@ function frameIds(value: CdpResult): string[] {
 
 function exceptionDescription(value: CdpResult): string {
   return stringValue(recordValue(value.exception)?.description) || stringValue(value.text) || "Unknown page error";
-}
-
-function describeTarget(target: Exclude<BrowserTarget, { kind: "ref" | "css" | "point" }>): string {
-  return target.kind === "role"
-    ? `role ${target.role}${target.name ? ` named “${target.name}”` : ""}`
-    : `text “${target.text}”`;
 }
 
 function textMatches(actual: string, expected: string, exact = false): boolean {

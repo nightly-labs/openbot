@@ -143,6 +143,8 @@ the `media-attachments` capability; released protocol adapters keep their existi
 
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
+`browser-navigation.ts` owns the wait for a main-frame load, and `browser-target.ts` names a target.
+The host and the CDP engine both use them, so they give the same errors and the same target text.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and shared browser session. Local tab and

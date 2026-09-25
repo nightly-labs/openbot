@@ -47,6 +47,7 @@ import {
 } from "./browser-cdp";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import { applySiteIdentity } from "./browser-identity";
+import { navigateAndWait } from "./browser-navigation";
 import { BrowserRecorder } from "./browser-recorder";
 import {
   browserContextMenuItems,
@@ -67,7 +68,13 @@ import {
   type StoredBrowserTab,
   storedBrowserTab,
 } from "./browser-state";
-import { type BrowserDynamicToolHooks, browserInputAction, browserToolTimeout } from "./browser-tool-actions";
+import { describeBrowserTarget } from "./browser-target";
+import {
+  type BrowserDynamicToolHooks,
+  type BrowserInputCall,
+  browserInputAction,
+  browserToolTimeout,
+} from "./browser-tool-actions";
 import {
   type BrowserToolArguments,
   type BrowserToolCall,
@@ -934,243 +941,7 @@ export class BrowserHost {
     try {
       const call = parseBrowserToolCall(params.tool, params.arguments);
       this.#beginControl(params, call);
-      switch (call.tool) {
-        case "open": {
-          const { args } = call;
-          const url = args.url;
-          const tab = await this.open(url, params.threadId, params.ownerAgentId ?? null);
-          this.#updateControlTab(params, tab.id);
-          return textResult({ tab });
-        }
-        case "list_tabs": {
-          const tabs = this.listTabs().filter((tab) => this.#canUseToolTab(params, tab));
-          const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
-            ? this.#activeTabId
-            : (tabs.at(-1)?.id ?? null);
-          return textResult({ tabs, activeTabId });
-        }
-        case "status": {
-          const tabs = this.listTabs().filter((tab) => this.#canUseToolTab(params, tab));
-          const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
-            ? this.#activeTabId
-            : (tabs.at(-1)?.id ?? null);
-          const control = {
-            sessions: this.getControlState().sessions.filter((session) => session.threadId === params.threadId),
-          };
-          return textResult({ tabs, activeTabId, control });
-        }
-        case "snapshot": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const mode = args.image ?? "auto";
-          const capture = await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-            const result = await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked);
-            const includeImage = mode === "always" || (mode === "auto" && result.recommendImage);
-            if (!includeImage) return { result, imageUrl: null };
-            const image = await this.#boundEngineOperation(
-              tab,
-              tab.engine.screenshot(),
-              10_000,
-              "Browser screenshot timed out.",
-              keepQueueBlocked,
-            );
-            return { result, imageUrl: boundedCaptureDataUrl(image) };
-          });
-          return this.#snapshotResult(capture.result, mode, capture.imageUrl);
-        }
-        case "navigate": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const url = args.url;
-          const direction = args.direction;
-          if (!url && !direction) throw new Error("navigate requires url or direction.");
-          const timeoutMs = browserToolTimeout(args.timeoutMs);
-          return textResult(
-            await this.#runAction(
-              tabId,
-              "navigate",
-              undefined,
-              async (tab, deadline) => {
-                const operationTimeout = remainingTime(deadline, "Browser navigate timed out.");
-                if (url) {
-                  const normalizedUrl = normalizeBrowserUrl(url);
-                  tab.requestedUrl = normalizedUrl;
-                  await navigateAndWait(
-                    tab.contents,
-                    () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-                    operationTimeout,
-                  );
-                } else if (direction === "reload") {
-                  await navigateAndWait(
-                    tab.contents,
-                    () => {
-                      tab.contents.reload();
-                      return true;
-                    },
-                    operationTimeout,
-                  );
-                } else if (direction) {
-                  await navigateAndWait(tab.contents, () => navigateHistory(tab.contents, direction), operationTimeout);
-                }
-              },
-              timeoutMs,
-            ),
-          );
-        }
-        case "click":
-        case "type":
-        case "press":
-        case "hover":
-        case "scroll":
-        case "select_option":
-        case "set_checked":
-        case "drag":
-        case "upload_files": {
-          this.#requireToolTab(params, call.args.tabId);
-          const action = browserInputAction(call, hooks);
-          return textResult(
-            await this.#runAction(
-              call.args.tabId,
-              action.name,
-              action.target,
-              (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
-              browserToolTimeout(call.args.timeoutMs),
-              call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
-            ),
-          );
-        }
-        case "wait_for": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const target = args.target;
-          const condition = {
-            target,
-            text: args.text,
-            url: args.url,
-            state: args.state,
-          };
-          if (!condition.target && !condition.text && !condition.url && !condition.state)
-            throw new Error("wait_for requires a condition.");
-          const timeoutMs = browserToolTimeout(args.timeoutMs);
-          return textResult(
-            await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-              const timeoutMessage = "Browser wait condition timed out.";
-              const deadline = Date.now() + timeoutMs;
-              // The engine checks this deadline between commands, which a frame that answers none of
-              // them never reaches.
-              const waitTimeout = remainingTime(deadline, timeoutMessage);
-              await this.#boundEngineOperation(
-                tab,
-                tab.engine.waitFor(condition, waitTimeout),
-                waitTimeout,
-                timeoutMessage,
-                keepQueueBlocked,
-              );
-              return (
-                await this.#readSnapshot(
-                  tab,
-                  tab.revision + 1,
-                  keepQueueBlocked,
-                  remainingTime(deadline, timeoutMessage),
-                  timeoutMessage,
-                )
-              ).snapshot;
-            }),
-          );
-        }
-        case "evaluate": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const expression = args.expression;
-          const awaitPromise = args.awaitPromise ?? true;
-          return textResult(
-            await this.#runEvaluation(tabId, expression, awaitPromise, browserToolTimeout(args.timeoutMs)),
-          );
-        }
-        case "set_environment": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          return textResult(
-            await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-              const environment = resolveEnvironment(args, tab.environment, tab.view.getBounds());
-              // This also bounds the engine's rollback if applying the environment fails.
-              await this.#boundEngineOperation(
-                tab,
-                tab.engine.setEnvironment(environment),
-                10_000,
-                "Browser environment change timed out.",
-                keepQueueBlocked,
-              );
-              tab.environment = environment;
-              await this.#persistState();
-              this.#emitChanged();
-              return (await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked)).snapshot;
-            }),
-          );
-        }
-        case "recording_start": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          await this.#enqueue(tabId, (tab) => {
-            this.#requireNoSecretDocument(tab, "Recording");
-            return this.#recorder.start(tabId, tab.contents);
-          });
-          return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
-        }
-        case "recording_stop": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          return textResult({ artifact: await this.#enqueue(tabId, () => this.#recorder.stop(tabId)) });
-        }
-        case "act": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const revision = args.revision;
-          const action = args.action;
-          return textResult(await this.act(tabId, revision, action));
-        }
-        case "screenshot": {
-          const { args } = call;
-          const tabId = args.tabId;
-          this.#requireToolTab(params, tabId);
-          const imageUrl = await this.screenshot(tabId);
-          return { success: true, contentItems: [{ type: "inputImage", imageUrl }] };
-        }
-        case "close_tab": {
-          const { args } = call;
-          const tabId = args.tabId;
-          // Checked only for a tab that exists, so closing an id that is already gone stays a silent
-          // success and a repeated close is idempotent.
-          const tab = this.#tabs.get(tabId);
-          if (tab) {
-            this.#requireToolTab(params, tabId);
-            logger.info("Agent closed a browser tab.", {
-              tabId,
-              host: logUrlHost(tab.requestedUrl),
-              agentId: params.ownerAgentId ?? null,
-            });
-          }
-          await this.close(tabId);
-          return textResult({ closed: true });
-        }
-        case "submit_secret":
-        case "request_takeover":
-          // Published in BROWSER_TOOL_DEFINITIONS like every other tool, but answered by the agent
-          // service, which intercepts the namespace before the call reaches a host. Reaching here
-          // means a caller bypassed that, and silently succeeding would tell the model the user had
-          // been asked for control when nobody was.
-          throw new Error("Browser takeover is handled by the agent service, not the browser host.");
-        default:
-          return call satisfies never;
-      }
+      return await this.#runTool(call.tool, call, params, hooks);
     } catch (error) {
       return {
         success: false,
@@ -1182,6 +953,248 @@ export class BrowserHost {
     } finally {
       this.#finishControl(params);
     }
+  }
+
+  // The tool is a separate argument so `ToolHandlers[Tool]` and `ToolCalls[Tool]` stay correlated.
+  #runTool<Tool extends BrowserToolName>(
+    tool: Tool,
+    call: ToolCalls[Tool],
+    params: DynamicToolCallParams,
+    hooks: BrowserDynamicToolHooks,
+  ): Promise<DynamicToolResult> {
+    return this.#toolHandlers[tool](call, params, hooks);
+  }
+
+  readonly #toolHandlers: ToolHandlers = {
+    open: async ({ args }, params) => {
+      const tab = await this.open(args.url, params.threadId, params.ownerAgentId ?? null);
+      this.#updateControlTab(params, tab.id);
+      return textResult({ tab });
+    },
+    list_tabs: async (_call, params) => textResult(this.#toolTabs(params)),
+    status: async (_call, params) => {
+      const control = {
+        sessions: this.getControlState().sessions.filter((session) => session.threadId === params.threadId),
+      };
+      return textResult({ ...this.#toolTabs(params), control });
+    },
+    snapshot: ({ args }, params) => this.#snapshotTool(args, params),
+    navigate: ({ args }, params) => this.#navigateTool(args, params),
+    click: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    type: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    press: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    hover: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    scroll: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    select_option: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    set_checked: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    drag: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    upload_files: (call, params, hooks) => this.#inputTool(call, params, hooks),
+    wait_for: ({ args }, params) => this.#waitForTool(args, params),
+    evaluate: async ({ args }, params) => {
+      this.#requireToolTab(params, args.tabId);
+      return textResult(
+        await this.#runEvaluation(
+          args.tabId,
+          args.expression,
+          args.awaitPromise ?? true,
+          browserToolTimeout(args.timeoutMs),
+        ),
+      );
+    },
+    set_environment: ({ args }, params) => this.#setEnvironmentTool(args, params),
+    recording_start: async ({ args }, params) => {
+      const { tabId } = args;
+      this.#requireToolTab(params, tabId);
+      await this.#enqueue(tabId, (tab) => {
+        this.#requireNoSecretDocument(tab, "Recording");
+        return this.#recorder.start(tabId, tab.contents);
+      });
+      return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
+    },
+    recording_stop: async ({ args }, params) => {
+      const { tabId } = args;
+      this.#requireToolTab(params, tabId);
+      return textResult({ artifact: await this.#enqueue(tabId, () => this.#recorder.stop(tabId)) });
+    },
+    act: async ({ args }, params) => {
+      this.#requireToolTab(params, args.tabId);
+      return textResult(await this.act(args.tabId, args.revision, args.action));
+    },
+    screenshot: async ({ args }, params) => {
+      this.#requireToolTab(params, args.tabId);
+      const imageUrl = await this.screenshot(args.tabId);
+      return { success: true, contentItems: [{ type: "inputImage", imageUrl }] };
+    },
+    close_tab: async ({ args }, params) => {
+      const { tabId } = args;
+      // Checked only for a tab that exists, so closing an id that is already gone stays a silent
+      // success and a repeated close is idempotent.
+      const tab = this.#tabs.get(tabId);
+      if (tab) {
+        this.#requireToolTab(params, tabId);
+        logger.info("Agent closed a browser tab.", {
+          tabId,
+          host: logUrlHost(tab.requestedUrl),
+          agentId: params.ownerAgentId ?? null,
+        });
+      }
+      await this.close(tabId);
+      return textResult({ closed: true });
+    },
+    submit_secret: rejectTakeoverTool,
+    request_takeover: rejectTakeoverTool,
+  };
+
+  #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
+    const tabs = this.listTabs().filter((tab) => this.#canUseToolTab(params, tab));
+    const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
+      ? this.#activeTabId
+      : (tabs.at(-1)?.id ?? null);
+    return { tabs, activeTabId };
+  }
+
+  async #snapshotTool(
+    args: BrowserToolArguments<"snapshot">,
+    params: DynamicToolCallParams,
+  ): Promise<DynamicToolResult> {
+    const { tabId } = args;
+    this.#requireToolTab(params, tabId);
+    const mode = args.image ?? "auto";
+    const capture = await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+      const result = await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked);
+      const includeImage = mode === "always" || (mode === "auto" && result.recommendImage);
+      if (!includeImage) return { result, imageUrl: null };
+      const image = await this.#boundEngineOperation(
+        tab,
+        tab.engine.screenshot(),
+        10_000,
+        "Browser screenshot timed out.",
+        keepQueueBlocked,
+      );
+      return { result, imageUrl: boundedCaptureDataUrl(image) };
+    });
+    return this.#snapshotResult(capture.result, mode, capture.imageUrl);
+  }
+
+  async #navigateTool(
+    args: BrowserToolArguments<"navigate">,
+    params: DynamicToolCallParams,
+  ): Promise<DynamicToolResult> {
+    const { tabId, url, direction } = args;
+    this.#requireToolTab(params, tabId);
+    if (!url && !direction) throw new Error("navigate requires url or direction.");
+    return textResult(
+      await this.#runAction(
+        tabId,
+        "navigate",
+        undefined,
+        async (tab, deadline) => {
+          const operationTimeout = remainingTime(deadline, "Browser navigate timed out.");
+          if (url) {
+            const normalizedUrl = normalizeBrowserUrl(url);
+            tab.requestedUrl = normalizedUrl;
+            await navigateAndWait(
+              tab.contents,
+              () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
+              operationTimeout,
+            );
+          } else if (direction === "reload") {
+            await navigateAndWait(
+              tab.contents,
+              () => {
+                tab.contents.reload();
+                return true;
+              },
+              operationTimeout,
+            );
+          } else if (direction) {
+            await navigateAndWait(tab.contents, () => navigateHistory(tab.contents, direction), operationTimeout);
+          }
+        },
+        browserToolTimeout(args.timeoutMs),
+      ),
+    );
+  }
+
+  async #inputTool(
+    call: BrowserInputCall,
+    params: DynamicToolCallParams,
+    hooks: BrowserDynamicToolHooks,
+  ): Promise<DynamicToolResult> {
+    this.#requireToolTab(params, call.args.tabId);
+    const action = browserInputAction(call, hooks);
+    return textResult(
+      await this.#runAction(
+        call.args.tabId,
+        action.name,
+        action.target,
+        (tab, deadline, markDispatched) => action.run(tab.engine, deadline, markDispatched),
+        browserToolTimeout(call.args.timeoutMs),
+        call.tool === "upload_files" ? hooks.onUploadOperationStarted : undefined,
+      ),
+    );
+  }
+
+  async #waitForTool(
+    args: BrowserToolArguments<"wait_for">,
+    params: DynamicToolCallParams,
+  ): Promise<DynamicToolResult> {
+    const { tabId } = args;
+    this.#requireToolTab(params, tabId);
+    const condition = { target: args.target, text: args.text, url: args.url, state: args.state };
+    if (!condition.target && !condition.text && !condition.url && !condition.state)
+      throw new Error("wait_for requires a condition.");
+    const timeoutMs = browserToolTimeout(args.timeoutMs);
+    return textResult(
+      await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+        const timeoutMessage = "Browser wait condition timed out.";
+        const deadline = Date.now() + timeoutMs;
+        // The engine checks this deadline between commands, which a frame that answers none of
+        // them never reaches.
+        const waitTimeout = remainingTime(deadline, timeoutMessage);
+        await this.#boundEngineOperation(
+          tab,
+          tab.engine.waitFor(condition, waitTimeout),
+          waitTimeout,
+          timeoutMessage,
+          keepQueueBlocked,
+        );
+        return (
+          await this.#readSnapshot(
+            tab,
+            tab.revision + 1,
+            keepQueueBlocked,
+            remainingTime(deadline, timeoutMessage),
+            timeoutMessage,
+          )
+        ).snapshot;
+      }),
+    );
+  }
+
+  async #setEnvironmentTool(
+    args: BrowserToolArguments<"set_environment">,
+    params: DynamicToolCallParams,
+  ): Promise<DynamicToolResult> {
+    const { tabId } = args;
+    this.#requireToolTab(params, tabId);
+    return textResult(
+      await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+        const environment = resolveEnvironment(args, tab.environment, tab.view.getBounds());
+        // This also bounds the engine's rollback if applying the environment fails.
+        await this.#boundEngineOperation(
+          tab,
+          tab.engine.setEnvironment(environment),
+          10_000,
+          "Browser environment change timed out.",
+          keepQueueBlocked,
+        );
+        tab.environment = environment;
+        await this.#persistState();
+        this.#emitChanged();
+        return (await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked)).snapshot;
+      }),
+    );
   }
 
   async resolveUploadTarget(params: DynamicToolCallParams): Promise<BrowserUploadAssignment> {
@@ -2548,21 +2561,6 @@ function boundedCaptureDataUrl(image: NativeImage): string {
     .toDataURL();
 }
 
-function describeBrowserTarget(target: BrowserTarget): string {
-  switch (target.kind) {
-    case "ref":
-      return `ref ${target.ref}@${target.revision}`;
-    case "role":
-      return `${target.role}${target.name ? ` “${target.name}”` : ""}`;
-    case "text":
-      return `text “${target.text}”`;
-    case "css":
-      return `css ${target.selector}`;
-    case "point":
-      return `point ${target.x},${target.y}`;
-  }
-}
-
 function presetDimensions(preset: "fill" | "desktop" | "tablet" | "mobile" | "custom" | undefined) {
   switch (preset) {
     case "desktop":
@@ -2586,91 +2584,22 @@ function navigateHistory(contents: WebContents, direction: BrowserNavigationDire
   return true;
 }
 
-async function navigateAndWait(
-  contents: WebContents,
-  initiate: () => boolean | Promise<unknown>,
-  timeoutMs = 10_000,
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    let started = false;
-    let inPlace = false;
-    let settled = false;
-    let timedOut = false;
-    let initiationPending = false;
-    let timer: NodeJS.Timeout;
-    const cleanup = () => {
-      clearTimeout(timer);
-      contents.off("did-start-navigation", didStartNavigation);
-      contents.off("did-stop-loading", didStopLoading);
-      contents.off("did-navigate-in-page", didNavigateInPage);
-      contents.off("did-fail-load", didFailLoad);
-      contents.off("destroyed", destroyed);
-    };
-    const finish = (error?: unknown) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (error) reject(error);
-      else resolve();
-    };
-    const complete = () => {
-      finish(timedOut ? new Error("Navigation timed out.") : undefined);
-    };
-    const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
-      if (!isMainFrame) return;
-      started = true;
-      inPlace = isInPlace;
-    };
-    const didStopLoading = () => {
-      if (started && !inPlace) complete();
-    };
-    const didNavigateInPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
-      if (started && inPlace && isMainFrame) complete();
-    };
-    const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-      if (!started || !isMainFrame) return;
-      finish(timedOut ? new Error("Navigation timed out.") : new Error(`Navigation failed (${code}): ${description}`));
-    };
-    const destroyed = () => {
-      finish(new Error("Browser tab was closed during navigation."));
-    };
-    contents.on("did-start-navigation", didStartNavigation);
-    contents.on("did-stop-loading", didStopLoading);
-    contents.on("did-navigate-in-page", didNavigateInPage);
-    contents.on("did-fail-load", didFailLoad);
-    contents.once("destroyed", destroyed);
-    timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        const navigationWasActive = started || contents.isLoading();
-        contents.stop();
-        if (!navigationWasActive && !initiationPending) complete();
-      } catch (error) {
-        finish(error);
-      }
-    }, timeoutMs);
-    timer.unref();
-    try {
-      const initiation = initiate();
-      if (initiation === false) {
-        complete();
-      } else if (initiation !== true) {
-        initiationPending = true;
-        void initiation.then(
-          () => {
-            initiationPending = false;
-            if (!contents.isLoading()) complete();
-          },
-          (error) => {
-            initiationPending = false;
-            finish(timedOut ? new Error("Navigation timed out.") : error);
-          },
-        );
-      }
-    } catch (error) {
-      finish(error);
-    }
-  });
+type BrowserToolName = BrowserToolCall["tool"];
+type ToolCalls = { [Tool in BrowserToolName]: Extract<BrowserToolCall, { tool: Tool }> };
+type ToolHandlers = {
+  [Tool in BrowserToolName]: (
+    call: ToolCalls[Tool],
+    params: DynamicToolCallParams,
+    hooks: BrowserDynamicToolHooks,
+  ) => Promise<DynamicToolResult>;
+};
+
+// Published in BROWSER_TOOL_DEFINITIONS like every other tool, but answered by the agent service,
+// which intercepts the namespace before the call reaches a host. Reaching here means a caller
+// bypassed that, and silently succeeding would tell the model the user had been asked for control
+// when nobody was.
+function rejectTakeoverTool(): Promise<DynamicToolResult> {
+  return Promise.reject(new Error("Browser takeover is handled by the agent service, not the browser host."));
 }
 
 function textResult(value: unknown): DynamicToolResult {
