@@ -6,8 +6,6 @@ import { createOpenBotLogger } from "@openbot/logging";
 const ALLOWED_DIRECTORIES = [
   // electron-builder application icons.
   "build/",
-  // Images that the Markdown documentation links.
-  "docs/images/",
   // Images that the renderer bundles, and Storybook fixtures.
   "src/renderer/src/assets/",
   "src/renderer/stories/assets/",
