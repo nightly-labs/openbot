@@ -1295,20 +1295,21 @@ export class MailboxStore {
    * Transfers folder and no other record that is not deleted uses the same path.
    */
   async deleteStoredFile(fileId: string): Promise<void> {
-    const records = [
-      ...this.#state.messages.flatMap((message) => message.attachments),
-      ...this.#state.generatedAttachments,
-    ];
-    const targets = records.filter((record) => record.id === fileId && !record.deletedAt);
-    if (targets.length === 0) throw new Error("The file does not exist or is already deleted.");
+    // The path checks wait, so they run before the state changes. Then no other write can save the
+    // markers without their outbox entry, and a failed save restores a copy that has all other changes.
+    const managedPaths = new Map<string, string | null>();
+    for (const path of new Set(this.#undeletedFileRecords(fileId).map((target) => target.path))) {
+      managedPaths.set(path, await this.#files.managedTransferFile(path));
+    }
+    const records = this.#fileRecords();
+    const targets = this.#undeletedFileRecords(fileId);
     const previous = structuredClone(this.#state);
     const deletedAt = new Date().toISOString();
     for (const target of targets) target.deletedAt = deletedAt;
     const inUse = new Set(records.filter((record) => !record.deletedAt).map((record) => record.path));
     const deletions: string[] = [];
     for (const path of new Set(targets.map((target) => target.path))) {
-      if (inUse.has(path)) continue;
-      const managed = await this.#files.managedTransferFile(path);
+      const managed = inUse.has(path) ? null : managedPaths.get(path);
       if (managed) deletions.push(managed);
     }
     try {
@@ -1318,6 +1319,16 @@ export class MailboxStore {
       throw error;
     }
     await this.#drainFileDeletionOutbox();
+  }
+
+  #fileRecords(): StoredAttachment[] {
+    return [...this.#state.messages.flatMap((message) => message.attachments), ...this.#state.generatedAttachments];
+  }
+
+  #undeletedFileRecords(fileId: string): StoredAttachment[] {
+    const targets = this.#fileRecords().filter((record) => record.id === fileId && !record.deletedAt);
+    if (targets.length === 0) throw new Error("The file does not exist or is already deleted.");
+    return targets;
   }
 
   async verifyDeliveryAttachments(deliveryId: string): Promise<void> {

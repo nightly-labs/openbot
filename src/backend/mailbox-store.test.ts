@@ -11,6 +11,7 @@ import {
   isAttachmentSummary,
 } from "@openbot/contracts/ipc";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { AttachmentFiles } from "./attachment-files";
 import { MailboxStore } from "./mailbox-store";
 import { OpenBotDatabase } from "./openbot-database";
 
@@ -1128,6 +1129,53 @@ describe("MailboxStore", () => {
     await restored.initialize();
     expect(restored.listStoredFiles()).toEqual([]);
     await expect(restored.resolveAttachment(file.attachment.id)).resolves.toBeNull();
+  });
+
+  it("keeps a message sent while a file delete waits when the delete cannot be saved", async () => {
+    const source = join(root, "report.txt");
+    await writeFile(source, "report");
+    const [draft] = await store.prepareAttachments([source]);
+    assert(draft);
+    await store.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: ["chief"],
+      text: "Review",
+      draftIds: [draft.id],
+    });
+    const [file] = store.listStoredFiles();
+    assert(file);
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const managedTransferFile = AttachmentFiles.prototype.managedTransferFile;
+    const pathCheck = vi.spyOn(AttachmentFiles.prototype, "managedTransferFile").mockImplementation(async function (
+      this: AttachmentFiles,
+      path: string,
+    ) {
+      await released;
+      return managedTransferFile.call(this, path);
+    });
+
+    const deletion = store.deleteStoredFile(file.attachment.id);
+    await vi.waitFor(() => expect(pathCheck).toHaveBeenCalled());
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent meanwhile" });
+    vi.spyOn(OpenBotDatabase.prototype, "replaceMailboxState").mockImplementationOnce(() => {
+      throw new Error("The disk is full.");
+    });
+    release();
+    await expect(deletion).rejects.toThrow("The disk is full.");
+    await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Sent later" });
+    vi.restoreAllMocks();
+
+    const restored = new MailboxStore(join(root, "user-data"), join(root, "Shared"));
+    await restored.initialize();
+    expect(restored.listQueue("chief").deliveries.map((delivery) => delivery.text)).toEqual([
+      "Review",
+      "Sent meanwhile",
+      "Sent later",
+    ]);
+    expect(restored.listStoredFiles().map((stored) => stored.attachment.id)).toEqual([file.attachment.id]);
   });
 
   it("marks a file deleted from Storage without following a symlink out of the transfer root", async () => {

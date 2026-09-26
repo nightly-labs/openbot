@@ -130,7 +130,8 @@ export interface ProviderHooks {
    * Runs when the runtime stops a client it used for a reason other than an exit: an idle release,
    * a sign-out that an account refresh found, or a new client for the same provider. `#handleExit`
    * skips such a client, and it can never answer its pending prompts, approvals and browser
-   * takeovers. It runs after the stop, so a request the process sent while it stopped is cleared too.
+   * takeovers, or complete the turns it ran. It runs after the stop, so a request the process sent
+   * while it stopped is cleared too.
    */
   onClientStopped(client: AgentClient): void;
   /** True once stop() has begun, so a client exiting during shutdown does not trigger a restart. */

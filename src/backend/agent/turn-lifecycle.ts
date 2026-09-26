@@ -94,6 +94,8 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
+  /** The client and provider thread of each running turn, from its `turn/started`. */
+  readonly #runningTurns = new Map<string, { client: AgentClient; agentId: string; threadId: string }>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -131,6 +133,24 @@ export class TurnLifecycle {
   dispose(): void {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
+    this.#runningTurns.clear();
+  }
+
+  /**
+   * Ends each turn a client ran when the runtime stops it for a reason other than an exit: a
+   * sign-out that an account refresh found, or a new client for the same provider. The stopped
+   * process sends no `turn/completed` and `#handleExit` skips it, so without this its turns stay
+   * active, and its deliveries running, until OpenBot restarts.
+   */
+  interruptTurnsOf(client: AgentClient): void {
+    for (const [turnId, turn] of this.#runningTurns) {
+      if (turn.client !== client) continue;
+      this.#runningTurns.delete(turnId);
+      this.#attention.clearForTurn(turn.threadId, turnId);
+      void this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").catch((error) => {
+        this.#hooks.emitError("turn_completion_failed", error, turn.agentId);
+      });
+    }
   }
 
   handleNotification(notification: AppServerNotification, source: AgentClient): void {
@@ -169,6 +189,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
+        this.#runningTurns.set(turnId, { client: source, agentId, threadId });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
@@ -298,6 +319,7 @@ export class TurnLifecycle {
   }
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
+    this.#runningTurns.delete(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);

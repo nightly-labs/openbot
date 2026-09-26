@@ -352,6 +352,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
           this.#attention.clearApprovals(client);
+          this.#turn.interruptTurnsOf(client);
         },
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) =>

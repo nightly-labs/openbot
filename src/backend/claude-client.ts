@@ -408,28 +408,40 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   }
 
   async #readAccount(): Promise<AccountReadResult> {
+    const status = await this.#readAuthStatus();
+    if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
+    return {
+      account: {
+        type: "claude",
+        email: isString(status.email) ? status.email : null,
+        planType: isString(status.subscriptionType) ? status.subscriptionType : null,
+      },
+      requiresOpenaiAuth: false,
+    };
+  }
+
+  /**
+   * `claude auth status` exits 1 when signed out and still prints its status. Only a status says
+   * signed out: a timeout, a failed spawn or unreadable output throws, so an account refresh keeps
+   * the working client instead of stopping it as signed out.
+   */
+  async #readAuthStatus(): Promise<DynamicRecord> {
+    let stdout: unknown;
+    let failure: unknown = null;
     try {
-      const { stdout } = await execFileAsync(this.#cli.executable, ["auth", "status", "--json"], {
+      ({ stdout } = await execFileAsync(this.#cli.executable, ["auth", "status", "--json"], {
         timeout: 5_000,
         maxBuffer: 64 * 1024,
         shell: process.platform === "win32",
         env: claudeEnvironment(this.#cli),
-      });
-      const status = JSON.parse(stdout);
-      if (!isRecord(status) || status.loggedIn !== true) {
-        return { account: null, requiresOpenaiAuth: false };
-      }
-      return {
-        account: {
-          type: "claude",
-          email: isString(status.email) ? status.email : null,
-          planType: isString(status.subscriptionType) ? status.subscriptionType : null,
-        },
-        requiresOpenaiAuth: false,
-      };
-    } catch {
-      return { account: null, requiresOpenaiAuth: false };
+      }));
+    } catch (error) {
+      failure = error;
+      stdout = isRecord(error) ? error.stdout : undefined;
     }
+    const status = parseAuthStatus(stdout);
+    if (status && (failure === null || status.loggedIn === false)) return status;
+    throw failure ?? new Error("Claude returned an unreadable sign-in status.");
   }
 
   async #resumeThread(threadId: string, config: ThreadConfig): Promise<void> {
@@ -1184,6 +1196,16 @@ function requiredString(value: unknown, key: string): string {
   const result = getString(value, key);
   if (!result) throw new Error(`${key} is required.`);
   return result;
+}
+
+function parseAuthStatus(stdout: unknown): DynamicRecord | null {
+  if (!isString(stdout)) return null;
+  try {
+    const status = JSON.parse(stdout);
+    return isRecord(status) && typeof status.loggedIn === "boolean" ? status : null;
+  } catch {
+    return null;
+  }
 }
 
 function readInputText(params: unknown): string {
