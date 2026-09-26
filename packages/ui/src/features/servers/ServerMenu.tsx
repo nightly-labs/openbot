@@ -43,7 +43,7 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   onSelect: (serverId: string) => void;
   onAdd?: () => void;
   /** The menu view has no room for the marketplace button on the sidebar title, so the menu holds it. */
-  onOpenMarketplace?: () => void;
+  onOpenMarketplace?: (() => void) | undefined;
   /** The compact sidebar hides the server name. The rail stays visible then. */
   compact?: boolean;
 }

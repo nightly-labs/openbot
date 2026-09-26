@@ -50,10 +50,10 @@ export type ServerActionMenu = Pick<
 >;
 
 export interface ServerActionCallbacks {
-  onSetMuted?: (serverId: string, muted: boolean, durationMs?: number) => void;
-  onSetNotificationLevel?: (serverId: string, level: ServerNotificationLevel) => void;
-  onOpenUsage?: (serverId: string, trigger: HTMLElement | null) => void;
-  onOpenSettings?: (serverId: string, trigger: HTMLElement | null) => void;
+  onSetMuted?: ((serverId: string, muted: boolean, durationMs?: number) => void) | undefined;
+  onSetNotificationLevel?: ((serverId: string, level: ServerNotificationLevel) => void) | undefined;
+  onOpenUsage?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
+  onOpenSettings?: ((serverId: string, trigger: HTMLElement | null) => void) | undefined;
 }
 
 /** Mute, notification level, usage and settings for one server. */
