@@ -41,7 +41,9 @@ export function createWebMarketplaceCalls(
       removeMcpServer: async (input, serverId) => removeMcpServer(request(serverId), input),
     },
     addAgent: async (input, serverId) => {
-      if (!serverId) throw new Error("Only an owner or admin of this server can add an agent to it.");
+      // No id: the account is a member, or the host runs an OpenBot without agent-install-v1.
+      if (!serverId)
+        throw new Error("Only an owner or admin can add an agent here, and the host must run a current OpenBot.");
       return installMarketplaceAgent(request(serverId), input);
     },
     openUrl: async (url) => {
