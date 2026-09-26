@@ -665,6 +665,105 @@ textarea {
   padding: 2px 3px 0 10px;
 }
 
+/* The frame edge. The server rail and the whole top row - the sidebar, chat and side panel headers -
+ * share one darker surface, and the chat list sits inside it as an inset panel with a rounded
+ * corner. The panel's top line runs on under the chat header, and its right edge is the divider,
+ * so the sidebar's own edge stays out of the top row. The theme layer at the end of this file also
+ * sets these backgrounds, so the selectors carry the frame class to win. */
+@media (min-width: 721px) {
+  .app-frame-with-server-rail > .server-rail,
+  .app-frame-with-server-rail > .sidebar,
+  .app-frame-with-server-rail .conversation-header,
+  .app-frame-with-server-rail .direct-conversation-header,
+  .app-frame-with-server-rail .first-agent-setup-header {
+    background: var(--openbot-bg-native-sidebar);
+  }
+
+  .app-frame-with-server-rail > .server-rail::before,
+  .app-frame-with-server-rail > .server-rail::after {
+    content: none;
+  }
+
+  .app-frame-with-server-rail > .sidebar {
+    position: relative;
+    isolation: isolate;
+    border-right: 0;
+  }
+
+  .app-frame-with-server-rail > .sidebar::before {
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--left-header-height) - 1px) 0 0 0;
+    border: 1px solid var(--openbot-border-strong);
+    border-bottom: 0;
+    border-top-left-radius: var(--openbot-radius-lg);
+    /* The border is translucent. Over the edge, not the fill, it is the same shade as the chat
+     * header's line it meets. */
+    background: var(--openbot-bg-sidebar) padding-box;
+    content: "";
+    pointer-events: none;
+  }
+
+  .app-frame-with-server-rail .sidebar-topbar {
+    border-bottom: 0;
+  }
+
+  /* The search sits as far below the panel's top line as it sits in from the side line, which
+   * keeps its corner clear of the panel's rounded one. */
+  .app-frame-with-server-rail .sidebar-search-wrap {
+    padding-top: 11px;
+  }
+
+  .app-frame-with-server-rail .sidebar-compact-search {
+    top: 11px;
+  }
+
+  .app-frame-with-server-rail .conversation-header,
+  .app-frame-with-server-rail .first-agent-setup-header {
+    border-bottom: 1px solid var(--openbot-border-strong);
+  }
+
+  /* A direct conversation's header is taller on its own, so its line would miss the panel's. */
+  .app-frame-with-server-rail .direct-conversation-header {
+    height: var(--left-header-height);
+    border-bottom: 1px solid var(--openbot-border-strong);
+  }
+
+  .app-frame-with-server-rail .direct-conversation-person .person-avatar {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* The compatibility screen has no header, so it paints the top row and its line itself. */
+  .app-frame-with-server-rail .remote-compatibility-screen {
+    background:
+      linear-gradient(var(--openbot-border-strong), var(--openbot-border-strong)) 0
+      calc(var(--left-header-height) - 1px) / 100% 1px no-repeat,
+      linear-gradient(var(--openbot-bg-native-sidebar), var(--openbot-bg-native-sidebar)) 0 0 / 100%
+      var(--left-header-height) no-repeat;
+  }
+
+  /* A side panel's header continues the top row: the chat header's height, so the lines meet, and a
+   * shadow one pixel to the left that covers the panel's left border in the row. That border then
+   * starts at the line, as the sidebar's divider does. The tabbed browser covers the whole window,
+   * so its header stays as it is. */
+  .app-frame-with-server-rail .settings-panel-header,
+  .app-frame-with-server-rail .file-preview-header,
+  .app-frame-with-server-rail .browser-preview-header {
+    height: var(--left-header-height);
+    border-bottom: 1px solid var(--openbot-border-strong);
+    background: var(--openbot-bg-native-sidebar);
+    box-shadow: -1px -1px 0 var(--openbot-bg-native-sidebar);
+  }
+
+  .app-frame-with-server-rail .account-dock-hybrid::before {
+    background:
+      linear-gradient(to bottom, transparent, var(--openbot-bg-native-sidebar) 24px) left / var(--server-rail-width)
+      100% no-repeat,
+      linear-gradient(to bottom, transparent, var(--openbot-bg-sidebar) 24px);
+  }
+}
+
 .sidebar-server-name {
   min-width: 0;
   max-width: 100%;
@@ -797,6 +896,11 @@ textarea {
 .sidebar-search-wrap {
   position: relative;
   padding: 8px 12px 6px;
+}
+
+/* The field's gap already spaces the text from the icon, so the input's own padding goes. */
+.sidebar-search-wrap .search-field input {
+  padding-inline: 0;
 }
 
 .sidebar-compact-search {
