@@ -1024,9 +1024,15 @@ function sqliteD1(database: DatabaseSync): D1Database {
     }
 
     async run() {
-      const result = database.prepare(this.sql).run(...this.values);
-      return { success: true, meta: { changes: Number(result.changes) }, results: [] };
+      // D1 counts the rows that triggers change too, like SQLite total_changes().
+      const before = totalChanges();
+      database.prepare(this.sql).run(...this.values);
+      return { success: true, meta: { changes: totalChanges() - before }, results: [] };
     }
+  }
+
+  function totalChanges() {
+    return Number(database.prepare("SELECT total_changes() AS changes").get()?.changes);
   }
 
   let batchChain = Promise.resolve();
