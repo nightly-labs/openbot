@@ -3,6 +3,7 @@ import {
   type AccountUsageLimit,
   type AccountUsageWindow,
   type AgentProviderId,
+  accountUsageCoversModel,
   agentProviderDescriptor,
   agentProviderName,
   isAgentProvider,
@@ -64,14 +65,6 @@ function usageRow(provider: AgentProviderId, limit: AccountUsageLimit | null): A
     resetsAtLabel: window ? formatUsageReset(window.resetsAt) : null,
     tone: usageTone(remainingPercent),
   };
-}
-
-/**
- * Whether the provider's account quota limits this model. OpenCode reports only the Go quota, and
- * OpenCode also runs free, custom and own-sign-in models that the Go quota does not limit.
- */
-export function accountUsageCoversModel(provider: AgentProviderId, model: string | null | undefined): boolean {
-  return provider !== "opencode" || Boolean(model?.toLowerCase().startsWith("opencode-go/"));
 }
 
 /**

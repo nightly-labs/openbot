@@ -1,5 +1,5 @@
 import { IMAGE_ATTACHMENT_ACCEPT, supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
-import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { accountUsageCoversModel, canPreviewAttachment } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -17,7 +17,6 @@ import {
   Plus,
   Puzzle,
 } from "@openbot/ui";
-import { accountUsageCoversModel } from "@openbot/ui/features/account/account-usage-view";
 import { fileBadge, formatFileSize } from "@openbot/ui/features/conversation/AttachmentCards";
 import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";

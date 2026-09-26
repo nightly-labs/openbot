@@ -11,7 +11,12 @@ import type {
   CustomProviderRestart,
   ProviderCodeLoginStart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isAgentProvider, isReasoningEffort } from "@openbot/contracts/ipc";
+import {
+  accountUsageCoversModel,
+  agentProviderDescriptor,
+  isAgentProvider,
+  isReasoningEffort,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -476,7 +481,8 @@ export class ProviderRuntime implements ProviderPort {
       return { limits: structuredClone([...collected.values()]) };
     }
     const client = this.#clients.get(scope.provider);
-    return client ? this.#refreshUsage(client, scope.model, false) : { limits: [] };
+    if (!client || !accountUsageCoversModel(scope.provider, scope.model)) return { limits: [] };
+    return this.#refreshUsage(client, scope.model, false);
   }
 
   async start(): Promise<void> {
