@@ -178,6 +178,7 @@
     "test:codex": "bun scripts/codex-doctor.ts --strict",
     "test:filesystem": "bun scripts/filesystem-smoke.ts",
     "test:imagegen": "bun scripts/filesystem-smoke.ts --provider codex --imagegen",
+    "test:workspace-only": "bun scripts/filesystem-smoke.ts --workspace-only",
     "test:storage-live": "bun scripts/provider-storage-smoke.ts",
     "test:grok-live": "bun scripts/provider-storage-smoke.ts --grok-only",
     "test:team-live": "electron scripts/team-webrtc-live-smoke-app",

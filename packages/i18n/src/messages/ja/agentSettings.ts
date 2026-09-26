@@ -80,9 +80,13 @@ export const messages = {
   "agentSettings.runtime.workspaceNote":
     "「ワークスペースのみ」は、書き込みをこのエージェントのワークスペース、共有フォルダー、一時フォルダーに制限します。読み取りとネットワークは引き続き使用できます。",
   "agentSettings.runtime.workspaceNotEnforced":
-    "{provider} はまだこれを適用しないため、このエージェントは引き続きフルアクセスを持ちます。Codex エージェントには適用されます。",
-  "agentSettings.runtime.workspaceEnforced":
-    "外部に書き込む必要があるコマンドは、自動承認がオンでも先に確認します。Computer Use と OpenBot ブラウザーは制限されません。Computer Use は下でオフにできます。",
+    "{provider} はまだこれを適用しないため、このエージェントは引き続きフルアクセスを持ちます。Codex と Claude エージェントには適用されます。",
+  "agentSettings.runtime.workspaceEnforcedCommand":
+    "外部に書き込む必要があるコマンドは、自動承認がオンでも先に確認します。",
+  "agentSettings.runtime.workspaceEnforcedClaude":
+    "外部のファイル編集は、自動承認がオンでも先に確認します。コマンドは外部に書き込めません。",
+  "agentSettings.runtime.workspaceUnlimited":
+    "Computer Use と OpenBot ブラウザーは制限されません。Computer Use は下でオフにできます。",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "このエージェントにこのコンピューターのアプリの操作を許可します",
 } as const satisfies PartialTranslation<typeof source>;

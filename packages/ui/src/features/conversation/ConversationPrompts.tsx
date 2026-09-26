@@ -109,7 +109,7 @@ export function ApprovalCard(props: {
   /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string;
 }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [submitting, setSubmitting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
@@ -151,7 +151,7 @@ export function ApprovalCard(props: {
           {t("prompt.approval.badge")}
         </Badge>
       </header>
-      <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{reason()}</p>}</Show>
+      <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{sourceText(reason())}</p>}</Show>
       <div class="approval-card-content">
         <Show when={props.approval.command}>
           {(command) => (

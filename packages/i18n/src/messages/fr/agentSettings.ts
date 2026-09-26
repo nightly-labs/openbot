@@ -82,9 +82,13 @@ export const messages = {
   "agentSettings.runtime.workspaceNote":
     "« Espace de travail uniquement » limite les écritures à l’espace de travail de cet agent, au dossier partagé et aux dossiers temporaires. La lecture et le réseau restent disponibles.",
   "agentSettings.runtime.workspaceNotEnforced":
-    "{provider} ne l’applique pas encore : cet agent a donc toujours un accès complet. Les agents Codex sont limités.",
-  "agentSettings.runtime.workspaceEnforced":
-    "Une commande qui doit écrire à l’extérieur vous demande d’abord, même quand l’approbation automatique est activée. Computer Use et le navigateur OpenBot ne sont pas limités ; vous pouvez désactiver Computer Use ci-dessous.",
+    "{provider} ne l’applique pas encore : cet agent a donc toujours un accès complet. Les agents Codex et Claude sont limités.",
+  "agentSettings.runtime.workspaceEnforcedCommand":
+    "Une commande qui doit écrire à l’extérieur vous demande d’abord, même quand l’approbation automatique est activée.",
+  "agentSettings.runtime.workspaceEnforcedClaude":
+    "Une modification de fichier à l’extérieur vous demande d’abord, même quand l’approbation automatique est activée. Une commande ne peut pas écrire à l’extérieur.",
+  "agentSettings.runtime.workspaceUnlimited":
+    "Computer Use et le navigateur OpenBot ne sont pas limités ; vous pouvez désactiver Computer Use ci-dessous.",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Autoriser cet agent à contrôler les apps de cet ordinateur",
 } as const satisfies PartialTranslation<typeof source>;

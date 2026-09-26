@@ -10,7 +10,7 @@ export const messages = {
   "marketplace.category.research": "Recherche",
   "marketplace.category.automation": "Automatisation",
   "marketplace.category.other": "Autre",
-  "marketplace.loadFailed": "Impossible de charger la place de marché.",
+  "marketplace.loadFailed": "Impossible de charger la Marketplace.",
   "marketplace.card.viewDetails": "Voir les détails de {name}",
   "marketplace.card.byCreator": "par {creator}",
   "marketplace.discover.skills": "Découvrir des compétences",
@@ -36,15 +36,15 @@ export const messages = {
   "marketplace.detail.sections": "Sections des détails",
   "marketplace.version": "Version {version}",
 
-  "marketplace.title": "Place de marché",
-  "marketplace.menu": "Menu de la place de marché",
+  "marketplace.title": "Marketplace",
+  "marketplace.menu": "Menu de la Marketplace",
   "marketplace.menu.discover": "Découvrir",
   "marketplace.menu.refresh": "Actualiser",
   "marketplace.mySubmissions": "Mes publications",
   "marketplace.addAgent": "Ajouter un agent",
   "marketplace.addSkill": "Ajouter une compétence",
-  "marketplace.close": "Fermer la place de marché",
-  "marketplace.kinds": "Types de contenu de la place de marché",
+  "marketplace.close": "Fermer la Marketplace",
+  "marketplace.kinds": "Types de contenu de la Marketplace",
   "marketplace.tab.agents": "Agents",
   "marketplace.tab.plugins": "Plugins",
   "marketplace.tab.skills": "Compétences",
@@ -56,7 +56,7 @@ export const messages = {
   "marketplace.searchPlaceholder.skills": "Rechercher par créateur ou nom de compétence",
 
   "marketplace.mine.description":
-    "Préparez une compétence ciblée et sûre, puis envoyez-la pour vérification par la place de marché.",
+    "Préparez une compétence ciblée et sûre, puis envoyez-la pour vérification par la Marketplace.",
   "marketplace.mine.choosePackage": "Choisir un dossier ou un ZIP",
   "marketplace.mine.empty":
     "Aucune publication pour l’instant. Choisissez un dossier ou un ZIP de compétence à publier.",
@@ -94,9 +94,9 @@ export const messages = {
 
   "marketplace.plugins.missing": "Ce plugin n’est pas dans le catalogue OpenBot.",
   "marketplace.plugins.browse": "Parcourir les plugins",
-  "marketplace.plugins.empty": "Les plugins ne sont pas encore dans la place de marché.",
+  "marketplace.plugins.empty": "Les plugins ne sont pas encore dans la Marketplace.",
 
-  "marketplace.agents.label": "Place de marché des agents",
+  "marketplace.agents.label": "Marketplace des agents",
   "marketplace.agents.loadingDetail": "Chargement des détails de l’agent…",
   "marketplace.agents.updating": "Mise à jour…",
   "marketplace.agents.update": "Mettre à jour l’agent",
@@ -149,7 +149,7 @@ export const messages = {
   "marketplace.error.uninstallPartial": "Une partie de {name} n’a pas pu être supprimée. {failures}",
   "marketplace.error.skillsNeedLocal": "Passez en local et créez un agent avant d’installer des compétences.",
   "marketplace.error.publishNeedsLocal": "Passez en local et choisissez un agent à publier.",
-  "marketplace.error.actionFailed": "Impossible de terminer l’action dans la place de marché. Réessayez.",
+  "marketplace.error.actionFailed": "Impossible de terminer l’action dans la Marketplace. Réessayez.",
   "marketplace.error.skillNameTaken":
     "Ce nom de compétence est déjà pris. Choisissez un autre nom dans SKILL.md, puis réessayez.",
   "marketplace.thisAgent": "cet agent",

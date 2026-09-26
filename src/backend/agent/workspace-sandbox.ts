@@ -1,13 +1,15 @@
+import { tmpdir } from "node:os";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
 
 type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
 
 /**
- * The Codex sandbox for one agent. A `workspace` agent can write only in its workspace, the shared
- * folder and the temporary folders. Reads and the network stay open, as the Access setting says. A command that must
- * write outside asks for approval, and `AttentionRegistry` always shows that approval.
+ * The sandbox mode sent with each thread. A `workspace` agent can write only in its workspace, the
+ * shared folder and the temporary folders. Reads and the network stay open, as the Access setting
+ * says. A write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
- * The other providers ignore these fields, so their agents keep full access.
+ * Codex takes the mode itself. The Claude client reads `workspace-write` and applies its own
+ * sandbox (`claude-workspace-sandbox.ts`). Grok and OpenCode ignore it, so their agents keep full access.
  */
 export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "danger-full-access" {
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
@@ -22,6 +24,14 @@ export type CodexSandboxPolicy =
       excludeTmpdirEnvVar: boolean;
       excludeSlashTmp: boolean;
     };
+
+/**
+ * The temporary folders that a Workspace only agent may write on every provider, as Codex allows them
+ * (`$TMPDIR` and `/tmp`). Compilers, package managers, test runners and the providers need them.
+ */
+export function workspaceTemporaryPaths(platform: NodeJS.Platform = process.platform): string[] {
+  return [...new Set(platform === "win32" ? [tmpdir()] : ["/tmp", tmpdir()])];
+}
 
 /** Sent with each turn. Codex keeps it for the turns after, so a changed setting applies at the next turn. */
 export function codexSandboxPolicy(agent: SandboxedAgent, sharedRoot: string): CodexSandboxPolicy {

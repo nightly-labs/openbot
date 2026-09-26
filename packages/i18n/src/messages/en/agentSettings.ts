@@ -80,9 +80,13 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.workspaceNote":
     "Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders. Reads and network stay available.",
   "agentSettings.runtime.workspaceNotEnforced":
-    "{provider} does not enforce it yet, so this agent still has full access. Codex agents are enforced.",
-  "agentSettings.runtime.workspaceEnforced":
-    "A command that must write outside asks you first, also when Auto approve is on. Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.",
+    "{provider} does not enforce it yet, so this agent still has full access. Codex and Claude agents are enforced.",
+  "agentSettings.runtime.workspaceEnforcedCommand":
+    "A command that must write outside asks you first, also when Auto approve is on.",
+  "agentSettings.runtime.workspaceEnforcedClaude":
+    "A file edit outside asks you first, also when Auto approve is on. A command cannot write outside.",
+  "agentSettings.runtime.workspaceUnlimited":
+    "Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Let this agent control apps on this computer",
 });

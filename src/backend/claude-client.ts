@@ -19,6 +19,13 @@ import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from
 import { sourceText } from "@openbot/i18n/source";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import {
+  CLAUDE_WORKSPACE_MANAGED_SETTINGS,
+  claudeWorkspaceHooks,
+  claudeWorkspaceSandbox,
+  claudeWorkspaceSkillPlugin,
+  claudeWriteOutsideRoots,
+} from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
@@ -70,6 +77,11 @@ interface ThreadConfig {
   profileGeneration: boolean;
   /** Part of the config so that a change restarts the query with the new servers. */
   computerUse: boolean;
+  /**
+   * Workspace only: Bash runs in the Claude sandbox, a file write outside the roots asks the user, and
+   * the project settings do not load. See `claude-workspace-sandbox.ts`.
+   */
+  workspaceOnly: boolean;
 }
 
 interface ActiveTurn {
@@ -158,6 +170,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #reportMcpDrops: McpDropReporter | undefined;
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
+  /** Where a Workspace only query keeps its skill plugin. Without it, such a query has no workspace skills. */
+  readonly #stateDirectory: string | undefined;
   /** Threads whose process was closed for being idle keep the config that resumes them. */
   readonly #threads = new IdleThreadPool<ThreadRuntime, ThreadConfig>({
     releaseAfterMs: CLAUDE_THREAD_IDLE_RELEASE_MS,
@@ -184,6 +198,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
     mcpAuthorization?: McpAuthorizationSource,
+    stateDirectory?: string,
   ) {
     super();
     this.#cli = cli;
@@ -194,6 +209,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#reportMcpDrops = reportMcpDrops;
     this.#mcpToolRuntimes = mcpToolRuntimes;
     this.#mcpAuthorization = mcpAuthorization;
+    this.#stateDirectory = stateDirectory;
   }
 
   get running(): boolean {
@@ -470,6 +486,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = async (toolName, toolInput, options) => {
       if (config.profileGeneration) return { behavior: "deny", message: "Profile generation has no tools." };
+      if (config.workspaceOnly) {
+        const outside = await claudeWriteOutsideRoots(toolName, toolInput, config.cwd, config.additionalDirectories);
+        if (outside) return this.#requestWriteApproval(threadId, outside, toolInput, options.toolUseID ?? randomUUID());
+      }
       if (toolName !== "AskUserQuestion") {
         return { behavior: "allow", updatedInput: toolInput } satisfies PermissionResult;
       }
@@ -487,6 +507,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             this.#mcpAuthorization,
           ),
         );
+    const skillPlugin =
+      config.workspaceOnly && this.#stateDirectory
+        ? await claudeWorkspaceSkillPlugin(this.#stateDirectory, config.cwd)
+        : null;
     // `stop()` may have run during the await: a query created now would outlive the client.
     if (!this.#running) throw new Error("Claude Agent SDK is not running.");
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
@@ -511,18 +535,27 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // that option.
         ...(claudeTakesPromptSnapshotFlag(this.#cli.version) ? { extraArgs: { "system-prompt-snapshot": "off" } } : {}),
         ...(config.profileGeneration ? { tools: [] } : {}),
-        settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
+        settingSources: config.profileGeneration ? [] : config.workspaceOnly ? ["user"] : ["user", "project", "local"],
         // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
         // settings, plugin and agent-frontmatter servers into the record above, so two computers
         // with the same OpenBot settings give their agents different tools and "which servers does
-        // my agent have" has no answer. `settingSources` stays as it is: the flag takes away MCP
-        // and nothing else, so permissions and hooks still load from those files.
+        // my agent have" has no answer. The flag takes away MCP and nothing else, so permissions and
+        // hooks still load from those files. Workspace only loads the user settings alone: see
+        // `claude-workspace-sandbox.ts`.
         strictMcpConfig: true,
         permissionMode: "default",
         includePartialMessages: true,
         persistSession: config.persistSession,
         additionalDirectories: config.additionalDirectories,
         canUseTool,
+        ...(config.workspaceOnly
+          ? {
+              sandbox: claudeWorkspaceSandbox(config.additionalDirectories),
+              hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories),
+              managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
+              plugins: skillPlugin ? [skillPlugin] : [],
+            }
+          : {}),
         mcpServers,
         env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
       },
@@ -1080,6 +1113,26 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
   }
 
+  /**
+   * A Workspace only agent's file write outside its roots, shown as a file-change approval. The
+   * approval registry never answers it without the user, as for a Codex write outside the sandbox.
+   */
+  async #requestWriteApproval(
+    threadId: string,
+    path: string,
+    toolInput: DynamicRecord,
+    toolUseId: string,
+  ): Promise<PermissionResult> {
+    const result = await this.#serverRequests.call("item/fileChange/requestApproval", {
+      threadId,
+      turnId: this.#threads.get(threadId)?.activeTurn?.id ?? randomUUID(),
+      itemId: toolUseId,
+      reason: sourceText("status.agent.claudeWriteOutside", { path }),
+    });
+    if (isRecord(result) && result.decision === "accept") return { behavior: "allow", updatedInput: toolInput };
+    return { behavior: "deny", message: "The user did not allow this write outside the workspace." };
+  }
+
   #requireThread(threadId: string): ThreadRuntime {
     const runtime = this.#threads.get(threadId);
     if (!runtime) throw new Error(`Unknown Claude thread: ${threadId}`);
@@ -1201,6 +1254,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     persistSession: !isRecord(params) || params.persistSession !== false,
     profileGeneration: isRecord(params) && params.profileGeneration === true,
     computerUse: computerUseParam(params),
+    workspaceOnly: isRecord(params) && params.sandbox === "workspace-write",
   };
 }
 

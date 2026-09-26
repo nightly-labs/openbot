@@ -106,6 +106,11 @@ export interface ProviderClientContext {
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
    */
   servesModel?(modelId: string): boolean;
+  /**
+   * A folder OpenBot owns for files it gives a provider process, outside every root an agent can
+   * write. Optional for the same reason as `reportMcpDrops`.
+   */
+  readonly providerStateDirectory?: string;
 }
 
 /** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
@@ -169,6 +174,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.reportMcpDrops,
         context.mcpToolRuntimes,
         context.mcpAuthorization,
+        context.providerStateDirectory,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,

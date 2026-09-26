@@ -971,7 +971,7 @@ export function ApprovalContent(props: {
   allowDesktopReview?: boolean;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const openInOpenBot = () =>
     props.onAction({
       type: "review-attention",
@@ -993,7 +993,7 @@ export function ApprovalContent(props: {
       <DynamicIslandIdentity
         name={props.item.agent.name}
         status={t("island.status.needsApproval")}
-        description={props.item.approval.reason ?? props.item.detail ?? t("island.approval.fallback")}
+        description={sourceText(props.item.approval.reason ?? props.item.detail ?? t("island.approval.fallback"))}
       />
       <IslandContentSwap contentKey={`${props.item.requestId}:${props.item.detail ?? ""}`} block>
         <div class="dynamic-island-surface-request-copy" data-island-motion-content>

@@ -867,7 +867,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     provider: agentProviderName(draft.runtime.provider),
                   })}
                 >
-                  {t("agentSettings.runtime.workspaceEnforced")}
+                  {draft.runtime.provider === "claude"
+                    ? t("agentSettings.runtime.workspaceEnforcedClaude")
+                    : t("agentSettings.runtime.workspaceEnforcedCommand")}{" "}
+                  {t("agentSettings.runtime.workspaceUnlimited")}
                 </Show>
               </Show>
             </Text>

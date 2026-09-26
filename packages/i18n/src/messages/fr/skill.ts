@@ -6,7 +6,7 @@ export const messages = {
   "skill.close": "Fermer les compétences",
   "skill.detailsDescription": "Détails de {name}",
   "skill.assignedDescription": "Compétences attribuées à {name}",
-  "skill.addFromMarketplace": "Ajouter depuis la marketplace",
+  "skill.addFromMarketplace": "Ajouter depuis la Marketplace",
   "skill.limitReached":
     "Cet agent a atteint la limite de {limit} compétences. Retirez une compétence avant d’en ajouter une autre.",
   "skill.managedOnHost": "Les compétences de cet agent sont gérées sur l’hôte.",
