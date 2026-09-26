@@ -122,7 +122,11 @@ export interface WebWorkspaceRuntime {
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
   search(agentId: string, query: string, cursor?: string): Promise<ConversationSearchPage>;
-  dispose(): Promise<void>;
+  /**
+   * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
+   * does. The browser then sends no end request, which the revoked cookie would only have refused.
+   */
+  dispose(options?: { sessionsEnded?: boolean }): Promise<void>;
 }
 
 export interface WebRuntimeEvents {
@@ -153,10 +157,13 @@ export function createWebWorkspaceRuntime(
       set: async (id, key) => localStorage.setItem(`openbot.web.host-key:${accountId}:${id}`, key),
     },
   });
+  let sessionsEnded = false;
   const peer = dependencies.createPeer({
     current: {
       getBootstrap: (id, key, sessionId) => directory.createBootstrap(id, key, sessionId),
-      endSession: (id) => directory.endSession(id),
+      endSession: async (id) => {
+        if (!sessionsEnded) await directory.endSession(id);
+      },
       onConnectionUpdate: async (update) => {
         if (update.state !== "online") {
           const releaseGeneration = liveViewGeneration + 1;
@@ -625,7 +632,8 @@ export function createWebWorkspaceRuntime(
       });
       return { results, total: value.total, nextCursor: value.nextCursor };
     },
-    async dispose() {
+    async dispose(options) {
+      if (options?.sessionsEnded) sessionsEnded = true;
       await discardCompletedDrafts();
       await releaseLiveView();
       browserView.disconnect();

@@ -44,7 +44,13 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   let channel: BroadcastChannel | null = null;
   let disposed = false;
   let sessionGeneration = 0;
-  function clearSession() {
+  /**
+   * The cookie's account session has ended. The server ended its remote sessions in the same write
+   * (`endAccountSession`), so the closing workspace does not end them again.
+   */
+  let sessionEnded = false;
+  function clearSession(ended = true) {
+    sessionEnded = ended;
     sessionGeneration += 1;
     setState((draft) => {
       draft.account = null;
@@ -133,11 +139,13 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     const generation = sessionGeneration;
     try {
       const account = accountFrom(await request("session"));
-      if (!disposed && generation === sessionGeneration)
+      if (!disposed && generation === sessionGeneration) {
+        sessionEnded = false;
         setState((draft) => {
           draft.account = account;
           draft.error = null;
         });
+      }
     } catch (error) {
       if (!disposed && generation === sessionGeneration)
         setState((draft) => {
@@ -193,6 +201,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     if (value === null) return;
     const account = accountFrom(value);
     sessionGeneration += 1;
+    sessionEnded = false;
     channel?.postMessage("session-changed");
     setState((draft) => {
       draft.account = account;
@@ -211,8 +220,9 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       void checkSession();
     };
     void checkSession();
+    // A page restored from the back-forward cache still has its session; its connection ends normally.
     const restore = () => {
-      clearSession();
+      clearSession(false);
       void checkSession();
     };
     window.addEventListener("pageshow", restore);
@@ -257,6 +267,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                 accountAvatarUrl={state.account?.avatarUrl ?? null}
                 accountFetch={accountFetch}
                 onSessionCheck={checkSession}
+                accountSessionEnded={() => sessionEnded}
                 onLogout={() => action(logout)}
                 createRuntime={props.createRuntime}
                 agentTemplateId={agentTemplateId()}
