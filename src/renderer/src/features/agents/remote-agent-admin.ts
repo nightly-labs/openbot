@@ -1,8 +1,16 @@
-import type { AgentAdminSettings, ServerSummary, UpdateAgentAdminSettingsInput } from "@openbot/contracts/ipc";
+import type {
+  AgentAdminSettings,
+  ServerSummary,
+  UpdateAgentAdminSettingsInput,
+  UpdateAgentInput,
+} from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { createEffect, createStore } from "solid-js";
 import { serverCanAdminister } from "../servers/server-capabilities";
-import { agentsPort } from "./agents-port";
+import { type AgentsPort, agentsPort } from "./agents-port";
+
+/** The two host calls. The web client, which has no `window.openbot`, sends them over its own connection. */
+export type RemoteAgentAdminCalls = Pick<AgentsPort["agent"], "getAgentAdminSettings" | "updateAgentAdminSettings">;
 
 /** A joined server where this account may change agent access and auto-approve. */
 export function serverCanAdministerAgents(server: ServerSummary | undefined): server is ServerSummary {
@@ -19,7 +27,10 @@ interface RemoteAgentAdminState {
  * agents keep reading the agent summary and the local approval preference, so the target is null
  * for them. The Team API agent summary does not carry either value.
  */
-export function createRemoteAgentAdmin(target: () => { server: ServerSummary; agentId: string } | null) {
+export function createRemoteAgentAdmin(
+  target: () => { server: ServerSummary; agentId: string } | null,
+  calls: () => RemoteAgentAdminCalls = () => agentsPort().agent,
+) {
   const [state, setState] = createStore<RemoteAgentAdminState>({ key: null, settings: null });
   const key = () => {
     const current = target();
@@ -43,8 +54,8 @@ export function createRemoteAgentAdmin(target: () => { server: ServerSummary; ag
     });
     const current = target();
     if (!requestKey || !current) return;
-    agentsPort()
-      .agent.getAgentAdminSettings(current.agentId, current.server.id)
+    calls()
+      .getAgentAdminSettings(current.agentId, current.server.id)
       .then((settings) => accept(requestKey, settings))
       // A failed read keeps the controls hidden, as for a member. The host checks the role on every write anyway.
       .catch(() => undefined);
@@ -62,8 +73,25 @@ export function createRemoteAgentAdmin(target: () => { server: ServerSummary; ag
       const server = target()?.server;
       if (!serverCanAdministerAgents(server) || server.kind !== "remote")
         throw new Error("Agent settings can only be changed by a server administrator.");
-      const settings = await agentsPort().agent.updateAgentAdminSettings(input, server.id);
+      const settings = await calls().updateAgentAdminSettings(input, server.id);
       accept(JSON.stringify([server.id, input.agentId]), settings);
     },
   };
 }
+
+/**
+ * Sends a profile change to an agent of a joined server. The Team API agent route ignores access,
+ * so access goes to the host's admin route and the other fields keep the agent route.
+ */
+export async function updateRemoteAgent(
+  admin: Pick<RemoteAgentAdmin, "update">,
+  input: UpdateAgentInput,
+  updateProfile: (input: UpdateAgentInput) => Promise<void>,
+): Promise<void> {
+  const { access, agentId, ...fields } = input;
+  if (access === undefined) return updateProfile(input);
+  await admin.update({ agentId, access });
+  if (Object.keys(fields).length) await updateProfile({ agentId, ...fields });
+}
+
+export type RemoteAgentAdmin = ReturnType<typeof createRemoteAgentAdmin>;

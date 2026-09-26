@@ -2,11 +2,11 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AttachmentImportEvent, type AttachmentSummary, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
+import { createWebFileSaver } from "./web-file-download";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId: () => string): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const urls = new Set<string>();
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
     if (!importing) return;
@@ -23,19 +23,12 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
+  const save = createWebFileSaver();
   async function download(id: string) {
-    const file = await remote.download(id);
-    const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
-    urls.add(url);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    link.click();
+    save(await remote.download(id));
   }
   onCleanup(() => {
     void cancelImportFiles();
-    for (const url of urls) URL.revokeObjectURL(url);
   });
   return {
     agent: {

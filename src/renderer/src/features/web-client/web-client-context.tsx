@@ -13,6 +13,7 @@ import type {
   RespondToPromptInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  TeamPresenceSnapshot,
 } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
@@ -43,6 +44,8 @@ interface WebWorkspaceState {
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
+  /** Who is on the connected host. Null until the host answers. */
+  presence: TeamPresenceSnapshot | null;
   capabilities: string[];
   status: "connecting" | "online" | "offline";
   hostsLoaded: boolean;
@@ -82,6 +85,7 @@ export function createWebWorkspace(props: {
     browserTabs: [],
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
+    presence: null,
     capabilities: [],
     status: "offline",
     hostsLoaded: false,
@@ -106,6 +110,8 @@ export function createWebWorkspace(props: {
   let reloadPromise: Promise<void> | null = null;
   let hostsRefreshPromise: Promise<void> | null = null;
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
+  /** Set when a revoked session connects again by itself; cleared when the host is online. */
+  let revokedReconnect = false;
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -147,18 +153,42 @@ export function createWebWorkspace(props: {
             draft.sidebarLayout = defaultSidebarLayout();
             draft.sidebarCollapsedSectionIds = [];
             draft.capabilities = [];
+            draft.presence = null;
             draft.duplicatingAgentIds = [];
           });
+          const revokedHostId = hostId;
+          const revokedGeneration = generation;
           void props
             .onSessionCheck()
             .then(() => refreshHosts())
+            .then(() => {
+              // A member or role change anywhere on the host revokes every session, this one
+              // too. The directory still lists the host, so this account can connect again.
+              // Try once: a second revocation before the host is online waits for Reconnect.
+              const host = state.host;
+              if (
+                disposed ||
+                revokedReconnect ||
+                hostId !== revokedHostId ||
+                generation !== revokedGeneration ||
+                host?.hostId !== revokedHostId
+              )
+                return;
+              revokedReconnect = true;
+              return connect(host);
+            })
             .catch(report);
           return;
         }
+        if (update.state === "online") revokedReconnect = false;
         if (update.state === "online" && update.resync) void resync();
       },
       event(id, event) {
         if (disposed || id !== hostId) return;
+        if (event.type === "team-presence")
+          setState((draft) => {
+            draft.presence = event.snapshot;
+          });
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
@@ -351,7 +381,13 @@ export function createWebWorkspace(props: {
           });
           await runtime.disconnect().catch(() => undefined);
         }
+        const connected = hosts.find((host) => host.hostId === hostId);
         setState((draft) => {
+          // The connected host is a copy from `connect`. An admin can rename it while connected.
+          if (connected && draft.host?.hostId === connected.hostId) {
+            draft.host.name = connected.name;
+            draft.host.logoKey = connected.logoKey;
+          }
           draft.hosts = hosts;
           draft.hostsLoaded = true;
           draft.hostsError = null;
@@ -438,6 +474,7 @@ export function createWebWorkspace(props: {
       draft.sidebarLayout = defaultSidebarLayout();
       draft.duplicatingAgentIds = [];
       draft.capabilities = [];
+      draft.presence = null;
       draft.error = null;
     });
     try {
@@ -451,6 +488,7 @@ export function createWebWorkspace(props: {
         ),
       ]);
       if (disposed || current !== generation) return;
+      revokedReconnect = false;
       setState((draft) => {
         draft.capabilities = capabilities;
         draft.agents = agents;
@@ -459,6 +497,16 @@ export function createWebWorkspace(props: {
         draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
+      // Presence only names people. A host that does not answer leaves the list empty.
+      void runtime.admin?.team.getPresence().then(
+        (presence) => {
+          if (!disposed && current === generation && !state.presence)
+            setState((draft) => {
+              draft.presence = presence;
+            });
+        },
+        () => undefined,
+      );
       const first = agents.find((agent) => agent.id === previousSelected) ?? agents[0];
       if (first) await select(first.id);
     } catch (error) {

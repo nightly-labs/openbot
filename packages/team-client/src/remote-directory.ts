@@ -1,5 +1,13 @@
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createInviteUrl, inviteUseCount, isPermanentInvite, parseInviteUrl } from "@openbot/contracts/invite-links";
+import {
+  createInviteUrl,
+  type InviteLinkOptions,
+  inviteUseCount,
+  isPermanentInvite,
+  OPENBOT_CONTROL_PLANE_ORIGIN,
+  OPENBOT_INVITE_ORIGIN,
+  parseInviteUrl,
+} from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -21,6 +29,9 @@ export interface RemoteTeamMember {
   name: string | null;
   role: "owner" | "admin" | "member";
   status: "active" | "revoked";
+  avatarUrl?: string | null;
+  /** Epoch milliseconds. */
+  createdAt?: number;
 }
 
 export interface RemoteTeamInvite {
@@ -78,6 +89,7 @@ export class RemoteTeamDirectoryClient {
   readonly #fetch: TeamClientFetch;
   readonly #hostKeys: RemoteHostKeyStore;
   readonly #pairedHost: MobileConnectHostBinding | undefined;
+  readonly #inviteLinks: InviteLinkOptions;
   #pinTail: Promise<void> = Promise.resolve();
 
   constructor(
@@ -86,6 +98,8 @@ export class RemoteTeamDirectoryClient {
       fetch: TeamClientFetch;
       hostKeys?: RemoteHostKeyStore;
       pairedHost?: MobileConnectHostBinding;
+      /** A development client passes `allowLocalDevelopmentApiUrl` to use a local account service. */
+      inviteLinks?: InviteLinkOptions;
     } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
   ) {
     this.#apiUrl = input.apiUrl;
@@ -93,6 +107,7 @@ export class RemoteTeamDirectoryClient {
     this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
+    this.#inviteLinks = input.inviteLinks ?? {};
     const keys = new Map<string, string>();
     this.#hostKeys = input.hostKeys ?? {
       get: async (hostId) => keys.get(hostId) ?? null,
@@ -164,12 +179,12 @@ export class RemoteTeamDirectoryClient {
     if (input.permanent && input.email) throw new Error("Permanent invitations cannot be sent by email.");
     // Validate the URL before creating an invitation.
     const payload = {
-      apiUrl: new URL(this.#apiUrl).toString(),
+      apiUrl: this.#inviteApiUrl(),
       serverId: host.hostId,
       fingerprint: remoteHostFingerprint(host.devicePublicKey),
       token: "x".repeat(32),
     };
-    createInviteUrl(payload);
+    createInviteUrl(payload, this.#inviteLinks);
     const value = await this.#request(`/v2/remote/hosts/${encodeURIComponent(host.hostId)}/invites`, {
       method: "POST",
       body: input,
@@ -178,7 +193,7 @@ export class RemoteTeamDirectoryClient {
       throw new Error("The invitation is invalid.");
     return {
       inviteId: value.inviteId,
-      inviteUrl: createInviteUrl({ ...payload, token: value.token }),
+      inviteUrl: createInviteUrl({ ...payload, token: value.token }, this.#inviteLinks),
       expiresAt: value.expiresAt,
     };
   }
@@ -265,12 +280,24 @@ export class RemoteTeamDirectoryClient {
     }
   }
 
+  /**
+   * The account service an invitation names. The public website serves the same Worker as
+   * `api.openbot.run`, but an invitation must name `api.openbot.run`: the desktop and mobile apps
+   * accept only that address.
+   */
+  #inviteApiUrl(): string {
+    const url = new URL(this.#apiUrl);
+    return this.#authentication.kind === "browser" && url.origin === OPENBOT_INVITE_ORIGIN
+      ? new URL(OPENBOT_CONTROL_PLANE_ORIGIN).toString()
+      : url.toString();
+  }
+
   async endSession(sessionId: string): Promise<void> {
     await this.#request(`/v2/remote/sessions/${encodeURIComponent(sessionId)}/end`, { method: "POST" });
   }
 
   async previewInvite(inviteUrl: string): Promise<RemoteInvitePreview> {
-    const invite = parseInviteUrl(inviteUrl);
+    const invite = parseInviteUrl(inviteUrl, this.#inviteLinks);
     const inviteOrigin = new URL(invite.apiUrl).origin;
     const origin = new URL(this.#apiUrl).origin;
     // These production origins serve the same account Worker. Requests still use this client's origin.
@@ -294,7 +321,7 @@ export class RemoteTeamDirectoryClient {
   }
 
   async acceptInvite(inviteUrl: string): Promise<RemoteTeamHost> {
-    const invite = parseInviteUrl(inviteUrl);
+    const invite = parseInviteUrl(inviteUrl, this.#inviteLinks);
     const preview = await this.previewInvite(inviteUrl);
     if (!preview.devicePublicKey) throw new Error("The invitation host key is missing.");
     // Save the pin before consuming the one-use token, including across app restarts.
@@ -413,6 +440,8 @@ function decodeMember(value: unknown): RemoteTeamMember {
     name: value.name,
     role: value.role,
     status: value.status,
+    ...(value.avatarUrl === null || isString(value.avatarUrl) ? { avatarUrl: value.avatarUrl } : {}),
+    ...(isNumber(value.createdAt) ? { createdAt: value.createdAt } : {}),
   };
 }
 
