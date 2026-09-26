@@ -1,9 +1,9 @@
 import { type ButtonRootProps, Root } from "@kobalte/core/button";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
+import { cx } from "@openbot/ui/utils";
 import { createLink } from "@tanstack/solid-router";
 import { cva, type VariantProps } from "class-variance-authority";
 import { omit } from "solid-js";
-import { cx } from "../../lib/utils";
 
 const buttonVariants = cva("landing-button", {
   variants: {

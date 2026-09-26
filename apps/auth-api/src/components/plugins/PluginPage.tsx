@@ -1,4 +1,4 @@
-import { createOpenBotPluginUrl } from "@openbot/contracts/plugin-links";
+import { createOpenBotPluginUrl, pluginLinkText } from "@openbot/contracts/plugin-links";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
@@ -8,7 +8,6 @@ import {
   PLUGIN_INDEX_ROUTE,
   pluginCategoryLabel,
   pluginExternalHref,
-  pluginLinkText,
   pluginPath,
   pluginSkills,
   type SitePlugin,

@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { type Accessor, createSignal, onSettled } from "solid-js";
 
 export interface LandingRevealOptions {
@@ -12,8 +13,7 @@ export function createLandingReveal(
 
   onSettled(() => {
     const element = getElement();
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (!element || reducedMotion || !globalThis.IntersectionObserver) {
+    if (!element || prefersReducedMotion() || !globalThis.IntersectionObserver) {
       setRevealed(true);
       return;
     }

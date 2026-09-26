@@ -1,9 +1,8 @@
+import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import type { ShaderMount } from "@paper-design/shaders";
 import { createMemo, createSignal, onSettled } from "solid-js";
 import { articleGradient, articleGradientCss, articleGradientUniforms } from "../../lib/article-gradient";
 import { articleArtPath, type ContentArtShape, type ContentCollection } from "../../lib/content-collection";
-import { motionWelcome } from "../../lib/motion";
-import { cx } from "../../lib/utils";
 
 // Three layers, cheapest first: a CSS gradient that server-renders, the PNG baked
 // at build time over it, and — for the featured card, article artwork, or a card
@@ -268,7 +267,9 @@ export function ArticleGradient(props: ArticleGradientProps) {
   onSettled(() => {
     const wantsArt = props.art?.shape === "card";
     const wantsPrime =
-      motionWelcome() && props.mode === "hover" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
+      !prefersReducedMotion() &&
+      props.mode === "hover" &&
+      !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
     // One observer does both jobs a card below the fold must wait on: putting
     // the PNG URL on, and drawing the exact first frame. Featured artwork skips
     // this and primes at once.
@@ -281,7 +282,7 @@ export function ArticleGradient(props: ArticleGradientProps) {
         : undefined;
 
     // Nothing will move, so the baked still is the whole picture.
-    if (!motionWelcome()) return stopWatching;
+    if (prefersReducedMotion()) return stopWatching;
 
     if (props.mode === "live") {
       // The still is painted first and the animation starts from it, so the

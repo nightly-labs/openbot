@@ -46,6 +46,20 @@ export function createOpenBotPluginUrl(slug: string): string {
 }
 
 /**
+ * What a listing's link row shows: the address without the scheme and the `www.` a reader does not
+ * need. The path stays, because a listing's three links usually differ only there. The app and the
+ * public plugin page both use it, so the two read alike.
+ */
+export function pluginLinkText(url: string): string {
+  try {
+    const { host, pathname } = new URL(url);
+    return `${host.replace(/^www\./, "")}${pathname === "/" ? "" : pathname.replace(/\/$/, "")}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * The slug a plugin link names, in either form. Throws for anything else, so a caller that wants a
  * decision rather than a value uses `isPluginUrl`.
  */

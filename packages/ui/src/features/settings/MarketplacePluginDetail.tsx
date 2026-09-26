@@ -11,6 +11,7 @@
  * plugin's examples and a skill's example are the same offer, so they read the same way.
  */
 
+import { pluginLinkText } from "@openbot/contracts/plugin-links";
 import {
   ArrowRight,
   Badge,
@@ -55,19 +56,6 @@ export function PluginIcon(props: { iconUrl: string | null; fallback?: "plugin" 
       </Show>
     </span>
   );
-}
-
-/**
- * What a link row shows: the address without the scheme and the `www.` a reader does not need. The
- * path stays, because a listing's three links usually differ only there.
- */
-function linkText(url: string) {
-  try {
-    const { host, pathname } = new URL(url);
-    return `${host.replace(/^www\./, "")}${pathname === "/" ? "" : pathname.replace(/\/$/, "")}`;
-  } catch {
-    return url;
-  }
 }
 
 /**
@@ -130,7 +118,7 @@ export function MarketplacePluginDetail(props: {
       { label: t("plugin.link.terms"), url: props.plugin.termsUrl },
     ]
       .filter((link): link is { label: string; url: string } => Boolean(link.url))
-      .map((link) => ({ ...link, text: linkText(link.url), name: `${link.label}: ${linkText(link.url)}` })),
+      .map((link) => ({ ...link, text: pluginLinkText(link.url), name: `${link.label}: ${pluginLinkText(link.url)}` })),
   );
 
   return (
