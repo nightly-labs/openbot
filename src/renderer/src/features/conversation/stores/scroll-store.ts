@@ -76,12 +76,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       const rows = timelineRows();
       return {
         identity: `${deps.props.server?.id ?? "local"}:${deps.props.agent?.id ?? ""}`,
+        rows,
         length: rows.length,
         lastId: rows.at(-1)?.id,
       };
     },
-    ({ identity }) => {
-      const rows = timelineRows();
+    ({ identity, rows }) => {
       if (identity !== talliedConversationIdentity) {
         talliedConversationIdentity = identity;
         newMessages = anchorNewMessages(rows);

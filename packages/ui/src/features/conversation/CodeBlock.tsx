@@ -1,6 +1,6 @@
 import { Button, Check, Copy } from "@openbot/ui";
 import { type ShjLanguage, type ShjToken, tokenize } from "@speed-highlight/core";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import type { MessageCodeBlock } from "./DataTable";
 
 interface CodeToken {
@@ -106,7 +106,7 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
 };
 
 export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean }) {
-  const [lines, setLines] = createSignal<CodeLine[]>(plainCodeLines(props.block.code));
+  const [lines, setLines] = createSignal<CodeLine[]>(untrack(() => plainCodeLines(props.block.code)));
   const [copied, setCopied] = createSignal(false);
   let highlightRun = 0;
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;

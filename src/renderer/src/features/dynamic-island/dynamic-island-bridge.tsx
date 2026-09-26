@@ -1,7 +1,7 @@
 import type { DynamicIslandAction } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
-import { createEffect, onSettled } from "solid-js";
+import { createEffect, onSettled, untrack } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -76,7 +76,9 @@ export function DynamicIslandBridge() {
     },
     (input) => {
       if (!input) return;
-      dynamicIslandCoordinator.replaceServer(input);
+      // The coordinator reads the agent and message stores once; the compute above decides
+      // when it reads them again.
+      untrack(() => dynamicIslandCoordinator.replaceServer(input));
       publishDynamicIslandPresentation();
     },
   );

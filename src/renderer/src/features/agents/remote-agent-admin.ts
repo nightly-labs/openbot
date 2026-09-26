@@ -5,7 +5,7 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { serverCanAdminister } from "../servers/server-capabilities";
 import { type AgentsPort, agentsPort } from "./agents-port";
 
@@ -52,7 +52,7 @@ export function createRemoteAgentAdmin(
       draft.key = null;
       draft.settings = null;
     });
-    const current = target();
+    const current = untrack(target);
     if (!requestKey || !current) return;
     calls()
       .getAgentAdminSettings(current.agentId, current.server.id)

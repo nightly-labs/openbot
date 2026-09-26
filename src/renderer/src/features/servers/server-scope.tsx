@@ -1,5 +1,5 @@
 import { errorMessage } from "@openbot/ui/error-message";
-import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled } from "solid-js";
+import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -195,9 +195,10 @@ const ServerScope = createSimpleContext({
 
     createEffect(
       () => serverLoadRequest(),
-      (request) => {
-        if (request?.serverId === activeServerId()) loadWorkspace();
-      },
+      (request) =>
+        untrack(() => {
+          if (request?.serverId === activeServerId()) loadWorkspace();
+        }),
     );
 
     // "Select this agent once you are on its server" - written before the switch

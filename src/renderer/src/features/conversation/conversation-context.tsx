@@ -8,7 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { errorMessage } from "@openbot/ui/error-message";
-import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
+import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
@@ -165,7 +165,7 @@ const Conversation = createSimpleContext({
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, openRevision: agentChatOpenRevision() }),
       ({ agentId }) => {
         if (!agentId) return;
-        const serverId = activeServerId();
+        const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
         conversationPageRequests.set(agentId, pageRequest);

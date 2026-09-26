@@ -30,9 +30,10 @@ const STATIC_CHAT_LIMIT = 100;
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
 ): ChatVirtualizer<TItemElement> {
-  const initialCount = options.count();
+  // The first rows only; the effect below tracks the count, keys and margin from here on.
+  const initialCount = untrack(options.count);
   const [virtualItems, setVirtualItems] = createSignal<VirtualItem[]>(
-    fallbackItems(initialCount, options.estimateSize, options.getItemKey, options.scrollMargin()),
+    untrack(() => fallbackItems(initialCount, options.estimateSize, options.getItemKey, options.scrollMargin())),
   );
   const [totalSize, setTotalSize] = createSignal(initialCount * options.estimateSize(0));
   const stableItems = new Map<VirtualItem["key"], { item: VirtualItem; update: (next: VirtualItem) => void }>();
@@ -100,19 +101,22 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
       };
     },
     ({ count, scrollMargin }) => {
-      virtualizer.setOptions({
-        ...virtualizer.options,
-        count,
-        getScrollElement: options.getScrollElement,
-        estimateSize: options.estimateSize,
-        getItemKey: options.getItemKey,
-        scrollMargin,
-        onChange: (instance) => {
-          scheduleRefresh();
-          untrack(() => options.onChange?.(instance));
-        },
+      // The virtualizer calls `getItemKey` here; `keyVersion` above is what tracks the keys.
+      untrack(() => {
+        virtualizer.setOptions({
+          ...virtualizer.options,
+          count,
+          getScrollElement: options.getScrollElement,
+          estimateSize: options.estimateSize,
+          getItemKey: options.getItemKey,
+          scrollMargin,
+          onChange: (instance) => {
+            scheduleRefresh();
+            untrack(() => options.onChange?.(instance));
+          },
+        });
+        virtualizer._willUpdate();
       });
-      virtualizer._willUpdate();
       scheduleRefresh();
     },
   );

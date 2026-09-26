@@ -1,7 +1,7 @@
 import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { Button, Download, RefreshCw, Spinner } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { createDigitRoll } from "../../digit-roll";
 import { errorMessage as formatErrorMessage } from "../../error-message";
 import { rendererDuration } from "../conversation/activity-timing";
@@ -118,7 +118,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
         setPresent(true);
         return;
       }
-      if (!present()) return;
+      if (!untrack(present)) return;
       const closeDuration = islandCloseDuration();
       if (closeDuration === 0) {
         setPresent(false);

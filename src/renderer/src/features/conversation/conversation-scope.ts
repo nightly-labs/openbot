@@ -749,7 +749,7 @@ export function createConversationViewScope(props: ConversationProps) {
     (agent) => {
       if (!agent) return;
       const pendingSettings = resources.runtimeSettingsAttempts.get(
-        agentConversationKey(props.server?.id ?? "local", props.agent?.id ?? ""),
+        untrack(() => agentConversationKey(props.server?.id ?? "local", props.agent?.id ?? "")),
       );
       if (
         pendingSettings?.pending &&
@@ -783,7 +783,7 @@ export function createConversationViewScope(props: ConversationProps) {
       lastPanelAgentId = agentId;
       clearRoutineSettingsRequest();
       resources.filePreviewRequestGeneration += 1;
-      const preview = sidebarFilePreview();
+      const preview = untrack(sidebarFilePreview);
       if (preview && preview.ownerAgentId !== agentId) {
         setSidebarFilePreview(null);
         setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
@@ -814,7 +814,7 @@ export function createConversationViewScope(props: ConversationProps) {
       suspended: props.browserVisibilitySuspended,
     }),
     ({ activeTab, addressEditing, screenOpen, activeBrowserTabId, onActivateBrowserTab, suspended }) => {
-      if (props.browserEnabled === false || suspended) return;
+      if (untrack(() => props.browserEnabled === false) || suspended) return;
       if (!addressEditing) setBrowserAddress(activeTab?.url ?? "https://www.google.com");
       if (screenOpen && activeTab && activeTab.id !== activeBrowserTabId) {
         onActivateBrowserTab(activeTab.id);
@@ -898,9 +898,9 @@ export function createConversationViewScope(props: ConversationProps) {
   );
 
   createEffect(
-    () => ({ agentId: props.agent?.id, open: browserPipOpen() }),
-    ({ open }) => {
-      if (props.browserEnabled === false) return;
+    () => ({ agentId: props.agent?.id, open: browserPipOpen(), browserEnabled: props.browserEnabled !== false }),
+    ({ open, browserEnabled }) => {
+      if (!browserEnabled) return;
       if (!open) {
         void conversationRuntime(props).browser.closePictureInPicture();
         return;
