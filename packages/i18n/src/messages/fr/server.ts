@@ -231,4 +231,6 @@ export const messages = {
     "Démarrez le contrôle à distance pour vérifier les composants et les autorisations de l’hôte. L’hôte signalera toute erreur de configuration.",
   "server.desktop.remoteControl": "Contrôle à distance",
   "server.desktop.startHint": "Démarrez le contrôle à distance depuis le bouton moniteur dans l’en-tête du serveur.",
+  "server.settings.providersTitle": "Fournisseurs",
+  "server.settings.providersDescription": "Gérez les fournisseurs d’IA de l’ordinateur qui exécute ce serveur.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -218,6 +218,9 @@ export function agentIpcHandlers({
           if (input.access !== undefined) {
             throw new Error(sourceText("error.agent.accessLocalOnly"));
           }
+          if (input.computerUse !== undefined) {
+            throw new Error(sourceText("error.agent.computerUseLocalOnly"));
+          }
           return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
             method: "PATCH",
             body: input,

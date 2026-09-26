@@ -254,11 +254,12 @@ export class D1AuthRepository implements AuthRepository {
       .prepare(
         `UPDATE auth_sessions SET revoked_at = ?
          WHERE token_hash = ? AND revoked_at IS NULL
-           AND id IN (SELECT session_id FROM mobile_auth_sessions)`,
+           AND id IN (SELECT session_id FROM mobile_auth_sessions)
+         RETURNING id`,
       )
       .bind(now, await sha256(sessionToken))
-      .run();
-    return result.meta.changes === 1;
+      .first<{ id: string }>();
+    return result !== null;
   }
 
   async updateUserName(userId: string, name: string, now: number): Promise<AuthUser> {
@@ -526,11 +527,14 @@ export class D1AuthRepository implements AuthRepository {
 
   async revokeAccountSession(userId: string, sessionId: string, now: number): Promise<boolean> {
     // The migration's trigger ends remote sessions and enqueues their disconnect atomically.
+    // RETURNING, not meta.changes: D1 also counts the rows that the trigger changes.
     const result = await this.database
-      .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL")
+      .prepare(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL RETURNING id",
+      )
       .bind(now, sessionId, userId)
-      .run();
-    return result.meta.changes === 1;
+      .first<{ id: string }>();
+    return result !== null;
   }
 
   async revokeMobileAuthDevice(userId: string, sessionId: string, now: number): Promise<boolean> {
@@ -538,11 +542,12 @@ export class D1AuthRepository implements AuthRepository {
       .prepare(
         `UPDATE auth_sessions SET revoked_at = ?
          WHERE id = ? AND user_id = ? AND revoked_at IS NULL
-           AND id IN (SELECT session_id FROM mobile_auth_sessions)`,
+           AND id IN (SELECT session_id FROM mobile_auth_sessions)
+         RETURNING id`,
       )
       .bind(now, sessionId, userId)
-      .run();
-    return result.meta.changes === 1;
+      .first<{ id: string }>();
+    return result !== null;
   }
 
   private async updateSessionActivity(tokenHash: string, lastUsedAt: number, now: number): Promise<void> {

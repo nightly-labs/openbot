@@ -5,7 +5,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
-import { conversationPort } from "./conversation-port";
+import { conversationPort, type SharedTableCalls } from "./conversation-port";
 
 interface SharedTablesModalProps {
   /** Resolves an owner id to a name. The owner can be an agent the user deleted, hence the lookup. */
@@ -13,6 +13,8 @@ interface SharedTablesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
+  /** Replaces the desktop calls, for a client that reaches the host another way. */
+  calls?: SharedTableCalls | undefined;
 }
 
 /**
@@ -31,6 +33,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
   const [deletingName, setDeletingName] = createSignal<string | null>(null);
   const scrollFades = createScrollFades();
   let modalContent: HTMLDivElement | undefined;
+  const tableCalls = (): SharedTableCalls => props.calls ?? conversationPort().agent;
 
   onSettled(() => scrollFades.stop);
 
@@ -38,7 +41,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const next = await conversationPort().agent.listTables();
+      const next = await tableCalls().listTables();
       setTables(next);
       props.onCountChange(next.length);
     } catch (caught) {
@@ -61,7 +64,7 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
     setDeletingName(table.name);
     setError(null);
     try {
-      await conversationPort().agent.deleteTable({ name: table.name });
+      await tableCalls().deleteTable({ name: table.name });
       setConfirmName(null);
       await loadTables(false);
     } catch (caught) {

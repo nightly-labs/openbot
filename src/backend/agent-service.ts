@@ -74,6 +74,7 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import { workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -431,6 +432,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hostedSites: this.#hostedSites,
       routines: this.#routines,
       approvalAutomation: options.approvalAutomation,
+      workspaceSandboxed: (agentId) => {
+        const agent = store.list().find((candidate) => candidate.id === agentId);
+        return agent !== undefined && workspaceAccessEnforced(agent);
+      },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
@@ -1148,7 +1153,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.title !== undefined ||
       input.description !== undefined ||
       input.model !== undefined ||
-      input.reasoningEffort !== undefined;
+      input.reasoningEffort !== undefined ||
+      input.access !== undefined ||
+      input.computerUse !== undefined;
     const agent = await this.#store.updateAgent({
       ...input,
       ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}),

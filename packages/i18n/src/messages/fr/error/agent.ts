@@ -65,4 +65,5 @@ export const messages = {
   "error.agent.storedProfileUnreadableId":
     "Le profil d’agent enregistré {id} a une valeur « {field} » illisible ; mettez à jour les données avant de démarrer OpenBot.",
   "error.agent.queueEditRejected": "Modification de la file d’attente refusée : {reason}",
+  "error.agent.computerUseLocalOnly": "Computer Use ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
 } as const satisfies PartialTranslation<typeof source>;

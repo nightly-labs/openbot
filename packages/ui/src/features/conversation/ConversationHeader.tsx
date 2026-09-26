@@ -2,6 +2,7 @@ import { Button, Folder, Lock, Upload } from "@openbot/ui";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { agentAccessLockLabel } from "@openbot/ui/features/agents/agent-access";
 import { ComputerIcon, RemoteDesktopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps } from "@solidjs/web";
@@ -58,15 +59,12 @@ export function ConversationHeader(props: ConversationHeaderProps) {
             </Button>
           )}
         </Show>
-        <Show when={props.agent?.access === "workspace"}>
-          <span
-            class="conversation-access-lock"
-            role="img"
-            aria-label={t("conversation.header.workspaceOnly")}
-            title={t("conversation.header.workspaceOnly")}
-          >
-            <Lock aria-hidden="true" />
-          </span>
+        <Show when={props.agent && agentAccessLockLabel(props.agent, t)}>
+          {(label) => (
+            <span class="conversation-access-lock" role="img" aria-label={label()} title={label()}>
+              <Lock aria-hidden="true" />
+            </span>
+          )}
         </Show>
       </div>
       <div class="conversation-header-actions no-drag">

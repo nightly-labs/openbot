@@ -227,4 +227,6 @@ export const messages = {
     "ホストのコンポーネントと権限を確認するには、リモート操作を開始してください。設定エラーがある場合は、ホストが報告します。",
   "server.desktop.remoteControl": "リモート操作",
   "server.desktop.startHint": "サーバーのヘッダーにあるモニターボタンからリモート操作を開始してください。",
+  "server.settings.providersTitle": "プロバイダー",
+  "server.settings.providersDescription": "このサーバーを実行するコンピューターの AI プロバイダーを管理します。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -30,7 +30,6 @@ export const messages = {
   "conversation.direct.input": "Écrire à {name}",
   "conversation.direct.send": "Envoyer le message privé",
   "conversation.header.settings": "Afficher les réglages de l’agent",
-  "conversation.header.workspaceOnly": "Espace de travail uniquement (pas encore appliqué)",
   "conversation.header.resumeRemote": "Reprendre le contrôle à distance",
   "conversation.header.openRemote": "Ouvrir le contrôle à distance",
   "conversation.header.hideFiles": "Masquer les fichiers",

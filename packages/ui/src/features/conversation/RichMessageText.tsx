@@ -5,7 +5,7 @@ import { Blocks, Button, Puzzle } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import type { AgentProfile, MessageCitation } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -13,6 +13,13 @@ import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { LinkIcon } from "./ConversationIcons";
 import { messageFileReferences } from "./FileReference";
+import {
+  sameStreamingTailOffsets,
+  splitStreamingTrail,
+  streamingTailOffsets,
+  streamingTrailReach,
+  useStreamingReveal,
+} from "./streamingReveal";
 
 export interface RichMessageTextProps {
   body: string;
@@ -26,7 +33,8 @@ export interface RichMessageTextProps {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
   showCitationFooter?: boolean;
-  streamingTail?: boolean;
+  /** The characters of a streaming body after this text. It fades the words revealed last. */
+  streamingTailAfter?: number | undefined;
 }
 
 const UNAVAILABLE_TAG_LABELS = {
@@ -46,13 +54,16 @@ export function RichMessageText(props: RichMessageTextProps) {
   const parts = createMemo(() =>
     richMessageParts(props.body, props.agents, props.skills ?? [], citationsByNumber(), attachmentsById()),
   );
-  const renderedParts = createMemo(() => {
-    const values = parts();
-    return values.map((part, index) => ({
-      part,
-      streamingTail: props.streamingTail === true && index === values.length - 1,
-    }));
-  });
+  const trail = useStreamingReveal();
+  const tailAfter = createMemo(
+    () =>
+      streamingTailOffsets(
+        parts().map((part) => (plainTextPart(part) ? part.text.length : Number.POSITIVE_INFINITY)),
+        props.streamingTailAfter,
+        streamingTrailReach(trail?.() ?? []),
+      ),
+    { equals: sameStreamingTailOffsets },
+  );
   const citations = createMemo(() => (props.citations ?? []).filter((citation) => safeBrowserUrl(citation.url)));
   const tooltipId = `rich-message-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{
@@ -84,9 +95,8 @@ export function RichMessageText(props: RichMessageTextProps) {
 
   return (
     <>
-      <For each={renderedParts()}>
-        {(renderedPart) => {
-          const part = renderedPart.part;
+      <For each={parts()}>
+        {(part, index) => {
           const attachment = part.attachment;
           const sharedPath = part.sharedPath;
           if (attachment || sharedPath) {
@@ -176,7 +186,11 @@ export function RichMessageText(props: RichMessageTextProps) {
               </span>
             );
           }
-          return renderedPart.streamingTail ? <StreamingTailText body={part.text} /> : part.text;
+          return (
+            <Show when={tailAfter()[index()] !== undefined} fallback={part.text}>
+              <StreamingTailText body={part.text} after={tailAfter()[index()] ?? 0} />
+            </Show>
+          );
         }}
       </For>
       <Show when={props.showCitationFooter !== false && citations().length > 0}>
@@ -220,45 +234,27 @@ export function RichMessageText(props: RichMessageTextProps) {
   );
 }
 
-function StreamingTailText(props: { body: string }) {
-  const parts = createMemo(() => splitStreamingTail(props.body));
-  let word: HTMLSpanElement | undefined;
-  let revealFrame: number | undefined;
-
-  const revealWord = (element: HTMLSpanElement) => {
-    word = element;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      word.classList.add("is-in");
-      return;
-    }
-    word.style.transition = "none";
-    word.classList.remove("is-in");
-    void word.offsetWidth;
-    word.style.removeProperty("transition");
-    revealFrame = window.requestAnimationFrame(() => word?.classList.add("is-in"));
-  };
-  onCleanup(() => {
-    if (revealFrame !== undefined) window.cancelAnimationFrame(revealFrame);
-  });
+function StreamingTailText(props: { body: string; after: number }) {
+  const trail = useStreamingReveal();
+  const parts = createMemo(() => splitStreamingTrail(props.body, trail?.() ?? [], props.after));
 
   return (
     <>
       {parts().prefix}
-      <Show when={parts().tail}>
-        {(tail) => (
-          <span ref={revealWord} class="t-stream-w">
-            {tail()}
+      <For each={parts().chunks}>
+        {(chunk) => (
+          /* The block that holds the tail renders again on each step. A delay of minus the step's
+             age continues its fade where it was, instead of starting it again. */
+          <span
+            class="t-stream-w"
+            style={{ "animation-delay": `${Math.min(0, chunk.revealedAt - performance.now())}ms` }}
+          >
+            {chunk.text}
           </span>
         )}
-      </Show>
+      </For>
     </>
   );
-}
-
-function splitStreamingTail(body: string): { prefix: string; tail: string } {
-  const match = /(\S+\s*)$/u.exec(body);
-  if (!match || match.index === undefined) return { prefix: body, tail: "" };
-  return { prefix: body.slice(0, match.index), tail: match[1] ?? "" };
 }
 
 export function MessageLink(props: {
@@ -290,6 +286,19 @@ export function MessageLink(props: {
       </span>
       {props.children}
     </a>
+  );
+}
+
+/** A part that shows its source text as it is, so its length counts body characters. */
+function plainTextPart(part: RichMessagePart): boolean {
+  return !(
+    part.agent ||
+    part.skill ||
+    part.mcpName ||
+    part.unavailableKind ||
+    part.citation ||
+    part.attachment ||
+    part.sharedPath
   );
 }
 

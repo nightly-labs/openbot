@@ -15,6 +15,7 @@ import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
+import { codexSandboxPolicy } from "./workspace-sandbox";
 
 /** Shown to the user when a message names a model of an endpoint that was taken out. */
 export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved");
@@ -294,7 +295,7 @@ export class DrainScheduler {
             cwd: agent.workspacePath,
             runtimeWorkspaceRoots: [agent.workspacePath, this.#store.sharedRoot],
             approvalPolicy: "on-request",
-            sandboxPolicy: { type: "dangerFullAccess" },
+            sandboxPolicy: codexSandboxPolicy(agent, this.#store.sharedRoot),
           },
           decodeTurnResponse,
         );

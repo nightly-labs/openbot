@@ -55,8 +55,6 @@ export const messages = {
     "Claude agit sans demander d’approbation, sauf pour les questions qu’il vous pose.",
   "agentSettings.runtime.providerApprovalNote":
     "Selon le fournisseur, les commandes sensibles peuvent d’abord demander une approbation.",
-  "agentSettings.runtime.workspaceNote":
-    "Le mode Espace de travail uniquement limite les écritures à l’espace de travail de cet agent et au dossier partagé. Les lectures et le réseau restent disponibles. Pas encore appliqué : cet agent a toujours un accès complet dans cette version.",
 
   "agentSettings.access.workspace": "Espace de travail uniquement",
   "agentSettings.access.full": "Accès complet",
@@ -81,4 +79,12 @@ export const messages = {
   "agentSettings.links.files": "Fichiers",
   "agentSettings.links.routines": "Routines",
   "agentSettings.links.routinesCount": { one: "{count} configurée", other: "{count} configurées" },
+  "agentSettings.runtime.workspaceNote":
+    "« Espace de travail uniquement » limite les écritures à l’espace de travail de cet agent, au dossier partagé et aux dossiers temporaires. La lecture et le réseau restent disponibles.",
+  "agentSettings.runtime.workspaceNotEnforced":
+    "{provider} ne l’applique pas encore : cet agent a donc toujours un accès complet. Les agents Codex sont limités.",
+  "agentSettings.runtime.workspaceEnforced":
+    "Une commande qui doit écrire à l’extérieur vous demande d’abord, même quand l’approbation automatique est activée. Computer Use et le navigateur OpenBot ne sont pas limités ; vous pouvez désactiver Computer Use ci-dessous.",
+  "agentSettings.computerUse.title": "Computer Use",
+  "agentSettings.computerUse.description": "Autoriser cet agent à contrôler les apps de cet ordinateur",
 } as const satisfies PartialTranslation<typeof source>;

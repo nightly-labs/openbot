@@ -9,7 +9,9 @@ The optional browser client at `/app` connects to the computer that runs OpenBot
 and attachment data travel through the existing encrypted host connection, not through the
 account Worker. The browser keeps chat pages, drafts, search results, and file previews in memory;
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
-their browser. The host must stay online.
+their browser. The host must stay online. An owner or admin can manage members and invitations from
+the browser; these requests go to the account Worker, as they do from the desktop app. Host settings,
+such as MCP servers, travel through the encrypted host connection.
 
 Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.
 Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
@@ -279,9 +281,10 @@ Remote Desktop data remain on the host. The central account service does not cop
 R2. The Signal service does not proxy them or write them to logs. The host does not need a public
 inbound port.
 
-An owner or admin of a joined server can manage its host from their own computer. A provider API key,
-a custom endpoint key or header, and a new server logo then travel from that computer to the host
-over the same encrypted team connection. The host stores them as it stores a change made on the host.
+An owner or admin of a joined server can manage its host from their own computer, or from the
+browser client at `/app`. A provider API key, a custom endpoint key or header, and a new server logo
+then travel from that computer or browser to the host over the same encrypted team connection. The
+browser does not store a key. The host stores them as it stores a change made on the host.
 No response returns a key, and neither computer writes request bodies to its logs.
 
 ## Other network connections

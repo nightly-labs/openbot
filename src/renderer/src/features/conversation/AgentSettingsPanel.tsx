@@ -14,7 +14,8 @@ import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
 import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, assignedSkillCount } from "./AgentSkillsModal";
-import { conversationPort } from "./conversation-port";
+import { conversationPort, type SharedTableCalls } from "./conversation-port";
+import type { ConversationRuntime } from "./conversation-runtime";
 import { agentMemoriesPort } from "./memories-port";
 import { agentRoutinesPort } from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
@@ -25,6 +26,8 @@ interface AgentSettingsPanelProps
     "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children"
   > {
   remoteClient?: boolean;
+  /** The web client's host calls. A remote client shows only Skills and Tables, and only with these. */
+  adminCalls?: ConversationRuntime["admin"];
   onOpenUsage?: (trigger: HTMLButtonElement) => void;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null;
@@ -33,7 +36,7 @@ interface AgentSettingsPanelProps
   onOpenRoutineRun?: (messageId: string) => void;
   skillsMode?: AgentSkillsMode;
   /** The joined server that runs the agent, for the `host` skills mode. */
-  skillsServerId?: string;
+  skillsServerId?: string | undefined;
   skillsMarketplaceOpen?: boolean;
   /** The shared data lives on the computer that runs the agents. A joined server shows it to an admin only. */
   tablesVisible?: boolean;
@@ -61,6 +64,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name));
   const routinesPort = createMemo(() => agentRoutinesPort(props.agent.id));
   const skillsMode = () => props.skillsMode ?? "mutable";
+  const tableCalls = (): SharedTableCalls => props.adminCalls?.sharedTables ?? conversationPort().agent;
+  const skillCalls = () =>
+    props.adminCalls?.skills ?? agentSkillCalls(skillsMode() === "host" ? props.skillsServerId : undefined);
   const storage = createStorageUsage(() => {
     const files = props.files;
     return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
@@ -84,15 +90,18 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
-      if (!props.remoteClient) {
-        void conversationPort()
-          .agent.listTables()
+      if (!props.remoteClient || props.tablesVisible !== false) {
+        void tableCalls()
+          .listTables()
           .catch(() => [])
           .then((items) => {
             setDraft((state) => {
               state.tables.count = items.length;
             });
           });
+      }
+      void loadSkillsCount(agentId);
+      if (!props.remoteClient) {
         void conversationPort()
           .agent.listMemories(agentId)
           .catch(() => [])
@@ -109,7 +118,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               state.routines.count = items.length;
             });
           });
-        void loadSkillsCount(agentId);
       }
     },
   );
@@ -125,7 +133,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       const items =
         skillsMode() === "readonly"
           ? await skillsPort().agent.listInstalledSkills(agentId)
-          : await agentSkillCalls(skillsMode() === "host" ? props.skillsServerId : undefined).listInstalled(agentId);
+          : await skillCalls().listInstalled(agentId);
       setDraft((state) => {
         state.skills.count = assignedSkillCount(items);
       });
@@ -178,23 +186,25 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       onResizeEnd={saveSettingsPanelWidth}
       detailOpen={draft.routines.open || draft.files.open}
       links={
-        <Show when={!props.remoteClient}>
+        <Show when={!props.remoteClient || skillsMode() !== "hidden" || props.tablesVisible !== false}>
           <SettingsLinkGroup>
-            <Show when={props.onOpenUsage}>
+            <Show when={!props.remoteClient && props.onOpenUsage}>
               <SettingsLinkRow
                 label={t("agentSettings.links.usage")}
                 onClick={(trigger) => props.onOpenUsage?.(trigger)}
               />
             </Show>
-            <SettingsLinkRow
-              label={t("agentSettings.links.memories")}
-              value={t("agentSettings.links.memoriesCount", { count: draft.memories.count })}
-              onClick={() =>
-                setDraft((state) => {
-                  state.memories.open = true;
-                })
-              }
-            />
+            <Show when={!props.remoteClient}>
+              <SettingsLinkRow
+                label={t("agentSettings.links.memories")}
+                value={t("agentSettings.links.memoriesCount", { count: draft.memories.count })}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.memories.open = true;
+                  })
+                }
+              />
+            </Show>
             <Show when={skillsMode() !== "hidden"}>
               <SettingsLinkRow
                 label={t("agentSettings.links.skills")}
@@ -228,15 +238,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               />
             </Show>
-            <SettingsLinkRow
-              label={t("agentSettings.links.routines")}
-              value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
-              onClick={() =>
-                setDraft((state) => {
-                  state.routines.open = true;
-                })
-              }
-            />
+            <Show when={!props.remoteClient}>
+              <SettingsLinkRow
+                label={t("agentSettings.links.routines")}
+                value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
+                onClick={() =>
+                  setDraft((state) => {
+                    state.routines.open = true;
+                  })
+                }
+              />
+            </Show>
           </SettingsLinkGroup>
         </Show>
       }
@@ -280,6 +292,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       <Show when={props.tablesVisible !== false}>
         <SharedTablesModal
           agents={props.agents ?? []}
+          calls={props.adminCalls?.sharedTables}
           open={draft.tables.open}
           onOpenChange={(open) =>
             setDraft((state) => {
@@ -315,6 +328,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           open={draft.skills.open}
           skillsMode={skillsMode()}
           serverId={props.skillsServerId}
+          calls={props.adminCalls?.skills}
+          catalog={props.remoteClient ? null : undefined}
           onCreateSkill={props.onCreateSkill}
           onTrySkill={props.onTrySkill}
           onAddFromMarketplace={

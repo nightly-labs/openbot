@@ -3,7 +3,7 @@ import { toast } from "@openbot/ui";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
-import { agentTemplatesPort } from "./agent-templates-port";
+import { type AgentTemplateInstallCalls, agentTemplatesPort } from "./agent-templates-port";
 
 interface InstallState {
   detail: AgentTemplateDetail | null;
@@ -18,11 +18,14 @@ interface InstallState {
 export function AgentTemplateInstall(props: {
   templateId: string | null;
   server?: ServerSummary | undefined;
+  /** Defaults to the desktop port. */
+  calls?: AgentTemplateInstallCalls;
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<InstallState>({ detail: null, loading: false });
+  const calls = (): AgentTemplateInstallCalls => props.calls ?? agentTemplatesPort();
 
   createEffect(
     () => props.templateId,
@@ -33,7 +36,7 @@ export function AgentTemplateInstall(props: {
       });
       if (!templateId) return;
       let current = true;
-      agentTemplatesPort()
+      calls()
         .agentTemplates.get(templateId)
         .then((detail) => {
           if (!current) return;
@@ -67,7 +70,7 @@ export function AgentTemplateInstall(props: {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       expectedUpdatedAt: reviewed.updatedAt,
     };
-    const port = agentTemplatesPort();
+    const port = calls();
     const agent = server
       ? await port.agent.addTemplateAgent(input, server.id)
       : (await port.agentTemplates.install(input)).agent;

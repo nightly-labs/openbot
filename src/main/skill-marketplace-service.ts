@@ -11,14 +11,20 @@ import type {
   MarketplaceSkillDetail,
   MarketplaceSkillPage,
   MarketplaceSkillQuery,
-  MarketplaceSkillSummary,
   SetEnabledSkillInput,
   SkillPackagePreview,
   SkillSubmission,
   SubmitSkillInput,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_TEMPLATE_LIMITS, isSkillCategory, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
+import {
+  AGENT_TEMPLATE_LIMITS,
+  decodeMarketplaceSkillDetail,
+  decodeMarketplaceSkillPage,
+  isSkillCategory,
+  marketplaceQueryParams,
+  SKILL_DESCRIPTION_MAX_LENGTH,
+} from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { parse as parseYaml } from "yaml";
@@ -65,14 +71,12 @@ export class SkillMarketplaceService {
   ) {}
 
   async list(query: MarketplaceSkillQuery = {}): Promise<MarketplaceSkillPage> {
-    const params = new URLSearchParams();
-    if (query.query) params.set("query", query.query);
-    if (query.category) params.set("category", query.category);
-    if (query.featured) params.set("featured", "true");
-    if (query.sort) params.set("sort", query.sort);
-    if (query.cursor) params.set("cursor", query.cursor);
-    if (query.limit) params.set("limit", String(query.limit));
-    const page = await this.auth.requestAuthorized(`/v1/skills/?${params}`, { method: "GET" }, decodeSkillPage);
+    const params = marketplaceQueryParams(query);
+    const page = await this.auth.requestAuthorized(
+      `/v1/skills/?${params}`,
+      { method: "GET" },
+      decodeMarketplaceSkillPage,
+    );
     return {
       ...page,
       skills: page.skills.map((skill) => ({
@@ -88,7 +92,7 @@ export class SkillMarketplaceService {
     const detail = await this.auth.requestAuthorized(
       `/v1/skills/${encodeURIComponent(skillId)}`,
       { method: "GET" },
-      decodeSkillDetail,
+      decodeMarketplaceSkillDetail,
     );
     return {
       ...detail,
@@ -203,7 +207,7 @@ export class SkillMarketplaceService {
     const detail = await this.auth.requestAuthorized(
       `/v1/skills/${encodeURIComponent(input.skillId)}/versions/${encodeURIComponent(input.versionId)}`,
       { method: "GET" },
-      decodeSkillDetail,
+      decodeMarketplaceSkillDetail,
     );
     const bundle = await this.auth.downloadAuthorized(
       `/v1/skills/${encodeURIComponent(input.skillId)}/versions/${encodeURIComponent(input.versionId)}/content`,
@@ -682,16 +686,6 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return Uint8Array.from(bytes).buffer;
 }
 
-function decodeSkillPage(value: unknown): MarketplaceSkillPage {
-  if (!isDynamicRecord(value) || !Array.isArray(value.skills) || !value.skills.every(isMarketplaceSkillSummary))
-    throw new Error("Invalid skill marketplace response.");
-  if (value.nextCursor !== null && !isString(value.nextCursor)) throw new Error("Invalid skill marketplace response.");
-  return { skills: value.skills, nextCursor: value.nextCursor };
-}
-function decodeSkillDetail(value: unknown): MarketplaceSkillDetail {
-  if (!isMarketplaceSkillDetail(value)) throw new Error("Invalid skill detail response.");
-  return value;
-}
 function decodeSubmissions(value: unknown): SkillSubmission[] {
   if (!Array.isArray(value) || !value.every(isSkillSubmission)) throw new Error("Invalid skill submissions.");
   return value;
@@ -703,37 +697,6 @@ function decodeSubmission(value: unknown): SkillSubmission {
 function decodeInstalledReceipt(value: unknown): { installed: true } {
   if (!isDynamicRecord(value) || value.installed !== true) throw new Error("Invalid install receipt response.");
   return { installed: true };
-}
-
-function isMarketplaceSkillSummary(value: unknown): value is MarketplaceSkillSummary {
-  return (
-    isDynamicRecord(value) &&
-    isString(value.id) &&
-    isString(value.slug) &&
-    isString(value.name) &&
-    isString(value.description) &&
-    isSkillCategory(value.category) &&
-    isString(value.creatorName) &&
-    (value.creatorAvatarUrl === undefined || value.creatorAvatarUrl === null || isString(value.creatorAvatarUrl)) &&
-    isNumber(value.version) &&
-    isNumber(value.installs) &&
-    isBoolean(value.featured) &&
-    (value.iconUrl === null || isString(value.iconUrl)) &&
-    isString(value.updatedAt)
-  );
-}
-
-function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDetail {
-  return (
-    isDynamicRecord(value) &&
-    isMarketplaceSkillSummary(value) &&
-    isString(value.versionId) &&
-    isString(value.bundleSha256) &&
-    isString(value.instructions) &&
-    (value.examplePrompt === undefined || (isString(value.examplePrompt) && value.examplePrompt.length <= 1_000)) &&
-    Array.isArray(value.files) &&
-    value.files.every(isString)
-  );
 }
 
 function isSkillSubmission(value: unknown): value is SkillSubmission {

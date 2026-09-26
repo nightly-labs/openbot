@@ -53,7 +53,6 @@ export const messages = {
   "sidebar.channel.noMessages": "メッセージはまだありません",
   "sidebar.channel.workingPreview": "作業中 · {preview}",
   "sidebar.channel.unread": { other: "未読メッセージ {count} 件" },
-  "sidebar.agent.workspaceOnly": "ワークスペースのみ (まだ適用されません)",
   "sidebar.people.online": "オンライン",
   "sidebar.people.offline": "オフライン",
   "sidebar.people.unread": { other: "未読のダイレクトメッセージ {count} 件" },

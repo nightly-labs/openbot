@@ -127,6 +127,11 @@ export interface AttentionRegistryOptions {
   routines: RoutineAttention;
   /** Read at each approval, so a grant the user gives now applies to the next request. */
   approvalAutomation?: ApprovalAutomationPolicy;
+  /**
+   * Whether the agent runs in the workspace sandbox now. Each approval it raises asks to go outside
+   * the limit the user chose, so Auto approve and Turbo do not answer it.
+   */
+  workspaceSandboxed?(agentId: string): boolean;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -153,6 +158,7 @@ export class AttentionRegistry {
   readonly #hostedSites: HostedSiteApprovals;
   readonly #routines: RoutineAttention;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
+  readonly #workspaceSandboxed: (agentId: string) => boolean;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -166,6 +172,7 @@ export class AttentionRegistry {
     this.#hostedSites = options.hostedSites;
     this.#routines = options.routines;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
+    this.#workspaceSandboxed = options.workspaceSandboxed ?? (() => false);
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -331,6 +338,7 @@ export class AttentionRegistry {
    * what the provider on the other end of each method understands.
    */
   #answerWithoutAsking(client: AgentClient, request: AppServerRequest, approval: AgentApproval): boolean {
+    if (this.#workspaceSandboxed(approval.agentId)) return false;
     if (!shouldAutoApprove(this.#approvalAutomation, approval)) return false;
     if (approval.kind === "permissions") {
       client.respond(request.id, { permissions: getRecord(request.params, "permissions") ?? {}, scope: "turn" });

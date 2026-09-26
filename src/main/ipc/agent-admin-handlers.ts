@@ -6,6 +6,7 @@ import {
   type AddedAgent,
   type AgentAdminSettings,
   decodeAgentAdminSettings,
+  decodeHostAddedAgent,
   decodeInstalledSkills,
   type InstalledSkill,
   parseUpdateAgentAdminSettingsInput,
@@ -30,7 +31,7 @@ import {
 } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler } from "./scoped-handler";
-import { isObject, requireString } from "./validation";
+import { requireString } from "./validation";
 
 interface AgentAdminRemoteServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -54,12 +55,6 @@ function decodeRemoteInstalledSkill(value: unknown): InstalledSkill {
 // The skills-admin-v1 codec has already checked that the body is an empty record.
 const acceptEmpty = (): undefined => undefined;
 
-// The agent-install-v1 codec has already checked both fields.
-function decodeRemoteAddedAgent(value: unknown): AddedAgent {
-  if (!isObject(value)) throw new Error("Invalid added agent.");
-  return { id: requireString(value.agentId, "agentId"), name: requireString(value.name, "name") };
-}
-
 export function agentAdminIpcHandlers({
   settings,
   skills,
@@ -82,7 +77,7 @@ export function agentAdminIpcHandlers({
   function remoteAdd(serverId: string, path: string, body: unknown): Promise<AddedAgent> {
     if (!remoteServers.supportsCapability(serverId, AGENT_INSTALL_CAPABILITY))
       throw new Error(sourceText("error.agent.addLocalOnly"));
-    return remoteServers.request(serverId, path, decodeRemoteAddedAgent, { method: "POST", body });
+    return remoteServers.request(serverId, path, decodeHostAddedAgent, { method: "POST", body });
   }
 
   return {

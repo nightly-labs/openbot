@@ -31,7 +31,7 @@ interface CustomProviderListDialogProps {
    * Without it the rows are listed but not removable, which is what a remote server shows. It runs
    * only after the user accepts the removal question this dialog asks.
    */
-  onDelete?: (provider: CustomProviderSummary) => void;
+  onDelete?: ((provider: CustomProviderSummary) => void) | undefined;
   onClose: () => void;
 }
 

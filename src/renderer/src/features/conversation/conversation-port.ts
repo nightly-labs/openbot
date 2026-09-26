@@ -1,4 +1,4 @@
-import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type { DeleteSharedTableInput, OpenBotDesktopApi, SharedTable } from "@openbot/contracts/ipc";
 
 /**
  * What the conversation domain reaches in main: agent and direct message pages, sends, reads,
@@ -36,4 +36,10 @@ export interface ConversationPort {
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function conversationPort(): ConversationPort {
   return window.openbot;
+}
+
+/** The tables every agent shares. The web client reaches them on the host through the Team API. */
+export interface SharedTableCalls {
+  listTables(): Promise<SharedTable[]>;
+  deleteTable(input: DeleteSharedTableInput): Promise<void>;
 }

@@ -493,6 +493,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isAgentAccess(value.access)) throw new Error("Invalid agent access.");
     result.access = value.access;
   }
+  if (value.computerUse !== undefined) {
+    if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
+    result.computerUse = value.computerUse;
+  }
   if (value.avatarSeed !== undefined) {
     if (!isAvatarSeed(value.avatarSeed)) throw new Error("Invalid avatar seed.");
     result.avatarSeed = value.avatarSeed;

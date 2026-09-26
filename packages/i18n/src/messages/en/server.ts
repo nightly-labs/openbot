@@ -222,4 +222,6 @@ export const messages = defineMessages("server", {
     "Start Remote Control to check the host components and permissions. The host will report any setup error.",
   "server.desktop.remoteControl": "Remote control",
   "server.desktop.startHint": "Start Remote Control from the monitor button in the server header.",
+  "server.settings.providersTitle": "Providers",
+  "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
 });

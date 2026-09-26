@@ -54,8 +54,6 @@ export const messages = defineMessages("agentSettings", {
     "Claude acts without asking for approval, except for questions it puts to you.",
   "agentSettings.runtime.providerApprovalNote":
     "Depending on the provider, sensitive commands may ask for approval first.",
-  "agentSettings.runtime.workspaceNote":
-    "Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay available. Not enforced yet: this agent still has full access in this version.",
 
   "agentSettings.access.workspace": "Workspace only",
   "agentSettings.access.full": "Full access",
@@ -79,4 +77,12 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.links.files": "Files",
   "agentSettings.links.routines": "Routines",
   "agentSettings.links.routinesCount": { one: "{count} configured", other: "{count} configured" },
+  "agentSettings.runtime.workspaceNote":
+    "Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders. Reads and network stay available.",
+  "agentSettings.runtime.workspaceNotEnforced":
+    "{provider} does not enforce it yet, so this agent still has full access. Codex agents are enforced.",
+  "agentSettings.runtime.workspaceEnforced":
+    "A command that must write outside asks you first, also when Auto approve is on. Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.",
+  "agentSettings.computerUse.title": "Computer Use",
+  "agentSettings.computerUse.description": "Let this agent control apps on this computer",
 });

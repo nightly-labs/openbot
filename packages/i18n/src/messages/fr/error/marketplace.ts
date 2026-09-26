@@ -59,4 +59,7 @@ export const messages = {
     "Retirez le secret ou l’adresse e-mail de la routine « {name} » avant la publication.",
   "error.marketplace.secretInSkill":
     "Retirez le secret ou l’adresse e-mail de la compétence « {name} » avant la publication.",
+  "error.marketplace.catalogLoadFailed": "Impossible de charger la marketplace. Réessayez.",
+  "error.marketplace.templateUnreadable":
+    "Impossible de lire cet agent partagé. Son propriétaire l’a peut-être supprimé.",
 } as const satisfies PartialTranslation<typeof source>;

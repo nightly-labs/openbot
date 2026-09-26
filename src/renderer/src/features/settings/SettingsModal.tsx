@@ -10,12 +10,10 @@ import type {
   HostedSitesDesktopApi,
   MobileConnectedDevice,
   MobileConnectTicket,
-  ProviderApiKeyStatus,
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -29,9 +27,8 @@ import {
   Text,
   UserRound,
 } from "@openbot/ui";
-import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
+import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
@@ -39,10 +36,11 @@ import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdate
 import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
+import { createProviderKeyState, ProviderSettingsDialogs } from "./ProviderSettingsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
@@ -182,15 +180,8 @@ function navItem(tab: SettingsTab): SettingsNavItem {
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
-  const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
-  /**
-   * Whether the optional OpenCode key is saved, for the row's badge. Read through the key API
-   * like the dialog does, on open and after the dialog closes with a save or a removal. Absent
-   * until the first read, and on a read failure, so the row shows no key badge rather than a
-   * wrong one.
-   */
-  const [openCodeKeyStatus, setOpenCodeKeyStatus] = createSignal<ProviderApiKeyStatus | undefined>(undefined);
   let modalElement: HTMLElement | undefined;
+  const providerKeyState = createProviderKeyState(props);
 
   const general = createSettingsGeneralStore({
     get agentStatus() {
@@ -202,34 +193,11 @@ export function SettingsModal(props: SettingsModalProps) {
     get providerAvailableVersions() {
       return props.providerAvailableVersions;
     },
-    openCodeKeyStatus,
+    openCodeKeyStatus: providerKeyState.openCodeKeyStatus,
     get providerHostName() {
       return props.providerHostName;
     },
   });
-  async function refreshOpenCodeKeyStatus(): Promise<void> {
-    const keys = props.providerKeys;
-    if (!keys) return;
-    let status: ProviderApiKeyStatus | undefined;
-    try {
-      status = (await keys.getProviderApiKeyState("opencode")).status;
-    } catch {
-      status = undefined;
-    }
-    // An answer from a source the modal has since left belongs to the other computer.
-    if (keys === props.providerKeys) setOpenCodeKeyStatus(status);
-  }
-  // The badge has to answer on first paint: the key state arrives after the rows, so an open
-  // without a read would show no badge until something else re-renders the list. The keys can move
-  // to a joined server's host while the modal is open, when that host's admin role arrives, so a
-  // new source is read again rather than keeping the other computer's answer.
-  createEffect(
-    () => (props.open ? props.providerKeys : undefined),
-    (keys) => {
-      setOpenCodeKeyStatus(undefined);
-      if (keys) void refreshOpenCodeKeyStatus();
-    },
-  );
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
   const updates = createSettingsUpdatesStore(props);
@@ -263,11 +231,6 @@ export function SettingsModal(props: SettingsModalProps) {
     activationMode: "automatic" as const,
   };
 
-  /** OpenCode is the only provider whose sign-in is a pasted key, so it is the only row served. */
-  function openProviderKeyDialog(provider: AgentProviderId): void {
-    if (provider === "opencode") setOpenCodeKeyOpen(true);
-  }
-
   function updateSetting<Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]): void {
     props.onValueChange({ ...props.value, [key]: value });
   }
@@ -288,31 +251,12 @@ export function SettingsModal(props: SettingsModalProps) {
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         floatingContent={
-          <>
-            <Show when={openCodeKeyOpen() && props.providerKeys}>
-              {(api) => (
-                <OpenCodeKeyDialog
-                  api={api()}
-                  onClose={() => {
-                    setOpenCodeKeyOpen(false);
-                    void refreshOpenCodeKeyStatus();
-                  }}
-                  onReconnect={props.onConnectProvider ? () => props.onConnectProvider?.("opencode") : undefined}
-                />
-              )}
-            </Show>
-            <Show when={props.codeLogin?.provider() ? props.codeLogin : undefined}>
-              {(api) => (
-                <ProviderCodeLoginDialog
-                  open={true}
-                  providerName={agentProviderDescriptor(api().provider() ?? "codex").displayName}
-                  state={api().state()}
-                  onOpenVerificationUrl={api().openVerificationUrl}
-                  onCancel={api().cancel}
-                />
-              )}
-            </Show>
-          </>
+          <ProviderSettingsDialogs
+            keys={providerKeyState}
+            providerKeys={props.providerKeys}
+            codeLogin={props.codeLogin}
+            onConnectProvider={props.onConnectProvider}
+          />
         }
         footer={
           <SaveBarDock value={profile.nameDirty() ? true : null}>
@@ -379,7 +323,7 @@ export function SettingsModal(props: SettingsModalProps) {
             onAddCustomProvider={props.onAddCustomProvider}
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
-            onSignInProvider={props.providerKeys ? openProviderKeyDialog : undefined}
+            onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
             turboModePending={props.turboModePending}
             onTestNotification={props.onTestNotification}

@@ -54,8 +54,6 @@ export const messages = {
   "agentSettings.runtime.claudeApprovalNote": "Claude は、あなたへの質問を除き、承認を求めずに操作します。",
   "agentSettings.runtime.providerApprovalNote":
     "プロバイダーによっては、重要なコマンドの実行前に承認を求めることがあります。",
-  "agentSettings.runtime.workspaceNote":
-    "「ワークスペースのみ」では、書き込みをこのエージェントのワークスペースと共有フォルダーに制限します。読み取りとネットワークは引き続き使用できます。まだ適用されていません。このバージョンでは、このエージェントは引き続きフルアクセスを持ちます。",
 
   "agentSettings.access.workspace": "ワークスペースのみ",
   "agentSettings.access.full": "フルアクセス",
@@ -79,4 +77,12 @@ export const messages = {
   "agentSettings.links.files": "ファイル",
   "agentSettings.links.routines": "ルーティン",
   "agentSettings.links.routinesCount": { other: "{count} 件設定済み" },
+  "agentSettings.runtime.workspaceNote":
+    "「ワークスペースのみ」は、書き込みをこのエージェントのワークスペース、共有フォルダー、一時フォルダーに制限します。読み取りとネットワークは引き続き使用できます。",
+  "agentSettings.runtime.workspaceNotEnforced":
+    "{provider} はまだこれを適用しないため、このエージェントは引き続きフルアクセスを持ちます。Codex エージェントには適用されます。",
+  "agentSettings.runtime.workspaceEnforced":
+    "外部に書き込む必要があるコマンドは、自動承認がオンでも先に確認します。Computer Use と OpenBot ブラウザーは制限されません。Computer Use は下でオフにできます。",
+  "agentSettings.computerUse.title": "Computer Use",
+  "agentSettings.computerUse.description": "このエージェントにこのコンピューターのアプリの操作を許可します",
 } as const satisfies PartialTranslation<typeof source>;

@@ -196,7 +196,7 @@ function desktopAuthenticationDatabase(calls: PreparedCall[]): D1Database {
 }
 
 function mobileRevocationDatabase(calls: PreparedCall[]): D1Database {
-  return singleStatementDatabase(calls);
+  return singleStatementDatabase(calls, { id: "mobile-session" });
 }
 
 function singleStatementDatabase(calls: PreparedCall[], first?: unknown): D1Database {

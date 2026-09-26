@@ -52,7 +52,6 @@ export const messages = defineMessages("sidebar", {
   "sidebar.channel.noMessages": "No messages yet",
   "sidebar.channel.workingPreview": "Working · {preview}",
   "sidebar.channel.unread": { one: "{count} unread messages", other: "{count} unread messages" },
-  "sidebar.agent.workspaceOnly": "Workspace only (not enforced yet)",
   "sidebar.people.online": "Online now",
   "sidebar.people.offline": "Offline",
   "sidebar.people.unread": { one: "{count} unread direct messages", other: "{count} unread direct messages" },

@@ -562,24 +562,20 @@
   will-change: height;
 }
 
+/* Opacity only: a blur filter on text repaints every fading word on each frame. */
 .t-stream-w {
-  opacity: 0;
-  filter: blur(var(--stream-blur));
-  transition:
-    opacity var(--stream-fade) var(--stream-ease),
-    filter var(--stream-fade) var(--stream-ease);
+  animation: t-stream-in var(--stream-fade) var(--stream-ease) both;
 }
 
-.t-stream-w.is-in {
-  opacity: 1;
-  filter: blur(0);
+@keyframes t-stream-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .t-stream-w {
-    opacity: 1;
-    filter: none;
-    transition: none;
+    animation: none;
   }
 }
 

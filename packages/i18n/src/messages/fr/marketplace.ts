@@ -153,4 +153,5 @@ export const messages = {
   "marketplace.error.skillNameTaken":
     "Ce nom de compétence est déjà pris. Choisissez un autre nom dans SKILL.md, puis réessayez.",
   "marketplace.thisAgent": "cet agent",
+  "marketplace.error.publishDesktopOnly": "Publiez depuis l’app de bureau OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

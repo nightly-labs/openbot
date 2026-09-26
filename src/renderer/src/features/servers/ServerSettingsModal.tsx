@@ -59,6 +59,7 @@ import {
   SettingsSection,
   ShieldCheck,
   SlidingTabs,
+  Sparkles,
   SwitchField,
   Tabs,
   Text,
@@ -75,6 +76,7 @@ import { useText } from "@openbot/ui/text";
 import { truncateMiddle } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
+import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
@@ -85,6 +87,8 @@ export interface ServerSettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   platform: "darwin" | "win32" | "linux";
+  /** False where no remote desktop can start, such as the browser client. The section is then absent. */
+  remoteDesktopSupported?: boolean;
   server: ServerSummary;
   hostStatus?: HostStatus | null;
   members: TeamPresenceMember[];
@@ -95,8 +99,9 @@ export interface ServerSettingsModalProps {
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
   onSetPublished: (published: boolean) => Promise<void>;
-  onSetMuted: (muted: boolean) => Promise<void>;
-  onSetNotificationLevel: (level: ServerNotificationLevel) => Promise<void>;
+  /** The Notifications section appears only when a caller supplies both: they are desktop notifications. */
+  onSetMuted?: (muted: boolean) => Promise<void>;
+  onSetNotificationLevel?: (level: ServerNotificationLevel) => Promise<void>;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
@@ -110,7 +115,7 @@ export interface ServerSettingsModalProps {
    * servers - a remote host without the capability, or a `member` account - passes nothing, and
    * then neither the tab nor the panel exists.
    */
-  mcpServers?: McpServerConfig[];
+  mcpServers?: McpServerConfig[] | undefined;
   /** Why the MCP list is empty, when the read failed rather than found nothing. */
   mcpLoadError?: string | null;
   /**
@@ -132,12 +137,17 @@ export interface ServerSettingsModalProps {
    * The Storage section appears only when a caller supplies this: a remote host without
    * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
    */
-  storage?: ServerStorageOptions;
+  storage?: ServerStorageOptions | undefined;
+  /**
+   * The Providers section appears only when a caller supplies this. The desktop app passes nothing:
+   * its own Settings holds the providers of every host it administers.
+   */
+  providers?: HostProviderSettings | undefined;
   /** The Import section appears only when a caller supplies this: agents import into the local server. */
   agentImport?: ServerImportOptions;
 }
 
-type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "import";
+type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "providers" | "import";
 type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
@@ -162,6 +172,7 @@ const sections = {
   desktop: { title: "server.settings.desktopTitle", description: "server.settings.desktopDescription" },
   mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
   storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
+  providers: { title: "server.settings.providersTitle", description: "server.settings.providersDescription" },
   import: { title: "server.settings.importTitle", description: "server.settings.importDescription" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
@@ -267,6 +278,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
    * updated peers would silently mint single-use, so the tab stays hidden there.
    */
   const permanentSupported = () => local() || props.server.apiUrl === null;
+  const remoteDesktopSection = () => props.remoteDesktopSupported !== false && props.platform === "darwin";
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
@@ -618,6 +630,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "desktop" ||
         value === "mcp" ||
         value === "storage" ||
+        value === "providers" ||
         value === "import"
       )
         setSection(value);
@@ -783,7 +796,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <UsersRound aria-hidden="true" />
               <span>{t(sections.members.title)}</span>
             </Tabs.Trigger>
-            <Show when={props.platform === "darwin"}>
+            <Show when={remoteDesktopSection()}>
               <Tabs.Trigger class="settings-modal-nav-item" value="desktop">
                 <Monitor aria-hidden="true" />
                 <span>{t(sections.desktop.title)}</span>
@@ -801,6 +814,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.storage.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.providers}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="providers">
+                <Sparkles aria-hidden="true" />
+                <span>{t(sections.providers.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={props.agentImport}>
               <Tabs.Trigger class="settings-modal-nav-item" value="import">
                 <Download aria-hidden="true" />
@@ -816,9 +835,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <MembersPanel />
         </Tabs.Content>
-        <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
-          <DesktopPanel />
-        </Tabs.Content>
+        <Show when={remoteDesktopSection()}>
+          <Tabs.Content value="desktop" class="settings-modal-tab-panel server-settings-panel" data-tab="desktop">
+            <DesktopPanel />
+          </Tabs.Content>
+        </Show>
         <Show when={props.mcpServers}>
           {(servers) => (
             <Tabs.Content value="mcp" class="settings-modal-tab-panel server-settings-panel" data-tab="mcp">
@@ -846,6 +867,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
               <ServerStoragePanel serverId={props.server.id} {...storage()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={props.providers}>
+          {(providers) => (
+            <Tabs.Content value="providers" class="settings-modal-tab-panel server-settings-panel" data-tab="providers">
+              <HostProviderSettingsPanel {...providers()} hostName={props.server.name} selectMount={modalElement()} />
             </Tabs.Content>
           )}
         </Show>
@@ -1092,52 +1120,62 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Item>
           </ItemGroup>
         </Show>
-        <SettingsSection title={t("server.settings.notifications")}>
-          <ItemGroup class="settings-modal-card">
-            <SwitchField
-              class="server-settings-mute-setting"
-              size="default"
-              checked={props.server.notificationsMuted}
-              disabled={Boolean(busy())}
-              onChange={(value) => void run("mute", () => props.onSetMuted(value))}
-              label={t("server.settings.muteNotifications")}
-              description={
-                props.server.notificationsMutedUntil === null
-                  ? t("server.settings.muteDescription")
-                  : t("server.settings.mutedUntilDescription", {
-                      until: serverMuteDescription(props.server, t, format),
-                    })
-              }
-            />
-            <Item>
-              <ItemContent>
-                <ItemTitle id="server-settings-notification-level-label">{t("server.settings.notifyAbout")}</ItemTitle>
-                <ItemDescription>{t("server.settings.notifyAboutDescription")}</ItemDescription>
-              </ItemContent>
-              <ItemActions>
-                <Select<ServerNotificationLevel>
-                  options={[...SERVER_NOTIFICATION_LEVELS]}
-                  value={props.server.notificationLevel}
-                  disabled={Boolean(busy())}
-                  placement="bottom-end"
-                  onChange={(level) => {
-                    if (level) void run("notification-level", () => props.onSetNotificationLevel(level));
-                  }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>{t(SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue])}</SelectItem>
-                  )}
-                >
-                  <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
-                    <SelectValue<ServerNotificationLevel>>
-                      {(state) => t(SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()])}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent />
-                </Select>
-              </ItemActions>
-            </Item>
-          </ItemGroup>
-        </SettingsSection>
+        <Show when={props.onSetMuted && props.onSetNotificationLevel}>
+          <SettingsSection title={t("server.settings.notifications")}>
+            <ItemGroup class="settings-modal-card">
+              <SwitchField
+                class="server-settings-mute-setting"
+                size="default"
+                checked={props.server.notificationsMuted}
+                disabled={Boolean(busy())}
+                onChange={(value) => void run("mute", () => props.onSetMuted?.(value) ?? Promise.resolve())}
+                label={t("server.settings.muteNotifications")}
+                description={
+                  props.server.notificationsMutedUntil === null
+                    ? t("server.settings.muteDescription")
+                    : t("server.settings.mutedUntilDescription", {
+                        until: serverMuteDescription(props.server, t, format),
+                      })
+                }
+              />
+              <Item>
+                <ItemContent>
+                  <ItemTitle id="server-settings-notification-level-label">
+                    {t("server.settings.notifyAbout")}
+                  </ItemTitle>
+                  <ItemDescription>{t("server.settings.notifyAboutDescription")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Select<ServerNotificationLevel>
+                    options={[...SERVER_NOTIFICATION_LEVELS]}
+                    value={props.server.notificationLevel}
+                    disabled={Boolean(busy())}
+                    placement="bottom-end"
+                    onChange={(level) => {
+                      if (level)
+                        void run(
+                          "notification-level",
+                          () => props.onSetNotificationLevel?.(level) ?? Promise.resolve(),
+                        );
+                    }}
+                    itemComponent={(item) => (
+                      <SelectItem item={item.item}>
+                        {t(SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue])}
+                      </SelectItem>
+                    )}
+                  >
+                    <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
+                      <SelectValue<ServerNotificationLevel>>
+                        {(state) => t(SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()])}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent mount={modalElement()} />
+                  </Select>
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
       </>
     );
   }
@@ -1305,7 +1343,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <SelectTrigger class="server-settings-role-select" size="sm" aria-label={t("server.invite.role")}>
                   <SelectValue<InviteRole>>{(state) => t(ROLE_LABELS[state.selectedOption()])}</SelectValue>
                 </SelectTrigger>
-                <SelectContent />
+                <SelectContent mount={modalElement()} />
               </Select>
               <Show
                 when={

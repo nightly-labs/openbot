@@ -2,6 +2,8 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/agent";
 
 export const messages = {
+  "agent.access.workspaceOnly": "ワークスペースのみ",
+  "agent.access.workspaceOnlyNotEnforced": "ワークスペースのみ ({provider} では適用されません)",
   "agent.setup.nameFallback": "新しいエージェント",
   "agent.setup.titleAdditional": "新しいエージェントを作成",
   "agent.setup.titleFirst": "最初のエージェントを作成",

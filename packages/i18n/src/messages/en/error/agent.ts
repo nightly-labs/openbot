@@ -56,4 +56,5 @@ export const messages = defineMessages("error.agent", {
     'Stored agent profile {id} has an unreadable "{field}" value; update the data before starting OpenBot.',
   // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
+  "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
 });

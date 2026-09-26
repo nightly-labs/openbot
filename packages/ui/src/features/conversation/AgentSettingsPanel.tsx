@@ -1,3 +1,4 @@
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_ACCESS_MODES,
@@ -9,8 +10,10 @@ import {
   type AgentStatus,
   type AvatarHue,
   type AvatarImageInput,
+  agentComputerUseEnabled,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
+  enforcesWorkspaceAccess,
   type ProviderRuntimeStatus,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -62,6 +65,8 @@ export interface AgentSettingsPanelProps {
   working: boolean;
   /** Access belongs to the computer that runs the agent, so a remote server hides the control. */
   accessEditable?: boolean;
+  /** Computer Use is local-only too, and no remote host administers it yet. */
+  computerUseEditable?: boolean;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[];
@@ -115,6 +120,7 @@ interface AgentSettingsDraft {
   fields: AgentTextFields;
   notifications: boolean;
   access: AgentAccess;
+  computerUse: boolean;
   /** Widening to full access waits here for the confirmation. */
   confirmingFullAccess: boolean;
   runtime: AgentRuntimeSettings;
@@ -143,6 +149,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     fields: { description: "", name: "", title: "" },
     notifications: true,
     access: DEFAULT_AGENT_ACCESS,
+    computerUse: true,
     confirmingFullAccess: false,
     runtime: { model: "gpt-5.6-luna", provider: props.agent.provider, reasoningEffort: "medium" },
     saveError: null,
@@ -190,6 +197,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agent.description,
           String(agent.notifications),
           agent.access ?? DEFAULT_AGENT_ACCESS,
+          String(agentComputerUseEnabled(agent)),
           runtimeSettings.provider,
           runtimeSettings.model,
           runtimeSettings.reasoningEffort,
@@ -222,6 +230,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         if (!keep.description) state.fields.description = agent.description;
         state.notifications = agent.notifications;
         state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
+        state.computerUse = agentComputerUseEnabled(agent);
         if (agentChanged) state.confirmingFullAccess = false;
         state.runtime.provider = runtimeSettings.provider;
         state.runtime.model = runtimeSettings.model;
@@ -504,6 +513,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     if (!disposed && props.agent.id === agentId && draft.access === nextAccess) {
       setDraft((state) => {
         state.access = previousAccess;
+      });
+    }
+  }
+
+  async function saveComputerUse(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.computerUse = next;
+    });
+    if (await saveAgentPatch({ computerUse: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.computerUse === next) {
+      setDraft((state) => {
+        state.computerUse = !next;
       });
     }
   }
@@ -838,7 +860,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </>
                 }
               >
-                {t("agentSettings.runtime.workspaceNote")}
+                {t("agentSettings.runtime.workspaceNote")}{" "}
+                <Show
+                  when={enforcesWorkspaceAccess(draft.runtime.provider)}
+                  fallback={t("agentSettings.runtime.workspaceNotEnforced", {
+                    provider: agentProviderName(draft.runtime.provider),
+                  })}
+                >
+                  {t("agentSettings.runtime.workspaceEnforced")}
+                </Show>
               </Show>
             </Text>
           </SettingsSection>
@@ -848,6 +878,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 {message()}
               </p>
             )}
+          </Show>
+          <Show when={props.computerUseEditable}>
+            <div class="agent-settings-notifications">
+              <div>
+                <strong>{t("agentSettings.computerUse.title")}</strong>
+                <span>{t("agentSettings.computerUse.description")}</span>
+              </div>
+              <Switch
+                size="sm"
+                aria-label={t("agentSettings.computerUse.title")}
+                checked={draft.computerUse}
+                onChange={(next) => void saveComputerUse(next)}
+              />
+            </div>
           </Show>
           <div class="agent-settings-notifications">
             <div>

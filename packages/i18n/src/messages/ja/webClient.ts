@@ -68,4 +68,12 @@ export const messages = {
   "webClient.error.fileType": "この種類のファイルを添付するには、ホストをアップデートしてください。",
   "webClient.error.uploadCancelled": "添付ファイルのアップロードはキャンセルされました。",
   "webClient.error.duplication": "このホストはエージェントの複製に対応していません。",
+  "webClient.error.connectServerFirst": "先にこのサーバーに接続してください。",
+  "webClient.error.agentInstallNotAllowed":
+    "ここにエージェントを追加できるのはオーナーまたは管理者のみで、ホストでは最新の OpenBot が動作している必要があります。",
+  "webClient.error.linkDesktopOnly": "このリンクはデスクトップアプリでのみ開けます。",
+  "webClient.error.saveEndpointOffline": "エンドポイントを保存するには、ホストに接続してください。",
+  "webClient.error.removeEndpointOffline": "エンドポイントを削除するには、ホストに接続してください。",
+  "webClient.error.hostNotConnected": "ホストが接続されていません。",
+  "webClient.error.memberNotFound": "このメンバーは存在しません。",
 } as const satisfies PartialTranslation<typeof source>;

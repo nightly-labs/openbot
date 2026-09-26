@@ -70,4 +70,12 @@ export const messages = {
   "webClient.error.fileType": "Mettez l’hôte à jour pour joindre ce type de fichier.",
   "webClient.error.uploadCancelled": "L’envoi de la pièce jointe a été annulé.",
   "webClient.error.duplication": "Cet hôte ne prend pas en charge la duplication d’agents.",
+  "webClient.error.connectServerFirst": "Connectez-vous d’abord à ce serveur.",
+  "webClient.error.agentInstallNotAllowed":
+    "Seul un propriétaire ou un administrateur peut ajouter un agent ici, et l’hôte doit exécuter une version récente d’OpenBot.",
+  "webClient.error.linkDesktopOnly": "Ce lien s’ouvre uniquement dans l’app de bureau.",
+  "webClient.error.saveEndpointOffline": "Connectez-vous à votre hôte pour enregistrer un point de terminaison.",
+  "webClient.error.removeEndpointOffline": "Connectez-vous à votre hôte pour supprimer un point de terminaison.",
+  "webClient.error.hostNotConnected": "L’hôte n’est pas connecté.",
+  "webClient.error.memberNotFound": "Ce membre n’existe pas.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -17,13 +17,18 @@ export const providerKeyApi: ProviderKeyApi = {
 
 /**
  * The same four calls for the host of a joined server the account administers. The key goes to that
- * host, and only its state comes back. Links still open in the browser of this computer.
+ * host, and only its state comes back. Links still open on this computer: in the desktop app by
+ * default, or through `openExternal` where there is no desktop bridge, as in the browser client.
  */
-export function hostProviderKeyApi(admin: () => ProviderAdminDesktopApi, serverId: string): ProviderKeyApi {
+export function hostProviderKeyApi(
+  admin: () => ProviderAdminDesktopApi,
+  serverId: string,
+  openExternal: ProviderKeyApi["openExternal"] = (destination) => window.openbot.openExternal(destination),
+): ProviderKeyApi {
   return {
     getProviderApiKeyState: (provider) => admin().getApiKeyState(provider, serverId),
     setProviderApiKey: (input) => admin().setApiKey(input, serverId),
     clearProviderApiKey: (provider) => admin().clearApiKey(provider, serverId),
-    openExternal: (destination) => window.openbot.openExternal(destination),
+    openExternal,
   };
 }

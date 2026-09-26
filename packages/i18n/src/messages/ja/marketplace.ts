@@ -150,4 +150,5 @@ export const messages = {
   "marketplace.error.skillNameTaken":
     "このスキル名はすでに使われています。SKILL.md で別の名前を選んでから、もう一度お試しください。",
   "marketplace.thisAgent": "このエージェント",
+  "marketplace.error.publishDesktopOnly": "OpenBot デスクトップアプリから公開してください。",
 } as const satisfies PartialTranslation<typeof source>;

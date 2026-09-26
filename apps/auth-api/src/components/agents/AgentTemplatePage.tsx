@@ -1,4 +1,4 @@
-import { createOpenBotAgentTemplateUrl } from "@openbot/contracts/agent-template-links";
+import { createOpenBotAgentTemplateUrl, createWebAppAgentTemplatePath } from "@openbot/contracts/agent-template-links";
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { createSignal, For, lazy, onSettled, Show } from "solid-js";
 import { agentTemplatePath } from "../../lib/agent-template-path";
@@ -23,7 +23,8 @@ export interface AgentTemplatePageProps {
  *
  * The card is tinted with the agent's own avatar colour, so each shared agent looks like itself.
  * The button opens `openbot://agents/<id>`, built from the id, and the app then shows its own preview
- * with Install; nothing here installs.
+ * with Install; nothing here installs. The fallback line also links `/app?agent=<id>`, where the
+ * browser client shows the same preview.
  */
 export function AgentTemplatePage(props: AgentTemplatePageProps) {
   // The Worker renders an empty box of the avatar's size, and the browser fills it in.
@@ -103,8 +104,9 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
         </article>
 
         <p class="agent-share-fallback">
-          OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a> or{" "}
-          <a href={openUrl()}>open the app</a>.
+          OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a>,{" "}
+          <a href={openUrl()}>open the app</a>, or{" "}
+          <a href={createWebAppAgentTemplatePath(props.template.id)}>add it in your browser</a>.
         </p>
       </main>
     </div>

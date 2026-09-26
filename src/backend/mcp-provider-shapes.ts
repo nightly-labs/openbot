@@ -3,8 +3,13 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
-import { type AgentProviderId, isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
-import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  type AgentProviderId,
+  COMPUTER_USE_MCP_SERVER_ID,
+  isReservedMcpServerName,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
@@ -123,6 +128,23 @@ export type ResolvedMcpServer = Extract<UsableMcpServer, { error?: undefined }>;
 /** A server that could not be resolved at all. Every provider refuses these for the same reason. */
 function unusableDrop(server: UnusableMcpServer): McpServerDrop {
   return { name: server.config.name, reason: server.reason, detail: server.error };
+}
+
+/**
+ * The configurations one agent is given: all of them, or all but Computer Use when the user turned
+ * it off for that agent.
+ */
+export function agentMcpServers(configs: readonly McpServerConfig[], computerUse: boolean): readonly McpServerConfig[] {
+  return computerUse ? configs : configs.filter((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID);
+}
+
+/**
+ * Whether the `thread/start` or `thread/resume` params allow Computer Use. `ThreadLifecycle` sends
+ * `computerUse: false` to Claude and the ACP clients only when it is off, because those clients read
+ * the MCP servers themselves. Absent means on.
+ */
+export function computerUseParam(params: unknown): boolean {
+  return !isDynamicRecord(params) || params.computerUse !== false;
 }
 
 /**

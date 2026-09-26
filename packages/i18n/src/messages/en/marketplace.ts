@@ -156,4 +156,5 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.skillNameTaken":
     "That skill name is already taken. Choose a different name in SKILL.md, then try again.",
   "marketplace.thisAgent": "this agent",
+  "marketplace.error.publishDesktopOnly": "Publish from the OpenBot desktop app.",
 });

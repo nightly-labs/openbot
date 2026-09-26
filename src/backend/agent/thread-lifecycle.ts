@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentSummary, McpServerConfig } from "@openbot/contracts/ipc";
+import {
+  type AgentSummary,
+  agentComputerUseEnabled,
+  type McpServerConfig,
+  workspaceAccessEnforced,
+} from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient, AgentProvider } from "../agent-client";
@@ -10,6 +15,7 @@ import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import type { MailboxStore } from "../mailbox-store";
 import {
+  agentMcpServers,
   type CodexDisabledMcpServer,
   type CodexMcpServer,
   codexDisabledServers,
@@ -31,6 +37,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById, estimateTokens, renderHandoffMessage, summarizeOldMessages } from "./delivery-content";
 import { developerInstructions } from "./developer-instructions";
 import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-items";
+import { codexSandboxConfig, codexSandboxMode } from "./workspace-sandbox";
 
 /**
  * What the Codex adapter sends, versioned. Codex ignores MCP configuration on resume, so a
@@ -292,7 +299,7 @@ export class ThreadLifecycle {
     // One reading of the MCP set for the request and for the manifest below. Read twice, a change
     // that lands while the provider answers would be recorded as what this session was given, and
     // `hasCurrentTools` would then accept a session that never got it.
-    const mcpServers = this.#mcpServers();
+    const mcpServers = this.#agentMcpServers(agent);
     // The runtimes join that single reading for the same reason: a download that finishes while
     // the provider answers must not be recorded as what resolved this session's servers.
     const toolRuntimes = this.#toolRuntimes();
@@ -302,13 +309,14 @@ export class ThreadLifecycle {
     const response = await client.request(
       "thread/start",
       {
-        ...(await this.codexConfig(client, mcpServers, disabled, toolRuntimes)),
+        ...(await this.codexConfig(agent, client, mcpServers, disabled, toolRuntimes)),
         model: agent.model,
         effort: agent.reasoningEffort,
         cwd: agent.workspacePath,
         runtimeWorkspaceRoots: [agent.workspacePath, this.#store.sharedRoot],
         approvalPolicy: "on-request",
-        sandbox: "danger-full-access",
+        sandbox: codexSandboxMode(agent),
+        ...this.#computerUseParam(agent, client),
         developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
         ephemeral: false,
         serviceName: "openbot",
@@ -382,16 +390,25 @@ export class ThreadLifecycle {
    * places resolves to the one the panel shows.
    */
   private async codexConfig(
+    agent: AgentSummary,
     client: AgentClient,
     configs: readonly McpServerConfig[],
     disabled: Record<string, CodexDisabledMcpServer>,
     toolRuntimes: McpToolRuntimes,
-  ): Promise<{ config?: { mcp_servers: Record<string, CodexMcpServer | CodexDisabledMcpServer> } }> {
+  ): Promise<{
+    config?: {
+      mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
+    } & ReturnType<typeof codexSandboxConfig>;
+  }> {
     if (client.provider !== "codex") return {};
     const { servers, dropped } = codexMcpServers(await usableMcpServers(configs, toolRuntimes, this.#mcpAuthorization));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
-    return Object.keys(mcpServers).length > 0 ? { config: { mcp_servers: mcpServers } } : {};
+    const config = {
+      ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
+      ...codexSandboxConfig(agent, this.#store.sharedRoot),
+    };
+    return Object.keys(config).length > 0 ? { config } : {};
   }
 
   /**
@@ -429,7 +446,8 @@ export class ThreadLifecycle {
    *
    * The profile the user edits is folded in as well. Codex keeps the developer instructions a
    * session was started with, so a session resumed after an edit goes on following the old
-   * standing remit. Memories stay out: the agent saves them during its own turns, and a new
+   * standing remit. The Access mode goes in for the same reason: the instructions say what the agent
+   * may write. Memories stay out: the agent saves them during its own turns, and a new
    * session for each one would drop the provider history far too often.
    */
   private toolFingerprint(
@@ -446,10 +464,21 @@ export class ThreadLifecycle {
           Object.keys(disabled).sort(),
           [toolRuntimes.binDirectories, toolRuntimes.commandAliases],
           CODEX_MCP_ADAPTER_VERSION,
-          [agent.name, agent.title, agent.description],
+          // Only a sandboxed agent adds a value: a full-access session keeps the fingerprint it had.
+          [agent.name, agent.title, agent.description, ...(workspaceAccessEnforced(agent) ? ["workspace"] : [])],
         ]),
       )
       .digest("hex");
+  }
+
+  /** The enabled servers this agent is given. Without Computer Use the fingerprint changes, so Codex replaces the session. */
+  #agentMcpServers(agent: AgentSummary): readonly McpServerConfig[] {
+    return agentMcpServers(this.#mcpServers(), agentComputerUseEnabled(agent));
+  }
+
+  /** Claude and the ACP clients read the servers themselves, so they are told to leave Computer Use out. */
+  #computerUseParam(agent: AgentSummary, client: AgentClient): { computerUse?: false } {
+    return client.provider === "codex" || agentComputerUseEnabled(agent) ? {} : { computerUse: false };
   }
 
   private async hasCurrentTools(agent: AgentSummary, client: AgentClient, sessionId: string): Promise<boolean> {
@@ -457,7 +486,12 @@ export class ThreadLifecycle {
       const stored = await readFile(this.toolManifestPath(sessionId), "utf8");
       return (
         stored ===
-        this.toolFingerprint(agent, this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())
+        this.toolFingerprint(
+          agent,
+          this.#agentMcpServers(agent),
+          await this.codexOwnServers(client),
+          this.#toolRuntimes(),
+        )
       );
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
@@ -478,10 +512,17 @@ export class ThreadLifecycle {
       cwd: agent.workspacePath,
       runtimeWorkspaceRoots: [agent.workspacePath, this.#store.sharedRoot],
       approvalPolicy: "on-request",
-      sandbox: "danger-full-access",
+      sandbox: codexSandboxMode(agent),
+      ...this.#computerUseParam(agent, client),
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),
-      ...(await this.codexConfig(client, this.#mcpServers(), await this.codexOwnServers(client), this.#toolRuntimes())),
+      ...(await this.codexConfig(
+        agent,
+        client,
+        this.#agentMcpServers(agent),
+        await this.codexOwnServers(client),
+        this.#toolRuntimes(),
+      )),
     };
   }
 

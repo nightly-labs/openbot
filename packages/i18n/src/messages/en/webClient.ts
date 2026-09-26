@@ -64,4 +64,12 @@ export const messages = defineMessages("webClient", {
   "webClient.error.fileType": "Update the host to attach this file type.",
   "webClient.error.uploadCancelled": "The attachment upload was cancelled.",
   "webClient.error.duplication": "This host does not support agent duplication.",
+  "webClient.error.connectServerFirst": "Connect to this server first.",
+  "webClient.error.agentInstallNotAllowed":
+    "Only an owner or admin can add an agent here, and the host must run a current OpenBot.",
+  "webClient.error.linkDesktopOnly": "This link opens only in the desktop app.",
+  "webClient.error.saveEndpointOffline": "Connect to your host to save an endpoint.",
+  "webClient.error.removeEndpointOffline": "Connect to your host to remove an endpoint.",
+  "webClient.error.hostNotConnected": "The host is not connected.",
+  "webClient.error.memberNotFound": "The member does not exist.",
 });

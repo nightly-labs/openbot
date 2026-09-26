@@ -286,7 +286,7 @@ export function isTeamRealtimeEvent(value: unknown): value is TeamRealtimeEvent 
   );
 }
 
-function isTeamPresenceSnapshot(value: unknown): value is TeamPresenceSnapshot {
+export function isTeamPresenceSnapshot(value: unknown): value is TeamPresenceSnapshot {
   if (!isDynamicRecord(value) || !Array.isArray(value.members)) return false;
   return (
     (value.serverId === null || isIdentifier(value.serverId)) &&

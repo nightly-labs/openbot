@@ -53,7 +53,6 @@ export const messages = {
   "sidebar.channel.noMessages": "Aucun message pour l’instant",
   "sidebar.channel.workingPreview": "En cours · {preview}",
   "sidebar.channel.unread": { one: "{count} message non lu", other: "{count} messages non lus" },
-  "sidebar.agent.workspaceOnly": "Espace de travail uniquement (pas encore appliqué)",
   "sidebar.people.online": "En ligne",
   "sidebar.people.offline": "Hors ligne",
   "sidebar.people.unread": {

@@ -62,4 +62,5 @@ export const messages = {
   "error.agent.storedProfileUnreadableId":
     "保存されたエージェントのプロフィール {id} に読み取れない「{field}」の値があります。OpenBot を起動する前にデータを更新してください。",
   "error.agent.queueEditRejected": "キューの編集が拒否されました: {reason}",
+  "error.agent.computerUseLocalOnly": "Computer Use は、エージェントを実行しているコンピューターでのみ変更できます。",
 } as const satisfies PartialTranslation<typeof source>;

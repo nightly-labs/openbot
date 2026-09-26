@@ -29,7 +29,6 @@ export const messages = defineMessages("conversation", {
   "conversation.direct.input": "Message {name}",
   "conversation.direct.send": "Send direct message",
   "conversation.header.settings": "View agent settings",
-  "conversation.header.workspaceOnly": "Workspace only (not enforced yet)",
   "conversation.header.resumeRemote": "Resume remote control",
   "conversation.header.openRemote": "Open remote control",
   "conversation.header.hideFiles": "Hide files",

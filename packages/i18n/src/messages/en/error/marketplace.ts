@@ -56,4 +56,6 @@ export const messages = defineMessages("error.marketplace", {
   "error.marketplace.secretInRoutine":
     'Remove the secret or email address from the routine "{name}" before publishing.',
   "error.marketplace.secretInSkill": 'Remove the secret or email address from the skill "{name}" before publishing.',
+  "error.marketplace.catalogLoadFailed": "The marketplace could not be loaded. Try again.",
+  "error.marketplace.templateUnreadable": "This shared agent could not be read. Its owner may have removed it.",
 });
