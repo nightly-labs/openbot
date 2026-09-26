@@ -76,34 +76,28 @@ const UNSERIALIZABLE = "[unserializable]";
 
 // A value the owner knows is secret: a saved provider key, an MCP header. No rule above can
 // recognise `x7Kq…` as a credential, so each one is masked by its exact text. Short values are
-// refused because masking `true` or `8080` would erase ordinary diagnostics. The set is bounded so
-// that rotating keys cannot grow it without limit; the oldest value goes first.
+// refused because masking `true` or `8080` would erase ordinary diagnostics. Each owner replaces its
+// own values, so a rotated or removed key leaves the set, and no owner's values push out another's.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
-const MAX_REGISTERED_SECRETS = 1_024;
-const registeredSecrets = new Set<string>();
+const registeredSecretsByOwner = new Map<string, string[]>();
 // Longest first, so a secret that contains another one is masked whole, not in parts.
 let registeredSecretsByLength: string[] = [];
 
 /**
- * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
- * URL-encoded forms.
+ * Makes `values` the secrets `owner` holds now. Every later log line, export and trace masks them
+ * in their raw, JSON-escaped and URL-encoded forms. An empty list removes the owner.
  */
-export function registerSecretValue(value: string): void {
-  if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
-  const forms = new Set([value, JSON.stringify(value).slice(1, -1), encodeURIComponent(value)]);
-  let changed = false;
-  for (const form of forms) {
-    if (registeredSecrets.has(form)) continue;
-    registeredSecrets.add(form);
-    changed = true;
+export function setSecretValues(owner: string, values: Iterable<string>): void {
+  const forms = new Set<string>();
+  for (const value of values) {
+    if (value.length < MIN_REGISTERED_SECRET_LENGTH) continue;
+    forms.add(value).add(JSON.stringify(value).slice(1, -1)).add(encodeURIComponent(value));
   }
-  if (!changed) return;
-  while (registeredSecrets.size > MAX_REGISTERED_SECRETS) {
-    const oldest = registeredSecrets.values().next();
-    if (oldest.done) break;
-    registeredSecrets.delete(oldest.value);
-  }
-  registeredSecretsByLength = [...registeredSecrets].sort((left, right) => right.length - left.length);
+  if (forms.size === 0) registeredSecretsByOwner.delete(owner);
+  else registeredSecretsByOwner.set(owner, [...forms]);
+  registeredSecretsByLength = [...new Set([...registeredSecretsByOwner.values()].flat())].sort(
+    (left, right) => right.length - left.length,
+  );
 }
 
 /** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */
@@ -119,11 +113,11 @@ function maskRegisteredSecrets(value: string): string {
   return result;
 }
 
+// The label rules run first: a registered value that is also a label, such as `password`, must
+// not erase the label before the rules can hide the value after it.
 export function redactText(value: string): string {
-  const masked = maskRegisteredSecrets(value);
-  const reparsed = redactSerializedJson(masked);
-  if (reparsed !== null) return reparsed;
-  return applyTextRules(redactEmbeddedJson(masked));
+  const reparsed = redactSerializedJson(value);
+  return maskRegisteredSecrets(reparsed ?? applyTextRules(redactEmbeddedJson(value)));
 }
 
 function applyTextRules(value: string): string {

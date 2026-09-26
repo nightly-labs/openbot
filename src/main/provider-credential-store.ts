@@ -2,7 +2,7 @@
 
 import { readFile, rm } from "node:fs/promises";
 import type { AgentProviderId, ProviderApiKeyStatus } from "@openbot/contracts/ipc";
-import { registerSecretValue } from "@openbot/logging";
+import { setSecretValues } from "@openbot/logging";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 
@@ -20,6 +20,8 @@ const envelopeSchema = z.object({
 });
 
 const MAX_ENVELOPE_BYTES = 64 * 1024;
+/** The owner name under which the stored keys are masked in logs. */
+const SECRET_OWNER = "provider-credentials";
 
 export interface SecretCipher {
   encrypt: (value: string) => Buffer;
@@ -59,6 +61,8 @@ export class ProviderCredentialStore {
     this.#loadError = null;
     try {
       this.#keys = await this.#read();
+      // A provider CLI can echo the key in an error, and no rule knows the shape of every provider's key.
+      setSecretValues(SECRET_OWNER, this.#keys.values());
     } catch (error) {
       this.#loadError = error instanceof Error ? error : new Error("The provider credential file is unreadable.");
     }
@@ -79,7 +83,6 @@ export class ProviderCredentialStore {
   }
 
   async set(provider: AgentProviderId, key: string): Promise<void> {
-    registerSecretValue(key);
     await this.#edit((keys) => {
       keys.set(provider, key);
       return true;
@@ -129,6 +132,7 @@ export class ProviderCredentialStore {
     }
     this.#keys = next;
     this.#loadError = null;
+    setSecretValues(SECRET_OWNER, next.values());
   }
 
   async #read(): Promise<Map<string, string>> {
@@ -143,10 +147,7 @@ export class ProviderCredentialStore {
     const envelope = envelopeSchema.parse(JSON.parse(source));
     const keys = new Map<string, string>();
     for (const [provider, encrypted] of Object.entries(envelope.credentials)) {
-      const key = this.#cipher.decrypt(Buffer.from(encrypted, "base64"));
-      // A provider CLI can echo the key in an error, and no rule knows the shape of every provider's key.
-      registerSecretValue(key);
-      keys.set(provider, key);
+      keys.set(provider, this.#cipher.decrypt(Buffer.from(encrypted, "base64")));
     }
     return keys;
   }

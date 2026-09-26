@@ -6,8 +6,8 @@ import {
   type LogValue,
   redactText,
   redactValue,
-  registerSecretValue,
   resolveLogLevel,
+  setSecretValues,
   toLogValue,
 } from "./index";
 
@@ -165,11 +165,11 @@ describe("redactText", () => {
   });
 });
 
-describe("registerSecretValue", () => {
+describe("setSecretValues", () => {
   // A saved key has no prefix or label that a rule can match, so only its exact text can mask it.
   it("masks a registered value in every form a log line can carry it", () => {
     const secret = 'x7Kq"9Lm/2Pz';
-    registerSecretValue(secret);
+    setSecretValues("forms", [secret]);
 
     expect(redactText(`provider said ${secret} was refused`)).toBe("provider said [redacted] was refused");
     expect(redactText(`body ${JSON.stringify({ note: secret })}`)).toBe('body {"note":"[redacted]"}');
@@ -178,9 +178,17 @@ describe("registerSecretValue", () => {
   });
 
   it("does not register a value too short to be a secret", () => {
-    registerSecretValue("8080");
+    setSecretValues("short", ["8080"]);
 
     expect(redactText("listening on 8080")).toBe("listening on 8080");
+  });
+
+  // A registered value can also be a label. Masking it first would erase the label the rules need.
+  it("keeps label rules working when a registered value is a label", () => {
+    setSecretValues("label", ["password"]);
+
+    expect(redactText("password=opaque-value")).not.toContain("opaque-value");
+    expect(redactText('{"password":"opaque-value"}')).not.toContain("opaque-value");
   });
 });
 
