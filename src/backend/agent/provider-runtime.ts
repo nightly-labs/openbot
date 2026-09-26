@@ -795,11 +795,13 @@ export class ProviderRuntime implements ProviderPort {
     return this.#confined.has(agentId) || this.#confinedStarts.has(agentId);
   }
 
-  /** Like `requireReadyClient`, for the process that runs this agent's turns. */
+  /**
+   * Like `requireReadyClient`, for the process that runs this agent's turns. An agent's own process
+   * does not need the shared one, so its turn can still be interrupted while the shared one restarts.
+   */
   requireReadyClientForAgent(agent: AgentSummary): AgentClient {
     const provider = providerForAgent(agent);
-    const shared = this.requireReadyClient(provider);
-    if (!this.#confined.has(agent.id) && !this.#confinementFor(agent)) return shared;
+    if (!this.#confined.has(agent.id) && !this.#confinementFor(agent)) return this.requireReadyClient(provider);
     const client = this.clientForAgent(agent);
     if (!client) throw new Error(`${providerLabel(provider)} has no process running for this agent.`);
     return client;
