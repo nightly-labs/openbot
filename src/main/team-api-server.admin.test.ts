@@ -16,7 +16,7 @@ import type {
   SharedTable,
   UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAgentAdminSettings } from "./agent-admin-settings";
 import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
@@ -288,7 +288,8 @@ describe("Team API providers-v1", () => {
       }),
       cancelProviderCodeLogin: async () => status,
       changeProviderCredential: async (provider: string, change: () => Promise<void>) => {
-        if (provider === "grok") throw new Error("Grok is busy. Try again when its turn ends.");
+        // A provider process can quote the key it failed with.
+        if (provider === "grok") throw new Error(`Grok could not start with ${PROVIDER_KEY}.`);
         await change();
         return status;
       },
@@ -296,6 +297,8 @@ describe("Team API providers-v1", () => {
     const credentials = {
       status: (provider: string) => (keys.has(provider) ? ("saved" as const) : ("missing" as const)),
       set: async (provider: string, key: string) => {
+        // As the real store does, so every later log line and error can mask the key.
+        registerSecretValue(key);
         keys.set(provider, key);
       },
       clear: async (provider: string) => {

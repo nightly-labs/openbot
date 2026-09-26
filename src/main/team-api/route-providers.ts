@@ -2,6 +2,7 @@ import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contr
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import { redactText } from "@openbot/logging";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
@@ -70,8 +71,9 @@ export async function routeProviders(
     }
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    // A busy provider or a failed download is a sentence for the admin, not a host fault.
-    if (error instanceof Error) throw new HttpError(409, error.message);
+    // A busy provider or a failed download is a sentence for the admin, not a host fault. A provider
+    // process can quote its key, so the message leaves this computer redacted.
+    if (error instanceof Error) throw new HttpError(409, redactText(error.message));
     throw error;
   }
 }

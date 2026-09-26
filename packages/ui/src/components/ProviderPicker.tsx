@@ -336,10 +336,19 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const connectOptional = () =>
                 freeModelsReady(option()) &&
                 providerRuntimeAction(state(), connecting(), runtimeStatus()) === "connect";
-              const runtimeAction = () =>
-                updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded"
-                  ? undefined
-                  : providerRuntimeAction(state(), connecting(), runtimeStatus());
+              const runtimeAction = () => {
+                if (updatable() && props.onUpdateProvider && runtimeStatus()?.phase === "not-downloaded") return;
+                const action = providerRuntimeAction(state(), connecting(), runtimeStatus());
+                // A remote host has no browser sign-in, so its caller passes no onConnectProvider:
+                // show only the Connect, Reconnect or Restart that the key dialog can answer.
+                if (action !== "connect" && action !== "reconnect" && action !== "restart") return action;
+                if (props.onConnectProvider) return action;
+                return option().id === "opencode" &&
+                  (action === "reconnect" || connectOptional()) &&
+                  props.onSignInProvider
+                  ? action
+                  : undefined;
+              };
               /**
                * The row has a way in the user finishes elsewhere, and something to run it with.
                *
