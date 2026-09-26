@@ -6,6 +6,7 @@ import {
   type FirstAgentDraft,
   FirstAgentSetup,
 } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
 import { createAgentInitialMessage } from "../agents/agent-initial-message";
 import type { WebWorkspaceRuntime } from "./web-runtime";
@@ -16,6 +17,7 @@ export function WebAgentSettings(props: {
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const { t } = useText();
   const [state, setState] = createStore<{
     draft: FirstAgentDraft;
     models: AgentModelOption[];
@@ -73,7 +75,7 @@ export function WebAgentSettings(props: {
       } catch {
         if (disposed || requestGeneration !== modelRequestGeneration) return;
         setState((draft) => {
-          draft.error = "Could not load the host models.";
+          draft.error = t("webClient.agent.modelsFailed");
         });
       }
     })();
@@ -109,9 +111,7 @@ export function WebAgentSettings(props: {
     } catch {
       if (!disposed)
         setState((draft) => {
-          draft.error = created
-            ? "The agent was created, but the workspace could not refresh. Reload before trying again."
-            : "The result is not confirmed. Close this form and check the host before trying again.";
+          draft.error = created ? t("webClient.agent.refreshFailed") : t("webClient.agent.unconfirmed");
           draft.uncertain = true;
         });
     } finally {

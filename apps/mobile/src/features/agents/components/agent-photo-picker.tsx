@@ -1,11 +1,11 @@
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { userErrorMessage } from "@openbot/user-errors";
 import type { Href } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ImagePlus, Trash2 } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
+import { useText } from "@/shared/lib/text";
 
 export interface AgentPhotoDraft extends RemoteFileUpload {
   uri: string;
@@ -25,6 +25,7 @@ export function AgentPhotoPicker({
   onChange: (photo: AgentPhotoDraft | null) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const { t, errorMessage } = useText();
   const foreground = useThemeColor("foreground");
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export function AgentPhotoPicker({
       const photo = await pickAvatarPhoto(cropRoute);
       if (photo) onChange({ uri: photo.uri, name: photo.name, mimeType: photo.mimeType, base64: photo.base64 });
     } catch (cause) {
-      setError(userErrorMessage(cause, "Could not open this photo. Try again."));
+      setError(errorMessage(cause, t("mobile.agent.photo.openFailed")));
     } finally {
       pending.current = false;
       onBusyChange(false);
@@ -48,7 +49,7 @@ export function AgentPhotoPicker({
       <Button
         isIconOnly
         variant="ghost"
-        accessibilityLabel={hasPhoto ? "Change photo" : "Add photo"}
+        accessibilityLabel={t(hasPhoto ? "mobile.agent.photo.change" : "mobile.agent.photo.add")}
         isDisabled={disabled}
         onPress={() => void choose()}
       >
@@ -58,7 +59,7 @@ export function AgentPhotoPicker({
         <Button
           isIconOnly
           variant="ghost"
-          accessibilityLabel="Remove photo"
+          accessibilityLabel={t("mobile.agent.photo.remove")}
           isDisabled={disabled}
           onPress={() => {
             setError(null);

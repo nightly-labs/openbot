@@ -1,4 +1,5 @@
 import type { MobileConnectHostBinding, MobileConnectTicket } from "@openbot/contracts/mobile-connect";
+import { sourceText } from "@openbot/i18n/source";
 import type { CentralAuthManager } from "./central-auth-manager";
 
 interface MobileConnectHostDependencies {
@@ -24,10 +25,11 @@ export async function createHostedMobileConnect({
   if (!host.getStatus().configured) await host.configure({ serverName: "OpenBot" });
   const status = await host.start();
   if (!isPublishedHost(status)) {
-    throw new Error(status.message ?? "This OpenBot could not be published for Mobile Connect.");
+    throw new Error(status.message ?? sourceText("error.host.mobileConnectPublishFailed"));
   }
   const binding = host.getMobileConnectHost();
-  if (!binding || binding.hostId !== status.serverId) throw new Error("The Mobile Connect host changed. Try again.");
+  if (!binding || binding.hostId !== status.serverId)
+    throw new Error(sourceText("error.host.mobileConnectHostChanged"));
   return centralAuth.createMobileConnect(binding);
 }
 

@@ -1,3 +1,4 @@
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import type { ExpoSpeechRecognitionErrorCode } from "expo-speech-recognition";
 import { localeName } from "./language-names";
 
@@ -65,8 +66,8 @@ export function pickRecognitionLocale(preferred: readonly string[], supported: r
 }
 
 /** A locale by name, such as "Polish (Poland)", so a speaker can find it. */
-function recognitionLocaleLabel(locale: string): string {
-  return localeName(locale) ?? locale;
+function recognitionLocaleLabel(locale: string, t: MobileTranslate): string {
+  return localeName(locale, t) ?? locale;
 }
 
 /**
@@ -77,13 +78,14 @@ export function dictationLanguageOptions(
   supported: readonly string[],
   /** Null for the automatic choice. */
   selected: string | null,
+  t: MobileTranslate,
 ): { value: string; label: string }[] {
   const locales = new Map<string, string>();
   for (const locale of [...supported, ...(selected ? [selected] : [])]) {
     if (!locales.has(normalizeLocale(locale))) locales.set(normalizeLocale(locale), locale);
   }
   return [...locales.values()]
-    .map((value) => ({ value, label: recognitionLocaleLabel(value) }))
+    .map((value) => ({ value, label: recognitionLocaleLabel(value, t) }))
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
@@ -92,19 +94,22 @@ export function hasRecognitionLocale(locale: string, locales: readonly string[])
 }
 
 export interface DictationNotice {
-  title: string;
-  message: string;
+  title: MobileTextKey;
+  message: MobileTextKey;
   /** The user can only change this permission in the device settings. */
   openSettings?: boolean;
 }
 
 export const microphoneOffNotice: DictationNotice = {
-  title: "Microphone access is off",
-  message: "To dictate a message, allow OpenBot to use the microphone and speech recognition in Settings.",
+  title: "mobile.chat.dictation.microphoneOffTitle",
+  message: "mobile.chat.dictation.microphoneOffMessage",
   openSettings: true,
 };
 
-export const dictationFailedNotice: DictationNotice = { title: "Dictation stopped", message: "Try again." };
+export const dictationFailedNotice: DictationNotice = {
+  title: "mobile.chat.dictation.stopped",
+  message: "mobile.chat.dictation.tryAgain",
+};
 
 /** Null when the stop needs no message: the user stopped it, or said nothing. */
 export function dictationNotice(code: ExpoSpeechRecognitionErrorCode): DictationNotice | null {
@@ -117,20 +122,17 @@ export function dictationNotice(code: ExpoSpeechRecognitionErrorCode): Dictation
     case "not-allowed":
       return microphoneOffNotice;
     case "language-not-supported":
-      return { title: "Dictation is not available", message: "Speech recognition does not support your language." };
+      return { title: "mobile.chat.dictation.unavailable", message: "mobile.chat.dictation.languageUnsupported" };
     case "service-not-allowed":
-      return {
-        title: "Dictation is not available",
-        message: "Speech recognition is off or not available on this device.",
-      };
+      return { title: "mobile.chat.dictation.unavailable", message: "mobile.chat.dictation.serviceUnavailable" };
     case "network":
-      return { title: "Dictation stopped", message: "Speech recognition needs a network connection. Try again." };
+      return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.networkNeeded" };
     case "busy":
-      return { title: "Dictation stopped", message: "Another app is using speech recognition. Try again." };
+      return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.busy" };
     // iOS also reports recognizer failures, such as a damaged language model,
     // as audio-capture, so do not blame the microphone.
     case "audio-capture":
-      return { title: "Dictation stopped", message: "Speech recognition failed. Try again." };
+      return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.failed" };
     default:
       return dictationFailedNotice;
   }

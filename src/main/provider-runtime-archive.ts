@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { sourceText } from "@openbot/i18n/source";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,10 +25,10 @@ export async function assertSafeArchive(path: string, allowedRoots: readonly str
   const names = namesValue.split(/\r?\n/u).filter(Boolean);
   const details = detailsValue.split(/\r?\n/u).filter(Boolean);
   if (details.some((line) => !["-", "d"].includes(line.trimStart().charAt(0)))) {
-    throw new Error("The runtime archive contains a link or special file.");
+    throw new Error(sourceText("error.provider.archiveSpecialFile"));
   }
   for (const name of names) {
-    if (name.includes("\0") || name.includes("\\")) throw new Error("The runtime archive contains an unsafe path.");
+    if (name.includes("\0") || name.includes("\\")) throw new Error(sourceText("error.provider.archiveUnsafePath"));
     const normalized = name.replace(/\/+$/u, "");
     const parts = normalized.split("/");
     if (
@@ -36,7 +37,7 @@ export async function assertSafeArchive(path: string, allowedRoots: readonly str
       /^[A-Za-z]:/u.test(normalized) ||
       parts.some((part) => !part || part === "." || part === "..")
     ) {
-      throw new Error("The runtime archive contains an unsafe path.");
+      throw new Error(sourceText("error.provider.archiveUnsafePath"));
     }
     if (!allowedRoots.includes(parts[0] ?? "")) throw new Error(message);
   }
@@ -55,7 +56,7 @@ export async function rejectNonRegularFiles(root: string): Promise<void> {
     entries.map(async (entry) => {
       const path = join(root, entry.name);
       if (entry.isSymbolicLink() || (!entry.isFile() && !entry.isDirectory())) {
-        throw new Error("The runtime contains a link or special file.");
+        throw new Error(sourceText("error.provider.runtimeSpecialFile"));
       }
       if (entry.isDirectory()) await rejectNonRegularFiles(path);
     }),

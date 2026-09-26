@@ -13,6 +13,7 @@ import { type ScannerOrigin, ScanQrSheet } from "@/features/auth/components/scan
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SplashWallpaper } from "@/shared/components/splash-backdrop";
 import { SPLASH_LOGO_SIZE, SPLASH_MORPH_START, splashReveal, splashTravel } from "@/shared/lib/splash-motion";
+import { useText } from "@/shared/lib/text";
 import {
   SPLASH_HANDOFF_DEADLINE_MS,
   SplashContentReadyContext,
@@ -33,6 +34,7 @@ function useContentReveal(delay: number) {
 }
 
 export function SignInScreen() {
+  const { t } = useText();
   const reportContentReady = useContext(SplashContentReadyContext);
   const motion = useContext(SplashMotionContext);
   const insets = useSafeAreaInsets();
@@ -150,10 +152,10 @@ export function SignInScreen() {
                 align="center"
                 className="tracking-openbot-tight"
               >
-                Your agents, anywhere.
+                {t("mobile.auth.signIn.title")}
               </Typography.Heading>
               <Typography.Paragraph color="muted" align="center">
-                Connect to OpenBot on your computer.
+                {t("mobile.auth.signIn.subtitle")}
               </Typography.Paragraph>
             </Animated.View>
             <Animated.View style={actionsStyle}>
@@ -168,18 +170,16 @@ export function SignInScreen() {
                 <View onLayout={({ nativeEvent: { layout } }) => setHelpTriggerHeight(layout.height)}>
                   <Accordion.Trigger className="min-h-11 justify-center gap-2">
                     <Typography color="muted" className="text-caption">
-                      Where is the QR code?
+                      {t("mobile.auth.signIn.helpTitle")}
                     </Typography>
                     <Accordion.Indicator />
                   </Accordion.Trigger>
                 </View>
                 <Accordion.Content>
                   <View className="gap-3 pt-3">
-                    <Typography.Paragraph color="muted">1. Open OpenBot on your computer.</Typography.Paragraph>
-                    <Typography.Paragraph color="muted">2. Go to Settings → Mobile Connect.</Typography.Paragraph>
-                    <Typography.Paragraph color="muted">
-                      3. Choose Generate QR code, then scan it here.
-                    </Typography.Paragraph>
+                    <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep1")}</Typography.Paragraph>
+                    <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep2")}</Typography.Paragraph>
+                    <Typography.Paragraph color="muted">{t("mobile.auth.signIn.helpStep3")}</Typography.Paragraph>
                   </View>
                 </Accordion.Content>
               </Accordion.Item>

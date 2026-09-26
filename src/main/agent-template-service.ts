@@ -12,13 +12,16 @@ import {
   createAgentTemplateShareUrl,
   isAgentTemplateId,
 } from "@openbot/contracts/agent-template-links";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_TEMPLATE_LIMITS,
   type AgentSummary,
   type AgentTemplateDetail,
   type AgentTemplatePreview,
   type AgentTemplatePublication,
   type AgentTemplateSkill,
   type AgentTemplateSnapshot,
+  type AgentTemplateSnapshotProblem,
   type AvatarImageInput,
   agentTemplateSnapshotProblem,
   decodeAgentTemplateDetail,
@@ -31,10 +34,42 @@ import {
   toAgentTemplateSnapshot,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { imageMimeType, localSchedule, toArrayBuffer, validTimezone } from "./agent-marketplace-service";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
+
+/** The words for a snapshot problem. The English is the text the contract sent before. */
+function snapshotProblemText(problem: AgentTemplateSnapshotProblem): string {
+  switch (problem.kind) {
+    case "name":
+      return sourceText("error.marketplace.templateName", { count: INPUT_LIMITS.agentName });
+    case "title":
+      return sourceText("error.marketplace.templateRole", { count: INPUT_LIMITS.agentTitle });
+    case "noInstructions":
+      return sourceText("error.marketplace.templateNoInstructions");
+    case "instructions":
+      return sourceText("error.marketplace.templateInstructions", { count: INPUT_LIMITS.agentDescription });
+    case "avatar":
+      return sourceText("error.marketplace.templateAvatar");
+    case "skills":
+      return sourceText("error.marketplace.templateSkills", { count: AGENT_TEMPLATE_LIMITS.skills });
+    case "localSkills":
+      return sourceText("error.marketplace.templateLocalSkills", { count: AGENT_TEMPLATE_LIMITS.embeddedSkills });
+    case "skill":
+      return sourceText("error.marketplace.templateSkill", { name: problem.name });
+    case "routines":
+      return sourceText("error.marketplace.templateRoutines", { count: INPUT_LIMITS.agentRoutines });
+    case "routine":
+      return sourceText("error.marketplace.templateRoutine", {
+        name: problem.name || sourceText("error.marketplace.templateRoutineNoName"),
+        count: INPUT_LIMITS.routineName,
+      });
+    case "tooLarge":
+      return sourceText("error.marketplace.templateTooLarge");
+  }
+}
 
 /** Embedded skills are written here in the new agent's workspace, added to the library, and removed. */
 const SKILL_STAGING = ".openbot/template-skills";
@@ -125,13 +160,13 @@ export class AgentTemplateService {
   }
 
   async publish({ agentId, card }: PublishAgentTemplateInput): Promise<AgentTemplatePublication> {
-    if (card && !isAgentTemplateCardPng(card)) throw new Error("The share card is invalid.");
+    if (card && !isAgentTemplateCardPng(card)) throw new Error(sourceText("error.marketplace.shareCardInvalid"));
     const agent = this.requireAgent(agentId);
     const snapshot = await this.snapshot(agent);
     // The first real cause, so the owner knows what to change.
     const problem = agentTemplateSnapshotProblem(snapshot);
-    if (problem) throw new Error(problem);
-    if (!isAgentTemplateSnapshot(snapshot)) throw new Error("This agent cannot be published.");
+    if (problem) throw new Error(snapshotProblemText(problem));
+    if (!isAgentTemplateSnapshot(snapshot)) throw new Error(sourceText("error.marketplace.cannotPublish"));
     assertNoSecrets(snapshot);
     const form = new FormData();
     form.set("snapshot", JSON.stringify(snapshot));
@@ -159,7 +194,7 @@ export class AgentTemplateService {
   }
 
   async get(templateId: string): Promise<AgentTemplateDetail> {
-    if (!isAgentTemplateId(templateId)) throw new Error("The agent link is invalid.");
+    if (!isAgentTemplateId(templateId)) throw new Error(sourceText("error.marketplace.linkInvalid"));
     const detail = await this.auth.requestAuthorized(
       `/v1/agent-templates/${encodeURIComponent(templateId)}`,
       { method: "GET" },
@@ -169,11 +204,11 @@ export class AgentTemplateService {
   }
 
   async install(input: InstallAgentTemplateInput): Promise<InstallAgentTemplateResult> {
-    if (!validTimezone(input.timezone)) throw new Error("The local timezone is invalid.");
+    if (!validTimezone(input.timezone)) throw new Error(sourceText("error.marketplace.timezoneInvalid"));
     const detail = await this.get(input.templateId);
     // The owner can republish while the dialog is open; only the version the user read is installed.
     if (detail.updatedAt !== input.expectedUpdatedAt)
-      throw new Error("This agent changed after you opened it. Open the link again to review the new version.");
+      throw new Error(sourceText("error.marketplace.changedSinceOpened"));
     // Every embedded skill is checked before the agent exists, so a bad one creates nothing. A local
     // skill with the same name is reused only when its text is the same: a template never revises a
     // skill the user already has.
@@ -189,16 +224,14 @@ export class AgentTemplateService {
         normalizedFiles(await library.bundle(current.id, current.version))["SKILL.md"],
       );
       if (text !== skill.markdown)
-        throw new Error(
-          `You already have a different local skill named "${current.name}". Rename or remove it, then add this agent again.`,
-        );
+        throw new Error(sourceText("error.marketplace.skillNameConflict", { name: current.name }));
       reused.set(slug, { id: current.id, revision: current.version });
     }
     let avatar: AvatarImageInput | null = null;
     if (detail.avatarUrl) {
       const bytes = await this.auth.downloadAuthorized(detail.avatarUrl);
       const mimeType = imageMimeType(bytes);
-      if (!mimeType) throw new Error("The agent avatar is invalid.");
+      if (!mimeType) throw new Error(sourceText("error.marketplace.avatarInvalid"));
       avatar = { mimeType, bytes };
     }
 
@@ -299,7 +332,7 @@ export class AgentTemplateService {
 
   private requireAgent(agentId: string): AgentSummary {
     const agent = this.agents.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error("Choose a local agent first.");
+    if (!agent) throw new Error(sourceText("error.skill.chooseLocalAgent"));
     return agent;
   }
 }
@@ -309,24 +342,26 @@ export class AgentTemplateService {
  * a silently changed instruction would publish an agent that does not do what its owner wrote.
  */
 function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
+  // Each pair is the error message for the field, then the field text.
   const fields: Array<[string, string]> = [
-    ["the name", snapshot.name],
-    ["the title", snapshot.title],
-    ["the instructions", snapshot.description],
-    ...snapshot.routines.flatMap(
-      (routine): Array<[string, string]> => [
-        [`the routine "${routine.name}"`, routine.name],
-        [`the routine "${routine.name}"`, routine.instruction],
-      ],
-    ),
+    [sourceText("error.marketplace.secretInName"), snapshot.name],
+    [sourceText("error.marketplace.secretInTitle"), snapshot.title],
+    [sourceText("error.marketplace.secretInInstructions"), snapshot.description],
+    ...snapshot.routines.flatMap((routine): Array<[string, string]> => {
+      const message = sourceText("error.marketplace.secretInRoutine", { name: routine.name });
+      return [
+        [message, routine.name],
+        [message, routine.instruction],
+      ];
+    }),
     ...snapshot.skills.flatMap(
       (skill): Array<[string, string]> =>
-        skill.kind === "embedded" ? [[`the skill "${skill.name}"`, skill.markdown]] : [],
+        skill.kind === "embedded"
+          ? [[sourceText("error.marketplace.secretInSkill", { name: skill.name }), skill.markdown]]
+          : [],
     ),
   ];
-  for (const [field, text] of fields)
-    if (redactText(text) !== text)
-      throw new Error(`Remove the secret or email address from ${field} before publishing.`);
+  for (const [message, text] of fields) if (redactText(text) !== text) throw new Error(message);
 }
 
 function isOwnedTemplate(value: unknown): value is OwnedTemplate {

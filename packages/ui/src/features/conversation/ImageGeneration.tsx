@@ -1,7 +1,7 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { Button, X } from "@openbot/ui";
 import { createEffect, createSignal, Show } from "solid-js";
-import { errorMessage } from "../../error-message";
+import { useText } from "../../text";
 import { DownloadIcon } from "./ConversationIcons";
 
 export type ImageGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
@@ -19,6 +19,7 @@ export interface ImageGenerationProps {
 }
 
 export function ImageGeneration(props: ImageGenerationProps) {
+  const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
   const [imageRatio, setImageRatio] = createSignal<string | null>(null);
   createEffect(
@@ -37,23 +38,27 @@ export function ImageGeneration(props: ImageGenerationProps) {
   const failure = () =>
     previewError() || previewUnavailable()
       ? isAttachment()
-        ? "The image preview is unavailable."
-        : "The generated image preview is unavailable."
+        ? t("chat.image.previewUnavailable")
+        : t("chat.image.generatedPreviewUnavailable")
       : errorMessage(
           props.error,
-          props.status === "interrupted" ? "Image generation was interrupted." : "Image generation did not complete.",
+          props.status === "interrupted" ? t("chat.image.wasInterrupted") : t("chat.image.didNotComplete"),
         );
   const label = () => {
-    if (props.status === "generating") return "Generating image";
-    if (previewError() || previewUnavailable()) return "Image unavailable";
-    if (props.status === "interrupted") return "Image generation interrupted";
-    if (props.status === "failed") return "Image generation failed";
-    return isAttachment() ? "Attached image" : "Generated image";
+    if (props.status === "generating") return t("chat.image.generating");
+    if (previewError() || previewUnavailable()) return t("chat.image.unavailable");
+    if (props.status === "interrupted") return t("chat.image.interrupted");
+    if (props.status === "failed") return t("chat.image.failed");
+    return isAttachment() ? t("chat.image.attached") : t("chat.image.generated");
   };
   const previewLabel = () =>
-    isAttachment() ? `Preview ${props.attachment?.name ?? "attached image"}` : "Preview generated image";
+    isAttachment()
+      ? t("chat.image.preview", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
+      : t("chat.image.previewGenerated");
   const downloadLabel = () =>
-    isAttachment() ? `Download ${props.attachment?.name ?? "attached image"}` : "Download generated image";
+    isAttachment()
+      ? t("chat.image.download", { name: props.attachment?.name ?? t("chat.image.attachedFallback") })
+      : t("chat.image.downloadGenerated");
   const stageRatio = () => (hasImage() && imageRatio() ? imageRatio() : ratioValue(props.aspectRatio));
 
   return (
@@ -65,7 +70,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
           "image-generation-failed": hasFailure(),
         },
       ]}
-      aria-label={hasImage() ? label() : isAttachment() ? "Image attachment" : "Image generation"}
+      aria-label={hasImage() ? label() : isAttachment() ? t("chat.image.attachment") : t("chat.image.generation")}
       aria-live={props.status === "generating" ? "polite" : undefined}
     >
       <div class="image-generation-stage" style={`--image-generation-ratio: ${stageRatio()}`}>
@@ -109,7 +114,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
           >
             <img
               src={props.attachment?.previewUrl ?? ""}
-              alt={props.prompt ?? "Generated image"}
+              alt={props.prompt ?? t("chat.image.generated")}
               onLoad={(event) => {
                 const { naturalHeight, naturalWidth } = event.currentTarget;
                 if (naturalWidth > 0 && naturalHeight > 0) setImageRatio(`${naturalWidth} / ${naturalHeight}`);
@@ -131,7 +136,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
             }}
           >
             <DownloadIcon />
-            Download
+            {t("common.download")}
           </Button>
         </Show>
       </div>
@@ -139,7 +144,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
         <div class="image-generation-meta">
           <span class="image-generation-label">{label()}</span>
           <Show when={props.prompt}>
-            <span class="image-generation-prompt">“{props.prompt}”</span>
+            <span class="image-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
           </Show>
           <Show when={hasFailure()}>
             <span class="image-generation-error" role="alert">

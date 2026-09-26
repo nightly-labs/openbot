@@ -8,6 +8,7 @@ import logo from "@/assets/icons/app-icon.png";
 import backgroundDark from "@/assets/splash/background-dark.webp";
 import backgroundLight from "@/assets/splash/background-light.webp";
 import { SPLASH_LOGO_SIZE, SPLASH_MORPH_START, splashTravel } from "@/shared/lib/splash-motion";
+import { useText } from "@/shared/lib/text";
 import type { SplashArtwork, SplashLogoTarget } from "@/shared/lib/use-splash-gate";
 
 // Native splash screens cannot layer a wallpaper behind a centered mark: iOS and
@@ -50,6 +51,7 @@ export function SplashWallpaper() {
 
 export function SplashBackdrop({ onArtworkDisplay, progress, target, reducedMotion }: SplashBackdropProps) {
   const { theme } = useUniwind();
+  const { t } = useText();
   const dark = theme === "dark";
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const backdropStyle = useAnimatedStyle(() => ({
@@ -74,7 +76,7 @@ export function SplashBackdrop({ onArtworkDisplay, progress, target, reducedMoti
       onLayout={({ nativeEvent: { layout } }) => setViewport({ width: layout.width, height: layout.height })}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel="Loading account"
+      accessibilityLabel={t("mobile.shared.splash.loading")}
       accessibilityState={{ busy: true }}
       style={{
         alignItems: "center",

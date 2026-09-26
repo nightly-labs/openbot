@@ -1,5 +1,6 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import type { AgentEvent, AgentSummary, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -349,7 +350,7 @@ export class ConversationRuntime {
 
   requireKnownAgent(agentId: string): AgentSummary {
     const agent = this.#listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(`Unknown agent: ${agentId}`);
+    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
     return agent;
   }
 }

@@ -74,6 +74,14 @@ Tests that import Electron code must mock `electron`. Follow `trusted-ipc.test.t
 with a fabricated sender frame. Services that can be tested without Electron should not import it.
 `index.ts` has module-scope Electron calls; source coverage tests read it instead of importing it.
 
+## Interface text
+
+An error or status text that can reach a user is `sourceText(key, params)` from
+`@openbot/i18n/source`, not a literal. Its English must stay the same, byte for byte: remote
+clients and older versions read it. Dialogs, menus and window titles use `language.translate`.
+Errors that only a malformed payload or a programming error can cause stay English. See
+[docs/i18n.md](../../docs/i18n.md#text-from-another-process).
+
 ## Ownership and lifecycle
 
 Keep `index.ts` as the dispatcher and lifecycle module. Do not move these responsibilities into it:

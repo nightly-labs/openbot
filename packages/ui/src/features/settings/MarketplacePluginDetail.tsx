@@ -33,6 +33,7 @@ import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { SkillGradient } from "@openbot/ui/skill-gradient";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentSelect } from "./AgentSelect";
 import { CATEGORY_LABELS } from "./MarketplaceCatalog";
 import type { MarketplacePluginPrompt, MarketplacePluginDetail as PluginDetail } from "./marketplace-plugins";
@@ -120,19 +121,23 @@ export function MarketplacePluginDetail(props: {
   onRunPrompt?: (prompt: MarketplacePluginPrompt) => void;
   onOpenUrl: (url: string) => void;
 }) {
+  const { t } = useText();
   /* The name a reader hears carries the visible host, so the row is not three times "Open link". */
   const links = createMemo(() =>
     [
-      { label: "Website", url: props.plugin.websiteUrl },
-      { label: "Privacy Policy", url: props.plugin.privacyPolicyUrl },
-      { label: "Terms of Service", url: props.plugin.termsUrl },
+      { label: t("plugin.link.website"), url: props.plugin.websiteUrl },
+      { label: t("plugin.link.privacyPolicy"), url: props.plugin.privacyPolicyUrl },
+      { label: t("plugin.link.terms"), url: props.plugin.termsUrl },
     ]
       .filter((link): link is { label: string; url: string } => Boolean(link.url))
       .map((link) => ({ ...link, text: linkText(link.url), name: `${link.label}: ${linkText(link.url)}` })),
   );
 
   return (
-    <section class="marketplace-detail-page marketplace-plugin-detail" aria-label={`${props.plugin.name} details`}>
+    <section
+      class="marketplace-detail-page marketplace-plugin-detail"
+      aria-label={t("marketplace.detail.label", { name: props.plugin.name })}
+    >
       <div class="marketplace-plugin-heading">
         <PluginIcon iconUrl={props.plugin.iconUrl} />
         <div class="marketplace-plugin-heading-copy">
@@ -146,7 +151,7 @@ export function MarketplacePluginDetail(props: {
             {(copyLink) => (
               <Button class="marketplace-plugin-share" variant="outline" onClick={() => void copyLink()()}>
                 <Link2 aria-hidden="true" />
-                Copy link
+                {t("plugin.copyLink")}
               </Button>
             )}
           </Show>
@@ -156,12 +161,12 @@ export function MarketplacePluginDetail(props: {
             <AgentSelect agents={props.agents} value={props.targetAgentId} onChange={props.onTargetChange} />
             <Show when={!props.installed}>
               <Button loading={props.busy} disabled={!props.targetAgentId} onClick={() => void props.onInstall()}>
-                Install plugin
+                {t("plugin.install")}
               </Button>
             </Show>
             <Show when={props.installed || props.removable}>
               <Button variant="destructive" loading={props.busy} onClick={() => void props.onUninstall()}>
-                Uninstall plugin
+                {t("plugin.uninstall")}
               </Button>
             </Show>
           </div>
@@ -191,7 +196,7 @@ export function MarketplacePluginDetail(props: {
                     {prompt.text}
                   </p>
                   <IconButton
-                    label={`Ask ${props.plugin.name}: ${prompt.text}`}
+                    label={t("plugin.askPrompt", { name: props.plugin.name, prompt: prompt.text })}
                     size="icon-lg"
                     variant="ghost"
                     disabled={!props.onRunPrompt}
@@ -209,7 +214,7 @@ export function MarketplacePluginDetail(props: {
       <p class="marketplace-detail-lead">{props.plugin.description}</p>
 
       <Show when={props.plugin.apps.length > 0}>
-        <PluginSection title="Apps" count={props.plugin.apps.length}>
+        <PluginSection title={t("plugin.section.apps")} count={props.plugin.apps.length}>
           <ItemGroup surface="subtle">
             <For each={props.plugin.apps}>
               {(app) => (
@@ -229,7 +234,7 @@ export function MarketplacePluginDetail(props: {
       </Show>
 
       <Show when={props.plugin.skills.length > 0}>
-        <PluginSection title="Skills" count={props.plugin.skills.length}>
+        <PluginSection title={t("plugin.section.skills")} count={props.plugin.skills.length}>
           <ItemGroup surface="subtle">
             <For each={props.plugin.skills}>
               {(skill) => (
@@ -248,24 +253,24 @@ export function MarketplacePluginDetail(props: {
         </PluginSection>
       </Show>
 
-      <PluginSection title="Information" count={3 + links().length}>
+      <PluginSection title={t("plugin.section.information")} count={3 + links().length}>
         {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row, so the two
             columns come from the grid on the list itself. */}
         <dl class="marketplace-plugin-information">
           <dt>
-            <Text tone="muted">Developer</Text>
+            <Text tone="muted">{t("plugin.info.developer")}</Text>
           </dt>
           <dd>
             <Text>{props.plugin.creatorName}</Text>
           </dd>
           <dt>
-            <Text tone="muted">Category</Text>
+            <Text tone="muted">{t("plugin.info.category")}</Text>
           </dt>
           <dd>
-            <Text>{CATEGORY_LABELS[props.plugin.category]}</Text>
+            <Text>{t(CATEGORY_LABELS[props.plugin.category])}</Text>
           </dd>
           <dt>
-            <Text tone="muted">Version</Text>
+            <Text tone="muted">{t("plugin.info.version")}</Text>
           </dt>
           <dd>
             <Text>{props.plugin.version}</Text>

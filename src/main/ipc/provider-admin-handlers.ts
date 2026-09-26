@@ -14,6 +14,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import type { CustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -52,7 +53,7 @@ export function providerAdminIpcHandlers({
 }: ProviderAdminIpcDependencies): Pick<IpcGroupHandlers, "providerAdmin"> {
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
-      throw new Error("Providers can only be changed on the computer that runs the agents.");
+      throw new Error(sourceText("error.provider.localOnly"));
     return remoteServers.request(serverId, path, decoder, { method: "POST", body });
   }
 

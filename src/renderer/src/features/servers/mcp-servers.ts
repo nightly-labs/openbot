@@ -7,6 +7,8 @@
  */
 
 import { type McpServerConfig, normalizeMcpConfig, type ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
+import { currentText } from "@openbot/ui/text";
 
 export type {
   McpServerConfig,
@@ -29,10 +31,10 @@ export type McpTestState =
   | { status: "failed"; error: string };
 
 /** The whole sentence a test produced, for the form. The row shows the short badge instead. */
-export function mcpTestMessage(test: McpTestState): string {
-  if (test.status === "testing") return "Connecting…";
+export function mcpTestMessage(test: McpTestState, t: AppTranslate): string {
+  if (test.status === "testing") return t("common.connecting");
   if (test.status === "failed") return test.error;
-  return test.toolCount === 1 ? "Connected · 1 tool" : `Connected · ${test.toolCount} tools`;
+  return t("mcp.test.connected", { count: test.toolCount });
 }
 
 /**
@@ -82,11 +84,11 @@ export function mcpConfigChanged(draft: McpServerConfig, baseline: McpServerConf
  * knows: a server is offered to this server's agents, or it is not. A test answers for itself, and
  * that answer is shown even on a server that is turned off, because the user asked for it.
  */
-export function mcpStatusLabel(config: McpServerConfig, test?: McpTestState): string {
-  if (test?.status === "testing") return "Testing…";
-  if (test?.status === "failed") return "Failed";
-  if (test) return mcpTestMessage(test);
-  return config.enabled ? "Enabled" : "Disabled";
+export function mcpStatusLabel(config: McpServerConfig, t: AppTranslate, test?: McpTestState): string {
+  if (test?.status === "testing") return t("mcp.status.testing");
+  if (test?.status === "failed") return t("mcp.status.failed");
+  if (test) return mcpTestMessage(test, t);
+  return config.enabled ? t("mcp.status.enabled") : t("mcp.status.disabled");
 }
 
 export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
@@ -103,12 +105,10 @@ export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
  * edits the field. A server that names a working directory reaches Claude and the test and no
  * other provider, which the user should be able to see without starting an agent to find out.
  */
-export function mcpProviderLimitNote(config: McpServerConfig): typeof PROVIDER_LIMIT_NOTE | null {
+export function mcpProviderLimitNote(config: McpServerConfig, t: AppTranslate): string | null {
   if (config.transport !== "stdio" || !config.workingDirectory.trim()) return null;
-  return PROVIDER_LIMIT_NOTE;
+  return t("mcp.server.providerLimitNote");
 }
-
-const PROVIDER_LIMIT_NOTE = "Claude only: a server with a working directory is not given to the other providers.";
 
 /**
  * What the panel says about the runtime a local stdio server is started with, or `null` when there
@@ -119,14 +119,15 @@ const PROVIDER_LIMIT_NOTE = "Claude only: a server with a working directory is n
  * server; a remote host downloads its own.
  */
 export function mcpToolRuntimeNote(status: ProviderRuntimeStatus | undefined): string | null {
+  const { t } = currentText();
   if (status?.phase === "downloading" || status?.phase === "finishing") {
-    const percent = status.progress === null ? "" : ` (${Math.round(Math.max(0, Math.min(100, status.progress)))}%)`;
-    return `Downloading the runtime a STDIO server is started with${percent}. One may not start until it finishes.`;
+    if (status.progress === null) return t("mcp.server.runtimeDownloading");
+    const percent = Math.round(Math.max(0, Math.min(100, status.progress)));
+    return t("mcp.server.runtimeDownloadingProgress", { percent });
   }
   // The download failed and nothing retries it on its own, so the sentence has to say what is left:
   // a computer with its own Node keeps working, because the managed runtime is the floor under that
   // and not a replacement for it.
-  if (status?.phase === "download-error")
-    return "The runtime a STDIO server is started with did not download. A server still starts if this computer has Node.";
+  if (status?.phase === "download-error") return t("mcp.server.runtimeDownloadFailed");
   return null;
 }

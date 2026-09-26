@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentEvent, AgentSummary, DuplicateAgentResult, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { type AgentStore, duplicationProfileSignature } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { AgentMemories } from "./agent-memories";
@@ -95,7 +96,7 @@ export class DuplicationGate {
     let duplicate: AgentSummary | null = null;
     try {
       const source = this.#conversation.requireKnownAgent(sourceAgentId);
-      if (this.#duplicatingAgents.has(sourceAgentId)) throw new Error("This agent is already being duplicated.");
+      if (this.#duplicatingAgents.has(sourceAgentId)) throw new Error(sourceText("error.agent.duplicationBusy"));
       this.assertAgentIdle(sourceAgentId);
       const sourceSignature = this.#sourceSignature(sourceAgentId);
       this.#duplicatingAgents.add(sourceAgentId);
@@ -132,10 +133,7 @@ export class DuplicationGate {
       }
       this.#routines.arm();
       if (rollbackError) {
-        throw new AggregateError(
-          [error, rollbackError],
-          "Agent duplication failed and the incomplete copy could not be removed.",
-        );
+        throw new AggregateError([error, rollbackError], sourceText("error.agent.duplicateCleanupFailed"));
       }
       throw error;
     } finally {
@@ -197,7 +195,7 @@ export class DuplicationGate {
   /** The precondition for starting a copy: nothing is waiting, and nothing is in flight. */
   assertAgentIdle(agentId: string): void {
     const queued = this.#mailbox.listQueue(agentId).deliveries.some((delivery) => delivery.status === "queued");
-    if (queued) throw new Error("Wait for the agent to finish and clear its queue before duplicating it.");
+    if (queued) throw new Error(sourceText("error.agent.waitBeforeDuplicate"));
     this.#assertAgentQuiet(agentId);
   }
 
@@ -214,7 +212,7 @@ export class DuplicationGate {
       .listQueue(agentId)
       .deliveries.some((delivery) => delivery.status === "starting" || delivery.status === "running");
     if (inFlight || this.#hooks.hasAttentionFor(agentId) || this.#conversation.snapshot(agentId)?.activeTurnId) {
-      throw new Error("Wait for the agent to finish and clear its queue before duplicating it.");
+      throw new Error(sourceText("error.agent.waitBeforeDuplicate"));
     }
   }
 
@@ -244,7 +242,7 @@ export class DuplicationGate {
   #assertSourceUnchanged(agentId: string, signature: string): void {
     this.#assertAgentQuiet(agentId);
     if (this.#sourceSignature(agentId) !== signature) {
-      throw new Error("The agent changed while it was being duplicated. Try again.");
+      throw new Error(sourceText("error.agent.changedWhileDuplicating"));
     }
   }
 }

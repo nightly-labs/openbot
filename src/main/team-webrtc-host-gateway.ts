@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { type IncomingConnection, TeamWebRtcHostPeer, type TeamWebRtcHostPeerOptions } from "./team-webrtc-host-peer";
 
@@ -99,7 +100,7 @@ export class TeamWebRtcHostGateway {
       .catch((error) => {
         if (this.#hostId === peerId)
           this.#options.onSignalRecoveryFailure?.(
-            error instanceof Error ? error : new Error("Remote Signal recovery failed."),
+            error instanceof Error ? error : new Error(sourceText("error.remote.signalRecoveryFailed")),
           );
       })
       .finally(() => {
@@ -138,7 +139,7 @@ export class TeamWebRtcHostGateway {
       };
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error("The Remote Signal connection timed out."));
+        reject(new Error(sourceText("error.remote.signalTimeout")));
       }, 30_000);
       this.#bridge.on("signalReady", onReady);
       this.#bridge.on("error", onError);

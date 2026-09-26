@@ -17,6 +17,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import { ChatCameraContent } from "./chat-camera-panel";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";
 
@@ -143,6 +144,7 @@ export function ChatAttachmentPanel({
 }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { t } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
@@ -312,7 +314,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={2}
               icon={Paperclip}
-              label="Files"
+              label={t("mobile.chat.attachment.files")}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}
@@ -321,7 +323,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={1}
               icon={Images}
-              label="Photos"
+              label={t("mobile.chat.attachment.photos")}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}
@@ -330,7 +332,7 @@ export function ChatAttachmentPanel({
             <AttachmentOption
               index={0}
               icon={Camera}
-              label="Camera"
+              label={t("mobile.chat.attachment.camera")}
               foreground={foreground}
               progress={progress}
               disabled={attachments.preparing}

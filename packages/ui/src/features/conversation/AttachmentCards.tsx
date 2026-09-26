@@ -1,6 +1,7 @@
 import { type AttachmentSummary, canPreviewAttachment } from "@openbot/contracts/ipc";
 import { Button, Download, Spinner } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { attachmentReferenceTone } from "./AttachmentReference";
 
@@ -11,10 +12,11 @@ import { attachmentReferenceTone } from "./AttachmentReference";
  * object rather than a button parked above a list.
  */
 export function AttachmentDownloadAll(props: { count: number; pending: boolean; onDownload: () => void }) {
-  const label = () => (props.pending ? "Downloading ZIP…" : "Download all as ZIP");
+  const { t } = useText();
+  const label = () => (props.pending ? t("attachment.downloadAll.pending") : t("attachment.downloadAll.label"));
   return (
     <div class="attachment-download-island">
-      <p class="attachment-download-island__copy">{props.count} attachments</p>
+      <p class="attachment-download-island__copy">{t("attachment.downloadAll.count", { count: props.count })}</p>
       <div class="attachment-download-island__action-shell">
         <Button
           type="button"
@@ -39,8 +41,8 @@ export function AttachmentDownloadAll(props: { count: number; pending: boolean; 
               data-state={props.pending ? "pending" : "action"}
               aria-hidden="true"
             >
-              <span data-text="action">Download</span>
-              <span data-text="pending">Zipping</span>
+              <span data-text="action">{t("common.download")}</span>
+              <span data-text="pending">{t("attachment.downloadAll.zipping")}</span>
             </span>
           </span>
         </Button>
@@ -54,6 +56,7 @@ export function AttachmentCards(props: {
   onPreview: (attachment: AttachmentSummary) => void;
   onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
+  const { t, format } = useText();
   const tooltipId = `attachment-action-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{ anchor: HTMLElement; content: string } | null>(null);
   // An image whose preview does not load was deleted from the host, or never arrived. The card
@@ -63,7 +66,7 @@ export function AttachmentCards(props: {
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
 
   const openTooltip = (anchor: HTMLElement) => {
-    setTooltip({ anchor, content: "Open file" });
+    setTooltip({ anchor, content: t("attachment.openFile") });
   };
   const closeTooltip = (anchor: HTMLElement) => {
     if (tooltip()?.anchor === anchor) setTooltip(null);
@@ -83,7 +86,7 @@ export function AttachmentCards(props: {
                 type="button"
                 class="attachment-preview-button"
                 disabled={isMissing(attachment) || !canPreviewAttachment(attachment)}
-                aria-label={`Preview ${attachment.name}`}
+                aria-label={t("attachment.preview", { name: attachment.name })}
                 onClick={() => props.onPreview(attachment)}
               >
                 <Show
@@ -107,7 +110,7 @@ export function AttachmentCards(props: {
                 </Show>
                 <span class="attachment-file-copy">
                   <strong>{attachment.name}</strong>
-                  <small>{isMissing(attachment) ? "File not found" : formatFileSize(attachment.size)}</small>
+                  <small>{isMissing(attachment) ? t("attachment.notFound") : format.fileSize(attachment.size)}</small>
                 </span>
               </Button>
               <Show when={!isMissing(attachment)}>
@@ -115,7 +118,7 @@ export function AttachmentCards(props: {
                   variant="ghost"
                   type="button"
                   class="attachment-open-button"
-                  aria-label={`Download ${attachment.name}`}
+                  aria-label={t("attachment.download", { name: attachment.name })}
                   onClick={() => {
                     setTooltip(null);
                     props.onAction(attachment, "download");
@@ -127,7 +130,7 @@ export function AttachmentCards(props: {
                   variant="ghost"
                   type="button"
                   class="attachment-open-button"
-                  aria-label={`Open ${attachment.name}`}
+                  aria-label={t("attachment.open", { name: attachment.name })}
                   aria-describedby={tooltipId}
                   onPointerEnter={(event) => openTooltip(event.currentTarget)}
                   onMouseEnter={(event) => openTooltip(event.currentTarget)}
@@ -177,12 +180,4 @@ function AttachmentOpenIcon() {
       <path d="M10.25 5.25h4.5v4.5M14.5 5.5l-6 6" />
     </svg>
   );
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  return `${(bytes / 1024 ** 4).toFixed(1)} TB`;
 }

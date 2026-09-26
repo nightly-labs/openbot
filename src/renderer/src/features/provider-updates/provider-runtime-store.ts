@@ -6,12 +6,12 @@ import {
   type ProviderRuntimeSnapshot,
   type ProviderRuntimesDesktopApi,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
 import {
   type ProviderUpdate,
   providerUpdateAvailable,
   providerUpdatesToAnnounce,
 } from "@openbot/ui/features/provider-updates/provider-update";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_PROVIDER_RUNTIMES } from "../../app-defaults";
@@ -96,8 +96,7 @@ export function createProviderRuntimeStore(
   }
 
   function runProviderUpdate(provider: AgentProviderId): Promise<void> {
-    if (!managesRuntimes())
-      return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
+    if (!managesRuntimes()) return Promise.reject(new Error(currentText().t("update.provider.remoteHost")));
     const update = providerUpdate(provider);
     // A CLI the user installed is not downloaded, but it has a version, and the row offers it the
     // same check as a managed runtime. Only a newer version is a reason to download.
@@ -117,7 +116,7 @@ export function createProviderRuntimeStore(
    */
   async function checkProviderUpdates(provider: AgentProviderId): Promise<void> {
     const source = api();
-    if (!source) throw new Error("Provider updates are unavailable.");
+    if (!source) throw new Error(currentText().t("update.provider.unavailable"));
     showProviderUpdateToast({ ...providerUpdate(provider), checking: true }, () => {});
     applyFrom(source, await source.checkForUpdates());
     if (disposed || source !== api()) return;
@@ -139,7 +138,7 @@ export function createProviderRuntimeStore(
         runtime: {
           ...update.runtime,
           phase: "download-error",
-          message: errorMessage(error, "The update could not start. Try again."),
+          message: currentText().errorMessage(error, currentText().t("update.provider.startFailed")),
         },
       },
       () => void startProviderUpdate(provider),
@@ -187,7 +186,7 @@ export function createProviderRuntimeStore(
 
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
     const source = api();
-    if (!source) throw new Error("Provider downloads are unavailable.");
+    if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const update = providerUpdate(provider);
     const isUpdate = update.availableVersion !== null;
     if (isUpdate) {
@@ -217,7 +216,7 @@ export function createProviderRuntimeStore(
               runtime: {
                 ...update.runtime,
                 phase: "download-error",
-                message: "The update could not start. Try again.",
+                message: currentText().t("update.provider.startFailed"),
               },
             },
             () => void downloadProviderRuntime(provider),
@@ -230,7 +229,7 @@ export function createProviderRuntimeStore(
 
   async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
     const source = api();
-    if (!source) throw new Error("Provider downloads are unavailable.");
+    if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const snapshot = await source.cancel(provider);
     updating.delete(provider);
     dismissProviderUpdateToast(provider);

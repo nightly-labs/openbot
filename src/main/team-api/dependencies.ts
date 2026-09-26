@@ -135,7 +135,10 @@ export interface TeamApiAdmin {
   skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
   /** `shared-tables-v1`: list and delete the tables the agents share. */
   sharedTables?: Pick<AgentService, "listTables" | "deleteTable">;
-  /** `agent-install-v1`: add an agent from a marketplace listing or a shared template. Both must be set. */
+  /**
+   * `agent-install-v1`: add an agent from a marketplace listing or a shared template. Both must be set.
+   * `agent-update-v1`: update an agent from a listing; needs only `marketplaceAgents`.
+   */
   marketplaceAgents?: Pick<AgentMarketplaceService, "install">;
   agentTemplates?: Pick<AgentTemplateService, "install">;
   /** `providers-v1`: code sign-in, provider API keys, managed CLI runtimes and custom endpoints. */

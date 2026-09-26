@@ -8,6 +8,7 @@ import {
   type SetApprovalAutomationInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { isMissingFileError } from "../backend/file-errors";
 
@@ -115,7 +116,7 @@ export class ApprovalAutomation {
 
   set(input: SetApprovalAutomationInput): Promise<ApprovalAutomationPreference> {
     if (input.autoApprove && input.agentId && this.#deletingAgentIds.has(input.agentId)) {
-      return Promise.reject(new Error("Cannot grant approval while the agent is being deleted."));
+      return Promise.reject(new Error(sourceText("error.agent.approvalWhileDeleting")));
     }
     const write = this.#pendingWrite.then(
       () => this.#apply(input),

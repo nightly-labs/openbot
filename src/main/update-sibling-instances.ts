@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { sourceText } from "@openbot/i18n/source";
 
 /**
  * Another OpenBot process running from the same application bundle. On a Mac shared by several
@@ -55,7 +56,7 @@ function listProcessesWithPs(platform: NodeJS.Platform): Promise<string> {
     // macOS comm is the executable path; Linux comm is only a truncated name.
     const columns = platform === "darwin" ? "pid=,uid=,comm=" : "pid=,uid=,args=";
     execFile("/bin/ps", ["-ax", "-o", columns], (error, stdout) => {
-      if (error) reject(new Error("Could not verify other OpenBot sessions. Try again before installing."));
+      if (error) reject(new Error(sourceText("error.update.siblingCheckFailed")));
       else resolve(stdout);
     });
   });

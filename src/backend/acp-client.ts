@@ -19,6 +19,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
@@ -27,6 +28,8 @@ import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   acpMcpServers,
+  agentMcpServers,
+  computerUseParam,
   type McpAuthorizationSource,
   type McpDropReporter,
   type McpServerSource,
@@ -34,6 +37,7 @@ import {
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { PendingServerRequests } from "./pending-server-requests";
+import type { SpawnTarget } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -122,13 +126,18 @@ interface AcpThread {
   turns: Array<{ id: string; status: string; items: ThreadItem[] }>;
   dynamicTools: DynamicToolNamespace[];
   workspaceRoots: string[];
+  /** Whether the session got the Computer Use server. Its MCP servers are fixed when it opens. */
+  computerUse: boolean;
   idleRelease: ReturnType<typeof setTimeout> | null;
   /** Also set when the session was loaded only for a read. */
   idleSince: number;
 }
 
 /** What a closed idle session needs to be loaded again, and the turns a read answers meanwhile. */
-type ReleasedAcpThread = Pick<AcpThread, "cwd" | "developerInstructions" | "dynamicTools" | "workspaceRoots" | "turns">;
+type ReleasedAcpThread = Pick<
+  AcpThread,
+  "cwd" | "developerInstructions" | "dynamicTools" | "workspaceRoots" | "computerUse" | "turns"
+>;
 
 /**
  * How long a session with no turn stays open in the agent process. The agent starts the user's MCP
@@ -169,6 +178,11 @@ export interface AcpProviderOptions {
    * construction reach the next process without any other plumbing. Spread after `env`.
    */
   extraEnv?: () => Record<string, string>;
+  /**
+   * Wraps the command for a Workspace only agent's own process (`process-confinement.ts`). It throws
+   * when this computer cannot make the sandbox, and then the process does not start.
+   */
+  confine?(target: SpawnTarget): SpawnTarget;
   signInMessage: string;
   /**
    * Whether the model this turn runs on may still be used. Read here, after every wait this client
@@ -208,11 +222,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // An agent that cannot close a session and load it again would keep its MCP servers or lose it.
     canRelease: () =>
       this.#loadsSessions && Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close),
-    snapshot: ({ cwd, developerInstructions, dynamicTools, workspaceRoots, turns }) => ({
+    snapshot: ({ cwd, developerInstructions, dynamicTools, workspaceRoots, computerUse, turns }) => ({
       cwd,
       developerInstructions,
       dynamicTools,
       workspaceRoots,
+      computerUse,
       turns,
     }),
     dispose: (thread) => this.#closeSession(thread),
@@ -224,6 +239,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           developerInstructions: released.developerInstructions,
           dynamicTools: released.dynamicTools,
           runtimeWorkspaceRoots: released.workspaceRoots,
+          computerUse: released.computerUse,
         },
         true,
       ),
@@ -257,7 +273,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#stopping = false;
-    const target = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const direct = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const target = this.options.confine ? this.options.confine(direct) : direct;
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...this.options.env, ...this.options.extraEnv?.() },
@@ -506,7 +523,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       await this.options.authenticate?.(connection, this.#initialization);
       this.#models = await this.#discoverModels();
       if (this.#models.length === 0) {
-        throw new Error("ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.");
+        throw new Error(sourceText("error.provider.acpNoModels"));
       }
       this.#signedIn = true;
     } catch (error) {
@@ -665,10 +682,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const requestedThreadId = getString(params, "threadId");
     if (!resume || !requestedThreadId) return this.#openThread(params, false);
     const held = this.#threads.get(requestedThreadId);
+    let turns: AcpThread["turns"] | undefined;
+    // The MCP servers are fixed when a session opens, so a changed Computer Use switch loads the
+    // session again. A session with a turn keeps its servers until a later resume.
+    if (held && !held.activeTurn && held.computerUse !== computerUseParam(params)) {
+      turns = held.turns;
+      await this.#threads.close(held);
+    }
     // A thread this client already holds takes the caller's settings even though no session is
     // opened for them: the loader may have been a `thread/read`, which carries none of its own, and
     // the turn that follows must not run on the settings of whoever loaded the session first.
-    if (held) {
+    else if (held) {
       held.developerInstructions = getString(params, "developerInstructions") ?? held.developerInstructions;
       await this.#applyConfig(held, getString(params, "model"), getString(params, "effort"));
       return { thread: { id: requestedThreadId } };
@@ -678,14 +702,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // bridge sessions under one id, of which only the last is reachable.
     const starting = this.#startingThreads.get(requestedThreadId);
     if (starting) return starting;
-    const start = this.#openThread(params, true).finally(() => {
+    const start = this.#openThread(params, true, turns).finally(() => {
       this.#startingThreads.delete(requestedThreadId);
     });
     this.#startingThreads.set(requestedThreadId, start);
     return start;
   }
 
-  async #openThread(params: unknown, resume: boolean): Promise<{ thread: { id: string } }> {
+  async #openThread(
+    params: unknown,
+    resume: boolean,
+    heldTurns?: AcpThread["turns"],
+  ): Promise<{ thread: { id: string } }> {
     const requestedThreadId = getString(params, "threadId");
     if (resume && requestedThreadId && !this.#loadsSessions) {
       // Reported as a missing session, which is what it is for the caller: the agent cannot give
@@ -695,6 +723,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const cwd = requiredString(params, "cwd");
     const dynamicTools = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const computerUse = computerUseParam(params);
     let threadRef: AcpThread | null = null;
     const mcp = await this.#bridge.createSession(
       requestedThreadId ?? randomUUID(),
@@ -712,7 +741,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // configuration that reached one of those names would take the agent's own tools away.
       const handoff = acpMcpServers(
         await usableMcpServers(
-          this.options.mcpServers?.() ?? [],
+          agentMcpServers(this.options.mcpServers?.() ?? [], computerUse),
           this.options.mcpToolRuntimes?.(),
           this.options.mcpAuthorization,
         ),
@@ -744,9 +773,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         currentModelId,
         mcp,
         activeTurn: null,
-        turns: this.#threads.released(id)?.turns ?? [],
+        turns: heldTurns ?? this.#threads.released(id)?.turns ?? [],
         dynamicTools,
         workspaceRoots: additionalDirectories,
+        computerUse,
         idleRelease: null,
         idleSince: 0,
       };
@@ -873,7 +903,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const model = thread.currentModelId;
     if (!model || !this.options.servesModel) return;
     if (!this.options.servesModel(model)) {
-      throw new Error("The endpoint this agent used was removed. Choose another model for it.");
+      throw new Error(sourceText("error.agent.endpointRemoved"));
     }
   }
 

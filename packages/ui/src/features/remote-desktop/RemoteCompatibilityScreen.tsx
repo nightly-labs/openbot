@@ -1,5 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { Alert, AlertContent, AlertDescription, Button } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
 
 /**
@@ -10,29 +11,36 @@ import { For, Show } from "solid-js";
  * and a context read here would quietly re-derive what that key already decided.
  */
 export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetry: () => Promise<void> }) {
+  const { t, sourceText } = useText();
   const title = () => {
-    if (props.server.issue?.code === "client_update_required") return "Update this OpenBot app";
-    if (props.server.issue?.code === "host_update_required") return `Update OpenBot on ${props.server.name}`;
-    if (props.server.issue?.code === "protocol_error") return "The host returned unsafe data";
-    return `Cannot connect to ${props.server.name}`;
+    if (props.server.issue?.code === "client_update_required") return t("server.compatibility.updateClientTitle");
+    if (props.server.issue?.code === "host_update_required") {
+      return t("server.compatibility.updateHostTitle", { name: props.server.name });
+    }
+    if (props.server.issue?.code === "protocol_error") return t("server.compatibility.unsafeDataTitle");
+    return t("server.compatibility.cannotConnectTitle", { name: props.server.name });
   };
   const description = () => {
     if (props.server.issue?.code === "client_update_required") {
-      return "This app supports only older protocols than the host. Update this app, then try again.";
+      return t("server.compatibility.updateClientDescription");
     }
     if (props.server.issue?.code === "host_update_required") {
-      return "The host supports only older protocols than this app. Update the host, then try again.";
+      return t("server.compatibility.updateHostDescription");
     }
     if (props.server.issue?.code !== "protocol_error") {
-      return props.server.issue?.message ?? "The host is not reachable.";
+      const message = props.server.issue?.message;
+      return message === undefined ? t("error.remote.hostUnreachable") : sourceText(message);
     }
-    return "OpenBot stopped this connection because a known payload was invalid. Your current workspace data was not changed.";
+    return t("server.compatibility.unsafeDataDescription");
   };
   const compatibility = () => props.server.compatibility;
   const details = () => [
-    ["Client version", compatibility()?.localAppVersion ?? "Unknown"],
-    ["Host version", compatibility()?.hostAppVersion ?? "Unknown"],
-    ["Negotiated protocol", compatibility()?.negotiatedProtocol ?? "None"],
+    [t("server.compatibility.clientVersion"), compatibility()?.localAppVersion ?? t("server.compatibility.unknown")],
+    [t("server.compatibility.hostVersion"), compatibility()?.hostAppVersion ?? t("server.compatibility.unknown")],
+    [
+      t("server.compatibility.negotiatedProtocol"),
+      compatibility()?.negotiatedProtocol ?? t("server.compatibility.none"),
+    ],
   ];
 
   return (
@@ -57,7 +65,7 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
           </For>
         </dl>
       </Show>
-      <Button onClick={() => void props.onRetry()}>Retry</Button>
+      <Button onClick={() => void props.onRetry()}>{t("common.retry")}</Button>
     </main>
   );
 }

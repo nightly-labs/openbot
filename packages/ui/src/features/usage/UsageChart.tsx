@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "@openbot/ui/chart";
 import { createMemo, For } from "solid-js";
+import { useText } from "../../text";
 import { UsageProviderMark } from "./UsageProviderMark";
 import {
   type UsageMetric,
@@ -26,22 +27,27 @@ import {
 } from "./usage-format";
 
 export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }) {
+  const text = useText();
+  const { t, format } = text;
   const chart = createMemo(() => usageSeries(props.result.providerDaily, props.result.daily, props.metric));
-  const measure = () => (props.metric === "Cost" ? "estimated cost in USD" : "processed tokens");
   const formatValue = (value: number) =>
-    props.metric === "Cost" ? usageExactCost(value) : `${usageNumber(value)} tokens`;
+    props.metric === "cost"
+      ? usageExactCost(value, text)
+      : t("usage.tokensAmount", { tokens: usageNumber(value, text) });
   // A host that reports totals but no split still draws one area, and naming it "Total"
   // twice - as its own row and as the sum - would say the same number to itself.
   const named = () => chart().series[0] !== usageTotalSeries;
   return (
-    <ChartContainer label={`Daily ${measure()} by provider. Exact values are available with View daily data.`}>
+    <ChartContainer
+      label={props.metric === "cost" ? t("usage.chart.costDescription") : t("usage.chart.tokensDescription")}
+    >
       <AreaChart
         data={chart().rows}
         margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
         accessibilityLayer
         role="img"
         tabIndex={0}
-        aria-label={`Daily ${measure()} by provider`}
+        aria-label={props.metric === "cost" ? t("usage.chart.costLabel") : t("usage.chart.tokensLabel")}
       >
         <CartesianGrid vertical={false} stroke="var(--openbot-border-strong)" />
         <XAxis
@@ -53,11 +59,14 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
           stroke="var(--openbot-text-muted)"
           // Uppercased here rather than in CSS: a .recharts-* rule is a class no component
           // names, which the dead-class scan in check:ui reports.
-          tickFormatter={(value) =>
-            new Date(`${String(value)}T12:00:00Z`)
-              .toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })
-              .toUpperCase()
-          }
+          tickFormatter={(value) => {
+            // The chart also formats values that are not days while it measures ticks. Intl throws on
+            // an invalid date, so such a value shows as it is.
+            const day = new Date(`${String(value)}T12:00:00Z`);
+            return Number.isNaN(day.getTime())
+              ? String(value)
+              : format.date(day, { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase();
+          }}
         />
         <YAxis
           tickLine={false}
@@ -65,7 +74,9 @@ export function UsageChart(props: { result: HostAnalytics; metric: UsageMetric }
           width={80}
           tickCount={4}
           stroke="var(--openbot-text-muted)"
-          tickFormatter={(value) => (props.metric === "Cost" ? usageCost(Number(value)) : usageCompact(Number(value)))}
+          tickFormatter={(value) =>
+            props.metric === "cost" ? usageCost(Number(value), text) : usageCompact(Number(value), text)
+          }
         />
         <ChartTooltip
           cursor={{ stroke: "var(--openbot-text-muted)", strokeWidth: 1 }}

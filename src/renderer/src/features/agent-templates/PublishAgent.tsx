@@ -1,7 +1,7 @@
 import { type AgentTemplatePreview, isAgentTemplateCardPng } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { PublishAgentDialog } from "@openbot/ui/features/agents/PublishAgentDialog";
+import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 import { writeClipboardText } from "../../clipboard";
 import { renderAgentTemplateCard } from "./agent-template-card";
@@ -42,7 +42,8 @@ export function createPublishAgent() {
         draft.agentId = null;
         draft.loading = false;
       });
-      toast.error(errorMessage(error, "Could not read the agent."));
+      const { t, errorMessage } = currentText();
+      toast.error(errorMessage(error, t("agentTemplate.publish.readFailed")));
     }
   }
 
@@ -67,8 +68,9 @@ export function createPublishAgent() {
   }
 
   async function copyLink(): Promise<void> {
-    if (!(await copyShareLink())) throw new Error("Could not copy the link.");
-    toast.success("Link copied");
+    const { t } = currentText();
+    if (!(await copyShareLink())) throw new Error(t("agentTemplate.publish.copyFailed"));
+    toast.success(t("agentTemplate.publish.copied"));
   }
 
   async function publish(): Promise<void> {
@@ -87,8 +89,9 @@ export function createPublishAgent() {
     });
     // The agent is published even when the copy fails, so that is said, not reported as a failure.
     const copied = await copyShareLink();
-    toast.success(update ? "Agent updated" : "Agent published", {
-      description: copied ? "The link is copied." : "Use Copy link to share it.",
+    const { t } = currentText();
+    toast.success(update ? t("agentTemplate.publish.updated") : t("agentTemplate.publish.publishedToast"), {
+      description: copied ? t("agentTemplate.publish.linkCopied") : t("agentTemplate.publish.copyHint"),
     });
   }
 
@@ -100,7 +103,8 @@ export function createPublishAgent() {
     setState((draft) => {
       if (draft.preview) draft.preview.publication = null;
     });
-    toast.success("Agent unpublished", { description: "The link no longer works." });
+    const { t } = currentText();
+    toast.success(t("agentTemplate.publish.unpublished"), { description: t("agentTemplate.publish.linkRemoved") });
   }
 
   const dialog = () => (

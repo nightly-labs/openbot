@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
+import { translateFor } from "@openbot/i18n";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -89,6 +90,7 @@ describe("ZIP attachment IPC", () => {
   function register(sourcePath: string) {
     const handlers = attachmentIpcHandlers({
       getMainWindow: () => null,
+      translate: translateFor("en"),
       service: {
         prepareAttachments: vi.fn(),
         prepareImportedAttachments: vi.fn(),
@@ -141,6 +143,7 @@ describe("single attachment download", () => {
   function registerSingle(resolved: { path: string; mimeType: string; name: string }) {
     const handlers = attachmentIpcHandlers({
       getMainWindow: () => null,
+      translate: translateFor("en"),
       service: {
         prepareAttachments: vi.fn(),
         prepareImportedAttachments: vi.fn(),

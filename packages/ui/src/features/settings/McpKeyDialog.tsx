@@ -5,6 +5,7 @@
 
 import { Button, ExternalLink, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createMemo, createStore, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
 import { applyMcpFlow, type McpAuthValues, type McpKeyFlow, mcpFlowComplete, mcpFlowError } from "./mcp-connect-auth";
 
@@ -18,6 +19,7 @@ export interface McpKeyDialogProps extends McpConnectBaseProps {
 }
 
 export function McpKeyDialog(props: McpKeyDialogProps) {
+  const { t } = useText();
   const { state, busy, forget, attempt } = createConnectRun(props);
   /* The form, which only this way in has: what is typed, and whether the user has tried to connect
      with it yet. The second gates the "fill this in" copy, so an untouched dialog asks rather than
@@ -27,7 +29,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
   /* The page the key is made on, when the flow names one and the caller can open it. */
   const docs = createMemo(() => {
     const url = props.flow.docsUrl;
-    return url && props.onOpenUrl ? { url, label: props.flow.docsLabel ?? "Get a key" } : null;
+    return url && props.onOpenUrl ? { url, label: props.flow.docsLabel ?? t("mcp.connect.getKey") } : null;
   });
 
   function edit(id: string, value: string) {
@@ -43,7 +45,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
     });
     if (!complete()) return;
     void attempt(async () => {
-      const error = mcpFlowError(props.subject.config, props.flow, form.values);
+      const error = mcpFlowError(props.subject.config, props.flow, form.values, t);
       if (error) throw new Error(error);
       return applyMcpFlow(props.subject.config, props.flow, form.values);
     });
@@ -56,8 +58,11 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
       busy={busy}
       description={
         props.flow.fields.length > 0
-          ? `Paste a credential from your ${props.subject.name} account. OpenBot connects with it and keeps it on ${props.hostName ?? "this computer"}.`
-          : `${props.subject.name} asks for no credential. OpenBot connects once to see which tools it offers.`
+          ? t("mcp.connect.keyDescription", {
+              name: props.subject.name,
+              host: props.hostName ?? t("mcp.connect.thisComputer"),
+            })
+          : t("mcp.connect.noCredentialDescription", { name: props.subject.name })
       }
       onSubmit={submit}
       action={
@@ -65,10 +70,10 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
           class="mcp-connect-primary"
           type="submit"
           loading={busy()}
-          loadingLabel="Connecting…"
+          loadingLabel={t("common.connecting")}
           disabled={busy() || (form.touched && !complete())}
         >
-          {state.phase === "failed" ? "Try again" : "Connect"}
+          {state.phase === "failed" ? t("common.tryAgain") : t("mcp.connect.connect")}
         </Button>
       }
     >
@@ -84,7 +89,9 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
                   description={field.hint}
                   required={!field.optional}
                   error={
-                    form.touched && !field.optional && !(form.values[field.id] ?? "").trim() ? "Required." : undefined
+                    form.touched && !field.optional && !(form.values[field.id] ?? "").trim()
+                      ? t("mcp.connect.required")
+                      : undefined
                   }
                 >
                   {/* A link is shown so the user can check what they pasted; a credential is not. */}
@@ -120,7 +127,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
           <p class="mcp-connect-row mcp-connect-privacy">
             <ShieldCheck aria-hidden="true" />
             <Text as="span" tone="muted">
-              Kept on {props.hostName ?? "this computer"}.
+              {t("mcp.connect.keptOn", { host: props.hostName ?? t("mcp.connect.thisComputer") })}
             </Text>
           </p>
         </div>

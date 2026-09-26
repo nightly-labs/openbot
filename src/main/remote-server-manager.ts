@@ -45,6 +45,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import { contentDispositionFileName } from "./content-disposition";
 import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
 import {
@@ -180,7 +181,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       transport: this.#webrtcTransport,
       sendInviteEmail: (input) => {
-        if (!this.#centralAccount.sendTeamInviteEmail) throw new Error("Email delivery is unavailable.");
+        if (!this.#centralAccount.sendTeamInviteEmail)
+          throw new Error(sourceText("error.remote.emailDeliveryUnavailable"));
         return this.#centralAccount.sendTeamInviteEmail(input);
       },
     });
@@ -326,7 +328,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   select(serverId: string): Promise<ServerSummary[]> {
     const operation = this.#selectChain.then(async () => {
       if (serverId !== LOCAL_SERVER_ID && !this.#store.has(serverId)) {
-        throw new Error("Remote server not found.");
+        throw new Error(sourceText("error.remote.serverNotFound"));
       }
       const previousSelection = this.#store.selection;
       const selectionRevision = this.#store.setActiveServerId(serverId);
@@ -392,17 +394,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     if (this.#webrtcTransport && !isLocalDevelopmentApi(invite.apiUrl)) {
       const preview = await this.#webrtcTransport.previewInvite(invite.token);
-      if (preview.hostId !== invite.serverId) throw new Error("The invitation host does not match its token.");
+      if (preview.hostId !== invite.serverId) throw new Error(sourceText("error.remote.inviteHostMismatch"));
       if (!preview.devicePublicKey || fingerprint(preview.devicePublicKey) !== invite.fingerprint) {
-        throw new Error("The invitation host identity does not match its token.");
+        throw new Error(sourceText("error.remote.inviteIdentityMismatch"));
       }
       const accepted = await this.#webrtcTransport.acceptInvite(invite.token);
-      if (accepted.hostId !== invite.serverId) throw new Error("The account service accepted a different host.");
+      if (accepted.hostId !== invite.serverId) throw new Error(sourceText("error.remote.inviteAcceptedOtherHost"));
       await this.#store.unhideHost(accepted.hostId);
       await this.#syncWebRtcHosts();
       const synchronized = this.#store.find(accepted.hostId);
       if (!synchronized || synchronized.fingerprint !== invite.fingerprint) {
-        throw new Error("The invitation host identity changed while it was accepted.");
+        throw new Error(sourceText("error.remote.inviteIdentityChanged"));
       }
       // The identity checked out, so an entry for this host that this build could not read is now
       // superseded. `#syncWebRtcHosts` above deliberately kept it -- reconciliation is not a join.
@@ -492,9 +494,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     if (this.#webrtcTransport && !isLocalDevelopmentApi(invite.apiUrl)) {
       const preview = await this.#webrtcTransport.previewInvite(invite.token);
-      if (preview.hostId !== invite.serverId) throw new Error("The invitation host does not match its token.");
+      if (preview.hostId !== invite.serverId) throw new Error(sourceText("error.remote.inviteHostMismatch"));
       if (!preview.devicePublicKey || fingerprint(preview.devicePublicKey) !== invite.fingerprint) {
-        throw new Error("The invitation host identity does not match its token.");
+        throw new Error(sourceText("error.remote.inviteIdentityMismatch"));
       }
       return {
         serverId: preview.hostId,
@@ -581,7 +583,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       : "error";
     try {
       if (server.transport === "webrtc-v2") {
-        if (!this.#webrtcTransport) throw new Error("The WebRTC transport is unavailable.");
+        if (!this.#webrtcTransport) throw new Error(sourceText("error.remote.webRtcUnavailable"));
         // The user retrying is what lifts the suspension a protocol or credential failure left
         // behind. Without this the connection comes up and the next disconnect never reconnects,
         // because `scheduleReconnect` still sees the host paused -- the HTTPS arm below gets the
@@ -612,13 +614,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async remove(serverId: string): Promise<void> {
-    if (serverId === LOCAL_SERVER_ID) throw new Error("The local server cannot be removed.");
+    if (serverId === LOCAL_SERVER_ID) throw new Error(sourceText("error.remote.localServerRemove"));
     const server = this.#store.find(serverId);
     // An owner cannot leave their own host, so the account service keeps listing it. Hiding it is
     // what makes the removal survive the next directory sync.
     let hideHost = false;
     if (server?.transport === "webrtc-v2") {
-      if (!this.#webrtcTransport) throw new Error("The WebRTC transport is unavailable.");
+      if (!this.#webrtcTransport) throw new Error(sourceText("error.remote.webRtcUnavailable"));
       if (server.role === "owner") hideHost = true;
       else await this.#webrtcTransport.leaveHost(serverId);
       await this.#webrtcTransport.disconnect(serverId).catch(() => undefined);
@@ -834,7 +836,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   checkRemoteDesktopSetup(serverId: string) {
     if (!this.supportsCapability(serverId, REMOTE_DESKTOP_SETUP_CAPABILITY))
-      throw new Error("Update OpenBot on the host to check remote desktop setup.");
+      throw new Error(sourceText("error.remote.desktopSetupHostUpdate"));
     return this.request(serverId, TEAM_API_ROUTES.remoteScreen.setup, decodeRemoteDesktopSetupFromHost, {
       method: "POST",
       body: {},
@@ -843,7 +845,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   testRemoteDesktop(input: RemoteDesktopTestInput) {
     if (!this.supportsCapability(input.serverId, REMOTE_DESKTOP_SETUP_CAPABILITY))
-      throw new Error("Update OpenBot on the host to test remote desktop setup.");
+      throw new Error(sourceText("error.remote.desktopTestHostUpdate"));
     return this.request(input.serverId, TEAM_API_ROUTES.remoteScreen.test, decodeRemoteDesktopTestFromHost, {
       method: "POST",
       body: { sessionId: input.sessionId, action: input.action },
@@ -856,7 +858,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       body: {},
     });
     if (this.#store.require(serverId).transport !== "webrtc-v2") return session;
-    if (!this.#remoteViewerProxy) throw new Error("The local remote viewer proxy is unavailable.");
+    if (!this.#remoteViewerProxy) throw new Error(sourceText("error.remote.viewerProxyUnavailable"));
     return {
       ...session,
       viewerUrl: await this.#remoteViewerProxy.viewerUrl(serverId, TEAM_API_ROUTES.remoteScreen.viewer(session.id)),
@@ -865,7 +867,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   async fetchRemoteViewerResource(serverId: string, path: string, init: RequestInit): Promise<Response> {
     const server = this.#store.require(serverId);
-    if (server.transport !== "webrtc-v2") throw new Error("The remote viewer transport is invalid.");
+    if (server.transport !== "webrtc-v2") throw new Error(sourceText("error.remote.viewerTransportInvalid"));
     return this.#client.fetch(server, new URL(path, server.apiUrl), init, false);
   }
 
@@ -886,7 +888,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       { method: "POST", body: { tabId } },
     );
     if (server.transport === "webrtc-v2") {
-      if (!this.#remoteViewerProxy) throw new Error("The local remote viewer proxy is unavailable.");
+      if (!this.#remoteViewerProxy) throw new Error(sourceText("error.remote.viewerProxyUnavailable"));
       const url = new URL(await this.#remoteViewerProxy.viewerUrl(serverId, session.streamPath));
       url.protocol = "ws:";
       return { sessionId: session.id, url: url.toString(), protocols: [] };

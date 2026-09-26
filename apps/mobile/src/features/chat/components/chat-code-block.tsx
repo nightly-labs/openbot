@@ -6,7 +6,8 @@ import { Check, Copy } from "lucide-react-native";
 import { memo, useEffect, useRef, useState } from "react";
 import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { type CodeToken, codeLanguage, highlightCode } from "../model/code-highlight";
+import { useText } from "@/shared/lib/text";
+import { type CodeToken, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
@@ -21,6 +22,7 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
   selectable?: boolean;
 }) {
   const { fontScale } = useWindowDimensions();
+  const { t } = useText();
   const [foreground, muted, keyword] = useThemeColor(["foreground", "muted", "link"]);
   const [string, number, error] = useCSSVariable([
     "--openbot-success-text",
@@ -77,20 +79,20 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
       await Clipboard.setStringAsync(text);
       setCopiedText(text);
     } catch {
-      Alert.alert("Could not copy code", "Please try again.");
+      Alert.alert(t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   }
   return (
     <View className="overflow-hidden bg-control/50" style={{ borderRadius: 18, borderCurve: "continuous" }}>
       <View className="flex-row items-center justify-between gap-3 pl-3 pr-1 pt-1">
         <Typography.Paragraph type="body-xs" className="shrink text-muted" numberOfLines={1}>
-          {codeLanguage(language).label}
+          {codeLanguageLabel(language, t)}
         </Typography.Paragraph>
         <Button
           isIconOnly
           variant="ghost"
           size="sm"
-          accessibilityLabel={copied ? "Code copied" : "Copy code"}
+          accessibilityLabel={copied ? t("mobile.chat.code.copied") : t("mobile.chat.code.copy")}
           onPress={copy}
         >
           {copied ? <Check size={14} color={String(muted)} /> : <Copy size={14} color={String(muted)} />}

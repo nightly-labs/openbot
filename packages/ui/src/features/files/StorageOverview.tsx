@@ -1,5 +1,6 @@
 import { CLEARABLE_STORAGE_CATEGORIES, type ClearableStorageCategory } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
   ChevronRight,
@@ -12,9 +13,9 @@ import {
 } from "@openbot/ui";
 import { SettingsBackIcon } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
+import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { formatFileSize } from "../conversation/AttachmentCards";
 import { FileList } from "./FileList";
 import {
   type AgentStorageRow,
@@ -26,6 +27,7 @@ import {
   type StoredFileAction,
   type StoredFileRow,
   sharePercent,
+  sharePercentLabel,
   storageGroupTotals,
   storageTotal,
 } from "./files-view";
@@ -68,10 +70,11 @@ const LARGEST_CHATS = 5;
  * cleared from here; the user deletes them where they live.
  */
 export function StorageOverview(props: StorageOverviewProps) {
+  const { t, format } = useText();
   const headingId = `storage-${createUniqueId()}`;
   const [showFiles, setShowFiles] = createSignal(false);
   const total = createMemo(() => storageTotal(props.breakdown));
-  const groups = createMemo(() => storageGroupTotals(props.breakdown));
+  const groups = createMemo(() => storageGroupTotals(props.breakdown, t));
   const removable = createMemo(() =>
     props.breakdown.flatMap((entry) =>
       entry.removable && entry.bytes > 0 && isOneOf(CLEARABLE_STORAGE_CATEGORIES, entry.category)
@@ -90,7 +93,8 @@ export function StorageOverview(props: StorageOverviewProps) {
     [...props.conversations].sort((left, right) => right.bytes - left.bytes).slice(0, LARGEST_CHATS),
   );
   const filesBytes = () => props.files.reduce((sum, file) => sum + file.size, 0);
-  const agentName = (agentId: string) => props.agents.find((agent) => agent.id === agentId)?.name ?? "Removed agent";
+  const agentName = (agentId: string) =>
+    props.agents.find((agent) => agent.id === agentId)?.name ?? t("files.storage.removedAgent");
 
   return (
     <Show
@@ -103,15 +107,15 @@ export function StorageOverview(props: StorageOverviewProps) {
               variant="ghost"
               size="icon-sm"
               class="storage-subview-back"
-              aria-label="Back to storage"
+              aria-label={t("files.storage.back")}
               onClick={() => setShowFiles(false)}
             >
               <SettingsBackIcon />
             </Button>
-            <h3>All files</h3>
+            <h3>{t("files.storage.allFiles")}</h3>
           </header>
           <FileList
-            label={`All files on ${props.hostName}`}
+            label={t("files.storage.allFilesOn", { host: props.hostName })}
             files={props.files}
             agents={props.agents}
             showConversation
@@ -129,14 +133,14 @@ export function StorageOverview(props: StorageOverviewProps) {
           <div class="storage-summary-heading">
             <div>
               <h3 id={`${headingId}-summary`} class="storage-summary-label">
-                OpenBot on {props.hostName}
+                {t("files.storage.openBotOn", { host: props.hostName })}
               </h3>
               <Show
                 when={props.state !== "scanning" || total() > 0}
                 fallback={<Skeleton class="storage-summary-total-skeleton" />}
               >
                 <Show when={props.state !== "error" || total() > 0}>
-                  <p class="storage-summary-total">{formatFileSize(total())}</p>
+                  <p class="storage-summary-total">{format.fileSize(total())}</p>
                 </Show>
               </Show>
               <p class="storage-summary-caption">
@@ -156,7 +160,7 @@ export function StorageOverview(props: StorageOverviewProps) {
               onClick={() => props.onRescan()}
             >
               <RefreshCw class="files-button-icon" aria-hidden="true" />
-              {props.state === "scanning" ? "Measuring…" : "Measure again"}
+              {props.state === "scanning" ? t("files.storage.measuring") : t("files.storage.measureAgain")}
             </Button>
           </div>
 
@@ -165,7 +169,7 @@ export function StorageOverview(props: StorageOverviewProps) {
               class="storage-scan-progress"
               value={props.scanProgress ?? 0}
               indeterminate={props.scanProgress === undefined}
-              aria-label="Measuring storage"
+              aria-label={t("files.storage.measuringStorage")}
             />
           </Show>
 
@@ -173,23 +177,21 @@ export function StorageOverview(props: StorageOverviewProps) {
             <div class="storage-message" role="alert">
               <TriangleAlert class="storage-message-icon" aria-hidden="true" />
               <div>
-                <p class="storage-message-title">Storage could not be measured</p>
+                <p class="storage-message-title">{t("files.storage.measureFailedTitle")}</p>
                 <p class="storage-message-description">{props.error}</p>
               </div>
             </div>
           </Show>
 
           <Show when={groups().length > 0}>
-            <StorageUsageBar groups={groups()} label="Storage by type" />
+            <StorageUsageBar groups={groups()} label={t("files.storage.byType")} />
           </Show>
           <Show when={props.state === "ready" && total() === 0}>
             <div class="storage-message">
               <HardDrive class="storage-message-icon" aria-hidden="true" />
               <div>
-                <p class="storage-message-title">Nothing stored yet</p>
-                <p class="storage-message-description">
-                  Agent workspaces, chat files and chat history show here when you start to use OpenBot.
-                </p>
+                <p class="storage-message-title">{t("files.storage.emptyTitle")}</p>
+                <p class="storage-message-description">{t("files.storage.emptyDescription")}</p>
               </div>
             </div>
           </Show>
@@ -198,7 +200,7 @@ export function StorageOverview(props: StorageOverviewProps) {
         <Show when={agentRows().length > 0}>
           <section class="storage-section" aria-labelledby={`${headingId}-agents`}>
             <h3 id={`${headingId}-agents`} class="storage-section-heading">
-              Agents
+              {t("files.storage.agents")}
             </h3>
             <ul class="storage-rows">
               <For each={agentRows()}>
@@ -208,7 +210,10 @@ export function StorageOverview(props: StorageOverviewProps) {
                       type="button"
                       variant="ghost"
                       class="storage-row"
-                      aria-label={`${row.agent?.name ?? "Removed agent"}, ${formatFileSize(row.bytes)}`}
+                      aria-label={t("files.storage.rowLabel", {
+                        name: row.agent?.name ?? t("files.storage.removedAgent"),
+                        size: format.fileSize(row.bytes),
+                      })}
                       onClick={() => props.onOpenAgent(row.agentId)}
                     >
                       <AgentAvatar
@@ -217,9 +222,9 @@ export function StorageOverview(props: StorageOverviewProps) {
                         class="storage-row-avatar"
                       />
                       <span class="storage-row-copy">
-                        <span class="storage-row-title">{row.agent?.name ?? "Removed agent"}</span>
+                        <span class="storage-row-title">{row.agent?.name ?? t("files.storage.removedAgent")}</span>
                         <span class="storage-row-meta">
-                          {fileCountLabel(row.fileCount)} · {chatCountLabel(row.conversationCount)}
+                          {fileCountLabel(row.fileCount, t)} · {chatCountLabel(row.conversationCount, t)}
                         </span>
                       </span>
                       <span class="storage-row-share" aria-hidden="true">
@@ -231,8 +236,10 @@ export function StorageOverview(props: StorageOverviewProps) {
                         />
                       </span>
                       <span class="storage-row-size">
-                        {formatFileSize(row.bytes)}
-                        <span class="storage-row-percent">{sharePercent(row.bytes, total())}%</span>
+                        {format.fileSize(row.bytes)}
+                        <span class="storage-row-percent">
+                          {sharePercentLabel(sharePercent(row.bytes, total()), format)}
+                        </span>
                       </span>
                     </Button>
                   </li>
@@ -245,7 +252,7 @@ export function StorageOverview(props: StorageOverviewProps) {
         <Show when={largestChats().length > 0}>
           <section class="storage-section" aria-labelledby={`${headingId}-chats`}>
             <h3 id={`${headingId}-chats`} class="storage-section-heading">
-              Largest chats
+              {t("files.storage.largestChats")}
             </h3>
             <ul class="storage-rows">
               <For each={largestChats()}>
@@ -255,7 +262,7 @@ export function StorageOverview(props: StorageOverviewProps) {
                       type="button"
                       variant="ghost"
                       class="storage-row"
-                      aria-label={`${chat.title}, ${formatFileSize(chat.bytes)}`}
+                      aria-label={t("files.storage.rowLabel", { name: chat.title, size: format.fileSize(chat.bytes) })}
                       onClick={() => props.onOpenConversation(chat.id)}
                     >
                       <span class="storage-row-copy">
@@ -263,11 +270,11 @@ export function StorageOverview(props: StorageOverviewProps) {
                           {chat.title}
                         </span>
                         <span class="storage-row-meta">
-                          {agentName(chat.agentId)} · {fileCountLabel(chat.fileCount)} · {chat.messageCount}{" "}
-                          {chat.messageCount === 1 ? "message" : "messages"}
+                          {agentName(chat.agentId)} · {fileCountLabel(chat.fileCount, t)} ·{" "}
+                          {t("files.messageCount", { count: chat.messageCount })}
                         </span>
                       </span>
-                      <span class="storage-row-size">{formatFileSize(chat.bytes)}</span>
+                      <span class="storage-row-size">{format.fileSize(chat.bytes)}</span>
                     </Button>
                   </li>
                 )}
@@ -279,18 +286,18 @@ export function StorageOverview(props: StorageOverviewProps) {
         <Show when={props.files.length > 0}>
           <section class="storage-section" aria-labelledby={`${headingId}-files`}>
             <h3 id={`${headingId}-files`} class="storage-section-heading">
-              Files
+              {t("files.storage.files")}
             </h3>
             <ul class="storage-rows">
               <li>
                 <Button type="button" variant="ghost" class="storage-row" onClick={() => setShowFiles(true)}>
                   <span class="storage-row-copy">
-                    <span class="storage-row-title">All files</span>
-                    <span class="storage-row-meta">Files of all agents and chats</span>
+                    <span class="storage-row-title">{t("files.storage.allFiles")}</span>
+                    <span class="storage-row-meta">{t("files.storage.allFilesDescription")}</span>
                   </span>
                   <span class="storage-row-size">
-                    {formatFileSize(filesBytes())}
-                    <span class="storage-row-percent">{fileCountLabel(props.files.length)}</span>
+                    {format.fileSize(filesBytes())}
+                    <span class="storage-row-percent">{fileCountLabel(props.files.length, t)}</span>
                   </span>
                   <ChevronRight class="storage-row-chevron" aria-hidden="true" />
                 </Button>
@@ -318,23 +325,27 @@ function StorageCaption(props: {
   freeBytes?: number | null;
   now?: Date;
 }) {
+  const { t, format } = useText();
   const parts = () => {
     const result: string[] = [];
-    if (props.state === "scanning") result.push("Measuring the OpenBot folder…");
-    else if (props.scannedAt) result.push(`Measured ${relativeTime(props.scannedAt, props.now ?? new Date())}`);
-    if (props.freeBytes != null) result.push(`${formatFileSize(props.freeBytes)} free on this disk`);
+    if (props.state === "scanning") result.push(t("files.storage.measuringFolder"));
+    else if (props.scannedAt)
+      result.push(
+        t("files.storage.measured", { time: relativeTime(props.scannedAt, props.now ?? new Date(), t, format) }),
+      );
+    if (props.freeBytes != null) result.push(t("files.storage.free", { size: format.fileSize(props.freeBytes) }));
     return result.join(" · ");
   };
   return <>{parts()}</>;
 }
 
-function relativeTime(iso: string, now: Date): string {
+function relativeTime(iso: string, now: Date, t: AppTranslate, format: AppFormat): string {
   const minutes = Math.round((now.getTime() - Date.parse(iso)) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t("files.storage.justNow");
+  if (minutes < 60) return t("files.storage.minutesAgo", { minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (hours < 24) return t("files.storage.hoursAgo", { hours });
+  return format.date(new Date(iso), { month: "short", day: "numeric" });
 }
 
 interface CleanupEntry {
@@ -342,10 +353,15 @@ interface CleanupEntry {
   bytes: number;
 }
 
-const CLEANUP_DESCRIPTIONS: Record<ClearableStorageCategory, string> = {
-  caches: "Copies of server files. OpenBot downloads them again when you open them.",
-  logs: "Diagnostic logs. New logs start at once.",
-};
+const CLEANUP_DESCRIPTIONS = {
+  caches: "files.cleanup.description.caches",
+  logs: "files.cleanup.description.logs",
+} as const satisfies Record<ClearableStorageCategory, AppTextKey>;
+
+const CLEANUP_CONFIRM_TITLES = {
+  caches: "files.cleanup.confirm.caches",
+  logs: "files.cleanup.confirm.logs",
+} as const satisfies Record<ClearableStorageCategory, AppTextKey>;
 
 function StorageCleanup(props: {
   entries: readonly CleanupEntry[];
@@ -353,6 +369,7 @@ function StorageCleanup(props: {
   disabled: boolean;
   onClear: (category: ClearableStorageCategory) => void | Promise<void>;
 }) {
+  const { t, format, errorMessage } = useText();
   const headingId = `storage-cleanup-${createUniqueId()}`;
   const [pending, setPending] = createSignal<CleanupEntry | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -365,7 +382,7 @@ function StorageCleanup(props: {
       await props.onClear(entry.category);
       setPending(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not clear the data.");
+      setError(errorMessage(caught, t("files.cleanup.failed")));
     }
   }
 
@@ -373,31 +390,33 @@ function StorageCleanup(props: {
     <section class="storage-section" aria-labelledby={headingId}>
       <div class="storage-section-heading-row">
         <h3 id={headingId} class="storage-section-heading">
-          Clean up
+          {t("files.cleanup.title")}
         </h3>
-        <span class="storage-section-aside">{formatFileSize(props.totalBytes)} can be cleared</span>
+        <span class="storage-section-aside">
+          {t("files.cleanup.canBeCleared", { size: format.fileSize(props.totalBytes) })}
+        </span>
       </div>
       <ul class="storage-rows storage-cleanup-rows">
         <For each={props.entries}>
           {(entry) => (
             <li class="storage-cleanup-row">
               <span class="storage-row-copy">
-                <span class="storage-row-title">{STORAGE_CATEGORY_LABELS[entry.category]}</span>
-                <span class="storage-row-meta">{CLEANUP_DESCRIPTIONS[entry.category]}</span>
+                <span class="storage-row-title">{t(STORAGE_CATEGORY_LABELS[entry.category])}</span>
+                <span class="storage-row-meta">{t(CLEANUP_DESCRIPTIONS[entry.category])}</span>
               </span>
-              <span class="storage-row-size">{formatFileSize(entry.bytes)}</span>
+              <span class="storage-row-size">{format.fileSize(entry.bytes)}</span>
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
                 disabled={props.disabled}
-                aria-label={`Clear ${STORAGE_CATEGORY_LABELS[entry.category]}`}
+                aria-label={t("files.cleanup.clearCategory", { category: t(STORAGE_CATEGORY_LABELS[entry.category]) })}
                 onClick={() => {
                   setError(null);
                   setPending(entry);
                 }}
               >
-                Clear
+                {t("files.cleanup.clear")}
               </Button>
             </li>
           )}
@@ -407,10 +426,13 @@ function StorageCleanup(props: {
         open={pending() !== null}
         onCancel={() => setPending(null)}
         onConfirm={confirm}
-        title={`Clear ${STORAGE_CATEGORY_LABELS[pending()?.category ?? "caches"].toLocaleLowerCase()}?`}
-        description={`This frees ${formatFileSize(pending()?.bytes ?? 0)}. ${CLEANUP_DESCRIPTIONS[pending()?.category ?? "caches"]}`}
-        confirmLabel="Clear"
-        pendingLabel="Clearing…"
+        title={t(CLEANUP_CONFIRM_TITLES[pending()?.category ?? "caches"])}
+        description={t("files.cleanup.confirmDescription", {
+          size: format.fileSize(pending()?.bytes ?? 0),
+          description: t(CLEANUP_DESCRIPTIONS[pending()?.category ?? "caches"]),
+        })}
+        confirmLabel={t("files.cleanup.clear")}
+        pendingLabel={t("files.cleanup.clearing")}
         error={error() ?? undefined}
       />
     </section>

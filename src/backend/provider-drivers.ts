@@ -1,4 +1,5 @@
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
@@ -19,6 +20,12 @@ import {
   openCodeSignInMessage,
 } from "./opencode-config";
 import { readOpenCodeGoUsage } from "./opencode-usage";
+import {
+  confineSpawnTarget,
+  OPENCODE_CONFINED_ENV,
+  openCodeStatePaths,
+  type ProcessConfinement,
+} from "./process-confinement";
 import type { AccountReadResult } from "./protocol";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -105,6 +112,11 @@ export interface ProviderClientContext {
    * flight. Read at the last moment before a prompt leaves, because everything above it awaits.
    */
   servesModel?(modelId: string): boolean;
+  /**
+   * A folder OpenBot owns for files it gives a provider process, outside every root an agent can
+   * write. Optional for the same reason as `reportMcpDrops`.
+   */
+  readonly providerStateDirectory?: string;
 }
 
 /** Nothing stored and no endpoint, for tests and for call sites that predate the credential store. */
@@ -123,7 +135,17 @@ export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
-  createClient(cli: AgentCliInfo, requestTimeoutMs: number, context: ProviderClientContext): AgentClient;
+  createClient(
+    cli: AgentCliInfo,
+    requestTimeoutMs: number,
+    context: ProviderClientContext,
+    confinement?: ProcessConfinement,
+  ): AgentClient;
+  /**
+   * Whether a Workspace only agent needs a process of its own. Codex and Claude confine each session
+   * themselves; Grok and OpenCode take `confinement` above and confine the whole process.
+   */
+  confinesProcess?: true;
   /**
    * The client that writes an agent profile, when the provider needs a different one. Profile
    * generation asks the model one question and must not let it act, so a provider that can be
@@ -143,7 +165,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
     validateAccount: (account) => {
       if (account.type !== "chatgpt") {
-        throw new Error("Codex requires a ChatGPT subscription login. Run `codex login`.");
+        throw new Error(sourceText("error.provider.codexLoginRequired"));
       }
     },
   },
@@ -168,6 +190,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.reportMcpDrops,
         context.mcpToolRuntimes,
         context.mcpAuthorization,
+        context.providerStateDirectory,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -183,7 +206,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
     },
     resolveCli: resolveGrokCli,
-    createClient: (cli, requestTimeoutMs, context) =>
+    confinesProcess: true,
+    createClient: (cli, requestTimeoutMs, context, confinement) =>
       new GrokAgentClient(
         cli,
         requestTimeoutMs,
@@ -192,6 +216,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.reportMcpDrops,
         context.mcpToolRuntimes,
         context.mcpAuthorization,
+        confinement,
       ),
     createProfileClient: (cli, requestTimeoutMs) => new GrokAgentClient(cli, requestTimeoutMs, true),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
@@ -207,12 +232,18 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // Both clients read the key and the custom providers at spawn, and the profile client merges the
     // endpoints *into* the deny-all layer rather than beside it: the two share one environment
     // variable, so the layer would be lost if a custom provider config replaced it.
-    createClient: (cli, timeout, context) =>
+    confinesProcess: true,
+    createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
         argv: ["acp"],
         env: {},
-        extraEnv: () => ({ ...opencodeEnv(cli, context), ...openCodeConfigEnv({}, context.customProviders) }),
+        ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
+        extraEnv: () => ({
+          ...opencodeEnv(cli, context),
+          ...openCodeConfigEnv({}, context.customProviders),
+          ...(confinement ? OPENCODE_CONFINED_ENV : {}),
+        }),
         signInMessage: openCodeSignInMessage(context.customProviders().length),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,

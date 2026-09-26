@@ -63,7 +63,6 @@ vi.mock("../components/attachment-preview", () => ({
     busy: false,
     share: native.share,
   }),
-  formatFileSize: (bytes: number) => `${bytes} B`,
 }));
 vi.mock("../components/use-chat-attachments", () => ({
   useChatAttachments: (initial: { id: string; name: string }[]) => ({

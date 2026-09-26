@@ -15,6 +15,7 @@
  */
 
 import { ConfirmDialog, Text } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
 
 /** What an uninstall is about to take, as the page found it on this computer. */
@@ -36,22 +37,23 @@ export function PluginUninstallDialog(props: {
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useText();
   return (
     <ConfirmDialog
       open={props.open}
       initialFocus="cancel"
       // A removal that is running is not cancellable: half of it has already happened.
       pending={props.busy}
-      title={`Uninstall ${props.plan.pluginName}?`}
-      description={`This removes what ${props.plan.pluginName} installed on this computer. Nothing else on this host or on this agent changes.`}
-      confirmLabel="Uninstall"
+      title={t("plugin.uninstallDialog.title", { name: props.plan.pluginName })}
+      description={t("plugin.uninstallDialog.description", { name: props.plan.pluginName })}
+      confirmLabel={t("plugin.uninstallDialog.confirm")}
       onCancel={props.onCancel}
       onConfirm={props.onConfirm}
     >
       <Show when={props.plan.appNames.length > 0}>
-        <section aria-label={`Apps to remove, ${props.plan.appNames.length}`}>
+        <section aria-label={t("plugin.uninstallDialog.appsLabel", { number: props.plan.appNames.length })}>
           <Text tone="muted" variant="label-sm">
-            Apps removed from this host
+            {t("plugin.uninstallDialog.appsTitle")}
           </Text>
           <ul>
             <For each={props.plan.appNames}>{(name) => <li>{name}</li>}</For>
@@ -59,15 +61,15 @@ export function PluginUninstallDialog(props: {
           {/* Said here rather than after the fact: a sign-in the user granted in a browser is
               dropped with the row, and the next install asks for it again. */}
           <Text tone="muted" variant="label-sm">
-            Their tools stop being available, and any sign-in OpenBot kept for them is forgotten.
+            {t("plugin.uninstallDialog.appsNote")}
           </Text>
         </section>
       </Show>
 
       <Show when={props.plan.skillSlugs.length > 0}>
-        <section aria-label={`Skills to remove, ${props.plan.skillSlugs.length}`}>
+        <section aria-label={t("plugin.uninstallDialog.skillsLabel", { number: props.plan.skillSlugs.length })}>
           <Text tone="muted" variant="label-sm">
-            Skills removed from {props.plan.agentName}
+            {t("plugin.uninstallDialog.skillsTitle", { agentName: props.plan.agentName })}
           </Text>
           <ul>
             <For each={props.plan.skillSlugs}>{(slug) => <li>{slug}</li>}</For>

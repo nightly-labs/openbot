@@ -3,8 +3,14 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
-import { type AgentProviderId, isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
-import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  type AgentProviderId,
+  COMPUTER_USE_MCP_SERVER_ID,
+  isReservedMcpServerName,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
 
@@ -125,6 +131,23 @@ function unusableDrop(server: UnusableMcpServer): McpServerDrop {
 }
 
 /**
+ * The configurations one agent is given: all of them, or all but Computer Use when the user turned
+ * it off for that agent.
+ */
+export function agentMcpServers(configs: readonly McpServerConfig[], computerUse: boolean): readonly McpServerConfig[] {
+  return computerUse ? configs : configs.filter((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID);
+}
+
+/**
+ * Whether the `thread/start` or `thread/resume` params allow Computer Use. `ThreadLifecycle` sends
+ * `computerUse: false` to Claude and the ACP clients only when it is off, because those clients read
+ * the MCP servers themselves. Absent means on.
+ */
+export function computerUseParam(params: unknown): boolean {
+  return !isDynamicRecord(params) || params.computerUse !== false;
+}
+
+/**
  * The enabled configurations a provider can actually be given.
  *
  * Two jobs, both of which have to happen exactly once and before anything else reads the list:
@@ -173,7 +196,12 @@ export async function usableMcpServer(
   const configured = mcpEnvironment(config).PATH;
   const path = appendToolRuntimes(configured ?? (await loginShellPath()), tools.binDirectories);
   const command = (await resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
-  if (!command) return { config, error: `Command not found: ${config.command}`, reason: "command_not_found" };
+  if (!command)
+    return {
+      config,
+      error: sourceText("error.backend.mcpCommandNotFound", { command: config.command }),
+      reason: "command_not_found",
+    };
   return {
     config,
     command,

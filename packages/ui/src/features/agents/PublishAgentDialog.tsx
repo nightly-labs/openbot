@@ -1,4 +1,5 @@
 import type { AgentTemplatePreview, MarketplaceAgentRoutine } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
   ArrowLeft,
   Badge,
@@ -14,8 +15,8 @@ import {
   toast,
   X,
 } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentAvatar } from "./AgentAvatar";
 import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentTemplateSections";
 
@@ -39,6 +40,7 @@ type Pending = "publish" | "unpublish" | null;
  * link. The caller reports a finished action in a toast; a failed one is reported here.
  */
 export function PublishAgentDialog(props: PublishAgentDialogProps) {
+  const { t, format, errorMessage } = useText();
   const [view, setView] = createSignal<View>("summary");
   const [pending, setPending] = createSignal<Pending>(null);
   const published = () => props.preview?.publication ?? null;
@@ -75,7 +77,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
     try {
       await props.onCopyLink();
     } catch (error) {
-      toast.error(errorMessage(error, "Could not copy the link."));
+      toast.error(errorMessage(error, t("agentTemplate.publish.copyFailed")));
     }
   }
 
@@ -99,28 +101,33 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
               closeButton?.focus({ preventScroll: true });
             }}
           >
-            <Dialog.Title class="sr-only">Publish {props.preview?.name ?? "agent"}</Dialog.Title>
-            <Dialog.Description class="sr-only">
-              Share this agent as a template. Its instructions, skills and routines are published. Files and memories
-              are not.
-            </Dialog.Description>
+            <Dialog.Title class="sr-only">
+              {t("agentTemplate.publish.title", {
+                name: props.preview?.name ?? t("agentTemplate.publish.nameFallback"),
+              })}
+            </Dialog.Title>
+            <Dialog.Description class="sr-only">{t("agentTemplate.publish.description")}</Dialog.Description>
             <Show when={published() && view() === "summary"}>
               <Badge variant="success-light" class="agent-template-status">
-                Published
+                {t("agentTemplate.publish.published")}
               </Badge>
             </Show>
             <div class="agent-template-corner-actions">
               <Show when={published() && view() === "summary"}>
                 <IconButton
-                  label={pending() === "unpublish" ? "Unpublishing…" : "Unpublish"}
+                  label={
+                    pending() === "unpublish"
+                      ? t("agentTemplate.publish.unpublishing")
+                      : t("agentTemplate.publish.unpublish")
+                  }
                   variant="ghost"
                   disabled={pending() === "unpublish"}
-                  onClick={() => void run("unpublish", props.onUnpublish, "Could not unpublish the agent.")}
+                  onClick={() => void run("unpublish", props.onUnpublish, t("agentTemplate.publish.unpublishFailed"))}
                 >
                   <Link2Off />
                 </IconButton>
               </Show>
-              <IconButton ref={closeButton} label="Close" variant="ghost" onClick={() => changeOpen(false)}>
+              <IconButton ref={closeButton} label={t("common.close")} variant="ghost" onClick={() => changeOpen(false)}>
                 <X />
               </IconButton>
             </div>
@@ -130,7 +137,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
               fallback={
                 <div class="agent-template-body">
                   <Text tone="muted" role="status">
-                    {props.loading ? "Loading agent…" : ""}
+                    {props.loading ? t("agentTemplate.install.loading") : ""}
                   </Text>
                 </div>
               }
@@ -155,7 +162,7 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                       <Show when={preview().updatedAt}>
                         {(updatedAt) => (
                           <Text tone="muted" variant="caption">
-                            Last updated {formatShortDate(updatedAt())}
+                            {t("agentTemplate.publish.lastUpdated", { date: formatShortDate(updatedAt(), format) })}
                           </Text>
                         )}
                       </Show>
@@ -166,13 +173,13 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
 
                     <ItemGroup surface="subtle" class="agent-template-rows">
                       <TemplateRow
-                        title="Context"
-                        detail={contextSummary(preview())}
+                        title={t("agentTemplate.publish.context")}
+                        detail={contextSummary(preview(), t)}
                         onClick={() => setView("context")}
                       />
                       <TemplateRow
-                        title="Routines"
-                        detail={routinesSummary(preview().routines)}
+                        title={t("agentTemplate.section.routines")}
+                        detail={routinesSummary(preview().routines, t)}
                         onClick={() => setView("routines")}
                       />
                     </ItemGroup>
@@ -187,9 +194,11 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                           type="button"
                           variant="default"
                           disabled={pending() === "publish"}
-                          onClick={() => void run("publish", props.onPublish, "Could not publish the agent.")}
+                          onClick={() => void run("publish", props.onPublish, t("agentTemplate.publish.publishFailed"))}
                         >
-                          {pending() === "publish" ? "Publishing…" : "Publish"}
+                          {pending() === "publish"
+                            ? t("agentTemplate.publish.publishing")
+                            : t("agentTemplate.publish.publish")}
                         </Button>
                       }
                     >
@@ -200,16 +209,18 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
                         onClick={() => void copyLink()}
                       >
                         <Copy class="size-4" aria-hidden="true" />
-                        Copy link
+                        {t("agentTemplate.publish.copyLink")}
                       </Button>
                       <Button
                         ref={primaryButton}
                         type="button"
                         variant="default"
                         disabled={pending() === "publish"}
-                        onClick={() => void run("publish", props.onPublish, "Could not update the agent.")}
+                        onClick={() => void run("publish", props.onPublish, t("agentTemplate.publish.updateFailed"))}
                       >
-                        {pending() === "publish" ? "Updating…" : "Update"}
+                        {pending() === "publish"
+                          ? t("agentTemplate.publish.updating")
+                          : t("agentTemplate.publish.update")}
                       </Button>
                     </Show>
                   </footer>
@@ -240,14 +251,15 @@ function TemplateDetailView(props: {
   preview: AgentTemplatePreview;
   onBack: () => void;
 }) {
+  const { t, sourceText } = useText();
   return (
     <div class="agent-template-body">
       <header class="agent-template-detail-header">
-        <IconButton label="Back" variant="ghost" onClick={props.onBack}>
+        <IconButton label={t("common.back")} variant="ghost" onClick={props.onBack}>
           <ArrowLeft />
         </IconButton>
         <Heading as="h3" size="sm">
-          {props.view === "context" ? "Context" : "Routines"}
+          {props.view === "context" ? t("agentTemplate.publish.context") : t("agentTemplate.section.routines")}
         </Heading>
       </header>
       <div class="agent-template-detail">
@@ -257,12 +269,12 @@ function TemplateDetailView(props: {
           <Show when={props.preview.skillsError}>
             {(error) => (
               <Text tone="danger" variant="caption" role="alert">
-                The skills cannot be published: {error()}
+                {t("agentTemplate.publish.skillsError", { reason: sourceText(error()) })}
               </Text>
             )}
           </Show>
           <Text tone="muted" variant="caption">
-            Files and memories are not published.
+            {t("agentTemplate.publish.filesNotPublished")}
           </Text>
         </Show>
       </div>
@@ -270,21 +282,23 @@ function TemplateDetailView(props: {
   );
 }
 
-function contextSummary(preview: AgentTemplatePreview) {
-  if (preview.skillsError) return "Skills need attention";
-  return preview.skills.length > 0 ? "Instructions and skills" : "Instructions";
+function contextSummary(preview: AgentTemplatePreview, t: AppTranslate) {
+  if (preview.skillsError) return t("agentTemplate.publish.skillsAttention");
+  return preview.skills.length > 0
+    ? t("agentTemplate.publish.instructionsAndSkills")
+    : t("agentTemplate.section.instructions");
 }
 
-function routinesSummary(routines: readonly MarketplaceAgentRoutine[]): string {
+function routinesSummary(routines: readonly MarketplaceAgentRoutine[], t: AppTranslate): string {
   const first = routines[0];
-  if (!first) return "No routines";
+  if (!first) return t("agentTemplate.publish.noRoutines");
   const others = routines.length - 1;
   if (others === 0) return first.name;
-  return `${first.name} and ${others} ${others === 1 ? "other" : "others"}`;
+  return t("agentTemplate.publish.routinesMore", { name: first.name, count: others });
 }
 
-function formatShortDate(value: string): string {
+function formatShortDate(value: string, format: AppFormat): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+  return format.date(date, { month: "short", day: "numeric" });
 }

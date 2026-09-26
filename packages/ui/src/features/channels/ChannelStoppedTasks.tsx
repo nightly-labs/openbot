@@ -1,6 +1,7 @@
 import type { ChannelMember, ChannelTask } from "@openbot/contracts/ipc";
 import { Button, buttonVariants, DropdownMenu } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 
 export function ChannelStoppedTasks(props: {
   tasks: Pick<ChannelTask, "id" | "ownerAgentId" | "error">[];
@@ -8,23 +9,27 @@ export function ChannelStoppedTasks(props: {
   name: (agentId: string | null) => string;
   onResume: (taskId: string, recipientAgentId: string | null) => Promise<boolean>;
 }) {
+  const { t, sourceText } = useText();
   return (
     <Show when={props.tasks.length}>
       <div class="channel-paused-tasks">
         <For each={props.tasks}>
           {(task) => (
-            <section class="channel-paused-task" aria-label={`Stopped task for ${props.name(task.ownerAgentId)}`}>
-              <p class="channel-paused-task-reason">{task.error}</p>
+            <section
+              class="channel-paused-task"
+              aria-label={t("channel.stoppedTask.label", { name: props.name(task.ownerAgentId) })}
+            >
+              <p class="channel-paused-task-reason">{task.error ? sourceText(task.error) : null}</p>
               <div class="channel-paused-task-actions">
                 <Button size="xs" onClick={() => void props.onResume(task.id, null)}>
-                  Continue
+                  {t("common.continue")}
                 </Button>
                 <DropdownMenu.Root placement="top-start">
                   <DropdownMenu.Trigger
                     class={buttonVariants({ variant: "ghost", size: "xs" })}
-                    aria-label={`Reassign the stopped task of ${props.name(task.ownerAgentId)}`}
+                    aria-label={t("channel.stoppedTask.reassignLabel", { name: props.name(task.ownerAgentId) })}
                   >
-                    Reassign
+                    {t("channel.stoppedTask.reassign")}
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content>

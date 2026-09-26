@@ -1,6 +1,6 @@
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
 import { flush, onSettled } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
@@ -33,7 +33,8 @@ const lastErrorToastAt = new Map<string, number>();
 
 /** One sentence a reader can act on, whichever surface shows it. */
 function readableAgentError(message: string): string {
-  const readable = errorMessage(message, "The agent could not continue. Try again.");
+  const { t, errorMessage } = currentText();
+  const readable = errorMessage(message, t("agent.error.continueFailed"));
   if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
   return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
 }
@@ -297,7 +298,9 @@ export function AgentEventBridge() {
           lastErrorToastAt.set(toastKey, now);
           // An MCP server left out at hand-off is not the provider failing, and calling it a
           // provider error sends the user to the wrong settings page.
-          const title = event.code === "mcp_server_not_started" ? "MCP server not started" : "Provider error";
+          const { t } = currentText();
+          const title =
+            event.code === "mcp_server_not_started" ? t("agent.error.mcpNotStarted") : t("agent.error.provider");
           toast.error(title, { description: toastKey });
         }
       }

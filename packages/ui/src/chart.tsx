@@ -3,6 +3,7 @@
 import type { ComponentProps, JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { ResponsiveContainer, Tooltip, type TooltipContentProps } from "solid-recharts";
+import { useText } from "./text";
 
 export type { TooltipContentProps } from "solid-recharts";
 
@@ -27,6 +28,7 @@ export function ChartTooltipContent(
     total?: boolean;
   },
 ) {
+  const { t } = useText();
   const rows = () =>
     (props.payload ?? [])
       .filter((item) => typeof item.value === "number")
@@ -52,7 +54,7 @@ export function ChartTooltipContent(
         <Show when={props.total && rows().length > 1}>
           <div class="ui-chart-tooltip-row ui-chart-tooltip-total">
             <span class="ui-chart-tooltip-mark" />
-            <span>Total</span>
+            <span>{t("app.chart.total")}</span>
             <span class="ui-chart-tooltip-value">
               {props.formatValue(rows().reduce((sum, row) => sum + row.value, 0))}
             </span>

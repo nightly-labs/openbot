@@ -34,6 +34,7 @@ import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteAccountRefresh,
   createRemoteReadRefresh,
@@ -56,7 +57,6 @@ import {
   type TeamApiRequest,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
 import * as Crypto from "expo-crypto";
@@ -104,6 +104,7 @@ import type {
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
+import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
 export type {
@@ -297,7 +298,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         } catch (error) {
           if (generation !== directoryGeneration.current) return;
           setServerDirectoryState("error");
-          setServerDirectoryError(errorMessage(error, "The server directory is unavailable."));
+          const text = currentText();
+          setServerDirectoryError(text.errorMessage(error, text.t("mobile.workspace.error.directoryUnavailable")));
           throw error;
         }
       }),
@@ -329,7 +331,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       onUploadProgress?: (fraction: number) => void,
     ): Promise<T> => {
       const client = serverId ? connections.current.get(serverId)?.client : null;
-      if (!client) throw new Error("The mobile transport is not ready.");
+      if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
       return client.request(method, path, decode, body, upload, onUploadProgress);
     },
     [],
@@ -353,7 +355,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const saved = reconcileChannelPins(preferenceStore, serverId, channels);
           setPreferences((current) => ({ ...current, [serverId]: saved }));
         } catch {
-          Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
+          Alert.alert(
+            currentText().t("mobile.workspace.alert.preferencesTitle"),
+            currentText().t("mobile.workspace.alert.preferencesBody"),
+          );
         }
       }),
     [request, preferenceStore],
@@ -376,7 +381,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === current[serverId] ? current : { ...current, [serverId]: next };
         });
       } catch {
-        Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
+        Alert.alert(
+          currentText().t("mobile.workspace.alert.preferencesTitle"),
+          currentText().t("mobile.workspace.alert.preferencesBody"),
+        );
       }
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
@@ -410,7 +418,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const compatibility = await client.request("GET", TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
       if (!context.isCurrent()) return;
       if (compatibility.protocol.minimum > TEAM_PROTOCOL_V3 || compatibility.protocol.maximum < TEAM_PROTOCOL_V3) {
-        throw new Error("Update OpenBot Mobile or the desktop app before connecting.");
+        throw new Error(sourceText("error.remote.mobileUpdateRequired"));
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
@@ -422,11 +430,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           applySidebarLayout(serverId, layout);
         } catch (error) {
           if (!context.isCurrent()) return;
+          const text = currentText();
+          const message = text.errorMessage(error, text.t("mobile.workspace.error.sectionsLoadFailed"));
           setSidebarByServer((current) => ({
             ...current,
             [serverId]: {
               layout: current[serverId]?.layout ?? null,
-              error: errorMessage(error, "Could not load sections. Try again."),
+              error: message,
             },
           }));
         }
@@ -687,7 +697,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         (!activeServerId ||
           !serverCapabilities.current.get(activeServerId)?.includes(TEAM_CONVERSATION_UNREAD_CAPABILITY))
       ) {
-        Alert.alert("Update required", "Update this desktop server to mark conversations unread.");
+        Alert.alert(
+          currentText().t("mobile.workspace.alert.updateRequiredTitle"),
+          currentText().t("mobile.workspace.alert.updateRequiredUnread"),
+        );
         return;
       }
       if (!activeServerId) return;
@@ -721,7 +734,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         })
         .catch(() => {
           if (generation === loadGeneration.current) void refreshConversationReads().catch(() => undefined);
-          if (visibleMessageId === null) Alert.alert("Could not mark unread", "Reconnect to the server and try again.");
+          if (visibleMessageId === null)
+            Alert.alert(
+              currentText().t("mobile.workspace.alert.markUnreadTitle"),
+              currentText().t("mobile.workspace.alert.markUnreadBody"),
+            );
         });
       readWrites.current.set(agentId, write);
       void write.finally(() => {
@@ -739,7 +756,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         setPreferences((current) => ({ ...current, [serverId]: next }));
         return next;
       } catch {
-        Alert.alert("Could not save chat preferences", "Your previous preferences have been kept. Please try again.");
+        Alert.alert(
+          currentText().t("mobile.workspace.alert.preferencesTitle"),
+          currentText().t("mobile.workspace.alert.preferencesBody"),
+        );
         return null;
       }
     },
@@ -752,7 +772,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       sidebarByServer,
       mutateSidebarLayout: async (serverId, action) => {
         if (!serverCapabilities.current.get(serverId)?.includes("sidebar-layout")) {
-          throw new Error("This host does not support section changes.");
+          throw new Error(currentText().t("mobile.workspace.error.sectionsUnsupported"));
         }
         const layout = await request(
           "POST",
@@ -773,7 +793,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           setSavedServerOrder({ key: orderKey, ids: serverIds });
           return true;
         } catch {
-          Alert.alert("Could not save server order", "Your previous order has been kept. Please try again.");
+          Alert.alert(
+            currentText().t("mobile.workspace.alert.serverOrderTitle"),
+            currentText().t("mobile.workspace.alert.serverOrderBody"),
+          );
           return false;
         }
       },
@@ -804,7 +827,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       leaveServer: async (serverId) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
-        if (!server || server.role === "owner") throw new Error("Only joined remote servers can be left.");
+        if (!server || server.role === "owner")
+          throw new Error(currentText().t("mobile.workspace.error.leaveOwnServer"));
         await directory.leaveHost(server.id, server.membershipId);
         removedServers.current.add(serverId);
         readRefresh.invalidate(serverId);
@@ -994,7 +1018,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         ),
       loadAgentAnalytics: async (input, serverId) => {
         if (!agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
-          throw new Error("Agent is not on this host.");
+          throw new Error(currentText().t("mobile.workspace.error.agentNotOnHost"));
         return readAgentAnalytics(
           (method, path, decode) => request(method, path, decode, undefined, serverId),
           serverCapabilities.current.get(serverId) ?? [],
@@ -1016,7 +1040,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       deleteStoredFile: async (fileId, serverId) => {
         if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY))
-          throw new Error("This host does not support file management. Update OpenBot on the host.");
+          throw new Error(currentText().t("mobile.workspace.error.filesUnsupported"));
         await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
       },
       createAgent: async (input: CreateAgentInput) => {
@@ -1034,7 +1058,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {
         if (!serverId || !agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
-          throw new Error("The agent is unavailable on this host.");
+          throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
         const updated = await request(
           "PATCH",
           TEAM_API_ROUTES.agent.one(input.agentId),
@@ -1050,7 +1074,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       setAgentAvatar: async (agentId, image, serverId) => {
         if (!agents.some((agent) => agent.id === agentId && agent.serverId === serverId))
-          throw new Error("The agent is unavailable on this host.");
+          throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
         const updated = await request(
           image ? "PUT" : "DELETE",
           TEAM_API_ROUTES.agent.avatar(agentId),
@@ -1145,7 +1169,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       loadOlderMessages,
       uploadAttachment: async (agentId, input, targetServerId, onProgress) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error("The agent is unavailable.");
+        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
         return uploadAttachmentDraft(teamApi(serverId, onProgress), input);
       },
       downloadAttachment: (serverId, attachmentId) => {
@@ -1177,12 +1201,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
       discardAttachment: async (agentId, attachmentId, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error("The agent is unavailable.");
+        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
         await discardAttachmentDraft(teamApi(serverId), attachmentId);
       },
       sendMessage: async (agentId, text, attachmentDraftIds = [], replyToMessageId = null, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error("The agent is unavailable.");
+        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
         const receipt = await request(
           "POST",
           TEAM_API_ROUTES.agent.messages(agentId),
@@ -1216,7 +1240,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           !snapshot?.activeTurnId ||
           message.turnId !== snapshot.activeTurnId
         ) {
-          throw new Error("This form is no longer available.");
+          throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
         await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
           requestId: input.requestId,

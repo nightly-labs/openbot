@@ -28,6 +28,7 @@ import {
   type CreateRoutineInput,
   isChannelDraft,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { unzipSync, zipSync } from "fflate";
 import { isPathInside } from "../backend/path-containment";
 import {
@@ -106,7 +107,8 @@ export class AgentImportService {
     const wrapper = wrapperFolder([...entries.keys()]);
     const inner = new Map([...entries].map(([name, entry]) => [name.slice(wrapper.length), entry]));
     const manifestName = `${wrapper}${AGENT_IMPORT_MANIFEST}`;
-    if (!entries.has(manifestName)) throw new Error(`The export must contain ${AGENT_IMPORT_MANIFEST}.`);
+    if (!entries.has(manifestName))
+      throw new Error(sourceText("error.import.manifestMissing", { manifest: AGENT_IMPORT_MANIFEST }));
     const { manifest, warnings } = decodeImportManifest(
       extract(bytes, (name) => name === manifestName)[manifestName] ?? new Uint8Array(),
     );
@@ -118,11 +120,11 @@ export class AgentImportService {
     for (const agent of manifest.agents) {
       for (const skill of agent.skills)
         if (!inner.has(`${skill}/SKILL.md`))
-          throw new Error(`${agent.name}: the skill folder ${skill} has no SKILL.md.`);
+          throw new Error(sourceText("error.import.skillFolderMissing", { name: agent.name, skill }));
       if (agent.avatar) {
         const image = avatarImage(avatarBytes[wrapper + agent.avatar]);
         if (image) avatars.set(agent.key, image);
-        else warnings.push(`${agent.name}: the avatar is skipped because it is not a PNG, JPEG, or WebP under 512 KB.`);
+        else warnings.push(sourceText("error.import.avatarSkipped", { name: agent.name }));
       }
     }
 
@@ -172,20 +174,19 @@ export class AgentImportService {
   async apply(input: ApplyAgentImportInput): Promise<AgentImportResult> {
     const staged = this.#staged?.token === input.token ? this.#staged.value : null;
     this.#staged = null;
-    if (!staged) throw new Error("The export is no longer open. Choose it again.");
+    if (!staged) throw new Error(sourceText("error.import.exportClosed"));
     const selected = staged.agents.filter((agent) => input.keys.includes(agent.key));
-    if (selected.length !== input.keys.length)
-      throw new Error("The selection names an agent that is not in the export.");
+    if (selected.length !== input.keys.length) throw new Error(sourceText("error.import.agentNotInExport"));
     const selectedChannels = staged.channels.filter((channel) => input.channelKeys.includes(channel.key));
     if (selectedChannels.length !== input.channelKeys.length)
-      throw new Error("The selection names a channel that is not in the export.");
+      throw new Error(sourceText("error.import.channelNotInExport"));
     if (this.agents.listAgents().length + selected.length > INPUT_LIMITS.agents)
-      throw new Error(`A server can have at most ${INPUT_LIMITS.agents} agents.`);
+      throw new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents }));
 
     // The archive is read again rather than held since `stage`: an export can be hundreds of MB.
     // The file can change in between, so only the same bytes are accepted.
     const bytes = await readArchive(staged.path);
-    if (sha256(bytes) !== staged.sha256) throw new Error("The export changed after it was checked. Choose it again.");
+    if (sha256(bytes) !== staged.sha256) throw new Error(sourceText("error.import.exportChanged"));
     const imported: AgentSummary[] = [];
     const skipped: AgentImportSkipped[] = [];
     const warnings: string[] = [];
@@ -220,9 +221,9 @@ export class AgentImportService {
       const agentId = agentIds.get(key);
       return agentId ? [{ agentId }] : [];
     });
-    if (members.length === 0) throw new Error("None of its agents were imported.");
+    if (members.length === 0) throw new Error(sourceText("error.import.noMembersImported"));
     const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
-    if (source.lead && !leadAgentId) warnings.push(`${source.name}: its lead was not imported, so it has no lead.`);
+    if (source.lead && !leadAgentId) warnings.push(sourceText("error.import.leadNotImported", { name: source.name }));
     const draft: ChannelDraft = {
       name: source.name,
       title: source.title,
@@ -248,7 +249,13 @@ export class AgentImportService {
             schedule: routine.schedule,
           });
         } catch (error) {
-          warnings.push(`${source.name}: routine "${routine.name}" is skipped. ${message(error)}`);
+          warnings.push(
+            sourceText("error.import.routineSkipped", {
+              name: source.name,
+              routine: routine.name,
+              reason: message(error),
+            }),
+          );
         }
       }
       return { id: channel.id, name: channel.name };
@@ -317,7 +324,13 @@ export class AgentImportService {
             { recordConversationEvent: false },
           );
         } catch (error) {
-          warnings.push(`${source.name}: routine "${routine.name}" is skipped. ${message(error)}`);
+          warnings.push(
+            sourceText("error.import.routineSkipped", {
+              name: source.name,
+              routine: routine.name,
+              reason: message(error),
+            }),
+          );
         }
       }
       for (const text of source.memories) this.agents.createMemory({ agentId: agent.id, text });
@@ -339,9 +352,9 @@ export class AgentImportService {
 
 async function readArchive(path: string): Promise<Uint8Array> {
   const info = await stat(path);
-  if (!info.isFile()) throw new Error("Choose a .zip file.");
+  if (!info.isFile()) throw new Error(sourceText("error.import.chooseZip"));
   if (info.size === 0 || info.size > AGENT_IMPORT_LIMITS.archiveBytes)
-    throw new Error("The export must be a .zip under 500 MB.");
+    throw new Error(sourceText("error.import.zipTooLarge"));
   return new Uint8Array(await readFile(path));
 }
 
@@ -366,13 +379,13 @@ function listEntries(bytes: Uint8Array): Map<string, StagedEntry> {
     if (error instanceof UnsafeEntry)
       throw new Error(
         error.entry
-          ? `The export contains an unsafe file: ${error.entry}`
-          : `The export must expand to under 500 MB and ${AGENT_IMPORT_LIMITS.files} files.`,
+          ? sourceText("error.import.unsafeFile", { name: error.entry })
+          : sourceText("error.import.expandedTooLarge", { limit: AGENT_IMPORT_LIMITS.files }),
       );
     // A zip that Grok Bot is still writing has no central directory yet, so it reads as invalid.
-    throw new Error("The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.");
+    throw new Error(sourceText("error.import.zipInvalid"));
   }
-  if (!entries.size) throw new Error("The export is empty.");
+  if (!entries.size) throw new Error(sourceText("error.import.empty"));
   return entries;
 }
 
@@ -415,7 +428,7 @@ async function writeTree(root: string, files: ReadonlyArray<readonly [string, Ui
   for (const [name, data] of files) {
     const target = resolve(base, name);
     if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
-      throw new Error(`The export contains an unsafe file: ${name}`);
+      throw new Error(sourceText("error.import.unsafeFile", { name }));
     await mkdir(dirname(target), { recursive: true });
     // `wx` refuses to replace a file, so an entry can never overwrite what is already there.
     await writeFile(target, data, { flag: "wx" });

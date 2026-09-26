@@ -1,6 +1,7 @@
 import { type ComputerUsePermissionApp, LOCAL_SERVER_ID, type MacPermissionId } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, FolderOpen, GripVertical, Monitor, MousePointer2 } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { computerUsePort } from "./computer-use-port";
 
@@ -13,18 +14,22 @@ import { computerUsePort } from "./computer-use-port";
  * is Electron, and a card that said "OpenBot" would send the user looking for a row that never
  * appears.
  */
-const PERMISSION_HELP: Record<MacPermissionId, { title: string; pane: string; icon: typeof Monitor }> = {
+const PERMISSION_HELP: Record<MacPermissionId, { title: AppTextKey; pane: AppTextKey; icon: typeof Monitor }> = {
   "screen-recording": {
-    title: "Screen Recording",
-    pane: "Screen & System Audio Recording",
+    title: "computerUse.permission.screenRecording.title",
+    pane: "computerUse.permission.screenRecording.pane",
     icon: Monitor,
   },
   accessibility: {
-    title: "Accessibility",
-    pane: "Accessibility",
+    title: "computerUse.permission.accessibility.title",
+    pane: "computerUse.permission.accessibility.pane",
     icon: MousePointer2,
   },
 };
+
+/** The names of the applications this window can point at. They are product names. */
+const SUNSHINE_APP_NAME = "Sunshine";
+const OPENBOT_APP_NAME = "OpenBot";
 
 /** How often the driver is asked again while the user is in System Settings. */
 const POLL_INTERVAL_MS = 1_000;
@@ -39,6 +44,7 @@ export function permissionFromQuery(search: string): MacPermissionId {
 }
 
 export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; sunshine?: boolean }) {
+  const { t, errorMessage } = useText();
   const permission = props.permission;
   const help = PERMISSION_HELP[permission];
   const PermissionIcon = help.icon;
@@ -91,7 +97,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
     try {
       await computerUsePort().computerUse.revealPermissionApp();
     } catch (cause) {
-      setError(errorMessage(cause, "The application could not be shown in Finder."));
+      setError(errorMessage(cause, t("computerUse.help.revealFailed")));
     }
   }
 
@@ -122,8 +128,8 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
           <PermissionIcon />
         </span>
         <div>
-          <h1 id="computer-use-help-title">Turn on {help.title}</h1>
-          <p>System Settings is open at {help.pane}.</p>
+          <h1 id="computer-use-help-title">{t("computerUse.help.title", { permission: t(help.title) })}</h1>
+          <p>{t("computerUse.help.paneOpen", { pane: t(help.pane) })}</p>
         </div>
       </header>
 
@@ -134,7 +140,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
             variant="ghost"
             class={`computer-use-drag-card${dragging() ? " is-dragging" : ""}`}
             draggable="true"
-            aria-label={`Drag ${bundle().name} into System Settings, or press to show it in Finder`}
+            aria-label={t("computerUse.help.dragLabel", { name: bundle().name })}
             onClick={() => void reveal()}
             onDragStart={(event) => {
               // The file leaves through the main process, which is the only side that has one. The
@@ -144,7 +150,7 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
               setError(null);
               void computerUsePort()
                 .computerUse.startPermissionAppDrag()
-                .catch((cause) => setError(errorMessage(cause, "The application could not be dragged.")))
+                .catch((cause) => setError(errorMessage(cause, t("computerUse.help.dragFailed"))))
                 .finally(() => setDragging(false));
             }}
             onDragEnd={() => setDragging(false)}
@@ -157,19 +163,24 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
                 {(source) => <img src={source()} alt="" />}
               </Show>
             </span>
-            <strong>{bundle().name}.app</strong>
-            <span>Drag to add</span>
+            <strong>{`${bundle().name}.app`}</strong>
+            <span>{t("computerUse.help.dragToAdd")}</span>
           </Button>
         )}
       </Show>
 
       <ol class="computer-use-help-steps">
         <li>
-          <Show when={app()} fallback={<>Find {props.sunshine ? "Sunshine" : "OpenBot"} in the list.</>}>
-            {(bundle) => <>Drag {bundle().name}.app into the list.</>}
+          <Show
+            when={app()}
+            fallback={t("computerUse.help.findInList", {
+              name: props.sunshine ? SUNSHINE_APP_NAME : OPENBOT_APP_NAME,
+            })}
+          >
+            {(bundle) => t("computerUse.help.dragIntoList", { name: bundle().name })}
           </Show>
         </li>
-        <li>Turn the switch on.</li>
+        <li>{t("computerUse.help.turnOn")}</li>
       </ol>
 
       <Show when={error()}>
@@ -184,11 +195,11 @@ export function ComputerUsePermissionHelp(props: { permission: MacPermissionId; 
         <Show when={app()}>
           <Button type="button" variant="outline" size="sm" onClick={() => void reveal()}>
             <FolderOpen aria-hidden="true" />
-            Show in Finder
+            {t("computerUse.help.showInFinder")}
           </Button>
         </Show>
         <Button type="button" variant={granted() ? "default" : "outline"} size="sm" onClick={close}>
-          Done
+          {t("common.done")}
         </Button>
       </footer>
     </main>

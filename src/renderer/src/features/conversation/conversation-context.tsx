@@ -7,7 +7,7 @@ import type {
   ConversationSnapshot,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
@@ -190,7 +190,7 @@ const Conversation = createSimpleContext({
             const markReadOnOpen = agentChatsToMarkRead.delete(trackingKey);
             if (markReadOnOpen && (page.readState?.unreadCount ?? 0) > 0) {
               void markAgentMessagesRead(agentId, page.messages.at(-1)?.id ?? null, serverId).catch((error) =>
-                appendUiError(agentId, error, "Read state failed", serverId),
+                appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
               );
             } else if (agentChatsToRetryRead.has(trackingKey) && (page.readState?.unreadCount ?? 0) > 0) {
               const latestIncomingMessage = latestIncomingConversationMessage(page.messages);
@@ -199,7 +199,7 @@ const Conversation = createSimpleContext({
           })
           .catch((error) => {
             if (!scopeIsCurrent() || conversationPageRequests.get(agentId) !== pageRequest) return;
-            appendUiError(agentId, error, "Load failed", serverId);
+            appendUiError(agentId, error, currentText().t("chat.errorStatus.load"), serverId);
             if (agentChatsToMarkRead.delete(trackingKey)) markLatestVisibleAgentMessageRead(agentId, serverId);
           });
       },
@@ -329,7 +329,7 @@ const Conversation = createSimpleContext({
       if (!latestMessageId) return;
       if (autoReadAgentMessages.get(agentConversationKey(serverId, agentId))?.messageId === latestMessageId) return;
       void markAgentMessagesRead(agentId, latestMessageId, serverId).catch((error) =>
-        appendUiError(agentId, error, "Read state failed", serverId),
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
       );
     }
 
@@ -405,7 +405,7 @@ const Conversation = createSimpleContext({
           conversations[agentId]?.revision ?? -1,
           decision.rollbackState,
         );
-        appendUiError(agentId, error, "Read state failed", serverId);
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
       });
     }
 
@@ -635,7 +635,8 @@ const Conversation = createSimpleContext({
       } catch (error) {
         if (!requestIsCurrent()) return;
         updateConversation(agentId, (conversation) => {
-          conversation.olderError = errorMessage(error, "Older messages could not load.");
+          const text = currentText();
+          conversation.olderError = text.errorMessage(error, text.t("chat.history.olderFailed"));
         });
       } finally {
         if (scopeIsCurrent() && conversations[agentId] === conversationAtStart) {
@@ -689,7 +690,7 @@ const Conversation = createSimpleContext({
       });
       if (conversationPageRequests.get(agentId) !== request || !scopeIsCurrent()) return null;
       if (!page.messages.some((message) => message.id === messageId)) {
-        throw new Error("This message is no longer available.");
+        throw new Error(currentText().t("chat.messageUnavailable"));
       }
       applyConversationPage(page, "replace", "around");
       return page;
@@ -752,7 +753,7 @@ const Conversation = createSimpleContext({
         try {
           await markAgentMessagesRead(agentId, receipt.deliveries[0]?.id ?? receipt.messageId, serverId);
         } catch (error) {
-          appendUiError(agentId, error, "Read state failed", serverId);
+          appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
         }
         return true;
       } catch (error) {
@@ -764,7 +765,7 @@ const Conversation = createSimpleContext({
           result: "failed",
           failure_code: "send_failed",
         });
-        appendUiError(agentId, error, "Send failed", serverId);
+        appendUiError(agentId, error, currentText().t("chat.errorStatus.send"), serverId);
         return false;
       }
     }
@@ -826,7 +827,7 @@ const Conversation = createSimpleContext({
                 latestVisibleMessageId !== visibleMessageIdAtStart
               ) {
                 void markAgentMessagesRead(agentId, latestVisibleMessageId, serverId).catch((error) =>
-                  appendUiError(agentId, error, "Read state failed", serverId),
+                  appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
                 );
               }
             });

@@ -3,10 +3,12 @@ import { createEffect, createSignal, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
 
 export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | undefined }) {
+  const { t } = useText();
   const [entering, setEntering] = createSignal(false);
   const unreadCount = () => {
     const state = props.state();
@@ -52,7 +54,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           </Show>
           <Show when={state().kind === "responded"}>
             <svg viewBox="0 0 12 12">
-              <title>Responded</title>
+              <title>{t("sidebar.state.responded")}</title>
               <path d="m3 6.2 1.8 1.8L9 3.8" />
             </svg>
           </Show>

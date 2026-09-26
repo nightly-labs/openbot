@@ -4,6 +4,7 @@ import { ChevronLeft, SwitchCamera } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import { useText } from "@/shared/lib/text";
 
 // The preview arrives when the hardware is ready, which is not when the panel
 // opens. It fades in over the surface it was given rather than popping in.
@@ -38,6 +39,7 @@ export function ChatCameraContent({
   const [facing, setFacing] = useState<CameraType>("back");
   const [error, setError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
+  const { t, sourceText } = useText();
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -53,7 +55,7 @@ export function ChatCameraContent({
     try {
       const photo = await camera.current.takePictureAsync({ quality: 1 });
       if (!mounted.current) return;
-      if (!photo?.uri) throw new Error("Could not take the photo. Try again.");
+      if (!photo?.uri) throw new Error(t("mobile.chat.camera.captureFailed"));
       // Clear busy before handing the photo over: the panel refuses to leave
       // while a capture is in flight, and this one has landed.
       busyRef.current = false;
@@ -61,7 +63,8 @@ export function ChatCameraContent({
       onBusyChange(false);
       onCaptured(photo.uri);
     } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : "Could not take the photo. Try again.");
+      if (mounted.current)
+        setError(cause instanceof Error ? sourceText(cause.message) : t("mobile.chat.camera.captureFailed"));
     } finally {
       busyRef.current = false;
       if (mounted.current) setBusy(false);
@@ -90,7 +93,7 @@ export function ChatCameraContent({
           onCameraReady={() => setReady(true)}
           onMountError={() => {
             setReady(false);
-            setError("Could not start the camera. Close it and try again.");
+            setError(t("mobile.chat.camera.startFailed"));
           }}
         />
       </Animated.View>
@@ -106,7 +109,7 @@ export function ChatCameraContent({
           isIconOnly
           variant="secondary"
           className="size-12 rounded-full bg-black/60"
-          accessibilityLabel="Close camera"
+          accessibilityLabel={t("mobile.chat.camera.close")}
           isDisabled={busy}
           onPress={onCancel}
         >
@@ -116,7 +119,7 @@ export function ChatCameraContent({
           isIconOnly
           variant="secondary"
           className="size-16 rounded-full border-4 border-white/50 bg-white"
-          accessibilityLabel="Take photo"
+          accessibilityLabel={t("mobile.chat.camera.takePhoto")}
           isDisabled={!ready || busy}
           onPress={() => void capture()}
         />
@@ -124,7 +127,7 @@ export function ChatCameraContent({
           isIconOnly
           variant="secondary"
           className="size-12 rounded-full bg-black/60"
-          accessibilityLabel="Switch camera"
+          accessibilityLabel={t("mobile.chat.camera.switch")}
           isDisabled={busy}
           onPress={() => {
             setReady(false);

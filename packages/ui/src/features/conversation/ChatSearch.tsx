@@ -1,4 +1,5 @@
 import { Button, ChevronDown, ChevronUp, Input, Search, X } from "@openbot/ui";
+import { useText } from "../../text";
 
 interface ChatSearchProps {
   query: string;
@@ -12,18 +13,19 @@ interface ChatSearchProps {
 }
 
 export function ChatSearch(props: ChatSearchProps) {
+  const { t } = useText();
   const position = () => (props.total > 0 ? `${props.current + 1}/${props.total}` : "0/0");
 
   return (
     // biome-ignore lint/a11y/noRedundantRoles: Testing Library and older accessibility layers need the explicit landmark role.
-    <search class="chat-search" role="search" aria-label="Search conversation">
+    <search class="chat-search" role="search" aria-label={t("chat.search.label")}>
       <Search class="chat-search-icon" aria-hidden="true" />
       <Input
         ref={props.inputRef}
         class="chat-search-input"
         type="search"
         value={props.query}
-        aria-label="Search messages"
+        aria-label={t("chat.search.input")}
         autocomplete="off"
         autocapitalize="none"
         spellcheck={false}
@@ -49,7 +51,7 @@ export function ChatSearch(props: ChatSearchProps) {
         variant="ghost"
         size="xs"
         class="chat-search-button"
-        aria-label="Previous match"
+        aria-label={t("chat.search.previous")}
         disabled={props.total === 0}
         onClick={props.onPrevious}
       >
@@ -60,7 +62,7 @@ export function ChatSearch(props: ChatSearchProps) {
         variant="ghost"
         size="xs"
         class="chat-search-button"
-        aria-label="Next match"
+        aria-label={t("chat.search.next")}
         disabled={props.total === 0}
         onClick={props.onNext}
       >
@@ -71,7 +73,7 @@ export function ChatSearch(props: ChatSearchProps) {
         variant="ghost"
         size="xs"
         class="chat-search-button chat-search-close"
-        aria-label="Close conversation search"
+        aria-label={t("chat.search.close")}
         onClick={props.onClose}
       >
         <X aria-hidden="true" />

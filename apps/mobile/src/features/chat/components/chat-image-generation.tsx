@@ -16,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
+import { useText } from "@/shared/lib/text";
 import type { ImageDimensions } from "../model/image-dimensions";
 import { useAttachmentFile } from "./attachment-preview";
 import { ImageGenerationCanvas } from "./image-generation-canvas";
@@ -60,6 +61,7 @@ export function ChatImageGeneration({
   serverId: string;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const { t, sourceText } = useText();
   const [base, accent, surface, muted] = useThemeColor(["muted", "accent", "surface-secondary", "muted"]);
   const [previewError, setPreviewError] = useState(false);
   const [loaded, setLoaded] = useState<ImageDimensions | null>(null);
@@ -80,26 +82,32 @@ export function ChatImageGeneration({
   const ratio = dimensions ? dimensions.width / dimensions.height : requestedRatio(generation.aspectRatio);
   const frame = generationFrame(ratio, Math.min(MAX_WIDTH, windowWidth - 64));
   const label = unavailable
-    ? "Image unavailable"
+    ? t("mobile.chat.imageGeneration.unavailable")
     : downloadFailed
-      ? "Could not load the generated image"
+      ? t("mobile.chat.imageGeneration.loadFailed")
       : status === "failed"
-        ? "Image generation failed"
+        ? t("mobile.chat.imageGeneration.failed")
         : status === "interrupted"
-          ? "Image generation interrupted"
+          ? t("mobile.chat.imageGeneration.interrupted")
           : ready && loaded
-            ? "Generated image"
+            ? t("mobile.chat.imageGeneration.image")
             : status === "completed"
-              ? "Loading generated image"
-              : "Generating image";
+              ? t("mobile.chat.imageGeneration.loading")
+              : t("mobile.chat.imageGeneration.generating");
   const error = downloadFailed
-    ? (file.query.error?.message ?? "The generated image preview is unavailable.")
+    ? file.query.error
+      ? sourceText(file.query.error.message)
+      : t("mobile.chat.imageGeneration.previewUnavailable")
     : unavailable
-      ? "The generated image preview is unavailable."
+      ? t("mobile.chat.imageGeneration.previewUnavailable")
       : status === "failed"
-        ? (generation.error ?? "Image generation did not complete.")
+        ? generation.error
+          ? sourceText(generation.error)
+          : t("mobile.chat.imageGeneration.didNotComplete")
         : status === "interrupted"
-          ? (generation.error ?? "Image generation was interrupted.")
+          ? generation.error
+            ? sourceText(generation.error)
+            : t("mobile.chat.imageGeneration.wasInterrupted")
           : null;
 
   return (
@@ -199,13 +207,13 @@ export function ChatImageGeneration({
             void file.query.refetch();
           }}
         >
-          <Button.Label>Retry image</Button.Label>
+          <Button.Label>{t("mobile.chat.attachment.retryImage")}</Button.Label>
         </Button>
       ) : null}
       {viewing && file.uri ? (
         <ImageViewer
           uri={file.uri}
-          name={attachment?.name ?? "Generated image"}
+          name={attachment?.name ?? t("mobile.chat.imageGeneration.image")}
           dimensions={dimensions ?? frame}
           measureOrigin={(report) =>
             frameRef.current
@@ -268,6 +276,7 @@ function GeneratedImageReveal({
   const reducedMotion = useReducedMotion();
   const masked = Platform.OS === "ios" && !reducedMotion && animate;
   const progress = useSharedValue(0);
+  const { t } = useText();
   const [decoded, setDecoded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
@@ -303,7 +312,7 @@ function GeneratedImageReveal({
     // the frame's right edge.
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Preview generated image"
+      accessibilityLabel={t("mobile.chat.imageGeneration.preview")}
       onPress={onPress}
       style={{ width, height }}
     >
@@ -311,7 +320,7 @@ function GeneratedImageReveal({
         source={uri}
         contentFit="cover"
         transition={0}
-        accessibilityLabel={prompt ?? "Generated image"}
+        accessibilityLabel={prompt ?? t("mobile.chat.imageGeneration.image")}
         style={{ width, height, opacity: hidden ? 0 : 1 }}
         onLoad={({ source }) => {
           setDecoded(true);

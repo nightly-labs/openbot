@@ -3,7 +3,7 @@ import { isUpdateActivePhase, isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { Button, Download, RefreshCw, Spinner } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createDigitRoll } from "../../digit-roll";
-import { errorMessage as formatErrorMessage } from "../../error-message";
+import { useText } from "../../text";
 import { rendererDuration } from "../conversation/activity-timing";
 
 // `--panel-close-dur` is a calc() on the island itself, so it cannot be read off
@@ -53,11 +53,12 @@ function UpdateProgressValue(props: UpdateProgressValueProps) {
 }
 
 export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
+  const { t, errorMessage: formatErrorMessage } = useText();
   const [actionPending, setActionPending] = createSignal(false);
   const phase = () => props.updateStatus.phase;
   const errorMessage = createMemo(() => {
     const message = props.errorMessage?.trim() || props.updateStatus.message?.trim();
-    return formatErrorMessage(message, "Update failed. Try again.");
+    return formatErrorMessage(message, t("account.update.failedRetry"));
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
   // The island is a single nowrap line that ellipsizes, so it can only carry a failure short enough
@@ -77,25 +78,24 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
   });
   const actionLabel = createMemo(() => {
-    if (managed()) return "Managed by host";
-    if (failed()) return "Retry";
-    return ready() ? "Restart" : "Download";
+    if (managed()) return t("account.update.managedByHost");
+    if (failed()) return t("common.retry");
+    return ready() ? t("account.update.restart") : t("common.download");
   });
   const busyLabel = createMemo(() => {
-    if (actionPending() && failed()) return "Retrying";
+    if (actionPending() && failed()) return t("account.update.retrying");
     if (downloading() && progress() !== null) return null;
-    if (phase() === "installing" || (actionPending() && ready())) return "Restarting";
-    return "Starting";
+    if (phase() === "installing" || (actionPending() && ready())) return t("account.update.restarting");
+    return t("account.update.starting");
   });
   const accessibleActionLabel = createMemo(() => {
-    if (managed()) return "Update managed by host";
-    if (actionPending() && failed()) return "Retrying update";
-    if (downloading() && progress() !== null) return `Downloading update, ${progress()}%`;
-    if (phase() === "installing" || (actionPending() && ready())) return "Restarting to update";
-    if (failed()) return `Retry update. ${errorMessage()}`;
-    return `${ready() ? "Restart to update" : "Download update"}. ${
-      ready() ? "Update ready" : "New update available"
-    }.`;
+    if (managed()) return t("account.update.managedByHostLabel");
+    if (actionPending() && failed()) return t("account.update.retryingLabel");
+    const percent = progress();
+    if (downloading() && percent !== null) return t("account.update.downloadingLabel", { percent });
+    if (phase() === "installing" || (actionPending() && ready())) return t("account.update.restartingLabel");
+    if (failed()) return t("account.update.retryLabel", { reason: errorMessage() });
+    return ready() ? t("account.update.restartLabel") : t("account.update.downloadLabel");
   });
 
   createEffect(
@@ -155,10 +155,10 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
           aria-live="polite"
         >
           <strong data-text="available" aria-hidden={ready() || failed() ? "true" : undefined}>
-            New update available
+            {t("account.update.available")}
           </strong>
           <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"}>
-            Update ready
+            {t("account.update.ready")}
           </strong>
           <strong data-text="error" aria-hidden={failed() ? undefined : "true"} title={errorMessage()}>
             {errorMessage()}
@@ -209,7 +209,7 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
               aria-valuenow={progress() ?? 0}
               aria-valuemin="0"
               aria-valuemax="100"
-              aria-label="Update download progress"
+              aria-label={t("account.update.progress")}
             />
           </Show>
         </div>

@@ -5,6 +5,7 @@ import type {
   BrowserControlSession,
   BrowserTab,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
   AlertContent,
@@ -28,37 +29,38 @@ import {
   CloseIcon,
   PlusIcon,
 } from "@openbot/ui/features/conversation/ConversationIcons";
+import { useText } from "@openbot/ui/text";
 import { Portal } from "@solidjs/web";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import BrowserLiveView, { type BrowserViewRuntime } from "./BrowserLiveView";
 
-const BROWSER_ACTION_LABELS: Record<BrowserControlAction | BrowserControlDetailAction, string> = {
-  open: "Opening a page…",
-  "list-tabs": "Checking tabs…",
-  snapshot: "Reading the page…",
-  click: "Clicking…",
-  type: "Typing…",
-  key: "Using the keyboard…",
-  scroll: "Scrolling…",
-  back: "Going back…",
-  forward: "Going forward…",
-  reload: "Reloading…",
-  screenshot: "Taking a screenshot…",
-  status: "Checking browser status…",
-  navigate: "Navigating…",
-  press: "Using the keyboard…",
-  hover: "Hovering…",
-  "select-option": "Selecting an option…",
-  "set-checked": "Changing a control…",
-  drag: "Dragging…",
-  "upload-files": "Uploading files…",
-  "wait-for": "Waiting for the page…",
-  evaluate: "Evaluating page JavaScript…",
-  "set-environment": "Changing the viewport…",
-  "recording-start": "Starting recording…",
-  "recording-stop": "Saving recording…",
-  "close-tab": "Closing a tab…",
-};
+const BROWSER_ACTION_LABELS = {
+  open: "browser.action.open",
+  "list-tabs": "browser.action.listTabs",
+  snapshot: "browser.action.snapshot",
+  click: "browser.action.click",
+  type: "browser.action.type",
+  key: "browser.action.key",
+  scroll: "browser.action.scroll",
+  back: "browser.action.back",
+  forward: "browser.action.forward",
+  reload: "browser.action.reload",
+  screenshot: "browser.action.screenshot",
+  status: "browser.action.status",
+  navigate: "browser.action.navigate",
+  press: "browser.action.key",
+  hover: "browser.action.hover",
+  "select-option": "browser.action.selectOption",
+  "set-checked": "browser.action.setChecked",
+  drag: "browser.action.drag",
+  "upload-files": "browser.action.uploadFiles",
+  "wait-for": "browser.action.waitFor",
+  evaluate: "browser.action.evaluate",
+  "set-environment": "browser.action.setEnvironment",
+  "recording-start": "browser.action.recordingStart",
+  "recording-stop": "browser.action.recordingStop",
+  "close-tab": "browser.action.closeTab",
+} as const satisfies Record<BrowserControlAction | BrowserControlDetailAction, AppTextKey>;
 
 interface BrowserPanelProps {
   open: boolean;
@@ -90,11 +92,8 @@ interface BrowserPanelProps {
   macWindowControls?: boolean;
 }
 
-function diagnosticErrorLabel(count: number): string {
-  return `${count} browser diagnostic ${count === 1 ? "error" : "errors"}`;
-}
-
 export default function BrowserPanel(props: BrowserPanelProps) {
+  const { t, sourceText } = useText();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
@@ -130,8 +129,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
       </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
-          <strong>Open a page</strong>
-          <span>The agent can browse here while it works.</span>
+          <strong>{t("browser.empty.title")}</strong>
+          <span>{t("browser.empty.description")}</span>
         </div>
       </Show>
     </div>
@@ -147,8 +146,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
     >
       <Input
         value={props.address}
-        aria-label="Browser address"
-        placeholder="Search Google or enter a URL"
+        aria-label={t("browser.address.label")}
+        placeholder={t("browser.address.placeholder")}
         maxlength={INPUT_LIMITS.browserUrl}
         onValueChange={props.onAddressChange}
         onFocus={() => props.onAddressEditingChange(true)}
@@ -172,13 +171,13 @@ export default function BrowserPanel(props: BrowserPanelProps) {
           "browser-panel-mac-controls": props.macWindowControls === true,
         },
       ]}
-      aria-label="Browser"
+      aria-label={t("browser.panel.label")}
       value={props.activeTab?.id ?? "__empty"}
       activationMode="automatic"
     >
       <header class="browser-panel-header window-drag">
         <div class="browser-tabs no-drag">
-          <Tabs.List class="browser-tab-strip" aria-label="Browser tabs">
+          <Tabs.List class="browser-tab-strip" aria-label={t("browser.tabs.label")}>
             <For each={props.tabs} keyed={(tab) => tab.id}>
               {(tab) => {
                 const control = () => {
@@ -186,7 +185,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                   return session?.phase === "acting" ? session : undefined;
                 };
                 const controller = () => props.controllerForTab(tab());
-                const title = () => (tab().loading ? "Loading…" : tab().title || tab().url);
+                const title = () => (tab().loading ? t("common.loading") : tab().title || tab().url);
                 return (
                   <div
                     role="presentation"
@@ -195,10 +194,15 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                     <Tabs.Trigger
                       as="button"
                       value={tab().id}
-                      aria-label={control() ? `${title()}, controlled by ${controller()?.name ?? "agent"}` : title()}
-                      aria-description={
-                        props.canCloseTabs === false ? undefined : "Press Delete or Control/Command W to close"
+                      aria-label={
+                        control()
+                          ? t("browser.tab.controlledBy", {
+                              title: title(),
+                              name: controller()?.name ?? t("browser.tab.controllerFallback"),
+                            })
+                          : title()
                       }
+                      aria-description={props.canCloseTabs === false ? undefined : t("browser.tab.closeHint")}
                       class={buttonVariants({ variant: "ghost", class: "browser-tab" })}
                       // Only user interaction activates a native tab. Collection registration can
                       // temporarily make the controlled selection absent and suggest the first tab.
@@ -221,7 +225,10 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                         {(session) => (
                           <span
                             class="browser-tab-control browser-tab-control-acting"
-                            title={`${controller()?.name ?? "Agent"}: ${BROWSER_ACTION_LABELS[session().detailAction ?? session().action]}`}
+                            title={t("browser.tab.controlStatus", {
+                              name: controller()?.name ?? t("browser.tab.agentFallback"),
+                              action: t(BROWSER_ACTION_LABELS[session().detailAction ?? session().action]),
+                            })}
                           >
                             <BrowserControlIcon />
                           </span>
@@ -232,7 +239,11 @@ export default function BrowserPanel(props: BrowserPanelProps) {
                         <span
                           class="browser-tab-close"
                           aria-hidden="true"
-                          title={`Close ${tab().title || "browser tab"}`}
+                          title={
+                            tab().title
+                              ? t("browser.tab.closeNamed", { name: tab().title })
+                              : t("browser.tab.closeUnnamed")
+                          }
                           onPointerDown={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -258,7 +269,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               variant="ghost"
               type="button"
               class="browser-new-tab"
-              aria-label="New browser tab"
+              aria-label={t("browser.newTab")}
               onClick={() => {
                 props.onAddressChange("https://www.google.com");
                 props.onOpenAddress?.("https://www.google.com");
@@ -276,8 +287,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             size="icon-xs"
             ref={(element) => (hideButton = element)}
             class="no-drag browser-hide"
-            aria-label="Hide browser"
-            title="Hide browser"
+            aria-label={t("browser.hide")}
+            title={t("browser.hide")}
             onClick={props.onBack}
           >
             <Minimize2 aria-hidden="true" />
@@ -290,7 +301,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <Button
               variant="ghost"
               type="button"
-              aria-label="Go back"
+              aria-label={t("browser.goBack")}
               class="browser-toolbar-button"
               disabled={!props.activeTab}
               onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "back")}
@@ -300,7 +311,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <Button
               variant="ghost"
               type="button"
-              aria-label="Go forward"
+              aria-label={t("browser.goForward")}
               class="browser-toolbar-button"
               disabled={!props.activeTab}
               onClick={() => props.activeTab && props.onNavigate?.(props.activeTab.id, "forward")}
@@ -312,7 +323,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             <Button
               variant="ghost"
               type="button"
-              aria-label="Reload page"
+              aria-label={t("browser.reload")}
               class="browser-toolbar-button"
               disabled={!props.activeTab}
               onClick={() => props.activeTab && props.onReload?.(props.activeTab.id)}
@@ -322,8 +333,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
           </Show>
           <Show when={props.onOpenAddress}>{addressBar()}</Show>
           <Show when={props.activeTab?.recording}>
-            <span class="browser-recording-status" role="status" aria-label="Browser recording active">
-              <CircleDot /> REC
+            <span class="browser-recording-status" role="status" aria-label={t("browser.recording.label")}>
+              <CircleDot /> {t("browser.recording.badge")}
             </span>
           </Show>
           <Show when={props.activeTab?.diagnosticErrorCount}>
@@ -331,8 +342,8 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               <span
                 class="browser-diagnostic-status"
                 role="status"
-                title={diagnosticErrorLabel(errorCount())}
-                aria-label={diagnosticErrorLabel(errorCount())}
+                title={t("browser.diagnosticErrors", { count: errorCount() })}
+                aria-label={t("browser.diagnosticErrors", { count: errorCount() })}
               >
                 <TriangleAlert /> {errorCount()}
               </span>
@@ -343,7 +354,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               variant="ghost"
               type="button"
               class="browser-toolbar-button"
-              aria-label="Open browser Picture in Picture"
+              aria-label={t("browser.pip.open")}
               onClick={props.onEnterPip}
             >
               <PictureInPicture2 class="browser-toolbar-icon" />
@@ -353,13 +364,13 @@ export default function BrowserPanel(props: BrowserPanelProps) {
         <Show when={popupFailure() && !dismissedPopupFailures().has(popupFailure()?.id ?? "")}>
           <Alert tone="warning" role="alert">
             <AlertContent>
-              <AlertTitle>Popup blocked</AlertTitle>
-              <AlertDescription>{popupFailure()?.message}</AlertDescription>
+              <AlertTitle>{t("browser.popupBlocked.title")}</AlertTitle>
+              <AlertDescription>{sourceText(popupFailure()?.message ?? "")}</AlertDescription>
             </AlertContent>
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label="Dismiss popup message"
+              aria-label={t("browser.popupBlocked.dismiss")}
               onClick={() => {
                 const failure = popupFailure();
                 if (failure) setDismissedPopupFailures((ids) => new Set([...ids, failure.id]));

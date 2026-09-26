@@ -1,8 +1,9 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MemoryEntry } from "@openbot/contracts/ipc";
+import type { AppFormat, AppMessages, AppTextKey } from "@openbot/i18n";
 import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import type { MemoriesPort } from "./memories-port";
@@ -15,7 +16,18 @@ interface AgentMemoriesModalProps {
   onCountChange: (count: number) => void;
 }
 
+const LIMIT_TEXT = {
+  agent: "memory.limitAgent",
+  channel: "memory.limitChannel",
+} as const satisfies Record<MemoriesPort["ownerNoun"], keyof AppMessages>;
+
+const EMPTY_TEXT = {
+  agent: "memory.emptyAgent",
+  channel: "memory.emptyChannel",
+} as const satisfies Record<MemoriesPort["ownerNoun"], AppTextKey>;
+
 export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
+  const { t, format, errorMessage } = useText();
   const [memories, setMemories] = createSignal<MemoryEntry[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -41,7 +53,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       setMemories(next);
       props.onCountChange(next.length);
     } catch (caught) {
-      setError(errorMessage(caught, "Could not load memories."));
+      setError(errorMessage(caught, t("memory.loadFailed")));
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -85,7 +97,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "create", result: "failed", failure_code: "create_failed" });
       }
-      setError(errorMessage(caught, "Could not save the memory."));
+      setError(errorMessage(caught, t("memory.saveFailed")));
     } finally {
       setSavingId(null);
     }
@@ -136,7 +148,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "update", result: "failed", failure_code: "update_failed" });
       }
-      setError(errorMessage(caught, "Could not update the memory."));
+      setError(errorMessage(caught, t("memory.updateFailed")));
     } finally {
       setSavingId(null);
     }
@@ -157,7 +169,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "delete", result: "failed", failure_code: "delete_failed" });
       }
-      setError(errorMessage(caught, "Could not delete the memory."));
+      setError(errorMessage(caught, t("memory.deleteFailed")));
     } finally {
       setSavingId(null);
     }
@@ -179,7 +191,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       if (!operationSucceeded) {
         analytics.track("memory_action", { action: "clear", result: "failed", failure_code: "clear_failed" });
       }
-      setError(errorMessage(caught, "Could not clear the memories."));
+      setError(errorMessage(caught, t("memory.clearFailed")));
     } finally {
       setSavingId(null);
     }
@@ -205,12 +217,14 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
           >
             <header class="agent-memories-header">
               <div class="agent-memories-heading">
-                <Dialog.Title>Memories</Dialog.Title>
-                <Dialog.Description class="sr-only">Saved memories for {props.port.ownerLabel}</Dialog.Description>
+                <Dialog.Title>{t("memory.title")}</Dialog.Title>
+                <Dialog.Description class="sr-only">
+                  {t("memory.description", { name: props.port.ownerLabel })}
+                </Dialog.Description>
               </div>
               <div class="agent-memories-header-actions">
                 <IconButton
-                  label="Add memory"
+                  label={t("memory.add")}
                   class="agent-memories-add-button"
                   variant="ghost"
                   disabled={loading() || memories().length >= props.port.limit}
@@ -218,7 +232,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                 >
                   <Plus />
                 </IconButton>
-                <IconButton label="Close memories" variant="ghost" onClick={() => props.onOpenChange(false)}>
+                <IconButton label={t("memory.close")} variant="ghost" onClick={() => props.onOpenChange(false)}>
                   <X />
                 </IconButton>
               </div>
@@ -226,15 +240,15 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
             <div class="agent-memories-body">
               <Show when={addOpen()}>
-                <section class="agent-memory-composer" aria-label="Add memory">
+                <section class="agent-memory-composer" aria-label={t("memory.add")}>
                   <Textarea
                     ref={(element) => (newMemoryInput = element)}
                     class="agent-memory-input"
                     rows="2"
                     maxlength={INPUT_LIMITS.agentMemoryText}
                     value={newText()}
-                    placeholder="Add a durable fact or preference"
-                    aria-label="New memory"
+                    placeholder={t("memory.newPlaceholder")}
+                    aria-label={t("memory.new")}
                     onValueChange={setNewText}
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
@@ -250,7 +264,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                   />
                   <div class="agent-memory-composer-actions">
                     <Button size="sm" variant="ghost" onClick={cancelAddComposer}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       size="sm"
@@ -259,7 +273,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                       loading={savingId() === "new"}
                       onClick={() => void createMemory()}
                     >
-                      Save memory
+                      {t("memory.save")}
                     </Button>
                   </div>
                 </section>
@@ -267,8 +281,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
 
               <Show when={memories().length >= props.port.limit}>
                 <p class="agent-memory-limit" role="status">
-                  This {props.port.ownerNoun} has reached the limit of {props.port.limit} memories. Edit, merge, or
-                  delete a memory before you add another one.
+                  {t(LIMIT_TEXT[props.port.ownerNoun], { limit: props.port.limit })}
                 </p>
               </Show>
               <Show when={!clearConfirmation() ? error() : null}>
@@ -279,10 +292,10 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                 )}
               </Show>
 
-              <Show when={!loading()} fallback={<p class="agent-memory-state">Loading memories…</p>}>
+              <Show when={!loading()} fallback={<p class="agent-memory-state">{t("memory.loading")}</p>}>
                 <Show
                   when={memories().length > 0}
-                  fallback={<p class="agent-memory-state">This {props.port.ownerNoun} has no saved memories yet.</p>}
+                  fallback={<p class="agent-memory-state">{t(EMPTY_TEXT[props.port.ownerNoun])}</p>}
                 >
                   <ul
                     ref={scrollFades.bind}
@@ -300,18 +313,18 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                                   type="button"
                                   class="agent-memory-row-main"
                                   variant="ghost"
-                                  aria-label={`Edit memory: ${memory.text}`}
+                                  aria-label={t("memory.editText", { text: memory.text })}
                                   onClick={() => startEditing(memory)}
                                 >
                                   <span class="agent-memory-text">{memory.text}</span>
                                   <span class="agent-memory-meta">
-                                    {memory.origin === "automatic" ? "Learned automatically" : "Added manually"}
+                                    {memory.origin === "automatic" ? t("memory.learned") : t("memory.manual")}
                                     {" · "}
-                                    {formatMemoryDate(memory.updatedAt)}
+                                    {formatMemoryDate(memory.updatedAt, t("memory.unknownDate"), format)}
                                   </span>
                                 </Button>
                                 <IconButton
-                                  label="Delete memory"
+                                  label={t("memory.delete")}
                                   class="agent-memory-delete-button"
                                   variant="destructive-ghost"
                                   disabled={savingId() === memory.id}
@@ -329,7 +342,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                                 rows="2"
                                 maxlength={INPUT_LIMITS.agentMemoryText}
                                 value={editingText()}
-                                aria-label="Edit memory"
+                                aria-label={t("memory.edit")}
                                 onValueChange={setEditingText}
                                 onKeyDown={(event) => {
                                   if (event.key !== "Escape") return;
@@ -340,7 +353,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                               />
                               <div class="agent-memory-editor-actions">
                                 <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                                  Cancel
+                                  {t("common.cancel")}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -349,7 +362,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                                   loading={savingId() === memory.id}
                                   onClick={() => void updateMemory(memory)}
                                 >
-                                  Save
+                                  {t("common.save")}
                                 </Button>
                               </div>
                             </div>
@@ -369,7 +382,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
                   variant="destructive"
                   onClick={() => setClearConfirmation(true)}
                 >
-                  Clear all memories
+                  {t("memory.clearAll")}
                 </Button>
               </footer>
             </Show>
@@ -381,14 +394,9 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
         open={clearConfirmation()}
         onCancel={cancelConfirmation}
         onConfirm={clearMemories}
-        title="Clear all memories?"
-        description={
-          <>
-            OpenBot will permanently remove all {memories().length} saved memories for {props.port.ownerLabel}. Original
-            messages will stay in the conversation history.
-          </>
-        }
-        confirmLabel="Clear all memories"
+        title={t("memory.clearTitle")}
+        description={t("memory.clearDescription", { total: memories().length, name: props.port.ownerLabel })}
+        confirmLabel={t("memory.clearAll")}
         pending={savingId() === "clear"}
         error={error()}
         initialFocus="cancel"
@@ -397,8 +405,8 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
   );
 }
 
-function formatMemoryDate(value: string): string {
+function formatMemoryDate(value: string, unknown: string, format: AppFormat): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown date";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  if (Number.isNaN(date.getTime())) return unknown;
+  return format.date(date, { dateStyle: "medium" });
 }

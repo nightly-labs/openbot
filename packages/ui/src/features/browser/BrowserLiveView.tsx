@@ -1,4 +1,5 @@
 import type { BrowserDesktopApi, BrowserLiveViewInput } from "@openbot/contracts/ipc";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
 
 /** CDP's modifier bitmap, which is what the host dispatches the event with. */
@@ -37,9 +38,11 @@ interface BrowserLiveViewProps {
  */
 export default function BrowserLiveView(props: BrowserLiveViewProps) {
   const runtime = props.runtime;
-  const [state, setState] = createStore<{ live: boolean; message: string }>({
+  const { t, errorMessage, sourceText } = useText();
+  // `message` is null while the view connects, and otherwise text from the host or an error.
+  const [state, setState] = createStore<{ live: boolean; message: string | null }>({
     live: false,
-    message: "Connecting to the page on the host…",
+    message: null,
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   /**
@@ -118,7 +121,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     if (event.tabId !== props.tabId) return;
     if (event.type === "stopped") {
       abandonStream();
-      setState(() => ({ live: false, message: event.reason }));
+      setState(() => ({ live: false, message: sourceText(event.reason) }));
       return;
     }
     if (!state.live) setState(() => ({ live: true, message: "" }));
@@ -136,10 +139,12 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     ({ tabId, active }) => {
       if (!active) return;
       abandonStream();
-      setState(() => ({ live: false, message: "Connecting to the page on the host…" }));
+      setState(() => ({ live: false, message: null }));
       void runtime
         .startLiveView(tabId)
-        .catch((error: unknown) => setState(() => ({ live: false, message: errorMessage(error) })));
+        .catch((error: unknown) =>
+          setState(() => ({ live: false, message: errorMessage(error, t("browser.liveView.failed")) })),
+        );
       onCleanup(() => void runtime.stopLiveView().catch(() => undefined));
     },
   );
@@ -211,7 +216,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         ref={setCanvas}
         tabindex="0"
         role="img"
-        aria-label="Live view of the page on the host"
+        aria-label={t("browser.liveView.label")}
         hidden={!state.live}
         onMouseMove={(event) => pointer(event, "move")}
         onMouseDown={(event) => {
@@ -239,7 +244,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       />
       <Show when={!state.live}>
         <div class="browser-empty-state">
-          <span>{state.message}</span>
+          <span>{state.message ?? t("browser.liveView.connecting")}</span>
         </div>
       </Show>
     </div>
@@ -250,8 +255,4 @@ function modifiers(event: MouseEvent | KeyboardEvent): number {
   return (
     (event.altKey ? ALT : 0) + (event.ctrlKey ? CONTROL : 0) + (event.metaKey ? META : 0) + (event.shiftKey ? SHIFT : 0)
   );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "This page could not be shown live.";
 }

@@ -1,6 +1,6 @@
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
+import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
 import type { RemoteInvitePreview } from "@openbot/team-client/remote-directory";
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
@@ -10,9 +10,13 @@ import { useEffect, useRef, useState } from "react";
 import { Keyboard, Pressable, View } from "react-native";
 
 import { AppLogo } from "@/features/auth/components/app-logo";
+import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { currentText, useText } from "@/shared/lib/text";
+
+const INVITE_PLACEHOLDER = "https://openbot.run/join?…";
 
 function normalizeInviteUrl(value: string): string | null {
   const invite = value.trim();
@@ -25,14 +29,14 @@ function normalizeInviteUrl(value: string): string | null {
   }
 }
 
-function describeInvite(preview: RemoteInvitePreview): string {
-  if (preview.permanent) return `${preview.role} · No expiry`;
-  const expires = new Date(preview.expiresAt).toLocaleDateString(undefined, {
+function describeInvite(preview: RemoteInvitePreview, t: MobileTranslate, format: AppFormat): string {
+  if (preview.permanent) return t("mobile.server.invite.noExpiry", { role: t(SERVER_ROLE_KEYS[preview.role]) });
+  const expires = format.date(new Date(preview.expiresAt), {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
-  return `${preview.role} · Expires ${expires}`;
+  return t("mobile.server.invite.expires", { role: t(SERVER_ROLE_KEYS[preview.role]), date: expires });
 }
 
 export function AddServerScreen({
@@ -42,6 +46,7 @@ export function AddServerScreen({
   initialInvite?: string;
   onJoined?: () => void;
 } = {}) {
+  const { t, format, errorMessage, sourceText } = useText();
   const [foreground, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
   const { addRemoteServer, servers, teamDirectory } = useMobileWorkspace();
   const [joinedId, setJoinedId] = useState<string | null>(null);
@@ -79,7 +84,8 @@ export function AddServerScreen({
       },
       (cause) => {
         if (!active) return;
-        setError(errorMessage(cause, "OpenBot could not load this invitation."));
+        const text = currentText();
+        setError(text.errorMessage(cause, text.t("mobile.server.invite.loadFailed")));
         setPreviewing(false);
       },
     );
@@ -107,13 +113,18 @@ export function AddServerScreen({
       const serverId = await addRemoteServer({ inviteUrl: reviewedInvite });
       setJoinedId(serverId);
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not join this server."));
+      setError(errorMessage(cause, t("mobile.server.invite.joinFailed")));
       joinInFlight.current = false;
     }
     setJoining(false);
   }
 
   const connected = joinedServer?.state === "online";
+  const joinStatus = joinedServer?.connectionMessage
+    ? sourceText(joinedServer.connectionMessage)
+    : t("common.connecting");
+  const joinedStatus = (name: string | undefined, status: string) =>
+    name ? t("mobile.server.join.joinedNamed", { name, status }) : t("mobile.server.join.joined", { status });
 
   return (
     <SheetScrollView
@@ -126,14 +137,18 @@ export function AddServerScreen({
       <View className="items-center gap-3 px-4">
         <AppLogo animation="blink" followDeviceOrientation interactive size={72} />
         <Typography.Heading type="h3" align="center" className="pt-1">
-          {joinedId ? (connected ? "Connected" : "Invitation accepted") : "Join a server"}
+          {joinedId
+            ? connected
+              ? t("mobile.server.join.connected")
+              : t("mobile.server.join.accepted")
+            : t("mobile.server.join.title")}
         </Typography.Heading>
         <Typography.Paragraph align="center" className="max-w-80 text-text-secondary">
           {joinedId
             ? connected && joinedServer
-              ? `You are connected to ${joinedServer.name}.`
-              : `You joined ${joinedServer?.name ?? "the server"}. ${joinedServer?.connectionMessage ?? "Connecting…"}`
-            : "Paste or scan the invitation you received from a server owner."}
+              ? t("mobile.server.join.connectedTo", { name: joinedServer.name })
+              : joinedStatus(joinedServer?.name, joinStatus)
+            : t("mobile.server.join.description")}
         </Typography.Paragraph>
       </View>
 
@@ -145,7 +160,7 @@ export function AddServerScreen({
             else router.back();
           }}
         >
-          <Button.Label className="font-sans font-semibold">Done</Button.Label>
+          <Button.Label className="font-sans font-semibold">{t("common.done")}</Button.Label>
         </Button>
       ) : (
         <View className="gap-5">
@@ -157,7 +172,7 @@ export function AddServerScreen({
               <Button
                 isIconOnly
                 variant="ghost"
-                accessibilityLabel="Scan invitation QR code"
+                accessibilityLabel={t("mobile.server.join.scan")}
                 isDisabled={joining}
                 onPress={() => {
                   Keyboard.dismiss();
@@ -168,9 +183,9 @@ export function AddServerScreen({
               </Button>
             }
             inputMode="url"
-            label="Invite link"
+            label={t("mobile.server.join.inviteLink")}
             maxLength={500}
-            placeholder="https://openbot.run/join?…"
+            placeholder={INVITE_PLACEHOLDER}
             returnKeyType="go"
             value={inviteLink}
             onChangeText={changeLink}
@@ -184,14 +199,15 @@ export function AddServerScreen({
               </View>
               <View className="min-w-0 flex-1 gap-0.5">
                 <Typography.Paragraph weight="semibold">
-                  {preview?.hostName ?? (previewing ? "Checking invitation…" : "Invitation unavailable")}
+                  {preview?.hostName ??
+                    (previewing ? t("mobile.server.invite.checking") : t("mobile.server.invite.unavailable"))}
                 </Typography.Paragraph>
                 <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
                   {preview
-                    ? describeInvite(preview)
+                    ? describeInvite(preview, t, format)
                     : previewing
-                      ? "Verifying the server identity."
-                      : "The server identity must be verified before you join."}
+                      ? t("mobile.server.invite.verifying")
+                      : t("mobile.server.invite.verifyRequired")}
                 </Typography.Paragraph>
               </View>
             </View>
@@ -205,11 +221,13 @@ export function AddServerScreen({
 
           {preview || !reviewedInvite || previewing ? (
             <Button size="lg" isDisabled={!preview || joining || previewing} onPress={() => void joinServer()}>
-              <Button.Label className="font-sans font-semibold">{joining ? "Joining…" : "Join server"}</Button.Label>
+              <Button.Label className="font-sans font-semibold">
+                {joining ? t("mobile.server.join.joining") : t("mobile.server.join.submit")}
+              </Button.Label>
             </Button>
           ) : (
             <Button size="lg" onPress={() => setRequest({ url: reviewedInvite })}>
-              <Button.Label className="font-sans font-semibold">Try again</Button.Label>
+              <Button.Label className="font-sans font-semibold">{t("common.tryAgain")}</Button.Label>
             </Button>
           )}
 
@@ -220,7 +238,7 @@ export function AddServerScreen({
             onPress={() => router.back()}
           >
             <Typography.Paragraph weight="semibold" className="text-text-secondary">
-              Cancel
+              {t("common.cancel")}
             </Typography.Paragraph>
           </Pressable>
         </View>

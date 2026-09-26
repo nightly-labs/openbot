@@ -7,6 +7,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { type McpOAuthAuthority, type McpSignIn, secureOAuthFetch } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
@@ -235,7 +236,7 @@ function createTransport(server: ResolvedMcpServer, authProvider?: OAuthClientPr
 function withDeadline<T>(work: Promise<T>, signal: AbortSignal, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new McpTimeout(timeoutMs)), timeoutMs);
-    const onAbort = () => reject(new Error("The connection was cancelled."));
+    const onAbort = () => reject(new Error(sourceText("error.backend.mcpConnectionCancelled")));
     signal.addEventListener("abort", onAbort, { once: true });
     if (signal.aborted) onAbort();
     work.then(resolve, reject).finally(() => {
@@ -277,13 +278,14 @@ class McpTimeout extends Error {
 
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
 export function describeMcpError(error: unknown, config: McpServerConfig, timeoutMs: number): string {
-  if (error instanceof McpTimeout) return `The server did not answer in ${Math.round(timeoutMs / 1000)} seconds.`;
+  if (error instanceof McpTimeout)
+    return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(timeoutMs / 1000) });
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
-  if (error instanceof UnauthorizedError) return "The server did not accept that sign-in.";
+  if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
   const status = httpStatus(error);
-  if (status !== null) return `The server answered ${status}.${statusAdvice(status)}`;
+  if (status !== null) return httpStatusMessage(status);
   const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("ENOENT")) return `Command not found: ${config.command}`;
+  if (message.includes("ENOENT")) return sourceText("error.backend.mcpCommandNotFound", { command: config.command });
   return redactMcpSecrets(message, config);
 }
 
@@ -291,8 +293,7 @@ export function describeMcpError(error: unknown, config: McpServerConfig, timeou
  * A refused registration is the service's choice, not the user's credentials: Figma, for one,
  * registers only the MCP clients it approved. "Try again" and the API key cannot change it.
  */
-const REGISTRATION_REFUSED =
-  "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.";
+const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;
@@ -308,10 +309,10 @@ function isRegistrationRefusal(error: unknown): boolean {
 }
 
 /** What the user can change. A link from a service such as Composio stops working when it is deleted. */
-function statusAdvice(status: number) {
-  if (isAccessRefusal(status)) return " Check the API key or other credentials.";
-  if (status === 404 || status === 410) return " Check the URL. The link may be wrong, expired, or deleted.";
-  return "";
+function httpStatusMessage(status: number): string {
+  if (isAccessRefusal(status)) return sourceText("error.backend.mcpServerHttpCredentials", { status });
+  if (status === 404 || status === 410) return sourceText("error.backend.mcpServerHttpUrl", { status });
+  return `The server answered ${status}.`;
 }
 
 function httpStatus(error: unknown): number | null {

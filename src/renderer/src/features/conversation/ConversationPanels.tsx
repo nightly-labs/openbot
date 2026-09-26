@@ -1,6 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
@@ -70,6 +70,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     settingsReasoning,
     updateRuntimeSettings,
   } = useConversationViewScope();
+  const { t, errorMessage } = useText();
   let browserPreviewTrigger: HTMLButtonElement | undefined;
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
@@ -84,8 +85,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               void conversationPort()
                 .storage.openLocation({ agentId })
                 .catch((error) =>
-                  toast.error("Could not open the workspace folder", {
-                    description: errorMessage(error, "Try again."),
+                  toast.error(t("conversation.panels.openWorkspaceFailed"), {
+                    description: errorMessage(error, t("conversation.panels.tryAgain")),
                   }),
                 )
           : undefined,
@@ -263,6 +264,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 serverCanAdminister(props.server, "shared-tables-v1")
               }
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
+              computerUseEditable={props.server?.kind === "local"}
               agents={props.agents}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&

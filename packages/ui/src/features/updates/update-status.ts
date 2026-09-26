@@ -1,5 +1,7 @@
 import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
+import { currentText, type TextValue } from "../../text";
 
 export interface UpdateStatusPresentation {
   actionLabel: string;
@@ -11,44 +13,48 @@ export interface UpdateStatusPresentation {
   managed: boolean;
 }
 
-export function presentUpdateStatus(status: UpdateStatus): UpdateStatusPresentation {
+export function presentUpdateStatus(
+  status: UpdateStatus,
+  text: Pick<TextValue, "t" | "format"> = currentText(),
+): UpdateStatusPresentation {
   const available = isUpdateActivePhase(status.phase);
   const busy = isUpdateBusyPhase(status.phase);
   const managed = status.managedByHost === true;
-  let actionLabel = "Check for updates";
+  let actionLabel: AppTextKey = "update.action.check";
 
   switch (status.phase) {
     case "checking":
-      actionLabel = "Checking for updates…";
+      actionLabel = "update.action.checking";
       break;
     case "available":
-      actionLabel = "Download update";
+      actionLabel = "update.action.download";
       break;
     case "downloading":
-      actionLabel = "Downloading update…";
+      actionLabel = "update.action.downloading";
       break;
     case "ready":
-      actionLabel = "Restart to update";
+      actionLabel = "update.action.restart";
       break;
     case "installing":
-      actionLabel = "Restarting…";
+      actionLabel = "update.action.restarting";
       break;
     case "error":
       // A failed download is retried in place rather than sending the user back through a check. A
       // failed install is not retryable: shutdown preparation has already run, so the message asks
       // for a relaunch and the action falls back to checking.
-      if (status.errorCode === "download_failed") actionLabel = "Retry download";
+      if (status.errorCode === "download_failed") actionLabel = "update.action.retryDownload";
       break;
   }
 
   let detail = "";
-  if (status.phase === "downloading" && status.progress !== null) detail = `${Math.round(status.progress)}%`;
+  if (status.phase === "downloading" && status.progress !== null)
+    detail = text.format.percent(Math.round(status.progress) / 100);
   else if (status.availableVersion) detail = `v${status.availableVersion}`;
-  else if (status.phase === "up-to-date") detail = "Up to date";
+  else if (status.phase === "up-to-date") detail = text.t("update.upToDate");
   else if (status.currentVersion) detail = `v${status.currentVersion}`;
 
   return {
-    actionLabel: managed ? "Managed by host" : actionLabel,
+    actionLabel: text.t(managed ? "update.managedByHost" : actionLabel),
     available,
     busy,
     detail,

@@ -1,11 +1,12 @@
 import { Check, Popover, RadioGroup } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
+import { useText } from "../../text";
 import { RoutineChipSelect } from "./RoutineChipSelect";
 import { RoutineTimeField } from "./RoutineTimeField";
 import { createStableChipAnchor } from "./routine-popover-anchor";
 import {
-  ROUTINE_EVERY_HOURS_OPTIONS,
   type RoutineHoursWindow,
+  routineEveryHoursOptions,
   routineHoursLabel,
   routineRunsPerDayLabel,
 } from "./routine-schedule-draft";
@@ -31,11 +32,13 @@ const LAST_WINDOW = { start: "09:00", end: "18:00" };
  * row does not read "Hourly every hour"; a longer step shows on the frequency chip instead.
  */
 export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
+  const text = useText();
+  const { t } = text;
   // Going back to "Between hours" restores the last window instead of the default.
   let lastWindow = LAST_WINDOW;
   const [surface, setSurface] = createSignal<HTMLElement>();
   const anchor = createStableChipAnchor(() => props.onClose?.());
-  const label = () => routineHoursLabel(props.window, props.minute);
+  const label = () => routineHoursLabel(props.window, props.minute, text);
   const choose = (value: string) => {
     if (value === "all-day") {
       if (props.window) lastWindow = props.window;
@@ -54,7 +57,7 @@ export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
     >
       <Popover.Trigger
         class="routine-chip routine-chip-flexible"
-        aria-label={`Hours: ${label()}`}
+        aria-label={t("routine.hours.chipLabel", { hours: label() })}
         title={label()}
         disabled={props.disabled}
       >
@@ -68,17 +71,19 @@ export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
           }}
           class="ui-popover-menu-surface routine-popover routine-window-menu"
         >
-          <Popover.Title class="sr-only">Choose hours</Popover.Title>
+          <Popover.Title class="sr-only">{t("routine.hours.choose")}</Popover.Title>
           <RadioGroup.Root
             class="routine-window-options"
-            aria-label="Hours"
+            aria-label={t("routine.hours.label")}
             value={props.window ? "between" : "all-day"}
             onChange={choose}
           >
             <RadioGroup.Item class="routine-window-option" value="all-day">
               <RadioGroup.ItemInput />
               <RadioGroup.ItemControl class="routine-window-option-control">
-                <RadioGroup.ItemLabel class="routine-window-option-label">All day</RadioGroup.ItemLabel>
+                <RadioGroup.ItemLabel class="routine-window-option-label">
+                  {t("routine.hours.allDay")}
+                </RadioGroup.ItemLabel>
                 <RadioGroup.ItemIndicator class="routine-window-option-check">
                   <Check aria-hidden="true" />
                 </RadioGroup.ItemIndicator>
@@ -87,7 +92,9 @@ export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
             <RadioGroup.Item class="routine-window-option" value="between">
               <RadioGroup.ItemInput />
               <RadioGroup.ItemControl class="routine-window-option-control">
-                <RadioGroup.ItemLabel class="routine-window-option-label">Between hours</RadioGroup.ItemLabel>
+                <RadioGroup.ItemLabel class="routine-window-option-label">
+                  {t("routine.hours.between")}
+                </RadioGroup.ItemLabel>
                 <RadioGroup.ItemIndicator class="routine-window-option-check">
                   <Check aria-hidden="true" />
                 </RadioGroup.ItemIndicator>
@@ -99,7 +106,7 @@ export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
               <div class="routine-window-range">
                 <div class="routine-window-range-times">
                   <RoutineTimeField
-                    label="Start time"
+                    label={t("routine.hours.startTime")}
                     value={window().start}
                     onChange={(start) => props.onChange({ ...window(), start })}
                   />
@@ -107,25 +114,25 @@ export function RoutineHoursWindowPicker(props: RoutineHoursWindowPickerProps) {
                     –
                   </span>
                   <RoutineTimeField
-                    label="End time"
+                    label={t("routine.hours.endTime")}
                     value={window().end}
                     onChange={(end) => props.onChange({ ...window(), end })}
                   />
                 </div>
                 <p class="routine-window-range-count" aria-live="polite">
-                  {routineRunsPerDayLabel(window(), props.everyHours)}
+                  {routineRunsPerDayLabel(window(), props.everyHours, text)}
                 </p>
               </div>
             )}
           </Show>
           <div class="routine-window-repeat">
             <span class="routine-window-repeat-label" aria-hidden="true">
-              Repeat
+              {t("routine.hours.repeat")}
             </span>
             <RoutineChipSelect
-              ariaLabel="Repeat"
+              ariaLabel={t("routine.hours.repeat")}
               mount={surface()}
-              options={ROUTINE_EVERY_HOURS_OPTIONS}
+              options={routineEveryHoursOptions(text)}
               value={String(props.everyHours)}
               onChange={(value) => props.onEveryHoursChange(Number(value))}
             />

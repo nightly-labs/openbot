@@ -8,6 +8,7 @@ import { parseRemoteDesktopTest } from "../ipc/server-inputs";
 // telling it remote control is switched off.
 
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import { RemoteScreenError } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 import type { TeamApiRemoteScreen } from "./dependencies";
@@ -33,11 +34,11 @@ export async function routeRemoteScreen(
     (url.pathname === TEAM_API_ROUTES.remoteScreen.setup || url.pathname === TEAM_API_ROUTES.remoteScreen.test) &&
     context.protocol < 4
   ) {
-    throw new RemoteScreenError(426, "protocol_mismatch", "Update the client to use remote desktop setup.");
+    throw new RemoteScreenError(426, "protocol_mismatch", sourceText("error.remote.desktopSetupClientUpdate"));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.setup) {
     if (!remoteScreen?.checkSetup)
-      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop setup is unavailable.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.desktopSetupUnavailable"));
     const body = await readJson(request);
     if (Object.keys(body).length !== 0)
       throw new RemoteScreenError(400, "protocol_mismatch", "Invalid remote desktop setup request.");
@@ -45,20 +46,21 @@ export async function routeRemoteScreen(
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.test) {
     if (!remoteScreen?.test)
-      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop testing is unavailable.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.desktopTestUnavailable"));
     const body = await readJson(request);
     const input = parseRemoteDesktopTest({ ...body, serverId: "host" });
     return json(200, await remoteScreen.test(input.sessionId, member.id, input.action));
   }
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.remoteScreen.capabilities) {
-    if (!remoteScreen) throw new RemoteScreenError(503, "host_unavailable", "Remote control is unavailable.");
+    if (!remoteScreen)
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     return json(200, remoteScreen.capabilities());
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.remoteScreen.sessions) {
     const identity = store.getIdentity();
     if (!identity || !remoteScreen) {
-      throw new RemoteScreenError(503, "host_unavailable", "Remote control is unavailable.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
     return json(
       201,
@@ -73,7 +75,7 @@ export async function routeRemoteScreen(
   }
   if (method === "PUT" && url.pathname === TEAM_API_ROUTES.remoteScreen.display) {
     if (!remoteScreen) {
-      throw new RemoteScreenError(503, "host_unavailable", "Remote control is unavailable.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
     const body = await readJson(request);
     await remoteScreen.selectDisplay(stringField(body, "displayId"));
@@ -82,11 +84,11 @@ export async function routeRemoteScreen(
   const remoteScreenSessionMatch = url.pathname.match(/^\/v1\/remote-screen\/sessions\/([^/]+)$/);
   if (method === "DELETE" && remoteScreenSessionMatch) {
     if (!remoteScreen) {
-      throw new RemoteScreenError(503, "host_unavailable", "Remote control is unavailable.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
     const closedSessionId = pathIdentifier(remoteScreenSessionMatch[1], "sessionId");
     if (!(await remoteScreen.closeMemberSession(closedSessionId, member.id))) {
-      throw new RemoteScreenError(404, "session_expired", "Remote control session not found.");
+      throw new RemoteScreenError(404, "session_expired", sourceText("error.remote.controlSessionNotFound"));
     }
     return empty(204);
   }

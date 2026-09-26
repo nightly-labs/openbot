@@ -22,6 +22,12 @@ Read and follow [`DESIGN.md`](./DESIGN.md) before changing mobile UI.
 - If neither an existing OpenBot component nor HeroUI Native fits an application-content need, verify that before creating a reusable component. If native APIs cannot satisfy a system-chrome requirement, document the constraint in the change before using a fallback.
 - Do not add status badges, warnings, or operational guidance unless the application state and repository behavior support the claim. Verify lifecycle and connectivity copy against the implementation before presenting it to users.
 
+## Interface text
+
+Render product text through catalog keys: `useText()` in a component, `currentText()` in a store
+or an `Alert.alert` callback, both from `@/shared/lib/text`. Mobile keys start with `mobile.`. Use
+`format` for numbers and dates, not `toLocaleString()`. See [docs/i18n.md](../../docs/i18n.md).
+
 ## Sheets
 
 Follow [DESIGN.md — Sheets](./DESIGN.md#sheets) for presentation options, tokens and header styling,

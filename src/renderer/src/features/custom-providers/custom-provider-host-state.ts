@@ -1,5 +1,5 @@
 import type { CustomProviderRestart, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 import { customProviderRestartMessage } from "./custom-provider-restart";
 
@@ -89,12 +89,13 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
       const restart = await options.onAdd?.(value);
       setState((current) => {
         current.open = false;
-        current.note = restart ? customProviderRestartMessage("Saved", restart) : null;
+        current.note = restart ? customProviderRestartMessage("Saved", restart, currentText().t) : null;
       });
       options.onSaved?.(value);
     } catch (error) {
       setState((current) => {
-        current.submitError = errorMessage(error, "OpenBot could not save this endpoint.");
+        const text = currentText();
+        current.submitError = text.errorMessage(error, text.t("customProvider.saveFailed"));
       });
     } finally {
       setState((current) => {
@@ -112,12 +113,13 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     try {
       const restart = await options.onDelete?.(provider.id);
       setState((current) => {
-        current.note = restart ? customProviderRestartMessage("Removed", restart) : null;
+        current.note = restart ? customProviderRestartMessage("Removed", restart, currentText().t) : null;
       });
       options.onRemoved?.(provider.id);
     } catch (error) {
       setState((current) => {
-        current.note = errorMessage(error, `OpenBot could not remove ${provider.name}.`);
+        const text = currentText();
+        current.note = text.errorMessage(error, text.t("customProvider.removeFailed", { name: provider.name }));
       });
     } finally {
       setState((current) => {

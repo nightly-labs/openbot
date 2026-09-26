@@ -795,6 +795,17 @@ describe.sequential("AgentService: providers", () => {
       },
     });
 
+    // The user turns Computer Use off for this agent. Codex ignores MCP changes on resume, so the
+    // session must be replaced without the server.
+    await service.updateAgent({ agentId: "chief", computerUse: false });
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const restart = paramsRecord(client.requests.filter((request) => request.method === "thread/start")[1]?.params);
+    expect(restart?.config).toBeUndefined();
+    expect(restart?.developerInstructions).toContain("The user turned Computer Use off for you.");
+
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
   });
@@ -1290,6 +1301,91 @@ describe.sequential("AgentService: providers", () => {
       }
     },
   );
+
+  /* Grok takes no sandbox per session. A Workspace only turn that reached the shared process would
+     run with full access, so the turn must go to the agent's own sandboxed process. */
+  it("runs a Workspace only Grok agent in a sandboxed process of its own, and back on the shared one", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const created: Array<{ client: FakeAgentClient; roots: readonly string[] | null }> = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "grok",
+      clientFactory: (provider, _cli, confinement) => {
+        const client = new FakeAgentClient(provider);
+        created.push({ client, roots: confinement?.writableRoots ?? null });
+        return client;
+      },
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const agent = await service.updateAgent({
+      agentId: "chief",
+      provider: "grok",
+      model: "grok-4.5",
+      access: "workspace",
+    });
+    const turnStarts = (client: FakeAgentClient | undefined) =>
+      client?.requests.filter((request) => request.method === "turn/start").length ?? 0;
+    const sharedStarts = () =>
+      created
+        .filter((entry) => entry.roots === null && entry.client.provider === "grok")
+        .reduce((count, entry) => count + turnStarts(entry.client), 0);
+
+    await service.sendMessage({ agentId: "chief", text: "Write a file." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const own = created.find((entry) => entry.roots !== null);
+    expect(own?.roots).toEqual([agent.workspacePath, store.sharedRoot]);
+    expect(turnStarts(own?.client)).toBe(1);
+    expect(sharedStarts()).toBe(0);
+
+    await service.updateAgent({ agentId: "chief", access: "full" });
+    await service.sendMessage({ agentId: "chief", text: "Again." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    expect(sharedStarts()).toBe(1);
+    expect(own?.client.running).toBe(false);
+  });
+
+  it("keeps the turn of a Workspace only agent when the shared Grok process exits", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const created: Array<{ client: FakeAgentClient; confined: boolean }> = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "grok",
+      clientFactory: (provider, _cli, confinement) => {
+        const client = new FakeAgentClient(provider, undefined, false);
+        if (confinement) client.sessionIdPrefix = "grok-own";
+        created.push({ client, confined: confinement !== undefined });
+        return client;
+      },
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("helper");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5", access: "workspace" });
+    await service.updateAgent({ agentId: "helper", provider: "grok", model: "grok-4.5" });
+    await service.sendMessage({ agentId: "chief", text: "Long work." });
+    await service.sendMessage({ agentId: "helper", text: "Long work." });
+    for (const agentId of ["chief", "helper"]) {
+      await waitForQueue(service, agentId, (queue) => queue.deliveries[0]?.status === "running");
+    }
+    const shared = created.find(
+      (entry) => !entry.confined && entry.client.requests.some((request) => request.method === "turn/start"),
+    );
+
+    shared?.client.emit("exit", new Error("Grok exited."));
+
+    // The helper's turn ran on the shared process, so its end shows that recovery has run.
+    await waitForQueue(service, "helper", (queue) => queue.deliveries[0]?.status === "interrupted");
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("running");
+  });
 
   it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);

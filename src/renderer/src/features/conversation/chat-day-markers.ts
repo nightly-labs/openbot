@@ -4,10 +4,18 @@
  * separator appears is here, away from either timeline, and is a pure function of two timestamps.
  */
 
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
+import { currentText } from "@openbot/ui/text";
+
 /** The clock a caller can replace, so a test does not depend on the day the test runs. */
 export interface DayMarkerOptions {
   now?: Date;
+  /** The locale of the date and time when the caller gives no `format`. */
   locale?: string;
+  /** The interface text. Without it, the label uses the text of the app's provider. */
+  t?: AppTranslate;
+  /** The interface formats. Without it, the date and time use `locale`. */
+  format?: AppFormat;
 }
 
 function startOfDay(value: Date): number {
@@ -18,8 +26,14 @@ function dayDifference(from: Date, to: Date): number {
   return Math.round((startOfDay(to) - startOfDay(from)) / 86_400_000);
 }
 
-function timeOf(value: Date, locale?: string): string {
-  return value.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+function timeOf(value: Date, options: DayMarkerOptions): string {
+  const time = { hour: "numeric", minute: "2-digit" } as const;
+  return options.format ? options.format.date(value, time) : value.toLocaleTimeString(options.locale, time);
+}
+
+function dateOf(value: Date, options: DayMarkerOptions): string {
+  const date = { weekday: "short", month: "short", day: "numeric" } as const;
+  return options.format ? options.format.date(value, date) : value.toLocaleDateString(options.locale, date);
 }
 
 /**
@@ -42,9 +56,9 @@ export function dayMarkerLabel(
   }
   const now = options.now ?? new Date();
   const age = dayDifference(current, now);
-  const time = timeOf(current, options.locale);
-  if (age === 0) return `Today ${time}`;
-  if (age === 1) return `Yesterday ${time}`;
-  const date = current.toLocaleDateString(options.locale, { weekday: "short", month: "short", day: "numeric" });
-  return `${date} ${time}`;
+  const t = options.t ?? currentText().t;
+  const time = timeOf(current, options);
+  if (age === 0) return t("chat.day.today", { time });
+  if (age === 1) return t("chat.day.yesterday", { time });
+  return t("chat.day.date", { date: dateOf(current, options), time });
 }

@@ -16,12 +16,14 @@ import {
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import { AttachmentThumbnail, localAttachmentPreview, useAttachmentFile } from "../components/attachment-preview";
 import { useChatAttachments } from "../components/use-chat-attachments";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import { useQueuedChat } from "../context/queued-messages-context";
 
 export function QueuedMessageEditScreen() {
+  const { t } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
   const navigation = useNavigation();
@@ -95,22 +97,18 @@ export function QueuedMessageEditScreen() {
     const go = () => navigation.dispatch(data.action);
     const release = () =>
       releaseThenExit(go, () => {
-        Alert.alert(
-          "Still holding the message",
-          "OpenBot could not release this message, so the agent keeps waiting for it. Try again after the phone reconnects.",
-          [
-            { text: "Keep editing", style: "cancel" },
-            { text: "Leave anyway", onPress: () => exitAfter(null, go) },
-          ],
-        );
+        Alert.alert(t("mobile.chat.queue.stillHoldingTitle"), t("mobile.chat.queue.stillHoldingMessage"), [
+          { text: t("mobile.chat.queue.keepEditing"), style: "cancel" },
+          { text: t("mobile.chat.queue.leaveAnyway"), onPress: () => exitAfter(null, go) },
+        ]);
       });
     if (!dirty) {
       release();
       return;
     }
-    Alert.alert("Discard changes?", "The queued message keeps the text the agent already has.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: release },
+    Alert.alert(t("mobile.chat.queue.discardTitle"), t("mobile.chat.queue.discardMessage"), [
+      { text: t("mobile.chat.queue.keepEditing"), style: "cancel" },
+      { text: t("mobile.chat.queue.discard"), style: "destructive", onPress: release },
     ]);
   });
 
@@ -118,7 +116,7 @@ export function QueuedMessageEditScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          This message is no longer queued.
+          {t("mobile.chat.queue.noLongerQueued")}
         </Typography.Paragraph>
       </SettingsContent>
     );
@@ -128,7 +126,7 @@ export function QueuedMessageEditScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          The agent already received this message, so it cannot be changed.
+          {t("mobile.chat.queue.alreadyReceived")}
         </Typography.Paragraph>
         <SettingsSection>
           <SettingsRow
@@ -136,7 +134,7 @@ export function QueuedMessageEditScreen() {
             disabled={queue.busy}
             onPress={() => exitAfter(queue.discardFinishedEdit(), () => router.back())}
           >
-            <Typography>Close</Typography>
+            <Typography>{t("common.close")}</Typography>
           </SettingsRow>
         </SettingsSection>
       </SettingsContent>
@@ -148,7 +146,7 @@ export function QueuedMessageEditScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          {pending ? "Holding the message for you…" : "OpenBot could not hold this message for editing."}
+          {pending ? t("mobile.chat.queue.holding") : t("mobile.chat.queue.holdFailed")}
         </Typography.Paragraph>
         {queue.error ? (
           <Typography.Paragraph accessibilityRole="alert" align="center" className="text-danger-text">
@@ -158,7 +156,7 @@ export function QueuedMessageEditScreen() {
         {pending ? null : (
           <SettingsSection>
             <SettingsRow disclosure={false} onPress={hold}>
-              <Typography>Try again</Typography>
+              <Typography>{t("common.tryAgain")}</Typography>
             </SettingsRow>
           </SettingsSection>
         )}
@@ -171,12 +169,12 @@ export function QueuedMessageEditScreen() {
   return (
     <SettingsContent>
       <SheetFormField
-        label="Message"
+        label={t("mobile.chat.queue.messageLabel")}
         appearance="soft"
         multiline
         editable={!queue.busy && !edit.pendingSave}
         maxLength={INPUT_LIMITS.messageText}
-        placeholder="Message text"
+        placeholder={t("mobile.chat.queue.messagePlaceholder")}
         value={text}
         onChangeText={(value) => {
           setTyped({ editId: edit.editId, text: value });
@@ -191,7 +189,7 @@ export function QueuedMessageEditScreen() {
           (Boolean(text.trim()) || edit.keepAttachmentIds.length > 0 || added > 0)
         }
         pending={queue.busy}
-        label="Save queued message"
+        label={t("mobile.chat.queue.save")}
         onSave={() => {
           // The controller holds the files this edit added, so a save after a restart still
           // uploads the copies this phone kept for it.
@@ -206,16 +204,16 @@ export function QueuedMessageEditScreen() {
 
       <SettingsSection>
         <SettingsRow disclosure={false} disabled={queue.busy} onPress={() => releaseThenExit(() => router.back())}>
-          <Typography className="text-danger-text">Cancel edit</Typography>
+          <Typography className="text-danger-text">{t("mobile.chat.queue.cancelEdit")}</Typography>
         </SettingsRow>
       </SettingsSection>
 
       <SettingsNote>
         {queue.progress === null
           ? edit.pendingSave
-            ? "Save is not confirmed. Retry Save to check the result."
-            : "The agent waits for this message until you save it."
-          : `Uploading ${queue.progress} of ${added} files…`}
+            ? t("mobile.chat.queue.saveUnconfirmed")
+            : t("mobile.chat.queue.agentWaits")
+          : t("mobile.chat.queue.uploadingFiles", { progress: queue.progress, total: added })}
       </SettingsNote>
 
       {queue.error ? (
@@ -258,6 +256,7 @@ function QueuedEditAttachments({
   kept: AttachmentSummary[];
   onPreparingChange?: (preparing: boolean) => void;
 }) {
+  const { t } = useText();
   const muted = useThemeColor("muted");
   const attachments = useChatAttachments(queue.attachments, queue.changeAttachments, queue.attachmentSupport);
   const busy = queue.busy || attachments.preparing || Boolean(queue.edit?.pendingSave);
@@ -265,7 +264,7 @@ function QueuedEditAttachments({
     onPreparingChange?.(attachments.preparing);
   }, [attachments.preparing, onPreparingChange]);
   return (
-    <SettingsSection title="Attachments">
+    <SettingsSection title={t("mobile.chat.queue.attachments")}>
       {kept.map((file) => (
         <KeptAttachmentRow
           key={file.id}
@@ -279,10 +278,10 @@ function QueuedEditAttachments({
         <SettingsRow
           key={file.id}
           leading={<AttachmentThumbnail name={file.name} uri={localAttachmentPreview(file)} />}
-          supportingText="Added on this phone"
+          supportingText={t("mobile.chat.queue.addedOnPhone")}
           trailing={
             <AttachmentRemoveButton
-              label={`Remove ${file.name}`}
+              label={t("mobile.chat.attachment.remove", { name: file.name })}
               disabled={busy}
               onPress={() => attachments.remove(file.id)}
             />
@@ -297,7 +296,7 @@ function QueuedEditAttachments({
         leading={<AddIcon>{<Paperclip color={String(muted)} size={22} />}</AddIcon>}
         onPress={() => void attachments.chooseFiles()}
       >
-        <Typography>Add files</Typography>
+        <Typography>{t("mobile.chat.queue.addFiles")}</Typography>
       </SettingsRow>
       <SettingsRow
         disclosure={false}
@@ -305,7 +304,7 @@ function QueuedEditAttachments({
         leading={<AddIcon>{<ImagePlus color={String(muted)} size={22} />}</AddIcon>}
         onPress={() => void attachments.choosePhotos()}
       >
-        <Typography>Add photos</Typography>
+        <Typography>{t("mobile.chat.queue.addPhotos")}</Typography>
       </SettingsRow>
     </SettingsSection>
   );
@@ -328,12 +327,19 @@ function KeptAttachmentRow({
   disabled: boolean;
   onRemove: () => void;
 }) {
+  const { t } = useText();
   const image = attachment.kind === "image";
   const file = useAttachmentFile(serverId, attachment, image);
   return (
     <SettingsRow
       leading={<AttachmentThumbnail name={attachment.name} uri={image ? file.uri : null} />}
-      trailing={<AttachmentRemoveButton label={`Remove ${attachment.name}`} disabled={disabled} onPress={onRemove} />}
+      trailing={
+        <AttachmentRemoveButton
+          label={t("mobile.chat.attachment.remove", { name: attachment.name })}
+          disabled={disabled}
+          onPress={onRemove}
+        />
+      }
     >
       <Typography numberOfLines={1}>{attachment.name}</Typography>
     </SettingsRow>

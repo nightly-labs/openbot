@@ -1,4 +1,5 @@
 import type { AccountUsage, AvatarImageInput, CentralAuthState } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, createStore, flush, onCleanup, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
@@ -113,7 +114,7 @@ const Auth = createSimpleContext({
             status: "error",
             issue: {
               code: "auth_unavailable",
-              message: "OpenBot could not load the account service.",
+              message: currentText().t("account.login.loadFailed"),
             },
           }),
         );

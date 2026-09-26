@@ -28,6 +28,7 @@ import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   isTeamCurrentCapability,
@@ -57,6 +58,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { TEAM_PROTOCOL_V4 } from "@openbot/contracts/team-protocol/v4";
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
 import { McpServerError } from "../backend/mcp-server-store";
@@ -254,7 +256,7 @@ export class TeamApiServer {
       this.#server?.listen(0, "127.0.0.1", () => resolve());
     });
     const address = this.#server.address();
-    if (!address || isString(address)) throw new Error("Could not bind the team API.");
+    if (!address || isString(address)) throw new Error(sourceText("error.team.bindFailed"));
     this.#port = address.port;
     this.#agentListener = (event) => this.#broadcastAgentEvent(event);
     this.#options.agents.on("event", this.#agentListener);
@@ -492,7 +494,7 @@ export class TeamApiServer {
               identity.serverId,
             )
           : null;
-        if (!user) return this.#json(response, 401, { error: "OpenBot sign-in is required." });
+        if (!user) return this.#json(response, 401, { error: sourceText("error.team.signInRequired") });
         this.#checkRate(request, user.email);
         const result = await this.#options.store.acceptInviteWithAccount(
           stringField(body, "inviteToken", false, INPUT_LIMITS.identifier),
@@ -518,7 +520,7 @@ export class TeamApiServer {
               identity.serverId,
             )
           : null;
-        if (!user) return this.#json(response, 401, { error: "OpenBot sign-in is required." });
+        if (!user) return this.#json(response, 401, { error: sourceText("error.team.signInRequired") });
         this.#checkRate(request, user.email);
         return this.#json(response, 200, await this.#options.store.loginWithAccount(user));
       }
@@ -528,7 +530,7 @@ export class TeamApiServer {
       const token = bearerToken(request.headers.authorization);
       const authenticated = token ? this.#options.store.authenticateSession(token) : null;
       if (!authenticated || !token) {
-        return this.#json(response, 401, { error: "Authentication required." });
+        return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
       }
       const context = this.#requestContext(request, response, url, token, authenticated);
       const agents = this.#options.agents.listAgents();
@@ -547,7 +549,7 @@ export class TeamApiServer {
           (agentId && hidden.has(pathIdentifier(agentId, "agentId"))) ||
           [url.searchParams.get("agentId"), url.searchParams.get("botId")].some((id) => id !== null && hidden.has(id))
         ) {
-          throw new HttpError(404, "Agent not found.");
+          throw new HttpError(404, sourceText("error.team.agentNotFound"));
         }
       }
 
@@ -581,7 +583,7 @@ export class TeamApiServer {
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
-      return this.#json(response, 404, { error: "Route not found." });
+      return this.#json(response, 404, { error: sourceText("error.team.routeNotFound") });
     } catch (error) {
       // The only catch, too. A module with its own would cut an unexpected error off from the
       // logger below and answer 400 where the failure was a 500 nobody would then ever see.
@@ -593,7 +595,7 @@ export class TeamApiServer {
         error instanceof AnalyticsInputError;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError ? error.status : expected ? 400 : 500;
-      const message = expected ? error.message : "Request failed.";
+      const message = expected ? error.message : sourceText("error.team.requestFailed");
       const code = error instanceof RemoteScreenError ? error.code : undefined;
       if (!expected) (this.#options.logger ?? logger).error("Team API request failed:", toLogValue(error));
       return this.#json(response, status, { error: message, ...(code ? { code } : {}) });
@@ -656,14 +658,14 @@ export class TeamApiServer {
     const current = this.#rateLimits.get(key);
     if (!current || current.resetAt <= now) {
       if (!current && this.#rateLimits.size >= this.#rateLimitCapacity) {
-        throw new HttpError(429, "Too many sign-in attempts. Try again later.");
+        throw new HttpError(429, sourceText("error.team.tooManySignInAttempts"));
       }
       this.#rateLimits.set(key, { attempts: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
       return;
     }
     current.attempts += 1;
     if (current.attempts > RATE_LIMIT_ATTEMPTS) {
-      throw new HttpError(429, "Too many sign-in attempts. Try again later.");
+      throw new HttpError(429, sourceText("error.team.tooManySignInAttempts"));
     }
   }
 
@@ -1069,10 +1071,7 @@ export class TeamApiServer {
       ]);
       const rollbackErrors = rollbackResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
       if (rollbackErrors.length > 0) {
-        throw new AggregateError(
-          [error, ...rollbackErrors],
-          "Agent duplication failed and the incomplete copy could not be removed.",
-        );
+        throw new AggregateError([error, ...rollbackErrors], sourceText("error.agent.duplicateCleanupFailed"));
       }
       throw error;
     }
@@ -1160,6 +1159,7 @@ export class TeamApiServer {
           return (
             this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
           );
+        if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
         if (capability === PROVIDERS_ADMIN_CAPABILITY) return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         return true;
@@ -1177,7 +1177,7 @@ export class TeamApiServer {
       return {
         status: 426,
         body: {
-          error: "Update this OpenBot client before connecting to this host.",
+          error: sourceText("error.team.clientUpdateRequired"),
           code: "client_update_required",
           host,
         },
@@ -1201,8 +1201,8 @@ export class TeamApiServer {
       status: 426,
       body: {
         error: clientIsOlder
-          ? "Update this OpenBot client before connecting to this host."
-          : "Update OpenBot on the host before connecting.",
+          ? sourceText("error.team.clientUpdateRequired")
+          : sourceText("error.team.hostUpdateRequired"),
         code: clientIsOlder ? "client_update_required" : "host_update_required",
         host,
         client: { appVersion: clientAppVersion, protocol },
@@ -1252,13 +1252,13 @@ function unavailableSidebarLayout(): TeamApiSidebarLayout {
       agentOrder: [],
     }),
     mutate: async () => {
-      throw new HttpError(503, "Sidebar layout is unavailable.");
+      throw new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable"));
     },
     withProfileAssignment: async () => {
-      throw new Error("Sidebar layout is unavailable.");
+      throw new Error(sourceText("error.team.sidebarLayoutUnavailable"));
     },
     placeDuplicateAfter: async () => {
-      throw new HttpError(503, "Sidebar layout is unavailable.");
+      throw new HttpError(503, sourceText("error.team.sidebarLayoutUnavailable"));
     },
     removeAgent: async () => ({
       revision: 0,

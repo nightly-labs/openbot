@@ -1,4 +1,3 @@
-import { errorMessage } from "../../../error-message";
 /**
  * The two changes the sidebar can have half-made: a delete confirmation waiting on the user, and an
  * open section-name editor. Both live in one store because only one of each can exist, and because
@@ -7,6 +6,7 @@ import { errorMessage } from "../../../error-message";
 
 import type { ChannelSummary, SidebarSection } from "@openbot/contracts/ipc";
 import { createMemo, createStore } from "solid-js";
+import { currentText } from "../../../text";
 import type { SidebarProps } from "../sidebar-types";
 
 /**
@@ -99,7 +99,8 @@ export function createSidebarPendingStore(deps: {
     setPending((state) => {
       if (!state.deletion) return;
       state.deletion.deleting = false;
-      state.deletion.error = errorMessage(cause, "Could not delete this item. Try again.");
+      const text = currentText();
+      state.deletion.error = text.errorMessage(cause, text.t("sidebar.delete.failed"));
     });
   }
 
@@ -188,7 +189,7 @@ export function createSidebarPendingStore(deps: {
     if (!editor || editor.saving) return;
     const name = editor.name.trim();
     if (!name) {
-      setSectionNameError("Section name is required.");
+      setSectionNameError(currentText().t("sidebar.section.nameRequired"));
       focusSectionName();
       return;
     }
@@ -199,7 +200,7 @@ export function createSidebarPendingStore(deps: {
         !(target.kind === "rename" && target.sectionId === section.id),
     );
     if (duplicate) {
-      setSectionNameError("Section names must be unique.");
+      setSectionNameError(currentText().t("sidebar.section.nameUnique"));
       focusSectionName();
       return;
     }
@@ -221,7 +222,8 @@ export function createSidebarPendingStore(deps: {
     } catch (error) {
       setPending((state) => {
         if (!state.sectionEditor) return;
-        state.sectionEditor.error = errorMessage(error, "Could not save this section. Try again.");
+        const text = currentText();
+        state.sectionEditor.error = text.errorMessage(error, text.t("sidebar.section.saveFailed"));
         state.sectionEditor.saving = false;
       });
       focusSectionName();

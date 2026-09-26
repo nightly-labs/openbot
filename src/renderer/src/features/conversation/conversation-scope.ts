@@ -1,4 +1,5 @@
 import type { UpdateAgentInput } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import {
   createContext,
   createEffect,
@@ -937,7 +938,7 @@ export function createConversationViewScope(props: ConversationProps) {
     try {
       await conversationRuntime(props).openUrl(url);
     } catch {
-      setScopedComposerError("Could not open the link in the external browser.", target);
+      setScopedComposerError(currentText().t("composer.error.openLink"), target);
     }
   }
 

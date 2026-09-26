@@ -5,6 +5,7 @@ import { ChatView } from "@/features/chat/components/chat-view";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useText } from "@/shared/lib/text";
 import { useChannels } from "../components/use-channels";
 import { ChannelSend } from "../model/channel-send";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
@@ -16,6 +17,7 @@ export function ChannelChatScreen() {
 }
 
 function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
+  const { t } = useText();
   const { agents, servers } = useMobileWorkspace();
   // A sheet removes focus, but the chat remains mounted behind it. Release history
   // only when this route unmounts; the workspace pauses network reads in the background.
@@ -70,7 +72,13 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   return (
     <ChatView
-      target={{ kind: "channel", id: channelId, serverId, name: channel?.name ?? "Channel", members }}
+      target={{
+        kind: "channel",
+        id: channelId,
+        serverId,
+        name: channel?.name ?? t("mobile.channel.chat.fallbackName"),
+        members,
+      }}
       agents={members}
       mentionAgents={members}
       projectedMessages={messages}
@@ -103,7 +111,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       send={(body, files, replyToMessageId, upload) =>
         sender.send(body, files, replyToMessageId, channel?.members ?? [], upload)
       }
-      notice={channel?.archived ? "Deleted channel. Preview only." : undefined}
+      notice={channel?.archived ? t("mobile.channel.chat.deletedNotice") : undefined}
       needsAction={channelTasksNeedingAction(page?.tasks ?? []).length > 0 && !channel?.archived}
     />
   );

@@ -1,4 +1,5 @@
-import type { ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
+import type { ServerConnectionState, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Bell,
   BellOff,
@@ -13,41 +14,52 @@ import {
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
+import { useText } from "../../text";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
 // The same choices as Discord's server menu. No duration mutes until the user unmutes.
-const MUTE_CHOICES: readonly { label: string; durationMs?: number }[] = [
-  { label: "For 15 minutes", durationMs: 15 * 60_000 },
-  { label: "For 1 hour", durationMs: 60 * 60_000 },
-  { label: "For 3 hours", durationMs: 3 * 60 * 60_000 },
-  { label: "For 8 hours", durationMs: 8 * 60 * 60_000 },
-  { label: "For 24 hours", durationMs: 24 * 60 * 60_000 },
-  { label: "Until I turn it back on" },
+const MUTE_CHOICES: readonly { label: AppTextKey; durationMs?: number }[] = [
+  { label: "server.mute.for15Minutes", durationMs: 15 * 60_000 },
+  { label: "server.mute.for1Hour", durationMs: 60 * 60_000 },
+  { label: "server.mute.for3Hours", durationMs: 3 * 60 * 60_000 },
+  { label: "server.mute.for8Hours", durationMs: 8 * 60 * 60_000 },
+  { label: "server.mute.for24Hours", durationMs: 24 * 60 * 60_000 },
+  { label: "server.mute.untilTurnedOn" },
 ];
 
-export const SERVER_NOTIFICATION_LEVEL_LABELS: Record<ServerNotificationLevel, string> = {
-  all: "All activity",
-  "needs-me": "Only when it needs me",
-  nothing: "Nothing",
-};
+export const SERVER_NOTIFICATION_LEVEL_LABELS = {
+  all: "server.notificationLevel.all",
+  "needs-me": "server.notificationLevel.needsMe",
+  nothing: "server.notificationLevel.nothing",
+} as const satisfies Record<ServerNotificationLevel, AppTextKey>;
+
+const SERVER_STATE_LABELS = {
+  online: "server.state.online",
+  connecting: "server.state.connecting",
+  offline: "server.state.offline",
+  error: "server.state.error",
+  incompatible: "server.state.incompatible",
+} as const satisfies Record<ServerConnectionState, AppTextKey>;
 
 const NOTIFICATION_LEVELS: readonly ServerNotificationLevel[] = ["all", "needs-me", "nothing"];
 
 /** "Muted until 14:30", with the weekday when the mute ends on another day. */
 export function serverMuteDescription(
   server: Pick<ServerSummary, "notificationsMutedUntil">,
+  t: AppTranslate,
+  format: AppFormat,
   now = new Date(),
 ): string {
-  if (server.notificationsMutedUntil === null) return "Muted";
+  if (server.notificationsMutedUntil === null) return t("server.mute.muted");
   const until = new Date(server.notificationsMutedUntil);
   const sameDay = until.toDateString() === now.toDateString();
-  const time = until.toLocaleTimeString(undefined, {
+  const time = format.date(until, {
     hour: "numeric",
     minute: "2-digit",
     ...(sameDay ? {} : { weekday: "short" }),
   });
-  return `Muted until ${time}`;
+  return t("server.mute.mutedUntil", { time });
 }
 
 interface ServerRailProps {
@@ -67,6 +79,7 @@ interface DragSlot {
 }
 
 export function ServerRail(props: ServerRailProps) {
+  const { t } = useText();
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
   const [announcement, setAnnouncement] = createSignal("");
@@ -206,7 +219,7 @@ export function ServerRail(props: ServerRailProps) {
     ids[index] = displaced;
     ids[targetIndex] = moved;
     props.onReorder(ids);
-    setAnnouncement(`Moved server to position ${targetIndex + 1} of ${ids.length}.`);
+    setAnnouncement(t("server.rail.moved", { position: targetIndex + 1, total: ids.length }));
   }
 
   function dropServer(targetId: string): void {
@@ -219,7 +232,7 @@ export function ServerRail(props: ServerRailProps) {
     ids.splice(sourceIndex, 1);
     ids.splice(targetIndex, 0, sourceId);
     props.onReorder(ids);
-    setAnnouncement(`Moved server to position ${targetIndex + 1} of ${ids.length}.`);
+    setAnnouncement(t("server.rail.moved", { position: targetIndex + 1, total: ids.length }));
   }
 
   function stopDragging(): void {
@@ -232,7 +245,7 @@ export function ServerRail(props: ServerRailProps) {
   return (
     <aside
       class="server-rail"
-      aria-label="Servers"
+      aria-label={t("server.rail.label")}
       onDragOver={(event) => {
         if (!draggedId()) return;
         event.preventDefault();
@@ -328,13 +341,13 @@ export function ServerRail(props: ServerRailProps) {
           <Tooltip.Trigger
             type="button"
             class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-            aria-label="Add remote server"
+            aria-label={t("server.rail.addRemote")}
             onClick={props.onAdd}
           >
             <span class="server-rail-monogram">+</span>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content class="server-rail-tooltip">Add remote server</Tooltip.Content>
+            <Tooltip.Content class="server-rail-tooltip">{t("server.rail.addRemote")}</Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
         <span class="sr-only" aria-live="polite">
@@ -354,8 +367,16 @@ function ServerRailButton(props: {
   onOpenSettings?: (serverId: string, trigger: HTMLElement | null) => void;
   onMove?: (direction: -1 | 1) => void;
 }) {
+  const { t, format } = useText();
   const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
   let trigger: HTMLElement | null = null;
+  const buttonLabel = () =>
+    [
+      t("server.rail.buttonLabel", { name: props.server.name }),
+      ...(props.server.notificationsMuted ? [t("server.rail.notificationsMuted")] : []),
+      ...(props.server.state === "online" ? [] : [t(SERVER_STATE_LABELS[props.server.state])]),
+    ].join(", ");
+  const muteDescription = () => serverMuteDescription(props.server, t, format);
   return (
     <Tooltip.Root
       open={overlay.tooltipOpen && !overlay.menuOpen}
@@ -383,7 +404,7 @@ function ServerRailButton(props: {
             as="button"
             type="button"
             class={buttonVariants({ variant: "ghost", class: "server-rail-button" })}
-            aria-label={`${props.server.name} server${props.server.notificationsMuted ? ", notifications muted" : ""}${props.server.state === "online" ? "" : `, ${props.server.state}`}`}
+            aria-label={buttonLabel()}
             aria-pressed={props.server.active ? "true" : "false"}
             aria-keyshortcuts={props.onMove ? "Shift+F10 Alt+ArrowUp Alt+ArrowDown" : "Shift+F10"}
             onClick={() => props.onSelect(props.server.id)}
@@ -427,7 +448,7 @@ function ServerRailButton(props: {
             </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
-            <ContextMenu.Content class="agent-context-menu" aria-label="Server actions">
+            <ContextMenu.Content class="agent-context-menu" aria-label={t("server.rail.actions")}>
               <Show when={props.onSetMuted}>
                 <Show
                   when={!props.server.notificationsMuted}
@@ -438,8 +459,8 @@ function ServerRailButton(props: {
                     >
                       <Bell class="agent-context-icon size-4" aria-hidden="true" />
                       <span class="server-rail-menu-label">
-                        <span>Unmute server</span>
-                        <span class="server-rail-menu-detail">{serverMuteDescription(props.server)}</span>
+                        <span>{t("server.rail.unmute")}</span>
+                        <span class="server-rail-menu-detail">{muteDescription()}</span>
                       </span>
                     </ContextMenu.Item>
                   }
@@ -447,7 +468,7 @@ function ServerRailButton(props: {
                   <ContextMenu.Sub>
                     <ContextMenu.SubTrigger>
                       <BellOff class="agent-context-icon size-4" aria-hidden="true" />
-                      <span>Mute server</span>
+                      <span>{t("server.rail.mute")}</span>
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </ContextMenu.SubTrigger>
                     <ContextMenu.Portal>
@@ -457,7 +478,7 @@ function ServerRailButton(props: {
                             <ContextMenu.Item
                               onSelect={() => props.onSetMuted?.(props.server.id, true, choice.durationMs)}
                             >
-                              <span>{choice.label}</span>
+                              <span>{t(choice.label)}</span>
                             </ContextMenu.Item>
                           )}
                         </For>
@@ -471,9 +492,9 @@ function ServerRailButton(props: {
                   <ContextMenu.SubTrigger class="server-rail-menu-detail-item">
                     <Bell class="agent-context-icon size-4" aria-hidden="true" />
                     <span class="server-rail-menu-label">
-                      <span>Notification settings</span>
+                      <span>{t("server.rail.notificationSettings")}</span>
                       <span class="server-rail-menu-detail">
-                        {SERVER_NOTIFICATION_LEVEL_LABELS[props.server.notificationLevel]}
+                        {t(SERVER_NOTIFICATION_LEVEL_LABELS[props.server.notificationLevel])}
                       </span>
                     </span>
                     <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
@@ -490,7 +511,7 @@ function ServerRailButton(props: {
                         <For each={NOTIFICATION_LEVELS}>
                           {(level) => (
                             <ContextMenu.RadioItem value={level}>
-                              <span>{SERVER_NOTIFICATION_LEVEL_LABELS[level]}</span>
+                              <span>{t(SERVER_NOTIFICATION_LEVEL_LABELS[level])}</span>
                               <Show when={props.server.notificationLevel === level}>
                                 <Check class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                               </Show>
@@ -508,7 +529,7 @@ function ServerRailButton(props: {
               <Show when={props.onOpenUsage}>
                 <ContextMenu.Item onSelect={() => props.onOpenUsage?.(props.server.id, trigger)}>
                   <ChartArea class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>Usage</span>
+                  <span>{t("server.rail.usage")}</span>
                 </ContextMenu.Item>
               </Show>
               <Show when={props.onOpenSettings}>
@@ -525,7 +546,7 @@ function ServerRailButton(props: {
                     <circle cx="6" cy="5.5" r=".8" />
                     <circle cx="6" cy="14.5" r=".8" />
                   </svg>
-                  <span>Server settings</span>
+                  <span>{t("server.rail.settings")}</span>
                 </ContextMenu.Item>
               </Show>
             </ContextMenu.Content>
@@ -535,7 +556,7 @@ function ServerRailButton(props: {
       <Tooltip.Portal>
         <Tooltip.Content class="server-rail-tooltip">
           {props.server.name}
-          {props.server.notificationsMuted ? ` · ${serverMuteDescription(props.server)}` : ""}
+          {props.server.notificationsMuted ? ` · ${muteDescription()}` : ""}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

@@ -1,5 +1,6 @@
 import { Button, Popover, RadioGroup } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 import { createStableChipAnchor } from "./routine-popover-anchor";
 import {
   ROUTINE_EVERY_DAY,
@@ -25,9 +26,11 @@ type RoutineWeekdayPickerProps = (
  * a weekly run picks exactly one, so it is a radio group and the arrow keys move the choice.
  */
 export function RoutineWeekdayPicker(props: RoutineWeekdayPickerProps) {
+  const text = useText();
   const anchor = createStableChipAnchor(() => props.onClose?.());
-  const label = () => (props.mode === "many" ? routineDaySetLabel(props.days) : routineWeekdayShort(props.day));
-  const chipLabel = () => (props.mode === "many" ? routineDayChipLabel(props.days) : label());
+  const label = () =>
+    props.mode === "many" ? routineDaySetLabel(props.days, text) : routineWeekdayShort(props.day, text);
+  const chipLabel = () => (props.mode === "many" ? routineDayChipLabel(props.days, text) : label());
   return (
     <Popover.Root
       modal
@@ -38,7 +41,7 @@ export function RoutineWeekdayPicker(props: RoutineWeekdayPickerProps) {
     >
       <Popover.Trigger
         class="routine-chip routine-chip-flexible"
-        aria-label={`Days: ${label()}`}
+        aria-label={text.t("routine.weekday.chipLabel", { days: label() })}
         title={chipLabel() === label() ? undefined : label()}
         disabled={props.disabled}
       >
@@ -49,7 +52,7 @@ export function RoutineWeekdayPicker(props: RoutineWeekdayPickerProps) {
           ref={anchor.setContent}
           class="ui-popover-menu-surface routine-popover routine-weekday-popover"
         >
-          <Popover.Title class="sr-only">Choose days</Popover.Title>
+          <Popover.Title class="sr-only">{text.t("routine.weekday.choose")}</Popover.Title>
           <Show
             when={props.mode === "many" && props}
             fallback={
@@ -67,8 +70,9 @@ export function RoutineWeekdayPicker(props: RoutineWeekdayPickerProps) {
 }
 
 function ManyWeekdays(props: { days: number[]; onChange: (days: number[]) => void }) {
+  const text = useText();
   return (
-    <fieldset class="routine-weekday-strip" aria-label="Days">
+    <fieldset class="routine-weekday-strip" aria-label={text.t("routine.weekday.days")}>
       <For each={ROUTINE_EVERY_DAY}>
         {(day) => {
           const selected = () => props.days.includes(day);
@@ -77,13 +81,13 @@ function ManyWeekdays(props: { days: number[]; onChange: (days: number[]) => voi
               type="button"
               variant="ghost"
               class={["routine-day", { "routine-day-selected": selected() }]}
-              aria-label={routineWeekdayName(day)}
+              aria-label={routineWeekdayName(day, text)}
               aria-pressed={selected() ? "true" : "false"}
               // The last day stays on, and saying so beats a click that does nothing.
-              title={selected() && props.days.length === 1 ? "At least one day is required" : undefined}
+              title={selected() && props.days.length === 1 ? text.t("routine.weekday.oneRequired") : undefined}
               onClick={() => props.onChange(toggleRoutineDay(props.days, day))}
             >
-              {routineWeekdayInitial(day)}
+              {routineWeekdayInitial(day, text)}
             </Button>
           );
         }}
@@ -93,10 +97,11 @@ function ManyWeekdays(props: { days: number[]; onChange: (days: number[]) => voi
 }
 
 function SingleWeekday(props: { day: number; onChange: (day: number) => void }) {
+  const text = useText();
   return (
     <RadioGroup.Root
       class="routine-weekday-strip"
-      aria-label="Day"
+      aria-label={text.t("routine.weekday.day")}
       orientation="horizontal"
       value={String(props.day)}
       onChange={(value) => props.onChange(Number(value))}
@@ -104,9 +109,9 @@ function SingleWeekday(props: { day: number; onChange: (day: number) => void }) 
       <For each={ROUTINE_EVERY_DAY}>
         {(day) => (
           <RadioGroup.Item class="routine-day-item" value={String(day)}>
-            <RadioGroup.ItemInput aria-label={routineWeekdayName(day)} />
+            <RadioGroup.ItemInput aria-label={routineWeekdayName(day, text)} />
             <RadioGroup.ItemControl class={["routine-day", { "routine-day-selected": props.day === day }]}>
-              <span aria-hidden="true">{routineWeekdayInitial(day)}</span>
+              <span aria-hidden="true">{routineWeekdayInitial(day, text)}</span>
             </RadioGroup.ItemControl>
           </RadioGroup.Item>
         )}

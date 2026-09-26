@@ -2,6 +2,7 @@ import { access, chmod, copyFile, link, mkdir, readFile, rm, stat, writeFile } f
 import { join } from "node:path";
 import type { ManagedRuntimeId } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   parseBunVersion,
@@ -138,7 +139,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       };
     },
     stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
-      await assertSafeArchive(downloadedPath, CODEX_ARCHIVE_ROOTS, "The Codex archive has an unexpected path.");
+      await assertSafeArchive(downloadedPath, CODEX_ARCHIVE_ROOTS, sourceText("error.provider.codexArchivePath"));
       await extractArchive(downloadedPath, staging);
       await rejectNonRegularFiles(staging);
       const license = await downloadSmallFile(
@@ -150,7 +151,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     verify: async (root, spec, lock) => {
       const manifest = JSON.parse(await readFile(join(root, "codex-package.json"), "utf8"));
       if (!isDynamicRecord(manifest) || manifest.version !== lock.codex.version) {
-        throw new Error("Unexpected Codex runtime version.");
+        throw new Error(sourceText("error.provider.codexVersionUnexpected"));
       }
       await Promise.all([
         access(join(root, "bin", spec.target === "win32-x64" ? "codex-code-mode-host.exe" : "codex-code-mode-host")),
@@ -181,7 +182,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       await rm(extracted, { recursive: true, force: true });
       await mkdir(extracted, { recursive: true });
       try {
-        await assertSafeArchive(downloadedPath, ["package"], "The Claude archive has an unexpected path.");
+        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.claudeArchivePath"));
         await extractArchive(downloadedPath, extracted);
         await rejectNonRegularFiles(extracted);
         const packageRoot = join(extracted, "package");
@@ -192,7 +193,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
           packageManifest.name !== artifact.package ||
           packageManifest.version !== spec.packageVersion
         ) {
-          throw new Error("The Claude package does not match the runtime catalog.");
+          throw new Error(sourceText("error.provider.claudePackageMismatch"));
         }
         await mkdir(join(staging, "bin"), { recursive: true });
         await Promise.all([
@@ -218,9 +219,9 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       const artifact = lock.claude.artifacts[spec.target];
       const executable = join(root, "bin", spec.executableName);
       if ((await sha256File(executable)) !== artifact.binarySha256)
-        throw new Error("Claude runtime checksum mismatch.");
+        throw new Error(sourceText("error.provider.claudeChecksum"));
       if ((await sha256File(join(root, "LICENSE.md"))) !== lock.claude.licenseSha256) {
-        throw new Error("Claude license checksum mismatch.");
+        throw new Error(sourceText("error.provider.claudeLicenseChecksum"));
       }
     },
     parseVersion: parseClaudeVersion,
@@ -247,7 +248,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       await rm(extracted, { recursive: true, force: true });
       await mkdir(extracted, { recursive: true });
       try {
-        await assertSafeArchive(downloadedPath, ["package"], "The OpenCode archive has an unexpected path.");
+        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.opencodeArchivePath"));
         await extractArchive(downloadedPath, extracted);
         await rejectNonRegularFiles(extracted);
         const packageRoot = join(extracted, "package");
@@ -258,7 +259,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
           packageManifest.name !== artifact.package ||
           packageManifest.version !== spec.packageVersion
         ) {
-          throw new Error("The OpenCode package does not match the runtime catalog.");
+          throw new Error(sourceText("error.provider.opencodePackageMismatch"));
         }
         // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
         const license = await downloadSmallFile(
@@ -288,10 +289,10 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       const artifact = lock.opencode.artifacts[spec.target];
       const executable = join(root, "bin", spec.executableName);
       if ((await sha256File(executable)) !== artifact.binarySha256) {
-        throw new Error("OpenCode runtime checksum mismatch.");
+        throw new Error(sourceText("error.provider.opencodeChecksum"));
       }
       if ((await sha256File(join(root, "LICENSE"))) !== lock.opencode.licenseSha256) {
-        throw new Error("OpenCode license checksum mismatch.");
+        throw new Error(sourceText("error.provider.opencodeLicenseChecksum"));
       }
     },
     parseVersion: parseOpencodeVersion,
@@ -339,13 +340,13 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     verify: async (root, spec, lock) => {
       const executable = join(root, "bin", spec.executableName);
       if ((await sha256File(executable)) !== lock.grok.artifacts[spec.target].assetSha256) {
-        throw new Error("Grok runtime checksum mismatch.");
+        throw new Error(sourceText("error.provider.grokChecksum"));
       }
       if ((await sha256File(join(root, "LICENSE"))) !== lock.grok.licenseSha256) {
-        throw new Error("Grok license checksum mismatch.");
+        throw new Error(sourceText("error.provider.grokLicenseChecksum"));
       }
       if ((await sha256File(join(root, "THIRD-PARTY-NOTICES"))) !== lock.grok.noticesSha256) {
-        throw new Error("Grok notices checksum mismatch.");
+        throw new Error(sourceText("error.provider.grokNoticesChecksum"));
       }
     },
     parseVersion: parseGrokVersion,
@@ -372,7 +373,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       await rm(extracted, { recursive: true, force: true });
       await mkdir(extracted, { recursive: true });
       try {
-        await assertSafeArchive(downloadedPath, ["package"], "The Bun archive has an unexpected path.");
+        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.bunArchivePath"));
         await extractArchive(downloadedPath, extracted);
         await rejectNonRegularFiles(extracted);
         const packageRoot = join(extracted, "package");
@@ -383,7 +384,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
           packageManifest.name !== artifact.package ||
           packageManifest.version !== lock.bun.version
         ) {
-          throw new Error("The Bun package does not match the runtime catalog.");
+          throw new Error(sourceText("error.provider.bunPackageMismatch"));
         }
         // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
         const license = await downloadSmallFile(
@@ -414,9 +415,10 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     verify: async (root, spec, lock) => {
       const artifact = lock.bun.artifacts[spec.target];
       const executable = join(root, "bin", spec.executableName);
-      if ((await sha256File(executable)) !== artifact.binarySha256) throw new Error("Bun runtime checksum mismatch.");
+      if ((await sha256File(executable)) !== artifact.binarySha256)
+        throw new Error(sourceText("error.provider.bunChecksum"));
       if ((await sha256File(join(root, "LICENSE.md"))) !== lock.bun.licenseSha256) {
-        throw new Error("Bun license checksum mismatch.");
+        throw new Error(sourceText("error.provider.bunLicenseChecksum"));
       }
       // Only the size, because the second name is the same bytes: hashing 80MB twice on every start
       // would buy nothing. A truncated or replaced file fails this, and a swapped whole binary is
@@ -425,7 +427,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         stat(executable),
         stat(join(root, "bin", bunxExecutableName(spec.target))),
       ]);
-      if (bun.size !== bunx.size) throw new Error("The Bun package manager runner is missing or damaged.");
+      if (bun.size !== bunx.size) throw new Error(sourceText("error.provider.bunxDamaged"));
     },
     parseVersion: parseBunVersion,
   },

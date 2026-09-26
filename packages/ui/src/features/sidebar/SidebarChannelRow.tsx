@@ -7,6 +7,7 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
 import { sidebarMessageTime } from "./sidebar-filtering";
@@ -22,13 +23,14 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
     sidebarClickIsSuppressed,
     startChatDragging,
   } = useSidebarScope();
+  const { t, format } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const title = () => rowProps.channel.title.trim();
   /* Running work is a prefix on the preview line rather than a word beside the name: one line
    * carries both and the row keeps the height every other row in the list has. */
   const preview = () => {
-    const text = rowProps.channel.lastMessage?.text ?? "No messages yet";
-    return rowProps.channel.activeTasks > 0 ? `Working · ${text}` : text;
+    const text = rowProps.channel.lastMessage?.text ?? t("sidebar.channel.noMessages");
+    return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
@@ -85,13 +87,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary }) {
                 </Show>
               </span>
               <span class="agent-row-time">
-                {sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt)}
+                {sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format)}
               </span>
             </span>
             <span class="agent-row-preview">{preview()}</span>
           </span>
           <Show when={rowProps.channel.unreadCount > 0}>
-            <span class="sr-only">{rowProps.channel.unreadCount} unread messages</span>
+            <span class="sr-only">{t("sidebar.channel.unread", { count: rowProps.channel.unreadCount })}</span>
           </Show>
         </ContextMenu.Trigger>
         <Show when={!rowProps.channel.archived}>

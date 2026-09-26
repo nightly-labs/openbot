@@ -3,6 +3,7 @@
 import { copyFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseApplyAgentImportInput } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import type { AgentImportService } from "../agent-import-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -11,6 +12,7 @@ import { stringPayload } from "./validation";
 export interface AgentImportIpcDependencies {
   agentImport: AgentImportService;
   getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
   /** The export skill a user adds to Grok Bot by hand. It ships in the app's resources. */
   exportSkillPath: string;
 }
@@ -18,6 +20,7 @@ export interface AgentImportIpcDependencies {
 export function agentImportIpcHandlers({
   agentImport,
   getMainWindow,
+  translate,
   exportSkillPath,
 }: AgentImportIpcDependencies): Pick<IpcGroupHandlers, "agentImport"> {
   return {
@@ -25,9 +28,9 @@ export function agentImportIpcHandlers({
       choose: handler(async () => {
         const mainWindow = getMainWindow();
         const options: OpenDialogOptions = {
-          title: "Choose an agent export",
+          title: translate("dialog.chooseAgentExport"),
           properties: ["openFile"],
-          filters: [{ name: "Agent exports", extensions: ["zip"] }],
+          filters: [{ name: translate("dialog.filter.agentExports"), extensions: ["zip"] }],
         };
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
@@ -40,7 +43,7 @@ export function agentImportIpcHandlers({
       saveSkill: handler(async () => {
         const mainWindow = getMainWindow();
         const options: SaveDialogOptions = {
-          title: "Save the export skill",
+          title: translate("dialog.saveExportSkill"),
           defaultPath: join(app.getPath("downloads"), "SKILL.md"),
           filters: [{ name: "Markdown", extensions: ["md"] }],
         };

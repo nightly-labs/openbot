@@ -6,6 +6,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
 import { isIOS } from "@/shared/lib/platform";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
+import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import {
   applyDictationResult,
@@ -91,13 +92,14 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
 
 function showNotice(notice: DictationNotice): void {
   void haptics.notification("error");
+  const { t } = currentText();
   Alert.alert(
-    notice.title,
-    notice.message,
+    t(notice.title),
+    t(notice.message),
     notice.openSettings
       ? [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("mobile.chat.dictation.openSettings"), onPress: () => void Linking.openSettings() },
         ]
       : undefined,
   );

@@ -18,6 +18,7 @@ import {
 } from "@openbot/contracts/team-protocol/v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
@@ -84,7 +85,7 @@ export async function requestJson<T>(
       // `classifyRemoteConnectionError` recognised -- every caller checking for a protocol failure
       // by class, the desktop probe among them, let it through as an ordinary rejection.
       if (response.ok) {
-        throw new RemoteProtocolError("protocol_error", "The host returned invalid data.", null, { cause: error });
+        throw new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause: error });
       }
     }
   }
@@ -94,33 +95,23 @@ export async function requestJson<T>(
         ? sideRoute.response(path, response.status, value)
         : codec.decodeResponse(method, path, response.status, value);
     } catch (error) {
-      throw new RemoteProtocolError(
-        "protocol_error",
-        "The host returned data that this app could not safely use.",
-        null,
-        { cause: error },
-      );
+      throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause: error });
     }
   }
   if (!response.ok) {
     const message =
       isDynamicRecord(value) && isString(value.error)
         ? value.error
-        : `Remote server request failed (${response.status}).`;
+        : sourceText("error.remote.requestFailedStatus", { status: response.status });
     const code = isDynamicRecord(value) && isString(value.code) ? value.code : null;
     throw new RemoteRequestError(response.status, message, code);
   }
   try {
     return decoder(value);
   } catch (error) {
-    throw new RemoteProtocolError(
-      "protocol_error",
-      "The host returned data that this app could not safely use.",
-      null,
-      {
-        cause: error,
-      },
-    );
+    throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, {
+      cause: error,
+    });
   }
 }
 
@@ -153,14 +144,12 @@ export async function throwRemoteResponseError(response: Response, method: strin
     body = await response.clone().json();
   } catch (error) {
     if (response.headers.get("content-type")?.toLowerCase().includes("json")) {
-      throw new RemoteProtocolError(
-        "protocol_error",
-        "The host returned data that this app could not safely use.",
-        null,
-        { cause: error },
-      );
+      throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause: error });
     }
-    throw new RemoteRequestError(response.status, `Remote server request failed (${response.status}).`);
+    throw new RemoteRequestError(
+      response.status,
+      sourceText("error.remote.requestFailedStatus", { status: response.status }),
+    );
   }
   try {
     const value = decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, body);
@@ -168,13 +157,8 @@ export async function throwRemoteResponseError(response: Response, method: strin
     throw new RemoteRequestError(response.status, value.error, isString(value.code) ? value.code : null);
   } catch (error) {
     if (error instanceof RemoteRequestError) throw error;
-    throw new RemoteProtocolError(
-      "protocol_error",
-      "The host returned data that this app could not safely use.",
-      null,
-      {
-        cause: error,
-      },
-    );
+    throw new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, {
+      cause: error,
+    });
   }
 }

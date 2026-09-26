@@ -8,6 +8,7 @@ import { isDeleteSharedTableInput, isSharedTable, type SharedTable } from "@open
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { SHARED_TABLES_CAPABILITY, SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -51,7 +52,7 @@ export function sharedTableIpcHandlers({
         local: (input) => service.deleteTable(input),
         remote: (input, serverId) => {
           if (!remoteServers.supportsCapability(serverId, SHARED_TABLES_CAPABILITY))
-            throw new Error("Shared data is managed on the computer that runs these agents.");
+            throw new Error(sourceText("error.backend.sharedDataLocalOnly"));
           return remoteServers.request(serverId, SHARED_TABLES_ROUTES.delete, acceptEmpty, {
             method: "POST",
             body: input,

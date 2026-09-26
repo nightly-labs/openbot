@@ -1,6 +1,7 @@
 // The window that stands beside a System Settings pane while the user grants a permission.
 
 import type { ComputerUsePermissionApp, MacPermissionId } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { BrowserWindow, NativeImage } from "electron";
 import { applicationBundleName } from "./computer-use-permission-app";
 
@@ -95,10 +96,10 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
     if (sender.id !== this.#rendererId) throw new Error("The Computer Use drag must start in the help window.");
     const generation = this.#generation;
     const path = this.#bundlePath(sender.id);
-    if (!path) throw new Error("This build of OpenBot has no application to drag.");
+    if (!path) throw new Error(sourceText("error.computerUse.noAppToDrag"));
     const icon = await this.#options.bundleIcon(path);
     if (generation !== this.#generation || sender.id !== this.#rendererId) {
-      throw new Error("The permission help window changed before the drag started.");
+      throw new Error(sourceText("error.computerUse.helpWindowChanged"));
     }
     sender.startDrag({ file: path, icon });
   }
@@ -106,7 +107,7 @@ export class ComputerUsePermissionHelpWindowController<W extends PermissionHelpW
   /** The way past a drag the user cannot make, which is the `+` button in the pane. */
   reveal(senderId?: number): void {
     const path = this.#bundlePath(senderId);
-    if (!path) throw new Error("This build of OpenBot has no application to show.");
+    if (!path) throw new Error(sourceText("error.computerUse.noAppToShow"));
     this.#options.revealPath(path);
   }
 

@@ -11,10 +11,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { Button, Dialog, Textarea } from "@openbot/ui";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
-import { errorMessage } from "@openbot/ui/error-message";
+import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { InvitePreviewCard } from "@openbot/ui/features/servers/JoinServerDialog";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
@@ -39,7 +39,10 @@ const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = AGENT_PROVIDERS.
   name: agentProviderName(id),
 }));
 
+const TEXT_MARKER = "\u0000";
+
 export function InitialSetup(props: InitialSetupProps) {
+  const { t, errorMessage } = useText();
   const initialInviteUrl = untrack(() => props.inviteUrl?.trim() ?? "");
   const [route, setRoute] = createSignal<SetupRoute | null>(
     untrack(() => (props.reviewing ? "local" : initialInviteUrl ? "remote" : null)),
@@ -107,7 +110,7 @@ export function InitialSetup(props: InitialSetupProps) {
     try {
       await props.onSave(provider);
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not save your local setup."));
+      setError(errorMessage(cause, t("onboarding.setup.saveFailed")));
       setSaving(false);
     }
   }
@@ -121,7 +124,7 @@ export function InitialSetup(props: InitialSetupProps) {
       return true;
     } catch (cause) {
       setInvitePreview(null);
-      setError(errorMessage(cause, "OpenBot could not verify this invitation."));
+      setError(errorMessage(cause, t("onboarding.setup.verifyFailed")));
       return false;
     } finally {
       setSaving(false);
@@ -140,29 +143,46 @@ export function InitialSetup(props: InitialSetupProps) {
     try {
       await props.onJoinRemote({ inviteUrl: inviteUrl().trim() }, provider);
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not connect to this host."));
+      setError(errorMessage(cause, t("onboarding.setup.connectFailed")));
       setSaving(false);
     }
   }
 
+  const joinNoteParts = () => {
+    const [before = "", after = ""] = t("onboarding.setup.joinNote", { email: TEXT_MARKER }).split(TEXT_MARKER);
+    return [before, after] as const;
+  };
+
+  /** "ChatGPT, Claude, or Grok", built from the registry so a new provider joins the sentence. */
+  function providerSentence(): string {
+    const names = PROVIDERS.map((provider) => provider.name);
+    const last = names[names.length - 1];
+    return names.length < 2
+      ? (last ?? "")
+      : t("onboarding.setup.providerList", {
+          providers: names.slice(0, -1).join(t("onboarding.setup.providerSeparator")),
+          last: last ?? "",
+        });
+  }
+
   const title = () => {
-    if (props.reviewing) return "Providers & permissions";
-    if (route() === "local") return "Set up this computer";
-    if (route() === "remote") return "Connect to a host";
-    return "Where will OpenBot run?";
+    if (props.reviewing) return t("onboarding.setup.reviewTitle");
+    if (route() === "local") return t("onboarding.setup.localTitle");
+    if (route() === "remote") return t("onboarding.setup.remoteTitle");
+    return t("onboarding.setup.title");
   };
 
   const description = () => {
     if (props.reviewing) {
-      return "Choose the default provider for local agents and review macOS permissions.";
+      return t("onboarding.setup.reviewDescription");
     }
     if (route() === "local") {
-      return "Agents, conversations, and files stay on this computer.";
+      return t("onboarding.setup.localDescription");
     }
     if (route() === "remote") {
-      return "Use an invitation from the person who runs your OpenBot host.";
+      return t("onboarding.setup.remoteDescription");
     }
-    return "Use this computer, or connect to an OpenBot host that runs somewhere else.";
+    return t("onboarding.setup.description");
   };
 
   return (
@@ -176,7 +196,7 @@ export function InitialSetup(props: InitialSetupProps) {
                   variant="ghost"
                   type="button"
                   class="initial-setup-back"
-                  aria-label="Back to connection choice"
+                  aria-label={t("onboarding.setup.back")}
                   onClick={() => {
                     setError("");
                     setRoute(null);
@@ -198,11 +218,11 @@ export function InitialSetup(props: InitialSetupProps) {
                   class="initial-setup-signout"
                   onClick={() => void props.onLogout?.()}
                 >
-                  Sign out
+                  {t("onboarding.setup.signOut")}
                 </Button>
               </Show>
             </div>
-            <p class="initial-setup-eyebrow">OpenBot setup</p>
+            <p class="initial-setup-eyebrow">{t("onboarding.setup.eyebrow")}</p>
             <Dialog.Title as="h1" id="initial-setup-title">
               {title()}
             </Dialog.Title>
@@ -212,20 +232,20 @@ export function InitialSetup(props: InitialSetupProps) {
           </header>
 
           <Show when={!props.reviewing && route() === null}>
-            <ul class="setup-route-list" aria-label="Connection type">
+            <ul class="setup-route-list" aria-label={t("onboarding.setup.connectionType")}>
               <li>
                 <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("local")}>
                   <span class="setup-route-icon setup-route-icon-local" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
-                      <title>Local computer</title>
+                      <title>{t("onboarding.setup.localIcon")}</title>
                       <rect x="3" y="4" width="18" height="13" rx="2.5" />
                       <path d="M8 21h8M12 17v4" />
                     </svg>
                     <i />
                   </span>
                   <span class="setup-route-copy">
-                    <strong>Use this computer</strong>
-                    <small>Run {providerSentence()} locally. Keep all OpenBot data here.</small>
+                    <strong>{t("onboarding.setup.localRoute")}</strong>
+                    <small>{t("onboarding.setup.localRouteDetail", { providers: providerSentence() })}</small>
                   </span>
                   <RouteArrow />
                 </Button>
@@ -234,7 +254,7 @@ export function InitialSetup(props: InitialSetupProps) {
                 <Button variant="ghost" type="button" class="setup-route-button" onClick={() => chooseRoute("remote")}>
                   <span class="setup-route-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
-                      <title>Remote host</title>
+                      <title>{t("onboarding.setup.remoteIcon")}</title>
                       <rect x="3" y="3" width="18" height="7" rx="2.5" />
                       <rect x="3" y="14" width="18" height="7" rx="2.5" />
                       <path d="M7 6.5h.01M7 17.5h.01" />
@@ -242,8 +262,8 @@ export function InitialSetup(props: InitialSetupProps) {
                     <i />
                   </span>
                   <span class="setup-route-copy">
-                    <strong>Connect to a host</strong>
-                    <small>Use agents and conversations from an existing OpenBot host.</small>
+                    <strong>{t("onboarding.setup.remoteTitle")}</strong>
+                    <small>{t("onboarding.setup.remoteRouteDetail")}</small>
                   </span>
                   <RouteArrow />
                 </Button>
@@ -256,9 +276,9 @@ export function InitialSetup(props: InitialSetupProps) {
               <ProviderPicker
                 value={selectedProvider()}
                 options={providerOptions()}
-                ariaLabel="Default provider"
-                label="Default provider"
-                hint="Used for new local agents. You can change it for each agent later."
+                ariaLabel={t("onboarding.setup.defaultProvider")}
+                label={t("onboarding.setup.defaultProvider")}
+                hint={t("onboarding.setup.defaultProviderHint")}
                 disabled={saving()}
                 allowUnavailableSelection
                 focusFirst
@@ -281,7 +301,7 @@ export function InitialSetup(props: InitialSetupProps) {
                 when={invitePreview()}
                 fallback={
                   <label>
-                    <span>Host invitation</span>
+                    <span>{t("onboarding.setup.invitation")}</span>
                     <Textarea
                       rows="3"
                       maxlength={INPUT_LIMITS.inviteUrl}
@@ -291,7 +311,7 @@ export function InitialSetup(props: InitialSetupProps) {
                         setInvitePreview(null);
                         setError("");
                       }}
-                      placeholder="Paste an https://openbot.run/join invitation link"
+                      placeholder={t("onboarding.setup.invitationPlaceholder")}
                       spellcheck={false}
                       autofocus
                       required
@@ -312,15 +332,16 @@ export function InitialSetup(props: InitialSetupProps) {
                         setError("");
                       }}
                     >
-                      Use another invitation
+                      {t("onboarding.setup.otherInvitation")}
                     </Button>
                   </>
                 )}
               </Show>
               <Show when={!invitePreview()}>
                 <p class="setup-remote-note">
-                  You will join as <strong>{props.accountEmail}</strong>. Email invitations only work for the address
-                  that received them.
+                  {joinNoteParts()[0]}
+                  <strong>{props.accountEmail}</strong>
+                  {joinNoteParts()[1]}
                 </p>
               </Show>
             </form>
@@ -336,7 +357,7 @@ export function InitialSetup(props: InitialSetupProps) {
             <div class="initial-setup-actions">
               <Show when={props.reviewing}>
                 <Button variant="ghost" type="button" class="initial-setup-secondary" onClick={props.onClose}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </Show>
               <Button
@@ -352,17 +373,17 @@ export function InitialSetup(props: InitialSetupProps) {
               >
                 {saving()
                   ? route() === "remote"
-                    ? "Connecting…"
-                    : "Saving…"
+                    ? t("common.connecting")
+                    : t("common.saving")
                   : props.reviewing
-                    ? "Save changes"
+                    ? t("onboarding.setup.saveChanges")
                     : route() === "remote"
                       ? invitePreview()
-                        ? "Connect to host"
-                        : "Review invitation"
+                        ? t("onboarding.setup.connect")
+                        : t("onboarding.setup.reviewInvitation")
                       : selectedProvider()
-                        ? `Continue with ${providerName(selectedProvider())}`
-                        : "Choose a provider"}
+                        ? t("onboarding.setup.continueWith", { provider: providerName(selectedProvider()) })
+                        : t("onboarding.setup.chooseProvider")}
               </Button>
             </div>
           </Show>
@@ -382,11 +403,4 @@ function RouteArrow() {
 
 function providerName(provider: AgentProviderId | null): string {
   return provider === null ? agentProviderName("codex") : agentProviderName(provider);
-}
-
-/** "ChatGPT, Claude, or Grok", built from the registry so a new provider joins the sentence. */
-function providerSentence(): string {
-  const names = PROVIDERS.map((provider) => provider.name);
-  const last = names[names.length - 1];
-  return names.length < 2 ? (last ?? "") : `${names.slice(0, -1).join(", ")}, or ${last}`;
 }

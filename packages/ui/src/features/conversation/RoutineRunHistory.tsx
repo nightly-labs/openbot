@@ -1,6 +1,8 @@
 import { isRoutineRun, type RoutineRunFields } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, Check, CirclePause, Clock3, TriangleAlert, X } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { type TextValue, useText } from "../../text";
 
 interface RoutineRunHistoryProps {
   runs: RoutineRunFields[];
@@ -16,21 +18,23 @@ function runMessageId(run: RoutineRunFields): string | null {
 }
 
 export function RoutineRunHistory(props: RoutineRunHistoryProps) {
+  const text = useText();
+  const { t } = text;
   const visibleRuns = () => props.runs.slice(0, 10);
   return (
     <section class="agent-routine-history" aria-labelledby="routine-history-heading">
-      <h3 id="routine-history-heading">Run history</h3>
-      <Show when={visibleRuns().length > 0} fallback={<p class="agent-routines-empty">No runs yet.</p>}>
+      <h3 id="routine-history-heading">{t("routine.history.title")}</h3>
+      <Show when={visibleRuns().length > 0} fallback={<p class="agent-routines-empty">{t("routine.history.empty")}</p>}>
         <div class="agent-routine-run-list">
           <For each={visibleRuns()}>
             {(run) => {
-              const label =
+              const label = () =>
                 run.kind === "manual"
-                  ? `Manual · ${formatRoutineRunTime(run.scheduledFor)}`
-                  : formatRoutineRunTime(run.scheduledFor);
+                  ? t("routine.history.manualRun", { time: formatRoutineRunTime(run.scheduledFor, text) })
+                  : formatRoutineRunTime(run.scheduledFor, text);
               const content = (
                 <>
-                  <span>{label}</span>
+                  <span>{label()}</span>
                   <RoutineRunStatus status={run.status} />
                 </>
               );
@@ -44,7 +48,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                       variant="ghost"
                       type="button"
                       class="agent-routine-run-row agent-routine-run-link"
-                      aria-label={`Open ${label} in chat`}
+                      aria-label={t("routine.history.openRun", { run: label() })}
                       onClick={() => props.onOpenRun?.(messageId())}
                     >
                       {content}
@@ -61,7 +65,8 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
 }
 
 function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
-  const label = () => routineRunStatusLabel(props.status);
+  const { t } = useText();
+  const label = () => t(RUN_STATUS_LABEL[props.status]);
   return (
     <span
       class={`agent-routine-run-icon agent-routine-run-icon-${props.status}`}
@@ -88,15 +93,15 @@ function RoutineRunStatus(props: { status: RoutineRunFields["status"] }) {
   );
 }
 
-function formatRoutineRunTime(value: string): string {
+function formatRoutineRunTime(value: string, text: Pick<TextValue, "t" | "format">): string {
   const date = new Date(value);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
-  if (sameCalendarDay(date, today)) return `Today at ${time}`;
-  if (sameCalendarDay(date, yesterday)) return `Yesterday at ${time}`;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  const time = text.format.date(date, { hour: "numeric", minute: "2-digit" });
+  if (sameCalendarDay(date, today)) return text.t("routine.history.today", { time });
+  if (sameCalendarDay(date, yesterday)) return text.t("routine.history.yesterday", { time });
+  return text.format.date(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function sameCalendarDay(left: Date, right: Date): boolean {
@@ -107,6 +112,12 @@ function sameCalendarDay(left: Date, right: Date): boolean {
   );
 }
 
-function routineRunStatusLabel(status: RoutineRunFields["status"]): string {
-  return status === "needs-attention" ? "Needs attention" : `${status.slice(0, 1).toUpperCase()}${status.slice(1)}`;
-}
+const RUN_STATUS_LABEL = {
+  queued: "routine.runStatus.queued",
+  running: "routine.runStatus.running",
+  "needs-attention": "routine.runStatus.needsAttention",
+  succeeded: "routine.runStatus.succeeded",
+  failed: "routine.runStatus.failed",
+  interrupted: "routine.runStatus.interrupted",
+  cancelled: "routine.runStatus.cancelled",
+} as const satisfies Record<RoutineRunFields["status"], AppTextKey>;

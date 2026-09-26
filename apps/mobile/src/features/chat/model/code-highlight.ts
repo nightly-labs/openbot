@@ -1,3 +1,4 @@
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { type ShjLanguage, type ShjToken, tokenize } from "@speed-highlight/core";
 
 export interface CodeToken {
@@ -105,6 +106,21 @@ export function codeLanguage(info = "") {
   const name = (info.trim().split(/\s+/u)[0] ?? "").toLowerCase();
   const language = LANGUAGE_ALIASES[name] ?? LANGUAGES.find((item) => item === name) ?? "plain";
   return { language, label: language === "plain" && name ? name : (LANGUAGE_LABELS[language] ?? language) };
+}
+
+const LANGUAGE_LABEL_KEYS: Partial<Record<ShjLanguage, MobileTextKey>> = {
+  asm: "mobile.chat.code.language.assembly",
+  bash: "mobile.chat.code.language.shell",
+  diff: "mobile.chat.code.language.diff",
+  plain: "mobile.chat.code.language.plain",
+  regex: "mobile.chat.code.language.regex",
+};
+
+/** The label of `codeLanguage` in the interface language. A name from the fence stays as written. */
+export function codeLanguageLabel(info: string | undefined, t: MobileTranslate): string {
+  const { language, label } = codeLanguage(info);
+  const key = LANGUAGE_LABEL_KEYS[language];
+  return key && label === LANGUAGE_LABELS[language] ? t(key) : label;
 }
 
 export async function highlightCode(text: string, info?: string): Promise<CodeToken[]> {

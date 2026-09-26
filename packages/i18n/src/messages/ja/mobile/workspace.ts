@@ -1,0 +1,36 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/mobile/workspace";
+
+export const messages = {
+  "mobile.workspace.status.notConnected": "未接続",
+  "mobile.workspace.status.online": "オンライン",
+  "mobile.workspace.status.offline": "オフライン",
+  "mobile.workspace.status.error": "接続エラー",
+  "mobile.workspace.status.reconnecting": "再接続しています",
+  "mobile.workspace.status.attempt": "試行 {attempt}/{limit}",
+  "mobile.workspace.status.attemptPrefix": "試行 ",
+  "mobile.workspace.status.retryIn": "{seconds} 秒後に再試行します",
+  "mobile.workspace.section.agents": "エージェント",
+  "mobile.workspace.error.directoryUnavailable": "サーバーディレクトリを利用できません。",
+  "mobile.workspace.error.sectionsLoadFailed": "セクションを読み込めませんでした。もう一度お試しください。",
+  "mobile.workspace.error.transportNotReady": "モバイル接続の準備ができていません。",
+  "mobile.workspace.error.sectionsUnsupported": "このホストはセクションの変更に対応していません。",
+  "mobile.workspace.error.leaveOwnServer": "退出できるのは参加したリモートサーバーのみです。",
+  "mobile.workspace.error.agentNotOnHost": "エージェントはこのホストにありません。",
+  "mobile.workspace.error.filesUnsupported":
+    "このホストはファイル管理に対応していません。ホストの OpenBot を更新してください。",
+  "mobile.workspace.error.agentUnavailableOnHost": "このホストではエージェントを利用できません。",
+  "mobile.workspace.error.agentUnavailable": "エージェントを利用できません。",
+  "mobile.workspace.error.formUnavailable": "このフォームは利用できなくなりました。",
+  "mobile.workspace.alert.preferencesTitle": "チャットの設定を保存できませんでした",
+  "mobile.workspace.alert.preferencesBody": "以前の設定を保持しました。もう一度お試しください。",
+  "mobile.workspace.alert.updateRequiredTitle": "アップデートが必要です",
+  "mobile.workspace.alert.updateRequiredUnread": "会話を未読にするには、このデスクトップサーバーを更新してください。",
+  "mobile.workspace.alert.markUnreadTitle": "未読にできませんでした",
+  "mobile.workspace.alert.markUnreadBody": "サーバーに再接続して、もう一度お試しください。",
+  "mobile.workspace.alert.serverOrderTitle": "サーバーの順序を保存できませんでした",
+  "mobile.workspace.alert.serverOrderBody": "以前の順序を保持しました。もう一度お試しください。",
+  "mobile.workspace.error.connectFailed": "サーバーへの接続に失敗しました。",
+  "mobile.workspace.error.disconnectFailed": "サーバーの切断が正常に完了しませんでした。",
+  "mobile.workspace.error.queueEditRejected": "ホストはこの編集を受け付けませんでした。",
+} as const satisfies PartialTranslation<typeof source>;

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { VoiceModelStatus, VoiceTranscriptionResult } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { VoiceModelService } from "./voice-model-service";
 
@@ -23,7 +24,7 @@ interface VoiceTranscriptionEvents {
  * without one, so this is the whole of voice on that platform: a stated limit, not a download that
  * spends half a gigabyte on a model nothing can read.
  */
-const RUNTIME_UNAVAILABLE_MESSAGE = "Local voice transcription is not available on this platform.";
+const RUNTIME_UNAVAILABLE_MESSAGE = sourceText("error.voice.runtimeUnavailable");
 
 interface VoiceTranscriptionServiceOptions {
   resourcesRoot: string;
@@ -62,13 +63,13 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   }
 
   async transcribe(audio: Uint8Array): Promise<VoiceTranscriptionResult> {
-    if (this.busy) throw new Error("A voice transcription is already in progress.");
+    if (this.busy) throw new Error(sourceText("error.voice.busy"));
     this.busy = true;
     let temporaryRoot: string | undefined;
     const modelStatus = await this.prepareModel();
     if (modelStatus.phase !== "ready") {
       this.busy = false;
-      throw new Error(modelStatus.message ?? "The voice model is unavailable.");
+      throw new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable"));
     }
     const model = this.model.modelPath;
     const startedAt = Date.now();
@@ -135,7 +136,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       });
       const timer = setTimeout(() => {
         child.kill();
-        rejectRun(new Error("Voice transcription timed out."));
+        rejectRun(new Error(sourceText("error.voice.transcriptionTimedOut")));
       }, TRANSCRIPTION_TIMEOUT_MS);
       child.once("error", (error) => {
         clearTimeout(timer);
@@ -153,16 +154,16 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
 function errorCategory(error: unknown): "unknown" | "runtime-unavailable" | "timeout" | "inference-failed" {
   if (!(error instanceof Error)) return "unknown";
   if (errorCode(error) === "ENOENT") return "runtime-unavailable";
-  if (error.message.includes("timed out")) return "timeout";
+  if (error.message === sourceText("error.voice.transcriptionTimedOut")) return "timeout";
   return "inference-failed";
 }
 
 function userFacingError(error: unknown): Error {
-  if (error instanceof Error && error.message.includes("timed out")) return error;
+  if (error instanceof Error && error.message === sourceText("error.voice.transcriptionTimedOut")) return error;
   if (error instanceof Error && errorCode(error) === "ENOENT") {
-    return new Error("Local voice transcription is unavailable. Run `bun run voice:prepare` and restart OpenBot.");
+    return new Error(sourceText("error.voice.prepareRequired"));
   }
-  return new Error("OpenBot could not transcribe this recording.");
+  return new Error(sourceText("error.voice.transcriptionFailed"));
 }
 
 function errorCode(error: Error): string | undefined {

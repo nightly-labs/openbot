@@ -6,7 +6,7 @@ import type {
   DirectThreadSummary,
   DirectTypingRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { usePlatform } from "../../platform";
@@ -194,7 +194,10 @@ const DirectMessages = createSimpleContext({
         }
       } catch (error) {
         if (!scopeIsCurrent() || request !== directConversationRequest) return;
-        if (!hasCached) setDirectConversationError(errorMessage(error, "The messages could not load."));
+        if (!hasCached) {
+          const text = currentText();
+          setDirectConversationError(text.errorMessage(error, text.t("conversation.direct.loadFailed")));
+        }
       } finally {
         if (scopeIsCurrent() && request === directConversationRequest) setDirectConversationLoading(false);
       }
@@ -232,9 +235,10 @@ const DirectMessages = createSimpleContext({
         });
         setDirectConversationPages((current) => ({ ...current, [memberId]: page.pageInfo }));
       } catch (error) {
+        const text = currentText();
         setDirectOlderErrors((current) => ({
           ...current,
-          [memberId]: errorMessage(error, "Older messages could not load."),
+          [memberId]: text.errorMessage(error, text.t("conversation.direct.olderFailed")),
         }));
       } finally {
         setDirectOlderLoading((current) => ({ ...current, [memberId]: false }));
@@ -254,9 +258,10 @@ const DirectMessages = createSimpleContext({
         setDirectConversationPages((current) => ({ ...current, [memberId]: page.pageInfo }));
       } catch (error) {
         if (request !== directConversationRequest || activeDirectMemberId() !== memberId) return;
+        const text = currentText();
         setDirectOlderErrors((current) => ({
           ...current,
-          [memberId]: errorMessage(error, "The unread message could not load."),
+          [memberId]: text.errorMessage(error, text.t("conversation.direct.unreadFailed")),
         }));
       }
     }
@@ -266,7 +271,7 @@ const DirectMessages = createSimpleContext({
       clientMessageId: string,
     ): Promise<{ message: DirectMessage; readError?: string }> {
       const memberId = activeDirectMemberId();
-      if (!memberId) throw new Error("Select a person first.");
+      if (!memberId) throw new Error(currentText().t("conversation.direct.noPerson"));
       const analytics = desktopAnalytics.scope();
       const serverKind = activeServer()?.kind ?? "unknown";
       let message: DirectMessage;
@@ -300,7 +305,8 @@ const DirectMessages = createSimpleContext({
       try {
         await markDirectMessagesRead(memberId, message.sequence);
       } catch (error) {
-        readError = errorMessage(error, "Could not mark messages as read.");
+        const text = currentText();
+        readError = text.errorMessage(error, text.t("conversation.direct.markReadFailed"));
       }
       await refreshDirectThreads();
       return { message, ...(readError ? { readError } : {}) };

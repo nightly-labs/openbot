@@ -4,6 +4,7 @@ import type {
   AgentImportPreviewChannel,
   AgentImportResult,
 } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
   Button,
   Checkbox,
@@ -22,8 +23,8 @@ import {
   Upload,
 } from "@openbot/ui";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import { formatFileSize } from "../conversation/AttachmentCards";
 
 /**
  * `idle`: the guide, before an export is chosen. `reading`: main is checking the chosen file.
@@ -40,6 +41,13 @@ export const AGENT_IMPORT_PROMPT = "Export my agents for OpenBot";
  * `skill`: create a new agent there and add the export skill by hand.
  */
 export type AgentImportSetup = "agent" | "skill";
+
+/** The name of the export agent on its Grok Bot page. */
+const EXPORT_AGENT_NAME = "OpenBot export";
+const EXPORT_SKILL_FILE = "SKILL.md";
+const EXPORT_SKILL_ID = "openbot-export";
+
+type CountKind = "agent" | "channel" | "skill" | "routine" | "memory" | "file";
 
 export interface AgentImportViewProps {
   phase: AgentImportPhase;
@@ -115,21 +123,19 @@ function ImportGuide(props: {
   onSaveExportSkill: () => void;
   onChoose: () => void;
 }) {
+  const { t, format, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
   return (
     <section class="agent-import-guide" aria-labelledby={headingId}>
       <header class="agent-import-intro">
         <h3 id={headingId} class="agent-import-heading">
-          Move your agents from Grok Bot
+          {t("import.guide.title")}
         </h3>
-        <p class="agent-import-lede">
-          An export agent in Grok Bot packs names, instructions, avatars, skills, routines, memories, and the files you
-          include into one .zip file.
-        </p>
+        <p class="agent-import-lede">{t("import.guide.lede")}</p>
       </header>
 
       <Show when={props.error}>
-        <ImportAlert title="The export could not be opened" description={props.error ?? ""} />
+        <ImportAlert title={t("import.guide.openFailed")} description={sourceText(props.error ?? "")} />
       </Show>
 
       <ol class="agent-import-steps">
@@ -138,54 +144,54 @@ function ImportGuide(props: {
             1
           </span>
           <div class="agent-import-step-body">
-            <p class="agent-import-step-title">Add the export agent to Grok Bot</p>
+            <p class="agent-import-step-title">{t("import.guide.step1")}</p>
             <SlidingTabs.Root
               class="agent-import-setup"
               value={props.setup}
               onChange={(value) => props.onSetupChange(value === "skill" ? "skill" : "agent")}
             >
-              <SlidingTabs.List aria-label="How to add the export agent">
-                <SlidingTabs.Trigger value="agent">Install the agent</SlidingTabs.Trigger>
-                <SlidingTabs.Trigger value="skill">Set it up yourself</SlidingTabs.Trigger>
+              <SlidingTabs.List aria-label={t("import.guide.setupLabel")}>
+                <SlidingTabs.Trigger value="agent">{t("import.guide.setupAgent")}</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="skill">{t("import.guide.setupSkill")}</SlidingTabs.Trigger>
               </SlidingTabs.List>
               <SlidingTabs.ContentSlot>
                 <SlidingTabs.Content value="agent" class="agent-import-setup-panel">
                   <div class="agent-import-card">
                     <AgentAvatar seed="openbot-export" class="storage-row-avatar" />
                     <span class="agent-import-card-copy">
-                      <span class="agent-import-card-name">OpenBot export</span>
-                      <span class="agent-import-card-meta">Grok Bot agent · has the export skill</span>
+                      <span class="agent-import-card-name">{EXPORT_AGENT_NAME}</span>
+                      <span class="agent-import-card-meta">{t("import.guide.agentMeta")}</span>
                     </span>
                     <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenExportAgent()}>
                       <ExternalLink aria-hidden="true" />
-                      Open the export agent
+                      {t("import.guide.openAgent")}
                     </Button>
                   </div>
-                  <p class="agent-import-step-note">
-                    Install the ready agent from its Grok Bot page. The export leaves it out.
-                  </p>
+                  <p class="agent-import-step-note">{t("import.guide.agentNote")}</p>
                 </SlidingTabs.Content>
                 <SlidingTabs.Content value="skill" class="agent-import-setup-panel">
                   <div class="agent-import-card">
                     <File class="agent-import-card-icon" aria-hidden="true" />
                     <span class="agent-import-card-copy">
-                      <span class="agent-import-card-name">SKILL.md</span>
+                      <span class="agent-import-card-name">{EXPORT_SKILL_FILE}</span>
                       <span class="agent-import-card-meta">
-                        openbot-export
+                        {EXPORT_SKILL_ID}
                         <Show when={props.exportSkill}>
-                          {(text) => <> · {formatFileSize(new TextEncoder().encode(text()).byteLength)}</>}
+                          {(text) => <> · {format.fileSize(new TextEncoder().encode(text()).byteLength)}</>}
                         </Show>
                       </span>
                     </span>
-                    <CopyButton value={props.exportSkill} label="Copy" copiedLabel="Skill copied" />
+                    <CopyButton
+                      value={props.exportSkill}
+                      label={t("common.copy")}
+                      copiedLabel={t("import.guide.skillCopied")}
+                    />
                     <Button type="button" variant="ghost" size="sm" onClick={() => props.onSaveExportSkill()}>
                       <Download aria-hidden="true" />
-                      Save file…
+                      {t("import.guide.saveFile")}
                     </Button>
                   </div>
-                  <p class="agent-import-step-note">
-                    Add this skill to a new agent in Grok Bot, used only for the export. The export leaves it out.
-                  </p>
+                  <p class="agent-import-step-note">{t("import.guide.skillNote")}</p>
                 </SlidingTabs.Content>
               </SlidingTabs.ContentSlot>
             </SlidingTabs.Root>
@@ -196,14 +202,17 @@ function ImportGuide(props: {
             2
           </span>
           <div class="agent-import-step-body">
-            <p class="agent-import-step-title">Send it this message</p>
+            <p class="agent-import-step-title">{t("import.guide.step2")}</p>
             <div class="agent-import-prompt">
               <span class="agent-import-prompt-text">{AGENT_IMPORT_PROMPT}</span>
-              <CopyButton iconOnly value={AGENT_IMPORT_PROMPT} label="Copy message" copiedLabel="Message copied" />
+              <CopyButton
+                iconOnly
+                value={AGENT_IMPORT_PROMPT}
+                label={t("import.guide.copyMessage")}
+                copiedLabel={t("import.guide.messageCopied")}
+              />
             </div>
-            <p class="agent-import-step-note">
-              It asks if it can include workspace files, then saves the .zip file to Downloads.
-            </p>
+            <p class="agent-import-step-note">{t("import.guide.messageNote")}</p>
           </div>
         </li>
         <li class="agent-import-step">
@@ -211,19 +220,19 @@ function ImportGuide(props: {
             3
           </span>
           <div class="agent-import-step-body">
-            <p class="agent-import-step-title">Choose the .zip file</p>
+            <p class="agent-import-step-title">{t("import.guide.step3")}</p>
             <Button
               type="button"
               variant="ghost"
               class="agent-import-picker"
               loading={props.reading}
-              loadingLabel="Reading the export…"
+              loadingLabel={t("import.guide.reading")}
               onClick={() => props.onChoose()}
             >
               <FolderOpen class="agent-import-picker-icon" aria-hidden="true" />
               <span class="agent-import-picker-copy">
-                <span class="agent-import-picker-title">Choose export file</span>
-                <span class="agent-import-picker-meta">You see its agents before anything changes.</span>
+                <span class="agent-import-picker-title">{t("import.guide.choose")}</span>
+                <span class="agent-import-picker-meta">{t("import.guide.chooseNote")}</span>
               </span>
             </Button>
           </div>
@@ -243,14 +252,20 @@ function ImportReview(props: {
   onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
 }) {
+  const { t, format, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const selected = createMemo(() => props.preview.agents.filter((agent) => !excluded().has(agent.key)));
   const fileBytes = () => props.preview.agents.reduce((total, agent) => total + agent.fileBytes, 0);
   const caption = () => {
     const parts: string[] = [];
-    if (props.preview.exportedAt) parts.push(`Exported ${formatDate(props.preview.exportedAt, props.now)}`);
-    parts.push(fileBytes() > 0 ? `${formatFileSize(fileBytes())} of files` : "No workspace files");
+    if (props.preview.exportedAt)
+      parts.push(t("import.review.exported", { date: formatDate(props.preview.exportedAt, format, props.now) }));
+    parts.push(
+      fileBytes() > 0
+        ? t("import.review.fileSize", { size: format.fileSize(fileBytes()) })
+        : t("import.review.noFiles"),
+    );
     return parts.join(" · ");
   };
   const toggle = (key: string, include: boolean) => {
@@ -276,8 +291,11 @@ function ImportReview(props: {
   };
   const importLabel = () =>
     selectedChannels().length > 0
-      ? `Import ${countLabel(selected().length, "agent")} and ${countLabel(selectedChannels().length, "channel")}`
-      : `Import ${countLabel(selected().length, "agent")}`;
+      ? t("import.review.importBoth", {
+          agents: countLabel(selected().length, "agent", t),
+          channels: countLabel(selectedChannels().length, "channel", t),
+        })
+      : t("import.review.importAgents", { agents: countLabel(selected().length, "agent", t) });
 
   return (
     <>
@@ -285,9 +303,9 @@ function ImportReview(props: {
         <div class="storage-summary-heading">
           <div>
             <h3 id={`${headingId}-summary`} class="storage-summary-label">
-              {sourceLabel(props.preview.sourceApp)} export
+              {t("import.review.title", { source: sourceLabel(props.preview.sourceApp) })}
             </h3>
-            <p class="storage-summary-total">{countLabel(props.preview.agents.length, "agent")}</p>
+            <p class="storage-summary-total">{countLabel(props.preview.agents.length, "agent", t)}</p>
             <p class="storage-summary-caption">{caption()}</p>
           </div>
           <Button
@@ -296,29 +314,29 @@ function ImportReview(props: {
             variant="secondary"
             disabled={props.importing}
             loading={props.reading}
-            loadingLabel="Reading…"
+            loadingLabel={t("import.review.reading")}
             onClick={() => props.onChoose()}
           >
             <Upload class="files-button-icon" aria-hidden="true" />
-            Choose another
+            {t("import.review.chooseAnother")}
           </Button>
         </div>
       </section>
 
       <Show when={props.error}>
-        <ImportAlert title="The import did not start" description={props.error ?? ""} />
+        <ImportAlert title={t("import.review.startFailed")} description={sourceText(props.error ?? "")} />
       </Show>
       <Show when={props.preview.warnings.length > 0}>
-        <ImportNotes title="Some items will not move" notes={props.preview.warnings} />
+        <ImportNotes title={t("import.review.warnings")} notes={props.preview.warnings} />
       </Show>
 
       <section class="storage-section" aria-labelledby={`${headingId}-agents`}>
         <div class="storage-section-heading-row">
           <h3 id={`${headingId}-agents`} class="storage-section-heading">
-            Agents
+            {t("import.review.agents")}
           </h3>
           <span class="storage-section-aside">
-            {selected().length} of {props.preview.agents.length} selected
+            {t("import.review.selected", { selected: selected().length, total: props.preview.agents.length })}
           </span>
         </div>
         <ul class="storage-rows">
@@ -330,7 +348,7 @@ function ImportReview(props: {
                     id={`${headingId}-agent-${agent.key}`}
                     checked={!excluded().has(agent.key)}
                     disabled={props.importing}
-                    aria-label={`Import ${agent.name}`}
+                    aria-label={t("import.review.importItem", { name: agent.name })}
                     onChange={(event) => toggle(agent.key, event.currentTarget.checked)}
                   />
                   <AgentAvatar seed={agent.key} url={agent.avatarUrl} class="storage-row-avatar" />
@@ -341,10 +359,10 @@ function ImportReview(props: {
                         <NameExistsHint name={agent.name} />
                       </Show>
                     </span>
-                    <span class="storage-row-meta">{contentsLabel(agent)}</span>
+                    <span class="storage-row-meta">{contentsLabel(agent, t)}</span>
                   </span>
                   <Show when={agent.fileBytes > 0}>
-                    <span class="storage-row-size">{formatFileSize(agent.fileBytes)}</span>
+                    <span class="storage-row-size">{format.fileSize(agent.fileBytes)}</span>
                   </Show>
                 </label>
               </li>
@@ -357,10 +375,13 @@ function ImportReview(props: {
         <section class="storage-section" aria-labelledby={`${headingId}-channels`}>
           <div class="storage-section-heading-row">
             <h3 id={`${headingId}-channels`} class="storage-section-heading">
-              Channels
+              {t("import.review.channels")}
             </h3>
             <span class="storage-section-aside">
-              {selectedChannels().length} of {props.preview.channels.length} selected
+              {t("import.review.selected", {
+                selected: selectedChannels().length,
+                total: props.preview.channels.length,
+              })}
             </span>
           </div>
           <ul class="storage-rows">
@@ -372,7 +393,7 @@ function ImportReview(props: {
                       id={`${headingId}-channel-${channel.key}`}
                       checked={importable(channel) && !excludedChannels().has(channel.key)}
                       disabled={props.importing || !importable(channel)}
-                      aria-label={`Import ${channel.name}`}
+                      aria-label={t("import.review.importItem", { name: channel.name })}
                       onChange={(event) => toggleChannel(channel.key, event.currentTarget.checked)}
                     />
                     <span class="agent-import-members" aria-hidden="true">
@@ -388,7 +409,7 @@ function ImportReview(props: {
                     </span>
                     <span class="storage-row-copy">
                       <span class="storage-row-title">{channel.name}</span>
-                      <span class="storage-row-meta">{channelContentsLabel(channel)}</span>
+                      <span class="storage-row-meta">{channelContentsLabel(channel, t)}</span>
                       <ChannelMemberNote
                         channel={channel}
                         selectedMembers={selectedMembers(channel)}
@@ -405,13 +426,13 @@ function ImportReview(props: {
 
       <div class="agent-import-actions">
         <Button type="button" variant="ghost" disabled={props.importing} onClick={() => props.onCancel()}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           type="button"
           disabled={selected().length === 0 || props.reading}
           loading={props.importing}
-          loadingLabel="Importing…"
+          loadingLabel={t("import.review.importing")}
           onClick={() =>
             props.onImport(
               selected().map((agent) => agent.key),
@@ -432,6 +453,7 @@ function ChannelMemberNote(props: {
   selectedMembers: string[];
   agentsByKey: ReadonlyMap<string, AgentImportPreviewAgent>;
 }) {
+  const { t } = useText();
   const missing = () =>
     props.channel.memberKeys
       .filter((key) => !props.selectedMembers.includes(key))
@@ -440,8 +462,8 @@ function ChannelMemberNote(props: {
     <Show when={missing().length > 0}>
       <span class="agent-import-row-note">
         {props.selectedMembers.length === 0
-          ? "Select at least one of its agents to import it."
-          : `Imports without ${missing().join(", ")}.`}
+          ? t("import.review.channelNeedsMember")
+          : t("import.review.channelWithout", { names: missing().join(", ") })}
       </span>
     </Show>
   );
@@ -449,7 +471,8 @@ function ChannelMemberNote(props: {
 
 /** A second agent with a name already on this server is allowed; the hint says so before import. */
 function NameExistsHint(props: { name: string }) {
-  const text = () => `An agent named ${props.name} already exists. The import adds another one.`;
+  const { t } = useText();
+  const text = () => t("import.review.nameExists", { name: props.name });
   return (
     <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
       <Tooltip.Trigger as="span" tabindex={0} class="agent-import-name-hint" aria-label={text()}>
@@ -467,38 +490,42 @@ function ImportResult(props: {
   onOpenAgent: (agentId: string) => void;
   onDone: () => void;
 }) {
+  const { t, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
   const notImported = () => props.result.skipped.length + props.result.skippedChannels.length;
-  const notImportedLabel = () =>
-    [
-      props.result.skipped.length > 0 ? countLabel(props.result.skipped.length, "agent") : null,
-      props.result.skippedChannels.length > 0 ? countLabel(props.result.skippedChannels.length, "channel") : null,
-    ]
-      .filter(Boolean)
-      .join(" and ");
+  const notImportedLabel = () => {
+    const agents = countLabel(props.result.skipped.length, "agent", t);
+    const channels = countLabel(props.result.skippedChannels.length, "channel", t);
+    if (props.result.skipped.length > 0 && props.result.skippedChannels.length > 0)
+      return t("import.result.notImportedBoth", { agents, channels });
+    return t("import.result.notImported", { items: props.result.skipped.length > 0 ? agents : channels });
+  };
   return (
     <>
       <section class="storage-summary" aria-labelledby={`${headingId}-summary`}>
         <h3 id={`${headingId}-summary`} class="storage-summary-label">
-          Import finished
+          {t("import.result.title")}
         </h3>
         <p class="storage-summary-total agent-import-done">
           <Show when={props.result.agents.length > 0}>
             <CircleCheck class="agent-import-done-icon" aria-hidden="true" />
           </Show>
           {props.result.channels.length > 0
-            ? `${countLabel(props.result.agents.length, "agent")} and ${countLabel(props.result.channels.length, "channel")} imported`
-            : `${countLabel(props.result.agents.length, "agent")} imported`}
+            ? t("import.result.importedBoth", {
+                agents: countLabel(props.result.agents.length, "agent", t),
+                channels: countLabel(props.result.channels.length, "channel", t),
+              })
+            : t("import.result.importedAgents", { agents: countLabel(props.result.agents.length, "agent", t) })}
         </p>
         <Show when={notImported() > 0}>
-          <p class="storage-summary-caption">{notImportedLabel()} did not import.</p>
+          <p class="storage-summary-caption">{notImportedLabel()}</p>
         </Show>
       </section>
 
       <Show when={props.result.agents.length + props.result.channels.length > 0}>
         <section class="storage-section" aria-labelledby={`${headingId}-imported`}>
           <h3 id={`${headingId}-imported`} class="storage-section-heading">
-            Imported
+            {t("import.result.imported")}
           </h3>
           <ul class="storage-rows">
             <For each={props.result.agents}>
@@ -508,7 +535,7 @@ function ImportResult(props: {
                     type="button"
                     variant="ghost"
                     class="storage-row"
-                    aria-label={`Open ${agent.name}`}
+                    aria-label={t("import.result.open", { name: agent.name })}
                     onClick={() => props.onOpenAgent(agent.id)}
                   >
                     <AgentAvatar agent={agent} class="storage-row-avatar" />
@@ -529,7 +556,7 @@ function ImportResult(props: {
                   <Hash class="agent-import-channel-icon" aria-hidden="true" />
                   <span class="storage-row-copy">
                     <span class="storage-row-title">{channel.name}</span>
-                    <span class="storage-row-meta">Channel</span>
+                    <span class="storage-row-meta">{t("import.result.channel")}</span>
                   </span>
                 </li>
               )}
@@ -541,7 +568,7 @@ function ImportResult(props: {
       <Show when={notImported() > 0}>
         <section class="storage-section" aria-labelledby={`${headingId}-skipped`}>
           <h3 id={`${headingId}-skipped`} class="storage-section-heading">
-            Not imported
+            {t("import.result.notImportedTitle")}
           </h3>
           <ul class="storage-rows">
             <For each={[...props.result.skipped, ...props.result.skippedChannels]}>
@@ -550,7 +577,7 @@ function ImportResult(props: {
                   <TriangleAlert class="storage-message-icon agent-import-skipped-icon" aria-hidden="true" />
                   <span class="storage-row-copy">
                     <span class="storage-row-title">{entry.name}</span>
-                    <span class="agent-import-row-note">{entry.reason}</span>
+                    <span class="agent-import-row-note">{sourceText(entry.reason)}</span>
                   </span>
                 </li>
               )}
@@ -560,12 +587,12 @@ function ImportResult(props: {
       </Show>
 
       <Show when={props.result.warnings.length > 0}>
-        <ImportNotes title="Some items did not move" notes={props.result.warnings} />
+        <ImportNotes title={t("import.result.warnings")} notes={props.result.warnings} />
       </Show>
 
       <div class="agent-import-actions">
         <Button type="button" variant="secondary" onClick={() => props.onDone()}>
-          Done
+          {t("common.done")}
         </Button>
       </div>
     </>
@@ -585,48 +612,64 @@ function ImportAlert(props: { title: string; description: string }) {
 }
 
 function ImportNotes(props: { title: string; notes: readonly string[] }) {
+  const { sourceText } = useText();
   return (
     <div class="storage-message">
       <TriangleAlert class="storage-message-icon" aria-hidden="true" />
       <div>
         <p class="storage-message-title">{props.title}</p>
         <ul class="agent-import-notes">
-          <For each={props.notes}>{(note) => <li class="storage-message-description">{note}</li>}</For>
+          <For each={props.notes}>{(note) => <li class="storage-message-description">{sourceText(note)}</li>}</For>
         </ul>
       </div>
     </div>
   );
 }
 
-function contentsLabel(agent: AgentImportPreviewAgent): string {
+function contentsLabel(agent: AgentImportPreviewAgent, t: AppTranslate): string {
   const parts = [
-    countLabel(agent.skillCount, "skill"),
-    countLabel(agent.routineCount, "routine"),
-    countLabel(agent.memoryCount, "memory", "memories"),
+    countLabel(agent.skillCount, "skill", t),
+    countLabel(agent.routineCount, "routine", t),
+    countLabel(agent.memoryCount, "memory", t),
   ];
-  if (agent.fileCount > 0) parts.push(countLabel(agent.fileCount, "file"));
+  if (agent.fileCount > 0) parts.push(countLabel(agent.fileCount, "file", t));
   return parts.join(" · ");
 }
 
-function channelContentsLabel(channel: AgentImportPreviewChannel): string {
+function channelContentsLabel(channel: AgentImportPreviewChannel, t: AppTranslate): string {
   return [
-    countLabel(channel.memberKeys.length, "agent"),
-    countLabel(channel.routineCount, "routine"),
-    countLabel(channel.memoryCount, "memory", "memories"),
+    countLabel(channel.memberKeys.length, "agent", t),
+    countLabel(channel.routineCount, "routine", t),
+    countLabel(channel.memoryCount, "memory", t),
   ].join(" · ");
 }
 
-function countLabel(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+function countLabel(count: number, kind: CountKind, t: AppTranslate): string {
+  switch (kind) {
+    case "agent":
+      return t("import.count.agent", { count });
+    case "channel":
+      return t("import.count.channel", { count });
+    case "skill":
+      return t("import.count.skill", { count });
+    case "routine":
+      return t("import.count.routine", { count });
+    case "memory":
+      return t("import.count.memory", { count });
+    case "file":
+      return t("import.count.file", { count });
+  }
 }
 
 function sourceLabel(app: string): string {
   return app === "grok-bot" ? "Grok Bot" : app;
 }
 
-function formatDate(value: string, now = new Date()): string {
+function formatDate(value: string, format: AppFormat, now = new Date()): string {
   const date = new Date(value);
-  return date.toLocaleDateString(undefined, {
+  // Intl throws on an invalid date, where `toLocaleDateString` returns text.
+  if (Number.isNaN(date.getTime())) return value;
+  return format.date(date, {
     day: "numeric",
     month: "short",
     ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),

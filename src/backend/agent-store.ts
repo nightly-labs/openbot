@@ -46,18 +46,21 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 
-type StoredAgent = AgentSummary & { access: AgentAccess };
-type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access"> & {
+type StoredAgent = AgentSummary & { access: AgentAccess; computerUse: boolean };
+type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access" | "computerUse"> & {
   avatarUrl?: string | null;
   provider?: AgentProviderId;
   // Absent on every agent stored before the setting existed, which keeps the access it always had.
   access?: AgentAccess;
+  // Absent on every agent stored before the setting existed, which keeps Computer Use on.
+  computerUse?: boolean;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -254,7 +257,7 @@ export class AgentStore {
     profileOperationId?: string,
   ): Promise<AgentSummary> {
     if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
+      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
     }
     const name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
     const description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
@@ -295,7 +298,7 @@ export class AgentStore {
       throw new Error("This agent duplication operation is already committed.");
     }
     if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
+      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
     }
     const source = this.#requireAgent(sourceId);
     const sourceProfileSignature = duplicationProfileSignature(source);
@@ -314,6 +317,7 @@ export class AgentStore {
     record.model = source.model;
     record.reasoningEffort = source.reasoningEffort;
     record.access = source.access;
+    record.computerUse = source.computerUse;
     record.avatarSeed = source.avatarSeed;
     record.avatarHue = source.avatarHue;
 
@@ -348,11 +352,11 @@ export class AgentStore {
         (stagedAvatarPath ? await fileFingerprint(stagedAvatarPath) : null) !== sourceAvatarSignature ||
         (sourceAvatar ? await fileFingerprint(sourceAvatar.path) : null) !== sourceAvatarSignature
       ) {
-        throw new Error("The agent changed while it was being duplicated. Try again.");
+        throw new Error(sourceText("error.agent.changedWhileDuplicating"));
       }
       await rewriteInternalWorkspaceSymlinks(source.workspacePath, stagedWorkspace, record.workspacePath);
       if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-        throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
+        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
       }
       record.name = duplicateAgentName(source.name, this.#state.agents);
       await rename(stagedWorkspace, record.workspacePath);
@@ -400,7 +404,7 @@ export class AgentStore {
       throw new Error("The agent duplication receipt is invalid.");
     }
     const agent = this.#state.agents.find((candidate) => candidate.id === resultAgent.id);
-    if (!agent) throw new Error("The duplicated agent no longer exists.");
+    if (!agent) throw new Error(sourceText("error.agent.duplicatedAgentGone"));
     return {
       agent: { ...agent },
       layout: structuredClone(resultLayout),
@@ -532,6 +536,10 @@ export class AgentStore {
       if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
       next.access = input.access;
     }
+    if (input.computerUse !== undefined) {
+      if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
+      next.computerUse = input.computerUse;
+    }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
       next.avatarSeed = input.avatarSeed;
@@ -588,7 +596,7 @@ export class AgentStore {
       return { ...agent };
     }
     if (!isValidAvatarImage(image.mimeType, image.bytes)) {
-      throw new Error("Choose a valid PNG, JPEG, or WebP image up to 512 KB.");
+      throw new Error(sourceText("error.team.logoInvalid"));
     }
     const version = randomUUID();
     const extension = avatarFileExtension(image.mimeType);
@@ -678,7 +686,7 @@ export class AgentStore {
       return { ...existing };
     }
     if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-      throw new Error(`A host can have up to ${INPUT_LIMITS.agents} agents.`);
+      throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
     }
 
     const record = this.#createRecord(id, name ?? titleFromId(id), title ?? "Local teammate");
@@ -1037,10 +1045,10 @@ export class AgentStore {
       const parsed = JSON.parse(await readFile(this.#statePath, "utf8"));
       const stored = isRecord(parsed) ? parsed[LEGACY_AGENTS_STATE_KEY] : null;
       if (!isRecord(parsed) || !isBoolean(parsed.examplesInitialized) || !Array.isArray(stored)) {
-        throw new Error("Agent state is corrupt or from a newer OpenBot version; refusing to overwrite it.");
+        throw new Error(sourceText("error.agent.stateCorrupt"));
       }
       if (stored.some((agent) => isRecord(agent) && "role" in agent)) {
-        throw new Error("Stored agent profiles use the old role field; update the data before starting OpenBot.");
+        throw new Error(sourceText("error.agent.oldRoleField"));
       }
 
       let agents: StoredAgent[];
@@ -1049,10 +1057,10 @@ export class AgentStore {
       } else if (parsed.version === 2 && stored.every(isStoredAgent)) {
         agents = stored.map(normalizeStoredAgent);
       } else {
-        throw new Error("Agent state is corrupt or from a newer OpenBot version; refusing to overwrite it.");
+        throw new Error(sourceText("error.agent.stateCorrupt"));
       }
       if (new Set(agents.map((agent) => agent.id)).size !== agents.length) {
-        throw new Error("Agent state contains duplicate agent ids; refusing to overwrite it.");
+        throw new Error(sourceText("error.agent.duplicateIds"));
       }
       return { version: 2, examplesInitialized: parsed.examplesInitialized, agents };
     } catch (error) {
@@ -1124,6 +1132,7 @@ export class AgentStore {
       model: DEFAULT_AGENT_MODEL,
       reasoningEffort: DEFAULT_REASONING_EFFORT,
       access: DEFAULT_AGENT_ACCESS,
+      computerUse: true,
       threadId: null,
       workspacePath: join(this.#agentsRoot, id),
       preview: NEW_AGENT_PREVIEW,
@@ -1136,7 +1145,7 @@ export class AgentStore {
 
   #requireAgent(id: string): StoredAgent {
     const agent = this.#state.agents.find((candidate) => candidate.id === id);
-    if (!agent) throw new Error(`Unknown agent: ${id}`);
+    if (!agent) throw new Error(sourceText("error.agent.unknown", { id }));
     return agent;
   }
 }
@@ -1163,7 +1172,7 @@ function duplicateAgentName(sourceName: string, agents: readonly StoredAgent[]):
     const candidate = `${base.slice(0, Math.max(1, INPUT_LIMITS.agentName - suffix.length)).trimEnd()}${suffix}`;
     if (!existing.has(candidate.toLocaleLowerCase())) return candidate;
   }
-  throw new Error("OpenBot could not create a unique agent copy name.");
+  throw new Error(sourceText("error.agent.copyNameFailed"));
 }
 
 /**
@@ -1331,6 +1340,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
   return (
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
     (record.access === undefined || isAgentAccess(record.access)) &&
+    (record.computerUse === undefined || isBoolean(record.computerUse)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1383,6 +1393,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
   const access =
     value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
+  const computerUse =
+    value.computerUse === undefined || isBoolean(value.computerUse) ? value.computerUse : reset("computerUse", true);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1413,6 +1425,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
+    ...(computerUse === undefined ? {} : { computerUse }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };
@@ -1426,8 +1439,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
  * this string reaches a dialog, a log and any diagnostics export.
  */
 function unreadableProfileMessage({ unreadable, id }: UnreadableStoredAgent): string {
-  const subject = id === null ? "A stored agent profile" : `Stored agent profile ${id}`;
-  return `${subject} has an unreadable "${unreadable}" value; update the data before starting OpenBot.`;
+  if (id === null) return sourceText("error.agent.storedProfileUnreadable", { field: unreadable });
+  return sourceText("error.agent.storedProfileUnreadableId", { id, field: unreadable });
 }
 
 function isMarketplaceSource(value: unknown): boolean {
@@ -1471,6 +1484,7 @@ function migrateLegacyAgent(agent: LegacyStoredAgent): StoredAgent {
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
     access: DEFAULT_AGENT_ACCESS,
+    computerUse: true,
     threadId: agent.threadId,
     workspacePath: agent.workspacePath,
     preview: agent.preview,
@@ -1486,6 +1500,7 @@ function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {
     ...agent,
     provider: agent.provider ?? providerForLegacyModel(agent.model),
     access: agent.access ?? DEFAULT_AGENT_ACCESS,
+    computerUse: agent.computerUse ?? true,
     avatarUrl: isString(agent.avatarUrl) && parseAgentAvatarUrl(agent.avatarUrl, agent.id) ? agent.avatarUrl : null,
     ...(agent.marketplaceSource === undefined
       ? {}

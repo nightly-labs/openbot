@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
+import { useText } from "../../text";
 
 export type DataTableAlignment = "left" | "center" | "right";
 
@@ -31,8 +32,9 @@ export interface MessageCodeBlock {
 export type MessageContentBlock = ComparisonTableBlock | DataTableBlock | MessageCodeBlock | MessageTextBlock;
 
 export function DataTable(props: { table: DataTableBlock; renderCell?: (text: string) => JSX.Element }) {
+  const { t } = useText();
   return (
-    <section class="message-data-table-scroll" aria-label="Data table" tabindex="0">
+    <section class="message-data-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
       <table class="message-data-table" style={`--message-data-table-columns: ${props.table.headers.length}`}>
         <thead>
           <tr>

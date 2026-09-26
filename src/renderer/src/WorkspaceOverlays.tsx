@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, Loading, Show } from "solid-js";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
@@ -97,7 +98,8 @@ function PermissionsReview(props: AccountProps) {
  * Skills and marketplace agents, which install into an Agent's workspace on the host. The picker
  * lists the agents of this computer, or of a joined server this account administers; a member
  * browses and installs nothing. A marketplace agent is added to that joined server when its host
- * serves `agent-install-v1`, otherwise to this computer.
+ * serves `agent-install-v1`, otherwise to this computer. An agent of a joined server is updated from
+ * its listing only when its host serves `agent-update-v1`.
  */
 function SkillsMarketplace() {
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
@@ -130,6 +132,7 @@ function SkillsMarketplace() {
           activeAgentId={manage() ? (activeAgent()?.id ?? "") : ""}
           hostServerId={hostServerId()}
           agentServerId={agentServerId()}
+          agentUpdateServerId={remoteAdminServer(activeServer(), "agent-update-v1")?.id}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -296,8 +299,8 @@ function ServerSettings() {
       hostName:
         server.kind === "local"
           ? platform.appInfo()?.platform === "darwin"
-            ? "This Mac"
-            : "This computer"
+            ? currentText().t("app.host.thisMac")
+            : currentText().t("app.host.thisComputer")
           : server.name,
       canManage: canManageStorage(server),
       onOpenAgent: (agentId) => openOnServer(server, agentId, () => selectAgent(agentId)),

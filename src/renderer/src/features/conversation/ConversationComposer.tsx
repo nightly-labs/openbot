@@ -17,13 +17,14 @@ import {
   Plus,
   Puzzle,
 } from "@openbot/ui";
-import { fileBadge, formatFileSize } from "@openbot/ui/features/conversation/AttachmentCards";
+import { fileBadge } from "@openbot/ui/features/conversation/AttachmentCards";
 import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { CloseIcon, MoreIcon, StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show } from "solid-js";
 import { useConversationViewScope } from "./conversation-scope";
 import { formatVoiceDuration, voiceButtonLabel, voiceSupported } from "./voice-status";
@@ -72,6 +73,11 @@ export function ConversationComposer() {
     voicePhase,
     voiceModelProgress,
   } = useConversationViewScope();
+  const { t, format } = useText();
+  const messageLabel = () =>
+    props.agent?.name
+      ? t("composer.placeholder.message", { name: props.agent.name })
+      : t("composer.placeholder.messageAgent");
   const [pickerOpen, setPickerOpen] = createSignal(false);
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
@@ -170,10 +176,10 @@ export function ConversationComposer() {
           {(message) => (
             <div class="composer-reply-preview">
               <div>
-                <span>Replying to {message().author === "you" ? "your message" : "Agent"}</span>
+                <span>{t(message().author === "you" ? "composer.reply.toYou" : "composer.reply.toAgent")}</span>
                 <p>
                   <RichMessageText
-                    body={message().body || "Attachment"}
+                    body={message().body || t("composer.reply.attachment")}
                     agents={props.agents}
                     skills={installedSkills()}
                     attachments={message().attachments}
@@ -186,7 +192,7 @@ export function ConversationComposer() {
               <Button
                 variant="ghost"
                 type="button"
-                aria-label="Cancel reply"
+                aria-label={t("composer.reply.cancel")}
                 disabled={voicePhase() === "transcribing"}
                 onClick={() => updateCurrentDraft({ replyToMessageId: null })}
               >
@@ -248,11 +254,11 @@ export function ConversationComposer() {
                     <Show when={attachment.kind === "file"}>
                       <span class="composer-attachment-copy">
                         <strong title={attachment.name}>{attachment.name}</strong>
-                        <small>{formatFileSize(attachment.size)}</small>
+                        <small>{format.fileSize(attachment.size)}</small>
                       </span>
                     </Show>
                     <ImageRemoveButton
-                      label={`Remove ${attachment.name}`}
+                      label={t("composer.attachment.remove", { name: attachment.name })}
                       disabled={voicePhase() === "transcribing" || savePending()}
                       onClick={() => removeAttachment(attachment.id)}
                     />
@@ -276,14 +282,14 @@ export function ConversationComposer() {
                 !agentReady()
                   ? props.runtime
                     ? props.server?.state === "online"
-                      ? "Complete provider setup on your host to start"
-                      : "Connect to your host to start"
-                    : "Complete agent CLI setup to start"
+                      ? t("composer.placeholder.hostSetup")
+                      : t("composer.placeholder.connectHost")
+                    : t("composer.placeholder.cliSetup")
                   : replyTarget()
-                    ? "Reply…"
-                    : `Message ${props.agent?.name ?? "agent"}`
+                    ? t("composer.placeholder.reply")
+                    : messageLabel()
               }
-              ariaLabel={`Message ${props.agent?.name ?? "agent"}`}
+              ariaLabel={messageLabel()}
               focusRequest={composerFocusRequest()}
               onValueChange={(text) => {
                 updateCurrentDraft({ text });
@@ -334,7 +340,7 @@ export function ConversationComposer() {
             >
               <DropdownMenu.Trigger
                 class="composer-button"
-                aria-label="Add to prompt"
+                aria-label={t("composer.add.label")}
                 disabled={
                   attachmentBusy() ||
                   submitting() ||
@@ -347,7 +353,7 @@ export function ConversationComposer() {
                 <Plus aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content aria-label="Add to prompt">
+                <DropdownMenu.Content aria-label={t("composer.add.label")}>
                   <DropdownMenu.Item
                     disabled={attachmentBusy()}
                     onPointerDown={(event) => {
@@ -356,11 +362,11 @@ export function ConversationComposer() {
                     onKeyDown={(event) => openAttachmentPickerFromKey(event, "images")}
                   >
                     <Image aria-hidden="true" />
-                    <span>Attach image</span>
+                    <span>{t("composer.add.image")}</span>
                   </DropdownMenu.Item>
-                  <DropdownMenu.Item disabled title="Skill selection is not available yet.">
+                  <DropdownMenu.Item disabled title={t("composer.add.skillUnavailable")}>
                     <Puzzle aria-hidden="true" />
-                    <span>Use a skill</span>
+                    <span>{t("composer.add.skill")}</span>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     disabled={attachmentBusy()}
@@ -370,7 +376,7 @@ export function ConversationComposer() {
                     onKeyDown={(event) => openAttachmentPickerFromKey(event, "all")}
                   >
                     <File aria-hidden="true" />
-                    <span>Add context</span>
+                    <span>{t("composer.add.context")}</span>
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
@@ -379,14 +385,14 @@ export function ConversationComposer() {
               <Show when={attachmentBusy() && props.runtime?.cancelImportFiles} keyed>
                 {(cancelImportFiles) => (
                   <Button variant="ghost" type="button" onClick={() => void cancelImportFiles()}>
-                    Cancel upload
+                    {t("composer.upload.cancel")}
                   </Button>
                 )}
               </Show>
               <Show when={voiceAvailable()}>
                 <Show when={voicePhase() === "preparing"}>
                   <span class="voice-model-progress" role="status">
-                    Downloading voice model {voiceModelProgress() ?? 0}%
+                    {t("composer.voice.progress", { progress: voiceModelProgress() ?? 0 })}
                   </span>
                 </Show>
                 <Show
@@ -396,7 +402,7 @@ export function ConversationComposer() {
                       variant="ghost"
                       type="button"
                       class="dictation-button"
-                      aria-label={voiceButtonLabel(voicePhase())}
+                      aria-label={t(voiceButtonLabel(voicePhase()))}
                       disabled={
                         voicePhase() === "requesting" ||
                         voicePhase() === "preparing" ||
@@ -418,12 +424,12 @@ export function ConversationComposer() {
                     </Button>
                   }
                 >
-                  <fieldset class="voice-recording-status" aria-label="Voice recording">
+                  <fieldset class="voice-recording-status" aria-label={t("composer.voice.recording")}>
                     <Button
                       variant="ghost"
                       type="button"
                       class="voice-recording-stop"
-                      aria-label="Stop voice recording"
+                      aria-label={t("composer.voice.stop")}
                       onClick={stopVoiceRecording}
                     >
                       <StopIcon />
@@ -446,10 +452,10 @@ export function ConversationComposer() {
                     class="voice-button"
                     aria-label={
                       editingDeliveryId()
-                        ? "Save queued message"
+                        ? t("composer.send.saveQueued")
                         : voicePhase() === "recording"
-                          ? "Send voice message"
-                          : "Send message"
+                          ? t("composer.send.voice")
+                          : t("composer.send.message")
                     }
                     disabled={
                       attachmentBusy() ||
@@ -472,7 +478,7 @@ export function ConversationComposer() {
                   variant="ghost"
                   type="button"
                   class="voice-button voice-button-active"
-                  aria-label="Stop agent"
+                  aria-label={t("composer.send.stop")}
                   onClick={props.onStop}
                 >
                   <StopIcon />
