@@ -15,7 +15,7 @@ import { OWNERSHIP_MARKER } from "./managed-skill-service";
  * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide and
  * the skill paths in Google's Antigravity ACP server.
  */
-const PROVIDER_SKILL_FOLDERS: Record<AgentProviderId, readonly string[]> = {
+const PROVIDER_SKILL_FOLDERS: Record<AgentProviderId, readonly [string, ...string[]]> = {
   codex: [".agents/skills"],
   claude: [".claude/skills"],
   grok: [".agents/skills"],
@@ -48,7 +48,11 @@ export async function listFolderSkills(
         ? skill
         : {
             ...skill,
-            problem: `${agentProviderCliName(agent.provider)} does not read ${folder}. Copy this folder to ${reads[0]}.`,
+            problem: sourceText("error.skill.folderNotRead", {
+              provider: agentProviderCliName(agent.provider),
+              folder,
+              target: reads[0],
+            }),
           },
     );
   }

@@ -229,10 +229,10 @@ export function openAttachmentForServer(
         await writeFile(filePath, downloaded.bytes, { mode: 0o600 });
         return;
       }
-      const cacheRoot = join(app.getPath("userData"), "remote-attachments");
-      await mkdir(cacheRoot, { recursive: true });
-      const cached = join(cacheRoot, `${input.attachmentId}-${suggestedName}`);
-      await writeFile(cached, downloaded.bytes, { mode: 0o600 });
+      const cached = await cacheRemoteFile("remote-attachments", `${target}:${input.attachmentId}`, {
+        name: suggestedName,
+        bytes: downloaded.bytes,
+      });
       if (input.action === "reveal") shell.showItemInFolder(cached);
       else await openPath(cached);
     },

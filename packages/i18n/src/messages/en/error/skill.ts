@@ -54,4 +54,5 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localSourceNotFolder": "Skill source must be a folder.",
   "error.skill.localMissingSkillFile": "The skill folder needs SKILL.md at its root.",
   "error.skill.pathSymlink": "Skill paths cannot contain symbolic links.",
+  "error.skill.folderNotRead": "{provider} does not read {folder}. Copy this folder to {target}.",
 });
