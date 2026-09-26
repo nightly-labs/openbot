@@ -10,11 +10,13 @@ export interface AgentsPort {
     | "createAgent"
     | "deleteAgent"
     | "duplicateAgent"
+    | "getAgentAdminSettings"
     | "listConversationReads"
     | "listModels"
     | "onEvent"
     | "setAvatar"
     | "updateAgent"
+    | "updateAgentAdminSettings"
   >;
 }
 

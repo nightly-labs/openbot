@@ -11,13 +11,12 @@ import { canManageStorage, serverHasStorage } from "./features/files/storage-usa
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
-import { serverSupportsCapability } from "./features/servers/server-capabilities";
+import { remoteAdminServer, serverCanAdminister } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
 import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
-import { providerKeyApi } from "./features/settings/provider-key-api";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import {
@@ -95,8 +94,10 @@ function PermissionsReview(props: AccountProps) {
 }
 
 /**
- * Skills and marketplace agents, which install into an Agent's workspace on this
- * machine, so the picker is empty for a remote server.
+ * Skills and marketplace agents, which install into an Agent's workspace on the host. The picker
+ * lists the agents of this computer, or of a joined server this account administers; a member
+ * browses and installs nothing. A marketplace agent is added to that joined server when its host
+ * serves `agent-install-v1`, otherwise to this computer.
  */
 function SkillsMarketplace() {
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
@@ -105,11 +106,13 @@ function SkillsMarketplace() {
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const local = createMemo(() => activeServer()?.kind === "local");
-  /* What both example controls need: a local agent whose composer is free to take another line. */
+  const manage = createMemo(() => serverCanAdminister(activeServer(), "skills-admin-v1"));
+  const hostServerId = () => remoteAdminServer(activeServer(), "skills-admin-v1")?.id;
+  const agentServerId = () => remoteAdminServer(activeServer(), "agent-install-v1")?.id;
+  /* What both example controls need: a managed agent whose composer is free to take another line. */
   const composerFree = createMemo(
     () =>
-      local() &&
+      manage() &&
       agentStatus().phase === "ready" &&
       !controller.submitting() &&
       !controller.selectionSending() &&
@@ -123,8 +126,10 @@ function SkillsMarketplace() {
       <Loading>
         <SkillsMarketplaceModal
           open={true}
-          agents={local() ? agentList() : []}
-          activeAgentId={local() ? (activeAgent()?.id ?? "") : ""}
+          agents={manage() ? agentList() : []}
+          activeAgentId={manage() ? (activeAgent()?.id ?? "") : ""}
+          hostServerId={hostServerId()}
+          agentServerId={agentServerId()}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -135,7 +140,11 @@ function SkillsMarketplace() {
             composerFree()
               ? (agentId, skill) => {
                   const server = activeServer();
-                  if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
+                  if (
+                    !serverCanAdminister(server, "skills-admin-v1") ||
+                    !agentList().some((agent) => agent.id === agentId)
+                  )
+                    return;
                   selectAgent(agentId);
                   controller.appendSkillExample({ serverId: server.id, agentId }, skill);
                   setSkillsMarketplaceOpen(false);
@@ -146,15 +155,22 @@ function SkillsMarketplace() {
           plugins={MARKETPLACE_PLUGINS}
           initialPluginSlug={pendingPluginSlug() ?? undefined}
           onInitialPluginSlugConsumed={() => setPendingPluginSlug(null)}
-          /* A plugin's app is an MCP server, which the host holds. Only a local server takes one
-             here, as the agents list does, so a remote server browses the listings and installs
-             nothing. */
-          pluginServerId={local() ? activeServer()?.id : undefined}
+          /* A plugin's app is an MCP server, which the host holds. A joined server takes one over
+             `mcp-servers-v1` from an admin, as the agents list does; a member browses the listings
+             and installs nothing. */
+          pluginServerId={
+            manage() && serverCanAdminister(activeServer(), MCP_SERVERS_CAPABILITY) ? activeServer()?.id : undefined
+          }
+          pluginHostName={manage() ? remoteAdminServer(activeServer(), MCP_SERVERS_CAPABILITY)?.name : undefined}
           onRunPluginPrompt={
             composerFree()
               ? (agentId, prompt) => {
                   const server = activeServer();
-                  if (server?.kind !== "local" || !agentList().some((agent) => agent.id === agentId)) return;
+                  if (
+                    !serverCanAdminister(server, "skills-admin-v1") ||
+                    !agentList().some((agent) => agent.id === agentId)
+                  )
+                    return;
                   selectAgent(agentId);
                   controller.appendPluginPrompt({ serverId: server.id, agentId }, prompt.text);
                   setSkillsMarketplaceOpen(false);
@@ -167,16 +183,21 @@ function SkillsMarketplace() {
   );
 }
 
-/** A shared agent from an `openbot://agents/<id>` link, which installs on this machine. */
+/**
+ * A shared agent from an `openbot://agents/<id>` link. It is added where a marketplace agent is: on
+ * the selected joined server when this account administers it, otherwise on this computer.
+ */
 function SharedAgentInstall() {
   const { pendingAgentTemplateId, setPendingAgentTemplateId } = useSettings();
   const { openInstalledMarketplaceAgent } = useServerSelection();
+  const { activeServer } = useServers();
 
   return (
     <Show when={pendingAgentTemplateId()}>
       <Loading>
         <AgentTemplateInstall
           templateId={pendingAgentTemplateId()}
+          server={remoteAdminServer(activeServer(), "agent-install-v1")}
           onClose={() => setPendingAgentTemplateId(null)}
           onInstalled={openInstalledMarketplaceAgent}
         />
@@ -219,7 +240,13 @@ function ServerSettings() {
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
-  const { toolRuntimeStatuses } = useProviders();
+  const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
+  /**
+   * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
+   * over `providers-v1`, those of the host of the joined server on screen.
+   */
+  const holdsToolRuntimes = (server: ServerSummary) =>
+    server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
   const {
     serverSettingsTarget,
     serverSettingsOpen,
@@ -250,8 +277,7 @@ function ServerSettings() {
    * The gate on the whole feature: the tab and the panel both hang off `mcpServers`. A remote host
    * answers 403 to a `member` and 400 without the capability, so neither ever sees the section.
    */
-  const canUseMcp = (server: ServerSummary) =>
-    server.kind === "local" || (serverSupportsCapability(server, MCP_SERVERS_CAPABILITY) && server.role !== "member");
+  const canUseMcp = (server: ServerSummary) => serverCanAdminister(server, MCP_SERVERS_CAPABILITY);
 
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
@@ -307,9 +333,9 @@ function ServerSettings() {
             onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
-            // Only for this computer: the runtime a remote host starts its own servers with is that
-            // host's, and this window downloads nothing for it.
-            mcpToolRuntimeNote={server().kind === "local" ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
+            // Only for the computer whose runtimes this window holds: another host starts its servers
+            // with its own runtime, which this window has not read.
+            mcpToolRuntimeNote={holdsToolRuntimes(server()) ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
             mcpLoadError={serverSettingsMcpError()}
             onMcpSectionShown={() => void refreshMcpServers()}
             onRetryMcpServers={() => void refreshMcpServers()}
@@ -365,19 +391,30 @@ function AppSettings(props: AccountProps) {
     connectProvider,
     openProviderInstallGuide,
     codeLogin,
+    providerAdminServerId,
+    providerKeys,
+    hostCustomProviders,
   } = useProviders();
-  const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
-  /** Provider downloads are the local machine's business, never a remote host's. */
-  const localProviderDownloads = createMemo(
-    () => activeServer()?.kind === "local" && providerRuntimeDownloadsAvailable(),
-  );
+  const localEndpoints = useCustomProviders();
+  const local = () => activeServer()?.kind === "local";
   /**
-   * A named endpoint merges into the `opencode acp` process on *this* computer, so a remote server
-   * must show no custom row, no list and no Add. This is not `localProviderDownloads()`: that one
-   * also needs `providerRuntimeDownloadsAvailable()`, which is about managed runtime downloads and
-   * would hide this feature on a build without them.
+   * The providers of the computer the agents run on: this one, or the host of a joined server the
+   * account administers over `providers-v1`. Any other server shows none of these controls.
    */
-  const localCustomProviders = createMemo(() => activeServer()?.kind === "local");
+  const providerDownloads = createMemo(
+    () => (local() || providerAdminServerId() !== undefined) && providerRuntimeDownloadsAvailable(),
+  );
+  /** The browser sign-in and the install guide open on this computer, so they stay local. */
+  const localProviderDownloads = createMemo(() => local() && providerRuntimeDownloadsAvailable());
+  /**
+   * A named endpoint merges into the `opencode acp` process of the computer the agents run on, so a
+   * server this window cannot manage shows no custom row, no list and no Add. This is not
+   * `providerDownloads()`: that one also needs `providerRuntimeDownloadsAvailable()`, which is about
+   * managed runtime downloads and would hide this feature on a build without them.
+   */
+  const endpoints = createMemo(() =>
+    local() ? localEndpoints : providerAdminServerId() !== undefined ? hostCustomProviders : undefined,
+  );
 
   return (
     <Loading>
@@ -398,18 +435,19 @@ function AppSettings(props: AccountProps) {
         onListAccountSessions={auth.listAccountSessions}
         onRevokeAccountSession={auth.revokeAccountSession}
         agentStatus={agentStatus()}
-        providerRuntimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
-        providerAvailableVersions={localProviderDownloads() ? providerAvailableVersions() : undefined}
-        onUpdateProvider={localProviderDownloads() ? startProviderUpdate : undefined}
-        onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
-        onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
+        providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
+        providerAvailableVersions={providerDownloads() ? providerAvailableVersions() : undefined}
+        onUpdateProvider={providerDownloads() ? startProviderUpdate : undefined}
+        onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}
+        onCancelProviderDownload={providerDownloads() ? cancelProviderRuntimeDownload : undefined}
         onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
         onInstallProvider={localProviderDownloads() ? openProviderInstallGuide : undefined}
-        customProviders={localCustomProviders() ? customProviders() : undefined}
-        onAddCustomProvider={localCustomProviders() ? saveCustomProvider : undefined}
-        onDeleteCustomProvider={localCustomProviders() ? deleteCustomProvider : undefined}
-        providerKeys={localProviderDownloads() ? providerKeyApi : undefined}
-        codeLogin={localProviderDownloads() ? codeLogin : undefined}
+        customProviders={endpoints()?.customProviders()}
+        onAddCustomProvider={endpoints()?.saveCustomProvider}
+        onDeleteCustomProvider={endpoints()?.deleteCustomProvider}
+        providerKeys={providerDownloads() ? providerKeys() : undefined}
+        providerHostName={providerAdminServerId() === undefined ? undefined : activeServer()?.name}
+        codeLogin={providerDownloads() ? codeLogin : undefined}
         hostedSitesApi={appPort().hostedSites}
         turboModePending={turboModePending()}
         onTestNotification={sendTestNotification}

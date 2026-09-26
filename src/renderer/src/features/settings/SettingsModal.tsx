@@ -79,13 +79,15 @@ export interface SettingsModalProps {
   customProviders?: readonly CustomProviderSummary[];
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
   /**
-   * Reads and writes the optional provider keys. Absent while the active server is not this
-   * computer, which is also what takes the row's sign-in button away.
+   * Reads and writes the optional provider keys of the computer the providers run on. Absent when
+   * this window cannot manage them, which is also what takes the row's sign-in button away.
    */
   providerKeys?: ProviderKeyApi;
+  /** The joined server whose host runs the listed providers. Absent when this computer runs them. */
+  providerHostName?: string | undefined;
   /**
    * The code sign-in, for the providers that offer one. Absent for the same reason as
-   * `providerKeys`: a remote server's provider is not signed in from this computer.
+   * `providerKeys`.
    */
   codeLogin?: ProviderCodeLoginApi;
   hostedSitesApi?: HostedSitesDesktopApi;
@@ -201,21 +203,31 @@ export function SettingsModal(props: SettingsModalProps) {
       return props.providerAvailableVersions;
     },
     openCodeKeyStatus,
+    get providerHostName() {
+      return props.providerHostName;
+    },
   });
   async function refreshOpenCodeKeyStatus(): Promise<void> {
-    if (!props.providerKeys) return;
+    const keys = props.providerKeys;
+    if (!keys) return;
+    let status: ProviderApiKeyStatus | undefined;
     try {
-      setOpenCodeKeyStatus((await props.providerKeys.getProviderApiKeyState("opencode")).status);
+      status = (await keys.getProviderApiKeyState("opencode")).status;
     } catch {
-      setOpenCodeKeyStatus(undefined);
+      status = undefined;
     }
+    // An answer from a source the modal has since left belongs to the other computer.
+    if (keys === props.providerKeys) setOpenCodeKeyStatus(status);
   }
   // The badge has to answer on first paint: the key state arrives after the rows, so an open
-  // without a read would show no badge until something else re-renders the list.
+  // without a read would show no badge until something else re-renders the list. The keys can move
+  // to a joined server's host while the modal is open, when that host's admin role arrives, so a
+  // new source is read again rather than keeping the other computer's answer.
   createEffect(
-    () => props.open,
-    (open) => {
-      if (open) void refreshOpenCodeKeyStatus();
+    () => (props.open ? props.providerKeys : undefined),
+    (keys) => {
+      setOpenCodeKeyStatus(undefined);
+      if (keys) void refreshOpenCodeKeyStatus();
     },
   );
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
