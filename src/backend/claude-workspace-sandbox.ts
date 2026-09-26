@@ -16,6 +16,11 @@ import { isPathInside } from "./path-containment";
  *   matches the tool, and `ask` then sends the write to `canUseTool`, which asks the user.
  *
  * Reads, the network and the MCP servers stay open, as the Access setting says.
+ *
+ * Claude still loads the project `.claude/settings*.json`, because the managed skills are in
+ * `.claude/skills` of the workspace. Such a file can widen this sandbox, so Claude's Bash sandbox and
+ * the hook below keep the agent from writing it. A Codex agent can write it before a switch to Claude:
+ * Codex cannot deny one path in a writable root while it takes a sandbox mode.
  */
 export function claudeWorkspaceSandbox(roots: readonly string[]): NonNullable<Options["sandbox"]> {
   return {
