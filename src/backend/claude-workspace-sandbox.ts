@@ -1,6 +1,7 @@
-import { lstat, readlink, realpath } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
-import type { HookCallbackMatcher, Options } from "@anthropic-ai/claude-agent-sdk";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, readlink, realpath, rename, symlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
+import type { HookCallbackMatcher, Options, SdkPluginConfig } from "@anthropic-ai/claude-agent-sdk";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
 import { isMissingFileError } from "./file-errors";
@@ -17,10 +18,12 @@ import { isPathInside } from "./path-containment";
  *
  * Reads, the network and the MCP servers stay open, as the Access setting says.
  *
- * Claude still loads the project `.claude/settings*.json`, because the managed skills are in
- * `.claude/skills` of the workspace. Such a file can widen this sandbox, so Claude's Bash sandbox and
- * the hook below keep the agent from writing it. A Codex agent can write it before a switch to Claude:
- * Codex cannot deny one path in a writable root while it takes a sandbox mode.
+ * The files in `.claude` of the workspace are not trusted: a Codex agent can write them before a
+ * switch to Claude, because Codex cannot deny one path in a writable root while it takes a sandbox
+ * mode. Their `sandbox.filesystem.allowWrite`, `Edit(...)` rules and hooks would widen this sandbox or
+ * run outside it. So the query loads the user settings only, the workspace skills come back through
+ * `claudeWorkspaceSkillPlugin`, and `CLAUDE_WORKSPACE_MANAGED_SETTINGS` stops the hooks of settings
+ * and skills.
  */
 export function claudeWorkspaceSandbox(roots: readonly string[]): NonNullable<Options["sandbox"]> {
   return {
@@ -30,6 +33,45 @@ export function claudeWorkspaceSandbox(roots: readonly string[]): NonNullable<Op
     allowUnsandboxedCommands: false,
     filesystem: { allowWrite: writableRoots(roots) },
   };
+}
+
+/**
+ * Only the hooks of managed settings run, and OpenBot gives none. The SDK hook of
+ * `claudeWorkspaceHooks` still runs. A hook in the frontmatter of a workspace skill does not.
+ */
+export const CLAUDE_WORKSPACE_MANAGED_SETTINGS: NonNullable<Options["managedSettings"]> = {
+  allowManagedHooksOnly: true,
+};
+
+/**
+ * A plugin named `openbot` whose `skills` links to `.claude/skills` of the workspace, because Claude
+ * reads that folder only with the project settings. Claude lists each skill as `openbot:<name>` and
+ * `/<name>` still works. The plugin folder is in `stateDirectory`, outside every root the agent can
+ * write: a plugin can also start hooks and language servers, which run outside the sandbox.
+ */
+export async function claudeWorkspaceSkillPlugin(stateDirectory: string, cwd: string): Promise<SdkPluginConfig> {
+  const directory = join(stateDirectory, "claude-skill-plugins", createHash("sha256").update(cwd).digest("hex"));
+  await mkdir(join(directory, ".claude-plugin"), { recursive: true, mode: 0o700 });
+  await writeFile(join(directory, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "openbot" })}\n`);
+  const link = join(directory, "skills");
+  const target = join(cwd, ".claude", "skills");
+  if ((await currentLink(link)) !== target) {
+    // A link made aside and renamed over the old one, so a query that starts at the same time never
+    // sees the plugin without its skills.
+    const staged = `${link}.${randomUUID()}`;
+    await symlink(target, staged, "junction");
+    await rename(staged, link);
+  }
+  return { type: "local", path: directory };
+}
+
+async function currentLink(path: string): Promise<string | null> {
+  try {
+    return await readlink(path);
+  } catch (error) {
+    if (isMissingFileError(error)) return null;
+    throw error;
+  }
 }
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"];
@@ -60,8 +102,8 @@ export function claudeWorkspaceHooks(cwd: string, roots: readonly string[]): Non
  * The path a file tool would write outside the roots and the temporary folders, or null when it writes
  * inside them or is not a file tool. Symbolic links are resolved, also a link to a file that does not
  * exist yet, so a link in the workspace that points outside it counts as outside. A path that cannot be
- * resolved counts as outside. Claude's own settings files in a root count as
- * outside too: an agent that wrote them could give itself more access at the next start.
+ * resolved counts as outside. Claude's own settings files in a root count as outside too: Workspace
+ * only ignores them, but a Full access session or Claude in a terminal loads them and runs their hooks.
  */
 export async function claudeWriteOutsideRoots(
   toolName: string,

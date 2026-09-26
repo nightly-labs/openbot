@@ -721,6 +721,7 @@ export async function createApplicationServices({
       // The bearer token for an http server, minted here and spent by the provider process. The
       // service asks for one at each hand-off; only a test the user pressed may open a browser.
       mcpOAuth,
+      providerStateDirectory: join(app.getPath("userData"), "provider-state"),
     },
     // Appended to the stored servers at each spawn, so the same tools reach Codex, Claude and the
     // ACP providers. Null until the daemon runs, which is what keeps a machine with no driver from

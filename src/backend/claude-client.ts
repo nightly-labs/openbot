@@ -18,7 +18,13 @@ import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
-import { claudeWorkspaceHooks, claudeWorkspaceSandbox, claudeWriteOutsideRoots } from "./claude-workspace-sandbox";
+import {
+  CLAUDE_WORKSPACE_MANAGED_SETTINGS,
+  claudeWorkspaceHooks,
+  claudeWorkspaceSandbox,
+  claudeWorkspaceSkillPlugin,
+  claudeWriteOutsideRoots,
+} from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
@@ -70,7 +76,10 @@ interface ThreadConfig {
   profileGeneration: boolean;
   /** Part of the config so that a change restarts the query with the new servers. */
   computerUse: boolean;
-  /** Workspace only: Bash runs in the Claude sandbox, and a file write outside the roots asks the user. */
+  /**
+   * Workspace only: Bash runs in the Claude sandbox, a file write outside the roots asks the user, and
+   * the project settings do not load. See `claude-workspace-sandbox.ts`.
+   */
   workspaceOnly: boolean;
 }
 
@@ -160,6 +169,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #reportMcpDrops: McpDropReporter | undefined;
   readonly #mcpToolRuntimes: McpToolRuntimeSource | undefined;
   readonly #mcpAuthorization: McpAuthorizationSource | undefined;
+  /** Where a Workspace only query keeps its skill plugin. Without it, such a query has no workspace skills. */
+  readonly #stateDirectory: string | undefined;
   /** Threads whose process was closed for being idle keep the config that resumes them. */
   readonly #threads = new IdleThreadPool<ThreadRuntime, ThreadConfig>({
     releaseAfterMs: CLAUDE_THREAD_IDLE_RELEASE_MS,
@@ -186,6 +197,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
     mcpAuthorization?: McpAuthorizationSource,
+    stateDirectory?: string,
   ) {
     super();
     this.#cli = cli;
@@ -196,6 +208,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#reportMcpDrops = reportMcpDrops;
     this.#mcpToolRuntimes = mcpToolRuntimes;
     this.#mcpAuthorization = mcpAuthorization;
+    this.#stateDirectory = stateDirectory;
   }
 
   get running(): boolean {
@@ -493,6 +506,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             this.#mcpAuthorization,
           ),
         );
+    const skillPlugin =
+      config.workspaceOnly && this.#stateDirectory
+        ? await claudeWorkspaceSkillPlugin(this.#stateDirectory, config.cwd)
+        : null;
     // `stop()` may have run during the await: a query created now would outlive the client.
     if (!this.#running) throw new Error("Claude Agent SDK is not running.");
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
@@ -517,12 +534,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         // that option.
         ...(claudeTakesPromptSnapshotFlag(this.#cli.version) ? { extraArgs: { "system-prompt-snapshot": "off" } } : {}),
         ...(config.profileGeneration ? { tools: [] } : {}),
-        settingSources: config.profileGeneration ? [] : ["user", "project", "local"],
+        settingSources: config.profileGeneration ? [] : config.workspaceOnly ? ["user"] : ["user", "project", "local"],
         // The MCP panel is the only door. Without this, Claude merges project `.mcp.json`, user
         // settings, plugin and agent-frontmatter servers into the record above, so two computers
         // with the same OpenBot settings give their agents different tools and "which servers does
-        // my agent have" has no answer. `settingSources` stays as it is: the flag takes away MCP
-        // and nothing else, so permissions and hooks still load from those files.
+        // my agent have" has no answer. The flag takes away MCP and nothing else, so permissions and
+        // hooks still load from those files. Workspace only loads the user settings alone: see
+        // `claude-workspace-sandbox.ts`.
         strictMcpConfig: true,
         permissionMode: "default",
         includePartialMessages: true,
@@ -533,6 +551,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ? {
               sandbox: claudeWorkspaceSandbox(config.additionalDirectories),
               hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories),
+              managedSettings: CLAUDE_WORKSPACE_MANAGED_SETTINGS,
+              plugins: skillPlugin ? [skillPlugin] : [],
             }
           : {}),
         mcpServers,
