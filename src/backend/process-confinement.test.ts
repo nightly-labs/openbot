@@ -66,13 +66,13 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
 });
 
 describe("confineSpawnTarget", () => {
-  it("does not start the process where it cannot make the sandbox", () => {
+  it.each(["linux", "win32"] as const)("does not start the process on %s, which has no sandbox for it", (platform) => {
     expect(() =>
       confineSpawnTarget(
-        { command: "grok", args: [], windowsVerbatimArguments: true },
-        { writableRoots: ["C:\\workspace"] },
-        grokStatePaths({}, "C:\\Users\\a"),
-        "win32",
+        { command: "grok", args: [], windowsVerbatimArguments: false },
+        { writableRoots: ["/workspace"] },
+        grokStatePaths({}, "/home/a"),
+        platform,
       ),
     ).toThrow(ProcessConfinementUnavailableError);
   });

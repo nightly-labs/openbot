@@ -34,7 +34,7 @@ export function agentComputerUseEnabled(agent: Pick<AgentSummary, "computerUse">
  * Whether this agent runs inside the workspace sandbox now. Every provider enforces it. Codex runs the
  * agent in its `workspace-write` sandbox. Claude runs Bash in its sandbox and asks before a file edit
  * outside the roots. Grok and OpenCode run the agent in a provider process of its own, inside an
- * operating system sandbox (`process-confinement.ts`); on Windows that process does not start.
+ * operating system sandbox (`process-confinement.ts`); on Linux and Windows that process does not start.
  */
 export function workspaceAccessEnforced(agent: Pick<AgentSummary, "access">): boolean {
   return agent.access === "workspace";

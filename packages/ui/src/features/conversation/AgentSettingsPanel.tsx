@@ -853,7 +853,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   ? "A file edit outside asks you first, also when Auto approve is on. A command cannot write outside."
                   : draft.runtime.provider === "codex"
                     ? "A command that must write outside asks you first, also when Auto approve is on."
-                    : `The whole ${agentProviderName(draft.runtime.provider)} process runs in a sandbox, so a write outside fails. Not available on Windows.`}{" "}
+                    : `The whole ${agentProviderName(draft.runtime.provider)} process runs in a sandbox, so a write outside fails. Available on macOS only.`}{" "}
                 Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.
               </Show>
             </Text>

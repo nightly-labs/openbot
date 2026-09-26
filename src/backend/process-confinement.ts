@@ -1,15 +1,17 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
 
 /**
- * The folders one Workspace only agent may write: its workspace and the shared folder.
+ * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
+ * folders and the provider's state are added to them.
  *
  * Grok and OpenCode take no sandbox per session, so a Workspace only agent on them gets a provider
  * process of its own, and OpenBot starts that process inside an operating system sandbox. The whole
  * process is confined: the file edit tools, the shell, and every command and MCP server it starts.
- * Nothing inside the process can take the sandbox away, and a computer that cannot make it does not
- * start the process at all.
+ * Nothing inside the process can take the sandbox away. Only macOS has the sandbox now: on Linux and
+ * Windows the process does not start, and the user must choose Full access.
  */
 export interface ProcessConfinement {
   readonly writableRoots: readonly string[];
@@ -44,7 +46,6 @@ export class ProcessConfinementUnavailableError extends Error {
 }
 
 const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
-const BWRAP_PATHS = ["/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap"];
 
 /** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
 export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
@@ -99,7 +100,7 @@ export function confineSpawnTarget(
   state: ProviderStatePaths,
   platform: NodeJS.Platform = process.platform,
 ): SpawnTarget {
-  const writable = [...confinement.writableRoots, ...state.writable, ...temporaryPaths()];
+  const writable = [...confinement.writableRoots, ...state.writable, ...workspaceTemporaryPaths(platform)];
   const protectedPaths = [
     ...state.protected,
     ...confinement.writableRoots.flatMap((root) => state.protectedInRoots.map((name) => join(root, name))),
@@ -112,17 +113,10 @@ export function confineSpawnTarget(
       windowsVerbatimArguments: false,
     };
   }
-  if (platform === "linux") {
-    const bwrap = BWRAP_PATHS.find((path) => existsSync(path));
-    if (!bwrap) throw new ProcessConfinementUnavailableError(unavailable("bubblewrap (bwrap)"));
-    return {
-      command: bwrap,
-      args: [...bwrapArgs(writable, protectedPaths), "--", target.command, ...target.args],
-      windowsVerbatimArguments: false,
-    };
-  }
+  // bubblewrap on Linux cannot deny a protected file that does not exist yet, such as a new
+  // `opencode.json`, so Linux fails closed until it can.
   throw new ProcessConfinementUnavailableError(
-    "Workspace only is not available for this provider on Windows. Choose Full access in the agent settings.",
+    "Workspace only is available for this provider on macOS only. Choose Full access in the agent settings.",
   );
 }
 
@@ -149,28 +143,6 @@ export function seatbeltProfile(writable: readonly string[], protectedPaths: rea
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
     "",
   ].join("\n");
-}
-
-/** The whole file system read-only, the writable folders bound over it, the protected paths over those. */
-export function bwrapArgs(writable: readonly string[], protectedPaths: readonly string[]): string[] {
-  const args = ["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--die-with-parent"];
-  for (const path of unique(writable.flatMap(realPaths))) {
-    if (existsSync(path)) args.push("--bind", path, path);
-  }
-  // bwrap can only bind a path that exists. A protected file that does not exist yet stays
-  // writable on Linux; the macOS profile denies it by name.
-  for (const path of unique(protectedPaths.flatMap(realPaths))) {
-    if (existsSync(path)) args.push("--ro-bind", path, path);
-  }
-  return args;
-}
-
-/**
- * The temporary folders, as Codex allows them for a Workspace only agent. Commands, compilers and the
- * provider itself need them.
- */
-function temporaryPaths(): string[] {
-  return ["/tmp", "/var/tmp", tmpdir()];
 }
 
 /**

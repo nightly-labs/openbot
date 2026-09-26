@@ -1351,6 +1351,42 @@ describe.sequential("AgentService: providers", () => {
     expect(own?.client.running).toBe(false);
   });
 
+  it("keeps the turn of a Workspace only agent when the shared Grok process exits", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const created: Array<{ client: FakeAgentClient; confined: boolean }> = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "grok",
+      clientFactory: (provider, _cli, confinement) => {
+        const client = new FakeAgentClient(provider, undefined, false);
+        if (confinement) client.sessionIdPrefix = "grok-own";
+        created.push({ client, confined: confinement !== undefined });
+        return client;
+      },
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await store.getOrCreate("helper");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5", access: "workspace" });
+    await service.updateAgent({ agentId: "helper", provider: "grok", model: "grok-4.5" });
+    await service.sendMessage({ agentId: "chief", text: "Long work." });
+    await service.sendMessage({ agentId: "helper", text: "Long work." });
+    for (const agentId of ["chief", "helper"]) {
+      await waitForQueue(service, agentId, (queue) => queue.deliveries[0]?.status === "running");
+    }
+    const shared = created.find(
+      (entry) => !entry.confined && entry.client.requests.some((request) => request.method === "turn/start"),
+    );
+
+    shared?.client.emit("exit", new Error("Grok exited."));
+
+    // The helper's turn ran on the shared process, so its end shows that recovery has run.
+    await waitForQueue(service, "helper", (queue) => queue.deliveries[0]?.status === "interrupted");
+    expect(service.listQueue("chief").deliveries[0]?.status).toBe("running");
+  });
+
   it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { service: agentService, store } = await startService(root, {

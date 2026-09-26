@@ -85,12 +85,17 @@ export class BootRecovery {
     ];
   }
 
-  /** The provider CLI exited, so the deliveries it was running have no turn left to finish. */
-  orphanDeliveriesOf(provider: AgentProvider): void {
+  /**
+   * The provider's shared CLI exited, so the deliveries it was running have no turn left to finish.
+   * An agent that runs on a process of its own (`runsOnOwnProcess`) keeps its turn.
+   */
+  orphanDeliveriesOf(provider: AgentProvider, runsOnOwnProcess: (agentId: string) => boolean): void {
     const agents = this.#store.list();
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
       const agent = agents.find((candidate) => candidate.id === delivery.recipientAgentId);
-      if (agent && providerForAgent(agent) === provider) this.#orphanedDeliveryIds.add(delivery.id);
+      if (agent && providerForAgent(agent) === provider && !runsOnOwnProcess(agent.id)) {
+        this.#orphanedDeliveryIds.add(delivery.id);
+      }
     }
   }
 
