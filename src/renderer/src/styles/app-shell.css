@@ -858,7 +858,7 @@ textarea {
   border: 1px solid transparent;
   border-radius: var(--openbot-radius-sm);
   background: transparent;
-  color: var(--openbot-text-secondary);
+  color: var(--openbot-text-muted);
   pointer-events: auto;
   cursor: pointer;
   -webkit-app-region: no-drag;
