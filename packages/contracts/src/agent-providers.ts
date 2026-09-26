@@ -178,6 +178,16 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
 }
 
 /**
+ * The providers that stay on the computer that runs OpenBot. The Team API does not carry them, so a
+ * joined server's settings do not list them.
+ */
+export const LOCAL_ONLY_PROVIDERS = ["antigravity"] as const satisfies readonly AgentProviderId[];
+
+export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
+  return isOneOf(LOCAL_ONLY_PROVIDERS, provider);
+}
+
+/**
  * The tools OpenBot downloads for the MCP servers rather than for an agent: a JavaScript runtime,
  * so that `npx some-server` starts on a machine that has never had Node.
  *

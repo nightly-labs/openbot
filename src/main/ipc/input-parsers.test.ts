@@ -3,7 +3,7 @@ import { parseRemoteDesktopSetupAction, parseRemoteDesktopTest } from "./server-
 // @vitest-environment node
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
+import { CUSTOM_PROVIDER_LIMITS, isCustomProviderSummary } from "@openbot/contracts/ipc";
 import { describe, expect, it, vi } from "vitest";
 import {
   agentRequest,
@@ -940,6 +940,15 @@ describe("custom provider input parsing", () => {
     expect(() => parseSaveCustomProvider({ ...endpoint, id: "studio/local" })).toThrowError("A provider ID must be");
     expect(() => parseSaveCustomProvider({ ...endpoint, id: "Studio" })).toThrowError("A provider ID must be");
     expect(() => parseDeleteCustomProvider({ id: "studio/local" })).toThrowError("A provider ID must be");
+  });
+
+  // An endpoint saved as `antigravity` before Gemini existed must stay in the list and be removable.
+  it("keeps a saved endpoint whose id a newer built-in provider now uses", () => {
+    expect(() => parseSaveCustomProvider({ ...endpoint, id: "antigravity" })).toThrowError("A provider ID must be");
+    expect(parseDeleteCustomProvider({ id: "antigravity" })).toEqual({ id: "antigravity" });
+    expect(
+      isCustomProviderSummary({ id: "antigravity", name: "Mine", baseUrl: "http://x", hasApiKey: false, models: [] }),
+    ).toBe(true);
   });
 
   // The CLI is given this URL to call. Any other scheme is a way to make the provider process read
