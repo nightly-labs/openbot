@@ -38,6 +38,16 @@ export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput>
   throw new Error(currentText().t("app.avatar.tooLarge"));
 }
 
+/** A `data:` URL for a preview. The CSP `img-src` allows `data:` but not `blob:`. */
+export function avatarImageDataUrl(image: AvatarImageInput): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < image.bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...image.bytes.subarray(offset, offset + chunkSize));
+  }
+  return `data:${image.mimeType};base64,${btoa(binary)}`;
+}
+
 /** A RIFF WebP with a VP8X header whose animation flag is set. */
 function isAnimatedWebp(bytes: Uint8Array): boolean {
   const header = String.fromCharCode(...bytes.subarray(0, 16));
