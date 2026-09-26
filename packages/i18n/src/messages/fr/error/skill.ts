@@ -60,4 +60,5 @@ export const messages = {
   "error.skill.localSourceNotFolder": "La source de la compétence doit être un dossier.",
   "error.skill.localMissingSkillFile": "Le dossier de la compétence doit contenir SKILL.md à sa racine.",
   "error.skill.pathSymlink": "Les chemins des compétences ne peuvent pas contenir de liens symboliques.",
+  "error.skill.folderNotRead": "{provider} ne lit pas {folder}. Copiez ce dossier dans {target}.",
 } as const satisfies PartialTranslation<typeof source>;
