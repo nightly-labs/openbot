@@ -20,6 +20,52 @@ env:
   GIT_CONFIG_VALUE_0: main
 
 jobs:
+  detect:
+    # Four lanes check workspaces that most pull requests do not touch, so a pull request runs each
+    # of them only when a path it reads changed. A path every workspace reads - the lockfile, a
+    # shared package, a workflow - runs all of them. A push to main and a manual run always run
+    # every lane: `deploy-production` needs them, and a skipped need would skip the deploy.
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sites: ${{ steps.lanes.outputs.sites }}
+      remote: ${{ steps.lanes.outputs.remote }}
+      storybook: ${{ steps.lanes.outputs.storybook }}
+      surfaces: ${{ steps.lanes.outputs.surfaces }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A pull request checks out its merge commit. Its first parent is the base branch, so the
+          # two commits hold exactly the changes the pull request brings.
+          fetch-depth: 2
+
+      - name: Select lanes
+        id: lanes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            changed="package.json"
+          else
+            changed="$(git diff --name-only HEAD^1 HEAD)"
+          fi
+          shared='^(package\.json|bun\.lock|bunfig\.toml|\.nvmrc|biome\.json|tsconfig[^/]*\.json|\.github/|packages/|patches/|tools/|vendor/)'
+          lane() {
+            if grep -Eq "$shared|$2" <<<"$changed"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          lane sites '^apps/site-router/'
+          lane remote '^(remote|scripts)/'
+          lane storybook '^(src|apps/auth-api|\.storybook|resources|marketplace|build)/'
+          lane surfaces '^(apps/mobile|apps/site-router|remote|scripts)/'
+          cat "$GITHUB_OUTPUT"
+
   check:
     # `check:desktop` is this job and `browser` together, in that order. The
     # browser smoke test starts the real Electron binary under xvfb on another
@@ -118,6 +164,8 @@ jobs:
 
   tests-sites:
     name: Tests (sites)
+    needs: detect
+    if: needs.detect.outputs.sites == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -134,6 +182,8 @@ jobs:
 
   tests-remote:
     name: Tests (remote)
+    needs: detect
+    if: needs.detect.outputs.remote == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -163,6 +213,8 @@ jobs:
     # opens a socket, so it validates both Compose files on a runner with no
     # daemon.
     name: Surfaces
+    needs: detect
+    if: needs.detect.outputs.surfaces == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -210,6 +262,8 @@ jobs:
 
   storybook:
     name: Storybook build
+    needs: detect
+    if: needs.detect.outputs.storybook == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -260,6 +314,30 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 3
+
+  all-checks-pass:
+    # The one check branch protection requires. A lane that `detect` skipped counts as passed; a
+    # failed or cancelled job, including `detect` itself, fails this one.
+    name: All required checks pass
+    if: always()
+    needs: [detect, check, browser, tests-desktop, tests-sites, tests-remote, surfaces, api, storybook, preview]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail on a failed or cancelled job
+        shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *)
+                echo "A required job ended as $result." >&2
+                exit 1
+                ;;
+            esac
+          done
 
   deploy-production:
     name: Deploy Cloudflare production

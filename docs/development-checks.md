@@ -104,6 +104,18 @@ All of these jobs except the preview build gate Cloudflare production deployment
 that dependency list, which allowed deployment despite a failed mobile or remote check.
 These long suites belong in CI; local desktop runs can reach their time limits under load.
 
+The `Detect changed areas` job lets a pull request skip four lanes it cannot affect: Tests (sites),
+Tests (remote), Surfaces and Storybook build. It compares the merge commit with its first parent, and
+runs a lane when a path the lane reads changed. A path every workspace reads (`package.json`,
+`bun.lock`, `tsconfig*.json`, `biome.json`, `.github/`, `packages/`, `tools/`, `patches/`, `vendor/`)
+runs all four. A push to `main` and a manual run always run every lane, because a skipped need would
+skip `deploy-production`. When a new lane reads another directory, add it to that lane's pattern in
+the `detect` job.
+
+`All required checks pass` needs every other check job and fails when one of them failed or was
+cancelled; a skipped lane counts as a pass. Branch protection requires only this job, so a new lane
+needs no change in the repository settings: add it to the gate's `needs` list.
+
 `verify:preload` reads `out/preload` after the build. TypeScript checks the preload source, but
 the renderer gets the bundle. The script runs each bundle in a `node:vm` context with a fake
 Electron and checks that `window.openbot` has exactly one function for each endpoint that
