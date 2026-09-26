@@ -75,6 +75,7 @@ import {
   Show,
   Switch,
   snapshot,
+  untrack,
 } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
@@ -583,9 +584,11 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
         setUninstalling(null);
         return;
       }
-      setMarket((state) => {
-        state.browse.targetAgentId = state.browse.targetAgentId || props.activeAgentId || props.agents[0]?.id || "";
-      });
+      untrack(() =>
+        setMarket((state) => {
+          state.browse.targetAgentId = state.browse.targetAgentId || props.activeAgentId || props.agents[0]?.id || "";
+        }),
+      );
       void loadSkills();
     },
   );
@@ -603,7 +606,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   createEffect(
     () => [props.open, market.browse.targetAgentId] as const,
     ([open, agentId]) => {
-      if (open && agentId) void loadInstalled(agentId);
+      if (open && agentId) void untrack(() => loadInstalled(agentId));
       else {
         setMarket((state) => {
           state.installed = [];
@@ -1449,7 +1452,7 @@ function AgentMarketplacePanel(props: {
       category: "other",
       listingId: undefined,
       preview: null,
-      sourceAgentId: props.agents[0]?.id ?? "",
+      sourceAgentId: untrack(() => props.agents[0]?.id ?? ""),
     },
     submissions: [],
   });

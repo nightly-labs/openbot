@@ -2,7 +2,7 @@ import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Skeleton, UserAvatar } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, For, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, useText } from "../../text";
 
 export const CATEGORY_LABELS = {
@@ -249,14 +249,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   createEffect(
     () => props.refreshVersion,
     () => {
-      void load();
+      void untrack(() => load());
     },
   );
   /* Typing waits before it reaches the network; the first run matches the empty state and loads nothing. */
   createEffect(
     () => props.query,
     (query) => {
-      if (query === state.query) return;
+      if (query === untrack(() => state.query)) return;
       clearTimeout(timer);
       requestVersion++;
       setState((s) => {

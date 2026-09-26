@@ -1,6 +1,6 @@
 import type { AgentProfile } from "@openbot/ui/data";
 import { StorageOverview } from "@openbot/ui/features/files/StorageOverview";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, untrack } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { type FilesPort, filesPort } from "./files-port";
 import { createStorageUsage } from "./storage-usage";
@@ -29,7 +29,7 @@ export function ServerStoragePanel(props: ServerStorageOptions & { serverId: str
     () => props.serverId,
     (serverId) => {
       let current = true;
-      calls()
+      untrack(calls)
         .agent.listAgents(serverId)
         .then((list) => {
           if (current) setAgents(list.map(toAgentProfile));

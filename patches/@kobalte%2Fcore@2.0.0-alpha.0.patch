@@ -288,6 +288,72 @@ index 6b8a3617f27946fec9535b14e108400de48a4bf2..a85c7f25ba6bcba2378334683a24ccec
  				if (prevItems.length === nextItems.length) return prevItems;
  				return nextItems;
  			});
+diff --git a/dist/create-list-state/C8P6E0Wr.js b/dist/create-list-state/C8P6E0Wr.js
+index 3a1c10db9009ce119539b2c8eb8d63b29f880d43..0defd369d272b01114acb420fcbb88f56c85eae5 100644
+--- a/dist/create-list-state/C8P6E0Wr.js
++++ b/dist/create-list-state/C8P6E0Wr.js
+@@ -1,7 +1,7 @@
+ import { n as createCollection } from "../create-collection/B_KE11tb.js";
+ import { t as primitives_exports } from "../primitives/CLOXSc13.js";
+ import { useLocale } from "../i18n/index.js";
+-import { createEffect, createMemo, createSignal, flush, merge, onSettled } from "solid-js";
++import { createEffect, createMemo, createSignal, flush, merge, onSettled, untrack } from "solid-js";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler } from "@kobalte/utils";
+ import { isAppleDevice, isMac } from "@solid-primitives/platform";
+@@ -361,7 +361,7 @@ function createSelectableCollection(props, ref, scrollRef) {
+ 	};
+ 	onSettled(() => {
+ 		if (mergedProps.deferAutoFocus) setTimeout(tryAutoFocus, 0);
+-		else tryAutoFocus();
++		else untrack(tryAutoFocus);
+ 	});
+ 	createEffect(() => [
+ 		finalScrollRef(),
+@@ -448,8 +448,8 @@ function createSelectableItem(props, ref) {
+ 		manager().focusedKey(),
+ 		manager().isFocused()
+ 	], ([refEl, itemKey, virtualFocus, focusedKey, isFocused]) => {
+-		if (refEl && itemKey === focusedKey && isFocused && !virtualFocus && document.activeElement !== refEl) if (props.focus) props.focus();
+-		else refEl.focus({ preventScroll: true });
++		if (refEl && itemKey === focusedKey && isFocused && !virtualFocus && document.activeElement !== refEl) if (props.focus) untrack(() => props.focus());
++		else untrack(() => refEl.focus({ preventScroll: true }));
+ 	});
+ 	return {
+ 		isSelected,
+diff --git a/dist/create-list-state/CgkAj-2j.jsx b/dist/create-list-state/CgkAj-2j.jsx
+index 459d60819480f18a86c3b292291761620c37ffad..4ab66e7b0e016c45fda73d55134eb77d21f1b785 100644
+--- a/dist/create-list-state/CgkAj-2j.jsx
++++ b/dist/create-list-state/CgkAj-2j.jsx
+@@ -1,7 +1,7 @@
+ import { n as createCollection } from "../create-collection/B_KE11tb.jsx";
+ import { t as primitives_exports } from "../primitives/BlSoAAAV.jsx";
+ import { useLocale } from "../i18n/index.jsx";
+-import { createEffect, createMemo, createSignal, flush, merge, onSettled } from "solid-js";
++import { createEffect, createMemo, createSignal, flush, merge, onSettled, untrack } from "solid-js";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler } from "@kobalte/utils";
+ import { isAppleDevice, isMac } from "@solid-primitives/platform";
+@@ -361,7 +361,7 @@ function createSelectableCollection(props, ref, scrollRef) {
+ 	};
+ 	onSettled(() => {
+ 		if (mergedProps.deferAutoFocus) setTimeout(tryAutoFocus, 0);
+-		else tryAutoFocus();
++		else untrack(tryAutoFocus);
+ 	});
+ 	createEffect(() => [
+ 		finalScrollRef(),
+@@ -448,8 +448,8 @@ function createSelectableItem(props, ref) {
+ 		manager().focusedKey(),
+ 		manager().isFocused()
+ 	], ([refEl, itemKey, virtualFocus, focusedKey, isFocused]) => {
+-		if (refEl && itemKey === focusedKey && isFocused && !virtualFocus && document.activeElement !== refEl) if (props.focus) props.focus();
+-		else refEl.focus({ preventScroll: true });
++		if (refEl && itemKey === focusedKey && isFocused && !virtualFocus && document.activeElement !== refEl) if (props.focus) untrack(() => props.focus());
++		else untrack(() => refEl.focus({ preventScroll: true }));
+ 	});
+ 	return {
+ 		isSelected,
 diff --git a/dist/hidden-select-base/DZDStUWy.js b/dist/hidden-select-base/DZDStUWy.js
 index 1de7ae73fc0f9f87874450396bf6e1972f9910e5..6b581d1fddcfd705ac860d43a1fa727eb0e3a7f0 100644
 --- a/dist/hidden-select-base/DZDStUWy.js
@@ -522,7 +588,7 @@ index 37fab336dc4866a58d11de9d0953319b51bb61f2..1add17f7eb3dc64697b6a7b76da22606
  		items,
  		onItemsChange: setItems
 diff --git a/dist/select/C2EhSCqp.jsx b/dist/select/C2EhSCqp.jsx
-index c59f01b8f5d79f3d349b315a7b131100cf2a0033..a851c2a92b7009c589e4e6cd90635836ebb41ecb 100644
+index c59f01b8f5d79f3d349b315a7b131100cf2a0033..8d1839b006676f64be7b595746e59d1edce25098 100644
 --- a/dist/select/C2EhSCqp.jsx
 +++ b/dist/select/C2EhSCqp.jsx
 @@ -15,7 +15,7 @@ import { i as PopperArrow, t as Popper } from "../popper/BzGqGM_d.jsx";
@@ -542,12 +608,12 @@ index c59f01b8f5d79f3d349b315a7b131100cf2a0033..a851c2a92b7009c589e4e6cd90635836
 -		listState.selectionManager().setSelectedKeys(keysToKeep);
 +		const selectionManager = untrack(() => listState.selectionManager());
 +		const keysToKeep = [...untrack(() => selectionManager.selectedKeys())].filter((key) => keys.includes(key));
-+		selectionManager.setSelectedKeys(keysToKeep);
++		untrack(() => selectionManager.setSelectedKeys(keysToKeep));
  	}, { defer: true });
  	const dataset = createMemo(() => ({
  		"data-expanded": disclosureState.isOpen() ? "" : void 0,
 diff --git a/dist/select/DuH3IApm.js b/dist/select/DuH3IApm.js
-index f74d54461295486ec063fd32d5dfe5489be7a339..9086cac82421234bb0adda512792439a0e23a7ec 100644
+index f74d54461295486ec063fd32d5dfe5489be7a339..5288fca45a4b39b2e56fcc402c3f7d9c0f8d04a7 100644
 --- a/dist/select/DuH3IApm.js
 +++ b/dist/select/DuH3IApm.js
 @@ -16,7 +16,7 @@ import { a as ListboxItemLabel, c as ListboxItem, i as ListboxRoot, o as Listbox
@@ -567,7 +633,7 @@ index f74d54461295486ec063fd32d5dfe5489be7a339..9086cac82421234bb0adda512792439a
 -		listState.selectionManager().setSelectedKeys(keysToKeep);
 +		const selectionManager = untrack(() => listState.selectionManager());
 +		const keysToKeep = [...untrack(() => selectionManager.selectedKeys())].filter((key) => keys.includes(key));
-+		selectionManager.setSelectedKeys(keysToKeep);
++		untrack(() => selectionManager.setSelectedKeys(keysToKeep));
  	}, { defer: true });
  	const dataset = createMemo(() => ({
  		"data-expanded": disclosureState.isOpen() ? "" : void 0,
