@@ -239,6 +239,85 @@ describe("TeamApiServer agents", () => {
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Gemini agents, provider rows, models and sign-in on the host for every protocol", async () => {
+    const fixture = opencodeFixture[0];
+    if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
+    const chief: AgentSummary = { ...fixture, id: "chief", provider: "codex", model: "gpt-5.6-luna" };
+    const gemini: AgentSummary = { ...fixture, id: "agent-gemini", provider: "antigravity", model: "gemini-3-pro" };
+    const option = { name: "Model", description: "", defaultReasoningEffort: "medium" as const };
+    const createAgent = vi.fn(async () => chief);
+    const updateAgent = vi.fn(async () => gemini);
+    const { start, signIn } = await createTeamApiFixture("antigravity-visibility", { configure: true });
+    const { base } = await start({
+      appVersion: "1.0.0",
+      agents: createAgents({
+        listAgents: () => [chief, gemini],
+        createAgent,
+        updateAgent,
+        getStatus: () => ({
+          phase: "ready",
+          cliVersion: null,
+          auth: { kind: "antigravity", email: "owner@example.com" },
+          providers: [
+            { id: "codex", state: "available", version: null, message: null },
+            { id: "antigravity", state: "available", version: null, message: null, email: "owner@example.com" },
+          ],
+          capabilities: { chat: "ready", browser: "ready", computerUse: "ready" },
+          message: null,
+          fullAccess: true,
+        }),
+        listModels: () => [
+          { ...option, provider: "codex", id: "gpt-5.6-luna", supportedReasoningEfforts: ["medium"] },
+          { ...option, provider: "antigravity", id: "gemini-3-pro", supportedReasoningEfforts: ["medium"] },
+        ],
+      }),
+    });
+    const token = await signIn({ protocol: 4, appVersion: "1.0.0" });
+    for (const protocol of [1, 2, 3, 4]) {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
+        [TEAM_APP_VERSION_HEADER]: "1.0.0",
+        [TEAM_CAPABILITIES_HEADER]: protocol === 4 ? "opencode,agent-create-model" : "",
+        "Content-Type": "application/json",
+      };
+      for (const path of ["/v1/agents", "/v1/agents/status", "/v1/agents/models"]) {
+        const response = await fetch(`${base}${path}`, { headers });
+        expect(response.status).toBe(200);
+        expect(await response.text()).not.toContain("antigravity");
+      }
+      const status = await (await fetch(`${base}/v1/agents/status`, { headers })).json();
+      expect(status.auth).toEqual({ kind: "unknown" });
+      const agentIds = (await (await fetch(`${base}/v1/agents`, { headers })).json()).map(
+        (agent: AgentSummary) => agent.id,
+      );
+      expect(agentIds).toEqual(["chief"]);
+      const update = await fetch(`${base}/v1/agents/${gemini.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Renamed" }),
+      });
+      expect(update.status).toBe(404);
+      if (protocol === 4) {
+        const create = await fetch(`${base}/v1/agents`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            name: "Explorer",
+            description: "",
+            initialMessage: "Hello.",
+            avatarSeed: "mobile:newagentseed",
+            avatarHue: null,
+            provider: "antigravity",
+          }),
+        });
+        expect(create.status).toBe(400);
+      }
+    }
+    expect(createAgent).not.toHaveBeenCalled();
+    expect(updateAgent).not.toHaveBeenCalled();
+  });
+
   it("keeps agent access on the computer that runs the agent", async () => {
     const fixture = opencodeFixture[0];
     if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");

@@ -1,6 +1,6 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -45,7 +45,7 @@ export async function routeProviders(
       case PROVIDERS_ADMIN_ROUTES.apiKeyState:
         return json(200, { status: credentials.status(parsed(provider, body)) });
       case PROVIDERS_ADMIN_ROUTES.apiKeySet: {
-        const input = parsed(parseProviderApiKeyInput, body);
+        const input = parsed(wireApiKeyInput, body);
         // The same step as the local handler: the key and the process that uses it change together.
         await service.changeProviderCredential(input.provider, () => credentials.set(input.provider, input.key));
         return json(200, {});
@@ -85,8 +85,28 @@ function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
 }
 
-function provider(body: DynamicRecord) {
-  return parseProviderId(body.provider);
+/**
+ * The providers that `providers-v1` knows. Gemini (`antigravity`) stays on this computer, so a peer
+ * that names it gets the same refusal as for a provider that does not exist.
+ */
+const WIRE_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const satisfies readonly ManagedProviderId[];
+type WireProviderId = (typeof WIRE_PROVIDERS)[number];
+
+/** The `providers-v1` runtime snapshot. It has no entry for a local-only provider. */
+interface WireProviderRuntimeSnapshot extends Omit<ProviderRuntimeSnapshot, "providers"> {
+  providers: Record<WireProviderId, ProviderRuntimeStatus>;
+}
+
+function provider(body: DynamicRecord): WireProviderId {
+  const id = parseProviderId(body.provider);
+  if (!isOneOf(WIRE_PROVIDERS, id)) throw new Error("Unknown provider.");
+  return id;
+}
+
+function wireApiKeyInput(body: DynamicRecord) {
+  const input = parseProviderApiKeyInput(body);
+  if (!isOneOf(WIRE_PROVIDERS, input.provider)) throw new Error("Unknown provider.");
+  return input;
 }
 
 function managedProvider(body: DynamicRecord): ManagedProviderId {
@@ -104,7 +124,7 @@ function parsed<T>(parse: (value: DynamicRecord) => T, body: DynamicRecord): T {
 }
 
 /** A long download error is cut to the wire bound, so the snapshot never fails closed on the client. */
-function wireSnapshot(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
+function wireSnapshot(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSnapshot {
   return {
     revision: snapshot.revision,
     providers: {

@@ -22,6 +22,7 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),
       opencode: decodeProviderRuntimeStatus(providers.opencode),
+      antigravity: decodeProviderRuntimeStatus(providers.antigravity),
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

@@ -129,4 +129,16 @@ export const messages = {
   "error.provider.tryAgain": "もう一度お試しください。",
   "error.provider.noAgentProcess": "{provider} には、このエージェント用に実行中のプロセスがありません。",
   "error.provider.stoppedBeforeAgentProcess": "エージェントのプロセスが開始する前に {provider} が停止しました。",
+  "error.provider.archiveUnreadable": "ランタイムのアーカイブを読み取れないか、対応していない形式です。",
+  "error.provider.antigravityArchivePath": "Gemini のアーカイブに予期しないファイルがあります。",
+  "error.provider.antigravityChecksum": "Gemini ランタイムのチェックサムが一致しません。",
+  "error.provider.antigravityReleaseShape": "Gemini のリリースの形式が予期しないものです。",
+  "error.provider.antigravityMissing":
+    "Gemini はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.antigravityNotStarted": "Gemini サーバーは見つかりましたが、バージョンを読み取れません。",
+  "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
+  "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
+  "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
+  "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -90,6 +90,17 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     message: null,
     fullAccess: true,
   },
+  antigravity: {
+    phase: "blocked",
+    cliVersion: "1.2.1",
+    auth: { kind: "unknown" },
+    providers: [
+      { id: "antigravity", state: "sign-in-required", connectionState: "connecting", version: "1.2.1", message: null },
+    ],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
 };
 
 /** A fresh Mac: the driver is there and neither grant has been given yet. */

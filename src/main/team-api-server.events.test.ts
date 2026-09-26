@@ -39,14 +39,16 @@ import {
 afterEach(stopTeamApiFixtures);
 
 describe("TeamApiServer events", () => {
-  it("filters OpenCode snapshots and events for old peers without changing the host", async () => {
+  it("filters OpenCode for old peers and Gemini for every peer without changing the host", async () => {
     const source = opencodeFixture[0];
     if (!isAgentSummary(source)) throw new Error("Invalid OpenCode fixture.");
+    // Gemini stays on the host: no protocol, v4 included, gets its agent.
+    const gemini: AgentSummary = { ...source, id: "agent-gemini", provider: "antigravity", model: "gemini-3-pro" };
     const events = new EventEmitter();
-    const snapshot = { ...createAgents().getRuntimeSnapshot(), agents: [source] };
+    const snapshot = { ...createAgents().getRuntimeSnapshot(), agents: [source, gemini] };
     const { store, start } = await createTeamApiFixture("provider-events", { configure: true });
     const { port } = await start({
-      agents: createAgents({ listAgents: () => [source], getRuntimeSnapshot: () => snapshot }, events),
+      agents: createAgents({ listAgents: () => [source, gemini], getRuntimeSnapshot: () => snapshot }, events),
     });
     const login = await store.login("owner", "correct horse battery");
     for (const supportsOpencode of [false, true]) {
@@ -72,13 +74,13 @@ describe("TeamApiServer events", () => {
       const changed = new Promise<unknown>((resolve) =>
         socket.addEventListener("message", (event) => resolve(JSON.parse(String(event.data))), { once: true }),
       );
-      events.emit("event", { type: "agents-changed", agents: [source] });
+      events.emit("event", { type: "agents-changed", agents: [source, gemini] });
       await expect(changed).resolves.toMatchObject({ type: "bots-changed", bots: supportsOpencode ? [source] : [] });
       const closed = new Promise<void>((resolve) => socket.addEventListener("close", () => resolve(), { once: true }));
       socket.close();
       await closed;
     }
-    expect(snapshot.agents).toEqual([source]);
+    expect(snapshot.agents).toEqual([source, gemini]);
   });
 
   it("shares sidebar layout mutations with owner, admin, and member clients", async () => {

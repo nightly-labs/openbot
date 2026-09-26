@@ -19,7 +19,7 @@ import { isOneOf } from "./runtime-values";
  * the per-provider argv, palette tokens and runtime-lock schemas, which belong to the driver, the
  * stylesheet and the lock file.
  */
-export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
+export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity"] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
 export function isAgentProvider(value: unknown): value is AgentProviderId {
@@ -118,6 +118,21 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     pickerOrder: 3,
     codeSignIn: false,
   },
+  // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
+  // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
+  antigravity: {
+    id: "antigravity",
+    displayName: "Gemini",
+    cliName: "Antigravity ACP server",
+    onboardingDescription: "Google AI Pro or Ultra plan",
+    signInMessage: "Sign in with Google to use Gemini.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "antigravity",
+    pickerOrder: 4,
+    codeSignIn: false,
+  },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 
 export const AGENT_PROVIDER_DESCRIPTORS: readonly AgentProviderDescriptor[] = AGENT_PROVIDERS.map(
@@ -154,6 +169,7 @@ export const MANAGED_RUNTIME_PROVIDERS = [
   "claude",
   "grok",
   "opencode",
+  "antigravity",
 ] as const satisfies readonly AgentProviderId[];
 export type ManagedProviderId = (typeof MANAGED_RUNTIME_PROVIDERS)[number];
 

@@ -6,10 +6,9 @@ import {
   parseGenerateAgentProfile,
   parseSaveAgentProfile,
 } from "../ipc-agent-profile";
-import { isAgentProvider } from "../ipc-agent-status";
 import { BROWSER_SECRET_RESPONSE_PATH, parseBrowserSecretResponse } from "../ipc-browser-secret";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
-import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
+import { isBoolean, isDynamicRecord, isOneOf, isString } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import {
   decodeBrowserDisplayResponse,
@@ -306,11 +305,17 @@ function decodeUnreadRequest(value: unknown): TeamProtocolV4BaseJsonObject {
  * a present field with the wrong shape rejects the request rather than silently starting the agent
  * on the host default. Absent fields stay absent, so the host default still applies.
  */
+/**
+ * The providers v4 shipped with. It is not the app's provider list: a provider the app adds later
+ * is not part of this frozen protocol, so a v4 request cannot name it.
+ */
+const V4_AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
+
 function decodeAgentCreateModel(value: unknown): TeamProtocolV4BaseJsonObject {
   if (!isDynamicRecord(value)) throw new Error("Invalid agent creation request.");
   const result: TeamProtocolV4BaseJsonObject = {};
   if (value.provider !== undefined) {
-    if (!isAgentProvider(value.provider)) throw new Error("Invalid agent provider.");
+    if (!isOneOf(V4_AGENT_PROVIDERS, value.provider)) throw new Error("Invalid agent provider.");
     result.provider = value.provider;
   }
   if (value.model !== undefined) {

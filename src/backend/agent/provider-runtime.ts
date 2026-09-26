@@ -20,6 +20,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
 import {
@@ -44,12 +45,7 @@ import {
   decodeRecordResponse,
   type ModelListResponse,
 } from "./../protocol";
-import {
-  BUILT_IN_PROVIDER_DRIVERS,
-  type ProviderCliCommand,
-  type ProviderClientContext,
-  requireProviderDriver,
-} from "./../provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, type ProviderClientContext, requireProviderDriver } from "./../provider-drivers";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { withTimeout } from "../with-timeout";
@@ -204,6 +200,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "claude", state: "not-started", version: null, message: null },
     { id: "grok", state: "not-started", version: null, message: null },
     { id: "opencode", state: "not-started", version: null, message: null },
+    { id: "antigravity", state: "not-started", version: null, message: null },
   ],
   capabilities: {
     chat: "unavailable",
@@ -622,7 +619,27 @@ export class ProviderRuntime implements ProviderPort {
           return this.#startCodexLogin(openExternal);
         case "cli-command":
           await this.#cancelCliLogin(provider, null);
-          return this.#startCliLogin(provider, signIn.command);
+          return this.#startCliLogin(provider, (cli) => {
+            const child = spawn(cli.executable, [...signIn.command.argv], {
+              cwd: process.cwd(),
+              env: { ...process.env, ...signIn.command.env(cli) },
+              stdio: "ignore",
+              shell: false,
+              windowsHide: process.platform === "win32",
+            });
+            return { child, done: waitForSuccessfulProcess(child, signIn.command.timeoutMs) };
+          });
+        case "acp-authenticate":
+          await this.#cancelCliLogin(provider, null);
+          return this.#startCliLogin(provider, (cli) =>
+            startAcpAuthentication({
+              executable: cli.executable,
+              argv: signIn.argv,
+              env: {},
+              methodId: signIn.methodId,
+              timeoutMs: signIn.timeoutMs,
+            }),
+          );
         case "external":
           // Nothing to spawn: the user signs in with the provider's own CLI in a terminal, and
           // Connect only asks the provider again whether that has happened.
@@ -1031,6 +1048,7 @@ export class ProviderRuntime implements ProviderPort {
             case "browser":
               return this.#settleCodexLoginForRefresh();
             case "cli-command":
+            case "acp-authenticate":
             case "external":
               // `external` has nothing to cancel, and the call is a no-op without a pending login.
               await this.#cancelCliLogin(driver.id, null);
@@ -1381,23 +1399,20 @@ export class ProviderRuntime implements ProviderPort {
     }
   }
 
-  async #startCliLogin(provider: AgentProvider, command: ProviderCliCommand): Promise<AgentStatus> {
+  async #startCliLogin(
+    provider: AgentProvider,
+    start: (cli: AgentCliInfo) => { child: ChildProcess; done: Promise<void> },
+  ): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
 
     try {
       cli = await this.#resolveProviderCli(provider);
-      const child = spawn(cli.executable, [...command.argv], {
-        cwd: process.cwd(),
-        env: { ...process.env, ...command.env(cli) },
-        stdio: "ignore",
-        shell: false,
-        windowsHide: process.platform === "win32",
-      });
+      const { child, done } = start(cli);
       const pending: PendingCliLogin = { child, cli, task: null };
       this.#cliLogins.set(provider, pending);
       recordRestartActivity();
-      pending.task = waitForSuccessfulProcess(child, command.timeoutMs)
+      pending.task = done
         .then(() => this.#completeCliLogin(provider, pending))
         .catch((error) => this.#failCliLogin(provider, pending, error));
       return this.status();

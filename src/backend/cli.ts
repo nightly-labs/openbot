@@ -1,10 +1,11 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, posix, resolve, win32 } from "node:path";
+import { dirname, extname, join, posix, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 
 const execFileAsync = promisify(execFile);
@@ -36,7 +37,13 @@ export interface OpencodeCliInfo {
   source?: "system" | "managed";
 }
 
-export type AgentCliInfo = CodexCliInfo | ClaudeCliInfo | GrokCliInfo | OpencodeCliInfo;
+export interface AntigravityCliInfo {
+  executable: string;
+  version: string;
+  source?: "system" | "managed";
+}
+
+export type AgentCliInfo = CodexCliInfo | ClaudeCliInfo | GrokCliInfo | OpencodeCliInfo | AntigravityCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -205,6 +212,64 @@ export async function resolveOpencodeCli(
     found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
     found ? "invalid" : "missing",
   );
+}
+
+/** The file beside `bin/` that names the version of an Antigravity install. */
+export const ANTIGRAVITY_MANIFEST = "antigravity-package.json";
+
+export function antigravityHarnessName(target: string): "localharness_external" | "localharness_external.exe" {
+  return target.startsWith("win32") ? "localharness_external.exe" : "localharness_external";
+}
+
+/**
+ * The Antigravity server is never looked for on `PATH`: the Antigravity IDE installs an
+ * `antigravity` command that is an editor, not this server. Only the copy OpenBot downloaded, or the
+ * path in `OPENBOT_ANTIGRAVITY_PATH`, is used. The server takes no `--version`, so the version comes
+ * from the manifest two levels above the program, which a managed install writes.
+ *
+ * A path the user set is the only candidate: when it cannot start, the error says so, and the
+ * managed copy does not run in its place without a message.
+ */
+export async function resolveAntigravityCli(
+  input: { systemCandidates?: string[]; bundledExecutable?: string | null } = {},
+): Promise<AntigravityCliInfo> {
+  const override = input.systemCandidates ?? [configuredCliPath("antigravity")].filter((path) => path !== null);
+  const candidates =
+    override.length > 0
+      ? override.map((executable) => ({ executable, source: "system" as const }))
+      : input.bundledExecutable
+        ? [{ executable: input.bundledExecutable, source: "managed" as const }]
+        : [];
+  let found = false;
+  for (const candidate of candidates) {
+    if (!(await isExecutable(candidate.executable))) continue;
+    found = true;
+    try {
+      const manifest = join(dirname(dirname(candidate.executable)), ANTIGRAVITY_MANIFEST);
+      const version = parseAntigravityVersion(await readFile(manifest, "utf8"));
+      return { executable: candidate.executable, version, source: candidate.source };
+    } catch {
+      /* Try the remaining candidates. */
+    }
+  }
+  throw new CodexCliError(
+    found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
+    found ? "invalid" : "missing",
+  );
+}
+
+export function parseAntigravityVersion(manifest: string): string {
+  let version: unknown = null;
+  try {
+    const value = JSON.parse(manifest);
+    if (isDynamicRecord(value)) version = value.version;
+  } catch {
+    /* Reported below. */
+  }
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/u.test(version)) {
+    throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
+  }
+  return version;
 }
 
 export function bundledOpencodeExecutable(

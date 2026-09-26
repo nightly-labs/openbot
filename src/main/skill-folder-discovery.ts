@@ -12,17 +12,19 @@ import { OWNERSHIP_MARKER } from "./managed-skill-service";
  * The workspace skill folders each provider CLI reads by itself. OpenBot writes only `.agents/skills`
  * and `.claude/skills`. An agent keeps its workspace when its provider changes, so a skill can stay
  * in a folder the new provider does not read.
- * Sources: the Codex "build skills" guide, the Claude Code skills guide and the opencode skills guide.
+ * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide and
+ * the skill paths in Google's Antigravity ACP server.
  */
 const PROVIDER_SKILL_FOLDERS: Record<AgentProviderId, readonly string[]> = {
   codex: [".agents/skills"],
   claude: [".claude/skills"],
   grok: [".agents/skills"],
   opencode: [".opencode/skills", ".agents/skills", ".claude/skills"],
+  antigravity: [".gemini/skills", ".agents/skills"],
 };
 
 /** A skill in one of these workspace folders is listed even when the agent's provider does not read it. */
-const WORKSPACE_SKILL_FOLDERS = [".agents/skills", ".claude/skills", ".opencode/skills"] as const;
+const WORKSPACE_SKILL_FOLDERS = [".agents/skills", ".claude/skills", ".opencode/skills", ".gemini/skills"] as const;
 const MAX_SKILLS_PER_FOLDER = 200;
 const MAX_SKILL_FILE_BYTES = 256 * 1024;
 

@@ -24,6 +24,7 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onC
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
+import { FREE_PROVIDER, onboardingProviderRows } from "./onboarding-provider-rows";
 import { fallbackProviderState } from "./onboarding-provider-state";
 
 export interface OnboardingFlowProps {
@@ -81,6 +82,7 @@ const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string 
 const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
   "Included with OpenBot": "onboarding.provider.included",
   "Free models, no account needed": "onboarding.provider.freeModels",
+  "Google AI Pro or Ultra plan": "onboarding.provider.googlePlan",
 };
 
 /**
@@ -175,6 +177,44 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     }),
   );
   /**
+   * The plan rows that stay in the list, in their order, or `null` until the user first acts on the
+   * list. Until then the row rule can change the list when the provider status arrives. After that,
+   * a row never moves or goes away under the pointer.
+   */
+  const [keptProviders, setKeptProviders] = createSignal<AgentProviderId[] | null>(null);
+  /** The user chose the custom provider in "More providers", so it is a row from now on. */
+  const [customRevealed, setCustomRevealed] = createSignal(false);
+  const providerRows = createMemo(() => onboardingProviderRows(providerOptions(), keptProviders() ?? []));
+  const customInMore = () =>
+    Boolean(props.onAddCustomProvider) && (props.customProviders ?? []).length === 0 && !customRevealed();
+
+  /** Keeps the rows that the user sees now, and adds `provider` after them if it is not a row. */
+  function keepProviderRows(provider?: AgentProviderId): void {
+    const kept =
+      keptProviders() ??
+      providerRows()
+        .listed.map((option) => option.id)
+        .filter((id) => id !== FREE_PROVIDER);
+    const next = provider && provider !== FREE_PROVIDER && !kept.includes(provider) ? [...kept, provider] : kept;
+    if (next !== keptProviders()) setKeptProviders(next);
+  }
+
+  function chooseMoreProvider(provider: AgentProviderId): void {
+    keepProviderRows(provider);
+    setProviderSelectedByUser(true);
+    setSelectedProvider(provider);
+    setCustomSelected(false);
+  }
+
+  /** OpenCode runs the custom endpoints, so the form opens only when OpenCode can run one. */
+  function chooseMoreCustom(): void {
+    keepProviderRows();
+    setCustomRevealed(true);
+    const openCode = providerOptions().find((option) => option.id === FREE_PROVIDER);
+    if (openCode?.state === "available" || openCode?.state === "sign-in-required") host.openForm();
+  }
+
+  /**
    * The dialogs that add and remove an endpoint. The state is shared with Settings, which carries the
    * same removal sentence and the same busy row; what happens after a save or a removal is this
    * step's own, because only this step starts an agent on the model it just learned about.
@@ -195,6 +235,8 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       // `onSave` reads these two to decide whether to send a model, so a model of an endpoint that is
       // gone would be stored on the first agent. The remaining endpoints keep the row selected.
       if (customModel()?.startsWith(`${id}/`)) setCustomModel(null);
+      // The row stays where the user saw it, and does not go back into "More providers".
+      setCustomRevealed(true);
       if ((props.customProviders ?? []).length === 0) setCustomSelected(false);
     },
   });
@@ -218,6 +260,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
   function selectCustomProvider(): void {
+    keepProviderRows();
     setProviderSelectedByUser(true);
     setSelectedProvider("opencode");
     setCustomSelected(true);
@@ -277,9 +320,11 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     ({ options, selected, selectedByUser }) => {
       if (selectedByUser && selected && options.some((provider) => provider.id === selected)) return;
       if (selected && options.some((provider) => provider.id === selected && providerReady(provider))) return;
-      // A signed-in provider comes first; free models are the way in when none is.
+      // A signed-in provider comes first, then one whose CLI is on the computer. Free models are the
+      // way in when the user has neither.
       const ready =
         options.find((provider) => provider.state === "available") ??
+        options.find((provider) => provider.state === "sign-in-required" && !provider.freeModels) ??
         options.find((provider) => providerReady(provider));
       setSelectedProvider(ready?.id ?? null);
     },
@@ -342,6 +387,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     kind: "install" | "sign-in",
   ): Promise<void> {
     if (!action) return;
+    keepProviderRows();
     setError("");
     try {
       await action(provider);
@@ -367,6 +413,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   async function connectProvider(provider: AgentProviderId): Promise<void> {
     if (!props.onConnectProvider || props.refreshingProviders) return;
+    keepProviderRows();
     setError("");
     setProviderErrors((current) => ({ ...current, [provider]: undefined }));
     providersAwaitingFocusRefresh.add(provider);
@@ -387,6 +434,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
   async function downloadProvider(provider: AgentProviderId): Promise<void> {
     if (!props.onDownloadProvider) return;
+    keepProviderRows();
     setError("");
     setProviderSelectedByUser(true);
     setSelectedProvider(provider);
@@ -571,7 +619,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                 <div class="onboarding-provider">
                   <ProviderPicker
                     value={selectedProvider()}
-                    options={providerOptions()}
+                    options={providerRows().listed}
                     ariaLabel={t("onboarding.provider.defaultLabel")}
                     label={t("onboarding.provider.label")}
                     hint={
@@ -603,7 +651,16 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                     customSelected={customSelected()}
                     onSelectCustomProvider={props.onAddCustomProvider ? selectCustomProvider : undefined}
                     onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
+                    moreProviders={providerRows().hidden}
+                    customInMore={customInMore()}
+                    moreCallout={{
+                      title: t("onboarding.provider.moreTitle"),
+                      detail: t("onboarding.provider.moreDetail"),
+                    }}
+                    onChooseMoreProvider={chooseMoreProvider}
+                    onChooseMoreCustom={chooseMoreCustom}
                     onChange={(provider) => {
+                      keepProviderRows();
                       setProviderSelectedByUser(true);
                       setSelectedProvider(provider);
                       setCustomSelected(false);

@@ -67,6 +67,9 @@ export function decodeProviderRuntimeSnapshot(value: unknown): ProviderRuntimeSn
       claude: decodeProviderRuntimeStatus(providers.claude),
       grok: decodeProviderRuntimeStatus(providers.grok),
       opencode: decodeProviderRuntimeStatus(providers.opencode),
+      // `providers-v1` has no Gemini entry: Gemini stays on the host computer. This client cannot
+      // download or run it on the host, so the status is always "not downloaded".
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
     },
     toolRuntimes: { bun: decodeProviderRuntimeStatus(toolRuntimes.bun) },
   };

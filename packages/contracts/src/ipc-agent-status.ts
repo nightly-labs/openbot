@@ -69,7 +69,8 @@ export type AgentAuthState =
   | { kind: "chatgpt"; email: string | null }
   | { kind: "claude"; email: string | null }
   | { kind: "grok"; email: string | null }
-  | { kind: "opencode"; email: string | null };
+  | { kind: "opencode"; email: string | null }
+  | { kind: "antigravity"; email: string | null };
 
 export interface AccountUsageWindow {
   usedPercent: number;

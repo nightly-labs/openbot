@@ -46,6 +46,14 @@ const HEADERS = { "User-Agent": "OpenBot-runtime-installer" };
 
 export type BlockedVersions = ReadonlyMap<ManagedProviderId, ReadonlySet<string>>;
 
+/** The ACP registry's name for each target. */
+const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
+  "darwin-arm64": "darwin-aarch64",
+  "linux-x64": "linux-x86_64",
+  "linux-arm64": "linux-aarch64",
+  "win32-x64": "windows-x86_64",
+};
+
 const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext) => Promise<RuntimeSpec>> = {
   codex: async ({ target, lock, fetch }) => {
     const pinned = providerRuntimeDescriptor("codex").spec(target, lock);
@@ -101,6 +109,42 @@ const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext)
     if (!VERSION.test(version)) throw new Error(sourceText("error.provider.grokReleaseVersion"));
     const asset = lock.grok.artifacts[target].asset.replace(`grok-${lock.grok.version}-`, `grok-${version}-`);
     const url = `${lock.grok.distribution}/${asset}`;
+    return {
+      ...pinned,
+      version,
+      packageVersion: version,
+      source: "latest",
+      url,
+      archiveDigest: null,
+      downloadBytes: await downloadSize(fetch, url),
+    };
+  },
+  /**
+   * Google publishes the server in the ACP registry, with no hash, so the latest release is trusted
+   * on TLS alone, like Grok's. The download must stay on Google's release path and keep the layout
+   * the pinned version has: a changed command means a changed archive, which staging would refuse.
+   */
+  antigravity: async ({ target, lock, fetch }) => {
+    const pinned = providerRuntimeDescriptor("antigravity").spec(target, lock);
+    const agent = await fetchJson(fetch, lock.antigravity.registry);
+    const version = isString(agent.version) ? agent.version : null;
+    const binary = isDynamicRecord(agent.distribution) ? agent.distribution.binary : null;
+    const entry = isDynamicRecord(binary) ? binary[ACP_REGISTRY_TARGETS[target]] : null;
+    const artifact = lock.antigravity.artifacts[target];
+    const url = isDynamicRecord(entry) && isString(entry.archive) ? entry.archive : null;
+    const expectedUrl = version
+      ? `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset.replace(
+          `-${lock.antigravity.version}-`,
+          `-${version}-`,
+        )}`
+      : null;
+    if (
+      !(version && VERSION.test(version) && url !== null && url === expectedUrl) ||
+      !isDynamicRecord(entry) ||
+      entry.cmd !== `./${artifact.executable}`
+    ) {
+      throw new Error(sourceText("error.provider.antigravityReleaseShape"));
+    }
     return {
       ...pinned,
       version,

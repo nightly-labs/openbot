@@ -6,7 +6,7 @@ import {
   parseHostAnalyticsInput,
   parseSaveAgentProfile,
 } from "@openbot/contracts/ipc";
-import { hiddenProviderAgentIds } from "./provider-visibility";
+import { hiddenProviderAgentIds, isPeerHiddenProvider } from "./provider-visibility";
 // Agents: the collection, the sidebar that arranges them, and everything under one agent's id.
 //
 // The order in this file is the one thing about it that is not free. The static collection paths -
@@ -20,6 +20,7 @@ import { hiddenProviderAgentIds } from "./provider-visibility";
 // 400 on a malformed identifier into a 404 for some methods and not others.
 
 import { readFile } from "node:fs/promises";
+import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DuplicateAgentResult } from "@openbot/contracts/ipc";
@@ -62,10 +63,21 @@ export async function routeAgents(
   { agents, skills, sidebarLayout, duplicateAgent }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
-  const hidden = context.protocol < 4 ? hiddenProviderAgentIds(agents.listAgents()) : new Set<string>();
+  const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
   function requireCompatibleDefault(): void {
     if (context.protocol < 4 && agents.preferredProvider() === "opencode") {
       throw new HttpError(400, sourceText("error.team.defaultProviderRequiresV4"));
+    }
+  }
+  /**
+   * A peer cannot start an agent on a provider that its protocol does not show: the agent would be
+   * hidden from the peer that made it. With no named provider, the host default applies.
+   */
+  function requireVisibleProvider(named: AgentProviderId | undefined): void {
+    if (named !== undefined) {
+      if (isPeerHiddenProvider(named, context.protocol)) throw new HttpError(400, "provider is invalid.");
+    } else if (isPeerHiddenProvider(agents.preferredProvider(), context.protocol)) {
+      throw new HttpError(400, sourceText("error.team.providersUnsupported"));
     }
   }
   function requireVisible(id: string | undefined | null): void {
@@ -93,7 +105,10 @@ export async function routeAgents(
       throw new HttpError(400, sourceText("error.team.profileGenerationUnsupported"));
     const body = await readJson(request);
     if (typeof body.agentId === "string") requireVisible(body.agentId);
-    else requireCompatibleDefault();
+    else {
+      requireCompatibleDefault();
+      requireVisibleProvider(undefined);
+    }
     if (url.pathname === TEAM_API_ROUTES.agents.generateProfile) {
       return json(
         200,
@@ -146,8 +161,9 @@ export async function routeAgents(
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.agents.all) {
     requireCompatibleDefault();
-    const body = await readJson(request);
-    return json(201, await agents.createAgent(agentCreate(body)));
+    const input = agentCreate(await readJson(request));
+    requireVisibleProvider(input.provider);
+    return json(201, await agents.createAgent(input));
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
@@ -174,8 +190,9 @@ export async function routeAgents(
       return json(200, (await skills?.listInstalledForChatTags(agentId)) ?? []);
     }
     if (method === "PATCH" && !action) {
-      const body = await readJson(request);
-      return json(200, await agents.updateAgent(agentUpdate(body, agentId)));
+      const input = agentUpdate(await readJson(request), agentId);
+      if (input.provider !== undefined) requireVisibleProvider(input.provider);
+      return json(200, await agents.updateAgent(input));
     }
     if (method === "POST" && action === "duplicate") {
       const body = await readJson(request);

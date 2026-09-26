@@ -71,20 +71,35 @@ const bothConnectingAgentStatus: AgentStatus = {
   })),
 };
 
+/** A new computer: no provider is downloaded yet, Gemini included. */
 const lazyProviderAgentStatus: AgentStatus = {
   ...noProvidersConnectedAgentStatus,
-  providers: noProvidersConnectedAgentStatus.providers?.map((provider) => ({
-    ...provider,
-    state: "not-installed",
-    connectionState: undefined,
-    message: null,
-  })),
+  providers: [
+    ...(noProvidersConnectedAgentStatus.providers ?? []).map((provider) => ({
+      ...provider,
+      state: "not-installed" as const,
+      connectionState: undefined,
+      message: null,
+    })),
+    { id: "antigravity", state: "not-installed", version: null, message: null },
+  ],
+};
+
+/** Gemini is downloaded and signed in. The others are not downloaded yet. */
+const geminiSignedInAgentStatus: AgentStatus = {
+  ...lazyProviderAgentStatus,
+  providers: lazyProviderAgentStatus.providers?.map((provider) =>
+    provider.id === "antigravity"
+      ? { ...provider, state: "available", version: "1.2.1", email: "ada@example.com" }
+      : provider,
+  ),
 };
 
 const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStatus> => ({
   codex: { phase: "not-downloaded", progress: null, message: null, version: null },
   claude: { phase: "not-downloaded", progress: null, message: null, version: null },
   grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+  antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 
@@ -140,7 +155,7 @@ function RefreshResettingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviderAgentStatus.providers?.map((provider) =>
-    provider.id === "opencode" ? provider : { ...provider, state: "sign-in-required" },
+    provider.id === "opencode" || provider.id === "antigravity" ? provider : { ...provider, state: "sign-in-required" },
   ),
 };
 
@@ -155,9 +170,10 @@ function LazyProviderDownloadsFlow(props: {
   args: Parameters<typeof OnboardingFlow>[0];
   failGrokOnce?: boolean;
   downloaded?: boolean;
+  initialAgentStatus?: AgentStatus;
 }) {
   const [agentStatus, setAgentStatus] = createSignal(
-    props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus,
+    props.initialAgentStatus ?? (props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus),
   );
   const [runtimeStatuses, setRuntimeStatuses] = createSignal(
     props.downloaded ? downloadedRuntimeStatuses() : initialRuntimeStatuses(),
@@ -477,6 +493,27 @@ export const LazyProviderDownloads: Story = {
     agentStatus: lazyProviderAgentStatus,
   },
   render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} />,
+};
+
+/**
+ * A new computer with no saved endpoint. The list shows ChatGPT, Claude, Grok and OpenCode. Gemini
+ * and the custom provider are in "More providers".
+ */
+export const NewComputer: Story = {
+  args: {
+    agentStatus: lazyProviderAgentStatus,
+    customProviders: [],
+  },
+  render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} />,
+};
+
+/** The user is signed in to Gemini, so Gemini is the first row and Grok is in "More providers". */
+export const SignedInToGemini: Story = {
+  args: {
+    agentStatus: geminiSignedInAgentStatus,
+    customProviders: [],
+  },
+  render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} initialAgentStatus={geminiSignedInAgentStatus} />,
 };
 
 export const LazyProviderDownloadsWithFailure: Story = {

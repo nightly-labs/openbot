@@ -856,6 +856,137 @@
   line-height: 16px;
 }
 
+/* "More providers" is a button below the list, beside the hint. It uses the style of the heading's
+ * Refresh button, so the picker has one kind of small list action. */
+.provider-picker-footer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  margin-top: 7px;
+}
+
+.provider-picker-footer .provider-picker-hint {
+  margin: 0;
+}
+
+.ui-button.provider-picker-more {
+  flex: 0 0 auto;
+  gap: var(--openbot-space-1-5);
+  margin-inline-start: auto;
+  margin-inline-end: calc(var(--openbot-space-2) * -1);
+}
+
+.provider-picker-logo-stack {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+}
+
+.provider-picker-logo-stack-mark {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  box-shadow: 0 0 0 2px var(--openbot-bg-canvas);
+}
+
+.provider-picker-logo-stack-mark + .provider-picker-logo-stack-mark {
+  z-index: -1;
+  margin-inline-start: -4px;
+}
+
+.provider-picker-logo-stack-mark .provider-picker-logo {
+  width: 12px;
+  height: 12px;
+}
+
+/* The "More providers" dialog uses the custom provider dialog frame: a title, a close button and
+ * one plain list. It is pinned near the top, so it does not move when a search changes its height. */
+.custom-provider-backdrop.provider-more-backdrop {
+  align-items: start;
+  padding-top: min(14vh, 120px);
+}
+
+.custom-provider-dialog.provider-more-dialog {
+  width: min(400px, 100%);
+  max-height: min(600px, calc(100dvh - min(14vh, 120px) - var(--openbot-space-6)));
+  padding: var(--openbot-space-2);
+}
+
+.provider-more-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-1) var(--openbot-space-3);
+}
+
+.provider-more-title {
+  margin: 0;
+  font-size: var(--openbot-text-lg);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.ui-input.provider-more-search {
+  flex-shrink: 0;
+  margin: var(--openbot-space-1) 0 var(--openbot-space-2);
+}
+
+.provider-more-search::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.provider-more-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The name and description that the picker rows use; the full row is the target. */
+.ui-button.provider-more-row {
+  width: 100%;
+  height: auto;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  justify-content: stretch;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  color: inherit;
+  font: inherit;
+  line-height: normal;
+  text-align: left;
+  white-space: normal;
+}
+
+.ui-button.provider-more-row:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: -2px;
+}
+
+.provider-more-row .provider-picker-custom-mark {
+  grid-column: auto;
+}
+
+.provider-more-divider {
+  height: 1px;
+  margin: var(--openbot-space-1) var(--openbot-space-3);
+  border: 0;
+  background: var(--openbot-border);
+}
+
+.provider-more-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 .initial-setup-error {
   margin: 12px 2px 0;
   color: var(--openbot-danger);

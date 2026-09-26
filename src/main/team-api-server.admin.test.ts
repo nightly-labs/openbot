@@ -350,7 +350,7 @@ describe("Team API providers-v1", () => {
     };
     const snapshot: ProviderRuntimeSnapshot = {
       revision: 3,
-      providers: { codex: idle, claude: failed, grok: idle, opencode: idle },
+      providers: { codex: idle, claude: failed, grok: idle, opencode: idle, antigravity: idle },
       toolRuntimes: { bun: idle },
     };
     const runtimes = {
@@ -412,6 +412,15 @@ describe("Team API providers-v1", () => {
     // A long download error is cut to the wire bound, so the client does not refuse the snapshot.
     expect(download.providers.claude.message).toHaveLength(1024);
     expect((await send("/v1/admin/providers/runtimes/download", { provider: "cursor" })).status).toBe(400);
+    // Gemini stays on the host: providers-v1 has no entry for it, and a peer cannot name it.
+    expect(Object.keys(download.providers)).toEqual(["codex", "claude", "grok", "opencode"]);
+    for (const path of ["/v1/admin/providers/runtimes/download", "/v1/admin/providers/api-key/state"]) {
+      expect((await send(path, { provider: "antigravity" })).status).toBe(400);
+    }
+    expect((await send("/v1/admin/providers/api-key/set", { provider: "antigravity", key: PROVIDER_KEY })).status).toBe(
+      400,
+    );
+    expect(keys.size).toBe(0);
 
     const endpoint = {
       id: "studio",

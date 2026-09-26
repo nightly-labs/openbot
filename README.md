@@ -5,8 +5,8 @@
 
 OpenBot is a local-first desktop workspace for persistent AI teammates. It supports the local
 [Codex App Server](https://learn.chatgpt.com/docs/app-server) and
-[Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview)
-through ACP. It gives every agent its own workspace and
+[Claude Code](https://code.claude.com/docs/en/overview), plus [Grok CLI](https://docs.x.ai/build/overview),
+OpenCode, and Gemini through ACP. It gives every agent its own workspace and
 conversation, and provides local queues, file transfers, an embedded browser, and agent-to-agent
 messaging in one desktop app.
 
@@ -19,7 +19,7 @@ messaging in one desktop app.
 ## What works
 
 - Prompt-driven agent creation and editing on desktop and mobile, with editable instructions, avatar, and section review before saving.
-- Persistent agents backed by independent Codex, Claude, Grok, or OpenCode sessions and local workspaces.
+- Persistent agents backed by independent Codex, Claude, Grok, OpenCode, or Gemini sessions and local workspaces.
 - Per-agent context monitoring with automatic compaction before long threads exhaust the model window.
 - FIFO message queues with pause, resume, cancellation, and crash-safe persistence.
 - Agent-to-agent messages, replies, reactions, images, and managed file transfers.
@@ -31,7 +31,7 @@ messaging in one desktop app.
 - Optional OpenBot accounts through one-time email codes. The account API runs on Cloudflare Workers and D1.
 
 OpenBot is local-first, not offline-only. Codex connects to OpenAI, Claude connects to Anthropic,
-Grok connects to xAI,
+Grok connects to xAI, Gemini connects to Google,
 visited pages use the network, and installed plugins may connect to their own services.
 
 ## Install
@@ -111,6 +111,15 @@ Go key does not buy stay out of the picker. If you installed OpenCode yourself, 
 keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select an executable
 outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
 show these agents.
+
+Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity ACP server on
+this computer when you select Download on the Gemini row, because Google's license does not let
+OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
+`antigravity` command on your search path, because the Antigravity editor installs a command with
+that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
+`bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
+`bin/`. When that path is set, OpenBot uses only it. Gemini agents stay on this computer: team
+members do not see them.
 
 On Windows, install the native CLI and make sure `codex`, `claude`, or `grok` is available in PowerShell.
 Claude Code also requires Git for Windows. Then authenticate the installed CLI and restart OpenBot.
@@ -421,6 +430,8 @@ video formats, export as MP3 or MOV, or attach a text transcript. Remote hosts m
 - `~/.codex` — login and thread history managed exclusively by Codex CLI.
 - `~/.claude` — login and session history managed exclusively by Claude CLI.
 - `~/.grok` — login and session history managed exclusively by Grok CLI.
+- `~/.gemini` (or `$GEMINI_HOME`) — login and session history managed exclusively by the
+  Antigravity ACP server that Gemini uses.
 
 Deleting an agent removes its workspace, owned generated attachments, and deliveries addressed only
 to that agent. A transfer remains when another agent still uses the same message.

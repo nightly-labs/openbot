@@ -304,12 +304,16 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-// Migration 17 widens the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// Migrations 17 and 22 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
 // One line rather than the whole table: the substitution then survives any later baseline edit that does
 // not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
 const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
 
 const V17_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),`;
+
+// Migration 22 adds the Antigravity provider. This list is frozen with the migration: do not derive it
+// from `AGENT_PROVIDERS`, because a later provider must get its own migration.
+const V22_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),`;
 
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
@@ -367,7 +371,7 @@ const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
     BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-    V17_PROVIDER_SESSIONS_CHECK_SQL,
+    V22_PROVIDER_SESSIONS_CHECK_SQL,
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
@@ -465,6 +469,13 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Renames rows only, so no foreign-key pause, no vacuum, and nothing to mirror in the latest
     // schema: a new database has no rows to rename.
     up: freeComputerUseServerName,
+  },
+  {
+    version: 22,
+    // The same table rebuild as migration 17, so foreign keys stay off for the same reason: with them
+    // on, the DROP would set `projection_turns.provider_session_id` to NULL on every turn.
+    disableForeignKeys: true,
+    up: migrateProviderSessionsForAntigravity,
   },
 ];
 
@@ -719,16 +730,33 @@ function migrateProviderSessionsForGrok(db: DatabaseSync): void {
 // already built with the wider list, which is how a test replays an older version forward over a fresh file.
 // The index goes with the table it indexes, so it has to be recreated by name after the rename.
 function migrateProviderSessionsForOpencode(db: DatabaseSync): void {
+  widenProviderSessionsCheck(db, "'opencode'", V17_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v17");
+}
+
+// Migration 22 uses the same rebuild as migration 17. It also skips a table that already allows the
+// provider, so a replay over a database that `createLatestDatabase` built does not rebuild the table.
+function migrateProviderSessionsForAntigravity(db: DatabaseSync): void {
+  widenProviderSessionsCheck(db, "'antigravity'", V22_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v22");
+}
+
+// Migrations 17 and 22 share this SQL. Each migration gives its own CHECK line and staging table name, so the
+// SQL that migration 17 runs is the same text as before this function was shared.
+function widenProviderSessionsCheck(
+  db: DatabaseSync,
+  providerLiteral: string,
+  providerCheckSql: string,
+  stagingTable: string,
+): void {
   const row = db
     .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'projection_provider_sessions'")
     .get();
-  if (!isDynamicRecord(row) || !isString(row.sql) || row.sql.includes("'opencode'")) return;
+  if (!isDynamicRecord(row) || !isString(row.sql) || row.sql.includes(providerLiteral)) return;
 
   db.exec(`
-    CREATE TABLE projection_provider_sessions_v17 (
+    CREATE TABLE ${stagingTable} (
       id TEXT PRIMARY KEY,
       thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,
-      ${V17_PROVIDER_SESSIONS_CHECK_SQL}
+      ${providerCheckSql}
       external_session_id TEXT NOT NULL,
       model TEXT NOT NULL,
       effort TEXT NOT NULL,
@@ -739,7 +767,7 @@ function migrateProviderSessionsForOpencode(db: DatabaseSync): void {
       last_event_sequence INTEGER NOT NULL,
       UNIQUE(provider, external_session_id)
     );
-    INSERT INTO projection_provider_sessions_v17 (
+    INSERT INTO ${stagingTable} (
       id, thread_id, provider, external_session_id, model, effort, state,
       created_at, updated_at, resume_cursor, last_event_sequence
     ) SELECT
@@ -747,7 +775,7 @@ function migrateProviderSessionsForOpencode(db: DatabaseSync): void {
       created_at, updated_at, resume_cursor, last_event_sequence
     FROM projection_provider_sessions;
     DROP TABLE projection_provider_sessions;
-    ALTER TABLE projection_provider_sessions_v17 RENAME TO projection_provider_sessions;
+    ALTER TABLE ${stagingTable} RENAME TO projection_provider_sessions;
     CREATE INDEX provider_sessions_thread
       ON projection_provider_sessions(thread_id, provider, state);
   `);

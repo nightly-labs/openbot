@@ -21,9 +21,10 @@ import {
   Smartphone,
   Spinner,
 } from "@openbot/ui";
-import { createEffect, createUniqueId, For, Show } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { useText } from "../text";
+import { MoreProvidersDialog } from "./MoreProvidersDialog";
 
 export interface ProviderPickerOption {
   id: AgentProviderId;
@@ -102,12 +103,29 @@ export interface ProviderPickerProps {
    * a `<label>`: a click there would answer the radio instead.
    */
   onManageCustomProviders?: (() => void) | undefined;
+  /**
+   * The providers that the list does not show. With one or more, or with `customInMore`, a
+   * "More providers" button below the list opens a dialog that lists them. The caller adds the
+   * provider that the user chooses to `options`, and selects it.
+   */
+  moreProviders?: readonly ProviderPickerOption[] | undefined;
+  /** The custom provider row is in the "More providers" dialog, not in the list. */
+  customInMore?: boolean;
+  /** A note beside the "More providers" button, drawn like a row's `callout`. */
+  moreCallout?: { title: string; detail: string } | null;
+  onChooseMoreProvider?: ((provider: AgentProviderId) => void) | undefined;
+  onChooseMoreCustom?: (() => void) | undefined;
   onChange: (provider: AgentProviderId) => void;
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
   const { t, format, sourceText } = useText();
-  const inputs = new Map<AgentProviderId, HTMLInputElement>();
+  // Rows are keyed by position, so a row's input can show another provider after the list changes.
+  // The input is found by its current value, not by the provider it was made for.
+  const inputs = new Set<HTMLInputElement>();
+  const inputFor = (provider: AgentProviderId) =>
+    [...inputs].find((input) => input.isConnected && input.value === provider);
+  let moreButton: HTMLButtonElement | undefined;
   const pickerId = createUniqueId();
   const addCustomId = `${pickerId}-custom`;
   const customRadioId = `${pickerId}-custom-radio`;
@@ -121,6 +139,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
   const customSelectable = () => Boolean(props.onSelectCustomProvider) && endpointCount() > 0;
   /** The Custom provider row holds the check mark, so the provider row that serves it does not. */
   const checkedProvider = () => (customSelectable() && props.customSelected ? null : props.value);
+  const moreProviders = () => props.moreProviders ?? [];
+  const moreOffered = () => moreProviders().length > 0 || Boolean(props.customInMore);
+  const [moreOpen, setMoreOpen] = createSignal(false);
+  /**
+   * What the user chose in the dialog. A chosen provider becomes a row, so the focus goes to its
+   * radio and not back to the button. The custom provider opens its own dialog, which takes the focus.
+   */
+  let moreChoice: AgentProviderId | "custom" | null = null;
   let focused = false;
 
   /** One custom row; inside group when choosable, after when add-only. */
@@ -271,7 +297,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
       if (!focusFirst || focused) return;
       const first =
         options.find((option) => option.state === "available") ?? (allowUnavailableSelection ? options[0] : undefined);
-      const input = first ? inputs.get(first.id) : undefined;
+      const input = first ? inputFor(first.id) : undefined;
       if (!input) return;
       focused = true;
       input.focus();
@@ -384,22 +410,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                   title={option().message ? sourceText(option().message ?? "") : undefined}
                 >
                   <Show when={option().callout}>
-                    {(callout) => (
-                      <span class="provider-picker-callout" aria-hidden="true">
-                        <span class="provider-picker-callout-title">{callout().title}</span>
-                        <span class="provider-picker-callout-detail">{callout().detail}</span>
-                        <svg class="provider-picker-callout-arrow" viewBox="0 0 92 40" fill="none" aria-hidden="true">
-                          <circle cx="4" cy="6" r="3" fill="currentColor" />
-                          <path d="M4 6C20 34 56 38 81 31" stroke="currentColor" stroke-width="1.6" />
-                          <path d="M89 28.5L81.6 34.7L79.2 27Z" fill="currentColor" />
-                        </svg>
-                      </span>
-                    )}
+                    {(callout) => <ProviderCallout title={callout().title} detail={callout().detail} />}
                   </Show>
                   <label for={inputId()} class="provider-picker-option-selection">
                     <Input
                       id={inputId()}
-                      ref={(element) => inputs.set(option().id, element)}
+                      ref={(element) => inputs.add(element)}
                       type="radio"
                       name={props.ariaLabel}
                       value={option().id}
@@ -597,14 +613,97 @@ export function ProviderPicker(props: ProviderPickerProps) {
               );
             }}
           </For>
-          <Show when={customSelectable() ? openCode() : undefined}>{(engine) => customRow(engine)}</Show>
+          <Show when={customSelectable() && !props.customInMore ? openCode() : undefined}>
+            {(engine) => customRow(engine)}
+          </Show>
         </div>
-        <Show when={!customSelectable() && props.onAddCustomProvider ? openCode() : undefined}>
+        <Show when={!customSelectable() && props.onAddCustomProvider && !props.customInMore ? openCode() : undefined}>
           {(engine) => customRow(engine)}
         </Show>
       </div>
-      <Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>
+      <Show
+        when={moreOffered()}
+        fallback={<Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>}
+      >
+        {/* The button opens a dialog, so it is below the list and not a row in the radio group. */}
+        <div class="provider-picker-footer">
+          <Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            class="provider-picker-refresh provider-picker-more"
+            aria-haspopup="dialog"
+            ref={(element: HTMLButtonElement) => {
+              moreButton = element;
+            }}
+            disabled={props.disabled}
+            onClick={() => setMoreOpen(true)}
+          >
+            {/* Up to two logos, so the user can see that their provider is behind the button. */}
+            <Show when={moreProviders().length > 0}>
+              <span class="provider-picker-logo-stack" aria-hidden="true">
+                <For each={moreProviders().slice(0, 2)} keyed={false}>
+                  {(option) => (
+                    <span class="provider-picker-logo-stack-mark">
+                      <ProviderLogo provider={option().id} class="provider-picker-logo" />
+                    </span>
+                  )}
+                </For>
+              </span>
+            </Show>
+            {t("onboarding.provider.more")}
+          </Button>
+          <Show when={!moreOpen() ? props.moreCallout : undefined}>
+            {(callout) => (
+              <ProviderCallout title={callout().title} detail={callout().detail} class="provider-picker-callout-end" />
+            )}
+          </Show>
+        </div>
+        <MoreProvidersDialog
+          open={moreOpen()}
+          onOpenChange={setMoreOpen}
+          providers={moreProviders()}
+          custom={Boolean(props.customInMore)}
+          onChoose={(provider) => {
+            moreChoice = provider;
+            props.onChooseMoreProvider?.(provider);
+          }}
+          onChooseCustom={() => {
+            moreChoice = "custom";
+            props.onChooseMoreCustom?.();
+          }}
+          onCloseAutoFocus={(event) => {
+            const choice = moreChoice;
+            moreChoice = null;
+            // The dialog has no trigger, so Kobalte focuses nothing when it closes. With no choice, or a
+            // custom provider that no form opens for (OpenCode is not ready), the focus goes back to
+            // the button. The custom form takes the focus itself.
+            event.preventDefault();
+            if (!choice || (choice === "custom" && !customReady())) moreButton?.focus();
+            else if (choice !== "custom") inputFor(choice)?.focus();
+          }}
+        />
+      </Show>
     </div>
+  );
+}
+
+/**
+ * A short note with an arrow, like the drag hint of a macOS installer. It repeats text that is
+ * already on the screen, so assistive technology does not read it.
+ */
+function ProviderCallout(props: { title: string; detail: string; class?: string }) {
+  return (
+    <span class={["provider-picker-callout", props.class]} aria-hidden="true">
+      <span class="provider-picker-callout-title">{props.title}</span>
+      <span class="provider-picker-callout-detail">{props.detail}</span>
+      <svg class="provider-picker-callout-arrow" viewBox="0 0 92 40" fill="none" aria-hidden="true">
+        <circle cx="4" cy="6" r="3" fill="currentColor" />
+        <path d="M4 6C20 34 56 38 81 31" stroke="currentColor" stroke-width="1.6" />
+        <path d="M89 28.5L81.6 34.7L79.2 27Z" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
 
