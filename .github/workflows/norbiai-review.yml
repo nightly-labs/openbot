@@ -143,9 +143,9 @@ jobs:
       # What a pull request gets when it asks for nothing. Every other run is this pair
       # plus whatever the pull request or the review request overrode, and the override is
       # scoped to that one run: nothing here is written back, so the next pull request
-      # starts from these values again. A Claude model here runs at `CLAUDE_DEFAULT_EFFORT`.
-      # Name `chatgpt-web/extra-high` to review on Codex instead.
-      DEFAULT_MODEL: claude-opus-5-5
+      # starts from these values again. `gpt-6-astra` runs at `DEFAULT_EFFORT` on Codex.
+      # Name `claude-opus-5-5` to review on Claude Code instead.
+      DEFAULT_MODEL: gpt-6-astra
       # The default instead, when every changed file is documentation, a story, a test or a
       # message table. Has to be on `ALLOWED_MODELS`.
       LOW_RISK_MODEL: chatgpt-web/medium

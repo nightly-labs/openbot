@@ -96,8 +96,7 @@ needs a closer read than a large copy change.
 | Diff touches | Directive |
 | --- | --- |
 | Only documentation, comments, localization strings, Storybook stories, or tests with no production change | none (the workflow picks `chatgpt-web/medium` itself) |
-| Ordinary product code, IPC contracts, persisted state, provider processes, queues and crash recovery, the updater, or several workspaces at once | none (the default, `claude-opus-5-5` at `high`) |
-| A [non-negotiable](AGENTS.md#non-negotiable) area: migrations, a released Team API wire protocol, the renderer-to-main trust boundary, secret redaction, or licensing | `NorbiAI-Model: chatgpt-web/pro` |
+| Product code, including a [non-negotiable](AGENTS.md#non-negotiable) area: migrations, a released Team API wire protocol, the renderer-to-main trust boundary, secret redaction, or licensing | none (the default, `gpt-6-astra` at `low`) |
 
 When unsure between two rows, take the higher one. Do not lower the level to get a faster result on
 a risky change. A slower model on a very large diff can reach the job's time limit: split the pull
@@ -119,9 +118,9 @@ its own level — the `high` in `chatgpt-web/high` is the reasoning level, alrea
 the effort with another model or it changes nothing. `gpt-6-astra` itself is capped at `low`: asking
 for more is answered with a warning and the run goes ahead at `low`.
 
-The default, `claude-opus-5-5`, runs on Claude Code with the Claude login on the runner mac. It
-runs at `high` without `NorbiAI-Effort`. Every other model runs on Codex: name
-`chatgpt-web/extra-high` for a second opinion from Codex. Both use the same prompt, merge block and
+The default, `gpt-6-astra`, runs on Codex at `low`. Name `chatgpt-web/pro` for a closer read.
+`claude-opus-5-5` runs on Claude Code with the Claude login on the runner mac, at `high` without
+`NorbiAI-Effort`. Every other model runs on Codex. Both use the same prompt, merge block and
 findings list. Claude Code can only read: it gets the Read, Grep and Glob tools and the `git diff`,
 `git show`, `git log` and `git ls-files` commands. It does not load the pull request's own settings,
 hooks, `CLAUDE.md` or MCP servers.

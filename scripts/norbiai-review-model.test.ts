@@ -96,9 +96,9 @@ describe("NorbiAI reviewer selection", () => {
   });
 
   it("keeps the default for the half the pull request did not ask about", () => {
-    const { model, effort } = resolve({ description: "NorbiAI-Effort: high" });
+    const { model, effort } = resolve({ description: "NorbiAI-Model: chatgpt-web/pro" });
 
-    expect({ model, effort }).toEqual({ model: defaults.model, effort: "high" });
+    expect({ model, effort }).toEqual({ model: "chatgpt-web/pro", effort: job.env.DEFAULT_EFFORT });
   });
 
   it("lets the review request comment override the description for that run", () => {
@@ -133,12 +133,12 @@ describe("NorbiAI reviewer selection", () => {
   // the list, so only the maintainer's request comment is honoured there.
   it("ignores a fork's description but still reads the maintainer's comment", () => {
     const { model, effort, log } = resolve({
-      description: "NorbiAI-Model: chatgpt-web/medium",
-      comment: "NorbiAI-Effort: xhigh",
+      description: "NorbiAI-Effort: medium",
+      comment: "NorbiAI-Model: claude-opus-5-5",
       fork: true,
     });
 
-    expect({ model, effort }).toEqual({ model: defaults.model, effort: "xhigh" });
+    expect({ model, effort }).toEqual({ model: "claude-opus-5-5", effort: job.env.CLAUDE_DEFAULT_EFFORT });
     expect(log).toContain("::warning title=NorbiAI ignored a fork's reviewer override");
   });
 
@@ -301,17 +301,21 @@ describe("NorbiAI reviewer selection", () => {
 
   // The shared default effort is the cheapest level, because the Codex model that reads it
   // may go no higher. A Claude review that asked for no effort would run at that level.
-  it("reviews on Claude Code by default, at the Claude default effort unless asked", () => {
+  it("reviews on Codex by default, and on Claude Code at the Claude default effort unless asked", () => {
     expect(resolve({ description: "Fixes a bug." })).toMatchObject({
+      cli: "codex",
+      effort: job.env.DEFAULT_EFFORT,
+      reviewer: `gpt-6-astra, reasoning effort ${job.env.DEFAULT_EFFORT}`,
+    });
+    expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5" })).toMatchObject({
       cli: "claude",
       effort: job.env.CLAUDE_DEFAULT_EFFORT,
       reviewer: `claude-opus-5-5, reasoning effort ${job.env.CLAUDE_DEFAULT_EFFORT}`,
     });
-    expect(resolve({ description: "NorbiAI-Effort: low" })).toMatchObject({
+    expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5\nNorbiAI-Effort: low" })).toMatchObject({
       cli: "claude",
       effort: "low",
     });
-    expect(resolve({ description: "NorbiAI-Model: chatgpt-web/extra-high" }).cli).toBe("codex");
   });
 
   // The published review says what ran. Naming an effort beside a chatgpt-web slug described
