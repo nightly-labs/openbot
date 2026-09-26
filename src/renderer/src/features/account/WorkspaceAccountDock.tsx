@@ -1,6 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { StaticAccountDock } from "@openbot/ui/features/account/StaticAccountDock";
-import { createEffect, createMemo, Loading } from "solid-js";
+import { createEffect, createMemo, Loading, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
 import { AccountDock } from "../../lazy-views";
@@ -47,7 +47,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
 
   createEffect(
     () => usageTargetKey(),
-    (targetKey) => auth.selectAccountUsageTarget(targetKey),
+    (targetKey) => untrack(() => auth.selectAccountUsageTarget(targetKey)),
   );
 
   return (

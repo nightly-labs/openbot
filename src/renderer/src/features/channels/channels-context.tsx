@@ -299,8 +299,10 @@ const Channels = createSimpleContext({
           });
       }
     }
-    createEffect(accountKey, () => {
-      const selected = supported() ? savedChannelId(accountKey()) : null;
+    createEffect(accountKey, (account) => {
+      // Read once for this account; a later capability change does not reset the open channel.
+      const channelsSupported = untrack(supported);
+      const selected = channelsSupported ? savedChannelId(account) : null;
       refreshId += 1;
       readThrough.clear();
       failedCommand = null;
@@ -317,7 +319,7 @@ const Channels = createSimpleContext({
           });
         }),
       );
-      if (supported()) void refresh(selected);
+      if (channelsSupported) void untrack(() => refresh(selected));
     });
     onSettled(() => {
       const focus = () => {

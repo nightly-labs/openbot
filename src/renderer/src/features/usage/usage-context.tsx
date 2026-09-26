@@ -1,4 +1,4 @@
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useServers } from "../servers/servers-context";
 
@@ -30,9 +30,9 @@ const context = createSimpleContext({
      * The trigger goes with the old scope, so `null` replaces it: Back has nothing
      * to return focus to once the element it was opened from is gone.
      */
-    let previousServer = activeServerId();
+    let previousServer = untrack(activeServerId);
     createEffect(activeServerId, (serverId) => {
-      if (serverId !== previousServer && state.serverId) openUsage(serverId, null);
+      if (serverId !== previousServer && untrack(() => state.serverId)) openUsage(serverId, null);
       previousServer = serverId;
     });
 

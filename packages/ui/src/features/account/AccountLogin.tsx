@@ -3,7 +3,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
 import { ArrowLeft, Button, Input, RefreshCw } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
 
@@ -457,7 +457,7 @@ export function AccountLogin(props: AccountLoginProps) {
                       aria-describedby={emailErrorActive() ? "account-email-error" : undefined}
                       autofocus
                       onBlur={() => {
-                        const validationError = validateEmail(email());
+                        const validationError = validateEmail(untrack(email));
                         if (validationError) showEmailError(validationError);
                         else hideEmailError();
                       }}

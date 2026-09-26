@@ -5,7 +5,7 @@ import { Blocks, Button, Puzzle } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import type { AgentProfile, MessageCitation } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -100,7 +100,7 @@ export function RichMessageText(props: RichMessageTextProps) {
           const attachment = part.attachment;
           const sharedPath = part.sharedPath;
           if (attachment || sharedPath) {
-            const name = attachment?.name ?? part.text;
+            const name = untrack(() => attachment?.name) ?? part.text;
             return (
               <Button
                 variant="ghost"

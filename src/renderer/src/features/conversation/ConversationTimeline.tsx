@@ -224,8 +224,10 @@ export function ConversationTimeline() {
                 const message = createMemo(() => timelineMessages()[virtualRow.index]);
                 const initialMessage = untrack(message);
                 if (!initialMessage) return null;
-                const animateEntrance = initialMessage.animate === true && markMessageSeen(initialMessage.id);
-                const initialActionMarker = initialMessage.actionMarker;
+                const animateEntrance = untrack(
+                  () => initialMessage.animate === true && markMessageSeen(initialMessage.id),
+                );
+                const initialActionMarker = untrack(() => initialMessage.actionMarker);
                 /*
                  * The separator above the row. The first row always carries one, and a later row
                  * carries one when it opens a new day. A message with no stored timestamp can only
@@ -254,7 +256,7 @@ export function ConversationTimeline() {
                     startsDay: dayMarker() !== null,
                   });
                 });
-                const markerOnly = markerOnlyMessage(initialMessage);
+                const markerOnly = untrack(() => markerOnlyMessage(initialMessage));
                 // Consecutive markers keep the tighter marker gap so they read as one group.
                 const groupedWithMarker = createMemo(() => {
                   const current = message();
