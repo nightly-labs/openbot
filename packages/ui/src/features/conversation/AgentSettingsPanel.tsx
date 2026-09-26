@@ -44,7 +44,7 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 
@@ -150,7 +150,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     access: DEFAULT_AGENT_ACCESS,
     computerUse: true,
     confirmingFullAccess: false,
-    runtime: { model: "gpt-5.6-luna", provider: props.agent.provider, reasoningEffort: "medium" },
+    runtime: { model: "gpt-5.6-luna", provider: untrack(() => props.agent.provider), reasoningEffort: "medium" },
     saveError: null,
   });
   const avatarUrl = () => props.agent.avatarUrl ?? null;
@@ -205,44 +205,45 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         ].join("\u0000"),
       };
     },
-    ({ agent, runtimeSettings, signature }) => {
-      if (signature === lastSignature) return;
-      const agentChanged = agent.id !== lastAgentId;
-      if (agentChanged && lastAgentId) flushDirtyTextFields(lastAgentId);
-      // A field the user has edited keeps its draft, unless this is a different agent, whose values
-      // replace the panel wholesale. Read before the write, so a fresh agent clears the flags here.
-      const keep = {
-        description: !agentChanged && draft.dirty.description,
-        name: !agentChanged && draft.dirty.name,
-        title: !agentChanged && draft.dirty.title,
-      };
-      lastSignature = signature;
-      lastAgentId = agent.id;
-      setDraft((state) => {
-        if (agentChanged) {
-          state.dirty.description = false;
-          state.dirty.name = false;
-          state.dirty.title = false;
-        }
-        if (!keep.name) state.fields.name = agent.name;
-        if (!keep.title) state.fields.title = agent.title;
-        if (!keep.description) state.fields.description = agent.description;
-        state.notifications = agent.notifications;
-        state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
-        state.computerUse = agentComputerUseEnabled(agent);
-        if (agentChanged) state.confirmingFullAccess = false;
-        state.runtime.provider = runtimeSettings.provider;
-        state.runtime.model = runtimeSettings.model;
-        state.runtime.reasoningEffort = runtimeSettings.reasoningEffort;
-        state.avatar.seed = agent.avatarSeed;
-        state.avatar.hue = agent.avatarHue;
-        if (agentChanged) {
-          state.avatar.candidateSeed = agent.avatarSeed;
-          state.avatar.batch = 0;
-          state.avatar.pickerOpen = false;
-        }
-      });
-    },
+    ({ agent, runtimeSettings, signature }) =>
+      untrack(() => {
+        if (signature === lastSignature) return;
+        const agentChanged = agent.id !== lastAgentId;
+        if (agentChanged && lastAgentId) flushDirtyTextFields(lastAgentId);
+        // A field the user has edited keeps its draft, unless this is a different agent, whose values
+        // replace the panel wholesale. Read before the write, so a fresh agent clears the flags here.
+        const keep = {
+          description: !agentChanged && draft.dirty.description,
+          name: !agentChanged && draft.dirty.name,
+          title: !agentChanged && draft.dirty.title,
+        };
+        lastSignature = signature;
+        lastAgentId = agent.id;
+        setDraft((state) => {
+          if (agentChanged) {
+            state.dirty.description = false;
+            state.dirty.name = false;
+            state.dirty.title = false;
+          }
+          if (!keep.name) state.fields.name = agent.name;
+          if (!keep.title) state.fields.title = agent.title;
+          if (!keep.description) state.fields.description = agent.description;
+          state.notifications = agent.notifications;
+          state.access = agent.access ?? DEFAULT_AGENT_ACCESS;
+          state.computerUse = agentComputerUseEnabled(agent);
+          if (agentChanged) state.confirmingFullAccess = false;
+          state.runtime.provider = runtimeSettings.provider;
+          state.runtime.model = runtimeSettings.model;
+          state.runtime.reasoningEffort = runtimeSettings.reasoningEffort;
+          state.avatar.seed = agent.avatarSeed;
+          state.avatar.hue = agent.avatarHue;
+          if (agentChanged) {
+            state.avatar.candidateSeed = agent.avatarSeed;
+            state.avatar.batch = 0;
+            state.avatar.pickerOpen = false;
+          }
+        });
+      }),
   );
 
   onSettled(() => {

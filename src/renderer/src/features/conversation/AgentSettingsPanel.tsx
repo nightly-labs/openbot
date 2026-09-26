@@ -6,7 +6,7 @@ import SharedAgentSettingsPanel, {
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, Show } from "solid-js";
+import { createEffect, createMemo, createStore, Show, untrack } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
@@ -71,7 +71,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     const files = props.files;
     return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
   });
-  let lastSkillsMarketplaceOpen = props.skillsMarketplaceOpen === true;
+  let lastSkillsMarketplaceOpen = untrack(() => props.skillsMarketplaceOpen === true);
   createEffect(
     () => panelWidth(),
     (width) => {
@@ -100,7 +100,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             });
           });
       }
-      void loadSkillsCount(agentId);
+      void untrack(() => loadSkillsCount(agentId));
       if (!props.remoteClient) {
         void conversationPort()
           .agent.listMemories(agentId)
@@ -147,7 +147,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   createEffect(
     () => props.skillsMarketplaceOpen === true,
     (open) => {
-      if (lastSkillsMarketplaceOpen && !open && draft.skills.reopenAfterMarketplace) {
+      if (lastSkillsMarketplaceOpen && !open && untrack(() => draft.skills.reopenAfterMarketplace)) {
         setDraft((state) => {
           state.skills.reopenAfterMarketplace = false;
           state.skills.open = true;

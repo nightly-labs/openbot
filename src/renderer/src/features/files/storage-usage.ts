@@ -8,7 +8,7 @@ import {
 import { toast } from "@openbot/ui";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type FilesPort, filesPort } from "./files-port";
 
@@ -104,7 +104,7 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
         draft.usage = null;
         draft.loaded = false;
       });
-      void refresh();
+      void untrack(() => refresh());
     },
   );
 

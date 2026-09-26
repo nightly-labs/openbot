@@ -19,7 +19,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
 import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibraryToolbar";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { SkillPreview } from "../../components/SkillPreview";
 import { type AgentSkillCalls, agentSkillCalls, type SkillCatalogCalls, skillsPort } from "../../skills-port";
@@ -136,8 +136,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       }
       setConfirm(null);
       setFilter("all");
-      void loadSkills();
-      void loadCatalog();
+      void untrack(() => loadSkills());
+      void untrack(loadCatalog);
     },
   );
 
