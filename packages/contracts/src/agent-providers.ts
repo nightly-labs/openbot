@@ -57,6 +57,19 @@ export interface AgentProviderDescriptor {
    * renderer guesses at is a button that fails when it is pressed.
    */
   readonly codeSignIn: boolean;
+  /**
+   * The workspace skill folders the CLI reads by itself, in its own order. OpenBot writes only
+   * `.agents/skills` and `.claude/skills`, so each list names at least one of them.
+   * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide
+   * and the skill paths in Google's Antigravity ACP server.
+   */
+  readonly skillFolders: readonly [string, ...string[]];
+  /**
+   * How a Workspace only agent is held to its folders. `tool-sandbox`: the client checks each tool
+   * and asks before an edit. `command-sandbox`: the CLI runs each command in a sandbox.
+   * `confined-process`: the CLI runs in a sandboxed process of its own (`process-confinement.ts`).
+   */
+  readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
 }
 
 /**
@@ -76,6 +89,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "chatgpt",
     pickerOrder: 1,
     codeSignIn: true,
+    skillFolders: [".agents/skills"],
+    workspaceEnforcement: "command-sandbox",
   },
   claude: {
     id: "claude",
@@ -89,6 +104,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "claude",
     pickerOrder: 0,
     codeSignIn: false,
+    skillFolders: [".claude/skills"],
+    workspaceEnforcement: "tool-sandbox",
   },
   grok: {
     id: "grok",
@@ -102,6 +119,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "grok",
     pickerOrder: 2,
     codeSignIn: false,
+    skillFolders: [".agents/skills"],
+    workspaceEnforcement: "confined-process",
   },
   opencode: {
     id: "opencode",
@@ -117,6 +136,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "opencode",
     pickerOrder: 3,
     codeSignIn: false,
+    skillFolders: [".opencode/skills", ".agents/skills", ".claude/skills"],
+    workspaceEnforcement: "confined-process",
   },
   // Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on 18 June 2026,
   // so the plan runs through Google's Antigravity ACP server. The account and the models are Gemini.
@@ -132,6 +153,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "antigravity",
     pickerOrder: 4,
     codeSignIn: false,
+    skillFolders: [".gemini/skills", ".agents/skills"],
+    workspaceEnforcement: "confined-process",
   },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 

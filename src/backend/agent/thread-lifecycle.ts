@@ -37,7 +37,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { agentNamesById, estimateTokens, renderHandoffMessage, summarizeOldMessages } from "./delivery-content";
 import { developerInstructions } from "./developer-instructions";
 import { isArchivedThreadError, isMissingProviderSessionError } from "./thread-items";
-import { codexSandboxConfig, codexSandboxMode } from "./workspace-sandbox";
+import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./workspace-sandbox";
 
 /**
  * What the Codex adapter sends, versioned. Codex ignores MCP configuration on resume, so a
@@ -313,7 +313,7 @@ export class ThreadLifecycle {
         model: agent.model,
         effort: agent.reasoningEffort,
         cwd: agent.workspacePath,
-        runtimeWorkspaceRoots: [agent.workspacePath, this.#store.sharedRoot],
+        runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
         approvalPolicy: "on-request",
         sandbox: codexSandboxMode(agent),
         ...this.#computerUseParam(agent, client),
@@ -510,7 +510,7 @@ export class ThreadLifecycle {
       model: agent.model,
       effort: agent.reasoningEffort,
       cwd: agent.workspacePath,
-      runtimeWorkspaceRoots: [agent.workspacePath, this.#store.sharedRoot],
+      runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
       approvalPolicy: "on-request",
       sandbox: codexSandboxMode(agent),
       ...this.#computerUseParam(agent, client),
