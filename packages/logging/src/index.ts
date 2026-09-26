@@ -80,19 +80,20 @@ const UNSERIALIZABLE = "[unserializable]";
 // a process started with a replaced key can still print it until it stops. The set grows only by
 // the secrets the user saves while the app runs.
 //
-// Most values are masked before the rules run, so no rule can cut one and leave a part of it in the
-// log. A value that holds a word the rules read, such as `Authorization` or `password`, is masked
-// after them instead: masking it first would erase the label or scheme that hides the next value.
+// Every value is masked before the rules run, in one pass, so no rule can cut one and leave a part
+// of it in the log. A value becomes a marker the rules read as one token. A value that holds a word
+// the rules read, such as `password` or `Authorization`, may be the label or header name that hides
+// the next value, so its marker is itself a secret label that ends in `authorization`.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
-const secretsBeforeRules = new Set<string>();
-const secretsAfterRules = new Set<string>();
-let patternBeforeRules: RegExp | null = null;
-let patternAfterRules: RegExp | null = null;
-// What a value masked before the rules becomes until they have run. One token with no label word,
-// so every rule reads it as an ordinary value and consumes it whole.
-const REGISTERED_SECRET_MARKER = "__openbot_registered_value__";
+const VALUE_MARKER = "__openbot_registered_value__";
+const LABEL_MARKER = "__openbot_registered_secret_authorization";
+const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
+// Each registered form and the marker it becomes.
+const registeredSecrets = new Map<string, string>();
+// One alternation, longest first, so a secret that contains another one is masked whole.
+let registeredSecretPattern: RegExp | null = null;
 
 /**
  * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
@@ -100,24 +101,16 @@ const REGISTERED_SECRET_MARKER = "__openbot_registered_value__";
  */
 export function registerSecretValue(value: string): void {
   if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
-  const afterRules = RULE_WORD.test(value);
-  const secrets = afterRules ? secretsAfterRules : secretsBeforeRules;
-  const size = secrets.size;
-  secrets.add(value).add(JSON.stringify(value).slice(1, -1));
-  const encoded = uriEncoded(value);
-  if (encoded !== null) secrets.add(encoded);
-  if (secrets.size === size) return;
-  if (afterRules) patternAfterRules = alternation(secrets);
-  else patternBeforeRules = alternation(secrets);
-}
-
-// One alternation, longest first, so a secret that contains another one is masked whole, and one
-// pass, so a later secret cannot match inside the text an earlier one left.
-function alternation(secrets: Set<string>): RegExp {
-  const alternatives = [...secrets]
+  const marker = RULE_WORD.test(value) ? LABEL_MARKER : VALUE_MARKER;
+  const size = registeredSecrets.size;
+  for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
+    if (form !== null && !registeredSecrets.has(form)) registeredSecrets.set(form, marker);
+  }
+  if (registeredSecrets.size === size) return;
+  const alternatives = [...registeredSecrets.keys()]
     .sort((left, right) => right.length - left.length)
     .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
-  return new RegExp(alternatives.join("|"), "gu");
+  registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
 }
 
 // A lone surrogate cannot be URL-encoded. Such a value cannot appear in a URL either, and a
@@ -136,12 +129,11 @@ export function isSecretName(name: string): boolean {
 }
 
 export function redactText(value: string): string {
-  const marked = patternBeforeRules ? value.replace(patternBeforeRules, REGISTERED_SECRET_MARKER) : value;
+  const marked = registeredSecretPattern
+    ? value.replace(registeredSecretPattern, (secret) => registeredSecrets.get(secret) ?? VALUE_MARKER)
+    : value;
   const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
-  const unmarked = redacted.includes(REGISTERED_SECRET_MARKER)
-    ? redacted.split(REGISTERED_SECRET_MARKER).join("[redacted]")
-    : redacted;
-  return patternAfterRules ? unmarked.replace(patternAfterRules, "[redacted]") : unmarked;
+  return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
 function applyTextRules(value: string): string {

@@ -198,6 +198,8 @@ describe("registerSecretValue", () => {
     registerSecretValue("hunter22 suffix99");
 
     expect(redactText("password=hunter22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
+    registerSecretValue("monkey22 suffix99");
+    expect(redactText("password=monkey22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
