@@ -9,6 +9,10 @@ possible. Keep quotations, code, commands, paths, identifiers, and required tech
 Do not add an agent or model as author or co-author. Do not add `Co-Authored-By:` trailers or
 "Generated with" lines to commits or PRs.
 
+When a step doesn't need the developer's input, keep going. Put status notes in the same message as
+your next action. Stop and ask only when you can't continue without the developer, or before
+anything destructive: deleting data, force-pushing, or changing anything outside this repository.
+
 **Non-negotiable** rules protect user data, released contracts, and security. Change them only on
 an explicit developer decision. All other rules are defaults: follow the developer's preference
 and state which default you set aside. Do not argue by citing this file.
