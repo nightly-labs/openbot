@@ -165,17 +165,12 @@ export function createWebWorkspace(props: {
               // A member or role change anywhere on the host revokes every session, this one
               // too. The directory still lists the host, so this account can connect again.
               // Try once: a second revocation before the host is online waits for Reconnect.
-              const host = state.host;
-              if (
-                disposed ||
-                revokedReconnect ||
-                hostId !== revokedHostId ||
-                generation !== revokedGeneration ||
-                host?.hostId !== revokedHostId
-              )
+              // The directory copy has the new role; `state.host` keeps the role of the last connect.
+              const host = state.hosts.find((listed) => listed.hostId === revokedHostId);
+              if (disposed || revokedReconnect || hostId !== revokedHostId || generation !== revokedGeneration || !host)
                 return;
               revokedReconnect = true;
-              return connect(host);
+              return connect({ ...host });
             })
             .catch(report);
           return;
@@ -423,9 +418,9 @@ export function createWebWorkspace(props: {
     return refreshHosts().catch(() => undefined);
   }
   async function reconnect(): Promise<void> {
-    const host = state.host;
+    const host = state.hosts.find((listed) => listed.hostId === state.host?.hostId) ?? state.host;
     if (!host || state.status === "connecting") return;
-    await connect(host);
+    await connect({ ...host });
   }
   async function joinInvite(inviteUrl: string): Promise<void> {
     const normalizedInviteUrl = inviteUrl.trim();
