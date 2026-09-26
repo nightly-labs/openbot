@@ -11,7 +11,13 @@ import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { LinkIcon } from "./ConversationIcons";
 import { messageFileReferences } from "./FileReference";
-import { splitStreamingTrail, useStreamingReveal } from "./streamingReveal";
+import {
+  sameStreamingTailOffsets,
+  splitStreamingTrail,
+  streamingTailOffsets,
+  streamingTrailReach,
+  useStreamingReveal,
+} from "./streamingReveal";
 
 export interface RichMessageTextProps {
   body: string;
@@ -25,7 +31,8 @@ export interface RichMessageTextProps {
   onOpenSharedFile?: (path: string) => void;
   onOpenWorkspaceFile?: (path: string) => void;
   showCitationFooter?: boolean;
-  streamingTail?: boolean;
+  /** The characters of a streaming body after this text. It fades the words revealed last. */
+  streamingTailAfter?: number | undefined;
 }
 
 export function RichMessageText(props: RichMessageTextProps) {
@@ -38,13 +45,16 @@ export function RichMessageText(props: RichMessageTextProps) {
   const parts = createMemo(() =>
     richMessageParts(props.body, props.agents, props.skills ?? [], citationsByNumber(), attachmentsById()),
   );
-  const renderedParts = createMemo(() => {
-    const values = parts();
-    return values.map((part, index) => ({
-      part,
-      streamingTail: props.streamingTail === true && index === values.length - 1,
-    }));
-  });
+  const trail = useStreamingReveal();
+  const tailAfter = createMemo(
+    () =>
+      streamingTailOffsets(
+        parts().map((part) => (plainTextPart(part) ? part.text.length : Number.POSITIVE_INFINITY)),
+        props.streamingTailAfter,
+        streamingTrailReach(trail?.() ?? []),
+      ),
+    { equals: sameStreamingTailOffsets },
+  );
   const citations = createMemo(() => (props.citations ?? []).filter((citation) => safeBrowserUrl(citation.url)));
   const tooltipId = `rich-message-tooltip-${createUniqueId()}`;
   const [tooltip, setTooltip] = createSignal<{
@@ -76,9 +86,8 @@ export function RichMessageText(props: RichMessageTextProps) {
 
   return (
     <>
-      <For each={renderedParts()}>
-        {(renderedPart) => {
-          const part = renderedPart.part;
+      <For each={parts()}>
+        {(part, index) => {
           const attachment = part.attachment;
           const sharedPath = part.sharedPath;
           if (attachment || sharedPath) {
@@ -168,7 +177,11 @@ export function RichMessageText(props: RichMessageTextProps) {
               </span>
             );
           }
-          return renderedPart.streamingTail ? <StreamingTailText body={part.text} /> : part.text;
+          return (
+            <Show when={tailAfter()[index()] !== undefined} fallback={part.text}>
+              <StreamingTailText body={part.text} after={tailAfter()[index()] ?? 0} />
+            </Show>
+          );
         }}
       </For>
       <Show when={props.showCitationFooter !== false && citations().length > 0}>
@@ -212,9 +225,9 @@ export function RichMessageText(props: RichMessageTextProps) {
   );
 }
 
-function StreamingTailText(props: { body: string }) {
+function StreamingTailText(props: { body: string; after: number }) {
   const trail = useStreamingReveal();
-  const parts = createMemo(() => splitStreamingTrail(props.body, trail?.() ?? []));
+  const parts = createMemo(() => splitStreamingTrail(props.body, trail?.() ?? [], props.after));
 
   return (
     <>
@@ -264,6 +277,19 @@ export function MessageLink(props: {
       </span>
       {props.children}
     </a>
+  );
+}
+
+/** A part that shows its source text as it is, so its length counts body characters. */
+function plainTextPart(part: RichMessagePart): boolean {
+  return !(
+    part.agent ||
+    part.skill ||
+    part.mcpName ||
+    part.unavailableKind ||
+    part.citation ||
+    part.attachment ||
+    part.sharedPath
   );
 }
 
