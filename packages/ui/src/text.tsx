@@ -65,7 +65,7 @@ const TextContext = createContext<TextValue>(
 export interface TextProviderProps {
   locale: TranslatedLocale;
   /** The locale of numbers and dates (`formatLocale` from `@openbot/i18n`). The default is `locale`. */
-  formatLocale?: string;
+  formatLocale?: string | undefined;
 }
 
 // The locale of the last provider that rendered, for code that runs outside a component.
