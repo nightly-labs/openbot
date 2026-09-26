@@ -155,6 +155,8 @@ export interface ProviderHooks {
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** True while a turn of this agent runs. An agent's own process stays while its own turn runs. */
+  isAgentBusy(agentId: string): boolean;
   /** True while an agent is set to this provider, so a turn on it can come at any time. */
   isProviderAssigned(provider: AgentProvider): boolean;
   /**
@@ -427,7 +429,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#hooks.onClientStopped(client);
     }
     for (const [agentId, confined] of this.#confined) {
-      if (this.#hooks.isProviderBusy(confined.client.provider)) confined.lastUsed = now;
+      if (this.#hooks.isAgentBusy(agentId)) confined.lastUsed = now;
       if (now - confined.lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
       logger.info("Stopped an idle Workspace only provider process.", { provider: confined.client.provider, agentId });
       await this.#stopConfined(agentId, confined);
