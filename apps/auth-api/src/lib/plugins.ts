@@ -108,20 +108,6 @@ export function pluginIndexUrl(siteUrl: string = OPENBOT_SITE_URL): string {
 }
 
 /**
- * What a link row shows: the address without the scheme and without the `www.` a reader does not
- * need. The path stays, because a listing's three links usually differ only there. The same rule
- * the app's listing page uses, so the two read alike.
- */
-export function pluginLinkText(url: string): string {
-  try {
-    const { host, pathname } = new URL(url);
-    return `${host.replace(/^www\./, "")}${pathname === "/" ? "" : pathname.replace(/\/$/, "")}`;
-  } catch {
-    return url;
-  }
-}
-
-/**
  * The address a listing's link row is allowed to open, or `null` for one it is not.
  *
  * The catalog is a literal in this repository today, but `docs/plugin-distribution.md` says it

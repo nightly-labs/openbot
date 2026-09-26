@@ -1,6 +1,6 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { children, createSignal, onSettled, Show } from "solid-js";
-import { motionWelcome } from "../../lib/motion";
 import { ArticleGradient } from "./ArticleGradient";
 
 // Pictures, animations and video inside an article. A body is plain TSX, so a bare
@@ -92,7 +92,7 @@ export function ArticleGif(props: ArticleGifProps) {
   const [playing, setPlaying] = createSignal(true);
 
   onSettled(() => {
-    setPlaying(motionWelcome());
+    setPlaying(!prefersReducedMotion());
     setDecided(true);
   });
 
@@ -170,7 +170,7 @@ export function ArticleClip(props: ArticleClipProps) {
     // `muted` is a property rather than an attribute, and an unmuted clip is not
     // allowed to start on its own. Set it before anything is asked to play.
     element.muted = true;
-    setPlaying(motionWelcome());
+    setPlaying(!prefersReducedMotion());
     setDecided(true);
 
     // Without an observer there is no way to tell whether the clip is on screen,

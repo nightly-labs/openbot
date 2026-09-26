@@ -17,6 +17,7 @@ import type {
   SkillSubmission,
 } from "@openbot/contracts/ipc";
 import { isSkillCategory, mcpConfigErrors, SKILL_CATEGORIES } from "@openbot/contracts/ipc";
+import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -60,7 +61,7 @@ import type {
   MarketplacePluginPrompt,
   MarketplacePluginDetail as PluginDetail,
 } from "@openbot/ui/features/settings/marketplace-plugins";
-import { createPluginShareUrl, isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
+import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpConnectFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
 import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -362,7 +363,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   function copyPluginLink(slug: string) {
-    void writeClipboardText(createPluginShareUrl(slug)).catch(() => setError(t("marketplace.error.copyLink")));
+    void Promise.resolve()
+      .then(() => writeClipboardText(createPluginShareUrl(slug)))
+      .catch(() => setError(t("marketplace.error.copyLink")));
   }
 
   /**
@@ -1028,7 +1031,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                             const page = await calls().skills.list(query);
                             return { items: page.skills, nextCursor: page.nextCursor };
                           }}
-                          icon={(skill) => <SkillIcon skill={skill} />}
+                          icon={(skill) => <PluginIcon iconUrl={skill.iconUrl} />}
                           onOpen={openDetails}
                         />
                       </div>
@@ -1197,7 +1200,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                                       aria-label={t("marketplace.submission.viewDetails", { name: item.name })}
                                       onClick={() => openSubmissionDetails(item)}
                                     />
-                                    <SkillIcon skill={item} />
+                                    <PluginIcon iconUrl={item.iconUrl} />
                                     <div>
                                       <h3>{item.name}</h3>
                                       <p>
@@ -2028,7 +2031,7 @@ function SkillSubmissionDetailView(props: { submission: SkillSubmission }) {
       aria-label={t("marketplace.submission.detailsLabel", { name: props.submission.name })}
     >
       <div class="skills-marketplace-detail-hero skills-submission-detail-hero">
-        <SkillIcon skill={props.submission} />
+        <PluginIcon iconUrl={props.submission.iconUrl} />
         <div>
           <p class="skills-marketplace-detail-category">{t(CATEGORY_LABELS[props.submission.category])}</p>
           <h1>{props.submission.name}</h1>
@@ -2073,20 +2076,4 @@ function marketplaceErrorMessage(cause: unknown): string {
   const message = text.errorMessage(cause, text.t("marketplace.error.actionFailed"));
   if (message === SKILL_NAME_TAKEN) return text.t("marketplace.error.skillNameTaken");
   return message;
-}
-
-function SkillIcon(props: { skill: { name: string; iconUrl: string | null } }) {
-  const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
-  const iconUrl = createMemo(() => {
-    const url = props.skill.iconUrl;
-    return url && failedUrl() !== url ? url : null;
-  });
-
-  return (
-    <span class="skills-marketplace-icon">
-      <Show when={iconUrl()} fallback={<Puzzle />} keyed>
-        {(url) => <img src={url} alt="" onError={() => setFailedUrl(url)} />}
-      </Show>
-    </span>
-  );
 }
