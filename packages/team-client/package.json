@@ -22,8 +22,8 @@
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@noble/ed25519": "3.1.0",
-    "@noble/hashes": "2.3.0",
+    "@noble/ed25519": "3.2.0",
+    "@noble/hashes": "2.4.0",
     "@openbot/contracts": "workspace:*"
   },
   "devDependencies": {
