@@ -141,4 +141,18 @@ describe("provider authentication failures", () => {
   ] as const)("classifies %s as %s", (message, kind) => {
     expect(classifyUserError(new Error(message))).toBe(kind);
   });
+
+  it("reads the error kind in the reader's language behind an error class prefix", () => {
+    const error = new Error(
+      "Error invoking remote method 'test:action': RemoteRequestError: ENOENT: realpath '/tmp/x'",
+    );
+    expect(userErrorMessage(error, fallback, "fr")).toBe(
+      "Un fichier ou un dossier nécessaire est introuvable. Restaurez-le ou choisissez-en un autre, puis réessayez.",
+    );
+  });
+
+  it("strips an error class prefix from a product message", () => {
+    const error = new Error("Error invoking remote method 'test:action': RemoteRequestError: Choose another name.");
+    expect(userErrorMessage(error, fallback)).toBe("Choose another name.");
+  });
 });

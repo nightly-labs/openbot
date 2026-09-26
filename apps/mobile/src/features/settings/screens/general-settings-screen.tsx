@@ -1,4 +1,5 @@
 import { Host, Picker, Switch } from "@expo/ui";
+import { APP_LANGUAGE_OPTIONS } from "@openbot/i18n/languages";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useState } from "react";
@@ -6,6 +7,7 @@ import { useUniwind } from "uniwind";
 import { saveAnalyticsPreference, useAnalyticsPreference } from "@/features/analytics/preference";
 import { dictationLanguageOptions } from "@/features/chat/model/voice-dictation";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { saveAppLanguage, useAppLanguage } from "@/features/settings/model/app-language";
 import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import {
   AUTOMATIC_DICTATION_LANGUAGE,
@@ -15,8 +17,44 @@ import {
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
+import { useText } from "@/shared/lib/text";
+
+function LanguageSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const language = useAppLanguage();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingsSection title={t("mobile.settings.language.title")} footer={error ?? t("mobile.settings.language.footer")}>
+      <SettingsRow
+        trailing={
+          <Host matchContents colorScheme={dark ? "dark" : "light"}>
+            <Picker
+              selectedValue={language.value}
+              enabled={language.ready && !language.saving}
+              onValueChange={(next) => {
+                setError(null);
+                void saveAppLanguage(next).catch(() => setError(t("mobile.settings.saveFailed")));
+              }}
+            >
+              {APP_LANGUAGE_OPTIONS.map((option) => (
+                <Picker.Item
+                  key={option.id}
+                  label={option.id === "system" ? t("mobile.settings.language.system") : option.label}
+                  value={option.id}
+                />
+              ))}
+            </Picker>
+          </Host>
+        }
+      >
+        <Typography.Paragraph>{t("mobile.settings.language.row")}</Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
 
 function DictationSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
   const language = useDictationLanguage();
   const [supported, setSupported] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +101,7 @@ function DictationSection({ dark }: { dark: boolean }) {
           </Host>
         }
       >
-        <Typography.Paragraph>Language</Typography.Paragraph>
+        <Typography.Paragraph>{t("mobile.settings.dictation.language")}</Typography.Paragraph>
       </SettingsRow>
     </SettingsSection>
   );
@@ -117,6 +155,7 @@ export function GeneralSettingsScreen() {
           <Typography.Paragraph>Theme</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
+      <LanguageSection dark={theme === "dark"} />
       <DictationSection dark={theme === "dark"} />
       <SettingsSection
         title="Feedback"

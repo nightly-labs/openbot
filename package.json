@@ -158,6 +158,7 @@
     "typecheck:remote": "bun run --cwd remote/api typecheck",
     "typecheck": "bun run --parallel 'typecheck:*'",
     "lint": "biome check --max-diagnostics=none .",
+    "i18n:check": "bun scripts/i18n-check.ts",
     "lint:ratchet": "bun scripts/lint-ratchet.ts",
     "types:ratchet": "bun scripts/type-ratchet.ts",
     "format": "biome check --write --max-diagnostics=none .",

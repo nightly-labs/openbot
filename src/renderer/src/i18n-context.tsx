@@ -1,5 +1,7 @@
-import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
+import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
 import { type AppTranslate, resolveLocale, type TranslatedLocale, translateFor } from "@openbot/i18n";
+import { TextProvider } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import {
   createContext,
   createEffect,
@@ -114,9 +116,36 @@ const FALLBACK: I18nValue = {
 
 const I18nContext = createContext<I18nValue>(FALLBACK, { name: "I18n" });
 
-export function I18nProvider(props: ParentProps) {
+/**
+ * The language setting and the text context shared components read (`useText` from
+ * `@openbot/ui/text`). A screen reads text through `useText`; only the language setting itself
+ * needs `useI18n`.
+ */
+export function I18nProvider(props: ParentProps): JSX.Element {
   const value = createI18nValue();
-  return <I18nContext value={value}>{props.children}</I18nContext>;
+  return (
+    <I18nContext value={value}>
+      <TextProvider locale={value.locale()}>{props.children}</TextProvider>
+    </I18nContext>
+  );
+}
+
+/**
+ * A fixed language, for a surface without the desktop preference: the public web client before
+ * sign-in, and Storybook. Resolve a browser tag with `resolveLocale("system", navigator.language)`.
+ */
+export function StaticI18nProvider(props: ParentProps<{ locale: TranslatedLocale }>): JSX.Element {
+  const value: I18nValue = {
+    language: () => props.locale,
+    locale: () => props.locale,
+    t: (key, ...params) => translateFor(props.locale)(key, ...params),
+    changeLanguage: () => undefined,
+  };
+  return (
+    <I18nContext value={value}>
+      <TextProvider locale={props.locale}>{props.children}</TextProvider>
+    </I18nContext>
+  );
 }
 
 export function useI18n(): I18nValue {

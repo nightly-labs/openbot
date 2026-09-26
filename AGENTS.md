@@ -66,6 +66,12 @@ tokens and contracts; it does not render SolidJS DOM components.
 
 Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
 
+## Interface text
+
+Text that a user reads comes from `@openbot/i18n` catalog keys, on desktop, web and mobile. Do not
+write a literal. Errors that the main process, backend or team client send use `sourceText(key)`.
+Read [docs/i18n.md](docs/i18n.md) before adding a key or a language.
+
 ## Checks
 
 Do not run broad checks locally. They overload the user's computer. This explicit user preference

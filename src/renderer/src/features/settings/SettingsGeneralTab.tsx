@@ -24,11 +24,11 @@ import {
   Text,
   toast,
 } from "@openbot/ui";
+import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, Show } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import { useI18n } from "../../i18n-context";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { LanguageSelect } from "./LanguageSelect";

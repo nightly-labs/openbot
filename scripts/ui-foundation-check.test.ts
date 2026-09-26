@@ -225,3 +225,18 @@ it("rejects a story play function on each line its fixture marks, and nothing in
     [],
   );
 });
+
+it("warns on hardcoded interface text on each line its fixture marks, and not on translated text", () => {
+  const fixture = resolve(fixtureRenderer, "components/HardcodedText.tsx");
+  const marked = readFileSync(fixture, "utf8")
+    .split("\n")
+    .flatMap((line, index) => (line.trimEnd().endsWith("// flag") ? [index + 1] : []));
+  const diagnostics = pluginDiagnostics("no-hardcoded-ui-text.grit", fixture, "tsx");
+
+  expect(marked.length).toBeGreaterThan(0);
+  expect(diagnostics.map((item) => item.location?.start?.line)).toEqual(marked);
+  expect(diagnostics.every((item) => item.message.startsWith("[no-hardcoded-ui-text]"))).toBe(true);
+  expect(
+    pluginDiagnostics("no-hardcoded-ui-text.grit", resolve(cleanRenderer, "components/TranslatedText.tsx"), "tsx"),
+  ).toEqual([]);
+});

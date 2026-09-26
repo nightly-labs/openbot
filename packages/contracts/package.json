@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./agent-providers": "./src/agent-providers.ts",
+    "./app-language": "./src/app-language.ts",
     "./agent-template-links": "./src/agent-template-links.ts",
     "./attachment-files": "./src/attachment-files.ts",
     "./attachment-references": "./src/attachment-references.ts",

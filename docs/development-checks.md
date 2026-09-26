@@ -271,8 +271,15 @@ tight. The script never raises a count; a higher count is a hand edit that a rev
 rule has no findings left, turn it on in `biome.json` and remove it from the baseline.
 
 `nursery/noFloatingPromises` is the first rule. `nursery/noMisusedPromises` was rejected: its 37
-findings were all `if (cachedPromise)` presence checks. Biome cannot select a GritQL plugin with
-`--only`, so the ratchet holds only built-in Biome rules. A new GritQL rule must start clean.
+findings were all `if (cachedPromise)` presence checks.
+
+Biome cannot select a GritQL plugin with `--only`, and it reports every plugin under the one
+category `plugin`. So a plugin rule enters the baseline as `plugin/<name>`, and its message must
+start with `[<name>]`. The ratchet runs Biome once more with every built-in group skipped, and counts
+each plugin by that prefix. `plugin/no-hardcoded-ui-text`
+(`tools/ui-foundation/no-hardcoded-ui-text.grit`) is the first one: it warns on literal interface
+text in the renderer, shared UI and mobile sources. See [i18n.md](i18n.md). Other new GritQL rules
+must start clean.
 
 ### Type debt ratchet
 

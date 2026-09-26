@@ -23,6 +23,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
+import { useText } from "../text";
 
 export interface ProviderPickerOption {
   id: AgentProviderId;
@@ -55,7 +56,6 @@ export interface ProviderPickerOption {
 }
 
 export interface ProviderPickerProps {
-  t: AppTranslate;
   value: AgentProviderId | null;
   options: ProviderPickerOption[];
   ariaLabel: string;
@@ -106,6 +106,7 @@ export interface ProviderPickerProps {
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
+  const { t } = useText();
   const inputs = new Map<AgentProviderId, HTMLInputElement>();
   const pickerId = createUniqueId();
   const addCustomId = `${pickerId}-custom`;
@@ -113,7 +114,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
   const openCode = () => props.options.find((option) => option.id === "opencode");
   const customReady = () => servesCustomProvider(openCode());
   const endpointCount = () => props.customProviders?.length ?? 0;
-  const endpointCountLabel = () => props.t("provider.endpointCount", { count: endpointCount() });
+  const endpointCountLabel = () => t("provider.endpointCount", { count: endpointCount() });
   /** The count answers a click only where the list can be opened. Elsewhere it stays a badge. */
   const countManageable = () => endpointCount() > 0 && Boolean(props.onManageCustomProviders);
   /** The row is a choice once it has something to run and someone to tell about the choice. */
@@ -152,8 +153,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
         </Show>
         <SlidersHorizontal class="provider-picker-custom-mark" aria-hidden="true" />
         <span class="provider-picker-identity">
-          <span class="provider-picker-name">{props.t("provider.custom.name")}</span>
-          <small class="provider-picker-email">{props.t("provider.custom.description")}</small>
+          <span class="provider-picker-name">{t("provider.custom.name")}</span>
+          <small class="provider-picker-email">{t("provider.custom.description")}</small>
         </span>
         <span class="provider-picker-state">
           {/* Count only; endpoint naming is the model picker's job. Moves beside Add when it opens the list. */}
@@ -169,7 +170,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               tone={providerStatusTone(engine().state)}
               shape="pill"
             >
-              {providerStatusLabel(props.t, engine().state)}
+              {providerStatusLabel(t, engine().state)}
             </Badge>
           </Show>
         </span>
@@ -182,7 +183,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="ghost"
             size="xs"
             class="provider-picker-custom-count"
-            aria-label={props.t("provider.manageEndpoints", { count: endpointCount() })}
+            aria-label={t("provider.manageEndpoints", { count: endpointCount() })}
             disabled={props.disabled}
             onClick={() => props.onManageCustomProviders?.()}
           >
@@ -196,11 +197,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="outline"
             size="xs"
             class="provider-picker-install"
-            aria-label={props.t("provider.custom.addLabel")}
+            aria-label={t("provider.custom.addLabel")}
             disabled={props.disabled || props.refreshingProviders}
             onClick={() => props.onAddCustomProvider?.()}
           >
-            {props.t("provider.action.add")}
+            {t("provider.action.add")}
           </Button>
         </Show>
         {/* Same OpenCode runtime fetch unblocks Add. */}
@@ -222,7 +223,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               variant={action() === "download" ? "default" : "outline"}
               size="xs"
               class="provider-picker-install"
-              aria-label={props.t(PROVIDER_ACTION_LABEL[action()], { name: engine().name })}
+              aria-label={t(PROVIDER_ACTION_LABEL[action()], { name: engine().name })}
               disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
               onClick={() => {
                 if (action() === "cancel") {
@@ -232,7 +233,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 }
               }}
             >
-              {props.t(PROVIDER_ACTION_TEXT[action()])}
+              {t(PROVIDER_ACTION_TEXT[action()])}
             </Button>
           )}
         </Show>
@@ -249,11 +250,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             variant="outline"
             size="xs"
             class="provider-picker-install"
-            aria-label={props.t("provider.custom.installLabel")}
+            aria-label={t("provider.custom.installLabel")}
             disabled={props.disabled || props.refreshingProviders}
             onClick={() => void props.onInstallProvider?.("opencode")}
           >
-            {props.t("provider.action.install")}
+            {t("provider.action.install")}
           </Button>
         </Show>
       </div>
@@ -296,16 +297,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
               variant="ghost"
               size="xs"
               class="provider-picker-refresh"
-              aria-label={
-                props.refreshingProviders ? props.t("provider.refreshingLabel") : props.t("provider.refreshLabel")
-              }
+              aria-label={props.refreshingProviders ? t("provider.refreshingLabel") : t("provider.refreshLabel")}
               loading={props.refreshingProviders}
-              loadingLabel={props.t("provider.refreshing")}
+              loadingLabel={t("provider.refreshing")}
               disabled={props.disabled}
               onClick={() => void props.onRefreshProviders?.()}
             >
               <RefreshCw size={13} aria-hidden="true" />
-              {props.t("provider.refresh")}
+              {t("provider.refresh")}
             </Button>
           </Show>
         </div>
@@ -431,7 +430,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         }
                       >
                         <Badge class="provider-picker-status provider-picker-key-status" tone="neutral" shape="pill">
-                          {props.t("provider.key.free")}
+                          {t("provider.key.free")}
                         </Badge>
                       </Show>
                       <Show when={runtimeStatus()?.phase !== "not-downloaded" || updatable()}>
@@ -440,7 +439,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           tone={providerStatusTone(visualState())}
                           shape="pill"
                         >
-                          {providerStatusLabel(props.t, state(), connecting(), runtimeStatus(), updatable())}
+                          {providerStatusLabel(t, state(), connecting(), runtimeStatus(), updatable())}
                         </Badge>
                       </Show>
                     </span>
@@ -458,7 +457,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           }
                           size="xs"
                           class={connectOptional() ? "provider-picker-install" : providerActionClass(action())}
-                          aria-label={props.t(PROVIDER_ACTION_LABEL[action()], { name: option().name })}
+                          aria-label={t(PROVIDER_ACTION_LABEL[action()], { name: option().name })}
                           disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
                           onClick={() => {
                             if (action() === "cancel") {
@@ -479,7 +478,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                             }
                           }}
                         >
-                          {props.t(PROVIDER_ACTION_TEXT[action()])}
+                          {t(PROVIDER_ACTION_TEXT[action()])}
                         </Button>
                       )}
                     </Show>
@@ -497,11 +496,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="outline"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={props.t("provider.aria.install", { name: option().name })}
+                        aria-label={t("provider.aria.install", { name: option().name })}
                         disabled={props.disabled || props.refreshingProviders}
                         onClick={() => void props.onInstallProvider?.(option().id)}
                       >
-                        {props.t("provider.action.install")}
+                        {t("provider.action.install")}
                       </Button>
                     </Show>
                     <Show when={!runtimeStatus() && props.onConnectProvider}>
@@ -510,7 +509,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant={providerAction(state(), connecting()) === "connect" ? "default" : "outline"}
                         size="xs"
                         class={providerActionClass(providerAction(state(), connecting()))}
-                        aria-label={props.t(PROVIDER_ACTION_LABEL[providerAction(state(), connecting())], {
+                        aria-label={t(PROVIDER_ACTION_LABEL[providerAction(state(), connecting())], {
                           name: option().name,
                         })}
                         aria-busy={connecting() ? "true" : undefined}
@@ -520,7 +519,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         <Show when={connecting()}>
                           <Spinner size="sm" />
                         </Show>
-                        {props.t(PROVIDER_ACTION_TEXT[providerAction(state(), connecting())])}
+                        {t(PROVIDER_ACTION_TEXT[providerAction(state(), connecting())])}
                       </Button>
                     </Show>
                     {/* Claude's sign-in is a browser round trip it only needs while signed out.
@@ -547,11 +546,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         variant="outline"
                         size="xs"
                         class="provider-picker-install"
-                        aria-label={props.t("provider.aria.signIn", { name: option().name })}
+                        aria-label={t("provider.aria.signIn", { name: option().name })}
                         disabled={props.disabled || props.refreshingProviders}
                         onClick={() => void props.onSignInProvider?.(option().id)}
                       >
-                        {props.t("provider.action.signIn")}
+                        {t("provider.action.signIn")}
                       </Button>
                     </Show>
                     {/* The row's secondary actions: Update on every downloaded runtime, and the code
@@ -565,7 +564,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                         <DropdownMenu.Trigger
                           class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
-                          aria-label={props.t("provider.aria.moreActions", { name: option().name })}
+                          aria-label={t("provider.aria.moreActions", { name: option().name })}
                           disabled={props.disabled || props.refreshingProviders}
                         >
                           <Ellipsis aria-hidden="true" />
@@ -579,14 +578,14 @@ export function ProviderPicker(props: ProviderPickerProps) {
                               >
                                 <RefreshCw aria-hidden="true" />
                                 {updatable()
-                                  ? props.t("provider.action.updateTo", { version: option().availableVersion ?? "" })
-                                  : props.t("provider.action.checkForUpdates")}
+                                  ? t("provider.action.updateTo", { version: option().availableVersion ?? "" })
+                                  : t("provider.action.checkForUpdates")}
                               </DropdownMenu.Item>
                             </Show>
                             <Show when={codeSignInOffered()}>
                               <DropdownMenu.Item onSelect={() => void props.onSignInWithCodeProvider?.(option().id)}>
                                 <Smartphone aria-hidden="true" />
-                                {props.t("provider.action.signInWithCode")}
+                                {t("provider.action.signInWithCode")}
                               </DropdownMenu.Item>
                             </Show>
                           </DropdownMenu.Content>

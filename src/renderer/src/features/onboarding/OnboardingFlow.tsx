@@ -13,14 +13,13 @@ import {
 } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, Plus, toast } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
-import { freeModelsReady, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { freeModelsReady, ProviderPicker, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { errorMessage } from "@openbot/ui/error-message";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";

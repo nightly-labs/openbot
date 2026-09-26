@@ -11,10 +11,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { Button, Dialog, Textarea } from "@openbot/ui";
 import type { ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
+import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { errorMessage } from "@openbot/ui/error-message";
 import { InvitePreviewCard } from "@openbot/ui/features/servers/JoinServerDialog";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { fallbackProviderState } from "./onboarding-provider-state";
 

@@ -12,6 +12,7 @@
     "./dynamic-island": "./src/dynamic-island.tsx",
     "./qr-code": "./src/qr-code.tsx",
     "./questionnaire": "./src/questionnaire.tsx",
+    "./text": "./src/text.tsx",
     "./reference-chip": "./src/reference-chip.tsx",
     "./progress": "./src/progress.tsx",
     "./surface": "./src/surface.tsx",

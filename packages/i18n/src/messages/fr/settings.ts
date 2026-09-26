@@ -1,0 +1,91 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/settings";
+
+export const messages = {
+  // The language setting itself.
+  "settings.language.title": "Langue",
+  "settings.language.description": "OpenBot affiche les menus, les boutons et les messages dans cette langue.",
+  "settings.language.system": "Langue du système",
+  // The Settings window, General tab.
+  "settings.providers.title": "Fournisseurs d’IA",
+  "settings.appBehavior.title": "Comportement de l’application",
+  "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
+  "settings.launchAtLogin.description": "Ouvrir l’application lorsque vous vous connectez à cet ordinateur.",
+  "settings.keepRunning.title": "Garder OpenBot actif en arrière-plan",
+  "settings.keepRunning.description": "Poursuivre les tâches en cours après la fermeture de la fenêtre.",
+  "settings.workspace.title": "Espace de travail",
+  "settings.restoreWorkspace.title": "Restaurer le dernier espace de travail au lancement",
+  "settings.restoreWorkspace.description": "Rouvrir l’espace de travail et les tâches de votre session précédente.",
+  "settings.externalLinks.title": "Ouvrir les liens externes dans",
+  "settings.externalLinks.description": "Choisir où s’ouvrent les liens provenant des conversations.",
+  // The two link targets. The saved value stays in English; only the label is translated.
+  "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
+  "settings.externalLinks.openbot": "OpenBot",
+  "settings.autonomy.title": "Autonomie de l’agent",
+  "settings.turbo.title": "Mode Turbo",
+  "settings.turbo.description":
+    "Autoriser chaque agent à exécuter des commandes, modifier des fichiers, élargir son propre accès au système de fichiers et au réseau, et publier, mettre à jour ou supprimer des sites publics sans demander.",
+  "settings.turbo.confirmTitle": "Activer le mode Turbo ?",
+  "settings.turbo.confirmDescription":
+    "Les agents exécuteront des commandes, modifieront des fichiers, élargiront leur propre accès sur cet ordinateur, et publieront, mettront à jour ou supprimeront des sites publics sans vous demander d’abord. Vous pouvez le désactiver ici à tout moment.",
+  "settings.turbo.confirmCancel": "Annuler",
+  "settings.turbo.confirmAccept": "Activer",
+  "settings.autoApprove.revokeFailed":
+    "Impossible de révoquer l’approbation permanente pour {name}. Elle est toujours active. Réessayez.",
+  "settings.notifications.title": "Notifications",
+  "settings.desktopNotifications.title": "Notifications du bureau",
+  "settings.desktopNotifications.description": "Afficher une notification lorsqu’un agent a besoin d’attention.",
+  "settings.testNotification.title": "Notification de test",
+  "settings.testNotification.description":
+    "En afficher une maintenant. Si elle n’apparaît pas, autorisez les notifications d’OpenBot dans les réglages du système.",
+  "settings.testNotification.action": "Envoyer un test",
+  "settings.testNotification.failed": "Impossible d’afficher une notification.",
+  "settings.testNotification.openSettings": "Ouvrir les réglages du système",
+  "settings.testNotification.openSettingsFailed": "Impossible d’ouvrir les réglages du système.",
+  "settings.taskSound.title": "Émettre un son à la fin d’une tâche",
+  "settings.taskSound.description": "Utiliser un son court pour les tâches terminées.",
+  "settings.notch.title": "Comportement",
+  "settings.notch.show.title": "Afficher l’état dans l’encoche du MacBook",
+  "settings.notch.show.description":
+    "Afficher l’activité des agents et les éléments nécessitant votre attention en haut de chaque écran.",
+  "settings.notch.idle.title": "Afficher l’îlot au repos",
+  "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
+  "settings.notch.displays.title": "Afficher sur les écrans supplémentaires",
+  "settings.notch.displays.description": "Afficher l’îlot dynamique sur les écrans externes connectés.",
+  "settings.notch.haptics.title": "Retour haptique",
+  "settings.notch.haptics.description":
+    "Utiliser le trackpad Force Touch pour confirmer les interactions avec l’îlot dynamique.",
+  "settings.notch.size.title": "Taille",
+  "settings.notch.size.description": "Sur un écran avec encoche, l’îlot n’est jamais plus petit que l’encoche.",
+  "settings.notch.size.reset": "Rétablir la valeur par défaut",
+  "settings.notch.size.width": "Largeur",
+  "settings.notch.size.height": "Hauteur",
+  "settings.notch.size.previewNotch": "Écran intégré",
+  "settings.notch.size.previewIsland": "Écran externe",
+  "settings.privacy.title": "Confidentialité",
+  "settings.analytics.title": "Partager les données analytiques du produit",
+  "settings.analytics.description":
+    "Envoyer des métadonnées d’utilisation et de fiabilité, avec l’identifiant et l’e-mail de votre compte, aux services analytiques auto-hébergés d’OpenBot.",
+  // The Settings window shell: its tab list, headers and save bar.
+  "settings.tab.general.title": "Général",
+  "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.computerUse.title": "Utilisation de l’ordinateur",
+  "settings.tab.computerUse.description":
+    "Autoriser OpenBot à voir et à interagir avec les applications de cet ordinateur.",
+  "settings.tab.profile.title": "Profil",
+  "settings.tab.profile.description": "Gérer votre apparence dans OpenBot.",
+  "settings.tab.mobileConnect.title": "Connexion mobile",
+  "settings.tab.mobileConnect.description": "Se connecter en toute sécurité depuis votre téléphone.",
+  "settings.tab.dynamicIsland.title": "Îlot dynamique",
+  "settings.tab.dynamicIsland.description": "Choisir quand l’îlot s’affiche et sa taille.",
+  "settings.tab.updates.title": "Mises à jour",
+  "settings.tab.updates.description": "Garder OpenBot à jour sur cet ordinateur.",
+  "settings.tab.hostedSites.title": "Sites hébergés",
+  "settings.tab.hostedSites.description": "Consulter et gérer les sites statiques publiés par vos agents.",
+  "settings.sections.label": "Sections des réglages",
+  "settings.save.region": "Modifications non enregistrées",
+  "settings.save.notSaved": "Modifications non enregistrées",
+  "settings.save.reset": "Réinitialiser",
+  "settings.save.saving": "Enregistrement…",
+  "settings.save.save": "Enregistrer",
+} as const satisfies PartialTranslation<typeof source>;

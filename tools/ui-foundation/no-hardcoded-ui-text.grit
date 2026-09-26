@@ -1,0 +1,48 @@
+language js(typescript)
+
+// scope: src/renderer/src, packages/ui/src, apps/mobile/src, except tests and stories
+
+// User-facing text written as a literal: JSX text, a literal accessible name, label or
+// placeholder, a literal toast or alert, and a literal fallback to `errorMessage`. Each one shows
+// English to a reader who chose another language. Text without a letter, such as "·" or "/", is not
+// matched. The message starts with the rule name, so `lint:ratchet` can count this rule.
+
+or {
+  JsxText() as $text where {
+    $text <: r"(?s).*\p{L}.*",
+    register_diagnostic(span=$text, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+  },
+  JsxAttribute() as $attr where {
+    $attr <: r"(?s)(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)=(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*'|\{\s*\"[^\"]*\p{L}[^\"]*\"\s*\}|\{\s*'[^']*\p{L}[^']*'\s*\}|\{\s*`[^`$]*\p{L}[^`$]*`\s*\})",
+    register_diagnostic(span=$attr, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+  },
+  JsxExpressionChild() as $child where {
+    $child <: r"(?s)\{\s*(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*')\s*\}",
+    register_diagnostic(span=$child, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+  },
+  `$call($first, $...)` as $c where {
+    $call <: or {
+      `toast`,
+      `toast.$_`,
+      `Alert.alert`
+    },
+    $first <: or {
+      JsStringLiteralExpression(),
+      JsTemplateExpression()
+    },
+    $first <: r"(?s).*\p{L}.*",
+    register_diagnostic(span=$first, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+  },
+  `$call($_, $fallback)` as $c where {
+    $call <: or {
+      `errorMessage`,
+      `userErrorMessage`,
+      `$_.errorMessage`
+    },
+    $fallback <: or {
+      JsStringLiteralExpression(),
+      JsTemplateExpression()
+    },
+    register_diagnostic(span=$fallback, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+  }
+}

@@ -1,7 +1,12 @@
+import {
+  APP_LANGUAGE_OPTIONS,
+  type AppLanguage,
+  type AppLanguageOption,
+  appLanguageOption,
+} from "@openbot/i18n/languages";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { useI18n } from "../../i18n-context";
-import { APP_LANGUAGE_OPTIONS, type AppLanguage, type AppLanguageOption, appLanguageOption } from "./app-languages";
 
 /** Kobalte takes a mutable array. The exported catalog stays read-only, so copy it once here. */
 const options: AppLanguageOption[] = [...APP_LANGUAGE_OPTIONS];

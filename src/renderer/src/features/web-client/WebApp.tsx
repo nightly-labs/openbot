@@ -1,8 +1,10 @@
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { resolveLocale } from "@openbot/i18n";
 import { Toaster } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { createStore, onSettled, Show } from "solid-js";
+import { StaticI18nProvider } from "../../i18n-context";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";
 
@@ -206,48 +208,51 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       window.removeEventListener("pageshow", restore);
     };
   });
+  // The web client has no saved language setting, so it follows the browser.
   return (
-    <div class="web-app">
-      <Toaster />
-      <Show when={state.loaded} fallback={<p role="status">Loading OpenBot…</p>}>
-        <Show
-          keyed
-          when={state.account?.id}
-          fallback={
-            <AccountLogin
-              variant="production"
-              state={state.login}
-              onRetry={checkSession}
-              onRequestEmailCode={start}
-              onVerifyEmailCode={verify}
-              onReset={async () => {
-                clearSession();
-                setState((draft) => {
-                  draft.resendAt = 0;
-                });
-              }}
-            />
-          }
-        >
-          {(accountId) => (
-            <>
-              <Show when={state.error}>
-                <p role="alert">{state.error}</p>
-              </Show>
-              <WebWorkspace
-                accountId={accountId}
-                accountEmail={state.account?.email ?? ""}
-                accountName={state.account?.name ?? null}
-                accountAvatarUrl={state.account?.avatarUrl ?? null}
-                accountFetch={accountFetch}
-                onSessionCheck={checkSession}
-                onLogout={() => action(logout)}
-                createRuntime={props.createRuntime}
+    <StaticI18nProvider locale={resolveLocale("system", navigator.language)}>
+      <div class="web-app">
+        <Toaster />
+        <Show when={state.loaded} fallback={<p role="status">Loading OpenBot…</p>}>
+          <Show
+            keyed
+            when={state.account?.id}
+            fallback={
+              <AccountLogin
+                variant="production"
+                state={state.login}
+                onRetry={checkSession}
+                onRequestEmailCode={start}
+                onVerifyEmailCode={verify}
+                onReset={async () => {
+                  clearSession();
+                  setState((draft) => {
+                    draft.resendAt = 0;
+                  });
+                }}
               />
-            </>
-          )}
+            }
+          >
+            {(accountId) => (
+              <>
+                <Show when={state.error}>
+                  <p role="alert">{state.error}</p>
+                </Show>
+                <WebWorkspace
+                  accountId={accountId}
+                  accountEmail={state.account?.email ?? ""}
+                  accountName={state.account?.name ?? null}
+                  accountAvatarUrl={state.account?.avatarUrl ?? null}
+                  accountFetch={accountFetch}
+                  onSessionCheck={checkSession}
+                  onLogout={() => action(logout)}
+                  createRuntime={props.createRuntime}
+                />
+              </>
+            )}
+          </Show>
         </Show>
-      </Show>
-    </div>
+      </div>
+    </StaticI18nProvider>
   );
 }
