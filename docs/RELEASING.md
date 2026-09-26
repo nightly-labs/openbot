@@ -135,6 +135,14 @@ The published runtime uses a new recipe/input digest; no existing release assets
 The Linux GUI capability advisory GHSA-fp6g-27w5-489j does not apply: OpenBot does not ship Sunshine
 on Linux.
 
+## Pin the Gemini server
+
+`native-runtime.lock.json` pins Google's Antigravity ACP server for the Gemini provider by hand:
+the version from the ACP registry entry `antigravity-acp`, and for each target the zip name, its
+SHA-256 and size, and the SHA-256 of `agy_acp_server` and `localharness_external` in it. Download
+each zip from the registry `archive` URL, hash the zip and the two files, and set `installedBytes`
+above the extracted size. Do not commit the zip: Google's license does not allow redistribution.
+
 ## Pin the OpenCode CLI
 
 `native-runtime.lock.json` also pins the OpenCode CLI that OpenBot downloads for the OpenCode

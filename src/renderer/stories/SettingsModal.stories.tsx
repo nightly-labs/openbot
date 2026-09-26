@@ -53,6 +53,7 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   claude: { phase: "downloading", progress: 48, message: null, version: null },
   grok: { phase: "downloading", progress: 72, message: null, version: null },
   opencode: { phase: "downloading", progress: 96, message: null, version: null },
+  antigravity: { phase: "downloading", progress: 12, message: null, version: null },
 };
 
 /** Four connected runtimes, one of which has a newer version waiting. */
@@ -105,6 +106,7 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246", availableVersion: "2.1.250" },
   grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
   opencode: { phase: "ready", progress: 100, message: null, version: "1.18.30" },
+  antigravity: { phase: "ready", progress: 100, message: null, version: "1.2.1" },
 };
 
 function SettingsModalStory(props: {

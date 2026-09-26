@@ -135,7 +135,22 @@ describe("OnboardingFlow", () => {
       />
     ));
 
-    await fireEvent.click(view.getByRole("button", { name: "Add custom provider" }));
+    // The dialog has no trigger, so the picker gives the focus back: to the button when the dialog
+    // closes with no choice, and to the new row when a provider is chosen.
+    const moreButton = view.getByRole("button", { name: "More providers" });
+    await fireEvent.click(moreButton);
+    await fireEvent.keyDown(await screen.findByRole("dialog", { name: "More providers" }), { key: "Escape" });
+    await waitFor(() => expect(moreButton).toHaveFocus());
+    await fireEvent.click(moreButton);
+    const dialog = await screen.findByRole("dialog", { name: "More providers" });
+    await fireEvent.click(within(dialog).getByRole("button", { name: /Gemini/ }));
+    const radios = () => view.getByRole("radiogroup", { name: "Default provider" });
+    await waitFor(() => expect(within(radios()).getByRole("radio", { name: /Gemini/ })).toHaveFocus());
+
+    // With no saved endpoint, the custom provider is in "More providers", not a row of the list.
+    await fireEvent.click(view.getByRole("button", { name: "More providers" }));
+    const more = await screen.findByRole("dialog", { name: "More providers" });
+    await fireEvent.click(within(more).getByRole("button", { name: /Custom provider/ }));
     // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
     await fireEvent.input(await screen.findByLabelText(/^Provider ID/u), { target: { value: "studio-local" } });
     await fireEvent.input(screen.getByLabelText(/^Display name/u), { target: { value: "Studio Local" } });
@@ -276,6 +291,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const [agentStatus, setAgentStatus] = createSignal(initialAgentStatus);
@@ -357,6 +373,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const onDownloadProvider = vi.fn();
@@ -441,6 +458,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "ready", progress: 100, message: null, version: "1.18.27" },
     };
     const onConnectProvider = vi.fn();
@@ -500,6 +518,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     });
     const view = render(() => (
@@ -564,6 +583,7 @@ describe("OnboardingFlow", () => {
       codex: { phase: "not-downloaded", progress: null, message: null, version: null },
       claude: { phase: "not-downloaded", progress: null, message: null, version: null },
       grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+      antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
       opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
     };
     const view = render(() => (

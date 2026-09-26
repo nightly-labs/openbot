@@ -5,6 +5,9 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
+  ANTIGRAVITY_MANIFEST,
+  antigravityHarnessName,
+  parseAntigravityVersion,
   parseBunVersion,
   parseClaudeVersion,
   parseCodexVersion,
@@ -12,7 +15,7 @@ import {
   parseOpencodeVersion,
 } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
-import { assertSafeArchive, extractArchive, rejectNonRegularFiles } from "./provider-runtime-archive";
+import { assertSafeArchive, extractArchive, extractZipFiles, rejectNonRegularFiles } from "./provider-runtime-archive";
 
 export type RuntimeTarget = "darwin-arm64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
@@ -87,6 +90,8 @@ export interface ProviderRuntimeDescriptor {
   stage(context: ProviderStageContext): Promise<void>;
   /** Check a pinned install against the lock, beyond the shared executable and `--version` checks. */
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Promise<void>;
+  /** A file of the install whose text `parseVersion` reads, for a program with no `--version`. */
+  readonly versionFile?: string;
   parseVersion(output: string): string;
 }
 
@@ -350,6 +355,65 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       }
     },
     parseVersion: parseGrokVersion,
+  },
+  antigravity: {
+    runtime: "antigravity",
+    spec: (target, lock) => {
+      const artifact = lock.antigravity.artifacts[target];
+      return {
+        runtime: "antigravity",
+        target,
+        version: lock.antigravity.version,
+        packageVersion: lock.antigravity.version,
+        source: "lock",
+        url: `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset}`,
+        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
+        downloadBytes: artifact.downloadBytes,
+        installedBytes: artifact.installedBytes,
+        executableName: artifact.executable,
+      };
+    },
+    // The server looks for the harness beside itself, so both go to `bin/`. The zip has no licence
+    // file; the manifest names the terms Google publishes instead.
+    stage: async ({ spec, downloadedPath, staging, lock }) => {
+      const bin = join(staging, "bin");
+      const harness = antigravityHarnessName(spec.target);
+      await mkdir(bin, { recursive: true });
+      await extractZipFiles(
+        downloadedPath,
+        bin,
+        [spec.executableName, harness],
+        sourceText("error.provider.antigravityArchivePath"),
+      );
+      await writeFile(
+        join(staging, ANTIGRAVITY_MANIFEST),
+        `${JSON.stringify({
+          layoutVersion: 1,
+          version: spec.version,
+          target: spec.target,
+          executable: `bin/${spec.executableName}`,
+          harness: `bin/${harness}`,
+          licenseUrl: lock.antigravity.licenseUrl,
+        })}\n`,
+      );
+      if (spec.target !== "win32-x64") {
+        await Promise.all([chmod(join(bin, spec.executableName), 0o755), chmod(join(bin, harness), 0o755)]);
+      }
+    },
+    verify: async (root, spec, lock) => {
+      const artifact = lock.antigravity.artifacts[spec.target];
+      const [executable, harness] = await Promise.all([
+        sha256File(join(root, "bin", artifact.executable)),
+        sha256File(join(root, "bin", artifact.harness)),
+      ]);
+      if (executable !== artifact.executableSha256 || harness !== artifact.harnessSha256) {
+        throw new Error(sourceText("error.provider.antigravityChecksum"));
+      }
+    },
+    // The server takes no `--version`: it starts and waits for ACP on stdin. The manifest is covered
+    // by the same file hashes as the programs, so it cannot report a version the files are not.
+    versionFile: ANTIGRAVITY_MANIFEST,
+    parseVersion: parseAntigravityVersion,
   },
   bun: {
     runtime: "bun",

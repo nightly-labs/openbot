@@ -303,7 +303,8 @@ Network traffic can also occur when:
 - an installed build checks GitHub Releases for updates;
 - OpenBot checks for new provider CLI releases when it starts, once an hour, and when you select
   `Check for updates`. It asks `api.github.com` for Codex, `registry.npmjs.org` for Claude and
-  OpenCode, and `x.ai/cli` for Grok, and it reads a list of blocked versions from
+  OpenCode, `x.ai/cli` for Grok, and `raw.githubusercontent.com/agentclientprotocol/registry` and
+  `dl.google.com` (for the download size) for Gemini, and it reads a list of blocked versions from
   `raw.githubusercontent.com/nightly-labs/openbot`. These requests contain no account, agent,
   conversation or file data;
 - a user opens an explicitly labeled external support or setup link.
@@ -408,6 +409,17 @@ the response contains only the used percentage and reset time of each Go limit. 
 send that usage to its maintainer. No screen, log, data export, or diagnostics report contains the
 key; the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
 upload its session files. OpenCode manages its own login and resume state.
+
+### Gemini
+
+OpenBot downloads Google's Antigravity ACP server from `dl.google.com` when you select Download on
+the Gemini row. Each provider update check also asks `dl.google.com` for the size of the newest
+download, also when you do not use Gemini. Google's license does not let OpenBot include it in the application. OpenBot
+starts the server as a local process. Prompts, attachments, and tool results go to that process,
+and the server sends them to Google. Sign in opens Google's sign-in page in your browser. The
+server keeps its login and session files in `~/.gemini`, or in `$GEMINI_HOME`. OpenBot does not
+read, copy, or upload these files. Google's terms apply: <https://antigravity.google/terms>.
+Gemini agents stay on this computer: OpenBot does not show them to team members.
 
 ## Shared desktop channels
 

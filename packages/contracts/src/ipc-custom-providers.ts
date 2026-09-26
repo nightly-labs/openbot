@@ -85,12 +85,25 @@ export interface CustomProviderResult {
   restart: CustomProviderRestart;
 }
 
+/**
+ * The provider ids that no endpoint could have when endpoints shipped. A provider added later is
+ * refused only for a new endpoint (`isNewCustomProviderId`): an endpoint saved under that name
+ * before the upgrade must stay readable and removable, because one bad row empties the whole list.
+ */
+const RESERVED_AT_RELEASE = ["codex", "claude", "grok", "opencode"] as const;
+
+/** A saved endpoint id: what the list decoders and a delete accept. */
 export function isCustomProviderId(value: unknown): value is string {
   return (
     isBoundedString(value, INPUT_LIMITS.identifier) &&
     CUSTOM_PROVIDER_ID_PATTERN.test(value) &&
-    !AGENT_PROVIDERS.some((provider) => provider === value)
+    !isOneOf(RESERVED_AT_RELEASE, value)
   );
+}
+
+/** The id of an endpoint to save. It must not be the name of a built-in provider. */
+export function isNewCustomProviderId(value: unknown): value is string {
+  return isCustomProviderId(value) && !isOneOf(AGENT_PROVIDERS, value);
 }
 
 /**

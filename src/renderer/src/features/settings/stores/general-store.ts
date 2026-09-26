@@ -3,6 +3,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   agentProviderName,
+  isLocalOnlyProvider,
   type ProviderApiKeyStatus,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -35,7 +36,8 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    AGENT_PROVIDERS.map((provider) => {
+    // A joined server's host serves only the providers that the Team API carries.
+    AGENT_PROVIDERS.filter((provider) => !props.providerHostName || !isLocalOnlyProvider(provider)).map((provider) => {
       const agent = props.agentStatus?.providers?.find((candidate) => candidate.id === provider);
       const runtime = props.providerRuntimeStatuses?.[provider];
       return {

@@ -17,6 +17,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
 import { MANAGED_RUNTIME_PROVIDERS, MANAGED_TOOL_RUNTIMES, type ProviderRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import lockValue from "../../native-runtime.lock.json";
@@ -914,8 +915,10 @@ describe("ProviderRuntimeManager", () => {
     const manager = new ProviderRuntimeManager({ root, platform: "darwin", architecture: "arm64", lock });
 
     for (const runtime of [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES]) {
+      // Google names the Gemini server after its build, not after the provider.
+      const executable = runtime === "antigravity" ? "agy_acp_server.par" : runtime;
       expect(manager.executablePath(runtime)).toBe(
-        join(root, runtime, "darwin-arm64", lock[runtime].version, "bin", runtime),
+        join(root, runtime, "darwin-arm64", lock[runtime].version, "bin", executable),
       );
     }
   });
@@ -981,6 +984,39 @@ describe("ProviderRuntimeManager", () => {
     const entries = await readdir(join(root, "opencode")).catch(() => []);
     expect(entries).not.toContain("darwin-arm64");
     expect(entries.some((entry) => entry.startsWith(".staging-"))).toBe(false);
+  });
+
+  /*
+   * Google ships the Gemini server as a zip of two programs: the server and the harness it starts
+   * from its own folder. The server has no `--version`, so the version comes from the layout file
+   * staging writes. Any other file in the zip is refused, so no name in it can reach the disk.
+   */
+  it("stages the Gemini server beside its harness, and refuses a zip with another file", async () => {
+    const root = await temporaryRoot();
+    const fixture = antigravityFixture();
+    const manager = antigravityManager(root, fixture.lock, fixture.archive);
+    await manager.initialize();
+
+    await manager.downloadAndWait("antigravity");
+
+    const version = fixture.lock.antigravity.version;
+    expect(manager.getStatus().providers.antigravity).toMatchObject({ phase: "ready", version });
+    const installed = join(root, "antigravity", "darwin-arm64", version);
+    expect(await readFile(join(installed, "bin", "agy_acp_server.par"), "utf8")).toBe(fixture.serverText);
+    expect(await readFile(join(installed, "bin", "localharness_external"), "utf8")).toBe(fixture.harnessText);
+    expect(JSON.parse(await readFile(join(installed, "antigravity-package.json"), "utf8"))).toMatchObject({
+      layoutVersion: 1,
+      version,
+      executable: "bin/agy_acp_server.par",
+      harness: "bin/localharness_external",
+    });
+
+    const otherRoot = await temporaryRoot();
+    const extra = antigravityFixture([["../outside", "x"]]);
+    const refused = antigravityManager(otherRoot, extra.lock, extra.archive);
+    await refused.initialize();
+    await expect(refused.downloadAndWait("antigravity")).rejects.toThrow("The Gemini archive has an unexpected file.");
+    await expect(access(join(otherRoot, "outside"))).rejects.toThrow();
   });
 
   /*
@@ -1122,6 +1158,77 @@ async function bunFixture(): Promise<OpencodeFixture> {
   artifact.installedBytes = archive.byteLength + 1_024;
   lock.bun.licenseSha256 = digest(new TextEncoder().encode(licenseText));
   return { archive, binaryText, licenseText, lock };
+}
+
+/** A served Gemini zip with the lock rewritten to match it. `extra` adds files the zip must not hold. */
+function antigravityFixture(extra: [string, string][] = []) {
+  const lock = parseAgentRuntimeLock(structuredClone(lockValue));
+  const artifact = lock.antigravity.artifacts["darwin-arm64"];
+  const serverText = "#!/bin/sh\necho server\n";
+  const harnessText = "#!/bin/sh\necho harness\n";
+  const archive = zipArchive([[artifact.executable, serverText], [artifact.harness, harnessText], ...extra]);
+  artifact.assetSha256 = digest(archive);
+  artifact.executableSha256 = digest(new TextEncoder().encode(serverText));
+  artifact.harnessSha256 = digest(new TextEncoder().encode(harnessText));
+  artifact.downloadBytes = archive.byteLength;
+  artifact.installedBytes = archive.byteLength + 1_024;
+  return { archive, serverText, harnessText, lock };
+}
+
+function antigravityManager(
+  root: string,
+  lock: ReturnType<typeof parseAgentRuntimeLock>,
+  archive: Uint8Array,
+): ProviderRuntimeManager {
+  return new ProviderRuntimeManager({
+    root,
+    platform: "darwin",
+    architecture: "arm64",
+    lock,
+    fetchImpl: async () => chunkedResponse(archive, 4_096),
+  });
+}
+
+/** A deflated zip made on Unix, each entry a regular file with mode 755, as Google's zips are. */
+function zipArchive(files: [string, string][]): Uint8Array {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, text] of files) {
+    const data = Buffer.from(text);
+    const packed = deflateRawSync(data);
+    const nameBytes = Buffer.from(name);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc32(data), 14);
+    local.writeUInt32LE(packed.byteLength, 18);
+    local.writeUInt32LE(data.byteLength, 22);
+    local.writeUInt16LE(nameBytes.byteLength, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE((3 << 8) | 20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(crc32(data), 16);
+    central.writeUInt32LE(packed.byteLength, 20);
+    central.writeUInt32LE(data.byteLength, 24);
+    central.writeUInt16LE(nameBytes.byteLength, 28);
+    central.writeUInt32LE((0o100755 << 16) >>> 0, 38);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, packed);
+    centrals.push(central, nameBytes);
+    offset += local.byteLength + nameBytes.byteLength + packed.byteLength;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(directory.byteLength, 12);
+  end.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([...locals, directory, end]));
 }
 
 function bunManager(root: string, fixture: OpencodeFixture): ProviderRuntimeManager {

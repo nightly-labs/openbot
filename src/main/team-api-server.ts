@@ -534,23 +534,23 @@ export class TeamApiServer {
       }
       const context = this.#requestContext(request, response, url, token, authenticated);
       const agents = this.#options.agents.listAgents();
-      const hidden = context.protocol < 4 ? hiddenProviderAgentIds(agents) : new Set<string>();
+      const hidden = hiddenProviderAgentIds(agents, context.protocol);
       for (const id of this.#unrepresentableAgentIds(
         agents.filter((agent) => !hidden.has(agent.id)),
         context.protocol,
         context.capabilities,
       ))
         hidden.add(id);
-      if (context.protocol < 4 || hidden.size > 0) {
-        const responseRoute = this.#responseRoutes.get(response);
-        if (responseRoute) responseRoute.hiddenAgentIds = hidden;
-        const agentId = url.pathname.match(/^\/v1\/agents\/([^/]+)/u)?.[1];
-        if (
-          (agentId && hidden.has(pathIdentifier(agentId, "agentId"))) ||
-          [url.searchParams.get("agentId"), url.searchParams.get("botId")].some((id) => id !== null && hidden.has(id))
-        ) {
-          throw new HttpError(404, sourceText("error.team.agentNotFound"));
-        }
+      // Every protocol gets the projection, also with no hidden agent: a provider status row, a
+      // model or an auth state of a local-only provider can be in the response.
+      const responseRoute = this.#responseRoutes.get(response);
+      if (responseRoute) responseRoute.hiddenAgentIds = hidden;
+      const agentId = url.pathname.match(/^\/v1\/agents\/([^/]+)/u)?.[1];
+      if (
+        (agentId && hidden.has(pathIdentifier(agentId, "agentId"))) ||
+        [url.searchParams.get("agentId"), url.searchParams.get("botId")].some((id) => id !== null && hidden.has(id))
+      ) {
+        throw new HttpError(404, sourceText("error.team.agentNotFound"));
       }
 
       // First module that does not say "unmatched" wins, and the dispatcher then does nothing at
@@ -682,15 +682,16 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
     options: { preserveSemanticTags?: boolean } = {},
   ): string | null {
-    if (capabilities.has("opencode"))
-      return encodeTeamProtocolV4BaseCurrentEvent(event, {
+    const protocol = capabilities.has("opencode") ? 4 : 1;
+    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
+    const visible = (protocol === 4 ? hiddenAgentView : legacyProviderView)(event, hidden);
+    if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
+    if (protocol === 4)
+      return encodeTeamProtocolV4BaseCurrentEvent(visible, {
         ...options,
         preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
       });
-    const visible = legacyProviderView(event, hiddenProviderAgentIds(this.#options.agents.listAgents()));
-    return isAgentEvent(visible) || isTeamRealtimeEvent(visible)
-      ? encodeTeamProtocolV1CurrentEvent(visible, options)
-      : null;
+    return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
 
   #broadcastAgentEvent(event: AgentEvent): void {

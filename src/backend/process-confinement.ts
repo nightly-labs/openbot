@@ -8,7 +8,7 @@ import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
  * The folders one Workspace only agent may write: its workspace and the shared folder. The temporary
  * folders and the provider's state are added to them.
  *
- * Grok and OpenCode take no sandbox per session, so a Workspace only agent on them gets a provider
+ * Grok, OpenCode and Antigravity take no sandbox per session, so a Workspace only agent on them gets a provider
  * process of its own, and OpenBot starts that process inside an operating system sandbox. The whole
  * process is confined: the file edit tools, the shell, and every command and MCP server it starts.
  * Nothing inside the process can take the sandbox away. Only macOS has the sandbox now: on Linux and
@@ -81,6 +81,21 @@ export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = 
 
 const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
 
+/**
+ * The Antigravity server keeps its sign-in, sessions and harness files in `antigravity-acp` under
+ * the Gemini home, and hook scratch files in `artifacts`. The shared `config` folder, with the
+ * global hooks, skills and MCP servers, is not in the list, so it stays read-only. `settings.json`
+ * selects the sign-in and `trusted_workspaces.json` trusts folders for every other process.
+ */
+export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const geminiHome = env.GEMINI_HOME?.trim() || join(home, ".gemini");
+  const acp = join(geminiHome, "antigravity-acp");
+  return {
+    writable: [acp, join(geminiHome, "artifacts")],
+    protected: [join(acp, "settings.json"), join(acp, "trusted_workspaces.json")],
+  };
+}
+
 /** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 
@@ -92,7 +107,20 @@ export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CAC
  * in its own sandbox for the same reason. A whole folder is denied, because a folder renamed to
  * `.claude` would bring a settings file past a rule for the file alone.
  */
-const PROJECT_SETTINGS = [".claude", ".codex", ".grok", ".opencode", "opencode.json", "opencode.jsonc"];
+const PROJECT_SETTINGS = [
+  ".claude",
+  ".codex",
+  ".grok",
+  ".opencode",
+  "opencode.json",
+  "opencode.jsonc",
+  // Antigravity reads project skills from `.gemini` and its customizations from these four.
+  ".gemini",
+  ".agents",
+  ".agent",
+  "_agents",
+  "_agent",
+];
 
 /**
  * The command that starts `target` inside the sandbox. It throws when this computer cannot make the

@@ -380,5 +380,58 @@
         "executable": "bun.exe"
       }
     }
+  },
+  "antigravity": {
+    "registry": "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json",
+    "distribution": "https://dl.google.com/agy-extensions/releases",
+    "version": "1.2.1",
+    "license": "Proprietary",
+    "licenseUrl": "https://antigravity.google/terms",
+    "artifacts": {
+      "darwin-arm64": {
+        "asset": "agy-acp-server-1.2.1-darwin-arm64.zip",
+        "assetSha256": "0fab9938812e6b32b3b543e65e4f3a0025ceef755413db13542d9a9b81ea803c",
+        "downloadBytes": 111725488,
+        "installedBytes": 400000000,
+        "executable": "agy_acp_server.par",
+        "executableSha256": "c93c86c0f505fcdf8b13c695bed26d306141ef5446189d591397074d324db34e",
+        "harness": "localharness_external",
+        "harnessSha256": "1b8a2b712ca312c9769e425b800bfbcceec4770f19736404474d1e8e50d65456",
+        "platformDirectory": "macos"
+      },
+      "linux-x64": {
+        "asset": "agy-acp-server-1.2.1-linux-x86_64.zip",
+        "assetSha256": "9fbf0bd584a26478161f637cabd75113f72541c842d148f578ef1a6a9edcb843",
+        "downloadBytes": 333590110,
+        "installedBytes": 1055000000,
+        "executable": "agy_acp_server.par",
+        "executableSha256": "adbf34295671d1fd68b347efe4e4e2587816023cf41b9eff92c451834eb3de95",
+        "harness": "localharness_external",
+        "harnessSha256": "428236f899a22181ecb47b2885b167e71d4f1a661f8ce0046225174a32018f72",
+        "platformDirectory": "linux"
+      },
+      "linux-arm64": {
+        "asset": "agy-acp-server-1.2.1-linux-arm64.zip",
+        "assetSha256": "7e7ef4088bc185e1af4204029e0f4ec4210af20724f3ff262186ac0bcea6aa0e",
+        "downloadBytes": 321280184,
+        "installedBytes": 1050000000,
+        "executable": "agy_acp_server.par",
+        "executableSha256": "422da6b0a2691006d69b89f8d4ea6d8818f3fe90eddcdf5bf78b20fbd502c68a",
+        "harness": "localharness_external",
+        "harnessSha256": "f3ac92c3c19327659d4721b78d1741f809a6106858a3a47be97aa334ad8cbbd5",
+        "platformDirectory": "linux"
+      },
+      "win32-x64": {
+        "asset": "agy-acp-server-1.2.1-windows-x86_64.zip",
+        "assetSha256": "9b82493819bc14613baa76264d55ad307ddd8ab4a8d6e110edb32da35498c07b",
+        "downloadBytes": 124869770,
+        "installedBytes": 230000000,
+        "executable": "agy_acp_server.exe",
+        "executableSha256": "04fd51b5c6dfb6d11e649c2cfc61a64ca31d9a4a58a9a3e5c93db934cd7a9695",
+        "harness": "localharness_external.exe",
+        "harnessSha256": "d9283bd0505014ca44f0e02259b78209c13b2426c9780bd43b7779f8eafe438f",
+        "platformDirectory": "windows"
+      }
+    }
   }
 }

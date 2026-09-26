@@ -189,16 +189,16 @@ export interface AcpProviderOptions {
    * makes for the model configuration and the prompt images, because the endpoint can be removed
    * while those run and this process would still answer on it.
    */
-  servesModel?(modelId: string): boolean;
+  servesModel?: ((modelId: string) => boolean) | undefined;
   /**
    * The user's own MCP servers, read at spawn. OpenBot's bridge servers are appended after these,
    * so a configuration can never displace the tools the agent depends on.
    */
-  mcpServers?: McpServerSource;
+  mcpServers?: McpServerSource | undefined;
   /** What this provider could not be given. Reported once per spawn, by `AgentService`. */
-  reportMcpDrops?: McpDropReporter;
-  mcpToolRuntimes?: McpToolRuntimeSource;
-  mcpAuthorization?: McpAuthorizationSource;
+  reportMcpDrops?: McpDropReporter | undefined;
+  mcpToolRuntimes?: McpToolRuntimeSource | undefined;
+  mcpAuthorization?: McpAuthorizationSource | undefined;
   authenticate?(connection: ClientSideConnection, initialization: InitializeResponse): Promise<void>;
   /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not

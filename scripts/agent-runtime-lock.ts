@@ -59,6 +59,24 @@ const grokArtifactSchema = z.object({
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 
+/**
+ * Google ships the Antigravity ACP server as one zip per target with two programs in it: the
+ * server, and the harness it finds beside itself. Both are hashed, because either one runs.
+ */
+const antigravityArtifactSchema = z.object({
+  asset: z
+    .string()
+    .regex(/^agy-acp-server-\d+\.\d+\.\d+-(?:darwin-arm64|linux-x86_64|linux-arm64|windows-x86_64)\.zip$/u),
+  assetSha256: sha256Schema,
+  downloadBytes: z.number().int().positive(),
+  installedBytes: z.number().int().positive(),
+  executable: z.enum(["agy_acp_server.par", "agy_acp_server.exe"]),
+  executableSha256: sha256Schema,
+  harness: z.enum(["localharness_external", "localharness_external.exe"]),
+  harnessSha256: sha256Schema,
+  platformDirectory: z.enum(["macos", "linux", "windows"]),
+});
+
 const agentRuntimeLockSchema = z.object({
   schemaVersion: z.literal(1),
   codex: z.object({
@@ -141,6 +159,26 @@ const agentRuntimeLockSchema = z.object({
       "linux-x64": grokArtifactSchema,
       "linux-arm64": grokArtifactSchema,
       "win32-x64": grokArtifactSchema,
+    }),
+  }),
+  /**
+   * The server that signs in with a Google AI Pro or Ultra plan. It is proprietary, so OpenBot
+   * downloads it on the user's computer and does not ship it in a release. The archive has no licence
+   * file: the terms are at `licenseUrl`.
+   */
+  antigravity: z.object({
+    registry: z.literal(
+      "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json",
+    ),
+    distribution: z.literal("https://dl.google.com/agy-extensions/releases"),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
+    license: z.literal("Proprietary"),
+    licenseUrl: z.literal("https://antigravity.google/terms"),
+    artifacts: z.object({
+      "darwin-arm64": antigravityArtifactSchema,
+      "linux-x64": antigravityArtifactSchema,
+      "linux-arm64": antigravityArtifactSchema,
+      "win32-x64": antigravityArtifactSchema,
     }),
   }),
 });

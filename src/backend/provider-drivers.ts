@@ -4,7 +4,14 @@ import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
-import { type AgentCliInfo, resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "./cli";
+import {
+  type AgentCliInfo,
+  resolveAntigravityCli,
+  resolveClaudeCli,
+  resolveCodexCli,
+  resolveGrokCli,
+  resolveOpencodeCli,
+} from "./cli";
 import { GrokAgentClient } from "./grok-client";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type {
@@ -21,6 +28,7 @@ import {
 } from "./opencode-config";
 import { readOpenCodeGoUsage } from "./opencode-usage";
 import {
+  antigravityStatePaths,
   confineSpawnTarget,
   OPENCODE_CONFINED_ENV,
   openCodeStatePaths,
@@ -29,7 +37,7 @@ import {
 import type { AccountReadResult } from "./protocol";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
-export interface ProviderCliCommand {
+interface ProviderCliCommand {
   readonly argv: readonly string[];
   readonly env: (cli: AgentCliInfo) => Record<string, string>;
   readonly timeoutMs: number;
@@ -65,7 +73,18 @@ type ProviderSignIn =
   /** OpenBot spawns the provider's CLI and waits for the process to exit. */
   | { kind: "cli-command"; command: ProviderCliCommand }
   /** The user signs in with the CLI themselves; OpenBot only re-probes the provider afterwards. */
-  | { kind: "external" };
+  | { kind: "external" }
+  /**
+   * OpenBot starts the ACP server and calls `authenticate` with this method, which opens a browser
+   * from the server. Only the sign-in process calls it: in a status probe it would open a browser.
+   */
+  | { kind: "acp-authenticate"; methodId: string; argv: readonly string[]; timeoutMs: number };
+
+/**
+ * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
+ * argument. OpenBot starts it the same way.
+ */
+const ANTIGRAVITY_ARGV: readonly string[] = process.platform === "linux" ? ["--uid="] : [];
 
 /**
  * What a client needs from the app at spawn, beyond its own CLI: the stored secrets, and the user's
@@ -266,6 +285,35 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "opencode", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "antigravity",
+    // `oauth-personal` is the Google account sign-in that a Google AI Pro or Ultra plan uses.
+    signIn: {
+      kind: "acp-authenticate",
+      methodId: "oauth-personal",
+      argv: ANTIGRAVITY_ARGV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
+    resolveCli: resolveAntigravityCli,
+    confinesProcess: true,
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "antigravity",
+        argv: ANTIGRAVITY_ARGV,
+        env: {},
+        ...(confinement
+          ? { confine: (target) => confineSpawnTarget(target, confinement, antigravityStatePaths()) }
+          : {}),
+        signInMessage: sourceText("error.provider.antigravitySignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpAuthorization: context.mcpAuthorization,
+      }),
+    authState: (account) => ({ kind: "antigravity", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
 ] as const;

@@ -131,7 +131,7 @@ the `media-attachments` capability; released protocol adapters keep their existi
   Generated response attachments become visible only after the conversation and mailbox commit
   succeeds. Agent deletion and queue edits record file removals in the mailbox transaction; the
   deletion outbox retries failed removals.
-- `~/.codex`, `~/.claude`, and `~/.grok` are provider-owned login and resume state. They are not OpenBot
+- `~/.codex`, `~/.claude`, `~/.grok`, and `~/.gemini` are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
@@ -314,13 +314,14 @@ would refuse.
 
 The runtime manager offers the latest upstream release of each provider CLI. It checks at startup,
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
-`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, and `x.ai/cli/stable`
-for Grok. The version in `native-runtime.lock.json` is what a first install uses before a check has
+`releases/latest` for Codex, the npm `latest` tag for Claude and OpenCode, `x.ai/cli/stable`
+for Grok, and the ACP registry entry `antigravity-acp` for Gemini. The version in `native-runtime.lock.json` is what a first install uses before a check has
 answered, and Bun, which is a tool runtime and not a provider, stays on it.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
-Codex and npm `dist.integrity` for Claude and OpenCode. x.ai publishes no hash, so a Grok release
-is trusted on TLS alone. An upstream install writes `openbot-install.json` with the SHA-256 of each
+Codex and npm `dist.integrity` for Claude and OpenCode. x.ai and the ACP registry publish no hash,
+so a Grok or Gemini release is trusted on TLS alone. A Gemini release must stay on
+`dl.google.com/agy-extensions/releases` and keep the pinned command name. An upstream install writes `openbot-install.json` with the SHA-256 of each
 file it installed, and every start verifies that record and the binary's `--version` before the
 install is used. The newest version in the store that verifies is the one that runs.
 
@@ -1068,6 +1069,27 @@ about what costs money.
 Provider session IDs remain in `projection_provider_sessions`; migration 17 adds OpenCode while
 preserving turn links. Provider switches keep the same agent, workspace, and local thread.
 
+### Gemini
+
+The Gemini provider (id `antigravity`) starts Google's Antigravity ACP server
+(`agy_acp_server`). Google's license does not allow redistribution, so the runtime manager
+downloads the zip on the user's computer. `extractZipFiles` in `src/main/provider-runtime-archive.ts`
+accepts only the server and `localharness_external`, which the server starts from its own folder.
+The server has no `--version`, so staging writes `antigravity-package.json` and
+`verifyInstalledRuntime` reads the version from that file (`versionFile`). OpenBot never searches
+`PATH`, because the Antigravity editor installs an `antigravity` command that is not this server.
+
+Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
+(`src/backend/acp-sign-in.ts`): the server opens the browser and waits, and a status probe must
+never wait for that. The serving client never calls `authenticate`. A signed-out server answers
+`session/new` with "Authentication required", which the client reports as sign-in required.
+The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravity-acp` and
+`~/.gemini/artifacts` and protects its settings files. Migration 22 adds `antigravity` to
+`projection_provider_sessions`.
+
+The Team API wire protocols do not know `antigravity`. The host hides Gemini agents, models,
+status, and sign-in state from peers on every protocol version, and the providers route omits it.
+
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
@@ -1175,12 +1197,16 @@ A skill follows the [Agent Skills specification](https://agentskills.io/specific
 
 | Folder | Written by | Read by |
 | --- | --- | --- |
-| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode |
+| `<workspace>/.agents/skills/` | OpenBot, the user, the agent | Codex, Grok, OpenCode, Gemini |
 | `<workspace>/.claude/skills/` | OpenBot, the user, the agent | Claude Code, OpenCode |
 | `<workspace>/.opencode/skills/` | the user, the agent | OpenCode |
+| `<workspace>/.gemini/skills/` | the user, the agent | Gemini |
 | `~/.agents/skills/` | the user | Codex, Grok, OpenCode |
 | `~/.claude/skills/` | the user | Claude Code, OpenCode |
 | `~/.codex/skills/`, `~/.config/opencode/skills/` | the user | Codex, OpenCode |
+
+A confined agent (Grok, OpenCode or Gemini, not in Full access) cannot write the four workspace
+folders: `src/backend/process-confinement.ts` protects them as project settings.
 
 OpenBot writes each skill that it installs to both `.agents/skills/<slug>` and
 `.claude/skills/<slug>`, because Claude Code does not read `.agents/skills`. It copies the files and
@@ -1188,7 +1214,7 @@ does not make links. `.openbot/skills-lock.json` in the workspace records the fi
 `.openbot/skills-disabled/` holds disabled skills. A bundled skill has an `.openbot-managed.json`
 marker.
 
-`src/main/skill-folder-discovery.ts` lists all other skills in the three workspace folders as
+`src/main/skill-folder-discovery.ts` lists all other skills in the four workspace folders as
 `workspace` skills. The list is read-only: OpenBot never writes, moves or deletes these folders, and
 they do not count toward the agent's skill limit. A folder without `SKILL.md` is not a skill. A
 skill gets a `problem` when its `SKILL.md` does not follow the specification, or when it is in a

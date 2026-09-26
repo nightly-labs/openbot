@@ -14,14 +14,21 @@ import {
   isAgentModel,
   isCustomProviderHeaderName,
   isCustomProviderId,
+  isNewCustomProviderId,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { isObject, requireString } from "./validation";
 
 function parseProviderId(value: unknown): string {
-  // `isCustomProviderId` also refuses `codex`, `claude`, `grok` and `opencode`: an endpoint under a
-  // built-in provider's name would shadow that provider's own models in the picker.
+  // `isNewCustomProviderId` also refuses every built-in provider id: an endpoint under a built-in
+  // provider's name would shadow that provider's own models in the picker.
+  if (!isNewCustomProviderId(value)) throw new Error(sourceText("error.provider.idInvalid"));
+  return value;
+}
+
+/** A delete names a saved endpoint, which can have an id that a newer built-in provider now uses. */
+function parseSavedProviderId(value: unknown): string {
   if (!isCustomProviderId(value)) throw new Error(sourceText("error.provider.idInvalid"));
   return value;
 }
@@ -119,5 +126,5 @@ export function parseSaveCustomProvider(input: unknown): SaveCustomProviderInput
 
 export function parseDeleteCustomProvider(input: unknown): DeleteCustomProviderInput {
   if (!isObject(input)) throw new Error("Invalid endpoint.");
-  return { id: parseProviderId(input.id) };
+  return { id: parseSavedProviderId(input.id) };
 }

@@ -140,4 +140,16 @@ export const messages = {
   "error.provider.tryAgain": "Réessayez.",
   "error.provider.noAgentProcess": "{provider} n’a aucun processus en cours pour cet agent.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} s’est arrêté avant le démarrage du processus de l’agent.",
+  "error.provider.archiveUnreadable":
+    "L’archive de l’environnement d’exécution est illisible ou utilise un format non pris en charge.",
+  "error.provider.antigravityArchivePath": "L’archive Gemini contient un fichier inattendu.",
+  "error.provider.antigravityChecksum": "La somme de contrôle de l’environnement d’exécution Gemini ne correspond pas.",
+  "error.provider.antigravityReleaseShape": "La version Gemini a une forme inattendue.",
+  "error.provider.antigravityMissing": "Gemini n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
+  "error.provider.antigravityNotStarted": "Le serveur Gemini a été trouvé, mais sa version est illisible.",
+  "error.provider.antigravityVersionUnreadable": "Impossible de lire la version du serveur Gemini.",
+  "error.provider.antigravitySignIn": "Connectez-vous avec Google pour utiliser Gemini.",
+  "error.provider.acpSignInTimedOut": "La connexion a expiré.",
+  "error.provider.acpSignInStopped": "La connexion s’est arrêtée avant la fin.",
+  "error.provider.acpSignInFailed": "La connexion n’a pas abouti.",
 } as const satisfies PartialTranslation<typeof source>;

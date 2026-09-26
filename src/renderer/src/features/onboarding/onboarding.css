@@ -633,6 +633,28 @@
   }
 }
 
+/* The same note on the right of the list, for "More providers": the text aligns right and the
+   arrow is mirrored to point left. */
+.provider-picker-callout-end {
+  right: auto;
+  left: calc(100% + 10px);
+  align-items: flex-end;
+  text-align: right;
+  animation-name: provider-picker-callout-end-in;
+}
+
+.provider-picker-callout-end .provider-picker-callout-arrow {
+  align-self: flex-start;
+  transform: scaleX(-1);
+}
+
+@keyframes provider-picker-callout-end-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .provider-picker-callout {
     animation: none;

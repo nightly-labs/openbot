@@ -12,18 +12,20 @@ import {
   showProviderUpdateToast,
 } from "../src/features/provider-updates/provider-update-toast";
 
-const PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
+const PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity"] as const;
 const NAMES: Record<ManagedProviderId, string> = {
   codex: "ChatGPT",
   claude: "Claude",
   grok: "Grok",
   opencode: "OpenCode",
+  antigravity: "Gemini",
 };
 const INSTALLED: Record<ManagedProviderId, string> = {
   codex: "0.149.1",
   claude: "2.1.246",
   grok: "1.0.5",
   opencode: "1.18.30",
+  antigravity: "1.2.1",
 };
 
 /** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
@@ -32,6 +34,7 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   claude: "2.1.250",
   grok: null,
   opencode: null,
+  antigravity: null,
 };
 
 /** Fast enough to finish in a couple of seconds, slow enough to read. */
@@ -45,6 +48,7 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
     claude: { phase: "ready", progress: 100, message: null, version: INSTALLED.claude },
     grok: { phase: "ready", progress: 100, message: null, version: INSTALLED.grok },
     opencode: { phase: "ready", progress: 100, message: null, version: INSTALLED.opencode },
+    antigravity: { phase: "ready", progress: 100, message: null, version: INSTALLED.antigravity },
   };
 }
 

@@ -1,5 +1,11 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
-import type { AgentProviderId, AgentStatus, AppSetupState, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  AgentProviderStatus,
+  AgentStatus,
+  AppSetupState,
+  ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
@@ -71,20 +77,34 @@ const bothConnectingAgentStatus: AgentStatus = {
   })),
 };
 
-const lazyProviderAgentStatus: AgentStatus = {
-  ...noProvidersConnectedAgentStatus,
-  providers: noProvidersConnectedAgentStatus.providers?.map((provider) => ({
-    ...provider,
-    state: "not-installed",
-    connectionState: undefined,
-    message: null,
-  })),
+/** A new computer: no provider is downloaded yet, Gemini included. */
+const lazyProviders: AgentProviderStatus[] = [
+  ...(noProvidersConnectedAgentStatus.providers ?? []).map(
+    ({ connectionState: _connectionState, ...provider }): AgentProviderStatus => ({
+      ...provider,
+      state: "not-installed",
+      message: null,
+    }),
+  ),
+  { id: "antigravity", state: "not-installed", version: null, message: null },
+];
+const lazyProviderAgentStatus: AgentStatus = { ...noProvidersConnectedAgentStatus, providers: lazyProviders };
+
+/** Gemini is downloaded and signed in. The others are not downloaded yet. */
+const geminiSignedInAgentStatus: AgentStatus = {
+  ...lazyProviderAgentStatus,
+  providers: lazyProviders.map((provider) =>
+    provider.id === "antigravity"
+      ? { ...provider, state: "available", version: "1.2.1", email: "ada@example.com" }
+      : provider,
+  ),
 };
 
 const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStatus> => ({
   codex: { phase: "not-downloaded", progress: null, message: null, version: null },
   claude: { phase: "not-downloaded", progress: null, message: null, version: null },
   grok: { phase: "not-downloaded", progress: null, message: null, version: null },
+  antigravity: { phase: "not-downloaded", progress: null, message: null, version: null },
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 
@@ -140,7 +160,7 @@ function RefreshResettingFlow(props: { args: Parameters<typeof OnboardingFlow>[0
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviderAgentStatus.providers?.map((provider) =>
-    provider.id === "opencode" ? provider : { ...provider, state: "sign-in-required" },
+    provider.id === "opencode" || provider.id === "antigravity" ? provider : { ...provider, state: "sign-in-required" },
   ),
 };
 
@@ -155,9 +175,10 @@ function LazyProviderDownloadsFlow(props: {
   args: Parameters<typeof OnboardingFlow>[0];
   failGrokOnce?: boolean;
   downloaded?: boolean;
+  initialAgentStatus?: AgentStatus;
 }) {
   const [agentStatus, setAgentStatus] = createSignal(
-    props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus,
+    props.initialAgentStatus ?? (props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus),
   );
   const [runtimeStatuses, setRuntimeStatuses] = createSignal(
     props.downloaded ? downloadedRuntimeStatuses() : initialRuntimeStatuses(),
@@ -477,6 +498,27 @@ export const LazyProviderDownloads: Story = {
     agentStatus: lazyProviderAgentStatus,
   },
   render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} />,
+};
+
+/**
+ * A new computer with no saved endpoint. The list shows ChatGPT, Claude, Grok and OpenCode. Gemini
+ * and the custom provider are in "More providers".
+ */
+export const NewComputer: Story = {
+  args: {
+    agentStatus: lazyProviderAgentStatus,
+    customProviders: [],
+  },
+  render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} />,
+};
+
+/** The user is signed in to Gemini, so Gemini is the first row and Grok is in "More providers". */
+export const SignedInToGemini: Story = {
+  args: {
+    agentStatus: geminiSignedInAgentStatus,
+    customProviders: [],
+  },
+  render: (storyArgs) => <LazyProviderDownloadsFlow args={storyArgs} initialAgentStatus={geminiSignedInAgentStatus} />,
 };
 
 export const LazyProviderDownloadsWithFailure: Story = {

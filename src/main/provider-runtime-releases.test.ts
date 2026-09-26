@@ -85,4 +85,27 @@ describe("latestRelease", () => {
       "no verifiable download",
     );
   });
+
+  it("takes a Gemini release only from Google's release path, with the pinned layout", async () => {
+    const google = `${lock.antigravity.distribution}/macos/agy-acp-server-1.3.0-darwin-arm64.zip`;
+    const registry = (archive: string, cmd = "./agy_acp_server.par") =>
+      sources({
+        [lock.antigravity.registry]: {
+          version: "1.3.0",
+          distribution: { binary: { "darwin-aarch64": { archive, cmd } } },
+        },
+      });
+
+    await expect(
+      latestRelease("antigravity", { target: "darwin-arm64", lock, fetch: registry(google) }),
+    ).resolves.toMatchObject({ version: "1.3.0", url: google, archiveDigest: null, downloadBytes: tarball.byteLength });
+    for (const fetch of [
+      registry("https://mirror.example/agy-acp-server-1.3.0-darwin-arm64.zip"),
+      registry(google, "./other_server"),
+    ]) {
+      await expect(latestRelease("antigravity", { target: "darwin-arm64", lock, fetch })).rejects.toThrow(
+        "The Gemini release has an unexpected shape.",
+      );
+    }
+  });
 });

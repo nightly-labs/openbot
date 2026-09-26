@@ -178,6 +178,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       claude: emptyStatus(unsupportedMessage),
       grok: emptyStatus(unsupportedMessage),
       opencode: emptyStatus(unsupportedMessage),
+      antigravity: emptyStatus(unsupportedMessage),
       bun: emptyStatus(unsupportedMessage),
     };
   }
@@ -943,8 +944,10 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
   await access(executable);
   if (spec.source === "lock") await descriptor.verify(root, spec, lock);
   else await verifyInstallRecord(root, spec);
-  const { stdout } = await execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true });
-  if (descriptor.parseVersion(stdout) !== spec.version) {
+  const output = descriptor.versionFile
+    ? await readFile(join(root, descriptor.versionFile), "utf8")
+    : (await execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).stdout;
+  if (descriptor.parseVersion(output) !== spec.version) {
     throw new Error(sourceText("error.provider.unexpectedVersion"));
   }
 }
