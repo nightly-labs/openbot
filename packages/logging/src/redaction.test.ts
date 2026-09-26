@@ -183,12 +183,14 @@ describe("registerSecretValue", () => {
     expect(redactText("listening on 8080")).toBe("listening on 8080");
   });
 
-  // A registered value can also be a label. Masking it first would erase the label the rules need.
+  // A registered value can also be a label or a scheme. Masking it first would erase what the rules need.
   it("keeps label rules working when a registered value is a label", () => {
     registerSecretValue("password");
 
     expect(redactText("password=opaque-value")).not.toContain("opaque-value");
     expect(redactText('{"password":"opaque-value"}')).not.toContain("opaque-value");
+    registerSecretValue("Authorization");
+    expect(redactText("Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l")).not.toContain("YWxhZGRpbjpvcGVuc2VzYW1l");
   });
 
   // A label rule stops a value at the first space, so it must not run before the exact value.

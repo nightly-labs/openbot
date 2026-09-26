@@ -79,14 +79,20 @@ const UNSERIALIZABLE = "[unserializable]";
 // refused because masking `true` or `8080` would erase ordinary diagnostics. Nothing leaves the set:
 // a process started with a replaced key can still print it until it stops. The set grows only by
 // the secrets the user saves while the app runs.
+//
+// Most values are masked before the rules run, so no rule can cut one and leave a part of it in the
+// log. A value that holds a word the rules read, such as `Authorization` or `password`, is masked
+// after them instead: masking it first would erase the label or scheme that hides the next value.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
-const registeredSecrets = new Set<string>();
-// One alternation, longest first, so a secret that contains another one is masked whole, and one
-// pass, so a later secret cannot match inside the marker an earlier one left.
-let registeredSecretPattern: RegExp | null = null;
-// What a registered value becomes until the rules have run. It contains `secret`, so where the
-// value was a label, such as `password=…`, the label rules still hide the value after it.
-const REGISTERED_SECRET_MARKER = "__openbot_registered_secret__";
+const RULE_WORD =
+  /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
+const secretsBeforeRules = new Set<string>();
+const secretsAfterRules = new Set<string>();
+let patternBeforeRules: RegExp | null = null;
+let patternAfterRules: RegExp | null = null;
+// What a value masked before the rules becomes until they have run. One token with no label word,
+// so every rule reads it as an ordinary value and consumes it whole.
+const REGISTERED_SECRET_MARKER = "__openbot_registered_value__";
 
 /**
  * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
@@ -94,15 +100,24 @@ const REGISTERED_SECRET_MARKER = "__openbot_registered_secret__";
  */
 export function registerSecretValue(value: string): void {
   if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
-  const size = registeredSecrets.size;
-  registeredSecrets.add(value).add(JSON.stringify(value).slice(1, -1));
+  const afterRules = RULE_WORD.test(value);
+  const secrets = afterRules ? secretsAfterRules : secretsBeforeRules;
+  const size = secrets.size;
+  secrets.add(value).add(JSON.stringify(value).slice(1, -1));
   const encoded = uriEncoded(value);
-  if (encoded !== null) registeredSecrets.add(encoded);
-  if (registeredSecrets.size === size) return;
-  const alternatives = [...registeredSecrets]
+  if (encoded !== null) secrets.add(encoded);
+  if (secrets.size === size) return;
+  if (afterRules) patternAfterRules = alternation(secrets);
+  else patternBeforeRules = alternation(secrets);
+}
+
+// One alternation, longest first, so a secret that contains another one is masked whole, and one
+// pass, so a later secret cannot match inside the text an earlier one left.
+function alternation(secrets: Set<string>): RegExp {
+  const alternatives = [...secrets]
     .sort((left, right) => right.length - left.length)
     .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
-  registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
+  return new RegExp(alternatives.join("|"), "gu");
 }
 
 // A lone surrogate cannot be URL-encoded. Such a value cannot appear in a URL either, and a
@@ -120,13 +135,13 @@ export function isSecretName(name: string): boolean {
   return SECRET_KEY.test(name);
 }
 
-// The exact values go first, so that no label rule can cut one and leave a part of it in the log.
 export function redactText(value: string): string {
-  const marked = registeredSecretPattern ? value.replace(registeredSecretPattern, REGISTERED_SECRET_MARKER) : value;
+  const marked = patternBeforeRules ? value.replace(patternBeforeRules, REGISTERED_SECRET_MARKER) : value;
   const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
-  return redacted.includes(REGISTERED_SECRET_MARKER)
+  const unmarked = redacted.includes(REGISTERED_SECRET_MARKER)
     ? redacted.split(REGISTERED_SECRET_MARKER).join("[redacted]")
     : redacted;
+  return patternAfterRules ? unmarked.replace(patternAfterRules, "[redacted]") : unmarked;
 }
 
 function applyTextRules(value: string): string {
