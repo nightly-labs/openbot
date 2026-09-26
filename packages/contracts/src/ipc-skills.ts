@@ -200,8 +200,63 @@ function optionalSkillDescription(value: unknown): string | undefined {
   return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
 }
 
+/** The search part of a catalog list request. The agent catalog takes the same fields. */
+export function marketplaceQueryParams(query: MarketplaceSkillQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.query) params.set("query", query.query);
+  if (query.category) params.set("category", query.category);
+  if (query.featured) params.set("featured", "true");
+  if (query.sort) params.set("sort", query.sort);
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.limit) params.set("limit", String(query.limit));
+  return params;
+}
+
+export function decodeMarketplaceSkillPage(value: unknown): MarketplaceSkillPage {
+  if (!isDynamicRecord(value) || !Array.isArray(value.skills) || !value.skills.every(isMarketplaceSkillSummary))
+    throw new Error("Invalid skill marketplace response.");
+  if (value.nextCursor !== null && !isString(value.nextCursor)) throw new Error("Invalid skill marketplace response.");
+  return { skills: value.skills, nextCursor: value.nextCursor };
+}
+
+export function decodeMarketplaceSkillDetail(value: unknown): MarketplaceSkillDetail {
+  if (!isMarketplaceSkillDetail(value)) throw new Error("Invalid skill detail response.");
+  return value;
+}
+
+function isMarketplaceSkillSummary(value: unknown): value is MarketplaceSkillSummary {
+  return (
+    isDynamicRecord(value) &&
+    isString(value.id) &&
+    isString(value.slug) &&
+    isString(value.name) &&
+    isString(value.description) &&
+    isSkillCategory(value.category) &&
+    isString(value.creatorName) &&
+    (value.creatorAvatarUrl === undefined || value.creatorAvatarUrl === null || isString(value.creatorAvatarUrl)) &&
+    isNumber(value.version) &&
+    isNumber(value.installs) &&
+    isBoolean(value.featured) &&
+    (value.iconUrl === null || isString(value.iconUrl)) &&
+    isString(value.updatedAt)
+  );
+}
+
+function isMarketplaceSkillDetail(value: unknown): value is MarketplaceSkillDetail {
+  return (
+    isDynamicRecord(value) &&
+    isMarketplaceSkillSummary(value) &&
+    isString(value.versionId) &&
+    isString(value.bundleSha256) &&
+    isString(value.instructions) &&
+    (value.examplePrompt === undefined || (isString(value.examplePrompt) && value.examplePrompt.length <= 1_000)) &&
+    Array.isArray(value.files) &&
+    value.files.every(isString)
+  );
+}
+
 import { decodeRecord, requiredNumber, requiredString } from "./ipc-decoding";
-import { isOneOf, isString } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export interface CreateLocalSkillInput {
   agentId: string;

@@ -38,6 +38,7 @@ import {
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { SkillPreview } from "@openbot/ui/components/SkillPreview";
 import { errorMessage } from "@openbot/ui/error-message";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
@@ -73,11 +74,9 @@ import {
   snapshot,
 } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { appPort } from "../../app-port";
 import { writeClipboardText } from "../../clipboard";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
-import { SkillPreview } from "../../components/SkillPreview";
-import { agentSkillCalls, type SkillsPort, skillsPort } from "../../skills-port";
+import { desktopMarketplaceCalls, type MarketplaceCalls } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import type { PluginUninstallPlan } from "./PluginUninstallDialog";
 import { PluginUninstallDialog } from "./PluginUninstallDialog";
@@ -100,7 +99,7 @@ interface SkillsMarketplaceModalProps {
   /** Optional plugin listings; absent = not served yet. */
   plugins?: PluginDetail[];
   /** Host server id for plugin app installs. */
-  pluginServerId?: string;
+  pluginServerId?: string | undefined;
   /** The joined server that keeps a plugin's credential. Absent when this computer keeps it. */
   pluginHostName?: string | undefined;
   /**
@@ -125,6 +124,8 @@ interface SkillsMarketplaceModalProps {
    * a second link to the same listing reads as a new request instead of no change.
    */
   onInitialPluginSlugConsumed?: () => void;
+  /** What the dialog calls. Absent: this computer's bridge, as in the desktop app. */
+  calls?: MarketplaceCalls | undefined;
 }
 
 type Tab = "discover" | "mine";
@@ -134,9 +135,12 @@ type MarketplaceKind = "agents" | "plugins" | "skills";
  * The overview caches outlive the dialog, so opening it again does not ask again. Each one belongs to
  * one list function, so a story or a test that replaces the API never reads another one's answer.
  */
-const skillHomeCaches = new WeakMap<SkillsPort["skills"]["list"], MarketplaceHomeCache<MarketplaceSkillSummary>>();
+const skillHomeCaches = new WeakMap<
+  MarketplaceCalls["skills"]["list"],
+  MarketplaceHomeCache<MarketplaceSkillSummary>
+>();
 const agentHomeCaches = new WeakMap<
-  SkillsPort["marketplaceAgents"]["list"],
+  MarketplaceCalls["agents"]["list"],
   MarketplaceHomeCache<MarketplaceAgentSummary>
 >();
 
@@ -148,14 +152,16 @@ function homeCacheFor<K extends WeakKey, C>(caches: WeakMap<K, C>, key: K, creat
   return created;
 }
 
-const skillHomeCache = () =>
-  homeCacheFor(skillHomeCaches, skillsPort().skills.list, () => new MarketplaceHomeCache<MarketplaceSkillSummary>());
-const agentHomeCache = () =>
-  homeCacheFor(
-    agentHomeCaches,
-    skillsPort().marketplaceAgents.list,
-    () => new MarketplaceHomeCache<MarketplaceAgentSummary>(),
-  );
+const skillHomeCache = (calls: MarketplaceCalls) =>
+  homeCacheFor(skillHomeCaches, calls.skills.list, () => new MarketplaceHomeCache<MarketplaceSkillSummary>());
+const agentHomeCache = (calls: MarketplaceCalls) =>
+  homeCacheFor(agentHomeCaches, calls.agents.list, () => new MarketplaceHomeCache<MarketplaceAgentSummary>());
+
+/** The account's own submissions, which only the desktop app reads and sends. */
+function publishingCalls(calls: MarketplaceCalls) {
+  if (!calls.publishing) throw new Error("Publish from the OpenBot desktop app.");
+  return calls.publishing;
+}
 
 function isMarketplaceKind(value: string): value is MarketplaceKind {
   return value === "agents" || value === "plugins" || value === "skills";
@@ -204,6 +210,7 @@ interface SkillsMarketplace {
 }
 
 export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
+  const calls = () => props.calls ?? desktopMarketplaceCalls();
   const [market, setMarket] = createStore<SkillsMarketplace>({
     browse: { kind: "agents", tab: "discover", targetAgentId: "" },
     detail: { kind: "none" },
@@ -307,7 +314,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   function openPluginUrl(url: string) {
     const safe = safeBrowserUrl(url);
     if (!safe) return;
-    void appPort()
+    void calls()
       .openUrl(safe)
       .catch(() => setError("Could not open the link."));
   }
@@ -337,7 +344,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     plugin.apps.some((app) => Boolean(heldApp(app))) || plugin.skills.some((skill) => installedById().has(skill.id));
 
   async function loadHostMcpServers(serverId: string) {
-    const configs = await run(() => skillsPort().agent.listMcpServers(serverId));
+    const configs = await run(() => calls().mcp.listMcpServers(serverId));
     if (configs) setHostMcpServers(configs);
   }
 
@@ -363,7 +370,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   async function testPluginApp(config: McpServerConfig) {
     const serverId = props.pluginServerId;
     if (!serverId) throw new Error("Select a local server to connect this app.");
-    return skillsPort().agent.testMcpServer({ config }, serverId);
+    return calls().mcp.testMcpServer({ config }, serverId);
   }
 
   /**
@@ -398,7 +405,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       try {
         for (const skill of plugin.skills) {
           const held = installedById().has(skill.id);
-          await agentSkillCalls(props.hostServerId).install({ agentId, skillId: skill.id, versionId: skill.versionId });
+          await calls()
+            .agentSkills(props.hostServerId)
+            .install({ agentId, skillId: skill.id, versionId: skill.versionId });
           if (!held) added.push(skill.id);
         }
         for (const app of plugin.apps) {
@@ -413,7 +422,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
             await undoSkills(agentId, added);
             return false;
           }
-          setHostMcpServers(await skillsPort().agent.saveMcpServer({ config: connected }, serverId));
+          setHostMcpServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
         }
       } catch (error) {
         await undoSkills(agentId, added);
@@ -430,7 +439,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
   async function undoSkills(agentId: string, skillIds: readonly string[]) {
     for (const skillId of skillIds)
-      await agentSkillCalls(props.hostServerId)
+      await calls()
+        .agentSkills(props.hostServerId)
         .uninstall({ agentId, skillId })
         .catch(() => undefined);
   }
@@ -477,7 +487,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       const config = heldApp(app);
       if (!config) continue;
       try {
-        setHostMcpServers(await skillsPort().agent.removeMcpServer({ mcpServerId: config.id }, serverId));
+        setHostMcpServers(await calls().mcp.removeMcpServer({ mcpServerId: config.id }, serverId));
       } catch (cause) {
         failures.push(`${app.name}: ${marketplaceErrorMessage(cause)}`);
       }
@@ -486,7 +496,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       for (const skill of plugin.skills) {
         if (!installedById().has(skill.id)) continue;
         try {
-          await agentSkillCalls(props.hostServerId).uninstall({ agentId, skillId: skill.id });
+          await calls().agentSkills(props.hostServerId).uninstall({ agentId, skillId: skill.id });
         } catch (cause) {
           failures.push(`${skill.slug}: ${marketplaceErrorMessage(cause)}`);
         }
@@ -599,7 +609,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.installedLoad = "loading";
     });
-    const values = await run(() => agentSkillCalls(props.hostServerId).listInstalled(agentId));
+    const values = await run(() => calls().agentSkills(props.hostServerId).listInstalled(agentId));
     if (request !== installedRequest || !props.open || market.browse.targetAgentId !== agentId) return;
     if (!values) {
       setMarket((state) => {
@@ -616,7 +626,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
 
   async function loadMine() {
     setLoading(true);
-    const values = await run(() => skillsPort().skills.listMine());
+    const values = await run(() => publishingCalls(calls()).skills.listMine());
     if (values) {
       setMarket((state) => {
         state.submissions = values;
@@ -695,7 +705,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
-    const value = await run(() => skillsPort().skills.get(skill.id));
+    const value = await run(() => calls().skills.get(skill.id));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
@@ -720,7 +730,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.detail = { kind: "loading" };
     });
-    const value = await run(() => skillsPort().skills.get(skillId));
+    const value = await run(() => calls().skills.get(skillId));
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
@@ -761,7 +771,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     const analytics = desktopAnalytics.scope();
     setBusy(skill.id);
     const result = await run(() =>
-      agentSkillCalls(props.hostServerId).install({ agentId, skillId: skill.id, replaceModified }),
+      calls().agentSkills(props.hostServerId).install({ agentId, skillId: skill.id, replaceModified }),
     );
     analytics.track("marketplace_action", {
       entity: "skill",
@@ -774,7 +784,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   }
 
   async function choosePackage(skillId?: string) {
-    const value = await run(() => skillsPort().skills.choosePackage());
+    const value = await run(() => publishingCalls(calls()).skills.choosePackage());
     if (!value) return;
     const category = skillId
       ? (market.submissions.find((item) => item.skillId === skillId)?.category ?? "other")
@@ -800,7 +810,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     const icon = snapshot(market.publication.icon);
     setBusy("publish");
     const created = await run(() =>
-      skillsPort().skills.submit({
+      publishingCalls(calls()).skills.submit({
         draftId: value.draftId,
         showCreatorAvatar: true,
         category,
@@ -881,29 +891,31 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                         >
                           Discover
                         </DropdownMenu.Item>
+                        <Show when={calls().publishing}>
+                          <DropdownMenu.Item
+                            onSelect={() => {
+                              leaveActiveDetail();
+                              selectTab("mine");
+                            }}
+                          >
+                            My submissions
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Separator />
+                          <DropdownMenu.Item
+                            onSelect={() => {
+                              leaveActiveDetail();
+                              selectTab("mine");
+                              if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
+                            }}
+                          >
+                            <Plus /> Add {market.browse.kind === "agents" ? "agent" : "skill"}
+                          </DropdownMenu.Item>
+                        </Show>
                         <DropdownMenu.Item
                           onSelect={() => {
                             leaveActiveDetail();
-                            selectTab("mine");
-                          }}
-                        >
-                          My submissions
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Separator />
-                        <DropdownMenu.Item
-                          onSelect={() => {
-                            leaveActiveDetail();
-                            selectTab("mine");
-                            if (market.browse.kind === "agents") setAgentAddVersion((version) => version + 1);
-                          }}
-                        >
-                          <Plus /> Add {market.browse.kind === "agents" ? "agent" : "skill"}
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item
-                          onSelect={() => {
-                            leaveActiveDetail();
-                            if (market.browse.kind === "skills") skillHomeCache().forget();
-                            if (market.browse.kind === "agents") agentHomeCache().forget();
+                            if (market.browse.kind === "skills") skillHomeCache(calls()).forget();
+                            if (market.browse.kind === "agents") agentHomeCache(calls()).forget();
                             if (market.browse.kind === "skills") refresh();
                             else setAgentRefreshVersion((version) => version + 1);
                           }}
@@ -961,9 +973,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                           kind="skills"
                           query={searchQuery()}
                           refreshVersion={skillRefreshVersion()}
-                          homeCache={skillHomeCache()}
+                          homeCache={skillHomeCache(calls())}
                           list={async (query) => {
-                            const page = await skillsPort().skills.list(query);
+                            const page = await calls().skills.list(query);
                             return { items: page.skills, nextCursor: page.nextCursor };
                           }}
                           icon={(skill) => <SkillIcon skill={skill} />}
@@ -1175,6 +1187,7 @@ description: Turn merged work into clear, consistent release notes.
                                 installedLoad={installedLoadForTarget()}
                                 busy={panel.busy === skill.id}
                                 onTrySkill={props.onTrySkill}
+                                onOpenUrl={(url) => calls().openUrl(url)}
                                 onInstall={install}
                                 agents={props.agents}
                                 targetAgentId={market.browse.targetAgentId}
@@ -1282,6 +1295,7 @@ description: Turn merged work into clear, consistent release notes.
                          this computer's agents, so the agents of a joined server are neither. */
                       agents={props.hostServerId ? [] : props.agents}
                       serverId={props.agentServerId}
+                      calls={calls()}
                       view={market.browse.tab}
                       query={searchQuery()}
                       refreshVersion={agentRefreshVersion()}
@@ -1368,6 +1382,7 @@ function AgentMarketplacePanel(props: {
   refreshVersion: number;
   addVersion: number;
   serverId: string | undefined;
+  calls: MarketplaceCalls;
   onInstalled?: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   onEnterDetail: (name: string, close: () => void) => void;
   onLeaveDetail: () => void;
@@ -1423,7 +1438,7 @@ function AgentMarketplacePanel(props: {
 
   async function loadMine() {
     setLoading(true);
-    const values = await run(() => skillsPort().marketplaceAgents.listMine());
+    const values = await run(() => publishingCalls(props.calls).agents.listMine());
     if (values) {
       setMarket((state) => {
         state.submissions = values;
@@ -1439,7 +1454,7 @@ function AgentMarketplacePanel(props: {
     props.onEnterDetail(agent.name, closeAgent);
     const request = ++detailRequest;
     setLoading(true);
-    const value = await run(() => skillsPort().marketplaceAgents.get(agent.id));
+    const value = await run(() => props.calls.agents.get(agent.id));
     analytics.track("marketplace_action", {
       entity: "agent",
       action: "view",
@@ -1478,11 +1493,7 @@ function AgentMarketplacePanel(props: {
       timezone,
       receiptId: crypto.randomUUID(),
     };
-    const value = await run(async () =>
-      serverId
-        ? skillsPort().agent.addMarketplaceAgent(input, serverId)
-        : (await skillsPort().marketplaceAgents.install(input)).agent,
-    );
+    const value = await run(() => props.calls.addAgent(input, serverId));
     analytics.track("marketplace_action", {
       entity: "agent",
       action: updating ? "update" : "install",
@@ -1526,7 +1537,7 @@ function AgentMarketplacePanel(props: {
   async function refreshPublicationPreview(agentId: string) {
     const request = ++publicationRequest;
     setBusy("publish");
-    const value = await run(() => skillsPort().marketplaceAgents.preview(agentId));
+    const value = await run(() => publishingCalls(props.calls).agents.preview(agentId));
     if (request !== publicationRequest) return;
     setMarket((state) => {
       state.publication.preview = value ?? null;
@@ -1551,7 +1562,7 @@ function AgentMarketplacePanel(props: {
     const listingId = market.publication.listingId;
     setBusy("submit");
     const result = await run(() =>
-      skillsPort().marketplaceAgents.submit({
+      publishingCalls(props.calls).agents.submit({
         agentId: value.agentId,
         category: market.publication.category,
         showCreatorAvatar: true,
@@ -1583,9 +1594,9 @@ function AgentMarketplacePanel(props: {
             kind="agents"
             query={props.query}
             refreshVersion={catalogRefresh()}
-            homeCache={agentHomeCache()}
+            homeCache={agentHomeCache(props.calls)}
             list={async (query) => {
-              const page = await skillsPort().marketplaceAgents.list(query);
+              const page = await props.calls.agents.list(query);
               return { items: page.agents, nextCursor: page.nextCursor };
             }}
             icon={(agent) => (
@@ -1873,6 +1884,7 @@ function SkillDetailView(props: {
   targetAgentId: string;
   onTargetChange: (id: string) => void;
   onTrySkill?: (agentId: string, skill: MarketplaceSkillDetail) => void;
+  onOpenUrl: (url: string) => Promise<void>;
 }) {
   const current = () =>
     props.installed?.state === "installed" && props.installed.installedVersion >= props.skill.version;
@@ -1923,6 +1935,7 @@ function SkillDetailView(props: {
         }
         onTry={canTry() ? () => props.onTrySkill?.(props.targetAgentId, props.skill) : undefined}
         unavailableReason={unavailableReason()}
+        onOpenUrl={props.onOpenUrl}
       />
     </section>
   );

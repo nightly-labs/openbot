@@ -15,7 +15,8 @@
     "./workspace-preferences": "./src/workspace-preferences.ts",
     "./browser-view": "./src/browser-view.ts",
     "./team-api-requests": "./src/team-api-requests.ts",
-    "./team-admin-requests": "./src/team-admin-requests.ts"
+    "./team-admin-requests": "./src/team-admin-requests.ts",
+    "./marketplace-catalog": "./src/marketplace-catalog.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
