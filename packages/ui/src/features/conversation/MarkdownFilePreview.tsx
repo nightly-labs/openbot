@@ -1,5 +1,6 @@
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { MarkdownMessageText } from "./MarkdownMessageText";
 
 export interface MarkdownFilePreviewProps {
@@ -18,11 +19,15 @@ export interface MarkdownFilePreviewProps {
   onOpenWorkspaceFile: (path: string) => void;
 }
 
+/** The text limit of the callers that set `truncated`. */
+const TRUNCATED_AFTER = 1_000_000;
+
 export function isMarkdownFileName(name: string): boolean {
   return /\.(?:md|markdown)$/iu.test(name);
 }
 
 export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
+  const { t, format } = useText();
   const contentReady = () => props.loading !== true && !props.error;
 
   return (
@@ -31,7 +36,7 @@ export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
         when={contentReady()}
         fallback={
           <pre class={props.statusClass}>
-            {props.loading === true ? "Loading…" : (props.error ?? "Preview unavailable.")}
+            {props.loading === true ? t("common.loading") : (props.error ?? t("preview.unavailable"))}
           </pre>
         }
       >
@@ -49,7 +54,7 @@ export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
           />
         </article>
         <Show when={props.truncated}>
-          <p class={props.truncatedClass}>Preview truncated after 1,000,000 characters.</p>
+          <p class={props.truncatedClass}>{t("preview.truncated", { limit: format.number(TRUNCATED_AFTER) })}</p>
         </Show>
       </Show>
     </div>

@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import { recordRestartActivity } from "../backend/restart-activity";
 // The host's side of the live browser view: a session a member asks for, a socket that carries the
 // frames, and the pointer and key input that comes back on it.
@@ -86,7 +87,7 @@ export class BrowserViewGateway {
 
   createSession(input: { memberId: string; teamSessionId: string; tabId: string }): BrowserViewSessionResponse {
     if (this.#sessions.size >= (this.#options.maxSessions ?? MAX_SESSIONS)) {
-      throw new Error("Too many browser views are open on this host.");
+      throw new Error(sourceText("error.backend.browserViewLimit"));
     }
     const id = randomUUID().replaceAll("-", "");
     this.#sessions.set(id, {

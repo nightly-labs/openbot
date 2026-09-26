@@ -12,7 +12,9 @@ import { Button, Field, Input, Textarea } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { AVATAR_HUE_CHOICES, avatarCandidateSeeds, avatarHeadColor, avatarHueSwatch } from "../../bloub-avatar";
 import { ProviderModelPicker } from "../../components/ProviderModelPicker";
+import { useText } from "../../text";
 import { AgentAvatar } from "./AgentAvatar";
+import { AVATAR_HUE_LABEL } from "./avatar-hue-label";
 
 export interface FirstAgentDraft {
   name: string;
@@ -153,6 +155,7 @@ function matchesSuggestion(draft: FirstAgentDraft, suggestion: FirstAgentSuggest
 }
 
 export function FirstAgentSetup(props: FirstAgentSetupProps) {
+  const { t, sourceText } = useText();
   let suggestionList: HTMLUListElement | undefined;
   let activeSuggestionPointer: number | null = null;
   let suggestionDragStartX = 0;
@@ -167,7 +170,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
   const [canScrollSuggestionsForward, setCanScrollSuggestionsForward] = createSignal(false);
   const [draggingSuggestions, setDraggingSuggestions] = createSignal(false);
   const canSubmit = () => Boolean(props.value.name.trim()) && !props.submitting;
-  const displayName = () => props.value.name.trim() || "New agent";
+  const displayName = () => props.value.name.trim() || t("agent.setup.nameFallback");
 
   function updateSuggestionFades(): void {
     if (!suggestionList) return;
@@ -320,7 +323,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
             disabled={props.submitting}
             onClick={() => props.onCancel?.()}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
         </Show>
       </header>
@@ -334,7 +337,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           }}
         >
           <h2 id="first-agent-setup-title" class="sr-only">
-            {props.mode === "additional" ? "Create a new agent" : "Create your first agent"}
+            {props.mode === "additional" ? t("agent.setup.titleAdditional") : t("agent.setup.titleFirst")}
           </h2>
 
           <div
@@ -351,14 +354,14 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           </div>
 
           <fieldset class="first-agent-avatar-fieldset first-agent-color-fieldset" disabled={props.submitting}>
-            <legend class="sr-only">Agent color</legend>
+            <legend class="sr-only">{t("agent.setup.color")}</legend>
             <div class="first-agent-color-options">
               <Button
                 variant="ghost"
                 type="button"
                 size="sm"
                 class="first-agent-color-choice"
-                aria-label="Automatic agent color"
+                aria-label={t("agent.setup.colorAutomatic")}
                 aria-pressed={props.value.avatarHue === null ? "true" : "false"}
                 onClick={() => updateDraft({ avatarHue: null })}
               >
@@ -374,7 +377,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     type="button"
                     size="sm"
                     class="first-agent-color-choice"
-                    aria-label={`${option.label} agent color`}
+                    aria-label={t("agent.setup.colorOption", { color: t(AVATAR_HUE_LABEL[option.hue]) })}
                     aria-pressed={props.value.avatarHue === option.hue ? "true" : "false"}
                     onClick={() => updateDraft({ avatarHue: option.hue })}
                   >
@@ -386,7 +389,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           </fieldset>
 
           <fieldset class="first-agent-avatar-fieldset first-agent-face-fieldset" disabled={props.submitting}>
-            <legend class="sr-only">Agent face</legend>
+            <legend class="sr-only">{t("agent.setup.face")}</legend>
             <div class="first-agent-face-options">
               <For each={FIRST_AGENT_AVATAR_SEEDS}>
                 {(seed, index) => (
@@ -395,7 +398,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                     type="button"
                     size="sm"
                     class="first-agent-face-choice"
-                    aria-label={`Agent face ${index() + 1}`}
+                    aria-label={t("agent.setup.faceOption", { number: index() + 1 })}
                     aria-pressed={props.value.avatarSeed === seed ? "true" : "false"}
                     onClick={() => updateDraft({ avatarSeed: seed })}
                   >
@@ -412,7 +415,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           </fieldset>
 
           <div class="first-agent-fields">
-            <Field label="Name" required>
+            <Field label={t("agent.setup.name")} required>
               <Input
                 value={props.value.name}
                 maxlength={INPUT_LIMITS.agentName}
@@ -421,12 +424,12 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                 onValueChange={(name) => updateDraft({ name })}
               />
             </Field>
-            <Field label="What should this agent help with?">
+            <Field label={t("agent.setup.purpose")}>
               <Textarea
                 value={props.value.purpose}
                 rows={2}
                 maxlength={INPUT_LIMITS.agentDescription}
-                placeholder="Plan trips, compare options, or help with everyday work."
+                placeholder={t("agent.setup.purposePlaceholder")}
                 disabled={props.submitting}
                 onValueChange={(purpose) => updateDraft({ purpose })}
               />
@@ -437,7 +440,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                   {(status) => (
                     <ProviderModelPicker
                       variant="field"
-                      ariaLabel="Agent model"
+                      ariaLabel={t("agent.setup.model")}
                       provider={props.value.provider}
                       value={props.value.model}
                       modelOptions={options()}
@@ -459,7 +462,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
           <Show when={props.error}>
             {(error) => (
               <p class="first-agent-error" role="alert">
-                {error()}
+                {sourceText(error())}
               </p>
             )}
           </Show>
@@ -472,15 +475,15 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
               class="first-agent-submit"
               disabled={!canSubmit()}
               loading={props.submitting}
-              loadingLabel="Creating agent…"
+              loadingLabel={t("agent.setup.creating")}
             >
-              Create agent
+              {t("agent.setup.create")}
             </Button>
           </div>
         </form>
 
         <section class="first-agent-suggestions" aria-labelledby="first-agent-suggestions-title">
-          <h2 id="first-agent-suggestions-title">Suggestions</h2>
+          <h2 id="first-agent-suggestions-title">{t("agent.setup.suggestions")}</h2>
           <div
             class={`first-agent-suggestion-viewport${canScrollSuggestionsBack() ? " can-scroll-back" : ""}${canScrollSuggestionsForward() ? " can-scroll-forward" : ""}${draggingSuggestions() ? " is-dragging" : ""}`}
           >

@@ -26,6 +26,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import {
   AttachmentFiles,
@@ -195,10 +196,10 @@ export class MailboxStore {
   async prepareImportedAttachments(paths: string[], data: AttachmentDataInput[]): Promise<DraftAttachment[]> {
     if (paths.length + data.length === 0) return [];
     if (paths.length + data.length > MAX_ATTACHMENTS) {
-      throw new Error(`Choose at most ${MAX_ATTACHMENTS} files.`);
+      throw new Error(sourceText("error.attachment.tooMany", { limit: MAX_ATTACHMENTS }));
     }
     if (this.#state.drafts.length + paths.length + data.length > INPUT_LIMITS.draftAttachments) {
-      throw new Error(`Keep at most ${INPUT_LIMITS.draftAttachments} draft attachments.`);
+      throw new Error(sourceText("error.backend.draftAttachmentLimit", { limit: INPUT_LIMITS.draftAttachments }));
     }
     const prepared = await this.#files.prepareDrafts(paths, data);
     this.#state.drafts.push(...prepared);
@@ -249,9 +250,9 @@ export class MailboxStore {
 
     const recipients = [...new Set(input.recipientAgentIds)];
     const validateRecipients = this.prepareDelivery(recipients);
-    if (recipients.length === 0) throw new Error("At least one recipient is required.");
+    if (recipients.length === 0) throw new Error(sourceText("error.backend.recipientRequired"));
     if (recipients.length > INPUT_LIMITS.messageRecipients) {
-      throw new Error(`A message can have at most ${INPUT_LIMITS.messageRecipients} recipients.`);
+      throw new Error(sourceText("error.backend.recipientLimit", { limit: INPUT_LIMITS.messageRecipients }));
     }
     if (recipients.some((id) => !id || id.length > INPUT_LIMITS.identifier)) {
       throw new Error("A message recipient is invalid.");
@@ -261,21 +262,21 @@ export class MailboxStore {
     }
 
     const text = input.text.trim();
-    if (text.length > INPUT_LIMITS.messageText) throw new Error("Message is too long.");
+    if (text.length > INPUT_LIMITS.messageText) throw new Error(sourceText("error.agent.messageTooLong"));
 
     const drafts = (input.draftIds ?? []).map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
-      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
+      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+      if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
       return draft;
     });
     if (drafts.length !== new Set(input.draftIds ?? []).size) {
       throw new Error("Duplicate attachment draft.");
     }
     const sourcePaths = [...drafts.map((draft) => draft.path), ...(input.sourcePaths ?? [])];
-    if (!text && sourcePaths.length === 0) throw new Error("Message cannot be empty.");
+    if (!text && sourcePaths.length === 0) throw new Error(sourceText("error.backend.messageEmpty"));
     if (sourcePaths.length > MAX_ATTACHMENTS) {
-      throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
+      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
     }
 
     const createdAt = new Date().toISOString();
@@ -362,11 +363,12 @@ export class MailboxStore {
     if (ids.size !== input.draftIds.length) throw new Error("Duplicate attachment drafts.");
     const drafts = input.draftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
-      if (draft.ownerEditId) throw new Error("An attachment belongs to a queue edit.");
+      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+      if (draft.ownerEditId) throw new Error(sourceText("error.backend.attachmentInQueueEdit"));
       return draft;
     });
-    if (drafts.length > MAX_ATTACHMENTS) throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
+    if (drafts.length > MAX_ATTACHMENTS)
+      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
     const sender: StoredMessage["sender"] = { kind: "user" };
     const createdAt = new Date().toISOString();
     const attachments = await this.#files.commitMessageTransfer(
@@ -905,8 +907,8 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
-    if (!delivery) throw new Error("Queued message was not found.");
-    if (delivery.status !== "queued") throw new Error("Only queued messages can be cancelled.");
+    if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
+    if (delivery.status !== "queued") throw new Error(sourceText("error.backend.cancelQueuedOnly"));
     this.#finishCancellation(delivery, true);
   }
 
@@ -919,15 +921,16 @@ export class MailboxStore {
   #assertQueueNotEditing(deliveryId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     if (this.#state.deliveries.find((item) => item.id === deliveryId)?.editId)
-      throw new Error("This message is being edited. Save or cancel the edit first.");
+      throw new Error(sourceText("error.backend.messageBeingEdited"));
   }
 
   beginQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
-    if (delivery?.status !== "queued") throw new QueueEditRejectedError("This queued message is no longer available.");
+    if (delivery?.status !== "queued")
+      throw new QueueEditRejectedError(sourceText("error.backend.queuedMessageUnavailable"));
     if (delivery.editId && delivery.editId !== editId)
-      throw new QueueEditRejectedError("This message is being edited on another device.");
+      throw new QueueEditRejectedError(sourceText("error.backend.editedOnOtherDevice"));
     const previous = delivery.editId;
     delivery.editId = editId;
     try {
@@ -942,16 +945,16 @@ export class MailboxStore {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
     if (delivery?.status !== "queued" || delivery.editId !== editId)
-      throw new QueueEditRejectedError("This edit is no longer available.");
+      throw new QueueEditRejectedError(sourceText("error.backend.editUnavailable"));
     if (draftIds.length > MAX_ATTACHMENTS || new Set(draftIds).size !== draftIds.length)
       throw new Error("Invalid edit attachment count.");
     const drafts = draftIds.map((id) => {
       const draft = this.#state.drafts.find((item) => item.id === id);
-      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
+      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
       return draft;
     });
     if (drafts.some((draft) => draft.ownerEditId && draft.ownerEditId !== editId))
-      throw new Error("An attachment belongs to another edit.");
+      throw new Error(sourceText("error.backend.attachmentInOtherEdit"));
     const previous = drafts.map((draft) => draft.ownerEditId);
     for (const draft of drafts) draft.ownerEditId = editId;
     try {
@@ -994,7 +997,8 @@ export class MailboxStore {
   finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
     const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
-    if (!delivery || delivery.editId !== editId) throw new QueueEditRejectedError("This edit is no longer available.");
+    if (!delivery || delivery.editId !== editId)
+      throw new QueueEditRejectedError(sourceText("error.backend.editUnavailable"));
     this.#finishCancellation(delivery, false);
   }
 
@@ -1028,8 +1032,7 @@ export class MailboxStore {
   }
 
   #assertQueueNotUpdating(deliveryId: string): void {
-    if (this.#queueUpdates.has(deliveryId))
-      throw new Error("This message is being saved. Try again after it finishes.");
+    if (this.#queueUpdates.has(deliveryId)) throw new Error(sourceText("error.backend.messageBeingSaved"));
   }
 
   async updateQueuedMessage(
@@ -1060,32 +1063,33 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
     );
-    if (!delivery) throw new Error("Queued message was not found.");
-    if (delivery.status !== "queued") throw new Error("Only queued messages can be edited.");
-    if (delivery.editId !== editId) throw new Error("This message is being edited on another device.");
+    if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
+    if (delivery.status !== "queued") throw new Error(sourceText("error.backend.editQueuedOnly"));
+    if (delivery.editId !== editId) throw new Error(sourceText("error.backend.editedOnOtherDevice"));
 
     const message = this.#requireMessage(delivery.messageId);
     const keepIds = new Set(keepAttachmentIds);
     if (keepIds.size !== keepAttachmentIds.length) throw new Error("Duplicate attachments.");
     if (keepAttachmentIds.some((id) => !message.attachments.some((item) => item.id === id))) {
-      throw new Error("An attachment does not belong to the queued message.");
+      throw new Error(sourceText("error.backend.attachmentNotInMessage"));
     }
 
     const draftIds = new Set(attachmentDraftIds);
     if (draftIds.size !== attachmentDraftIds.length) throw new Error("Duplicate attachment drafts.");
     const drafts = attachmentDraftIds.map((id) => {
       const draft = this.#state.drafts.find((candidate) => candidate.id === id);
-      if (!draft) throw new Error(`Attachment draft no longer exists: ${id}`);
-      if (draft.ownerEditId && draft.ownerEditId !== editId) throw new Error("An attachment belongs to another edit.");
+      if (!draft) throw new Error(sourceText("error.backend.attachmentDraftGone", { id }));
+      if (draft.ownerEditId && draft.ownerEditId !== editId)
+        throw new Error(sourceText("error.backend.attachmentInOtherEdit"));
       return draft;
     });
     if (keepAttachmentIds.length + drafts.length > MAX_ATTACHMENTS) {
-      throw new Error(`Attach at most ${MAX_ATTACHMENTS} files.`);
+      throw new Error(sourceText("error.backend.attachLimit", { limit: MAX_ATTACHMENTS }));
     }
 
     const normalizedText = text.trim();
     if (!normalizedText && keepAttachmentIds.length === 0 && drafts.length === 0) {
-      throw new Error("Message cannot be empty.");
+      throw new Error(sourceText("error.backend.messageEmpty"));
     }
 
     const previous = structuredClone(message);
@@ -1183,7 +1187,7 @@ export class MailboxStore {
       new Set(requested).size !== requested.length ||
       requested.some((deliveryId) => !expected.has(deliveryId))
     ) {
-      throw new Error("Queue order is stale. Refresh the queue and try again.");
+      throw new Error(sourceText("error.backend.queueOrderStale"));
     }
     let nextVisible = 0;
     const orderedIds = [...allQueued]
@@ -1327,7 +1331,7 @@ export class MailboxStore {
 
   #undeletedFileRecords(fileId: string): StoredAttachment[] {
     const targets = this.#fileRecords().filter((record) => record.id === fileId && !record.deletedAt);
-    if (targets.length === 0) throw new Error("The file does not exist or is already deleted.");
+    if (targets.length === 0) throw new Error(sourceText("error.backend.fileGone"));
     return targets;
   }
 
@@ -1337,7 +1341,7 @@ export class MailboxStore {
     const message = this.#requireMessage(delivery.messageId);
     for (const attachment of message.attachments) {
       const resolved = await this.#files.resolveTransfer(attachment);
-      if (!resolved) throw new Error(`Managed attachment is missing or has changed: ${attachment.name}`);
+      if (!resolved) throw new Error(sourceText("error.backend.managedAttachmentChanged", { name: attachment.name }));
     }
   }
 
@@ -1516,7 +1520,7 @@ export class MailboxStore {
     try {
       const value = toCurrentMailboxState(JSON.parse(await readFile(this.#statePath, "utf8")));
       if (!value || !isStoredState(value)) {
-        throw new Error("Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.");
+        throw new Error(sourceText("error.backend.mailboxStateCorrupt"));
       }
       return value;
     } catch (error) {

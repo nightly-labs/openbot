@@ -1,5 +1,6 @@
 import { isDeleteSharedTableInput } from "@openbot/contracts/ipc";
 import { SHARED_TABLES_CAPABILITY, SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -19,7 +20,7 @@ export async function routeSharedTables(
   if (!list && !remove) return "unmatched";
   const tables = admin?.sharedTables;
   if (!tables || !capabilities.has(SHARED_TABLES_CAPABILITY))
-    throw new HttpError(400, "Shared data is not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.sharedDataUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
   if (list) return json(200, await tables.listTables());

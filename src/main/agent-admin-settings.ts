@@ -1,6 +1,7 @@
 // Access and auto-approve of one agent, as this computer holds them. The local IPC handlers and the
 // `agent-admin-v1` host routes share this, so a remote admin changes the same state as the local
 // window does, through the same writers.
+
 import {
   type AgentAdminSettings,
   type AgentSummary,
@@ -8,6 +9,7 @@ import {
   DEFAULT_AGENT_ACCESS,
   type UpdateAgentAdminSettingsInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../backend/agent-service";
 import type { ApprovalAutomation } from "./approval-automation-store";
 
@@ -29,7 +31,7 @@ export function createAgentAdminSettings({
 }: AgentAdminSettingsDependencies): AgentAdminSettingsService {
   function requireAgent(agentId: string): AgentSummary {
     const agent = agents.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new AgentNotFoundError("Agent not found.");
+    if (!agent) throw new AgentNotFoundError(sourceText("error.team.agentNotFound"));
     return agent;
   }
   function settings(agent: AgentSummary): AgentAdminSettings {

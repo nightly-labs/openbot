@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AttachmentImportEvent, type AttachmentSummary, filePreviewKindForFile } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import type { WebWorkspaceRuntime } from "./web-runtime";
@@ -18,7 +19,7 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
     }
   }
   const unavailable = async (): Promise<never> => {
-    throw new Error("This action is available in the desktop app.");
+    throw new Error(currentText().t("webClient.error.desktopOnly"));
   };
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
@@ -73,7 +74,8 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
     voice: { onModelStatus: () => () => {}, prepareModel: unavailable, transcribe: unavailable },
     async openUrl(value) {
       const url = new URL(value);
-      if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("This link cannot be opened.");
+      if (url.protocol !== "https:" && url.protocol !== "http:")
+        throw new Error(currentText().t("webClient.error.linkBlocked"));
       window.open(url.href, "_blank", "noopener,noreferrer");
     },
     async previewAttachment(attachment) {
@@ -96,7 +98,7 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
       const attachments: AttachmentSummary[] = [];
       try {
         if (files.length > INPUT_LIMITS.attachments)
-          throw new Error(`A message can have up to ${INPUT_LIMITS.attachments} attachments.`);
+          throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
         for (const file of files) {
           if (job.cancelled || hostId() !== serverId) break;
           attachments.push(await remote.upload(file));
@@ -119,7 +121,7 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
           type: "error",
           serverId,
           requestId,
-          message: error instanceof Error ? error.message : "File transfer failed.",
+          message: error instanceof Error ? error.message : currentText().t("webClient.error.fileTransfer"),
         });
       } finally {
         importing = undefined;

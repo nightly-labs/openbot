@@ -24,4 +24,10 @@ export const messages = defineMessages("common", {
   "common.open": "Open",
   "common.search": "Search",
   "common.loading": "Loading…",
+  "common.saving": "Saving…",
+  "common.tryAgain": "Try again",
+  "common.connecting": "Connecting…",
+  "common.download": "Download",
+  "common.removing": "Removing…",
+  "common.sending": "Sending…",
 });

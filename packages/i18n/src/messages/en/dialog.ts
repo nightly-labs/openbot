@@ -10,4 +10,7 @@ export const messages = defineMessages("dialog", {
   "dialog.filter.attachment": "Attachment",
   "dialog.filter.zipArchive": "ZIP archive",
   "dialog.filter.jsonDocument": "JSON document",
+  "dialog.chooseAgentExport": "Choose an agent export",
+  "dialog.filter.agentExports": "Agent exports",
+  "dialog.saveExportSkill": "Save the export skill",
 });

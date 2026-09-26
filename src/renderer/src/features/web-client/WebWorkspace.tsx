@@ -15,6 +15,7 @@ import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog"
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
 import { Conversation, createConversationController } from "../conversation/Conversation";
@@ -42,6 +43,7 @@ export function WebWorkspace(props: {
   onLogout: () => Promise<void>;
   createRuntime?: WebRuntimeFactory;
 }) {
+  const { t, sourceText } = useText();
   const workspace = createWebWorkspace(props);
   const controller = createConversationController({ onTypingChange: () => {} }, false);
   createEffect(
@@ -161,7 +163,7 @@ export function WebWorkspace(props: {
   createEffect(
     () => workspace.state.error,
     (error) => {
-      if (error) toast.error(error);
+      if (error) toast.error(sourceText(error));
     },
   );
   createEffect(
@@ -183,7 +185,7 @@ export function WebWorkspace(props: {
             setModels(nextModels);
           },
           (error: unknown) => {
-            if (active) toast.error(error instanceof Error ? error.message : "The host status could not be read.");
+            if (active) toast.error(error instanceof Error ? error.message : t("webClient.error.hostStatus"));
           },
         );
       }
@@ -194,7 +196,7 @@ export function WebWorkspace(props: {
   );
   async function refreshUsage(): Promise<AccountUsage> {
     const readUsage = workspace.runtime.accountUsage;
-    if (!readUsage || workspace.state.status !== "online") throw new Error("Connect to your host to view usage.");
+    if (!readUsage || workspace.state.status !== "online") throw new Error(t("webClient.error.usageOffline"));
     const generation = ++usageGeneration;
     const usage = await readUsage();
     if (generation === usageGeneration) setAccountUsage(usage);
@@ -205,7 +207,7 @@ export function WebWorkspace(props: {
     await workspace.select(id);
   }
   const unavailable = async (): Promise<never> => {
-    throw new Error("This action is available in the desktop app.");
+    throw new Error(t("webClient.error.desktopOnly"));
   };
   return (
     <ConversationControllerProvider controller={controller}>
@@ -339,20 +341,22 @@ export function WebWorkspace(props: {
                         <AlertTitle>
                           {workspace.state.host
                             ? workspace.state.status === "connecting"
-                              ? "Connecting to your computer"
-                              : "Your computer is disconnected"
+                              ? t("webClient.notice.connecting")
+                              : t("webClient.notice.disconnected")
                             : workspace.state.hostsLoading
-                              ? "Finding your computers"
+                              ? t("webClient.notice.findingHosts")
                               : workspace.state.hostsError
-                                ? "Could not load your computers"
-                                : "Connect your computer"}
+                                ? t("webClient.notice.hostsFailed")
+                                : t("webClient.notice.connectComputer")}
                         </AlertTitle>
                         <AlertDescription>
                           {workspace.state.host
-                            ? (workspace.state.error ??
-                              "Keep OpenBot open on your computer. Your draft stays here while you reconnect.")
-                            : (workspace.state.hostsError ??
-                              "Install and open OpenBot on your computer, then sign in with the same email and enable remote access. You can also join a computer with an invitation.")}
+                            ? workspace.state.error
+                              ? sourceText(workspace.state.error)
+                              : t("webClient.notice.keepOpen")
+                            : workspace.state.hostsError
+                              ? sourceText(workspace.state.hostsError)
+                              : t("webClient.notice.install")}
                         </AlertDescription>
                         <AlertActions>
                           <Show when={!workspace.state.host}>
@@ -362,10 +366,10 @@ export function WebWorkspace(props: {
                               target="_blank"
                               rel="noreferrer"
                             >
-                              Download OpenBot
+                              {t("webClient.notice.download")}
                             </a>
                             <Button variant="outline" size="sm" onClick={() => setJoinOpen(true)}>
-                              Join with invitation
+                              {t("webClient.notice.join")}
                             </Button>
                           </Show>
                           <Button
@@ -379,7 +383,9 @@ export function WebWorkspace(props: {
                               })
                             }
                           >
-                            {workspace.state.host ? "Reconnect" : "Refresh hosts"}
+                            {workspace.state.host
+                              ? t("webClient.notice.reconnect")
+                              : t("webClient.notice.refreshHosts")}
                           </Button>
                         </AlertActions>
                       </AlertContent>
@@ -388,11 +394,8 @@ export function WebWorkspace(props: {
                   <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
                     <Alert class="web-connection-notice" tone="warning" role="status">
                       <AlertContent>
-                        <AlertTitle>Check whether your message arrived</AlertTitle>
-                        <AlertDescription>
-                          The connection ended before delivery was confirmed. Refresh and check the conversation before
-                          sending again. Your message will not be sent again automatically.
-                        </AlertDescription>
+                        <AlertTitle>{t("webClient.uncertain.title")}</AlertTitle>
+                        <AlertDescription>{t("webClient.uncertain.description")}</AlertDescription>
                         <AlertActions>
                           <Button
                             variant="outline"
@@ -400,7 +403,7 @@ export function WebWorkspace(props: {
                             disabled={workspace.state.busy}
                             onClick={() => void workspace.run(workspace.refresh)}
                           >
-                            Refresh conversation
+                            {t("webClient.uncertain.refresh")}
                           </Button>
                           <Button
                             variant="outline"
@@ -416,7 +419,7 @@ export function WebWorkspace(props: {
                               });
                             }}
                           >
-                            I checked the conversation
+                            {t("webClient.uncertain.checked")}
                           </Button>
                         </AlertActions>
                       </AlertContent>
@@ -474,7 +477,7 @@ export function WebWorkspace(props: {
                 if (!sent)
                   controller.setComposerErrors((current) => ({
                     ...current,
-                    [`${server()?.id}:${id}`]: workspace.state.error ?? "Check the conversation before sending again.",
+                    [`${server()?.id}:${id}`]: workspace.state.error ?? t("webClient.error.checkConversation"),
                   }));
                 return sent;
               }}

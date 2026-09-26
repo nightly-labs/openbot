@@ -7,7 +7,7 @@ import { ja } from "./messages/ja/index";
 
 export { APP_LANGUAGES, type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
 export { type AppFormat, createFormat } from "./format";
-export { resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
+export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
 export {
   createTranslate,
   type Message,

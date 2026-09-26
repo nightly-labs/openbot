@@ -1,3 +1,4 @@
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 
 export type MobileSearchCategory = "all" | "messages" | "agents" | "files" | "routines";
@@ -5,7 +6,7 @@ type MobileSearchResultCategory = Exclude<MobileSearchCategory, "all">;
 
 export interface MobileSearchFilterOption {
   id: MobileSearchCategory;
-  label: string;
+  label: MobileTextKey;
 }
 
 interface MobileSearchTextResult {
@@ -25,11 +26,11 @@ interface MobileSearchAgentResult {
 export type MobileSearchResult = MobileSearchTextResult | MobileSearchAgentResult;
 
 export const MOBILE_SEARCH_FILTERS: MobileSearchFilterOption[] = [
-  { id: "all", label: "All" },
-  { id: "messages", label: "Messages" },
-  { id: "agents", label: "Agents" },
-  { id: "files", label: "Files" },
-  { id: "routines", label: "Routines" },
+  { id: "all", label: "mobile.search.filter.all" },
+  { id: "messages", label: "mobile.search.filter.messages" },
+  { id: "agents", label: "mobile.search.filter.agents" },
+  { id: "files", label: "mobile.search.filter.files" },
+  { id: "routines", label: "mobile.search.filter.routines" },
 ];
 
 //! MOCK DATA RENDERED HERE

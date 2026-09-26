@@ -26,6 +26,7 @@ import {
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { withTimeout } from "./with-timeout";
 
@@ -246,7 +247,7 @@ export class McpOAuth implements McpOAuthAuthority {
     return {
       provider,
       complete: async () => {
-        if (abandoned) throw new Error("The sign-in was abandoned.");
+        if (abandoned) throw new Error(sourceText("error.backend.mcpSignInAbandonedGeneric"));
         // Aborts with the wait: a token endpoint that never completes must not keep a request
         // running after this attempt ends, or its late response would write credentials a later
         // sign-in already replaced.
@@ -314,8 +315,8 @@ export class McpOAuth implements McpOAuthAuthority {
     // provider was built.
     const ensureCurrent = (): void => {
       if ((this.#generations.get(resource) ?? 0) !== generation)
-        throw new Error("The MCP sign-in was forgotten while it was running.");
-      if (isAbandoned()) throw new Error("The MCP sign-in was abandoned.");
+        throw new Error(sourceText("error.backend.mcpSignInForgotten"));
+      if (isAbandoned()) throw new Error(sourceText("error.backend.mcpSignInAbandoned"));
     };
     const guarded: McpOAuthStorage = {
       read: (candidate) => storage.read(candidate),
@@ -407,7 +408,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   state(): string {
     const { state } = this.#options;
-    if (!state) throw new Error("This MCP sign-in cannot open a browser.");
+    if (!state) throw new Error(sourceText("error.backend.mcpSignInNoBrowser"));
     return state;
   }
 
@@ -505,11 +506,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     // The probe moved on: a discovery slow enough to outlast it must not open a browser
     // afterwards for a grant nobody waits for.
     if (this.#options.isAbandoned()) return;
-    if (!this.#options.state) throw new Error("This MCP sign-in cannot open a browser.");
+    if (!this.#options.state) throw new Error(sourceText("error.backend.mcpSignInNoBrowser"));
     // The address arrives in the server's own discovery document, and the SDK accepts more than
     // web pages: an https server naming a file or an installed protocol handler must not reach
     // the browser. Loopback http stays, for a sign-in server on the user's own machine.
-    if (!isAuthorizationUrlSafe(authorizationUrl)) throw new Error("The sign-in address is not a web page.");
+    if (!isAuthorizationUrlSafe(authorizationUrl)) throw new Error(sourceText("error.backend.mcpSignInNotWebPage"));
     await this.#options.openExternal(authorizationUrl.toString());
   }
 
@@ -663,13 +664,12 @@ export function secureOAuthFetch(signal?: AbortSignal): FetchLike {
     let url = new URL(input instanceof URL ? input.toString() : input);
     let request: RequestInit = { ...init, ...(signal ? { signal } : {}), redirect: "manual" };
     for (let hop = 0; ; hop++) {
-      if (!isSecureEndpoint(url))
-        throw new Error(`The OAuth endpoint ${url.origin} is not https, so the credentials were not sent.`);
+      if (!isSecureEndpoint(url)) throw new Error(sourceText("error.backend.oauthNotHttps", { origin: url.origin }));
       const response = await fetch(url, request);
       const location = REDIRECT_STATUSES.has(response.status) ? response.headers.get("location") : null;
       // Not a redirect this follows: the SDK reads the answer, including a 3xx that names nowhere.
       if (location === null) return response;
-      if (hop >= MAX_OAUTH_REDIRECTS) throw new Error("The OAuth endpoint redirected too many times.");
+      if (hop >= MAX_OAUTH_REDIRECTS) throw new Error(sourceText("error.backend.oauthTooManyRedirects"));
       const next = new URL(location, url);
       // Following by hand means the stripping `fetch` would have done is this loop's job now. A
       // token request carries `Authorization: Basic` for a client with a secret, and the form
@@ -677,7 +677,7 @@ export function secureOAuthFetch(signal?: AbortSignal): FetchLike {
       // one only pointed at. Discovery carries neither, so an issuer may still redirect to the
       // authorization server that answers for it.
       if (next.origin !== url.origin && carriesCredential(request))
-        throw new Error(`The OAuth endpoint redirected to ${next.origin}, so the credentials were not forwarded.`);
+        throw new Error(sourceText("error.backend.oauthRedirectOrigin", { origin: next.origin }));
       url = next;
       request = redirected(request, response.status);
     }

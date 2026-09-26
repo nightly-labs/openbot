@@ -1,4 +1,73 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/webClient";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "webClient.loading": "Chargement d’OpenBot…",
+  "webClient.login.failed": "La connexion a échoué.",
+  "webClient.login.requestFailed": "La requête du compte a échoué.",
+  "webClient.login.sessionFailed": "Impossible de vérifier cette session.",
+  "webClient.login.wait": "Patientez avant de demander un autre code.",
+  "webClient.pane.navigation": "Navigation de l’espace de travail",
+  "webClient.pane.chat": "Discussion",
+  "webClient.pane.workspace": "Espace de travail",
+  "webClient.notice.connecting": "Connexion à votre ordinateur",
+  "webClient.notice.disconnected": "Votre ordinateur est déconnecté",
+  "webClient.notice.findingHosts": "Recherche de vos ordinateurs",
+  "webClient.notice.hostsFailed": "Impossible de charger vos ordinateurs",
+  "webClient.notice.connectComputer": "Connectez votre ordinateur",
+  "webClient.notice.keepOpen":
+    "Gardez OpenBot ouvert sur votre ordinateur. Votre brouillon reste ici pendant la reconnexion.",
+  "webClient.notice.install":
+    "Installez et ouvrez OpenBot sur votre ordinateur, puis connectez-vous avec la même adresse e-mail et activez l’accès à distance. Vous pouvez aussi rejoindre un ordinateur avec une invitation.",
+  "webClient.notice.download": "Télécharger OpenBot",
+  "webClient.notice.join": "Rejoindre avec une invitation",
+  "webClient.notice.reconnect": "Se reconnecter",
+  "webClient.notice.refreshHosts": "Actualiser les hôtes",
+  "webClient.uncertain.title": "Vérifiez si votre message est arrivé",
+  "webClient.uncertain.description":
+    "La connexion s’est terminée avant la confirmation de la livraison. Actualisez et vérifiez la conversation avant d’envoyer à nouveau. Votre message ne sera pas renvoyé automatiquement.",
+  "webClient.uncertain.refresh": "Actualiser la conversation",
+  "webClient.uncertain.checked": "J’ai vérifié la conversation",
+  "webClient.agent.modelsFailed": "Impossible de charger les modèles de l’hôte.",
+  "webClient.agent.refreshFailed":
+    "L’agent a été créé, mais l’espace de travail n’a pas pu être actualisé. Rechargez avant de réessayer.",
+  "webClient.agent.unconfirmed":
+    "Le résultat n’est pas confirmé. Fermez ce formulaire et vérifiez l’hôte avant de réessayer.",
+  "webClient.error.hostStatus": "Impossible de lire l’état de l’hôte.",
+  "webClient.error.usageOffline": "Connectez-vous à votre hôte pour voir l’utilisation.",
+  "webClient.error.desktopOnly": "Cette action est disponible dans l’application de bureau.",
+  "webClient.error.checkConversation": "Vérifiez la conversation avant d’envoyer à nouveau.",
+  "webClient.error.hostReported": "L’hôte a signalé une erreur. Vérifiez la conversation et l’état de l’hôte.",
+  "webClient.error.requestFailed": "La requête a échoué.",
+  "webClient.error.accessEnded": "L’accès à cet hôte a pris fin.",
+  "webClient.error.hostsFailed": "Impossible de charger vos hôtes.",
+  "webClient.error.enterInvitation": "Saisissez un lien d’invitation.",
+  "webClient.error.invitationOffline": "L’invitation a été acceptée, mais l’hôte est hors ligne. Réessayez.",
+  "webClient.error.otherConversation": "L’hôte a renvoyé une autre conversation.",
+  "webClient.error.messageTooLong": "Le message est trop long.",
+  "webClient.error.deliveryUnconfirmed":
+    "La livraison du message n’est pas confirmée. Actualisez et vérifiez la conversation avant d’envoyer à nouveau.",
+  "webClient.error.sidebarLayout": "Cet hôte ne prend pas en charge les modifications de la barre latérale.",
+  "webClient.error.deleteOffline": "Connectez-vous à votre hôte avant de supprimer un agent.",
+  "webClient.error.attachmentLimit": "Un message peut contenir au maximum {limit} pièces jointes.",
+  "webClient.error.linkBlocked": "Ce lien ne peut pas être ouvert.",
+  "webClient.error.fileTransfer": "Le transfert de fichier a échoué.",
+  "webClient.error.noLocks":
+    "Ce navigateur ne peut pas protéger la connexion à l’hôte. Utilisez un navigateur de bureau récent.",
+  "webClient.error.otherTab": "Cet hôte est ouvert dans un autre onglet. Fermez cette connexion avant de réessayer.",
+  "webClient.error.connectionClosed": "La connexion du navigateur est fermée.",
+  "webClient.error.hostChanged": "L’hôte sélectionné a changé.",
+  "webClient.error.requestIncomplete": "L’hôte n’a pas pu terminer cette requête. Actualisez avant de réessayer.",
+  "webClient.error.viewEnded": "La vue du navigateur s’est terminée.",
+  "webClient.error.viewChanged": "La vue du navigateur a changé.",
+  "webClient.error.connectionChanging": "La connexion à l’hôte est en train de changer.",
+  "webClient.error.identityChanged": "L’identité de l’hôte a changé. Connexion refusée.",
+  "webClient.error.connectionUnavailable": "La connexion à l’hôte n’est pas disponible.",
+  "webClient.error.incompatible":
+    "Cet hôte n’est pas compatible avec OpenBot web. Mettez l’hôte à jour et rechargez cette page.",
+  "webClient.error.sendUnconfirmed":
+    "La livraison du message n’est pas confirmée. Actualisez avant de l’envoyer à nouveau.",
+  "webClient.error.fileType": "Mettez l’hôte à jour pour joindre ce type de fichier.",
+  "webClient.error.uploadCancelled": "L’envoi de la pièce jointe a été annulé.",
+  "webClient.error.duplication": "Cet hôte ne prend pas en charge la duplication d’agents.",
+} as const satisfies PartialTranslation<typeof source>;

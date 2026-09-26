@@ -1,5 +1,6 @@
 import type { BrowserPreview } from "@openbot/contracts/ipc";
 import { Monitor, Skeleton } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 
 export function BrowserTakeoverPreview(props: {
@@ -7,6 +8,7 @@ export function BrowserTakeoverPreview(props: {
   previewStatus: "idle" | "loading" | "ready" | "failed";
   page: { title: string; host: string };
 }) {
+  const { t } = useText();
   return (
     <Show
       when={props.previewStatus === "ready" ? props.preview : null}
@@ -30,7 +32,7 @@ export function BrowserTakeoverPreview(props: {
           src={preview().dataUrl}
           width={preview().width}
           height={preview().height}
-          alt={`Preview of ${props.page.title}`}
+          alt={t("browser.preview.image", { title: props.page.title })}
         />
       )}
     </Show>

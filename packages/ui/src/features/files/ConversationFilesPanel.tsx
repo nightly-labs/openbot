@@ -1,7 +1,7 @@
 import { Button, Folder, X } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
-import { formatFileSize } from "../conversation/AttachmentCards";
 import { FileList } from "./FileList";
 import { fileCountLabel, type StoredFileAction, type StoredFileRow } from "./files-view";
 
@@ -30,25 +30,29 @@ export interface ConversationFilesPanelProps {
  * file preview. "Show in chat" in a row menu scrolls the conversation to the message.
  */
 export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
+  const { t, format } = useText();
   return (
     <aside
       class="browser-panel conversation-files-panel"
-      aria-label={`Files in ${props.conversationTitle}`}
+      aria-label={t("files.conversation.label", { title: props.conversationTitle })}
       style={props.width ? { "--browser-panel-width": `${props.width}px` } : undefined}
     >
       <header class="file-preview-header conversation-files-header">
         <Folder class="file-preview-file-icon" aria-hidden="true" />
-        <h2>Files</h2>
+        <h2>{t("files.conversation.title")}</h2>
         <Show when={!props.loading}>
           <span class="conversation-files-summary">
-            {fileCountLabel(props.files.length)} · chat {formatFileSize(props.chatBytes)}
+            {t("files.conversation.summary", {
+              files: fileCountLabel(props.files.length, t),
+              size: format.fileSize(props.chatBytes),
+            })}
           </span>
         </Show>
         <Button
           variant="ghost"
           type="button"
           class="browser-toolbar-button"
-          aria-label="Close files"
+          aria-label={t("files.conversation.close")}
           onClick={() => props.onClose()}
         >
           <X class="browser-toolbar-icon" />
@@ -56,7 +60,7 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
       </header>
       <div class="conversation-files-content">
         <FileList
-          label={`Files in ${props.conversationTitle}`}
+          label={t("files.conversation.label", { title: props.conversationTitle })}
           files={props.files}
           agents={props.agents}
           showConversation={false}
@@ -68,8 +72,8 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
           onRetry={props.onRetry}
           now={props.now}
           canDelete={props.canDelete}
-          emptyTitle="No files in this chat"
-          emptyDescription="Files you attach and files the agent makes show here."
+          emptyTitle={t("files.conversation.emptyTitle")}
+          emptyDescription={t("files.conversation.emptyDescription")}
           onPreview={props.onPreviewFile}
           onAction={props.onFileAction}
         />

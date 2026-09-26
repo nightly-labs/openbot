@@ -6,6 +6,7 @@ import type {
   CreateChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
@@ -33,7 +34,7 @@ const CHANNEL_ROUTINE_TABLES: RoutineTables = {
   commandPrefix: "channel-routine",
   eventPrefix: "channel-routine",
   limit: INPUT_LIMITS.agentRoutines,
-  limitMessage: `A channel can have at most ${INPUT_LIMITS.agentRoutines} routines.`,
+  limitMessage: sourceText("error.backend.channelRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
 };
 
 /**

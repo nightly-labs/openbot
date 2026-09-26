@@ -11,6 +11,7 @@ import {
   IDLE_DYNAMIC_ISLAND_PRESENTATION,
   IPC_ENDPOINTS,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import type { BrowserWindow, Display, Rectangle } from "electron";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
@@ -189,7 +190,7 @@ export class DynamicIslandWindowController {
     const window = await this.#ensureMainWindow();
     this.#options.presentMainWindow(window);
     if (action.type !== "open-app" && !sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.action, action)) {
-      throw new Error("The OpenBot window is temporarily unavailable.");
+      throw new Error(sourceText("error.backend.windowTemporarilyUnavailable"));
     }
   }
 
@@ -197,7 +198,7 @@ export class DynamicIslandWindowController {
     const current = this.#options.getMainWindow();
     if (current && !current.isDestroyed()) return current;
     const created = await this.#options.ensureMainWindow?.();
-    if (!created || created.isDestroyed()) throw new Error("The OpenBot window is unavailable.");
+    if (!created || created.isDestroyed()) throw new Error(sourceText("error.backend.windowUnavailable"));
     return created;
   }
 

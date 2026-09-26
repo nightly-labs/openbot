@@ -20,4 +20,10 @@ export const messages = {
   "common.open": "開く",
   "common.search": "検索",
   "common.loading": "読み込み中…",
+  "common.saving": "保存しています…",
+  "common.tryAgain": "もう一度試す",
+  "common.connecting": "接続しています…",
+  "common.download": "ダウンロード",
+  "common.removing": "削除しています…",
+  "common.sending": "送信しています…",
 } as const satisfies PartialTranslation<typeof source>;

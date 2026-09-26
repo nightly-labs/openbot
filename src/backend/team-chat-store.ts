@@ -9,6 +9,7 @@ import type {
   DirectThreadSummary,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 
 export class TeamChatStore {
@@ -185,12 +186,12 @@ export class TeamChatStore {
     createdAt?: string;
   }): DirectMessage {
     const text = input.text.trim();
-    if (!text) throw new Error("Write a message first.");
+    if (!text) throw new Error(sourceText("error.backend.directMessageRequired"));
     if (text.length > INPUT_LIMITS.directMessageText) {
-      throw new Error(`A direct message can have up to ${INPUT_LIMITS.directMessageText} characters.`);
+      throw new Error(sourceText("error.backend.directMessageTooLong", { limit: INPUT_LIMITS.directMessageText }));
     }
     if (input.senderMemberId === input.recipientMemberId) {
-      throw new Error("You cannot send a direct message to yourself.");
+      throw new Error(sourceText("error.backend.directMessageSelf"));
     }
     const memberIds = sortedMemberIds(input.senderMemberId, input.recipientMemberId);
     const threadId = directThreadId(memberIds[0], memberIds[1]);

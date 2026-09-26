@@ -6,8 +6,8 @@ import {
   type StorageUsage,
 } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { filesPort } from "./files-port";
@@ -88,8 +88,9 @@ export function createStorageUsage(target: () => StorageTarget | null) {
       });
     } catch (error) {
       if (id !== request) return;
+      const text = currentText();
       setState((draft) => {
-        draft.error = errorMessage(error, "Storage could not be measured.");
+        draft.error = text.errorMessage(error, text.t("files.storage.measureFailed"));
         draft.loading = false;
       });
     }
@@ -138,14 +139,17 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     try {
       await filesPort().storage.openFile({ fileId: file.id, action }, current.serverId);
     } catch (error) {
-      toast.error(`Could not open “${file.name}”`, { description: errorMessage(error, "Try again.") });
+      const text = currentText();
+      toast.error(text.t("files.storage.openFailed", { name: file.name }), {
+        description: text.errorMessage(error, text.t("files.storage.tryAgain")),
+      });
     }
   }
 
   /** Null while nothing went wrong. A host that answered null predates `storage-v1`. */
   function error(): string | null {
     if (state.error) return state.error;
-    return state.loaded && !state.usage ? "Update OpenBot on this server to see its storage." : null;
+    return state.loaded && !state.usage ? currentText().t("files.storage.updateServer") : null;
   }
 
   function scanState(): "scanning" | "ready" | "error" {

@@ -15,4 +15,9 @@ export const messages = defineMessages("error.update", {
     "The update service did not answer. OpenBot tries again on its own in a few minutes.",
   "error.update.checkNoRelease":
     "No published update was found for this platform. OpenBot tries again on its own in a few minutes.",
+  "error.update.managedByHost":
+    "Updates on this Mac are installed by the host. The update stays ready until the host's maintenance runs.",
+  "error.update.siblingSession":
+    "Another OpenBot session is still running from this application. Stop OpenBot in every other macOS user account first, then install the update again.",
+  "error.update.siblingCheckFailed": "Could not verify other OpenBot sessions. Try again before installing.",
 });

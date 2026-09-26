@@ -6,4 +6,5 @@ export const messages = defineMessages("menu", {
   "menu.stopAllAgents": "Stop all agents",
   "menu.checkForUpdates": "Check for Updates…",
   "menu.preferences": "Settings…",
+  "menu.copyLink": "Copy Link",
 });

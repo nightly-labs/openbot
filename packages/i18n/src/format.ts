@@ -33,8 +33,8 @@ const catalogs = { en, fr, ja } as const;
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
-function numberFormat(locale: TranslatedLocale, options: Intl.NumberFormatOptions | undefined): Intl.NumberFormat {
-  const cacheKey = `${locale}\u0000${JSON.stringify(options ?? {})}`;
+function numberFormat(locale: string | undefined, options: Intl.NumberFormatOptions | undefined): Intl.NumberFormat {
+  const cacheKey = `${locale ?? ""}\u0000${JSON.stringify(options ?? {})}`;
   const cached = numberFormats.get(cacheKey);
   if (cached) return cached;
   const created = new Intl.NumberFormat(locale, options);
@@ -42,7 +42,7 @@ function numberFormat(locale: TranslatedLocale, options: Intl.NumberFormatOption
   return created;
 }
 
-function compactNumber(locale: TranslatedLocale, value: number): string {
+function compactNumber(locale: string | undefined, value: number): string {
   try {
     return numberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
   } catch {
@@ -50,23 +50,30 @@ function compactNumber(locale: TranslatedLocale, value: number): string {
   }
 }
 
-const formats = new Map<TranslatedLocale, AppFormat>();
+const formats = new Map<string, AppFormat>();
 
-export function createFormat(locale: TranslatedLocale): AppFormat {
-  const cached = formats.get(locale);
+/**
+ * `locale` selects the words: file size units, list words and compact suffixes. `intlLocale`
+ * selects the conventions of numbers and dates (see `formatLocale`). `null` is the runtime's own
+ * locale, for a surface with no language setting.
+ */
+export function createFormat(locale: TranslatedLocale, intlLocale: string | null = locale): AppFormat {
+  const cacheKey = `${locale}\u0000${intlLocale ?? ""}`;
+  const cached = formats.get(cacheKey);
   if (cached) return cached;
+  const tag = intlLocale ?? undefined;
   const t = createTranslate({ source: en, translation: catalogs[locale], locale, sourceLocale: "en" });
   const oneDecimal = (value: number) =>
-    numberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
+    numberFormat(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
 
   const format: AppFormat = {
     locale,
-    number: (value, options) => numberFormat(locale, options).format(value),
+    number: (value, options) => numberFormat(tag, options).format(value),
     compact: (value) => compactNumber(locale, value),
-    percent: (value, options) => numberFormat(locale, { style: "percent", ...options }).format(value),
+    percent: (value, options) => numberFormat(tag, { style: "percent", ...options }).format(value),
     currencyUsd: (value, options) =>
-      numberFormat(locale, { style: "currency", currency: "USD", ...options }).format(value),
-    date: (value, options) => new Intl.DateTimeFormat(locale, options).format(value),
+      numberFormat(tag, { style: "currency", currency: "USD", ...options }).format(value),
+    date: (value, options) => new Intl.DateTimeFormat(tag, options).format(value),
     list: (items) => {
       if (typeof Intl.ListFormat === "function") {
         return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
@@ -86,6 +93,6 @@ export function createFormat(locale: TranslatedLocale): AppFormat {
       return t("format.fileSize.terabytes", { size: oneDecimal(bytes / 1024 ** 4) });
     },
   };
-  formats.set(locale, format);
+  formats.set(cacheKey, format);
   return format;
 }

@@ -38,6 +38,17 @@ function forms(message: Message): readonly string[] {
   );
 }
 
+/**
+ * `{count}` is a number. `{reason}` and `{detail}` hold another message, which can have more than one
+ * line. Other values are one line, so a template without a `\n{detail}` tail cannot match the text of
+ * the template that has one.
+ */
+function placeholderPattern(name: string) {
+  if (name === "count") return "(-?\\d+(?:\\.\\d+)?)";
+  if (name === "reason" || name === "detail") return "([\\s\\S]+?)";
+  return "([^\\n]+?)";
+}
+
 function compile(key: string, text: string): Template {
   const names: string[] = [];
   let pattern = "";
@@ -45,7 +56,7 @@ function compile(key: string, text: string): Template {
   for (const match of text.matchAll(/\{(\w+)\}/g)) {
     const name = match[1] ?? "";
     pattern += escapeRegExp(text.slice(last, match.index));
-    pattern += name === "count" ? "(-?\\d+(?:\\.\\d+)?)" : "([\\s\\S]+?)";
+    pattern += placeholderPattern(name);
     names.push(name);
     last = match.index + match[0].length;
   }

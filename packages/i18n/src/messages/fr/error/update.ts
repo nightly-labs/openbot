@@ -18,4 +18,10 @@ export const messages = {
     "Le service de mise à jour n’a pas répondu. OpenBot réessaiera de lui-même dans quelques minutes.",
   "error.update.checkNoRelease":
     "Aucune mise à jour publiée n’a été trouvée pour cette plateforme. OpenBot réessaiera de lui-même dans quelques minutes.",
+  "error.update.managedByHost":
+    "Sur ce Mac, l’hôte installe les mises à jour. La mise à jour reste prête jusqu’à la maintenance de l’hôte.",
+  "error.update.siblingSession":
+    "Une autre session OpenBot utilise encore cette application. Quittez d’abord OpenBot dans tous les autres comptes utilisateur macOS, puis installez de nouveau la mise à jour.",
+  "error.update.siblingCheckFailed":
+    "Impossible de vérifier les autres sessions OpenBot. Réessayez avant l’installation.",
 } as const satisfies PartialTranslation<typeof source>;

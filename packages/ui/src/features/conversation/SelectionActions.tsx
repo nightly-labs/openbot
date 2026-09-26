@@ -4,6 +4,7 @@ import { clamp } from "@openbot/ui/utils";
 import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { useText } from "../../text";
 
 const MESSAGE_TEXT_SELECTOR = ".message-copy[data-selection-message-id]";
 const INTERACTIVE_SELECTOR =
@@ -221,6 +222,7 @@ export function SelectionActionsBar(props: {
   onDismiss: () => void;
   onSend: (messageId: string, body: string) => Promise<boolean>;
 }) {
+  const { t } = useText();
   const [prompt, setPrompt] = createSignal("");
   const [expanded, setExpanded] = createSignal(false);
   const [mode, setMode] = createSignal<"idle" | "sending" | "error">("idle");
@@ -388,7 +390,7 @@ export function SelectionActionsBar(props: {
           ref={(element) => (bar = element)}
           class="selection-actions-bar"
           role="toolbar"
-          aria-label="Actions for selected text"
+          aria-label={t("chat.selection.label")}
           style={{ width: barWidth() ? `${barWidth()}px` : undefined }}
         >
           <div
@@ -404,13 +406,13 @@ export function SelectionActionsBar(props: {
             <Show when={mode() === "sending"}>
               <span class="selection-actions-status" role="status">
                 <span class="selection-actions-spinner" aria-hidden="true" />
-                Sending…
+                {t("common.sending")}
               </span>
             </Show>
 
             <Show when={mode() === "error"}>
               <span class="selection-actions-error" role="alert">
-                Couldn’t send
+                {t("chat.selection.sendFailed")}
               </span>
               <Button
                 variant="ghost"
@@ -420,13 +422,13 @@ export function SelectionActionsBar(props: {
                 onClick={() => void submit(lastInstruction())}
               >
                 <RetryIcon />
-                <span class="selection-actions-label">Retry</span>
+                <span class="selection-actions-label">{t("common.retry")}</span>
               </Button>
               <Button
                 variant="ghost"
                 type="button"
                 class="selection-actions-icon-button"
-                aria-label="Close selected text actions"
+                aria-label={t("chat.selection.close")}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={props.onDismiss}
               >
@@ -458,8 +460,8 @@ export function SelectionActionsBar(props: {
                 >
                   <Input
                     value={prompt()}
-                    aria-label="Describe edits"
-                    placeholder="Describe edits"
+                    aria-label={t("chat.selection.describe")}
+                    placeholder={t("chat.selection.describe")}
                     maxlength={maximumInstructionLength()}
                     onValueChange={updatePrompt}
                   />
@@ -480,29 +482,29 @@ export function SelectionActionsBar(props: {
                   <span class="selection-actions-divider" aria-hidden="true" />
                 </Show>
                 <PresetButton
-                  label="Explain"
+                  label={t("chat.selection.explain")}
                   icon={<ExplainIcon />}
                   onSelect={() => void submit(SELECTION_ACTION_INSTRUCTIONS.Explain)}
                 />
                 <PresetButton
-                  label="Improve"
+                  label={t("chat.selection.improve")}
                   icon={<ImproveIcon />}
                   onSelect={() => void submit(SELECTION_ACTION_INSTRUCTIONS.Improve)}
                 />
                 <Show when={expanded()}>
                   <div class="selection-actions-more-presets">
                     <PresetButton
-                      label="Shorten"
+                      label={t("chat.selection.shorten")}
                       icon={<ShortenIcon />}
                       onSelect={() => void submit(SELECTION_ACTION_INSTRUCTIONS.Shorten)}
                     />
                     <PresetButton
-                      label="Tone"
+                      label={t("chat.selection.tone")}
                       icon={<ToneIcon />}
                       onSelect={() => void submit(SELECTION_ACTION_INSTRUCTIONS.Tone)}
                     />
                     <PresetButton
-                      label="Grammar"
+                      label={t("chat.selection.grammar")}
                       icon={<GrammarIcon />}
                       onSelect={() => void submit(SELECTION_ACTION_INSTRUCTIONS.Grammar)}
                     />
@@ -513,7 +515,7 @@ export function SelectionActionsBar(props: {
                   variant="ghost"
                   type="button"
                   class="selection-actions-icon-button selection-actions-expand"
-                  aria-label={expanded() ? "Show fewer actions" : "Show more actions"}
+                  aria-label={t(expanded() ? "chat.selection.showFewer" : "chat.selection.showMore")}
                   aria-expanded={expanded() ? "true" : "false"}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => setExpanded((value) => !value)}
@@ -530,7 +532,7 @@ export function SelectionActionsBar(props: {
                   variant="ghost"
                   type="button"
                   class="selection-actions-send"
-                  aria-label="Send edit instruction"
+                  aria-label={t("chat.selection.send")}
                   tabindex={hasPrompt() ? undefined : -1}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => void submit(prompt())}

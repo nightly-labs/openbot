@@ -25,6 +25,7 @@ import {
   type RemoteMemberRole,
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
+import { sourceText } from "@openbot/i18n/source";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { isMissingFileError } from "../backend/file-errors";
@@ -79,8 +80,6 @@ const UNCERTAIN_EMAIL_CODE_REQUEST_FAILURES = new Set([
   "email_delivery_timeout",
   "email_delivery_unknown",
 ]);
-const AUTH_API_UNAVAILABLE_MESSAGE =
-  "OpenBot could not reach the account service. Check that the API is running, then try again.";
 const remoteTicketJwksSchema = z.object({
   keys: z.array(z.object({ kty: z.string() }).loose()).min(1),
 });
@@ -219,7 +218,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   getSignedInUser(): CentralAuthUser {
     if (this.#state.status !== "signed_in") {
-      throw new AuthApiError(401, "unauthorized", "Sign in to OpenBot first.");
+      throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInFirst"));
     }
     return structuredClone(this.#state.user);
   }
@@ -238,7 +237,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   async downloadAuthorized(path: string, timeoutMs = 30_000): Promise<Uint8Array> {
-    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", "Sign in is required.");
+    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
     const response = await this.#options.fetch(new URL(path, this.#options.apiUrl), {
       headers: { Authorization: `Bearer ${this.#sessionToken}` },
       signal: AbortSignal.timeout(timeoutMs),
@@ -355,7 +354,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       // The credential belongs to the account that asked for it. Writing it now would file
       // it under whichever session is stored next, so the caller is told the registration
       // no longer applies instead.
-      throw new Error("The signed-in account changed while this server was being registered.");
+      throw new Error(sourceText("error.auth.accountChangedDuringRegister"));
     }
     if (result.machineToken) this.#teamHostTokens.set(input.hostId.toLowerCase(), result.machineToken);
     await this.#writeStoredSession();
@@ -364,7 +363,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   issueRemoteHostTicket(hostId: string): Promise<RemoteConnectionBootstrap> {
     const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
-    if (!machineToken) throw new Error("The remote host credential is unavailable. Register the host again.");
+    if (!machineToken) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
     return this.#request(
       `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
@@ -560,7 +559,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   }
 
   async downloadRemoteHostLogo(hostId: string, version: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
-    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", "Sign in is required.");
+    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
     const url = new URL(`/v2/remote/hosts/${encodeURIComponent(hostId)}/logo`, this.#options.apiUrl);
     url.searchParams.set("v", version);
     const response = await this.#options.fetch(url, {
@@ -753,12 +752,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       if (challenge) {
         return this.#setState({
           ...challenge,
-          issue: centralAuthIssue(error, "email_sign_in_failed", "The sign-in code could not be verified."),
+          issue: centralAuthIssue(error, "email_sign_in_failed", sourceText("error.auth.codeNotVerified")),
         });
       }
       return this.#setState({
         status: "error",
-        issue: centralAuthIssue(error, "email_sign_in_failed", "The sign-in code could not be verified."),
+        issue: centralAuthIssue(error, "email_sign_in_failed", sourceText("error.auth.codeNotVerified")),
       });
     }
   }
@@ -778,7 +777,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   async updateAvatar(image: AvatarImageInput | null): Promise<CentralAuthState> {
     const sessionToken = this.#sessionToken;
-    if (!sessionToken) throw new AuthApiError(401, "unauthorized", "Sign in is required.");
+    if (!sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
     const user = image
       ? await this.#authorizedRequest(
           "/v1/me/avatar",
@@ -806,7 +805,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   async updateName(name: string): Promise<CentralAuthState> {
     const sessionToken = this.#sessionToken;
-    if (!sessionToken) throw new AuthApiError(401, "unauthorized", "Sign in is required.");
+    if (!sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
     const user = await this.#authorizedRequest(
       "/v1/me/profile",
       {
@@ -842,7 +841,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     let retryIndex = 0;
     while (true) {
       const remainingMs = deadline - Date.now();
-      if (remainingMs <= 0) throw new Error(AUTH_API_UNAVAILABLE_MESSAGE);
+      if (remainingMs <= 0) throw new Error(sourceText("error.auth.serviceUnavailable"));
       try {
         return await this.#request(
           path,
@@ -872,7 +871,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     decoder: (value: unknown) => T,
     timeoutMs?: number,
   ): Promise<T> {
-    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", "Sign in is required.");
+    if (!this.#sessionToken) throw new AuthApiError(401, "unauthorized", sourceText("error.auth.signInRequired"));
     return this.#request(
       path,
       {
@@ -977,7 +976,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       status: "error",
       issue: {
         code: unavailable ? "auth_api_unavailable" : apiError.code,
-        message: unavailable ? AUTH_API_UNAVAILABLE_MESSAGE : apiError.message,
+        message: unavailable ? sourceText("error.auth.serviceUnavailable") : apiError.message,
         ...(apiError?.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: apiError.retryAfterSeconds }),
       },
     });
@@ -1025,7 +1024,7 @@ class AuthApiError extends Error {
     return new AuthApiError(
       response.status,
       "auth_api_error",
-      "The account service returned an error.",
+      sourceText("error.auth.serviceError"),
       retryAfterSeconds,
     );
   }
@@ -1044,24 +1043,23 @@ function centralAuthIssue(error: unknown, fallbackCode: string, fallbackMessage:
 
 function emailCodeRequestIssue(error: unknown): CentralAuthIssue {
   if (error instanceof AuthApiError) {
-    return centralAuthIssue(error, "email_sign_in_start_failed", "OpenBot could not send the sign-in code.");
+    return centralAuthIssue(error, "email_sign_in_start_failed", sourceText("error.auth.codeNotSent"));
   }
   if (error instanceof DOMException && error.name === "TimeoutError") {
     return {
       code: "email_delivery_timeout",
-      message:
-        "OpenBot could not confirm delivery in time. The code may still arrive; check delivery before sending again.",
+      message: sourceText("error.auth.deliveryTimeout"),
     };
   }
   if (error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError")) {
     return {
       code: "email_delivery_unknown",
-      message: "The connection ended before OpenBot confirmed delivery. Check delivery to avoid sending another code.",
+      message: sourceText("error.auth.deliveryInterrupted"),
     };
   }
   return {
     code: "email_delivery_unknown",
-    message: "OpenBot could not confirm whether the sign-in code was sent. Check delivery before sending again.",
+    message: sourceText("error.auth.deliveryUnknown"),
   };
 }
 

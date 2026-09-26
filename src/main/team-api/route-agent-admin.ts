@@ -1,5 +1,6 @@
 import { parseUpdateAgentAdminSettingsInput } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { AgentNotFoundError } from "../agent-admin-settings";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -21,7 +22,7 @@ export async function routeAgentAdmin(
   if (!read && !update) return "unmatched";
   const settings = admin?.agents;
   if (!settings || !capabilities.has(AGENT_ADMIN_CAPABILITY))
-    throw new HttpError(400, "Agent settings are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
   requireAdmin(member);
   // `readJson` has already run the body through the agent-admin wire codec.
   const body = await readJson(request);

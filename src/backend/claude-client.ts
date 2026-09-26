@@ -16,6 +16,7 @@ import {
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
@@ -452,7 +453,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const current = this.#threads.get(threadId);
       if (current && JSON.stringify(current.config) === JSON.stringify(config)) return;
       if (current) {
-        if (current.activeTurn) throw new Error("Wait for the active Claude turn before refreshing its context.");
+        if (current.activeTurn) throw new Error(sourceText("error.provider.claudeTurnActive"));
         await this.#threads.close(current);
         continue;
       }

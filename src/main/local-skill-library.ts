@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile 
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { AgentSummary, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { parse as parseYaml } from "yaml";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
@@ -41,7 +42,7 @@ export class LocalSkillLibrary {
     const revisions = entries
       .filter((entry) => entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name))
       .map((entry) => Number(entry.name));
-    if (!revisions.length) throw new Error("Local skill has no published revisions.");
+    if (!revisions.length) throw new Error(sourceText("error.skill.localNoRevisions"));
     return Math.max(...revisions);
   }
 
@@ -88,7 +89,7 @@ export class LocalSkillLibrary {
       const bytes = await this.source(agentId, sourcePath);
       const info = inspectArchive(bytes);
       if ((await this.list()).some((skill) => skill.slug === info.slug))
-        throw new Error("A local skill with this name already exists. Revise it instead.");
+        throw new Error(sourceText("error.skill.localNameTaken"));
       const id = `local-skill-${randomUUID()}`;
       await this.publish(id, 1, bytes);
       return this.get(id, 1);
@@ -101,8 +102,7 @@ export class LocalSkillLibrary {
       if (current.version !== expectedRevision)
         throw new Error("The skill changed. Read its latest revision before revising it.");
       const bytes = await this.source(agentId, sourcePath);
-      if (inspectArchive(bytes).slug !== current.slug)
-        throw new Error("Keep the skill name unchanged when revising it.");
+      if (inspectArchive(bytes).slug !== current.slug) throw new Error(sourceText("error.skill.localKeepName"));
       await this.publish(id, expectedRevision + 1, bytes);
       return this.get(id, expectedRevision + 1);
     });
@@ -122,21 +122,21 @@ export class LocalSkillLibrary {
 
   private async source(agentId: string, sourcePath: string): Promise<Uint8Array> {
     const agent = this.agents().find((item) => item.id === agentId);
-    if (!agent) throw new Error("Choose a local agent first.");
+    if (!agent) throw new Error(sourceText("error.skill.chooseLocalAgent"));
     if (
       !sourcePath ||
       isAbsolute(sourcePath) ||
       sourcePath.includes("\\") ||
       sourcePath.split("/").some((part) => part === ".." || !part)
     )
-      throw new Error("Use a relative skill folder inside the current agent workspace.");
+      throw new Error(sourceText("error.skill.localRelativeFolder"));
     const root = await realpath(agent.workspacePath);
     const path = resolve(root, sourcePath);
-    if (!path.startsWith(`${root}${sep}`)) throw new Error("Skill source must be inside the agent workspace.");
+    if (!path.startsWith(`${root}${sep}`)) throw new Error(sourceText("error.skill.localSourceOutside"));
     await rejectLinks(root, path);
-    if (!(await lstat(path)).isDirectory()) throw new Error("Skill source must be a folder.");
+    if (!(await lstat(path)).isDirectory()) throw new Error(sourceText("error.skill.localSourceNotFolder"));
     if (!(await lstat(join(path, "SKILL.md"))).isFile())
-      throw new Error("The skill folder needs SKILL.md at its root.");
+      throw new Error(sourceText("error.skill.localMissingSkillFile"));
     const bytes = await archiveDirectory(path);
     inspectArchive(bytes);
     return bytes;
@@ -169,9 +169,9 @@ export class LocalSkillLibrary {
 
 async function rejectLinks(root: string, path: string): Promise<void> {
   let current = root;
-  if ((await lstat(root)).isSymbolicLink()) throw new Error("Skill paths cannot contain symbolic links.");
+  if ((await lstat(root)).isSymbolicLink()) throw new Error(sourceText("error.skill.pathSymlink"));
   for (const part of relative(root, path).split(sep).filter(Boolean)) {
     current = join(current, part);
-    if ((await lstat(current)).isSymbolicLink()) throw new Error("Skill paths cannot contain symbolic links.");
+    if ((await lstat(current)).isSymbolicLink()) throw new Error(sourceText("error.skill.pathSymlink"));
   }
 }

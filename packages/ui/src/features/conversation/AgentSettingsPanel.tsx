@@ -14,6 +14,7 @@ import {
   type ProviderRuntimeStatus,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   ConfirmDialog,
@@ -39,10 +40,11 @@ import {
   SettingsPanelHeader,
 } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
-import { errorMessage } from "@openbot/ui/error-message";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show } from "solid-js";
+import { useText } from "../../text";
+import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 
 export interface AgentRuntimeSettings {
   provider: AgentProviderId;
@@ -127,6 +129,7 @@ interface TextSaveRequest {
 }
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
+  const { t, errorMessage } = useText();
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       batch: 0,
@@ -261,7 +264,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       return true;
     } catch (error) {
       if (!disposed && props.agent.id === agentId) {
-        setSaveError(errorMessage(error, "Could not save agent settings."));
+        setSaveError(errorMessage(error, t("agentSettings.saveFailed")));
       }
       return false;
     }
@@ -360,11 +363,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     setSaveError(null);
     try {
       const saved = await props.onUpdateRuntimeSettings(agentId, settings, updates);
-      if (!saved && props.agent.id === agentId) setSaveError("Could not save agent settings.");
+      if (!saved && props.agent.id === agentId) setSaveError(t("agentSettings.saveFailed"));
       return saved;
     } catch (error) {
       if (props.agent.id === agentId) {
-        setSaveError(errorMessage(error, "Could not save agent settings."));
+        setSaveError(errorMessage(error, t("agentSettings.saveFailed")));
       }
       return false;
     }
@@ -401,7 +404,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       await props.onSetAgentAvatar(props.agent.id, image);
       return true;
     } catch (error) {
-      setSaveError(errorMessage(error, "Could not save the agent avatar."));
+      setSaveError(errorMessage(error, t("agentSettings.avatar.saveFailed")));
       return false;
     } finally {
       setDraft((state) => {
@@ -420,7 +423,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       const image = await normalizeAvatarFile(file);
       await props.onSetAgentAvatar(props.agent.id, image);
     } catch (error) {
-      setSaveError(errorMessage(error, "Could not process the agent avatar."));
+      setSaveError(errorMessage(error, t("agentSettings.avatar.processFailed")));
     } finally {
       setDraft((state) => {
         state.avatar.uploadBusy = false;
@@ -509,18 +512,18 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     <SettingsPanel
       onResizeEnd={props.onResizeEnd}
       id="settings-side-panel"
-      label="Agent settings"
+      label={t("agentSettings.label")}
       width={props.width}
       maxWidth={props.maxWidth}
       onResize={props.onResize}
     >
       <Show when={!props.detailOpen}>
         <SettingsPanelHeader
-          title="Settings"
+          title={t("agentSettings.title")}
           onBack={props.onClose}
-          backLabel="Back to details"
+          backLabel={t("agentSettings.backToDetails")}
           onClose={props.onClose}
-          closeLabel="Close details"
+          closeLabel={t("agentSettings.closeDetails")}
         />
       </Show>
       <Show when={!props.detailOpen}>
@@ -540,21 +543,21 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 })
               }
             >
-              <Popover.Trigger class="agent-settings-avatar" aria-label="Edit agent avatar">
+              <Popover.Trigger class="agent-settings-avatar" aria-label={t("agentSettings.avatar.edit")}>
                 <AgentAvatar seed={draft.avatar.seed} hue={draft.avatar.hue} url={avatarUrl()} motion="always" />
               </Popover.Trigger>
               <Popover.Content class="avatar-editor" aria-hidden={draft.avatar.pickerOpen ? undefined : "true"}>
-                <Popover.Title class="sr-only">Avatar editor</Popover.Title>
+                <Popover.Title class="sr-only">{t("agentSettings.avatar.editor")}</Popover.Title>
                 <Input
                   ref={(element) => (avatarFileInput = element)}
                   class="sr-only"
                   type="file"
-                  aria-label="Attach files"
+                  aria-label={t("agentSettings.avatar.attachFiles")}
                   accept="image/png,image/jpeg,image/webp"
                   onChange={(event) => void uploadAgentAvatar(event.currentTarget.files?.[0])}
                 />
                 <div class="avatar-editor-heading">
-                  <span>Image</span>
+                  <span>{t("agentSettings.avatar.image")}</span>
                   <div class="avatar-editor-actions">
                     <Show when={avatarUrl()}>
                       <Button
@@ -563,7 +566,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         disabled={draft.avatar.uploadBusy}
                         onClick={() => void setCustomAvatar(null)}
                       >
-                        Remove
+                        {t("common.remove")}
                       </Button>
                     </Show>
                   </div>
@@ -588,13 +591,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     </Show>
                   </span>
                   <span>
-                    <strong>{avatarUrl() ? "Replace image" : "Upload image"}</strong>
-                    <small>PNG, JPEG or WebP · square crop</small>
+                    <strong>
+                      {avatarUrl() ? t("agentSettings.avatar.replaceImage") : t("agentSettings.avatar.uploadImage")}
+                    </strong>
+                    <small>{t("agentSettings.avatar.imageHint")}</small>
                   </span>
                 </Button>
                 <div class="avatar-editor-divider" />
                 <div class="avatar-editor-heading">
-                  <span>Generated face</span>
+                  <span>{t("agentSettings.avatar.generatedFace")}</span>
                   <div class="avatar-editor-actions">
                     <Show when={draft.avatar.seed !== props.agent.id}>
                       <Button
@@ -608,7 +613,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                           void selectGeneratedAvatar(props.agent.id);
                         }}
                       >
-                        Reset to ID
+                        {t("agentSettings.avatar.resetToId")}
                       </Button>
                     </Show>
                     <Button
@@ -621,11 +626,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         })
                       }
                     >
-                      New set
+                      {t("agentSettings.avatar.newSet")}
                     </Button>
                   </div>
                 </div>
-                <fieldset class="avatar-face-grid" aria-label="Generated avatar faces">
+                <fieldset class="avatar-face-grid" aria-label={t("agentSettings.avatar.faces")}>
                   <For each={avatarCandidates()}>
                     {(seed, index) => (
                       <Button
@@ -637,8 +642,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         ]}
                         aria-label={
                           !avatarUrl() && draft.avatar.seed === seed
-                            ? "Selected avatar"
-                            : `Avatar option ${index() + 1}`
+                            ? t("agentSettings.avatar.selected")
+                            : t("agentSettings.avatar.option", { number: index() + 1 })
                         }
                         aria-pressed={!avatarUrl() && draft.avatar.seed === seed ? "true" : "false"}
                         onClick={() => void selectGeneratedAvatar(seed)}
@@ -650,14 +655,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 </fieldset>
                 <div class="avatar-editor-divider" />
                 <div class="avatar-editor-heading">
-                  <span>Color</span>
+                  <span>{t("agentSettings.avatar.color")}</span>
                 </div>
-                <fieldset class="avatar-color-grid" aria-label="Avatar color">
+                <fieldset class="avatar-color-grid" aria-label={t("agentSettings.avatar.colorLabel")}>
                   <Button
                     variant="ghost"
                     type="button"
                     class={["avatar-color-choice", { "avatar-choice-selected": draft.avatar.hue === null }]}
-                    aria-label="Automatic avatar color"
+                    aria-label={t("agentSettings.avatar.autoColor")}
                     aria-pressed={draft.avatar.hue === null ? "true" : "false"}
                     onClick={() => {
                       setDraft((state) => {
@@ -666,7 +671,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                       void saveAgentPatch({ avatarHue: null });
                     }}
                   >
-                    <span class="avatar-color-swatch avatar-color-swatch-auto">A</span>
+                    <span class="avatar-color-swatch avatar-color-swatch-auto">
+                      {t("agentSettings.avatar.autoInitial")}
+                    </span>
                   </Button>
                   <For each={AVATAR_HUE_OPTIONS}>
                     {(option) => (
@@ -674,7 +681,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         variant="ghost"
                         type="button"
                         class={["avatar-color-choice", { "avatar-choice-selected": draft.avatar.hue === option.hue }]}
-                        aria-label={`${option.label} avatar color`}
+                        aria-label={t("agentSettings.avatar.hueColor", { hue: t(AVATAR_HUE_LABEL[option.hue]) })}
                         aria-pressed={draft.avatar.hue === option.hue ? "true" : "false"}
                         onClick={() => {
                           setDraft((state) => {
@@ -691,10 +698,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Popover.Content>
             </Popover.Root>
           </div>
-          <SettingsField label="Name">
+          <SettingsField label={t("agentSettings.name")}>
             <Input
               value={draft.fields.name}
-              aria-label="Agent name"
+              aria-label={t("agentSettings.nameLabel")}
               maxlength={INPUT_LIMITS.agentName}
               onValueChange={(value) =>
                 setDraft((state) => {
@@ -705,11 +712,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               onBlur={saveName}
             />
           </SettingsField>
-          <SettingsField label="Title">
+          <SettingsField label={t("agentSettings.agentTitle")}>
             <Input
               value={draft.fields.title}
-              aria-label="Agent title"
-              placeholder="Describe what your agent does"
+              aria-label={t("agentSettings.agentTitleLabel")}
+              placeholder={t("agentSettings.agentTitlePlaceholder")}
               maxlength={INPUT_LIMITS.agentTitle}
               onValueChange={(value) =>
                 setDraft((state) => {
@@ -720,12 +727,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               onBlur={saveTitle}
             />
           </SettingsField>
-          <SettingsField label="Instructions">
+          <SettingsField label={t("agentSettings.instructions")}>
             <Textarea
               rows="4"
               value={draft.fields.description}
-              aria-label="Agent instructions"
-              placeholder="What this agent is for"
+              aria-label={t("agentSettings.instructionsLabel")}
+              placeholder={t("agentSettings.instructionsPlaceholder")}
               maxlength={INPUT_LIMITS.agentDescription}
               onValueChange={(value) => {
                 setDraft((state) => {
@@ -738,11 +745,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
           </SettingsField>
           {props.links}
-          <SettingsSection class="agent-settings-runtime" title="Runtime">
+          <SettingsSection class="agent-settings-runtime" title={t("agentSettings.runtime.title")}>
             <div class="agent-settings-runtime-rows">
               <ProviderModelPicker
                 variant="field"
-                ariaLabel="Agent model"
+                ariaLabel={t("agentSettings.runtime.model")}
                 provider={draft.runtime.provider}
                 value={draft.runtime.model}
                 agentStatus={props.agentStatus}
@@ -754,9 +761,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 onConnectProvider={props.onConnectProvider}
                 disabled={props.working}
                 disabledReason={
-                  props.working
-                    ? "Wait for the current work to finish before changing models."
-                    : "Models are available after an agent CLI connects."
+                  props.working ? t("agentSettings.runtime.modelBusy") : t("agentSettings.runtime.modelUnavailable")
                 }
                 onChange={(nextModel, provider) => void selectModel(nextModel, provider)}
               />
@@ -770,12 +775,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }}
                 itemComponent={(item) => <SelectItem item={item.item}>{reasoningLabel(item.item.rawValue)}</SelectItem>}
               >
-                <SelectTrigger class="agent-settings-runtime-row" aria-label="Agent reasoning level">
-                  <span class="agent-settings-runtime-label">Reasoning</span>
+                <SelectTrigger
+                  class="agent-settings-runtime-row"
+                  aria-label={t("agentSettings.runtime.reasoningLabel")}
+                >
+                  <span class="agent-settings-runtime-label">{t("agentSettings.runtime.reasoning")}</span>
                   <SelectValue<AgentReasoningEffort>>
                     {(state) => {
                       const effort = state.selectedOption();
-                      return effort ? reasoningLabel(effort) : "Select reasoning";
+                      return effort ? reasoningLabel(effort) : t("agentSettings.runtime.selectReasoning");
                     }}
                   </SelectValue>
                 </SelectTrigger>
@@ -796,21 +804,25 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                       });
                     } else void saveAccess(nextAccess);
                   }}
-                  itemComponent={(item) => <SelectItem item={item.item}>{accessLabel(item.item.rawValue)}</SelectItem>}
+                  itemComponent={(item) => (
+                    <SelectItem item={item.item}>{t(ACCESS_LABEL[item.item.rawValue])}</SelectItem>
+                  )}
                 >
-                  <SelectTrigger class="agent-settings-runtime-row" aria-label="Agent access">
-                    <span class="agent-settings-runtime-label">Access</span>
+                  <SelectTrigger class="agent-settings-runtime-row" aria-label={t("agentSettings.runtime.accessLabel")}>
+                    <span class="agent-settings-runtime-label">{t("agentSettings.runtime.access")}</span>
                     <SelectValue<AgentAccess>>
-                      {(state) => accessLabel(state.selectedOption() ?? DEFAULT_AGENT_ACCESS)}
+                      {(state) => t(ACCESS_LABEL[state.selectedOption() ?? DEFAULT_AGENT_ACCESS])}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent />
                 </Select>
               </Show>
               <div class="agent-settings-runtime-path">
-                <span class="agent-settings-runtime-label">Working directory</span>
+                <span class="agent-settings-runtime-label">{t("agentSettings.runtime.workingDirectory")}</span>
                 <span>
-                  {props.agent.workspacePath ? breakablePath(props.agent.workspacePath) : "Not available yet"}
+                  {props.agent.workspacePath
+                    ? breakablePath(props.agent.workspacePath)
+                    : t("agentSettings.runtime.notAvailable")}
                 </span>
               </div>
             </div>
@@ -819,15 +831,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 when={draft.access === "workspace"}
                 fallback={
                   <>
-                    The agent runs with full computer access from its workspace and the shared folder.{" "}
+                    {t("agentSettings.runtime.fullAccessNote")}{" "}
                     {draft.runtime.provider === "claude"
-                      ? "Claude acts without asking for approval, except for questions it puts to you."
-                      : "Depending on the provider, sensitive commands may ask for approval first."}
+                      ? t("agentSettings.runtime.claudeApprovalNote")
+                      : t("agentSettings.runtime.providerApprovalNote")}
                   </>
                 }
               >
-                Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay
-                available. Not enforced yet: this agent still has full access in this version.
+                {t("agentSettings.runtime.workspaceNote")}
               </Show>
             </Text>
           </SettingsSection>
@@ -840,12 +851,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           </Show>
           <div class="agent-settings-notifications">
             <div>
-              <strong>Notifications</strong>
-              <span>Get notified when this agent finishes or needs input</span>
+              <strong>{t("agentSettings.notifications.title")}</strong>
+              <span>{t("agentSettings.notifications.description")}</span>
             </div>
             <Switch
               size="sm"
-              aria-label="Notifications"
+              aria-label={t("agentSettings.notifications.title")}
               checked={draft.notifications}
               onChange={(next) => {
                 setDraft((state) => {
@@ -860,10 +871,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           open={draft.confirmingFullAccess}
           tone="default"
           initialFocus="cancel"
-          title="Give this agent full access?"
-          description="The agent can then read, change and delete any file your user account can reach, run any command, and use the network. One misunderstood instruction or a malicious web page can reach your personal files."
-          cancelLabel="Keep workspace only"
-          confirmLabel="Allow full access"
+          title={t("agentSettings.fullAccess.title")}
+          description={t("agentSettings.fullAccess.description")}
+          cancelLabel={t("agentSettings.fullAccess.cancel")}
+          confirmLabel={t("agentSettings.fullAccess.confirm")}
           onCancel={() =>
             setDraft((state) => {
               state.confirmingFullAccess = false;
@@ -905,6 +916,7 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
   );
 }
 
-function accessLabel(access: AgentAccess) {
-  return access === "workspace" ? "Workspace only" : "Full access";
-}
+const ACCESS_LABEL = {
+  workspace: "agentSettings.access.workspace",
+  full: "agentSettings.access.full",
+} as const satisfies Record<AgentAccess, AppTextKey>;

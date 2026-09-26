@@ -4,6 +4,7 @@ import {
   decodeTeamProtocolV2FileControlFrame,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "./file-upload";
 
 interface Download {
@@ -34,7 +35,7 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
     if (waiter) {
       clearTimeout(waiter.timer);
       waiters.delete(id);
-      waiter.reject(new Error("The attachment download timed out. Try again."));
+      waiter.reject(new Error(sourceText("error.remote.downloadTimeout")));
     }
   }
   function touch(id: string) {
@@ -54,20 +55,20 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
       for (const id of downloads.keys()) remove(id);
       for (const waiter of waiters.values()) {
         clearTimeout(waiter.timer);
-        waiter.reject(new Error("The attachment connection closed."));
+        waiter.reject(new Error(sourceText("error.remote.attachmentConnectionClosed")));
       }
       waiters.clear();
     },
     async take(id: string): Promise<RemoteFileUpload> {
       if (!downloads.get(id)?.complete) {
-        if (waiters.has(id) || waiters.size >= 10) throw new Error("Too many attachment downloads.");
+        if (waiters.has(id) || waiters.size >= 10) throw new Error(sourceText("error.remote.tooManyDownloads"));
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => expire(id), 60_000);
           waiters.set(id, { resolve, reject, timer });
         });
       }
       const entry = downloads.get(id);
-      if (!entry?.complete) throw new Error("The attachment download is incomplete. Try again.");
+      if (!entry?.complete) throw new Error(sourceText("error.remote.downloadIncompleteRetry"));
       remove(id);
       const parts: string[] = [];
       for (let offset = 0; offset < entry.bytes.length; offset += 8192)
@@ -143,11 +144,11 @@ export function createRemoteFileReceiver(send: (data: string) => Promise<void>) 
       if (frame.type === "file-complete") {
         const entry = downloads.get(frame.transferId);
         if (!entry) return true;
-        if (entry.received !== entry.bytes.length) throw new Error("The attachment download is incomplete.");
+        if (entry.received !== entry.bytes.length) throw new Error(sourceText("error.remote.downloadIncomplete"));
         const digest = Array.from(sha256(entry.bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
         if (digest !== entry.digest) {
           remove(frame.transferId);
-          throw new Error("The attachment download is damaged. Try again.");
+          throw new Error(sourceText("error.remote.downloadDamaged"));
         }
         entry.complete = true;
         touch(frame.transferId);

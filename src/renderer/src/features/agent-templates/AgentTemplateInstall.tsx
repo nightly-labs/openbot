@@ -1,7 +1,7 @@
 import type { AddedAgent, AgentTemplateDetail, ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { agentTemplatesPort } from "./agent-templates-port";
 
@@ -21,6 +21,7 @@ export function AgentTemplateInstall(props: {
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {
+  const { t, errorMessage } = useText();
   const [state, setState] = createStore<InstallState>({ detail: null, loading: false });
 
   createEffect(
@@ -48,7 +49,7 @@ export function AgentTemplateInstall(props: {
             draft.loading = false;
           });
           props.onClose();
-          toast.error(errorMessage(error, "Could not read the shared agent."));
+          toast.error(errorMessage(error, t("agentTemplate.install.readFailed")));
         });
       return () => {
         current = false;
@@ -71,9 +72,12 @@ export function AgentTemplateInstall(props: {
       ? await port.agent.addTemplateAgent(input, server.id)
       : (await port.agentTemplates.install(input)).agent;
     props.onClose();
-    toast.success(server ? `${agent.name} added to ${server.name}` : `${agent.name} added`, {
-      description: "Its instructions, skills and routines are ready.",
-    });
+    toast.success(
+      server
+        ? t("agentTemplate.install.addedTo", { name: agent.name, server: server.name })
+        : t("agentTemplate.install.added", { name: agent.name }),
+      { description: t("agentTemplate.install.ready") },
+    );
     // Opening the new agent reports its own failure and never rejects, so it cannot read as a failed install.
     await props.onInstalled(agent, server?.id);
   }

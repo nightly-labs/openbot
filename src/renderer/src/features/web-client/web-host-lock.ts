@@ -1,7 +1,8 @@
+import { currentText } from "@openbot/ui/text";
+
 /** A logical host session belongs to one account credential. Prevent tabs from replacing each other's peer. */
 export async function acquireWebHostLock(accountId: string, hostId: string): Promise<() => void> {
-  if (!navigator.locks)
-    throw new Error("This browser cannot protect the host connection. Use a current desktop browser.");
+  if (!navigator.locks) throw new Error(currentText().t("webClient.error.noLocks"));
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;
@@ -10,7 +11,7 @@ export async function acquireWebHostLock(accountId: string, hostId: string): Pro
     void navigator.locks
       .request(`openbot.web.host:${accountId}:${hostId}`, { ifAvailable: true }, async (lock) => {
         if (!lock) {
-          reject(new Error("This host is open in another tab. Close that connection before trying again."));
+          reject(new Error(currentText().t("webClient.error.otherTab")));
           return;
         }
         resolve(release);

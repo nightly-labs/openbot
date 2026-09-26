@@ -2,6 +2,7 @@ import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openb
 import { Button, Input, Typography } from "heroui-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { useText } from "@/shared/lib/text";
 
 export function BrowserSecretCard({
   request,
@@ -12,16 +13,17 @@ export function BrowserSecretCard({
   respondToTakeover: (decision: "complete" | "cancel") => Promise<void>;
   respond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
+  const { t } = useText();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const password = request.secret?.method === "password";
   const digits = request.secret?.digits ?? 6;
   const title = password
-    ? "Password"
+    ? t("mobile.chat.browserSecret.password")
     : request.secret?.method === "authenticator"
-      ? "Authenticator code"
-      : "One-time code";
+      ? t("mobile.chat.browserSecret.authenticatorCode")
+      : t("mobile.chat.browserSecret.oneTimeCode");
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
     setPending(true);
@@ -54,20 +56,22 @@ export function BrowserSecretCard({
     };
     return (
       <View className="gap-2 border-t border-border bg-background p-4">
-        <Typography.Heading>Browser takeover</Typography.Heading>
+        <Typography.Heading>{t("mobile.chat.browserSecret.takeoverTitle")}</Typography.Heading>
         <Typography.Paragraph>
-          Complete this step in the browser on the computer running OpenBot.{" "}
-          {request.secret?.requiresReload ? "Then reload the page before choosing I’m done." : ""}
+          {t("mobile.chat.browserSecret.takeoverBody")}{" "}
+          {request.secret?.requiresReload ? t("mobile.chat.browserSecret.takeoverReload") : ""}
         </Typography.Paragraph>
         {error ? (
-          <Typography.Paragraph accessibilityRole="alert">The request could not be completed.</Typography.Paragraph>
+          <Typography.Paragraph accessibilityRole="alert">
+            {t("mobile.chat.browserSecret.takeoverFailed")}
+          </Typography.Paragraph>
         ) : null}
         <View className="flex-row gap-2">
           <Button isDisabled={pending} onPress={() => void finish("complete")}>
-            <Button.Label>I'm done</Button.Label>
+            <Button.Label>{t("mobile.chat.browserSecret.done")}</Button.Label>
           </Button>
           <Button variant="secondary" isDisabled={pending} onPress={() => void finish("cancel")}>
-            <Button.Label>Cancel</Button.Label>
+            <Button.Label>{t("common.cancel")}</Button.Label>
           </Button>
         </View>
       </View>
@@ -77,7 +81,7 @@ export function BrowserSecretCard({
     <View className="gap-2 border-t border-border bg-background p-4">
       <Typography.Heading>{title}</Typography.Heading>
       <Typography.Paragraph>
-        Submit once to {request.secret?.origin}. This value is not added to chat.
+        {t("mobile.chat.browserSecret.submitOnce", { origin: request.secret?.origin ?? "" })}
       </Typography.Paragraph>
       <Input
         accessibilityLabel={title}
@@ -98,7 +102,7 @@ export function BrowserSecretCard({
       ) : null}
       {error ? (
         <Typography.Paragraph accessibilityRole="alert">
-          The request could not be completed. Check the connection and try again.
+          {t("mobile.chat.browserSecret.submitFailed")}
         </Typography.Paragraph>
       ) : null}
       <View className="flex-row gap-2">
@@ -106,13 +110,13 @@ export function BrowserSecretCard({
           isDisabled={pending || (password ? !value : value.length !== digits)}
           onPress={() => void send("submit")}
         >
-          <Button.Label>Submit</Button.Label>
+          <Button.Label>{t("mobile.chat.browserSecret.submit")}</Button.Label>
         </Button>
         <Button variant="secondary" isDisabled={pending} onPress={() => void send("cancel")}>
-          <Button.Label>Cancel</Button.Label>
+          <Button.Label>{t("common.cancel")}</Button.Label>
         </Button>
         <Button variant="tertiary" isDisabled={pending} onPress={() => void send("takeover")}>
-          <Button.Label>Take over</Button.Label>
+          <Button.Label>{t("mobile.chat.browserSecret.takeOver")}</Button.Label>
         </Button>
       </View>
     </View>

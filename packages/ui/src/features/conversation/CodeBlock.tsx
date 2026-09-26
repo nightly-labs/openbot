@@ -1,6 +1,8 @@
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Check, Copy } from "@openbot/ui";
 import { type ShjLanguage, type ShjToken, tokenize } from "@speed-highlight/core";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { useText } from "../../text";
 import type { MessageCodeBlock } from "./DataTable";
 
 interface CodeToken {
@@ -75,13 +77,19 @@ const SUPPORTED_LANGUAGES = new Set<string>([
   "yaml",
 ]);
 
+// Words, not language names: these are translated.
+const LANGUAGE_TEXT_KEYS = {
+  asm: "chat.code.language.assembly",
+  bash: "chat.code.language.shell",
+  diff: "chat.code.language.diff",
+  plain: "chat.code.language.plain",
+  regex: "chat.code.language.regex",
+} as const satisfies Partial<Record<ShjLanguage, AppTextKey>>;
+
 const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
-  asm: "Assembly",
-  bash: "Shell",
   c: "C",
   css: "CSS",
   csv: "CSV",
-  diff: "Diff",
   docker: "Dockerfile",
   go: "Go",
   html: "HTML",
@@ -94,9 +102,7 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
   lua: "Lua",
   make: "Makefile",
   md: "Markdown",
-  plain: "Code",
   py: "Python",
-  regex: "Regular expression",
   rs: "Rust",
   sql: "SQL",
   toml: "TOML",
@@ -106,13 +112,14 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
 };
 
 export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean }) {
+  const { t } = useText();
   const [lines, setLines] = createSignal<CodeLine[]>(plainCodeLines(props.block.code));
   const [copied, setCopied] = createSignal(false);
   let highlightRun = 0;
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const language = () => codeLanguage(props.block.language);
-  const languageLabel = () => codeLanguageLabel(props.block.language);
+  const languageLabel = () => codeLanguageLabel(props.block.language, t);
 
   createEffect(
     () => ({ code: props.block.code, language: language() }),
@@ -144,7 +151,7 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
   };
 
   return (
-    <section class="message-code-block" aria-label={`${languageLabel()} code block`}>
+    <section class="message-code-block" aria-label={t("chat.code.blockLabel", { language: languageLabel() })}>
       <header class="message-code-header">
         <div class="message-code-heading">
           <Show when={props.block.filename}>
@@ -157,7 +164,7 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
           variant="ghost"
           size="xs"
           class="message-code-copy"
-          aria-label={copied() ? "Code copied" : "Copy code"}
+          aria-label={copied() ? t("chat.code.copied") : t("chat.code.copy")}
           onClick={() => void copy()}
         >
           <span class="message-code-copy-icons" aria-hidden="true">
@@ -168,7 +175,7 @@ export function CodeBlock(props: { block: MessageCodeBlock; streaming?: boolean 
               <Check />
             </span>
           </span>
-          <span>{copied() ? "Copied" : "Copy"}</span>
+          <span>{copied() ? t("common.copied") : t("common.copy")}</span>
         </Button>
       </header>
       <pre class="message-code-scroll" tabindex="0">
@@ -206,11 +213,18 @@ function isSupportedLanguage(language: string): language is ShjLanguage {
   return SUPPORTED_LANGUAGES.has(language);
 }
 
-export function codeLanguageLabel(language: string): string {
+function isTranslatedLanguage(language: ShjLanguage): language is keyof typeof LANGUAGE_TEXT_KEYS {
+  return language in LANGUAGE_TEXT_KEYS;
+}
+
+export function codeLanguageLabel(language: string, t: AppTranslate): string {
   const normalized = codeLanguage(language);
-  if (normalized !== "plain") return LANGUAGE_LABELS[normalized] ?? normalized.toUpperCase();
+  if (normalized !== "plain") {
+    if (isTranslatedLanguage(normalized)) return t(LANGUAGE_TEXT_KEYS[normalized]);
+    return LANGUAGE_LABELS[normalized] ?? normalized.toUpperCase();
+  }
   const original = language.trim();
-  return original ? original.toUpperCase() : "Code";
+  return original ? original.toUpperCase() : t(LANGUAGE_TEXT_KEYS.plain);
 }
 
 function plainCodeLines(code: string): CodeLine[] {

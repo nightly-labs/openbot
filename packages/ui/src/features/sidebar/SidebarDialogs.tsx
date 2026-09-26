@@ -2,6 +2,7 @@
 
 import { ConfirmDialog } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { useSidebarScope } from "./sidebar-scope";
@@ -18,9 +19,14 @@ export function SidebarDialogs() {
     props,
     sectionDeleteTarget,
   } = useSidebarScope();
+  const { t } = useText();
   const shared = {
-    confirmLabel: "Delete",
-    pendingLabel: "Deleting…",
+    get confirmLabel() {
+      return t("common.delete");
+    },
+    get pendingLabel() {
+      return t("sidebar.delete.pending");
+    },
     onCancel: closeDelete,
   };
   // Each dialog unmounts with its target, so its text never shows an empty name while it closes.
@@ -34,8 +40,8 @@ export function SidebarDialogs() {
             pending={deleting()}
             error={deleteError()}
             media={<AgentAvatar agent={agent()} style={{ width: "44px", height: "44px" }} />}
-            title={`Delete ${agent().name}?`}
-            description="This removes the agent and its OpenBot conversation from the app. Its queue, memories, routines, and workspace are deleted. History stored separately by the connected CLI provider is not deleted."
+            title={t("sidebar.delete.title", { name: agent().name })}
+            description={t("sidebar.delete.agentDescription")}
             onConfirm={confirmDelete}
           />
         )}
@@ -49,8 +55,8 @@ export function SidebarDialogs() {
             pending={deleting()}
             error={deleteError()}
             media={<ChannelAvatar members={channel().members} agents={props.agents} layout="cluster" />}
-            title={`Delete ${channel().name}?`}
-            description="This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Member agents are kept."
+            title={t("sidebar.delete.title", { name: channel().name })}
+            description={t("sidebar.delete.channelDescription")}
             onConfirm={confirmDelete}
           />
         )}
@@ -63,8 +69,8 @@ export function SidebarDialogs() {
             open
             pending={deleting()}
             error={deleteError()}
-            title={`Delete ${section().name}?`}
-            description="Agents in this section will move to Unassigned. No agents will be deleted."
+            title={t("sidebar.delete.title", { name: section().name })}
+            description={t("sidebar.delete.sectionDescription")}
             onConfirm={confirmSectionDelete}
           />
         )}

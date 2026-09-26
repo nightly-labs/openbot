@@ -1,4 +1,3 @@
-import { userErrorMessage } from "@openbot/user-errors";
 import { Redirect, router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { openBrowserAsync } from "expo-web-browser";
@@ -8,6 +7,7 @@ import { View } from "react-native";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
+import { useText } from "@/shared/lib/text";
 import { forgetIncomingLink, pendingInvitationId, readIncomingLink } from "../model/incoming-links";
 
 export function IncomingLinkScreen() {
@@ -16,6 +16,7 @@ export function IncomingLinkScreen() {
 }
 
 function IncomingLinkContent({ request }: { request?: string }) {
+  const { t, errorMessage } = useText();
   const { session, connect } = useMobileSession();
   const [link] = useState(() => readIncomingLink(request));
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ function IncomingLinkContent({ request }: { request?: string }) {
       forgetIncomingLink(request);
       if (mounted.current) setPaired(true);
     } catch (cause) {
-      if (mounted.current) setError(userErrorMessage(cause, "OpenBot could not connect. Try again."));
+      if (mounted.current) setError(errorMessage(cause, t("mobile.link.connectFailed")));
     } finally {
       locked.current = false;
       if (mounted.current) setBusy(false);
@@ -67,11 +68,9 @@ function IncomingLinkContent({ request }: { request?: string }) {
     return (
       <View className="flex-1 bg-background">
         <View className="gap-2 px-5 pt-safe-offset-4">
-          <Typography.Paragraph align="center">
-            Sign in with your desktop to review this invitation.
-          </Typography.Paragraph>
+          <Typography.Paragraph align="center">{t("mobile.link.invite.signIn")}</Typography.Paragraph>
           <Button variant="ghost" onPress={close}>
-            <Button.Label>Cancel invitation</Button.Label>
+            <Button.Label>{t("mobile.link.invite.cancel")}</Button.Label>
           </Button>
         </View>
         <SignInScreen />
@@ -84,35 +83,35 @@ function IncomingLinkContent({ request }: { request?: string }) {
       <Stack.Screen options={{ gestureEnabled: !busy, headerShown: false }} />
       <Typography.Heading type="h3">
         {link.kind === "pairing"
-          ? "Connect this phone"
+          ? t("mobile.link.pairing.title")
           : link.kind === "plugin"
-            ? "Open plugin page"
-            : "Link unavailable"}
+            ? t("mobile.link.plugin.title")
+            : t("mobile.link.unavailable.title")}
       </Typography.Heading>
       <Typography.Paragraph>
         {link.kind === "pairing"
           ? session
-            ? "You are already signed in. Sign out in Settings before connecting another account."
-            : "Continue only if you requested this Mobile Connect link from your desktop."
+            ? t("mobile.link.pairing.alreadySignedIn")
+            : t("mobile.link.pairing.description")
           : link.kind === "plugin"
-            ? "View this plugin on the OpenBot website."
-            : "This link is invalid, is no longer available, or is not supported on mobile."}
+            ? t("mobile.link.plugin.description")
+            : t("mobile.link.unavailable.description")}
       </Typography.Paragraph>
       {error ? <Typography.Paragraph className="text-danger-text">{error}</Typography.Paragraph> : null}
       {link.kind === "pairing" && !session ? (
         <Button isDisabled={busy} onPress={() => void pair()}>
-          <Button.Label>{busy ? "Connecting…" : "Connect"}</Button.Label>
+          <Button.Label>{busy ? t("common.connecting") : t("mobile.link.pairing.connect")}</Button.Label>
         </Button>
       ) : null}
       {link.kind === "plugin" ? (
         <Button
-          onPress={() => void openBrowserAsync(link.url).catch(() => setError("Could not open the plugin page."))}
+          onPress={() => void openBrowserAsync(link.url).catch(() => setError(t("mobile.link.plugin.openFailed")))}
         >
-          <Button.Label>View plugin</Button.Label>
+          <Button.Label>{t("mobile.link.plugin.view")}</Button.Label>
         </Button>
       ) : null}
       <Button variant="ghost" isDisabled={busy} onPress={close}>
-        <Button.Label>Close</Button.Label>
+        <Button.Label>{t("common.close")}</Button.Label>
       </Button>
     </View>
   );

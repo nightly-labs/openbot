@@ -1,4 +1,5 @@
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
@@ -16,7 +17,7 @@ import { isMissingProviderSessionError, isRequestTimeout, providerForAgent } fro
 import type { ThreadLifecycle } from "./thread-lifecycle";
 
 /** Shown to the user when a message names a model of an endpoint that was taken out. */
-export const REMOVED_ENDPOINT_MESSAGE = "The endpoint this agent used was removed. Choose another model for it.";
+export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved");
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;

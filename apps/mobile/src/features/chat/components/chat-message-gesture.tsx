@@ -7,6 +7,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 
 export function ChatMessageGesture({
   children,
@@ -19,6 +20,7 @@ export function ChatMessageGesture({
   onOpenActions: () => void;
 }>) {
   const muted = useThemeColor("muted");
+  const { t } = useText();
   const offset = useSharedValue(0);
   const bubbleStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }));
   const iconStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, offset.get() / 64) }));
@@ -66,12 +68,12 @@ export function ChatMessageGesture({
             <Button
               variant="ghost"
               onPress={openActions}
-              accessibilityActions={onReply ? [{ name: "reply", label: "Reply" }] : []}
+              accessibilityActions={onReply ? [{ name: "reply", label: t("mobile.chat.message.reply") }] : []}
               onAccessibilityAction={({ nativeEvent }) => {
                 if (nativeEvent.actionName === "reply" && onReply) reply();
               }}
             >
-              <Button.Label>Message actions</Button.Label>
+              <Button.Label>{t("mobile.chat.message.actions")}</Button.Label>
             </Button>
           ) : null}
         </Animated.View>

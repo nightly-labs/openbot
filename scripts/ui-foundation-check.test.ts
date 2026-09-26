@@ -226,7 +226,7 @@ it("rejects a story play function on each line its fixture marks, and nothing in
   );
 });
 
-it("warns on hardcoded interface text on each line its fixture marks, and not on translated text", () => {
+it("flags hardcoded interface text on each line its fixture marks, and not on translated text", () => {
   const fixture = resolve(fixtureRenderer, "components/HardcodedText.tsx");
   const marked = readFileSync(fixture, "utf8")
     .split("\n")

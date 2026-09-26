@@ -2,6 +2,7 @@ import type { BrowserPreview, BrowserTakeoverRequest, RespondToBrowserSecretInpu
 import { Button, Input, Maximize2, Monitor } from "@openbot/ui";
 import { OtpInput } from "@openbot/ui/features/account/OtpInput";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
 export function BrowserSecretCard(props: {
@@ -10,6 +11,7 @@ export function BrowserSecretCard(props: {
   loadPreview?: (tabId: string) => Promise<BrowserPreview>;
   onRespond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
+  const { t } = useText();
   const [preview, setPreview] = createSignal<BrowserPreview | null>(null);
   const [previewStatus, setPreviewStatus] = createSignal<"loading" | "ready" | "failed">("loading");
   const [previewHidden, setPreviewHidden] = createSignal(false);
@@ -21,10 +23,16 @@ export function BrowserSecretCard(props: {
   const password = () => method() === "password";
   const title = () =>
     password()
-      ? "Enter your password"
+      ? t("browser.secret.title.password")
       : method() === "authenticator"
-        ? "Enter your authenticator code"
-        : "Enter your one-time code";
+        ? t("browser.secret.title.authenticator")
+        : t("browser.secret.title.code");
+  // The origin is bold inside the sentence, so the sentence is split where the origin goes.
+  const submitOnce = () => {
+    const marker = "\u0000";
+    const [before = "", after = ""] = t("browser.secret.submitOnce", { origin: marker }).split(marker);
+    return { before, after };
+  };
   const valid = () => (password() ? value().length > 0 : value().length === digits());
   onCleanup(() => setValue(""));
   createEffect(
@@ -68,7 +76,7 @@ export function BrowserSecretCard(props: {
     try {
       await props.onRespond(input);
     } catch {
-      setError("The request could not be completed. Check the connection and try again.");
+      setError(t("browser.secret.failed"));
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);
@@ -77,7 +85,7 @@ export function BrowserSecretCard(props: {
   return (
     <form
       class="conversation-interaction-card browser-secret-card"
-      aria-label="Secure authentication"
+      aria-label={t("browser.secret.label")}
       aria-busy={pending() ? "true" : "false"}
       onSubmit={(event) => {
         event.preventDefault();
@@ -88,28 +96,30 @@ export function BrowserSecretCard(props: {
         <h2>{title()}</h2>
       </header>
       <p>
-        Submit once to <strong>{props.request.secret?.origin}</strong>
+        {submitOnce().before}
+        <strong>{props.request.secret?.origin}</strong>
+        {submitOnce().after}
       </p>
       <p>
         {method() === "authenticator"
-          ? "Use the code from your authenticator app."
+          ? t("browser.secret.hint.authenticator")
           : password()
-            ? "Your password goes directly to this site."
-            : "Use the code sent by email or text message."}{" "}
-        This value is not added to chat.
+            ? t("browser.secret.hint.password")
+            : t("browser.secret.hint.code")}{" "}
+        {t("browser.secret.notAddedToChat")}
       </p>
       <Show
         when={password()}
         fallback={
           <Show when={!pending()}>
             <div class="browser-secret-code">
-              <span class="browser-secret-label">{digits()}-digit code</span>
+              <span class="browser-secret-label">{t("browser.secret.codeLength", { digits: digits() })}</span>
               <OtpInput
                 value={value()}
                 length={digits()}
                 numeric
                 masked
-                label={`${digits()}-digit code`}
+                label={t("browser.secret.codeLength", { digits: digits() })}
                 status={error() ? "error" : "idle"}
                 errorMessage={error()}
                 onChange={(next) => {
@@ -123,9 +133,9 @@ export function BrowserSecretCard(props: {
       >
         <Show when={!pending()}>
           <label class="browser-secret-password">
-            <span class="browser-secret-label">Password</span>
+            <span class="browser-secret-label">{t("browser.secret.password")}</span>
             <Input
-              aria-label="Password"
+              aria-label={t("browser.secret.password")}
               type="password"
               autocomplete="off"
               maxlength={4096}
@@ -149,7 +159,7 @@ export function BrowserSecretCard(props: {
         <figure class="browser-takeover-preview">
           <figcaption class="browser-takeover-preview-bar">
             <Monitor aria-hidden="true" />
-            <span>Sign-in page</span>
+            <span>{t("browser.secret.signInPage")}</span>
             <small>{props.request.secret?.origin}</small>
           </figcaption>
           <Show
@@ -159,7 +169,7 @@ export function BrowserSecretCard(props: {
                 <BrowserTakeoverPreview
                   preview={preview()}
                   previewStatus={previewStatus()}
-                  page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+                  page={{ title: t("browser.secret.signInPage"), host: props.request.secret?.origin ?? "" }}
                 />
               </div>
             }
@@ -168,17 +178,17 @@ export function BrowserSecretCard(props: {
               variant="ghost"
               type="button"
               class="browser-takeover-preview-viewport browser-takeover-preview-open"
-              aria-label="Open sign-in page in browser"
+              aria-label={t("browser.secret.openSignInPage")}
               onClick={() => props.onOpen?.()}
             >
               <BrowserTakeoverPreview
                 preview={preview()}
                 previewStatus={previewStatus()}
-                page={{ title: "Sign-in page", host: props.request.secret?.origin ?? "" }}
+                page={{ title: t("browser.secret.signInPage"), host: props.request.secret?.origin ?? "" }}
               />
               <span class="browser-takeover-preview-open-label" aria-hidden="true">
                 <Maximize2 />
-                Open in browser
+                {t("browser.secret.openInBrowser")}
               </span>
             </Button>
           </Show>
@@ -186,13 +196,13 @@ export function BrowserSecretCard(props: {
       </Show>
       <footer class="browser-takeover-actions">
         <Button type="submit" disabled={pending() || !valid()}>
-          {pending() ? "Submitting…" : "Submit"}
+          {pending() ? t("browser.secret.submitting") : t("browser.secret.submit")}
         </Button>
         <Button type="button" variant="secondary" disabled={pending()} onClick={() => void respond("cancel")}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="button" variant="secondary" disabled={pending()} onClick={() => void respond("takeover")}>
-          Take over
+          {t("browser.secret.takeOver")}
         </Button>
       </footer>
     </form>

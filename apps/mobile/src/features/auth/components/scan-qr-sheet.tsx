@@ -17,6 +17,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 
 import { QrScanner } from "@/features/auth/components/qr-scanner";
+import { useText } from "@/shared/lib/text";
 import { ScanQrButton } from "./scan-qr-button";
 import { ScannerCloseButton } from "./scanner-close-button";
 
@@ -41,6 +42,7 @@ export function ScanQrSheet({
   onClose: () => void;
   onScan: (data: string, beforeConnect: () => Promise<void>) => Promise<void>;
 }) {
+  const { t } = useText();
   const [phase, setPhase] = useState<"opening" | "open" | "closing" | "closed">("opening");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -226,7 +228,7 @@ export function ScanQrSheet({
                     className="absolute inset-x-0 top-0 flex-row items-center justify-between gap-3 px-5 py-3"
                   >
                     <Typography.Heading type="h4" className={camera ? "text-white" : undefined}>
-                      Scan QR code
+                      {t("mobile.auth.scanQrCode")}
                     </Typography.Heading>
                     <ScannerCloseButton disabled={busy} onPress={close} />
                   </View>

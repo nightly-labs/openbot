@@ -6,6 +6,7 @@ import type {
   SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeSaveAgentProfileResult } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentStore } from "../agent-store";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
 
@@ -52,13 +53,13 @@ export class ProfileSave {
     const receipt = this.store.database.commandResult(commandId);
     if (receipt !== undefined) {
       const saved = decodeSaveAgentProfileResult(receipt);
-      if (input.agentId && saved.agent.id !== input.agentId) throw new Error("This save belongs to another agent.");
+      if (input.agentId && saved.agent.id !== input.agentId) throw new Error(sourceText("error.agent.saveOtherAgent"));
       const agent = this.store.list().find((candidate) => candidate.id === saved.agent.id);
-      if (!agent) throw new Error("The saved agent no longer exists.");
+      if (!agent) throw new Error(sourceText("error.agent.savedGone"));
       return { agent, layout: sidebar.getSnapshot() };
     }
     const previous = input.agentId ? this.store.list().find((agent) => agent.id === input.agentId) : null;
-    if (input.agentId && !previous) throw new Error("This agent no longer exists.");
+    if (input.agentId && !previous) throw new Error(sourceText("error.agent.gone"));
     let created: AgentSummary | null = null;
     const oldAvatar = previous ? this.store.resolveAvatar(previous.id) : null;
     const result = await sidebar.withProfileAssignment(input.draft.sectionId, async (assign) => {

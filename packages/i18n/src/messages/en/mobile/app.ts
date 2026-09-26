@@ -1,3 +1,28 @@
 import { defineMessages } from "../../../message";
 
-export const messages = defineMessages("mobile.app", {});
+export const messages = defineMessages("mobile.app", {
+  "mobile.app.route.scanQrCode": "Scan QR code",
+  "mobile.app.route.actionsNeeded": "Actions needed",
+  "mobile.app.route.newChannel": "New channel",
+  "mobile.app.route.createAgent": "Create an agent",
+  "mobile.app.route.newSection": "New section",
+  "mobile.app.route.settings": "Settings",
+  "mobile.app.route.profile": "Profile",
+  "mobile.app.route.general": "General",
+  "mobile.app.route.accountSessions": "Account sessions",
+  "mobile.app.route.about": "About",
+  "mobile.app.route.hiddenChats": "Hidden chats",
+  "mobile.app.route.deletedChannels": "Deleted channels",
+  "mobile.app.route.cropPhoto": "Move and Scale",
+  "mobile.app.route.queuedMessages": "Queued messages",
+  "mobile.app.route.messageOptions": "Message options",
+  "mobile.app.route.editMessage": "Edit message",
+  "mobile.app.route.serverOptions": "Server options",
+  "mobile.app.route.members": "Members",
+  "mobile.app.route.message": "Message",
+  "mobile.app.messageActions.reply": "Reply",
+  "mobile.app.messageActions.selectText": "Select Text",
+  "mobile.app.messageActions.copied": "Message copied",
+  "mobile.app.messageActions.copy": "Copy message",
+  "mobile.app.messageActions.text": "Message text",
+});

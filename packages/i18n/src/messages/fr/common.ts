@@ -20,4 +20,10 @@ export const messages = {
   "common.open": "Ouvrir",
   "common.search": "Rechercher",
   "common.loading": "Chargement…",
+  "common.saving": "Enregistrement…",
+  "common.tryAgain": "Réessayer",
+  "common.connecting": "Connexion…",
+  "common.download": "Télécharger",
+  "common.removing": "Suppression…",
+  "common.sending": "Envoi…",
 } as const satisfies PartialTranslation<typeof source>;

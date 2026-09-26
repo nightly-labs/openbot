@@ -7,4 +7,5 @@ export const messages = {
   "menu.stopAllAgents": "Arrêter tous les agents",
   "menu.checkForUpdates": "Rechercher des mises à jour…",
   "menu.preferences": "Réglages…",
+  "menu.copyLink": "Copier le lien",
 } as const satisfies PartialTranslation<typeof source>;

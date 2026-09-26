@@ -4,6 +4,7 @@ import {
   encodeTeamProtocolV2FileChunk,
   encodeTeamProtocolV2Frame,
 } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 
 // Native/DOM bridge copies Base64 strings. Keep its working set below the host's larger file limit.
 export const MOBILE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -18,7 +19,7 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
   return {
     async cancelUpload() {
       for (const [transferId, transfer] of pending) {
-        transfer.error = new Error("The attachment upload was cancelled.");
+        transfer.error = new Error(sourceText("error.remote.uploadCancelled"));
         transfer.reject(transfer.error);
         await send(encodeTeamProtocolV2Frame({ version: 2, type: "file-cancel", transferId, reason: "Cancelled" }));
       }
@@ -29,13 +30,13 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
       if (!transfer) return;
       if (frame.type === "file-ack") transfer.opened();
       if (frame.type === "file-cancel") {
-        transfer.error = new Error("The host rejected the attachment.");
+        transfer.error = new Error(sourceText("error.remote.attachmentRejected"));
         transfer.reject(transfer.error);
       }
     },
     cancel() {
       for (const transfer of pending.values()) {
-        transfer.error = new Error("The attachment connection closed.");
+        transfer.error = new Error(sourceText("error.remote.attachmentConnectionClosed"));
         transfer.reject(transfer.error);
       }
       pending.clear();
@@ -43,11 +44,11 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
     /** `onProgress` hears the bytes sent after each chunk, for a person watching the file go. */
     async upload(input: RemoteFileUpload, onProgress?: (sent: number, total: number) => void) {
       if (input.base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-        throw new Error("Attachments must be 10 MB or smaller.");
+        throw new Error(sourceText("error.remote.attachmentTooLarge"));
       const decoded = atob(input.base64);
       const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
-      if (bytes.length > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
-      if (pending.size !== 0) throw new Error("Wait for the current attachment to finish.");
+      if (bytes.length > MOBILE_ATTACHMENT_BYTES) throw new Error(sourceText("error.remote.attachmentTooLarge"));
+      if (pending.size !== 0) throw new Error(sourceText("error.remote.attachmentBusy"));
       const transferId = createId();
       let opened = () => {};
       let reject = (_error: Error) => {};
@@ -62,7 +63,7 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
       };
       pending.set(transferId, transfer);
       const timer = setTimeout(() => {
-        transfer.error = new Error("The attachment upload timed out.");
+        transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
         reject(transfer.error);
       }, 60_000);
       try {

@@ -1,4 +1,5 @@
 import type { QueueDeliveryStatus } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
   CalendarClock,
@@ -27,6 +28,7 @@ import type {
   ChatActionMarkerStatus,
   RoutineRunMarkerTransition,
 } from "../../data";
+import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { formatChatTimestamp } from "./chat-timestamp";
@@ -42,20 +44,21 @@ interface ChatActionMarkerProps {
   onOpenHostedSite?: (url: string) => void;
 }
 
-const STATUS_LABELS: Record<ChatActionMarkerStatus, string> = {
-  queued: "Queued",
-  "in-progress": "In progress",
-  "needs-attention": "Needs attention",
-  completed: "Completed",
-  partial: "Partial",
-  failed: "Failed",
-  interrupted: "Interrupted",
-  cancelled: "Cancelled",
-  unavailable: "Unavailable",
-};
+const STATUS_LABELS = {
+  queued: "chat.marker.status.queued",
+  "in-progress": "chat.marker.status.inProgress",
+  "needs-attention": "chat.marker.status.needsAttention",
+  completed: "chat.marker.status.completed",
+  partial: "chat.marker.status.partial",
+  failed: "chat.marker.status.failed",
+  interrupted: "chat.marker.status.interrupted",
+  cancelled: "chat.marker.status.cancelled",
+  unavailable: "chat.marker.status.unavailable",
+} as const satisfies Record<ChatActionMarkerStatus, AppTextKey>;
 
 export function ChatActionMarker(props: ChatActionMarkerProps) {
-  const label = () => markerLabel(props.marker);
+  const { t, format } = useText();
+  const label = () => markerLabel(props.marker, t);
   const [historyExpanded, setHistoryExpanded] = createSignal(false);
   /* The list leaves with an animation of its own, so it stays mounted until that
      animation ends. Without motion there is nothing to wait for. */
@@ -73,7 +76,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
       role={props.announce ? "status" : "group"}
       aria-live={props.announce ? "polite" : "off"}
-      aria-label={markerAccessibleLabel(props.marker, props.agents)}
+      aria-label={markerAccessibleLabel(props.marker, props.agents, t)}
     >
       <div class="chat-action-marker-summary">
         <MarkerContent class="chat-action-marker-content">
@@ -119,7 +122,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
             {(marker) => (
               <ActionTarget
                 available={Boolean(props.onOpenSkill)}
-                actionLabel={`Open skill ${marker().skillName}`}
+                actionLabel={t("chat.marker.openSkill", { name: marker().skillName })}
                 name={marker().skillName}
                 icon={Puzzle}
                 onOpen={props.onOpenSkill ? () => props.onOpenSkill?.({ skillId: marker().skillId }) : undefined}
@@ -127,7 +130,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
             )}
           </Show>
           <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
-            {formatMarkerTime(props.marker.timestamp)}
+            {formatMarkerTime(props.marker.timestamp, t, format)}
           </time>
           <Show when={(routineHistory()?.length ?? 0) > 0}>
             <Button
@@ -137,9 +140,15 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
               type="button"
               aria-expanded={historyExpanded() ? "true" : "false"}
               aria-controls={historyId()}
-              aria-label={`${historyExpanded() ? "Hide" : "Show"} history for ${
-                props.marker.kind === "routine-run" ? props.marker.routineName : "routine"
-              }`}
+              aria-label={
+                props.marker.kind === "routine-run"
+                  ? historyExpanded()
+                    ? t("chat.marker.hideHistory", { name: props.marker.routineName })
+                    : t("chat.marker.showHistory", { name: props.marker.routineName })
+                  : historyExpanded()
+                    ? t("chat.marker.hideRoutineHistory")
+                    : t("chat.marker.showRoutineHistory")
+              }
               onClick={toggleHistory}
             >
               <ChevronDown aria-hidden="true" />
@@ -167,6 +176,7 @@ function RoutineRunHistory(props: {
   open: boolean;
   onClosed: () => void;
 }) {
+  const { t, format } = useText();
   return (
     <div
       class="chat-action-history-panel"
@@ -180,7 +190,7 @@ function RoutineRunHistory(props: {
       }}
     >
       <div class="chat-action-history-clip">
-        <ol id={props.id} class="chat-action-history" aria-label="Earlier routine states">
+        <ol id={props.id} class="chat-action-history" aria-label={t("chat.marker.earlierStates")}>
           <For each={props.transitions}>
             {(transition, index) => {
               const previous = () => props.transitions[index() - 1];
@@ -190,8 +200,8 @@ function RoutineRunHistory(props: {
                   <MarkerIcon class="chat-action-history-icon">
                     <Dynamic component={routineHistoryIcon(transition.status)} aria-hidden="true" />
                   </MarkerIcon>
-                  <span>{routineHistoryLabel(transition.status, previous()?.status)}</span>
-                  <time datetime={transition.timestamp}>{formatMarkerTime(transition.timestamp)}</time>
+                  <span>{routineHistoryLabel(transition.status, previous()?.status, t)}</span>
+                  <time datetime={transition.timestamp}>{formatMarkerTime(transition.timestamp, t, format)}</time>
                 </li>
               );
             }}
@@ -206,6 +216,7 @@ function HostedSiteTarget(props: {
   marker: Extract<ChatActionMarkerModel, { kind: "hosted-site" }>;
   onOpenHostedSite?: (url: string) => void;
 }) {
+  const { t } = useText();
   const name = () => props.marker.hostname ?? props.marker.title;
   const status = () => hostedSiteMarkerStatus(props.marker.status);
   const interactive = () =>
@@ -230,7 +241,7 @@ function HostedSiteTarget(props: {
         variant="ghost"
         type="button"
         class={`chat-action-target chat-action-target-status-${status()}`}
-        aria-label={`Open site ${name()}`}
+        aria-label={t("chat.marker.openSite", { name: name() })}
         onClick={() => {
           if (props.marker.url) props.onOpenHostedSite?.(props.marker.url);
         }}
@@ -246,6 +257,7 @@ function AgentTarget(props: {
   agents: AgentProfile[];
   onSelectAgent: (agentId: string) => void;
 }) {
+  const { t } = useText();
   const source = () => props.agents.find((agent) => agent.id === props.marker.sourceAgentId);
   const recipients = () => props.marker.targetDeliveries;
   const singleRecipient = () => {
@@ -286,7 +298,7 @@ function AgentTarget(props: {
                 )}
               </For>
             </span>
-            <span>{recipients().length} agents</span>
+            <span>{t("chat.marker.agentCount", { count: recipients().length })}</span>
           </DropdownMenu.Trigger>
           <DropdownMenu.Content class="chat-action-agent-menu">
             <For each={recipients()}>
@@ -299,8 +311,10 @@ function AgentTarget(props: {
                     onSelect={() => props.onSelectAgent(delivery.agentId)}
                   >
                     <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
-                    <span class="chat-action-agent-menu-name">{agent()?.name ?? "Unavailable agent"}</span>
-                    <span class="chat-action-agent-menu-status">{deliveryStatusLabel(delivery.status)}</span>
+                    <span class="chat-action-agent-menu-name">
+                      {agent()?.name ?? t("chat.marker.unavailableAgent")}
+                    </span>
+                    <span class="chat-action-agent-menu-status">{deliveryStatusLabel(delivery.status, t)}</span>
                   </DropdownMenu.Item>
                 );
               }}
@@ -317,13 +331,14 @@ function AgentButton(props: {
   fallbackId: string | undefined;
   onSelectAgent: (agentId: string) => void;
 }) {
+  const { t } = useText();
   return (
     <Show
       when={props.agent}
       fallback={
         <span class="chat-action-target chat-action-target-unavailable" title={props.fallbackId}>
           <AgentAvatar class="chat-action-agent-avatar" />
-          <span>Unavailable agent</span>
+          <span>{t("chat.marker.unavailableAgent")}</span>
         </span>
       }
     >
@@ -333,7 +348,7 @@ function AgentButton(props: {
           type="button"
           class="chat-action-target"
           style={agentTargetStyle(agent())}
-          aria-label={`Open chat with ${agent().name}`}
+          aria-label={t("chat.marker.openChat", { name: agent().name })}
           onClick={() => props.onSelectAgent(agent().id)}
         >
           <AgentAvatar agent={agent()} class="chat-action-agent-avatar" />
@@ -352,13 +367,14 @@ function RoutineTarget(props: {
   available: boolean;
   onOpenRoutine?: (routine: { routineId: string; name: string }) => void;
 }) {
+  const { t } = useText();
   return (
     <ActionTarget
       name={props.routineName}
       icon={props.icon ?? CalendarClock}
       status={props.status}
       available={props.available}
-      actionLabel={`Open routine ${props.routineName}`}
+      actionLabel={t("chat.marker.openRoutine", { name: props.routineName })}
       onOpen={
         props.onOpenRoutine
           ? () => props.onOpenRoutine?.({ routineId: props.routineId, name: props.routineName })
@@ -376,6 +392,7 @@ function ActionTarget(props: {
   actionLabel: string;
   onOpen?: () => void;
 }) {
+  const { t } = useText();
   const interactive = () => props.available && Boolean(props.onOpen);
   const content = (
     <>
@@ -393,7 +410,7 @@ function ActionTarget(props: {
           class={`chat-action-target chat-action-target-unavailable${props.status ? ` chat-action-target-status-${props.status}` : ""}`}
         >
           {content}
-          <span class="sr-only">Unavailable</span>
+          <span class="sr-only">{t("chat.marker.unavailable")}</span>
         </span>
       }
     >
@@ -410,50 +427,57 @@ function ActionTarget(props: {
   );
 }
 
-function markerLabel(marker: ChatActionMarkerModel): string {
+const SKILL_ACTION_LABELS = {
+  created: "chat.marker.skill.created",
+  revised: "chat.marker.skill.revised",
+  installed: "chat.marker.skill.installed",
+} as const satisfies Record<Extract<ChatActionMarkerModel, { kind: "skill-lifecycle" }>["action"], AppTextKey>;
+
+function markerLabel(marker: ChatActionMarkerModel, t: AppTranslate): string {
   if (marker.kind === "unavailable") return marker.label;
-  if (marker.kind === "skill-lifecycle")
-    return { created: "Created skill", revised: "Revised skill", installed: "Installed skill" }[marker.action];
+  if (marker.kind === "skill-lifecycle") return t(SKILL_ACTION_LABELS[marker.action]);
   if (marker.kind === "agent-message") {
-    if (marker.expectsReply) return marker.direction === "outgoing" ? "Messaged" : "Message from";
-    return marker.direction === "outgoing" ? "Informed" : "Update from";
+    if (marker.expectsReply)
+      return marker.direction === "outgoing" ? t("chat.marker.messaged") : t("chat.marker.messageFrom");
+    return marker.direction === "outgoing" ? t("chat.marker.informed") : t("chat.marker.updateFrom");
   }
-  if (marker.kind === "channel-routing") return marker.action === "assigned" ? "Assigned to" : "Continuing with";
+  if (marker.kind === "channel-routing")
+    return marker.action === "assigned" ? t("chat.marker.assignedTo") : t("chat.marker.continuingWith");
   if (marker.kind === "routine-lifecycle") {
     return marker.action === "created"
-      ? "Created routine"
+      ? t("chat.marker.routine.created")
       : marker.action === "updated"
-        ? "Updated routine"
-        : "Deleted routine";
+        ? t("chat.marker.routine.updated")
+        : t("chat.marker.routine.deleted");
   }
   if (marker.kind === "hosted-site") {
     if (marker.action === "publish") {
-      if (marker.status === "running") return "Deploying site";
-      if (marker.status === "succeeded") return "Published site";
-      if (marker.status === "failed") return "Site deploy failed";
-      if (marker.status === "interrupted") return "Site deploy interrupted";
-      return "Site deploy cancelled";
+      if (marker.status === "running") return t("chat.marker.site.deploying");
+      if (marker.status === "succeeded") return t("chat.marker.site.published");
+      if (marker.status === "failed") return t("chat.marker.site.deployFailed");
+      if (marker.status === "interrupted") return t("chat.marker.site.deployInterrupted");
+      return t("chat.marker.site.deployCancelled");
     }
     if (marker.action === "replace") {
-      if (marker.status === "running") return "Updating site";
-      if (marker.status === "succeeded") return "Updated site";
-      if (marker.status === "failed") return "Site update failed";
-      if (marker.status === "interrupted") return "Site update interrupted";
-      return "Site update cancelled";
+      if (marker.status === "running") return t("chat.marker.site.updating");
+      if (marker.status === "succeeded") return t("chat.marker.site.updated");
+      if (marker.status === "failed") return t("chat.marker.site.updateFailed");
+      if (marker.status === "interrupted") return t("chat.marker.site.updateInterrupted");
+      return t("chat.marker.site.updateCancelled");
     }
-    if (marker.status === "running") return "Deleting site";
-    if (marker.status === "succeeded") return "Deleted site";
-    if (marker.status === "failed") return "Site deletion failed";
-    if (marker.status === "interrupted") return "Site deletion interrupted";
-    return "Site deletion cancelled";
+    if (marker.status === "running") return t("chat.marker.site.deleting");
+    if (marker.status === "succeeded") return t("chat.marker.site.deleted");
+    if (marker.status === "failed") return t("chat.marker.site.deleteFailed");
+    if (marker.status === "interrupted") return t("chat.marker.site.deleteInterrupted");
+    return t("chat.marker.site.deleteCancelled");
   }
-  if (marker.status === "queued") return "Invoked routine";
-  if (marker.status === "running") return "Running routine";
-  if (marker.status === "needs-attention") return "Routine needs attention";
-  if (marker.status === "succeeded") return "Completed routine";
-  if (marker.status === "failed") return "Routine failed";
-  if (marker.status === "interrupted") return "Routine interrupted";
-  return "Cancelled routine";
+  if (marker.status === "queued") return t("chat.marker.run.invoked");
+  if (marker.status === "running") return t("chat.marker.run.running");
+  if (marker.status === "needs-attention") return t("chat.marker.run.needsAttention");
+  if (marker.status === "succeeded") return t("chat.marker.run.completed");
+  if (marker.status === "failed") return t("chat.marker.run.failed");
+  if (marker.status === "interrupted") return t("chat.marker.run.interrupted");
+  return t("chat.marker.run.cancelled");
 }
 
 function agentTargetStyle(agent: AgentProfile | undefined): string | undefined {
@@ -470,24 +494,27 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
   return mixedColor ? `--chat-action-agent-color: ${mixedColor}` : undefined;
 }
 
-function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfile[]): string {
-  const label = markerLabel(marker);
+function markerAccessibleLabel(marker: ChatActionMarkerModel, agents: AgentProfile[], t: AppTranslate): string {
+  const label = markerLabel(marker, t);
   if (marker.kind === "unavailable") return label;
-  if (marker.kind === "skill-lifecycle") return `${label}, ${marker.skillName}`;
+  if (marker.kind === "skill-lifecycle") return t("chat.marker.accessible.named", { label, name: marker.skillName });
+  const unavailable = t("chat.marker.unavailableAgent");
   if (marker.kind === "agent-message") {
-    const agentLabel =
+    const agent =
       marker.direction === "incoming"
-        ? (agents.find((agent) => agent.id === marker.sourceAgentId)?.name ?? "Unavailable agent")
+        ? (agents.find((candidate) => candidate.id === marker.sourceAgentId)?.name ?? unavailable)
         : marker.targetDeliveries.length === 1
-          ? (agents.find((agent) => agent.id === marker.targetDeliveries[0]?.agentId)?.name ?? "Unavailable agent")
-          : `${marker.targetDeliveries.length} agents`;
-    return `${label} ${agentLabel}, ${STATUS_LABELS[marker.status]}`;
+          ? (agents.find((candidate) => candidate.id === marker.targetDeliveries[0]?.agentId)?.name ?? unavailable)
+          : t("chat.marker.agentCount", { count: marker.targetDeliveries.length });
+    return t("chat.marker.accessible.message", { label, agent, status: t(STATUS_LABELS[marker.status]) });
   }
   if (marker.kind === "channel-routing") {
-    return `${label} ${agents.find((agent) => agent.id === marker.agentId)?.name ?? "Unavailable agent"}`;
+    const agent = agents.find((candidate) => candidate.id === marker.agentId)?.name ?? unavailable;
+    return t("chat.marker.accessible.routing", { label, agent });
   }
-  if (marker.kind === "hosted-site") return `${label}, ${marker.hostname ?? marker.title}`;
-  return `${label}, ${marker.routineName}`;
+  if (marker.kind === "hosted-site")
+    return t("chat.marker.accessible.named", { label, name: marker.hostname ?? marker.title });
+  return t("chat.marker.accessible.named", { label, name: marker.routineName });
 }
 
 function hostedSiteMarkerStatus(
@@ -516,14 +543,16 @@ function routineMarkerStatus(
 function routineHistoryLabel(
   status: RoutineRunMarkerTransition["status"],
   previousStatus: RoutineRunMarkerTransition["status"] | undefined,
+  t: AppTranslate,
 ) {
-  if (status === "queued") return "Invoked";
-  if (status === "running") return previousStatus === "needs-attention" ? "Resumed" : "Started";
-  if (status === "needs-attention") return "Needed attention";
-  if (status === "succeeded") return "Completed";
-  if (status === "failed") return "Failed";
-  if (status === "interrupted") return "Interrupted";
-  return "Cancelled";
+  if (status === "queued") return t("chat.marker.history.invoked");
+  if (status === "running")
+    return previousStatus === "needs-attention" ? t("chat.marker.history.resumed") : t("chat.marker.history.started");
+  if (status === "needs-attention") return t("chat.marker.history.neededAttention");
+  if (status === "succeeded") return t("chat.marker.history.completed");
+  if (status === "failed") return t("chat.marker.history.failed");
+  if (status === "interrupted") return t("chat.marker.history.interrupted");
+  return t("chat.marker.history.cancelled");
 }
 
 function routineHistoryIcon(status: RoutineRunMarkerTransition["status"]) {
@@ -535,9 +564,9 @@ function routineHistoryIcon(status: RoutineRunMarkerTransition["status"]) {
   return CirclePause;
 }
 
-function deliveryStatusLabel(status: QueueDeliveryStatus): string {
-  if (status === "starting" || status === "running") return "In progress";
-  return STATUS_LABELS[status];
+function deliveryStatusLabel(status: QueueDeliveryStatus, t: AppTranslate): string {
+  if (status === "starting" || status === "running") return t(STATUS_LABELS["in-progress"]);
+  return t(STATUS_LABELS[status]);
 }
 
 function statusIcon(status: ChatActionMarkerStatus) {
@@ -550,8 +579,8 @@ function statusIcon(status: ChatActionMarkerStatus) {
   return MessageCircle;
 }
 
-function formatMarkerTime(value: string): string {
+function formatMarkerTime(value: string, t: AppTranslate, format: AppFormat): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown time";
-  return formatChatTimestamp(date);
+  if (Number.isNaN(date.getTime())) return t("chat.marker.unknownTime");
+  return formatChatTimestamp(date, format);
 }

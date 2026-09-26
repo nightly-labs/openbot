@@ -1,4 +1,60 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  // Skill package, library, and marketplace errors.
+  "error.skill.symlinks": "スキルパッケージにシンボリックリンクを含めることはできません。",
+  "error.skill.expandedTooLarge": "展開後のスキルは 10 MB 未満である必要があります。",
+  "error.skill.irregularEntry": "スキルパッケージに含められるのは通常のファイルとフォルダーのみです。",
+  "error.skill.packageTooLarge": "スキルパッケージは 10 MB 未満である必要があります。",
+  "error.skill.missingSkillFile": "スキルパッケージのルートに SKILL.md が必要です。",
+  "error.skill.frontmatterMissing": "SKILL.md は YAML フロントマターで始まる必要があります。",
+  "error.skill.metadataInvalid": "SKILL.md のメタデータが無効です。",
+  "error.skill.nameAndDescriptionRequired": "SKILL.md には有効な名前と説明が必要です。",
+  "error.skill.zipInvalid": "選択した ZIP は無効です。",
+  "error.skill.fileCountInvalid": "スキルパッケージのファイル数が無効です。",
+  "error.skill.slugInvalid": "このスキル名からは有効なスラッグを作成できません。",
+  "error.skill.tooManyFiles": "スキルに含められるファイルは {limit} 個までです。",
+  "error.skill.unsafeFile": "スキルパッケージに安全でないファイルが含まれています: {name}",
+  "error.skill.markdownTooLarge": "SKILL.md が 256 KB を超えています。",
+  "error.skill.markdownUnreadable": "SKILL.md を読み取れませんでした。",
+  "error.skill.frontmatterInvalid": "SKILL.md のフロントマターが有効な YAML ではありません。",
+  "error.skill.descriptionLength": "SKILL.md には 1〜{limit} 文字の説明が必要です。",
+  "error.skill.nameMismatch": "SKILL.md にはフォルダー名と同じ「name: {slug}」が必要です。",
+  "error.skill.draftExpired": "選択したスキルパッケージの有効期限が切れました。もう一度選択してください。",
+  "error.skill.localHasNoVersion": "公開済みのバージョンがないローカルスキルがあります。",
+  "error.skill.publishLocalFirst": "このエージェントを公開する前に、ローカルスキルを個別に公開してください。",
+  "error.skill.bundleMismatch": "ダウンロードしたスキルが、署名済みのカタログ記録と一致しませんでした。",
+  "error.skill.metadataMismatch": "ダウンロードしたスキルのメタデータがカタログと一致しません。",
+  "error.skill.folderTaken": "このフォルダー名は、インストール済みの別のスキルが使用しています。",
+  "error.skill.replaceModified": "このスキルにはローカルの変更があります。続けるには置き換えを確認してください。",
+  "error.skill.removeModified": "このスキルにはローカルの変更があります。変更を削除するには削除を確認してください。",
+  "error.skill.notFound": "スキルが見つかりません。",
+  "error.skill.disableModified":
+    "このスキルにはローカルの変更があります。無効にする前に、両方のプロバイダーのコピーを保存するか一致させてください。",
+  "error.skill.disableNeedsRepair": "このスキルを無効にするには、先に修復が必要です。",
+  "error.skill.enableNeedsRepair": "このスキルを有効にするには、先に修復が必要です。",
+  "error.skill.providerFolderOccupied":
+    "このスキルのプロバイダーフォルダーは使用中です。有効にする前に、そのファイルを移動するか一致させてください。",
+  "error.skill.chooseLocalAgent": "先にローカルエージェントを選択してください。",
+  "error.skill.localLibraryUnavailable": "ローカルスキルライブラリを利用できません。",
+  "error.skill.lockInvalid": "インストール済みスキルの記録が無効です。変更せずにそのままにしました。",
+  "error.skill.installPathSymlink": "スキルのインストールパスにシンボリックリンクを含めることはできません。",
+  "error.skill.duplicateSlug":
+    "「{slug}」という名前のスキルが 2 つあります。公開する前にどちらかの名前を変更してください。",
+  "error.skill.publishNeedsRepair": "{name} にはローカルの変更があるか、公開前に修復が必要です。",
+  "error.skill.publishUntracked":
+    "{name} は正確なバージョン追跡の導入前にインストールされました。公開する前にアップデートまたは修復してください。",
+  "error.skill.tooManySkills": "エージェントに追加できるスキルは {limit} 個までです。",
+  "error.skill.unmanagedExists": "管理されていないスキルが {path} にすでに存在します。",
+  "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md が 64 KB を超えています。公開する前に短くしてください。",
+  "error.skill.localNoRevisions": "ローカルスキルに公開済みのリビジョンがありません。",
+  "error.skill.localNameTaken": "この名前のローカルスキルはすでに存在します。代わりにそのスキルを改訂してください。",
+  "error.skill.localKeepName": "スキルを改訂するときは、スキル名を変更しないでください。",
+  "error.skill.localRelativeFolder":
+    "現在のエージェントのワークスペース内にある、相対パスのスキルフォルダーを使用してください。",
+  "error.skill.localSourceOutside": "スキルのソースはエージェントのワークスペース内にある必要があります。",
+  "error.skill.localSourceNotFolder": "スキルのソースはフォルダーである必要があります。",
+  "error.skill.localMissingSkillFile": "スキルフォルダーのルートに SKILL.md が必要です。",
+  "error.skill.pathSymlink": "スキルのパスにシンボリックリンクを含めることはできません。",
+} as const satisfies PartialTranslation<typeof source>;

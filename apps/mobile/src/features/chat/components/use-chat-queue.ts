@@ -1,13 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
-import { userErrorMessage } from "@openbot/user-errors";
+import { type MobileTextKey, sourceText } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { currentText, useText } from "@/shared/lib/text";
 import {
   readQueueAttachment,
   removeQueueAttachment,
@@ -18,16 +19,24 @@ import {
   decodeQueueEditDraft,
   orderedQueue,
   type QueueEditDraft,
+  QueueEditDraftError,
   type StoredQueueAttachment,
 } from "../model/queue-edit-draft";
-import { uploadChatAttachments } from "../model/upload-chat-attachments";
+import { ChatUploadCancelledError, uploadChatAttachments } from "../model/upload-chat-attachments";
 import type { ChatAttachment } from "./use-chat-attachments";
 
 const EMPTY_DELIVERIES: QueueDelivery[] = [];
 
+const DRAFT_ERROR_KEYS = {
+  edit: "mobile.chat.queue.readEditFailed",
+  attachments: "mobile.chat.queue.readAttachmentsFailed",
+  pendingSave: "mobile.chat.queue.readPendingSaveFailed",
+} as const satisfies Record<QueueEditDraftError["part"], MobileTextKey>;
+
 export function useChatQueue(agentId: string, serverId: string, online: boolean, activeTurnId: string | null) {
   const { loadQueue, changeQueue, editQueue, canEditQueue, uploadAttachment, discardAttachment, attachmentSupport } =
     useMobileWorkspace();
+  const text = useText();
   const { session } = useMobileSession();
   const storageKey = `queue-edit.${session?.user.id}.${serverId}.${agentId}`;
   const queryClient = useQueryClient();
@@ -38,7 +47,14 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
     try {
       return { edit: decodeQueueEditDraft(SecureStore.getItem(storageKey)), error: null };
     } catch (cause) {
-      return { edit: null, error: userErrorMessage(cause, "Could not read the saved queue edit.") };
+      const { t, errorMessage } = currentText();
+      return {
+        edit: null,
+        error:
+          cause instanceof QueueEditDraftError
+            ? t(DRAFT_ERROR_KEYS[cause.part])
+            : errorMessage(cause, t("mobile.chat.queue.readEditFailed")),
+      };
     }
   });
   const [edit, setEdit] = useState<QueueEditDraft | null>(restored.edit);
@@ -71,7 +87,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
         if (editRef.current !== edit) return;
         SecureStore.setItem(storageKey, JSON.stringify(edit));
       } catch (cause) {
-        setError(userErrorMessage(cause, "Could not save the edit on this phone."));
+        const { t, errorMessage } = currentText();
+        setError(errorMessage(cause, t("mobile.chat.queue.saveEditFailed")));
       }
     }, 300);
     return () => clearTimeout(timer);
@@ -101,7 +118,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       if (busyRef.current) return false;
       // A silent refusal leaves a screen that waits for this result with nothing to show.
       if (!online) {
-        setError("Reconnect to change the queue.");
+        setError(currentText().t("mobile.chat.queue.reconnect"));
         return false;
       }
       busyRef.current = true;
@@ -111,7 +128,12 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
         await action();
         return true;
       } catch (cause) {
-        setError(userErrorMessage(cause, "Could not change the queue. Refresh and try again."));
+        const { t, errorMessage } = currentText();
+        setError(
+          cause instanceof ChatUploadCancelledError
+            ? t("mobile.chat.upload.cancelled")
+            : errorMessage(cause, t("mobile.chat.queue.changeFailed")),
+        );
         return false;
       } finally {
         busyRef.current = false;
@@ -164,7 +186,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
           const currentDelivery = currentQueue.deliveries.find(
             (item) => item.id === delivery.id && item.status === "queued",
           );
-          if (!currentDelivery) throw new Error("This queued message is no longer available.");
+          if (!currentDelivery) throw new Error(sourceText("error.backend.queuedMessageUnavailable"));
           const ready = {
             ...next,
             initialized: true,
@@ -184,7 +206,8 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
   const changeAttachments = useCallback(
     async (files: ChatAttachment[]) => {
       const current = editRef.current;
-      if (!current || busyRef.current || current.pendingSave) throw new Error("The edit is busy. Try again.");
+      if (!current || busyRef.current || current.pendingSave)
+        throw new Error(currentText().t("mobile.chat.queue.editBusy"));
       busyRef.current = true;
       setBusy(true);
       const created: StoredQueueAttachment[] = [];
@@ -199,7 +222,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
             addedAttachments.push(stored);
           }
         }
-        if (editRef.current?.editId !== current.editId) throw new Error("The queue edit has ended.");
+        if (editRef.current?.editId !== current.editId) throw new Error(currentText().t("mobile.chat.queue.editEnded"));
         const next = { ...editRef.current, addedAttachments };
         SecureStore.setItem(storageKey, JSON.stringify(next));
         editRef.current = next;
@@ -232,7 +255,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
           return;
         }
         if (edit.keepAttachmentIds.length + files.length > INPUT_LIMITS.attachments)
-          throw new Error(`You can attach up to ${INPUT_LIMITS.attachments} files.`);
+          throw new Error(currentText().t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments }));
         await uploadChatAttachments(files, {
           upload: async (file) => {
             const stored = edit.addedAttachments.find((item) => item.id === file.id);
@@ -302,7 +325,9 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       busy,
       progress,
       error:
-        error ?? restored.error ?? (query.error ? userErrorMessage(query.error, "Could not load the queue.") : null),
+        error ??
+        restored.error ??
+        (query.error ? text.errorMessage(query.error, text.t("mobile.chat.queue.loadFailed")) : null),
       loading: online && query.isPending,
       canEdit: canEditQueue(serverId),
       online,
@@ -386,6 +411,7 @@ export function useChatQueue(agentId: string, serverId: string, online: boolean,
       serverId,
       clearEdit,
       attachmentSupport,
+      text,
     ],
   );
 }

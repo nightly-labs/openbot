@@ -1,5 +1,6 @@
 // Publishing a local directory to a hosted site.
 
+import type { AppTranslate } from "@openbot/i18n";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import { parseDeleteHostedSite, parsePublishHostedSite, parseReplaceHostedSite } from "./app-inputs";
@@ -8,11 +9,13 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 export interface HostedSiteIpcDependencies {
   hostedSites: HostedSiteDesktopService;
   getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
 }
 
 export function hostedSiteIpcHandlers({
   hostedSites,
   getMainWindow,
+  translate,
 }: HostedSiteIpcDependencies): Pick<IpcGroupHandlers, "hostedSites"> {
   return {
     hostedSites: {
@@ -20,7 +23,7 @@ export function hostedSiteIpcHandlers({
       chooseDirectory: handler(async () => {
         const mainWindow = getMainWindow();
         const options: OpenDialogOptions = {
-          title: "Choose a static site directory",
+          title: translate("dialog.chooseSiteDirectory"),
           properties: ["openDirectory"],
         };
         const result = mainWindow

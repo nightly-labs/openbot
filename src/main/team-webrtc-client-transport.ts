@@ -24,6 +24,7 @@ import {
   decodeTeamProtocolV4WebRtcHttpResponse,
   encodeTeamProtocolV4WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import type {
   RemoteConnectionBootstrap,
   RemoteHostSummary,
@@ -190,7 +191,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   async leaveHost(hostId: string): Promise<void> {
     const host = (await this.#options.listHosts()).find((candidate) => candidate.hostId === hostId);
     if (!host) return;
-    if (host.role === "owner") throw new Error("The owner cannot leave this host.");
+    if (host.role === "owner") throw new Error(sourceText("error.remote.ownerCannotLeave"));
     await this.#options.removeMember(hostId, host.membershipId);
   }
 
@@ -284,7 +285,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     const result = new Promise<TeamProtocolV2Json>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.#pending.delete(requestId);
-        reject(new TeamWebRtcRequestError(504, "remote_timeout", "The remote request timed out."));
+        reject(new TeamWebRtcRequestError(504, "remote_timeout", sourceText("error.remote.requestTimeout")));
       }, TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS);
       this.#pending.set(requestId, { hostId, resolve, reject, timer });
     });
@@ -295,7 +296,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       if (pending) {
         clearTimeout(pending.timer);
         this.#pending.delete(requestId);
-        pending.reject(error instanceof Error ? error : new Error("The remote request failed."));
+        pending.reject(error instanceof Error ? error : new Error(sourceText("error.remote.requestFailed")));
       }
     }
     const envelope = await result;
@@ -394,7 +395,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
 
   async #connect(hostId: string, active: ActiveHost, existingSessionId: string | null): Promise<void> {
     const hostPublicKey = this.#hostPublicKeys.get(hostId);
-    if (!hostPublicKey) throw new Error("The remote host does not have a pinned device key.");
+    if (!hostPublicKey) throw new Error(sourceText("error.remote.pinnedKeyMissing"));
     const clientKeys = generateKeyPairSync("ed25519", {
       publicKeyEncoding: { type: "spki", format: "pem" },
       privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -445,7 +446,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       cleanupConnectionWait = cleanup;
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error("The WebRTC host did not connect."));
+        reject(new Error(sourceText("error.remote.hostDidNotConnect")));
       }, 30_000);
       const onConnected = (connectedHostId: string) => {
         if (connectedHostId !== hostId) return;
@@ -509,7 +510,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (!active.cancelled && this.#active.get(hostId) === active) return;
     await this.#options.bridge.disconnect(hostId).catch(() => undefined);
     await this.#options.endSession(sessionId).catch(() => undefined);
-    throw new Error("The remote connection was cancelled.");
+    throw new Error(sourceText("error.remote.connectionCancelled"));
   }
 
   async #sendEventControl(hostId: string, control: TeamProtocolV1CurrentEventControl): Promise<void> {
@@ -614,7 +615,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       if (pending.hostId !== hostId) continue;
       clearTimeout(pending.timer);
       this.#pending.delete(requestId);
-      pending.reject(new TeamWebRtcRequestError(503, "remote_disconnected", "The WebRTC host disconnected."));
+      pending.reject(
+        new TeamWebRtcRequestError(503, "remote_disconnected", sourceText("error.remote.hostDisconnected")),
+      );
     }
     this.emit("disconnected", hostId);
   };
@@ -767,7 +770,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (frame.sequence !== lastSequence + 1) {
-        this.#failProtocol(hostId, "The host event sequence has a gap.");
+        this.#failProtocol(hostId, sourceText("error.remote.eventGap"));
         return;
       }
       const optional = frame.type === "event" ? channelEvent(frame.payload) : null;
@@ -775,7 +778,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         ? { status: "known" as const, event: optional }
         : decodeTeamProtocolV4CurrentEvent(frame);
       if (decoded.status === "invalid") {
-        this.#failProtocol(hostId, "The host returned a malformed known event.");
+        this.#failProtocol(hostId, sourceText("error.remote.malformedKnownEvent"));
         return;
       }
       if (decoded.status === "known") this.emit("event", hostId, decoded.event);

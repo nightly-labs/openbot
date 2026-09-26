@@ -26,6 +26,7 @@ import { SplashBackdrop } from "@/shared/components/splash-backdrop";
 import { nativeSplash } from "@/shared/lib/native-splash";
 import { isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
+import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import {
   SplashContentReadyContext,
@@ -42,6 +43,7 @@ export const unstable_settings = {
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 
 function RootNavigator() {
+  const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
@@ -101,7 +103,7 @@ function RootNavigator() {
                     <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen
                       name="scan-qr-code"
-                      options={{ animation: "slide_from_right", title: "Scan QR code" }}
+                      options={{ animation: "slide_from_right", title: t("mobile.app.route.scanQrCode") }}
                     />
                   </Stack.Protected>
                   <Stack.Protected guard={Boolean(session)}>

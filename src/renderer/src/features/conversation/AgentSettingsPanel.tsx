@@ -5,6 +5,7 @@ import SharedAgentSettingsPanel, {
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
@@ -48,6 +49,7 @@ interface AgentSettingsPanelProps
 export type { AgentSkillsMode };
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
+  const { t } = useText();
   const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
   const [draft, setDraft] = createStore({
     tables: { count: 0, open: false },
@@ -179,11 +181,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         <Show when={!props.remoteClient}>
           <SettingsLinkGroup>
             <Show when={props.onOpenUsage}>
-              <SettingsLinkRow label="Usage" onClick={(trigger) => props.onOpenUsage?.(trigger)} />
+              <SettingsLinkRow
+                label={t("agentSettings.links.usage")}
+                onClick={(trigger) => props.onOpenUsage?.(trigger)}
+              />
             </Show>
             <SettingsLinkRow
-              label="Memories"
-              value={`${draft.memories.count} saved`}
+              label={t("agentSettings.links.memories")}
+              value={t("agentSettings.links.memoriesCount", { count: draft.memories.count })}
               onClick={() =>
                 setDraft((state) => {
                   state.memories.open = true;
@@ -192,8 +197,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             />
             <Show when={skillsMode() !== "hidden"}>
               <SettingsLinkRow
-                label="Skills"
-                value={`${draft.skills.count} assigned`}
+                label={t("agentSettings.links.skills")}
+                value={t("agentSettings.links.skillsCount", { count: draft.skills.count })}
                 onClick={() =>
                   setDraft((state) => {
                     state.skills.open = true;
@@ -203,8 +208,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             </Show>
             <Show when={props.tablesVisible !== false}>
               <SettingsLinkRow
-                label="Tables"
-                value={`${draft.tables.count} ${draft.tables.count === 1 ? "table" : "tables"}`}
+                label={t("agentSettings.links.tables")}
+                value={t("agentSettings.links.tablesCount", { count: draft.tables.count })}
                 onClick={() =>
                   setDraft((state) => {
                     state.tables.open = true;
@@ -214,7 +219,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             </Show>
             <Show when={props.files}>
               <SettingsLinkRow
-                label="Files"
+                label={t("agentSettings.links.files")}
                 value={storage.state.usage ? agentFilesLinkValue(storage.state.usage.breakdown) : undefined}
                 onClick={() =>
                   setDraft((state) => {
@@ -224,8 +229,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               />
             </Show>
             <SettingsLinkRow
-              label="Routines"
-              value={`${draft.routines.count} configured`}
+              label={t("agentSettings.links.routines")}
+              value={t("agentSettings.links.routinesCount", { count: draft.routines.count })}
               onClick={() =>
                 setDraft((state) => {
                   state.routines.open = true;

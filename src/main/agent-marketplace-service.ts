@@ -17,6 +17,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isAvatarHue, isAvatarSeed, isRoutineSchedule, isSkillCategory } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 
 interface AgentMarketplaceAuth {
   requestAuthorized<T>(path: string, init: RequestInit, decoder: (value: unknown) => T, timeoutMs?: number): Promise<T>;
@@ -118,7 +119,7 @@ export class AgentMarketplaceService {
 
   async preview(agentId: string): Promise<AgentPublicationPreview> {
     const agent = this.agents.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error("Choose a local agent first.");
+    if (!agent) throw new Error(sourceText("error.skill.chooseLocalAgent"));
     const skills = await this.skills.listPublishable(agentId);
     const routines = this.agents.listRoutines(agentId).map(({ name, instruction, active, trigger }) => ({
       name,
@@ -162,14 +163,14 @@ export class AgentMarketplaceService {
   }
 
   async install(input: InstallMarketplaceAgentInput): Promise<InstallMarketplaceAgentResult> {
-    if (!validTimezone(input.timezone)) throw new Error("The local timezone is invalid.");
+    if (!validTimezone(input.timezone)) throw new Error(sourceText("error.marketplace.timezoneInvalid"));
     const detail = await this.get(input.listingId);
     const existing = input.agentId
       ? this.agents.listAgents().find((candidate) => candidate.id === input.agentId)
       : undefined;
-    if (input.agentId && !existing) throw new Error("The installed agent no longer exists.");
+    if (input.agentId && !existing) throw new Error(sourceText("error.marketplace.installedAgentMissing"));
     if (existing?.marketplaceSource?.listingId !== detail.id) {
-      if (existing) throw new Error("This local agent was installed from a different marketplace agent.");
+      if (existing) throw new Error(sourceText("error.marketplace.differentListing"));
     }
     if (existing?.marketplaceSource?.versionId === detail.versionId) return { agent: existing };
 
@@ -177,7 +178,7 @@ export class AgentMarketplaceService {
     if (detail.avatarUrl) {
       const bytes = await this.auth.downloadAuthorized(detail.avatarUrl);
       const mimeType = imageMimeType(bytes);
-      if (!mimeType) throw new Error("The marketplace agent avatar is invalid.");
+      if (!mimeType) throw new Error(sourceText("error.marketplace.marketplaceAvatarInvalid"));
       avatar = { mimeType, bytes };
     }
     let agent =

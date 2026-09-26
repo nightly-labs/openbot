@@ -7,6 +7,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiBrowser, TeamApiBrowserView } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -97,7 +98,7 @@ export async function routeBrowser(
   // the frames and the input are on the socket it answers with, which `browser-view-gateway.ts`
   // serves. A host with the view switched off answers 404, the same as a host too old to know it.
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.viewSessions) {
-    if (!browserView) throw new HttpError(404, "The live browser view is unavailable.");
+    if (!browserView) throw new HttpError(404, sourceText("error.team.browserViewUnavailable"));
     const body = await readJson(request);
     return json(
       201,
@@ -110,9 +111,9 @@ export async function routeBrowser(
   }
   const viewSessionMatch = /^\/v1\/browser\/view\/sessions\/([^/]+)$/u.exec(url.pathname);
   if (method === "DELETE" && viewSessionMatch) {
-    if (!browserView) throw new HttpError(404, "The live browser view is unavailable.");
+    if (!browserView) throw new HttpError(404, sourceText("error.team.browserViewUnavailable"));
     if (!(await browserView.closeMemberSession(pathIdentifier(viewSessionMatch[1], "sessionId"), member.id))) {
-      throw new HttpError(404, "Browser view session not found.");
+      throw new HttpError(404, sourceText("error.team.browserSessionNotFound"));
     }
     return empty(204);
   }

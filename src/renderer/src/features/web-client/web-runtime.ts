@@ -66,6 +66,7 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import { currentText } from "@openbot/ui/text";
 import { acquireWebHostLock } from "./web-host-lock";
 
 export interface WebWorkspaceRuntime {
@@ -205,12 +206,12 @@ export function createWebWorkspaceRuntime(
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
   async function request(method: string, path: string, body: TeamProtocolV2Json = {}, upload?: RemoteFileUpload) {
-    if (disposed) throw new Error("The browser connection is closed.");
+    if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const result = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body, upload });
-    if (disposed || generation !== current) throw new Error("The selected host changed.");
+    if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     if (!result.ok || (result.status ?? 500) >= 400)
-      throw new Error("The host could not complete this request. Refresh before trying again.");
+      throw new Error(currentText().t("webClient.error.requestIncomplete"));
     return result.body;
   }
   // The shared Team API requests decode their own responses. A declaration, like `request`, so the
@@ -253,11 +254,11 @@ export function createWebWorkspaceRuntime(
         const next = await browserView.open(
           tabId,
           (frame) => emitView({ type: "frame", tabId, ...frame }),
-          () => emitView({ type: "stopped", tabId, reason: "The browser view ended." }),
+          () => emitView({ type: "stopped", tabId, reason: currentText().t("webClient.error.viewEnded") }),
         );
         if (currentGeneration !== liveViewGeneration) {
           await next.close().catch(() => undefined);
-          throw new Error("The browser view changed.");
+          throw new Error(currentText().t("webClient.error.viewChanged"));
         }
         liveView = next;
       },
@@ -325,7 +326,7 @@ export function createWebWorkspaceRuntime(
     },
     acceptInvite: (url) => directory.acceptInvite(url),
     async connect(host) {
-      if (connecting || disposed) throw new Error("The host connection is changing.");
+      if (connecting || disposed) throw new Error(currentText().t("webClient.error.connectionChanging"));
       connecting = true;
       try {
         await peer.cancelUpload().catch(() => undefined);
@@ -342,7 +343,7 @@ export function createWebWorkspaceRuntime(
           const release = await dependencies.acquireHostLock(accountId, host.hostId);
           if (disposed) {
             release();
-            throw new Error("The browser connection is closed.");
+            throw new Error(currentText().t("webClient.error.connectionClosed"));
           }
           releaseHostLock = release;
           lockedHostId = host.hostId;
@@ -353,7 +354,7 @@ export function createWebWorkspaceRuntime(
         const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
         const pinned = localStorage.getItem(key);
         if (pinned && pinned !== host.devicePublicKey)
-          throw new Error("The host identity changed. Connection refused.");
+          throw new Error(currentText().t("webClient.error.identityChanged"));
         localStorage.setItem(key, host.devicePublicKey);
         const result = await peer.execute({
           id: crypto.randomUUID(),
@@ -361,10 +362,11 @@ export function createWebWorkspaceRuntime(
           hostId: host.hostId,
           hostPublicKey: host.devicePublicKey,
         });
-        if (!result.ok || disposed || current !== generation) throw new Error("The host connection is not available.");
+        if (!result.ok || disposed || current !== generation)
+          throw new Error(currentText().t("webClient.error.connectionUnavailable"));
         const support = decodeTeamProtocolSupportV1(await request("GET", TEAM_API_ROUTES.compatibility));
         if (support.protocol.minimum > TEAM_PROTOCOL_V3 || support.protocol.maximum < TEAM_PROTOCOL_V3)
-          throw new Error("This host is not compatible with OpenBot web. Update the host and reload this page.");
+          throw new Error(currentText().t("webClient.error.incompatible"));
         capabilities = support.capabilities;
         if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
         return capabilities;
@@ -435,8 +437,7 @@ export function createWebWorkspaceRuntime(
         attachmentDraftIds,
         replyToMessageId,
       });
-      if (!isQueuedMessageReceipt(result))
-        throw new Error("Message delivery is not confirmed. Refresh before sending it again.");
+      if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
       removeCompletedDrafts(attachmentDraftIds);
     },
     stop: (id, turnId) => interruptAgentTurn(teamApi, id, turnId),
@@ -455,18 +456,18 @@ export function createWebWorkspaceRuntime(
         eml: capabilities.includes("eml-attachments"),
         media: capabilities.includes("media-attachments"),
       });
-      if (extension && !supported.includes(extension)) throw new Error("Update the host to attach this file type.");
-      if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
+      if (extension && !supported.includes(extension)) throw new Error(currentText().t("webClient.error.fileType"));
+      if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(currentText().t("error.remote.attachmentTooLarge"));
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (currentUpload !== uploadGeneration || uploadHostGeneration !== generation)
-        throw new Error("The attachment upload was cancelled.");
+        throw new Error(currentText().t("webClient.error.uploadCancelled"));
       let binary = "";
       for (const byte of bytes) binary += String.fromCharCode(byte);
       const mimeType = file.type || "application/octet-stream";
       const value = await uploadAttachmentDraft(teamApi, { name: file.name, mimeType, base64: btoa(binary) });
       if (currentUpload !== uploadGeneration) {
         if (uploadHostGeneration === generation) await discardAttachmentDraft(teamApi, value.id);
-        throw new Error("The attachment upload was cancelled.");
+        throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
       return value;
@@ -484,8 +485,9 @@ export function createWebWorkspaceRuntime(
       if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
       const base64 = requiredString(value, "base64");
       if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-        throw new Error("Attachments must be 10 MB or smaller.");
-      if (atob(base64).length > MOBILE_ATTACHMENT_BYTES) throw new Error("Attachments must be 10 MB or smaller.");
+        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+      if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
+        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
       return {
         name: requiredString(value, "name"),
         mimeType: requiredString(value, "mimeType"),
@@ -511,7 +513,7 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async duplicateAgent(agentId) {
-      if (!capabilities.includes("agent-duplication")) throw new Error("This host does not support agent duplication.");
+      if (!capabilities.includes("agent-duplication")) throw new Error(currentText().t("webClient.error.duplication"));
       const operationKey = `${lockedHostId ?? ""}\0${agentId}`;
       const operationId = duplicateOperationIds.get(operationKey) ?? crypto.randomUUID();
       duplicateOperationIds.set(operationKey, operationId);
@@ -525,7 +527,7 @@ export function createWebWorkspaceRuntime(
       await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...input });
     },
     async deleteAgent(agentId) {
-      if (connectedHostRole === "member") throw new Error("Members cannot delete agents.");
+      if (connectedHostRole === "member") throw new Error(currentText().t("error.team.membersCannotDeleteAgents"));
       await deleteAgent(teamApi, agentId);
     },
     async search(agentId, query, cursor) {

@@ -3,6 +3,7 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AppInfo, AppSetupState, AppVariant, ExternalDestination } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
@@ -116,15 +117,24 @@ export function appIpcHandlers({
       openUrl: payloadHandler(stringPayload("URL", INPUT_LIMITS.browserUrl), (url) => {
         const parsed = new URL(url);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          throw new Error("Only HTTP(S) links can open in the external browser.");
+          throw new Error(sourceText("error.app.externalLinkProtocol"));
         }
         return shell.openExternal(parsed.toString());
       }),
     },
     maintenance: {
-      exportData: handler(() => exportOpenBotData({ service, mailbox, parentWindow: getMainWindow() })),
+      exportData: handler(() =>
+        exportOpenBotData({ service, mailbox, parentWindow: getMainWindow(), translate: language.translate }),
+      ),
       exportDiagnostics: handler(() =>
-        exportDiagnostics({ service, browser, updater, trace, parentWindow: getMainWindow() }),
+        exportDiagnostics({
+          service,
+          browser,
+          updater,
+          trace,
+          parentWindow: getMainWindow(),
+          translate: language.translate,
+        }),
       ),
     },
   };

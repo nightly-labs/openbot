@@ -8,7 +8,7 @@ import {
 } from "@openbot/i18n";
 import { userErrorMessage } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
-import { createContext, type ParentProps, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, type ParentProps, useContext } from "solid-js";
 
 /**
  * The interface language, as shared components read it.
@@ -31,8 +31,9 @@ export interface TextValue {
   sourceText: (text: string) => string;
 }
 
-function createTextValue(locale: () => TranslatedLocale): TextValue {
-  const current = () => createFormat(locale());
+// `formatLocale` is `null` outside a provider: numbers and dates then use the runtime's locale.
+function createTextValue(locale: () => TranslatedLocale, formatLocale: () => string | null): TextValue {
+  const current = () => createFormat(locale(), formatLocale());
   return {
     locale,
     t: (key, ...params) => translateFor(locale())(key, ...params),
@@ -54,19 +55,46 @@ function createTextValue(locale: () => TranslatedLocale): TextValue {
 }
 
 const TextContext = createContext<TextValue>(
-  createTextValue(() => "en"),
+  createTextValue(
+    () => "en",
+    () => null,
+  ),
   { name: "Text" },
 );
 
 export interface TextProviderProps {
   locale: TranslatedLocale;
+  /** The locale of numbers and dates (`formatLocale` from `@openbot/i18n`). The default is `locale`. */
+  formatLocale?: string;
 }
 
+// The locale of the last provider that rendered, for code that runs outside a component.
+const [activeLocale, setActiveLocale] = createSignal<TranslatedLocale>("en");
+const [activeFormatLocale, setActiveFormatLocale] = createSignal<string | null>(null);
+const CURRENT_TEXT = createTextValue(activeLocale, activeFormatLocale);
+
 export function TextProvider(props: ParentProps<TextProviderProps>): JSX.Element {
-  const value = createTextValue(() => props.locale);
+  const formatLocale = () => props.formatLocale ?? props.locale;
+  const value = createTextValue(() => props.locale, formatLocale);
+  createEffect(
+    () => [props.locale, formatLocale()] as const,
+    ([locale, format]) => {
+      setActiveLocale(locale);
+      setActiveFormatLocale(format);
+    },
+  );
   return <TextContext value={value}>{props.children}</TextContext>;
 }
 
 export function useText(): TextValue {
   return useContext(TextContext);
+}
+
+/**
+ * The text of the app's provider, for a store or an action that runs outside a component. Text it
+ * returns is fixed when it is made, so keep it only as long as the message it explains: a component
+ * that renders the text itself should call `useText()` instead.
+ */
+export function currentText(): TextValue {
+  return CURRENT_TEXT;
 }

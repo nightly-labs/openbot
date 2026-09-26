@@ -4,15 +4,14 @@ import { useConversationViewScope } from "./conversation-scope";
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
-import { useI18n } from "../../i18n-context";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverHasStorage } from "../files/storage-usage";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
-  const i18n = useI18n();
+  const { t, errorMessage } = useText();
   const {
     actingBrowserControl,
     agentActivity,
@@ -32,14 +31,14 @@ export function ConversationHeader() {
   } = useConversationViewScope();
   const changeAutoApprove = createMemo(() => {
     const save = props.onSetAgentAutoApprove;
-    const name = props.agent?.name ?? "This agent";
+    const name = props.agent?.name ?? t("conversation.header.thisAgent");
     if (!save) return undefined;
     return (next: boolean) => {
       void save(next).catch((error) => {
         toast.error(
           next
-            ? errorMessage(error, `Could not save the standing approval for ${name}. Try again.`)
-            : i18n.t("settings.autoApprove.revokeFailed", { name }),
+            ? errorMessage(error, t("conversation.header.grantFailed", { name }))
+            : t("settings.autoApprove.revokeFailed", { name }),
         );
       });
     };
@@ -65,8 +64,8 @@ export function ConversationHeader() {
           modelChangesDisabled: agentActivity() === "Working",
           disabledReason:
             agentActivity() === "Working"
-              ? "Wait for the current work to finish before changing models."
-              : "Models are available after an agent CLI connects.",
+              ? t("conversation.header.modelsBusy")
+              : t("conversation.header.modelsUnavailable"),
           onChange: (model, provider) => void selectAndConfirmModel(model, provider),
           onReasoningEffortChange: (effort) => void selectAndConfirmReasoning(effort),
           autoApprove: props.agentAutoApproves,

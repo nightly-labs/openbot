@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import {
   Button,
   ChevronRight,
@@ -15,9 +16,9 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { errorMessage } from "@openbot/ui/error-message";
 import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
 import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibraryToolbar";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { SkillPreview } from "../../components/SkillPreview";
@@ -53,6 +54,7 @@ interface ConfirmRequest {
 }
 
 export function AgentSkillsModal(props: AgentSkillsModalProps) {
+  const { t, errorMessage, sourceText } = useText();
   const [skills, setSkills] = createSignal<InstalledSkill[]>([]);
   const [catalog, setCatalog] = createSignal<Record<string, { description: string; iconUrl: string | null }>>({});
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
@@ -78,6 +80,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
+  /** A folder skill problem is English text from main. */
+  const problemText = (skill: InstalledSkill) => (skill.problem === undefined ? undefined : sourceText(skill.problem));
   const selectedSkill = createMemo(() => {
     const id = selectedId();
     return id ? (skills().find((skill) => skill.skillId === id) ?? null) : null;
@@ -110,7 +114,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
         else if (localLibrary()) setFilter("local");
       }
     } catch (caught) {
-      if (request === listRequest) setError(errorMessage(caught, "Could not load skills."));
+      if (request === listRequest) setError(errorMessage(caught, t("skill.loadFailed")));
     } finally {
       if (showLoading && request === listRequest) setLoading(false);
     }
@@ -177,7 +181,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
         : await skillsPort().skills.get(skill.skillId);
       if (request === detailRequest) setDetail(next);
     } catch (caught) {
-      if (request === detailRequest) setError(errorMessage(caught, "Could not load skill details."));
+      if (request === detailRequest) setError(errorMessage(caught, t("skill.loadDetailsFailed")));
     } finally {
       if (request === detailRequest) setDetailLoading(false);
     }
@@ -217,7 +221,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
           failure_code: `${action}_failed`,
         });
       }
-      setError(errorMessage(caught, enabled ? "Could not enable the skill." : "Could not disable the skill."));
+      setError(errorMessage(caught, enabled ? t("skill.enableFailed") : t("skill.disableFailed")));
       return false;
     } finally {
       setSavingId(null);
@@ -249,7 +253,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
           failure_code: "uninstall_failed",
         });
       }
-      setError(errorMessage(caught, "Could not remove the skill."));
+      setError(errorMessage(caught, t("skill.removeFailed")));
     } finally {
       setSavingId(null);
     }
@@ -281,7 +285,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
           failure_code: "update_failed",
         });
       }
-      setError(errorMessage(caught, "Could not update the skill."));
+      setError(errorMessage(caught, t("skill.updateFailed")));
     } finally {
       setSavingId(null);
     }
@@ -315,11 +319,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
           >
             <header class="agent-memories-header">
               <div class="agent-memories-heading agent-skills-heading">
-                <Show when={selectedSkill()} fallback={<Dialog.Title>Skills</Dialog.Title>}>
+                <Show when={selectedSkill()} fallback={<Dialog.Title>{t("skill.title")}</Dialog.Title>}>
                   {(skill) => (
                     <>
                       <Button type="button" variant="ghost" class="agent-skills-parent" onClick={closeDetail}>
-                        Skills
+                        {t("skill.title")}
                       </Button>
                       <ChevronRight class="agent-skills-crumb" aria-hidden="true" />
                       <Dialog.Title>{skill().name}</Dialog.Title>
@@ -327,7 +331,9 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                   )}
                 </Show>
                 <Dialog.Description class="sr-only">
-                  {selectedSkill() ? `${selectedSkill()?.name} details` : `Assigned skills for ${props.agentName}`}
+                  {selectedSkill()
+                    ? t("skill.detailsDescription", { name: selectedSkill()?.name ?? "" })
+                    : t("skill.assignedDescription", { name: props.agentName })}
                 </Dialog.Description>
               </div>
               <div class="agent-memories-header-actions">
@@ -356,7 +362,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                 </Show>
                 <Show when={!selectedSkill() && mutable()}>
                   <IconButton
-                    label="Add from marketplace"
+                    label={t("skill.addFromMarketplace")}
                     variant="ghost"
                     disabled={!canAdd()}
                     onClick={addFromMarketplace}
@@ -364,7 +370,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                     <Store />
                   </IconButton>
                 </Show>
-                <IconButton label="Close skills" variant="ghost" onClick={() => props.onOpenChange(false)}>
+                <IconButton label={t("skill.close")} variant="ghost" onClick={() => props.onOpenChange(false)}>
                   <X />
                 </IconButton>
               </div>
@@ -415,13 +421,12 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                       >
                         <Show when={mutable() && atCap()}>
                           <p class="agent-memory-limit" role="status">
-                            This agent has reached the limit of {INPUT_LIMITS.agentSkills} skills. Remove a skill before
-                            you add another one.
+                            {t("skill.limitReached", { limit: INPUT_LIMITS.agentSkills })}
                           </p>
                         </Show>
                         <Show when={skillsMode() === "readonly"}>
                           <p class="agent-memory-limit" role="status">
-                            Skills for this agent are managed on the host.
+                            {t("skill.managedOnHost")}
                           </p>
                         </Show>
                         <Show when={!confirm() ? error() : null}>
@@ -433,7 +438,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                         </Show>
 
                         <div class="t-page-slide agent-skills-pages" data-page={selectedSkill() ? "2" : "1"}>
-                          <Show when={!loading()} fallback={<p class="agent-memory-state">Loading skills…</p>}>
+                          <Show when={!loading()} fallback={<p class="agent-memory-state">{t("skill.loading")}</p>}>
                             <Show
                               when={selectedSkill()}
                               fallback={
@@ -442,13 +447,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                   fallback={
                                     <div class="agent-skill-empty t-page" data-page-id="1">
                                       <p class="agent-memory-state">
-                                        {filter() === "enabled"
-                                          ? "This agent has no enabled skills."
-                                          : "This agent has no assigned skills yet."}
+                                        {filter() === "enabled" ? t("skill.emptyEnabled") : t("skill.emptyAssigned")}
                                       </p>
                                       <Show when={canAdd()}>
                                         <Button size="sm" onClick={addFromMarketplace}>
-                                          Add from marketplace
+                                          {t("skill.addFromMarketplace")}
                                         </Button>
                                       </Show>
                                     </div>
@@ -482,8 +485,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                               </div>
                                               <small>
                                                 {isFolderSkill(skill())
-                                                  ? (skill().problem ?? skill().description ?? skill().location)
-                                                  : (catalog()[skill().skillId]?.description ?? skillMeta(skill()))}
+                                                  ? (problemText(skill()) ?? skill().description ?? skill().location)
+                                                  : (catalog()[skill().skillId]?.description ?? skillMeta(skill(), t))}
                                               </small>
                                             </div>
                                           </Button>
@@ -493,11 +496,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                                 size="sm"
                                                 variant="ghost"
                                                 class="agent-skill-update"
-                                                aria-label={`Update ${skill().name}`}
+                                                aria-label={t("skill.updateName", { name: skill().name })}
                                                 disabled={savingId() !== null}
                                                 onClick={() => void install(skill(), false)}
                                               >
-                                                Update
+                                                {t("skill.update")}
                                               </Button>
                                             </Show>
                                             <SkillMoreMenu
@@ -541,22 +544,22 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                 >
                                   <Show when={isFolderSkill(skill())}>
                                     <Show when={skill().problem}>
-                                      {(problem) => <p class="agent-memory-error">{problem()}</p>}
+                                      {(problem) => <p class="agent-memory-error">{sourceText(problem())}</p>}
                                     </Show>
                                     <Show when={skill().description}>
                                       {(description) => <p class="agent-memory-state">{description()}</p>}
                                     </Show>
                                     <p class="agent-memory-state">
-                                      OpenBot did not install this skill. Edit or remove it in {skill().location}.
+                                      {t("skill.folderSkill", { location: skill().location ?? "" })}
                                     </p>
                                   </Show>
                                   <Show when={!localLibrary() && skill().skillId.startsWith("local-skill-")}>
                                     <p class="agent-memory-state" role="status">
-                                      This local skill is stored on the host. Open its details on that computer.
+                                      {t("skill.localOnHost")}
                                     </p>
                                   </Show>
                                   <Show when={detailLoading()}>
-                                    <p class="agent-memory-state">Loading details…</p>
+                                    <p class="agent-memory-state">{t("skill.loadingDetails")}</p>
                                   </Show>
                                   <Show when={detail()}>
                                     {(current) => (
@@ -589,14 +592,14 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                         // this, which names the wrong cause.
                                         unavailableReason={
                                           !mutable()
-                                            ? "Remote skills are read-only."
+                                            ? t("skill.unavailable.readOnly")
                                             : skill().state === "needs-repair"
-                                              ? "Repair this skill to try it."
+                                              ? t("skill.unavailable.repair")
                                               : skill().installedVersion !== current().version
-                                                ? "Update this skill to try this version."
+                                                ? t("skill.unavailable.updateVersion")
                                                 : savingId() === skill().skillId
-                                                  ? "Wait for this skill to finish saving, then try it."
-                                                  : "The agent composer is unavailable."
+                                                  ? t("skill.unavailable.saving")
+                                                  : t("skill.unavailable.composer")
                                         }
                                       />
                                     )}
@@ -620,10 +623,10 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
         open={confirm() !== null}
         onCancel={cancelConfirm}
         onConfirm={runConfirmed}
-        title={confirmTitle(confirm())}
-        description={confirmBody(confirm())}
+        title={confirmTitle(confirm(), t)}
+        description={confirmBody(confirm(), t)}
         tone={confirm()?.kind === "replace" ? "default" : "destructive"}
-        confirmLabel={confirmConfirm(confirm())}
+        confirmLabel={confirmConfirm(confirm(), t)}
         pending={savingId() !== null}
         error={error()}
         initialFocus="cancel"
@@ -640,11 +643,12 @@ function SkillMoreMenu(props: {
   onUninstall: () => void;
   triggerRef?: (element: HTMLButtonElement) => void;
 }) {
+  const { t } = useText();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         class="agent-skill-more"
-        aria-label={`More for ${props.skill.name}`}
+        aria-label={t("skill.moreFor", { name: props.skill.name })}
         disabled={props.disabled}
         ref={props.triggerRef}
       >
@@ -653,14 +657,14 @@ function SkillMoreMenu(props: {
       <DropdownMenu.Portal>
         <DropdownMenu.Content class="agent-skill-menu">
           <Show when={props.skill.state === "update-available"}>
-            <DropdownMenu.Item onSelect={props.onUpdate}>Update</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={props.onUpdate}>{t("skill.update")}</DropdownMenu.Item>
           </Show>
           <Show when={props.skill.state === "needs-repair" || props.skill.state === "modified"}>
-            <DropdownMenu.Item onSelect={props.onRepair}>Repair</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={props.onRepair}>{t("skill.repair")}</DropdownMenu.Item>
           </Show>
           <DropdownMenu.Item class="ui-action-menu-danger" onSelect={props.onUninstall}>
             <Trash2 />
-            Uninstall
+            {t("skill.uninstall")}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
@@ -695,29 +699,27 @@ export function assignedSkillCount(skills: InstalledSkill[]): number {
   return skills.filter((skill) => !isBuiltInSkill(skill) && !isFolderSkill(skill)).length;
 }
 
-function skillMeta(skill: InstalledSkill): string {
-  if (skill.state === "update-available") return `v${skill.installedVersion} · v${skill.availableVersion} available`;
-  return `v${skill.installedVersion}`;
-}
-
-function confirmTitle(request: ConfirmRequest | null) {
-  if (!request) return "";
-  if (request.kind === "replace") return "Replace local changes?";
-  return "Remove this skill?";
-}
-
-function confirmBody(request: ConfirmRequest | null) {
-  if (!request) return "";
-  if (request.kind === "replace") {
-    return "Updating this skill replaces the local files with the latest skill package. Your edits in this skill folder will be lost.";
+function skillMeta(skill: InstalledSkill, t: AppTranslate): string {
+  if (skill.state === "update-available") {
+    return t("skill.versionUpdate", { installed: skill.installedVersion, available: skill.availableVersion ?? "" });
   }
-  if (request.skill.state === "modified") {
-    return "This skill has local changes in the agent workspace. Remove deletes those files. Original chat messages stay.";
-  }
-  return "OpenBot will remove this skill from the agent. Chat history stays.";
+  return t("skill.version", { version: skill.installedVersion });
 }
 
-function confirmConfirm(request: ConfirmRequest | null) {
-  if (request?.kind === "replace") return "Replace skill";
-  return "Remove skill";
+function confirmTitle(request: ConfirmRequest | null, t: AppTranslate) {
+  if (!request) return "";
+  if (request.kind === "replace") return t("skill.confirm.replaceTitle");
+  return t("skill.confirm.removeTitle");
+}
+
+function confirmBody(request: ConfirmRequest | null, t: AppTranslate) {
+  if (!request) return "";
+  if (request.kind === "replace") return t("skill.confirm.replaceBody");
+  if (request.skill.state === "modified") return t("skill.confirm.removeModifiedBody");
+  return t("skill.confirm.removeBody");
+}
+
+function confirmConfirm(request: ConfirmRequest | null, t: AppTranslate) {
+  if (request?.kind === "replace") return t("skill.confirm.replace");
+  return t("skill.confirm.remove");
 }

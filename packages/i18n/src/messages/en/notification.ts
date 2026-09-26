@@ -8,4 +8,7 @@ export const messages = defineMessages("notification", {
   "notification.failed": "Stopped with an error.",
   "notification.test": "Notifications are working.",
   "notification.welcome": "OpenBot will tell you here when an agent needs you.",
+  // The toast region in each window.
+  "notification.toast.region": "Notifications",
+  "notification.toast.close": "Close notification",
 });

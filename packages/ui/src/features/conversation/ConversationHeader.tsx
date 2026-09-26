@@ -3,6 +3,7 @@ import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker"
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ComputerIcon, RemoteDesktopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { useText } from "@openbot/ui/text";
 import type { ComponentProps } from "@solidjs/web";
 import { Show } from "solid-js";
 
@@ -36,6 +37,7 @@ export interface ConversationHeaderProps {
 }
 
 export function ConversationHeader(props: ConversationHeaderProps) {
+  const { t } = useText();
   return (
     <header class="window-drag conversation-header">
       <div class="conversation-heading-group">
@@ -46,7 +48,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               size="sm"
               type="button"
               class="conversation-title no-drag"
-              aria-label="View agent settings"
+              aria-label={t("conversation.header.settings")}
               onPointerEnter={props.onSettingsIntent}
               onFocus={props.onSettingsIntent}
               onClick={props.onOpenSettings}
@@ -60,8 +62,8 @@ export function ConversationHeader(props: ConversationHeaderProps) {
           <span
             class="conversation-access-lock"
             role="img"
-            aria-label="Workspace only (not enforced yet)"
-            title="Workspace only (not enforced yet)"
+            aria-label={t("conversation.header.workspaceOnly")}
+            title={t("conversation.header.workspaceOnly")}
           >
             <Lock aria-hidden="true" />
           </span>
@@ -77,7 +79,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               variant="ghost"
               type="button"
               class="header-panel-toggle remote-desktop-button"
-              aria-label={control().active ? "Resume remote control" : "Open remote control"}
+              aria-label={t(control().active ? "conversation.header.resumeRemote" : "conversation.header.openRemote")}
               aria-expanded={control().visible ? "true" : "false"}
               disabled={!control().enabled}
               onClick={(event) => control().onOpen(event.currentTarget)}
@@ -95,7 +97,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               variant="ghost"
               type="button"
               class="header-panel-toggle"
-              aria-label={files().open ? "Hide files" : "Show files"}
+              aria-label={t(files().open ? "conversation.header.hideFiles" : "conversation.header.showFiles")}
               aria-expanded={files().open ? "true" : "false"}
               onClick={() => files().onToggle()}
             >
@@ -109,7 +111,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               variant="ghost"
               type="button"
               class="header-panel-toggle"
-              aria-label="Publish agent"
+              aria-label={t("conversation.header.publish")}
               aria-haspopup="dialog"
               onClick={() => publish().onOpen()}
             >
@@ -127,10 +129,10 @@ export function ConversationHeader(props: ConversationHeaderProps) {
             ]}
             aria-label={
               props.browser?.acting
-                ? `${props.browser?.agentName ?? "Agent"} is controlling the browser`
-                : props.browser?.open
-                  ? "Hide computer"
-                  : "Open computer"
+                ? t("conversation.header.browserActing", {
+                    name: props.browser?.agentName ?? t("conversation.header.agentFallback"),
+                  })
+                : t(props.browser?.open ? "conversation.header.hideComputer" : "conversation.header.openComputer")
             }
             aria-expanded={props.browser?.open ? "true" : "false"}
             disabled={props.browser?.disabled}

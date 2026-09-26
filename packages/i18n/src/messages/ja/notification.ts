@@ -8,4 +8,6 @@ export const messages = {
   "notification.failed": "エラーで停止しました。",
   "notification.test": "通知は正常に動作しています。",
   "notification.welcome": "エージェントが対応を必要とするときは、ここでお知らせします。",
+  "notification.toast.region": "通知",
+  "notification.toast.close": "通知を閉じる",
 } as const satisfies PartialTranslation<typeof source>;

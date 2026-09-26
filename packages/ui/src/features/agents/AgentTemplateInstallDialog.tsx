@@ -1,7 +1,7 @@
 import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import { Button, Dialog, Heading, IconButton, Text, toast, X } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { createSignal, Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentAvatar } from "./AgentAvatar";
 import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentTemplateSections";
 
@@ -19,6 +19,7 @@ export interface AgentTemplateInstallDialogProps {
  * anything is installed: a link alone never adds an agent.
  */
 export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProps) {
+  const { t, errorMessage } = useText();
   const [installing, setInstalling] = createSignal(false);
 
   async function install(): Promise<void> {
@@ -26,7 +27,7 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
     try {
       await props.onInstall();
     } catch (error) {
-      toast.error(errorMessage(error, "Could not add the agent."));
+      toast.error(errorMessage(error, t("agentTemplate.install.failed")));
     } finally {
       setInstalling(false);
     }
@@ -41,12 +42,14 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
       <Dialog.Portal>
         <Dialog.Overlay class="agent-template-backdrop">
           <Dialog.Content as="section" class="agent-template-dialog" aria-busy={installing() ? "true" : undefined}>
-            <Dialog.Title class="sr-only">Add {props.detail?.name ?? "shared agent"}</Dialog.Title>
-            <Dialog.Description class="sr-only">
-              Read the instructions, skills and routines of this shared agent before you add it.
-            </Dialog.Description>
+            <Dialog.Title class="sr-only">
+              {t("agentTemplate.install.title", {
+                name: props.detail?.name ?? t("agentTemplate.install.nameFallback"),
+              })}
+            </Dialog.Title>
+            <Dialog.Description class="sr-only">{t("agentTemplate.install.description")}</Dialog.Description>
             <div class="agent-template-corner-actions">
-              <IconButton label="Close" variant="ghost" onClick={() => changeOpen(false)}>
+              <IconButton label={t("common.close")} variant="ghost" onClick={() => changeOpen(false)}>
                 <X />
               </IconButton>
             </div>
@@ -56,7 +59,7 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
               fallback={
                 <div class="agent-template-body">
                   <Text tone="muted" role="status">
-                    {props.loading ? "Loading agent…" : ""}
+                    {props.loading ? t("agentTemplate.install.loading") : ""}
                   </Text>
                 </div>
               }
@@ -76,7 +79,7 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                         {detail().name}
                       </Heading>
                       <Text tone="muted" variant="caption">
-                        By {detail().creatorName}
+                        {t("agentTemplate.creator", { name: detail().creatorName })}
                       </Text>
                     </header>
                     <div class="agent-template-detail">
@@ -87,10 +90,10 @@ export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProp
                   </div>
                   <footer class="agent-template-actions">
                     <Button type="button" variant="ghost" disabled={installing()} onClick={() => changeOpen(false)}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button type="button" variant="default" disabled={installing()} onClick={() => void install()}>
-                      {installing() ? "Adding…" : "Add agent"}
+                      {installing() ? t("agentTemplate.install.pending") : t("agentTemplate.install.action")}
                     </Button>
                   </footer>
                 </>

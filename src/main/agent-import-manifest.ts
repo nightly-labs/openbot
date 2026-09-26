@@ -11,6 +11,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { AGENT_IMPORT_LIMITS, isAgentImportKey, isRoutineSchedule, type RoutineSchedule } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { isUnsafeArchivePath } from "./skill-package";
 
 export const AGENT_IMPORT_MANIFEST = "openbot-import.json";
@@ -65,19 +66,18 @@ export function decodeImportManifest(
   try {
     value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
-    throw new Error(`${AGENT_IMPORT_MANIFEST} is not valid JSON.`);
+    throw new Error(sourceText("error.import.manifestNotJson", { manifest: AGENT_IMPORT_MANIFEST }));
   }
   if (!isDynamicRecord(value) || value.format !== FORMAT)
-    throw new Error(`${AGENT_IMPORT_MANIFEST} is not an OpenBot agent export.`);
-  if (value.version !== VERSION)
-    throw new Error("This export was made by a newer export skill. Update OpenBot and try again.");
+    throw new Error(sourceText("error.import.notAgentExport", { manifest: AGENT_IMPORT_MANIFEST }));
+  if (value.version !== VERSION) throw new Error(sourceText("error.import.newerExportSkill"));
   const source = isDynamicRecord(value.source) ? value.source : {};
   const sourceApp = isBoundedString(source.app, AGENT_IMPORT_LIMITS.sourceApp) && source.app ? source.app : "unknown";
   const exportedAt =
     isString(source.exportedAt) && !Number.isNaN(Date.parse(source.exportedAt)) ? source.exportedAt : null;
-  if (!Array.isArray(value.agents) || value.agents.length === 0) throw new Error("The export contains no agents.");
+  if (!Array.isArray(value.agents) || value.agents.length === 0) throw new Error(sourceText("error.import.noAgents"));
   if (value.agents.length > INPUT_LIMITS.agents)
-    throw new Error(`The export contains more than ${INPUT_LIMITS.agents} agents.`);
+    throw new Error(sourceText("error.import.tooManyAgents", { limit: INPUT_LIMITS.agents }));
 
   const warnings: string[] = [];
   const keys = new Set<string>();
@@ -91,7 +91,7 @@ export function decodeImportManifest(
   const channelValues = value.channels === undefined ? [] : value.channels;
   if (!Array.isArray(channelValues)) throw new Error("The channel list is invalid.");
   if (channelValues.length > AGENT_IMPORT_LIMITS.channels)
-    throw new Error(`The export contains more than ${AGENT_IMPORT_LIMITS.channels} channels.`);
+    throw new Error(sourceText("error.import.tooManyChannels", { limit: AGENT_IMPORT_LIMITS.channels }));
   const channelKeys = new Set<string>();
   const channels: ImportChannel[] = [];
   for (const [index, item] of channelValues.entries()) {
@@ -99,7 +99,7 @@ export function decodeImportManifest(
     if (channelKeys.has(channel.key)) throw new Error(`Two channels use the key "${channel.key}".`);
     channelKeys.add(channel.key);
     if (channel.members.length === 0) {
-      warnings.push(`${channel.name}: the channel is skipped because none of its agents are in the export.`);
+      warnings.push(sourceText("error.import.channelSkipped", { name: channel.name }));
       continue;
     }
     channels.push(channel);
@@ -131,10 +131,10 @@ function decodeChannel(
   const members = [...new Set(value.members.filter(isString))];
   const known = members.filter((member) => agentKeys.has(member));
   if (known.length < members.length || members.length < value.members.length)
-    warnings.push(`${name}: members that are not agents in this export are left out.`);
+    warnings.push(sourceText("error.import.membersLeftOut", { name }));
   let lead = value.lead === undefined || value.lead === null ? null : value.lead;
   if (lead !== null && !(isString(lead) && known.includes(lead))) {
-    warnings.push(`${name}: the lead is not a member, so the channel has no lead.`);
+    warnings.push(sourceText("error.import.leadNotMember", { name }));
     lead = null;
   }
   const routines = value.routines === undefined ? [] : value.routines;
@@ -208,7 +208,7 @@ function decodeRoutines(values: unknown[], agent: string, warnings: string[], no
   for (const [index, value] of values.entries()) {
     const label = isDynamicRecord(value) && isString(value.name) ? value.name : `routine ${index + 1}`;
     if (routines.length >= INPUT_LIMITS.agentRoutines) {
-      warnings.push(`${agent}: only the first ${INPUT_LIMITS.agentRoutines} routines are imported.`);
+      warnings.push(sourceText("error.import.routineLimit", { name: agent, limit: INPUT_LIMITS.agentRoutines }));
       break;
     }
     if (!isDynamicRecord(value)) {
@@ -229,9 +229,7 @@ function decodeRoutines(values: unknown[], agent: string, warnings: string[], no
       value.instruction.length > INPUT_LIMITS.routineInstruction ||
       !isRoutineSchedule(schedule)
     ) {
-      warnings.push(
-        `${agent}: routine "${label.slice(0, 80)}" is skipped because its name, text, or schedule is invalid.`,
-      );
+      warnings.push(sourceText("error.import.routineInvalid", { name: agent, routine: label.slice(0, 80) }));
       continue;
     }
     routines.push({
@@ -253,8 +251,12 @@ function decodeMemories(values: unknown[], owner: string, warnings: string[], li
   const kept = memories.filter((text) => text.length <= INPUT_LIMITS.agentMemoryText);
   if (kept.length < values.length)
     warnings.push(
-      `${owner}: ${values.length - kept.length} memories are skipped because they are empty or longer than ${INPUT_LIMITS.agentMemoryText} characters.`,
+      sourceText("error.import.memoriesSkipped", {
+        name: owner,
+        skipped: values.length - kept.length,
+        limit: INPUT_LIMITS.agentMemoryText,
+      }),
     );
-  if (kept.length > limit) warnings.push(`${owner}: only the first ${limit} memories are imported.`);
+  if (kept.length > limit) warnings.push(sourceText("error.import.memoryLimit", { name: owner, limit }));
   return kept.slice(0, limit);
 }

@@ -1,5 +1,7 @@
+import type { AppTranslate } from "@openbot/i18n";
 import { Button, X } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 
 export function preferredMessageScrollBehavior(): ScrollBehavior {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -12,8 +14,8 @@ export function scrollToLatestMessage(scrollElement: HTMLElement): void {
   });
 }
 
-export function newMessagesLabel(count: number): string {
-  return `${count} new ${count === 1 ? "message" : "messages"}`;
+export function newMessagesLabel(count: number, t: AppTranslate): string {
+  return t("chat.newMessages.count", { count });
 }
 
 /**
@@ -29,6 +31,7 @@ export function newMessagesLabel(count: number): string {
  * through the name of the jump button.
  */
 export function ScrollToLatestButton(props: { onClick: () => void; newMessageCount?: number; onDismiss?: () => void }) {
+  const { t } = useText();
   const count = () => props.newMessageCount ?? 0;
   const showCount = () => count() > 0 && Boolean(props.onDismiss);
   return (
@@ -37,14 +40,14 @@ export function ScrollToLatestButton(props: { onClick: () => void; newMessageCou
         variant="ghost"
         type="button"
         class="scroll-to-latest-button"
-        aria-label={showCount() ? `Jump to ${newMessagesLabel(count())}` : "Scroll to latest message"}
+        aria-label={showCount() ? t("chat.newMessages.jump", { count: count() }) : t("chat.newMessages.scrollToLatest")}
         onClick={props.onClick}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path d="M12 4v14m-6-6 6 6 6-6" />
         </svg>
         <Show when={showCount()}>
-          <span class="scroll-to-latest-count">{newMessagesLabel(count())}</span>
+          <span class="scroll-to-latest-count">{newMessagesLabel(count(), t)}</span>
         </Show>
       </Button>
       <Show when={showCount()}>
@@ -52,7 +55,7 @@ export function ScrollToLatestButton(props: { onClick: () => void; newMessageCou
           variant="ghost"
           type="button"
           class="scroll-to-latest-dismiss"
-          aria-label="Dismiss new message count"
+          aria-label={t("chat.newMessages.dismiss")}
           onClick={() => props.onDismiss?.()}
         >
           <X aria-hidden="true" />

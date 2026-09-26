@@ -1,6 +1,7 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS } from "@openbot/contracts/input-limits";
 import type { AvatarImageInput } from "@openbot/contracts/ipc";
+import { currentText } from "./text";
 
 const OUTPUT_SIZES = [512, 448, 384, 320] as const;
 const OUTPUT_QUALITIES = [0.88, 0.82, 0.76, 0.7] as const;
@@ -12,9 +13,9 @@ interface AnimationFrame {
 }
 
 export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput> {
-  if (!isAvatarMimeType(file.type)) throw new Error("Choose a PNG, JPEG, or WebP image.");
+  if (!isAvatarMimeType(file.type)) throw new Error(currentText().t("app.avatar.type"));
   if (file.size > AVATAR_IMAGE_LIMITS.sourceBytes) {
-    throw new Error("Choose an image smaller than 10 MB.");
+    throw new Error(currentText().t("app.avatar.size"));
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   const source = isAnimatedWebp(bytes) ? null : await createImageBitmap(file);
@@ -34,7 +35,7 @@ export async function normalizeAvatarFile(file: File): Promise<AvatarImageInput>
   } finally {
     source?.close();
   }
-  throw new Error("OpenBot could not make this image small enough. Choose a simpler image.");
+  throw new Error(currentText().t("app.avatar.tooLarge"));
 }
 
 /** A RIFF WebP with a VP8X header whose animation flag is set. */
@@ -136,12 +137,12 @@ async function renderAvatar(
   canvas.width = outputSize;
   canvas.height = outputSize;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Image processing is unavailable.");
+  if (!context) throw new Error(currentText().t("app.avatar.processingUnavailable"));
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   const crop = avatarCrop(width, height);
   context.drawImage(source, crop.sourceX, crop.sourceY, crop.sourceSize, crop.sourceSize, 0, 0, outputSize, outputSize);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-  if (!blob) throw new Error("OpenBot could not process this image.");
+  if (!blob) throw new Error(currentText().t("app.avatar.processFailed"));
   return blob;
 }

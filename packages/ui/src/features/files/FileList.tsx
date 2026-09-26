@@ -1,4 +1,5 @@
 import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -23,9 +24,10 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
+import { useText } from "@openbot/ui/text";
 import { Dynamic } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Show } from "solid-js";
-import { fileBadge, formatFileSize } from "../conversation/AttachmentCards";
+import { fileBadge } from "../conversation/AttachmentCards";
 import { attachmentReferenceBadge, attachmentReferenceTone } from "../conversation/AttachmentReference";
 import {
   FILE_SORTS,
@@ -76,6 +78,7 @@ const LOADING_ROWS = [0, 1, 2, 3, 4];
  * Files panel. It owns the search, type filter and order; the caller owns the data and every action.
  */
 export function FileList(props: FileListProps) {
+  const { t, format, errorMessage } = useText();
   const [query, setQuery] = createStore<FileQuery>({
     search: props.initialQuery?.search ?? "",
     type: props.initialQuery?.type ?? "all",
@@ -84,12 +87,13 @@ export function FileList(props: FileListProps) {
   const [pendingDelete, setPendingDelete] = createSignal<StoredFileRow | null>(null);
   const [deleteError, setDeleteError] = createSignal<string | null>(null);
   const now = () => props.now ?? new Date();
+  const labelOf = (key: AppTextKey | undefined) => (key ? t(key) : undefined);
   const searched = createMemo(() => queryFiles(props.files, { ...query, type: "all" }));
   const counts = createMemo(() => fileTypeCounts(searched()));
   const visible = createMemo(() => queryFiles(props.files, { ...query }));
   const groups = createMemo(() =>
     props.groupByDay && query.sort === "newest"
-      ? groupFilesByDay(visible(), now())
+      ? groupFilesByDay(visible(), now(), t, format)
       : [{ key: "all", label: "", files: visible() }],
   );
   const filtered = () => query.search.trim() !== "" || query.type !== "all";
@@ -110,7 +114,7 @@ export function FileList(props: FileListProps) {
       await props.onAction(file, "delete");
       setPendingDelete(null);
     } catch (caught) {
-      setDeleteError(caught instanceof Error ? caught.message : "Could not delete the file.");
+      setDeleteError(errorMessage(caught, t("files.delete.failed")));
     }
   }
 
@@ -123,8 +127,8 @@ export function FileList(props: FileListProps) {
             type="search"
             size="sm"
             class="file-list-search-input"
-            placeholder="Search files"
-            aria-label="Search files"
+            placeholder={t("files.list.search")}
+            aria-label={t("files.list.search")}
             value={query.search}
             onValueChange={(value) =>
               setQuery((draft) => {
@@ -144,19 +148,19 @@ export function FileList(props: FileListProps) {
           }}
           itemComponent={(itemProps) => (
             <SelectItem item={itemProps.item}>
-              {FILE_SORTS.find((sort) => sort.value === itemProps.item.rawValue)?.label}
+              {labelOf(FILE_SORTS.find((sort) => sort.value === itemProps.item.rawValue)?.label)}
             </SelectItem>
           )}
         >
-          <SelectTrigger size="sm" class="file-list-sort" aria-label="Sort files">
+          <SelectTrigger size="sm" class="file-list-sort" aria-label={t("files.list.sort")}>
             <SelectValue<FileSort>>
-              {(selection) => FILE_SORTS.find((sort) => sort.value === selection.selectedOption())?.label}
+              {(selection) => labelOf(FILE_SORTS.find((sort) => sort.value === selection.selectedOption())?.label)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent />
         </Select>
       </div>
-      <fieldset class="file-list-filters" aria-label="File type">
+      <fieldset class="file-list-filters" aria-label={t("files.list.type")}>
         <For each={FILE_TYPE_FILTERS.filter((filter) => filter.value === "all" || counts()[filter.value] > 0)}>
           {(filter) => (
             <Button
@@ -171,7 +175,7 @@ export function FileList(props: FileListProps) {
                 })
               }
             >
-              {filter.label}
+              {t(filter.label)}
               <span class="file-list-filter-count">{counts()[filter.value]}</span>
             </Button>
           )}
@@ -181,7 +185,7 @@ export function FileList(props: FileListProps) {
       <Show
         when={!props.loading}
         fallback={
-          <div class="file-list-rows" role="status" aria-busy="true" aria-label="Loading files">
+          <div class="file-list-rows" role="status" aria-busy="true" aria-label={t("files.list.loading")}>
             <For each={LOADING_ROWS}>{() => <Skeleton class="file-list-skeleton" />}</For>
           </div>
         }
@@ -191,12 +195,12 @@ export function FileList(props: FileListProps) {
           fallback={
             <div class="file-list-message" role="alert">
               <TriangleAlert class="file-list-message-icon" data-tone="danger" aria-hidden="true" />
-              <p class="file-list-message-title">Files could not load</p>
+              <p class="file-list-message-title">{t("files.list.loadFailed")}</p>
               <p class="file-list-message-description">{props.error}</p>
               <Show when={props.onRetry}>
                 <Button type="button" size="sm" variant="secondary" onClick={() => props.onRetry?.()}>
                   <RefreshCw class="files-button-icon" aria-hidden="true" />
-                  Try again
+                  {t("common.tryAgain")}
                 </Button>
               </Show>
             </div>
@@ -206,9 +210,9 @@ export function FileList(props: FileListProps) {
             when={props.files.length > 0}
             fallback={
               <div class="file-list-message">
-                <p class="file-list-message-title">{props.emptyTitle ?? "No files yet"}</p>
+                <p class="file-list-message-title">{props.emptyTitle ?? t("files.list.emptyTitle")}</p>
                 <p class="file-list-message-description">
-                  {props.emptyDescription ?? "Files you attach and files agents make show here."}
+                  {props.emptyDescription ?? t("files.list.emptyDescription")}
                 </p>
               </div>
             }
@@ -217,18 +221,18 @@ export function FileList(props: FileListProps) {
               when={visible().length > 0}
               fallback={
                 <div class="file-list-message">
-                  <p class="file-list-message-title">No matching files</p>
+                  <p class="file-list-message-title">{t("files.list.noMatches")}</p>
                   <Show when={filtered()}>
                     <Button type="button" size="sm" variant="secondary" onClick={clearFilters}>
-                      Clear filters
+                      {t("files.list.clearFilters")}
                     </Button>
                   </Show>
                 </div>
               }
             >
               <p class="file-list-summary" aria-live="polite">
-                {fileCountLabel(visible().length)} ·{" "}
-                {formatFileSize(visible().reduce((sum, file) => sum + file.size, 0))}
+                {fileCountLabel(visible().length, t)} ·{" "}
+                {format.fileSize(visible().reduce((sum, file) => sum + file.size, 0))}
               </p>
               <For each={groups()}>
                 {(group) => (
@@ -248,11 +252,11 @@ export function FileList(props: FileListProps) {
                             canDelete={props.canDelete === true && file.deletable}
                             dateLabel={
                               group.label
-                                ? new Date(file.createdAt).toLocaleTimeString(undefined, {
+                                ? format.date(new Date(file.createdAt), {
                                     hour: "numeric",
                                     minute: "2-digit",
                                   })
-                                : fileDayLabel(file.createdAt, now())
+                                : fileDayLabel(file.createdAt, now(), t, format)
                             }
                             onPreview={() => props.onPreview(file)}
                             onAction={(action) => {
@@ -277,14 +281,16 @@ export function FileList(props: FileListProps) {
         open={pendingDelete() !== null}
         onCancel={() => setPendingDelete(null)}
         onConfirm={confirmDelete}
-        title={pendingDelete()?.status === "available" ? "Delete this file?" : "Remove this file?"}
+        title={
+          pendingDelete()?.status === "available" ? t("files.delete.titleAvailable") : t("files.delete.titleRemoved")
+        }
         description={
           pendingDelete()?.status === "available"
-            ? `“${pendingDelete()?.name}” is deleted from the disk. The messages that show it stay in the chat without the file.`
-            : `“${pendingDelete()?.name}” is removed from the list. The message that sent it stays in the chat.`
+            ? t("files.delete.descriptionAvailable", { name: pendingDelete()?.name ?? "" })
+            : t("files.delete.descriptionRemoved", { name: pendingDelete()?.name ?? "" })
         }
-        confirmLabel={pendingDelete()?.status === "available" ? "Delete" : "Remove"}
-        pendingLabel={pendingDelete()?.status === "available" ? "Deleting…" : "Removing…"}
+        confirmLabel={pendingDelete()?.status === "available" ? t("common.delete") : t("common.remove")}
+        pendingLabel={pendingDelete()?.status === "available" ? t("files.delete.deleting") : t("files.delete.removing")}
         error={deleteError() ?? undefined}
       />
     </section>
@@ -300,10 +306,11 @@ function FileRow(props: {
   onPreview: () => void;
   onAction: (action: StoredFileAction) => void;
 }) {
+  const { t, format } = useText();
   const available = () => props.file.status === "available";
   const meta = () =>
     [
-      formatFileSize(props.file.size),
+      format.fileSize(props.file.size),
       props.showConversation ? props.file.conversation?.title : null,
       props.agentName,
       props.dateLabel,
@@ -316,7 +323,11 @@ function FileRow(props: {
         variant="ghost"
         class="file-row-main"
         disabled={!available()}
-        aria-label={`${canPreviewAttachment(props.file) ? "Preview" : "Open"} ${props.file.name}`}
+        aria-label={
+          canPreviewAttachment(props.file)
+            ? t("attachment.preview", { name: props.file.name })
+            : t("attachment.open", { name: props.file.name })
+        }
         onClick={props.onPreview}
       >
         <FileVisual file={props.file} />
@@ -367,6 +378,7 @@ function FileVisual(props: { file: StoredFileRow }) {
 }
 
 function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
+  const { t } = useText();
   return (
     <Show when={props.status !== "available"}>
       <Badge
@@ -375,19 +387,24 @@ function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
           props.status === "missing" ? "warning-light" : props.status === "failed" ? "destructive-light" : "info-light"
         }
       >
-        {props.status === "missing" ? "Not found" : props.status === "failed" ? "Failed" : "On server"}
+        {props.status === "missing"
+          ? t("files.status.missing")
+          : props.status === "failed"
+            ? t("files.status.failed")
+            : t("files.status.remote")}
       </Badge>
     </Show>
   );
 }
 
 function FileRowMenu(props: { file: StoredFileRow; canDelete: boolean; onAction: (action: StoredFileAction) => void }) {
+  const { t } = useText();
   const status = () => props.file.status;
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={4}>
       <DropdownMenu.Trigger
         class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} file-row-menu-trigger`}
-        aria-label={`More actions for ${props.file.name}`}
+        aria-label={t("files.action.moreActions", { name: props.file.name })}
       >
         <Ellipsis aria-hidden="true" />
       </DropdownMenu.Trigger>
@@ -396,36 +413,36 @@ function FileRowMenu(props: { file: StoredFileRow; canDelete: boolean; onAction:
           <Show when={status() === "available"}>
             <DropdownMenu.Item onSelect={() => props.onAction("open")}>
               <ExternalLink aria-hidden="true" />
-              Open
+              {t("common.open")}
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => props.onAction("reveal")}>
               <FolderOpen aria-hidden="true" />
-              Show in Finder
+              {t("files.action.reveal")}
             </DropdownMenu.Item>
           </Show>
           <Show when={status() === "available" || status() === "remote"}>
             <DropdownMenu.Item onSelect={() => props.onAction("download")}>
               <Download aria-hidden="true" />
-              Download
+              {t("common.download")}
             </DropdownMenu.Item>
           </Show>
           <Show when={status() === "failed"}>
             <DropdownMenu.Item onSelect={() => props.onAction("retry")}>
               <RefreshCw aria-hidden="true" />
-              Try again
+              {t("common.tryAgain")}
             </DropdownMenu.Item>
           </Show>
           <Show when={props.file.conversation && props.file.messageId}>
             <DropdownMenu.Item onSelect={() => props.onAction("show-in-chat")}>
               <MessageCircle aria-hidden="true" />
-              Show in chat
+              {t("files.action.showInChat")}
             </DropdownMenu.Item>
           </Show>
           <Show when={props.canDelete}>
             <DropdownMenu.Separator />
             <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>
               <Trash2 aria-hidden="true" />
-              {status() === "available" ? "Delete" : "Remove"}
+              {status() === "available" ? t("common.delete") : t("common.remove")}
             </DropdownMenu.Item>
           </Show>
         </DropdownMenu.Content>

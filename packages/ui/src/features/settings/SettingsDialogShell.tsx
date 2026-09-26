@@ -2,6 +2,7 @@ import { Dialog, IconButton, X } from "@openbot/ui";
 import { cx } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { useText } from "../../text";
 
 interface SettingsDialogShellProps {
   open: boolean;
@@ -112,6 +113,7 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
 }
 
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
+  const { t } = useText();
   const [rendered, setRendered] = createSignal(untrack(() => props.open));
   const [closing, setClosing] = createSignal(false);
   const [canScrollUp, setCanScrollUp] = createSignal(false);
@@ -230,8 +232,8 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   <Dialog.Description class="settings-modal-description">{props.description}</Dialog.Description>
                 </div>
                 <IconButton
-                  label={props.closeLabel ?? "Close settings"}
-                  tooltip={props.closeLabel ?? "Close settings"}
+                  label={props.closeLabel ?? t("settings.dialog.close")}
+                  tooltip={props.closeLabel ?? t("settings.dialog.close")}
                   variant="ghost"
                   onClick={() => requestOpenChange(false)}
                 >

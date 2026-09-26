@@ -34,6 +34,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { mobileSidebarItems } from "@/features/workspace/model/sidebar-layout";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
@@ -156,6 +157,7 @@ function HeaderIconButton({
 }
 
 export function ConnectedScreen() {
+  const { t, sourceText } = useText();
   const { isLoaderPresent } = useAppLoadingOverlay();
   const { openDrawer } = useAppDrawer();
   const {
@@ -192,7 +194,7 @@ export function ConnectedScreen() {
   // belongs to this screen while it is the route on top.
   useScreenLoadingLabel(
     "/connected",
-    showLoader ? (hasSelectedServer ? "Connecting to server" : "Loading your servers") : null,
+    showLoader ? t(hasSelectedServer ? "mobile.agent.home.connecting" : "mobile.agent.home.loadingServers") : null,
   );
   const pinnedAgents = pinnedAgentIds
     .map((agentId) => activeAgents.find((agent) => agent.id === agentId))
@@ -218,8 +220,10 @@ export function ConnectedScreen() {
           (channel) =>
             !hiddenChannelIds.includes(channel.id) && !channel.archived && !pinnedChannelIds.includes(channel.id),
         ),
+        undefined,
+        t,
       ),
-    [sidebar?.layout, unpinnedAgents, channels.channels, hiddenChannelIds, pinnedChannelIds],
+    [sidebar?.layout, unpinnedAgents, channels.channels, hiddenChannelIds, pinnedChannelIds, t],
   );
   const visibleSectionIds = items.filter((item) => item.kind === "section").map((item) => item.id);
   const listReveal = useAgentListReveal(listReady, activeServer.id);
@@ -237,12 +241,12 @@ export function ConnectedScreen() {
   }, [items, collapsedSectionIds]);
   const optionsActions = useMemo<MenuAction[]>(
     () => [
-      { id: "add-agent", title: "Add agent" },
-      ...(sidebar?.layout ? [{ id: "add-section", title: "New section" }] : []),
-      ...(channels.supported ? [{ id: "add-channel", title: "New channel" }] : []),
-      ...(hasHiddenChats ? [{ id: "hidden-chats", title: "Hidden chats" }] : []),
+      { id: "add-agent", title: t("mobile.agent.home.addAgent") },
+      ...(sidebar?.layout ? [{ id: "add-section", title: t("mobile.agent.sectionForm.newTitle") }] : []),
+      ...(channels.supported ? [{ id: "add-channel", title: t("mobile.agent.home.newChannel") }] : []),
+      ...(hasHiddenChats ? [{ id: "hidden-chats", title: t("mobile.agent.hidden.title") }] : []),
     ],
-    [hasHiddenChats, channels.supported, sidebar?.layout],
+    [hasHiddenChats, channels.supported, sidebar?.layout, t],
   );
 
   return (
@@ -301,12 +305,12 @@ export function ConnectedScreen() {
             <AgentListRowReveal index={0} reveal={listReveal}>
               {sidebar?.error ? (
                 <View className="gap-2 px-4">
-                  <Typography.Paragraph className="text-danger-text">{sidebar.error}</Typography.Paragraph>
+                  <Typography.Paragraph className="text-danger-text">{sourceText(sidebar.error)}</Typography.Paragraph>
                   <Button
                     variant="secondary"
                     onPress={() => void refreshServer(activeServer.id).catch(() => undefined)}
                   >
-                    <Button.Label>Retry sections</Button.Label>
+                    <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
                   </Button>
                 </View>
               ) : null}
@@ -332,13 +336,13 @@ export function ConnectedScreen() {
                   <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
                 </View>
                 <View className="items-center gap-1.5">
-                  <Typography.Heading type="h4">Couldn’t load your servers</Typography.Heading>
+                  <Typography.Heading type="h4">{t("mobile.agent.home.serversFailed")}</Typography.Heading>
                   <Typography.Paragraph align="center" className="text-text-secondary">
-                    {serverDirectoryError ?? "Check that the desktop app is running and try again."}
+                    {serverDirectoryError ? sourceText(serverDirectoryError) : t("mobile.agent.home.serversFailedBody")}
                   </Typography.Paragraph>
                 </View>
                 <Button size="md" variant="secondary" onPress={() => void refreshServers().catch(() => undefined)}>
-                  <Button.Label>Try again</Button.Label>
+                  <Button.Label>{t("common.tryAgain")}</Button.Label>
                 </Button>
               </View>
             ) : servers.length === 0 ? (
@@ -347,26 +351,26 @@ export function ConnectedScreen() {
                   <Layers3 color={mutedColor} size={28} strokeWidth={1.6} />
                 </View>
                 <View className="items-center gap-1.5">
-                  <Typography.Heading type="h4">No servers available</Typography.Heading>
+                  <Typography.Heading type="h4">{t("mobile.agent.home.noServers")}</Typography.Heading>
                   <Typography.Paragraph align="center" className="text-text-secondary">
-                    Connect the desktop app again or join a remote server.
+                    {t("mobile.agent.home.noServersBody")}
                   </Typography.Paragraph>
                 </View>
               </View>
             ) : !hasSelectedServer ? (
               <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                <Typography.Heading type="h4">Choose a server</Typography.Heading>
+                <Typography.Heading type="h4">{t("mobile.agent.home.chooseServer")}</Typography.Heading>
                 <Button size="md" variant="secondary" onPress={openDrawer}>
-                  <Button.Label>Open servers</Button.Label>
+                  <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
                 </Button>
               </View>
             ) : activeAgents.length === 0 && activeServer.state !== "online" ? (
               <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
                 <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
                 <View className="items-center gap-1.5">
-                  <Typography.Heading type="h4">Waiting for connection</Typography.Heading>
+                  <Typography.Heading type="h4">{t("mobile.agent.home.waiting")}</Typography.Heading>
                   <Typography.Paragraph align="center" className="text-text-secondary">
-                    The agent list will load once this server is connected.
+                    {t("mobile.agent.home.waitingBody")}
                   </Typography.Paragraph>
                 </View>
               </View>
@@ -376,14 +380,14 @@ export function ConnectedScreen() {
                   <Bot color={mutedColor} size={30} strokeWidth={1.6} />
                 </View>
                 <View className="items-center gap-1.5">
-                  <Typography.Heading type="h4">No agents on this server</Typography.Heading>
+                  <Typography.Heading type="h4">{t("mobile.agent.home.noAgents")}</Typography.Heading>
                   <Typography.Paragraph align="center" className="text-text-secondary">
-                    Add an agent to start working from your phone.
+                    {t("mobile.agent.home.noAgentsBody")}
                   </Typography.Paragraph>
                 </View>
                 <Button size="md" variant="secondary" onPress={() => router.push("/add-agent")}>
                   <Plus color={iconColor} size={18} strokeWidth={2} />
-                  <Button.Label>Add agent</Button.Label>
+                  <Button.Label>{t("mobile.agent.home.addAgent")}</Button.Label>
                 </Button>
               </View>
             ) : null
@@ -396,7 +400,7 @@ export function ConnectedScreen() {
           headerLeft: isAndroid
             ? () => (
                 <View className="flex-row items-center gap-2">
-                  <HeaderIconButton accessibilityLabel="Open servers" onPress={openDrawer}>
+                  <HeaderIconButton accessibilityLabel={t("mobile.agent.home.openServers")} onPress={openDrawer}>
                     <Layers3 color={iconColor} size={22} strokeWidth={1.8} />
                   </HeaderIconButton>
                   <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
@@ -407,7 +411,10 @@ export function ConnectedScreen() {
             ? () => (
                 <View className="flex-row items-center gap-1">
                   {IS_AGENT_SEARCH_ENABLED ? (
-                    <HeaderIconButton accessibilityLabel="Search agents" onPress={() => router.push("/search-agents")}>
+                    <HeaderIconButton
+                      accessibilityLabel={t("mobile.agent.home.searchAgents")}
+                      onPress={() => router.push("/search-agents")}
+                    >
                       <Search color={iconColor} size={22} strokeWidth={1.9} />
                     </HeaderIconButton>
                   ) : null}
@@ -424,7 +431,7 @@ export function ConnectedScreen() {
                     style={{ height: 44, width: 44 }}
                   >
                     <View
-                      accessibilityLabel="Chat options"
+                      accessibilityLabel={t("mobile.agent.home.chatOptions")}
                       accessibilityRole="button"
                       accessible
                       className="size-11 items-center justify-center rounded-full"
@@ -452,16 +459,16 @@ export function ConnectedScreen() {
             {IS_AGENT_SEARCH_ENABLED ? (
               <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search-agents")} />
             ) : null}
-            <Stack.Toolbar.Menu icon="plus" accessibilityLabel="Chat options">
+            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")}>
               <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
-                Add agent
+                {t("mobile.agent.home.addAgent")}
               </Stack.Toolbar.MenuAction>
               {sidebar?.layout ? (
                 <Stack.Toolbar.MenuAction
                   icon="folder.badge.plus"
                   onPress={() => router.push({ pathname: "/section-form", params: { serverId: activeServer.id } })}
                 >
-                  New section
+                  {t("mobile.agent.sectionForm.newTitle")}
                 </Stack.Toolbar.MenuAction>
               ) : null}
               {channels.supported ? (
@@ -469,12 +476,12 @@ export function ConnectedScreen() {
                   icon="number"
                   onPress={() => router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
                 >
-                  New channel
+                  {t("mobile.agent.home.newChannel")}
                 </Stack.Toolbar.MenuAction>
               ) : null}
               {hasHiddenChats ? (
                 <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => router.push("/hidden-chats")}>
-                  Hidden chats
+                  {t("mobile.agent.hidden.title")}
                 </Stack.Toolbar.MenuAction>
               ) : null}
             </Stack.Toolbar.Menu>

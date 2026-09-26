@@ -1,5 +1,5 @@
 import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
-import { type AppTranslate, resolveLocale, type TranslatedLocale, translateFor } from "@openbot/i18n";
+import { type AppTranslate, formatLocale, resolveLocale, type TranslatedLocale, translateFor } from "@openbot/i18n";
 import { TextProvider } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import {
@@ -125,7 +125,9 @@ export function I18nProvider(props: ParentProps): JSX.Element {
   const value = createI18nValue();
   return (
     <I18nContext value={value}>
-      <TextProvider locale={value.locale()}>{props.children}</TextProvider>
+      <TextProvider locale={value.locale()} formatLocale={formatLocale(value.language(), navigator.language)}>
+        {props.children}
+      </TextProvider>
     </I18nContext>
   );
 }
@@ -134,7 +136,9 @@ export function I18nProvider(props: ParentProps): JSX.Element {
  * A fixed language, for a surface without the desktop preference: the public web client before
  * sign-in, and Storybook. Resolve a browser tag with `resolveLocale("system", navigator.language)`.
  */
-export function StaticI18nProvider(props: ParentProps<{ locale: TranslatedLocale }>): JSX.Element {
+export function StaticI18nProvider(
+  props: ParentProps<{ locale: TranslatedLocale; formatLocale?: string }>,
+): JSX.Element {
   const value: I18nValue = {
     language: () => props.locale,
     locale: () => props.locale,
@@ -143,7 +147,9 @@ export function StaticI18nProvider(props: ParentProps<{ locale: TranslatedLocale
   };
   return (
     <I18nContext value={value}>
-      <TextProvider locale={props.locale}>{props.children}</TextProvider>
+      <TextProvider locale={props.locale} formatLocale={props.formatLocale}>
+        {props.children}
+      </TextProvider>
     </I18nContext>
   );
 }

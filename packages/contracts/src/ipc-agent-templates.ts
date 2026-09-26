@@ -165,35 +165,37 @@ export function isAgentTemplateSnapshot(value: unknown): value is AgentTemplateS
   );
 }
 
+/** Why a template made from a local agent cannot be published. Main turns it into words. */
+export type AgentTemplateSnapshotProblem =
+  | { kind: "name" | "title" | "noInstructions" | "instructions" | "avatar" | "skills" | "localSkills" }
+  | { kind: "skill"; name: string }
+  | { kind: "routines" }
+  | { kind: "routine"; name: string }
+  | { kind: "tooLarge" };
+
 /**
- * The first reason a template made from a local agent cannot be published, in words the owner can
- * act on, or null when `isAgentTemplateSnapshot` accepts it. It checks the same limits in the same
- * order, so the message names the real cause.
+ * The first reason a template made from a local agent cannot be published, or null when
+ * `isAgentTemplateSnapshot` accepts it. It checks the same limits in the same order, so the
+ * message names the real cause.
  */
-export function agentTemplateSnapshotProblem(value: AgentTemplateSnapshot): string | null {
-  if (!value.name.trim() || value.name.length > INPUT_LIMITS.agentName)
-    return `Give this agent a name of 1 to ${INPUT_LIMITS.agentName} characters.`;
-  if (value.title.length > INPUT_LIMITS.agentTitle)
-    return `The role is longer than ${INPUT_LIMITS.agentTitle} characters. Shorten it.`;
-  if (!value.description.trim()) return "Add instructions to this agent before publishing it.";
-  if (value.description.length > INPUT_LIMITS.agentDescription)
-    return `The instructions are longer than ${INPUT_LIMITS.agentDescription} characters. Shorten them.`;
+export function agentTemplateSnapshotProblem(value: AgentTemplateSnapshot): AgentTemplateSnapshotProblem | null {
+  if (!value.name.trim() || value.name.length > INPUT_LIMITS.agentName) return { kind: "name" };
+  if (value.title.length > INPUT_LIMITS.agentTitle) return { kind: "title" };
+  if (!value.description.trim()) return { kind: "noInstructions" };
+  if (value.description.length > INPUT_LIMITS.agentDescription) return { kind: "instructions" };
   if (!isAvatarSeed(value.avatarSeed) || (value.avatarHue !== null && !isAvatarHue(value.avatarHue)))
-    return "The avatar of this agent is not valid. Choose it again in the agent settings.";
-  if (value.skills.length > AGENT_TEMPLATE_LIMITS.skills)
-    return `An agent can publish up to ${AGENT_TEMPLATE_LIMITS.skills} skills. Remove some of them.`;
+    return { kind: "avatar" };
+  if (value.skills.length > AGENT_TEMPLATE_LIMITS.skills) return { kind: "skills" };
   if (value.skills.filter((skill) => skill.kind === "embedded").length > AGENT_TEMPLATE_LIMITS.embeddedSkills)
-    return `An agent can publish up to ${AGENT_TEMPLATE_LIMITS.embeddedSkills} local skills. Remove some of them.`;
+    return { kind: "localSkills" };
   // `findIndex`, not `find`: the guard would narrow a typed skill to `never`.
   const skill = value.skills[value.skills.findIndex((candidate) => !isAgentTemplateSkill(candidate))];
-  if (skill) return `The skill "${skill.name}" cannot be published. Check its name and its SKILL.md.`;
-  if (value.routines.length > INPUT_LIMITS.agentRoutines)
-    return `An agent can publish up to ${INPUT_LIMITS.agentRoutines} routines. Remove some of them.`;
+  if (skill) return { kind: "skill", name: skill.name };
+  if (value.routines.length > INPUT_LIMITS.agentRoutines) return { kind: "routines" };
   const routine = value.routines[value.routines.findIndex((candidate) => !isAgentTemplateRoutine(candidate))];
-  if (routine)
-    return `The routine "${routine.name || "without a name"}" needs a name of up to ${INPUT_LIMITS.routineName} characters and an instruction.`;
+  if (routine) return { kind: "routine", name: routine.name };
   if (new TextEncoder().encode(JSON.stringify(value)).byteLength > AGENT_TEMPLATE_LIMITS.snapshotBytes)
-    return "This agent is too large to publish. Shorten its instructions, skills or routines.";
+    return { kind: "tooLarge" };
   return null;
 }
 

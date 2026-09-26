@@ -3,6 +3,7 @@
 import { Badge, buttonVariants, ContextMenu, Lock } from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator } from "./SidebarAgentIndicator";
@@ -19,11 +20,12 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
     sidebarClickIsSuppressed,
     startChatDragging,
   } = useSidebarScope();
+  const { t, format } = useText();
   const title = () => rowProps.agent.title.trim();
-  const accessLabel = () => (rowProps.agent.access === "workspace" ? ". Workspace only (not enforced yet)" : "");
+  const accessLabel = () => (rowProps.agent.access === "workspace" ? `. ${t("sidebar.agent.workspaceOnly")}` : "");
   const routineLabel = () => {
     const state = props.agentStates[rowProps.agent.id];
-    return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
+    return state?.kind === "routine" ? sidebarAgentStateLabel(state, t) : "";
   };
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
@@ -70,7 +72,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
                 <span class="agent-row-name">
                   <strong>{rowProps.agent.name}</strong>
                   <Show when={rowProps.agent.access === "workspace"}>
-                    <span class="agent-row-access" title="Workspace only (not enforced yet)">
+                    <span class="agent-row-access" title={t("sidebar.agent.workspaceOnly")}>
                       <Lock aria-hidden="true" />
                     </span>
                   </Show>
@@ -84,13 +86,13 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
                 </Show>
               </span>
               <span class="agent-row-time">
-                {rowProps.agent.updatedAt ? sidebarMessageTime(rowProps.agent.updatedAt) : rowProps.agent.time}
+                {rowProps.agent.updatedAt ? sidebarMessageTime(rowProps.agent.updatedAt, format) : rowProps.agent.time}
               </span>
             </span>
             <span class="agent-row-preview">{rowProps.agent.preview}</span>
           </span>
           <Show when={props.agentStates[rowProps.agent.id]}>
-            {(state) => <span class="sr-only">{sidebarAgentStateLabel(state())}</span>}
+            {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t)}</span>}
           </Show>
         </ContextMenu.Trigger>
         <SidebarAgentContextMenu agent={rowProps.agent} pinned={false} />

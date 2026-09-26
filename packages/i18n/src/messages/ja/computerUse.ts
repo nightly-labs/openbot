@@ -1,4 +1,43 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/computerUse";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  // Computer Use settings, the permission help window, and the window highlight.
+  "computerUse.permission.screenRecording.title": "画面収録",
+  "computerUse.permission.screenRecording.description": "OpenBot がアプリのウインドウを見られるようにします。",
+  "computerUse.permission.screenRecording.pane": "画面収録とシステムオーディオ録音",
+  "computerUse.permission.accessibility.title": "アクセシビリティ",
+  "computerUse.permission.accessibility.description": "OpenBot がクリックや入力をできるようにします。",
+  "computerUse.permission.accessibility.pane": "アクセシビリティ",
+  "computerUse.error.check": "OpenBot は Computer Use を確認できませんでした。",
+  "computerUse.error.openSettings": "OpenBot はシステム設定を開けませんでした。",
+  "computerUse.error.startDriver": "OpenBot は Computer Use ドライバを起動できませんでした。",
+  "computerUse.checkAgain": "もう一度確認",
+  "computerUse.checking": "Computer Use を確認しています",
+  "computerUse.unavailable.title": "Computer Use はまだ利用できません",
+  "computerUse.permissions.title": "システムの権限",
+  "computerUse.permissions.description": "権限は macOS が管理します。",
+  "computerUse.ready.title": "Computer Use の準備ができました",
+  "computerUse.ready.description":
+    "OpenBot はこのコンピュータのアプリを見て操作できます。このシステムでは追加の権限は必要ありません。",
+  "computerUse.openSettingsFailed.title": "システム設定を開けませんでした",
+  "computerUse.compact.title": "Computer Use を有効にする",
+  "computerUse.compact.description": "OpenBot がこのコンピュータのアプリを見て操作できるようにします。",
+  "computerUse.granted": "許可済み",
+  "computerUse.opening": "開いています…",
+  "computerUse.manage": "管理",
+  "computerUse.grant": "許可",
+  "computerUse.manageLabel": "{permission}を管理",
+  "computerUse.grantLabel": "{permission}を許可",
+  "computerUse.help.title": "{permission}をオンにする",
+  "computerUse.help.paneOpen": "システム設定で「{pane}」が開いています。",
+  "computerUse.help.dragLabel": "{name} をシステム設定にドラッグするか、押して Finder に表示します",
+  "computerUse.help.dragToAdd": "ドラッグして追加",
+  "computerUse.help.findInList": "リストで {name} を探してください。",
+  "computerUse.help.dragIntoList": "{name}.app をリストにドラッグしてください。",
+  "computerUse.help.turnOn": "スイッチをオンにしてください。",
+  "computerUse.help.showInFinder": "Finder に表示",
+  "computerUse.help.revealFailed": "アプリケーションを Finder に表示できませんでした。",
+  "computerUse.help.dragFailed": "アプリケーションをドラッグできませんでした。",
+  "computerUse.highlight.working": "OpenBot が {title} で作業しています",
+} as const satisfies PartialTranslation<typeof source>;

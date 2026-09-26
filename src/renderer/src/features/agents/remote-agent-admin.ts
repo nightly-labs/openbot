@@ -1,5 +1,6 @@
 import type { AgentAdminSettings, ServerSummary, UpdateAgentAdminSettingsInput } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { serverCanAdminister } from "../servers/server-capabilities";
 import { agentsPort } from "./agents-port";
@@ -61,7 +62,7 @@ export function createRemoteAgentAdmin(target: () => { server: ServerSummary; ag
     async update(input: UpdateAgentAdminSettingsInput): Promise<void> {
       const server = target()?.server;
       if (!serverCanAdministerAgents(server) || server.kind !== "remote")
-        throw new Error("Agent settings can only be changed by a server administrator.");
+        throw new Error(currentText().t("agent.error.adminOnly"));
       const settings = await agentsPort().agent.updateAgentAdminSettings(input, server.id);
       accept(JSON.stringify([server.id, input.agentId]), settings);
     },

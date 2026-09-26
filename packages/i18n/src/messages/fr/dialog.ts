@@ -11,4 +11,7 @@ export const messages = {
   "dialog.filter.attachment": "Pièce jointe",
   "dialog.filter.zipArchive": "Archive ZIP",
   "dialog.filter.jsonDocument": "Document JSON",
+  "dialog.chooseAgentExport": "Choisir une exportation d’agents",
+  "dialog.filter.agentExports": "Exportations d’agents",
+  "dialog.saveExportSkill": "Enregistrer la compétence d’exportation",
 } as const satisfies PartialTranslation<typeof source>;

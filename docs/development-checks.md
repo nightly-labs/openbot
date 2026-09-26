@@ -277,9 +277,8 @@ Biome cannot select a GritQL plugin with `--only`, and it reports every plugin u
 category `plugin`. So a plugin rule enters the baseline as `plugin/<name>`, and its message must
 start with `[<name>]`. The ratchet runs Biome once more with every built-in group skipped, and counts
 each plugin by that prefix. `plugin/no-hardcoded-ui-text`
-(`tools/ui-foundation/no-hardcoded-ui-text.grit`) is the first one: it warns on literal interface
-text in the renderer, shared UI and mobile sources. See [i18n.md](i18n.md). Other new GritQL rules
-must start clean.
+(`tools/ui-foundation/no-hardcoded-ui-text.grit`) used this path until its last finding was fixed;
+it is now an error. See [i18n.md](i18n.md). Other new GritQL rules must start clean.
 
 ### Type debt ratchet
 

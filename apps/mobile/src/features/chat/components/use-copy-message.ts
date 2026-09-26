@@ -1,8 +1,10 @@
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
 import { Alert } from "react-native";
+import { useText } from "@/shared/lib/text";
 
 export function useCopyMessage(text: string) {
+  const { t } = useText();
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
@@ -10,7 +12,7 @@ export function useCopyMessage(text: string) {
       setCopied(true);
       return true;
     } catch {
-      Alert.alert("Could not copy message", "Please try again.");
+      Alert.alert(t("mobile.chat.message.copyFailed"), t("mobile.chat.copyFailedMessage"));
       return false;
     }
   }

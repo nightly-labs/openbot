@@ -1,3 +1,4 @@
+import { useText } from "@openbot/ui/text";
 import { Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
@@ -12,7 +13,8 @@ import { WorkspaceShell } from "./WorkspaceShell";
 
 /** The one placeholder every gate below falls back to, at every depth. */
 function LoadingScreen() {
-  return <div class="initial-setup-screen" role="status" aria-label="Loading OpenBot" />;
+  const { t } = useText();
+  return <div class="initial-setup-screen" role="status" aria-label={t("app.loading")} />;
 }
 
 /**

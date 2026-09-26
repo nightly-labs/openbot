@@ -1,4 +1,5 @@
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { parseInstallAgentTemplate } from "../ipc/agent-template-handlers";
 import { parseInstallMarketplaceAgent } from "../ipc/app-inputs";
 import type { TeamApiAdmin } from "./dependencies";
@@ -22,7 +23,7 @@ export async function routeAgentInstall(
   const marketplaceAgents = admin?.marketplaceAgents;
   const agentTemplates = admin?.agentTemplates;
   if (!marketplaceAgents || !agentTemplates || !capabilities.has(AGENT_INSTALL_CAPABILITY))
-    throw new HttpError(400, "Adding agents is not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.agentInstallUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
   const add = marketplace ? addFromMarketplace(marketplaceAgents, body) : addFromTemplate(agentTemplates, body);

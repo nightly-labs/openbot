@@ -37,6 +37,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
@@ -187,7 +188,7 @@ export class HostService extends EventEmitter<HostEvents> {
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (async () => {
-          throw new Error("Remote Signal has not supplied ICE servers.");
+          throw new Error(sourceText("error.host.iceServersMissing"));
         }),
       ...(options.createRemoteDesktopRuntime ? { createRuntime: options.createRemoteDesktopRuntime } : {}),
       ...(logDirectory
@@ -252,7 +253,7 @@ export class HostService extends EventEmitter<HostEvents> {
           appVersion: options.appVersion,
           transferDirectory: join(options.logDirectory ?? ".openbot-remote", "transfers"),
           renewSignal: async (hostId) => {
-            if (!options.issueRemoteHostTicket) throw new Error("The WebRTC host service is not configured.");
+            if (!options.issueRemoteHostTicket) throw new Error(sourceText("error.host.webRtcNotConfigured"));
             return options.issueRemoteHostTicket(hostId);
           },
           onSignalRecoveryFailure: (error) => {
@@ -306,11 +307,11 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   async openRemoteDesktopSetup(action: RemoteDesktopSetupAction): Promise<void> {
-    if (process.platform !== "darwin") throw new Error("Permission setup is available on macOS.");
+    if (process.platform !== "darwin") throw new Error(sourceText("status.remote.setupMacOnly"));
     const executable = this.#options.remoteDesktopRuntimePaths?.sunshine;
-    if (!executable) throw new Error("The remote desktop runtime is not installed.");
+    if (!executable) throw new Error(sourceText("error.host.runtimeNotInstalled"));
     const appPath = dirname(dirname(dirname(executable)));
-    if (!this.#options.openRemoteDesktopSetup) throw new Error("Permission setup is not available.");
+    if (!this.#options.openRemoteDesktopSetup) throw new Error(sourceText("error.host.setupUnavailable"));
     await this.#options.openRemoteDesktopSetup(action, appPath);
   }
 
@@ -447,7 +448,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#options.store.unbindActiveHost();
       this.#status = initialHostStatus(null, this.#options.unattended ?? false);
       this.emit("changed", this.getStatus());
-      throw new Error("The signed-in account changed while this server was being created.");
+      throw new Error(sourceText("error.team.accountChangedDuringCreate"));
     }
     // The store checked the account before it resolved; the switch can still land between
     // there and here, and publishing then would show A's server to B.
@@ -478,7 +479,7 @@ export class HostService extends EventEmitter<HostEvents> {
       if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
       this.#setStatus({
         apiUrl: null,
-        message: "Registered this OpenBot for WebRTC access.",
+        message: sourceText("status.host.registered"),
       });
     } catch (error) {
       // A failure that arrives after another account signed in belongs to the host that is
@@ -486,7 +487,7 @@ export class HostService extends EventEmitter<HostEvents> {
       if (this.#isActiveHost(identity.serverId)) {
         this.#setStatus({
           phase: "error",
-          message: error instanceof Error ? error.message : "Could not reserve the public address.",
+          message: error instanceof Error ? error.message : sourceText("error.host.reserveAddressFailed"),
         });
       }
     }
@@ -502,7 +503,7 @@ export class HostService extends EventEmitter<HostEvents> {
     this.#setStatus({
       serverName: identity.serverName,
       logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
-      message: "Server identity updated.",
+      message: sourceText("status.host.identityUpdated"),
     });
     this.#api.refreshIdentity();
     const ownerMembershipId = this.#requiredOwnerMemberId();
@@ -534,7 +535,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   #assertStillActiveHost(serverId: string): void {
     if (!this.#isActiveHost(serverId)) {
-      throw new Error("The signed-in account changed while this server was being updated.");
+      throw new Error(sourceText("error.host.accountChangedDuringUpdate"));
     }
   }
 
@@ -552,7 +553,7 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   async #startRuntimeOperation(): Promise<HostStatus> {
-    if (!this.#options.store.configured) throw new Error("Name this OpenBot before publishing it.");
+    if (!this.#options.store.configured) throw new Error(sourceText("error.host.nameBeforePublish"));
     if ((this.#status.phase === "online" && this.#webRtcOnline) || this.#status.phase === "starting") {
       return this.getStatus();
     }
@@ -561,15 +562,15 @@ export class HostService extends EventEmitter<HostEvents> {
     const signedInUser = this.#options.getSignedInUser();
     this.#options.store.assertOwnerAccount(signedInUser);
     if (await this.#options.store.syncAccount(signedInUser)) this.#api.refreshPresence();
-    this.#setStatus({ phase: "starting", message: "Starting the WebRTC host…" });
+    this.#setStatus({ phase: "starting", message: sourceText("status.host.starting") });
 
     try {
       const apiPort = await this.#api.start();
       if (await this.#cancelSupersededStart(generation)) return this.getStatus();
       const identity = this.#options.store.getIdentity();
-      if (!identity) throw new Error("Name this OpenBot before publishing it.");
+      if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
       if (!this.#webrtcGateway || !this.#options.registerRemoteHost || !this.#options.issueRemoteHostTicket) {
-        throw new Error("The WebRTC host service is not configured.");
+        throw new Error(sourceText("error.host.webRtcNotConfigured"));
       }
       await this.#options.registerRemoteHost({
         hostId: identity.serverId,
@@ -598,7 +599,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#setStatus({
         apiUrl: bootstrap.signalUrl,
         apiOnline: true,
-        message: "This OpenBot is ready for WebRTC connections.",
+        message: sourceText("status.host.ready"),
       });
       if (await this.#cancelSupersededStart(generation)) return this.getStatus();
       await this.#options.store.setEnabledOnLaunch(identity.serverId, true);
@@ -614,7 +615,7 @@ export class HostService extends EventEmitter<HostEvents> {
         phase: "error",
         apiOnline: false,
         apiUrl: null,
-        message: error instanceof Error ? error.message : "This OpenBot could not be published.",
+        message: error instanceof Error ? error.message : sourceText("error.host.publishFailed"),
       });
     }
     return this.getStatus();
@@ -684,7 +685,7 @@ export class HostService extends EventEmitter<HostEvents> {
     const serverId = this.#options.store.getIdentity()?.serverId;
     this.#runtimeGeneration += 1;
     if (persistPreference) this.#options.store.assertOwnerAccount(this.#options.getSignedInUser());
-    this.#setStatus({ phase: "stopping", message: "Making this OpenBot private…" });
+    this.#setStatus({ phase: "stopping", message: sourceText("status.host.stopping") });
     await this.#stopRuntime();
     await this.#startOperation;
     await this.#stopRuntime();
@@ -698,7 +699,7 @@ export class HostService extends EventEmitter<HostEvents> {
       enabledOnLaunch: persistPreference ? false : this.#status.enabledOnLaunch,
       apiUrl: null,
       apiOnline: false,
-      message: "This OpenBot is private.",
+      message: sourceText("status.host.private"),
     });
     return this.getStatus();
   }
@@ -841,7 +842,7 @@ export class HostService extends EventEmitter<HostEvents> {
       const current = (await this.#options.listRemoteMembers(hostId)).find(
         (member) => member.membershipId === input.memberId,
       );
-      if (!current || current.role === "owner") throw new Error("The remote member does not exist.");
+      if (!current || current.role === "owner") throw new Error(sourceText("error.host.memberNotFound"));
       // The directory read is a round trip, and the account can change during it. Mutating
       // the previous account's host with the new account's authorization is what this guard
       // stops; the same check runs again before the result is written back.
@@ -857,7 +858,7 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#assertStillActiveHost(hostId);
       const members = await this.#options.listRemoteMembers(hostId);
       const updated = members.find((member) => member.membershipId === input.memberId);
-      if (!updated) throw new Error("The remote member does not exist.");
+      if (!updated) throw new Error(sourceText("error.host.memberNotFound"));
       await this.#options.store.syncRemoteDirectory(hostId, members);
       // Recording the directory is a write too, so the switch can land inside it and the
       // member below would be the previous account's.
@@ -929,7 +930,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   async createInvite(input: CreateTeamInviteInput): Promise<InviteSummary> {
     const identity = this.#options.store.getIdentity();
-    if (!identity) throw new Error("Name this OpenBot before publishing it.");
+    if (!identity) throw new Error(sourceText("error.host.nameBeforePublish"));
     const remoteInviteApiUrl = this.#remoteInviteApiUrl();
     if (remoteInviteApiUrl && this.#options.createRemoteInvite) {
       const invite = await this.#options.createRemoteInvite(identity.serverId, input);
@@ -979,7 +980,7 @@ export class HostService extends EventEmitter<HostEvents> {
     // address -- which `createInviteUrl` rejects, so a developer who had published this host could
     // not create an invite at all.
     const localApiUrl = this.#localApiUrl();
-    if (!localApiUrl) throw new Error("Make this OpenBot public before creating an invite.");
+    if (!localApiUrl) throw new Error(sourceText("error.host.publishBeforeInvite"));
     const invite = await this.#options.store.createInvite(input.role, input.email, { permanent: input.permanent });
     const inviteUrl = createInviteUrl(
       {
@@ -1058,7 +1059,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   #currentMemberId(): string {
     const memberId = this.#findCurrentMemberId();
-    if (!memberId) throw new Error("Your team access is unavailable.");
+    if (!memberId) throw new Error(sourceText("error.host.teamAccessUnavailable"));
     return memberId;
   }
 
@@ -1103,7 +1104,7 @@ export class HostService extends EventEmitter<HostEvents> {
 
   #requiredOwnerMemberId(): string {
     const memberId = this.#options.store.getOwnerMemberId();
-    if (!memberId) throw new Error("The host owner identity is unavailable.");
+    if (!memberId) throw new Error(sourceText("error.host.ownerIdentityUnavailable"));
     return memberId;
   }
 }

@@ -8,6 +8,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isMessageReaction } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -60,7 +61,7 @@ export async function routeAgentConversation(
     // itself. It has to be: the negotiated protocol also picks the adapter `json` encodes with, so a
     // route deciding on a different number than the encoder would answer in a shape it just refused.
     if (protocol < TEAM_PROTOCOL_V3 || !capabilities.has("conversation-unread")) {
-      throw new HttpError(400, "This client does not support marking conversations unread.");
+      throw new HttpError(400, sourceText("error.team.markUnreadUnsupported"));
     }
     await readJson(request);
     return json(200, await agents.markConversationUnread(agentId, member.id));

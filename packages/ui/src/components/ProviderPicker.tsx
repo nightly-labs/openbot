@@ -8,7 +8,7 @@ import type {
   ProviderRuntimePhase,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
-import type { AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
+import type { AppFormat, AppMessages, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -106,7 +106,7 @@ export interface ProviderPickerProps {
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
-  const { t } = useText();
+  const { t, format, sourceText } = useText();
   const inputs = new Map<AgentProviderId, HTMLInputElement>();
   const pickerId = createUniqueId();
   const addCustomId = `${pickerId}-custom`;
@@ -170,7 +170,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               tone={providerStatusTone(engine().state)}
               shape="pill"
             >
-              {providerStatusLabel(t, engine().state)}
+              {providerStatusLabel(t, format, engine().state)}
             </Badge>
           </Show>
         </span>
@@ -201,7 +201,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             disabled={props.disabled || props.refreshingProviders}
             onClick={() => props.onAddCustomProvider?.()}
           >
-            {t("provider.action.add")}
+            {t("common.add")}
           </Button>
         </Show>
         {/* Same OpenCode runtime fetch unblocks Add. */}
@@ -324,7 +324,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               };
               const version = () => {
                 const runtime = runtimeStatus();
-                return runtime ? providerVersionLabel(runtime) : null;
+                return runtime ? providerVersionLabel(runtime, { t }) : null;
               };
               const visualState = () => providerVisualState(state(), connecting(), runtimeStatus(), updatable());
               /**
@@ -381,7 +381,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       "provider-picker-option-with-callout": Boolean(option().callout),
                     },
                   ]}
-                  title={option().message ?? undefined}
+                  title={option().message ? sourceText(option().message ?? "") : undefined}
                 >
                   <Show when={option().callout}>
                     {(callout) => (
@@ -414,7 +414,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         {(detail) => <small class="provider-picker-email">{detail()}</small>}
                       </Show>
                       <Show when={option().checkError}>
-                        {(checkError) => <small class="provider-picker-check-error">{checkError()}</small>}
+                        {(checkError) => <small class="provider-picker-check-error">{sourceText(checkError())}</small>}
                       </Show>
                     </span>
                     {/* Version shares the badge column. */}
@@ -439,7 +439,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           tone={providerStatusTone(visualState())}
                           shape="pill"
                         >
-                          {providerStatusLabel(t, state(), connecting(), runtimeStatus(), updatable())}
+                          {providerStatusLabel(t, format, state(), connecting(), runtimeStatus(), updatable())}
                         </Badge>
                       </Show>
                     </span>
@@ -627,6 +627,7 @@ function providerStatusTone(state: ProviderVisualState): "success" | "warning" |
 /** Badge text, translated where drawn; downloads report a percentage, not a key. */
 function providerStatusLabel(
   translate: AppTranslate,
+  format: AppFormat,
   state: AgentProviderState,
   connecting = false,
   runtimeStatus?: ProviderRuntimeStatus,
@@ -634,7 +635,7 @@ function providerStatusLabel(
 ): string {
   // Downloads outrank connection words; the row reports progress until it ends.
   if (runtimeStatus?.phase === "downloading") {
-    return `${Math.round(Math.max(0, Math.min(100, runtimeStatus.progress ?? 0)))}%`;
+    return format.percent(Math.round(Math.max(0, Math.min(100, runtimeStatus.progress ?? 0))) / 100);
   }
   if (runtimeStatus?.phase === "finishing") return translate("provider.status.settingUp");
   if (connecting && state !== "available") return translate("provider.status.connecting");
@@ -671,12 +672,12 @@ function providerVisualState(
 type ProviderAction = "download" | "cancel" | "connect" | "reconnect" | "restart" | "retry";
 
 const PROVIDER_ACTION_TEXT = {
-  download: "provider.action.download",
-  cancel: "provider.action.cancel",
+  download: "common.download",
+  cancel: "common.cancel",
   connect: "provider.action.connect",
   reconnect: "provider.action.reconnect",
   restart: "provider.action.restart",
-  retry: "provider.action.retry",
+  retry: "common.retry",
 } as const satisfies Record<ProviderAction, AppTextKey>;
 
 /** The name a screen reader reads. It repeats the provider, because a list of rows that all say

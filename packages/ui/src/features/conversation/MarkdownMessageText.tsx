@@ -3,6 +3,7 @@ import { Dynamic } from "@solidjs/web";
 import type { Token, Tokens, TokensList } from "marked";
 import { marked } from "marked";
 import { createMemo, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
 import { MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
@@ -376,8 +377,9 @@ function MarkdownTable(props: { token: Tokens.Table; content: MarkdownContentPro
   const streamingCellIndex = createMemo(() =>
     props.streaming === true ? activeStreamingTableCellIndex(props.token) : -1,
   );
+  const { t } = useText();
   return (
-    <section class="message-markdown-table-scroll" aria-label="Data table" tabindex="0">
+    <section class="message-markdown-table-scroll" aria-label={t("chat.table.data")} tabindex="0">
       <table class="message-markdown-table">
         <thead>
           <tr>
@@ -420,6 +422,7 @@ function MarkdownInline(props: {
   streaming?: boolean;
   streamingTail?: boolean;
 }) {
+  const { t } = useText();
   const tokens = createMemo(() => repairEscapedLocalFileLinkTokens(props.tokens));
   const renderedTokens = createMemo(() => {
     const values = tokens();
@@ -523,7 +526,7 @@ function MarkdownInline(props: {
             if (url && props.content.imagesAsLinks) {
               return (
                 <MessageLink url={url} onOpenLink={props.content.onOpenLink}>
-                  {token.text || "View image"}
+                  {token.text || t("chat.image.view")}
                 </MessageLink>
               );
             }
@@ -781,6 +784,7 @@ function LocalFileLink(props: {
   kind: "shared" | "workspace";
   onOpen: (path: string) => void;
 }) {
+  const { t } = useText();
   const name = workspaceFileName(props.path);
   return (
     <Button
@@ -788,7 +792,9 @@ function LocalFileLink(props: {
       type="button"
       class="message-file-reference"
       data-file-tone={attachmentReferenceTone(name)}
-      aria-label={`Open ${props.kind} file ${name}`}
+      aria-label={
+        props.kind === "shared" ? t("chat.file.openShared", { name }) : t("chat.file.openWorkspace", { name })
+      }
       title={props.path}
       onClick={() => props.onOpen(props.path)}
     >

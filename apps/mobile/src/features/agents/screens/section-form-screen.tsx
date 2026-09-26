@@ -1,4 +1,3 @@
-import { userErrorMessage } from "@openbot/user-errors";
 import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -9,8 +8,10 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 export function SectionFormScreen() {
+  const { t, errorMessage } = useText();
   const { serverId, sectionId } = useLocalSearchParams<{ serverId: string; sectionId?: string }>();
   const { servers, sidebarByServer, mutateSidebarLayout } = useMobileWorkspace();
   const layout = sidebarByServer[serverId]?.layout;
@@ -30,9 +31,13 @@ export function SectionFormScreen() {
   const valid = name.trim().length > 0 && name.trim().length <= 40;
   usePreventRemove(!finished && (dirty || saving), ({ data }) => {
     if (pending.current) return;
-    Alert.alert("Discard changes?", "Your changes have not been saved.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => navigation.dispatch(data.action) },
+    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
+      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
+      {
+        text: t("mobile.agent.discard.discard"),
+        style: "destructive",
+        onPress: () => navigation.dispatch(data.action),
+      },
     ]);
   });
   useEffect(() => {
@@ -50,7 +55,7 @@ export function SectionFormScreen() {
       );
       setFinished(true);
     } catch (cause) {
-      setError(userErrorMessage(cause, "Could not save section. Please try again."));
+      setError(errorMessage(cause, t("mobile.agent.sectionForm.saveFailed")));
       pending.current = false;
       setSaving(false);
     }
@@ -62,26 +67,28 @@ export function SectionFormScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      <Stack.Screen options={{ title: sectionId ? "Rename section" : "New section" }} />
+      <Stack.Screen
+        options={{ title: t(sectionId ? "mobile.agent.sectionForm.renameTitle" : "mobile.agent.sectionForm.newTitle") }}
+      />
       <Stack.Toolbar placement="left">
         <Stack.Toolbar.Button
           icon={isIOS ? "xmark" : undefined}
-          accessibilityLabel="Close"
+          accessibilityLabel={t("common.close")}
           disabled={saving}
           onPress={() => router.back()}
         >
-          {isIOS ? "Close" : "×"}
+          {isIOS ? t("common.close") : "×"}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
       <SheetSaveAction
         dirty={dirty}
         canSave={available && valid && !finished}
         pending={saving}
-        label={sectionId ? "Save section" : "Create section"}
+        label={t(sectionId ? "mobile.agent.sectionForm.save" : "mobile.agent.sectionForm.create")}
         onSave={() => void save()}
       />
       <SheetFormField
-        label="Section name"
+        label={t("mobile.agent.sectionForm.name")}
         value={name}
         onChangeText={setName}
         editable={!saving}
@@ -91,9 +98,7 @@ export function SectionFormScreen() {
         onSubmitEditing={() => void save()}
       />
       {!available ? (
-        <Typography.Paragraph className="text-muted">
-          This section is unavailable. Reconnect to the server or close this form.
-        </Typography.Paragraph>
+        <Typography.Paragraph className="text-muted">{t("mobile.agent.sectionForm.unavailable")}</Typography.Paragraph>
       ) : null}
       {error ? <Typography.Paragraph className="text-danger-text">{error}</Typography.Paragraph> : null}
     </SheetScrollView>

@@ -151,6 +151,13 @@ describe("provider authentication failures", () => {
     );
   });
 
+  it("redacts a secret inside a value of a translated message", () => {
+    const error = new Error("Queue edit rejected: Could not connect with apiKey=example-secret-value.");
+    expect(userErrorMessage(error, fallback, "fr")).toBe(
+      "Modification de la file d’attente refusée : Could not connect with apiKey=[redacted]",
+    );
+  });
+
   it("strips an error class prefix from a product message", () => {
     const error = new Error("Error invoking remote method 'test:action': RemoteRequestError: Choose another name.");
     expect(userErrorMessage(error, fallback)).toBe("Choose another name.");

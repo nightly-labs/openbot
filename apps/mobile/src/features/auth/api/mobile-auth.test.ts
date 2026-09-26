@@ -21,6 +21,10 @@ vi.mock("expo/fetch", () => ({ fetch: native.fetch }));
 vi.mock("expo-crypto", () => ({}));
 vi.mock("expo-device", () => ({ deviceName: null, modelName: null }));
 vi.mock("@/shared/lib/platform", () => ({ isIOS: true, isAndroid: false }));
+vi.mock("@/shared/lib/text", async () => {
+  const { textFor } = await import("../../../shared/lib/text-value");
+  return { currentText: () => textFor("en") };
+});
 vi.mock("expo-secure-store", () => ({
   getItemAsync: async (key: string) => native.storage.get(key) ?? null,
   setItemAsync: async (key: string, value: string) => {

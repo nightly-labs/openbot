@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { type AgentProviderId, agentProviderCliName } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, type InstalledSkill, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { parse as parseYaml } from "yaml";
 import { OWNERSHIP_MARKER } from "./managed-skill-service";
 
@@ -101,28 +102,29 @@ async function readFolderSkill(workspace: string, folder: string, slug: string):
   let text: string;
   try {
     const file = join(directory, "SKILL.md");
-    if ((await stat(file)).size > MAX_SKILL_FILE_BYTES) return { ...skill, problem: "SKILL.md is larger than 256 KB." };
+    if ((await stat(file)).size > MAX_SKILL_FILE_BYTES)
+      return { ...skill, problem: sourceText("error.skill.markdownTooLarge") };
     text = await readFile(file, "utf8");
   } catch {
-    return { ...skill, problem: "SKILL.md could not be read." };
+    return { ...skill, problem: sourceText("error.skill.markdownUnreadable") };
   }
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text)?.[1];
-  if (frontmatter === undefined) return { ...skill, problem: "SKILL.md must begin with YAML frontmatter." };
+  if (frontmatter === undefined) return { ...skill, problem: sourceText("error.skill.frontmatterMissing") };
   let metadata: unknown;
   try {
     metadata = parseYaml(frontmatter);
   } catch {
-    return { ...skill, problem: "The SKILL.md frontmatter is not valid YAML." };
+    return { ...skill, problem: sourceText("error.skill.frontmatterInvalid") };
   }
-  if (!isDynamicRecord(metadata)) return { ...skill, problem: "The SKILL.md frontmatter is not valid YAML." };
+  if (!isDynamicRecord(metadata)) return { ...skill, problem: sourceText("error.skill.frontmatterInvalid") };
   const description = isString(metadata.description) ? metadata.description.trim() : "";
   if (!description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
     return {
       ...skill,
-      problem: `SKILL.md needs a description of 1 to ${SKILL_DESCRIPTION_MAX_LENGTH} characters.`,
+      problem: sourceText("error.skill.descriptionLength", { limit: SKILL_DESCRIPTION_MAX_LENGTH }),
     };
   if (metadata.name !== slug)
-    return { ...skill, description, problem: `SKILL.md needs "name: ${slug}", the same as its folder name.` };
+    return { ...skill, description, problem: sourceText("error.skill.nameMismatch", { slug }) };
   return { ...skill, description };
 }
 

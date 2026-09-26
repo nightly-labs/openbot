@@ -10,15 +10,15 @@ language js(typescript)
 or {
   JsxText() as $text where {
     $text <: r"(?s).*\p{L}.*",
-    register_diagnostic(span=$text, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+    register_diagnostic(span=$text, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
   JsxAttribute() as $attr where {
     $attr <: r"(?s)(?:aria-label|title|placeholder|alt|label|description|accessibilityLabel|accessibilityHint)=(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*'|\{\s*\"[^\"]*\p{L}[^\"]*\"\s*\}|\{\s*'[^']*\p{L}[^']*'\s*\}|\{\s*`[^`$]*\p{L}[^`$]*`\s*\})",
-    register_diagnostic(span=$attr, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+    register_diagnostic(span=$attr, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
   JsxExpressionChild() as $child where {
     $child <: r"(?s)\{\s*(?:\"[^\"]*\p{L}[^\"]*\"|'[^']*\p{L}[^']*')\s*\}",
-    register_diagnostic(span=$child, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+    register_diagnostic(span=$child, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
   `$call($first, $...)` as $c where {
     $call <: or {
@@ -31,7 +31,7 @@ or {
       JsTemplateExpression()
     },
     $first <: r"(?s).*\p{L}.*",
-    register_diagnostic(span=$first, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+    register_diagnostic(span=$first, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   },
   `$call($_, $fallback)` as $c where {
     $call <: or {
@@ -43,6 +43,6 @@ or {
       JsStringLiteralExpression(),
       JsTemplateExpression()
     },
-    register_diagnostic(span=$fallback, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="warn")
+    register_diagnostic(span=$fallback, message="[no-hardcoded-ui-text] Render user-facing text through a catalog key with t() from useText(). See docs/i18n.md.", severity="error")
   }
 }

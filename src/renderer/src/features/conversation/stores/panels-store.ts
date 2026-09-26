@@ -1,9 +1,12 @@
 import { type AttachmentSummary, type BrowserBounds, canPreviewAttachment } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal } from "solid-js";
 import { attachmentFilePreview } from "../attachment-preview";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps, ConversationTarget, RightPanelMode, SidebarFilePreview } from "../conversation-types";
+
+// Each member reads the interface language when it is called.
+const { t, errorMessage } = currentText();
 
 export interface RoutineSettingsRequest {
   agentId: string;
@@ -125,7 +128,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       setActiveRightPanel("file-preview", ownerAgentId);
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
-      deps.setComposerError(errorMessage(error, `Could not preview ${attachment.name}. Try again.`), target);
+      deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
     }
   }
 
@@ -137,7 +140,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         attachments: attachments.map(({ id, name }) => ({ id, name })),
       });
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not download attachments. Try again."), target);
+      deps.setComposerError(errorMessage(error, t("attachment.error.download")), target);
     }
   }
 
@@ -146,9 +149,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     void conversationRuntime(deps.props)
       .agent.openAttachment({ attachmentId: attachment.id, action })
-      .catch((error) =>
-        deps.setComposerError(errorMessage(error, "Could not open or save this attachment. Try again."), target),
-      );
+      .catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target));
   }
 
   function openSharedFile(path: string) {
@@ -206,9 +207,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         : source.kind === "shared"
           ? conversationRuntime(deps.props).agent.openSharedFile({ path: source.path })
           : conversationRuntime(deps.props).agent.openWorkspaceFile({ agentId: file.ownerAgentId, path: source.path });
-    void request.catch((error) =>
-      deps.setComposerError(errorMessage(error, "Could not open this file. Try again."), target),
-    );
+    void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.openFile")), target));
   }
 
   function downloadSidebarFile() {
@@ -265,9 +264,9 @@ function filePreviewError(error: unknown, path: string): string {
   } catch {
     // A literal percent sign can be part of a file name.
   }
-  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || "File";
+  const name = decodedPath.replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
   if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
-    return `“${name}” was not found. Ask the agent to create or restore the file, then click the link again.`;
+    return t("attachment.error.fileNotFound", { name });
   }
-  return errorMessage(error, `Could not preview “${name}”. Try again.`);
+  return errorMessage(error, t("attachment.error.previewFile", { name }));
 }

@@ -1,5 +1,4 @@
 import { validateProfileName } from "@openbot/contracts/validation";
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -14,9 +13,11 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
+import { useText } from "@/shared/lib/text";
 
 export function ProfileSettingsScreen() {
   const { session, updateProfile, signOut } = useMobileSession();
+  const { t, errorMessage } = useText();
   const foreground = useThemeColor("foreground");
   const savedName = session ? mobileUserName(session.user) : "";
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -31,8 +32,8 @@ export function ProfileSettingsScreen() {
   const nameError =
     nameChanged && validatedName.error
       ? validatedName.error === "unsafe"
-        ? "Remove line breaks and control characters from your name."
-        : "Use 3–20 characters for your display name."
+        ? t("mobile.settings.profile.nameUnsafe")
+        : t("mobile.settings.profile.nameLength")
       : null;
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
 
@@ -44,7 +45,7 @@ export function ProfileSettingsScreen() {
     try {
       await operation();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not save changes. Try again."));
+      setError(errorMessage(cause, t("mobile.settings.profile.saveFailed")));
     } finally {
       locked.current = false;
       setPendingAction(null);
@@ -72,14 +73,14 @@ export function ProfileSettingsScreen() {
       void perform("photo", choosePhoto);
       return;
     }
-    Alert.alert("Profile photo", undefined, [
-      { text: "Change photo", onPress: () => void perform("photo", choosePhoto) },
+    Alert.alert(t("mobile.settings.profile.photo"), undefined, [
+      { text: t("mobile.settings.profile.changePhoto"), onPress: () => void perform("photo", choosePhoto) },
       {
-        text: "Remove photo",
+        text: t("mobile.settings.profile.removePhoto"),
         style: "destructive",
         onPress: () => void perform("photo", () => updateProfile({ avatar: null })),
       },
-      { text: "Cancel", style: "cancel" },
+      { text: t("common.cancel"), style: "cancel" },
     ]);
   }
 
@@ -94,14 +95,16 @@ export function ProfileSettingsScreen() {
         dirty={nameChanged}
         canSave={!busy && !validatedName.error}
         pending={pendingAction === "name"}
-        label="Save name"
+        label={t("mobile.settings.profile.saveName")}
         onSave={() => void saveName()}
       />
       <View className="gap-6">
         <Pressable
           className="self-center"
           accessibilityRole="button"
-          accessibilityLabel={avatarUrl ? "Edit profile photo" : "Add profile photo"}
+          accessibilityLabel={
+            avatarUrl ? t("mobile.settings.profile.editPhoto") : t("mobile.settings.profile.addPhoto")
+          }
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           onPress={editPhoto}
@@ -112,9 +115,9 @@ export function ProfileSettingsScreen() {
           </View>
         </Pressable>
         <SheetFormField
-          label="Name"
+          label={t("mobile.settings.profile.name")}
           appearance="soft"
-          placeholder="Add your name"
+          placeholder={t("mobile.settings.profile.namePlaceholder")}
           autoCapitalize="words"
           autoCorrect={false}
           returnKeyType="done"
@@ -132,16 +135,16 @@ export function ProfileSettingsScreen() {
           {nameError ?? error}
         </Typography.Paragraph>
       ) : null}
-      <SettingsSection title="Email">
+      <SettingsSection title={t("mobile.settings.profile.email")}>
         <SettingsRow>
           <Typography.Paragraph selectable className="text-grouped-secondary">
             {session.user.email}
           </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      <SettingsSection title="Security">
+      <SettingsSection title={t("mobile.settings.profile.security")}>
         <SettingsRow disabled={busy} onPress={() => router.push("/settings/sessions")}>
-          <Typography.Paragraph>Account sessions</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.profile.accountSessions")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SettingsSection>
@@ -149,13 +152,19 @@ export function ProfileSettingsScreen() {
           disclosure={false}
           disabled={busy}
           onPress={() =>
-            Alert.alert("Sign out?", "Reconnect by scanning a new code from OpenBot on your desktop.", [
-              { text: "Cancel", style: "cancel" },
-              { text: "Sign out", style: "destructive", onPress: () => void perform("sign-out", signOut) },
+            Alert.alert(t("mobile.settings.profile.signOutTitle"), t("mobile.settings.profile.signOutBody"), [
+              { text: t("common.cancel"), style: "cancel" },
+              {
+                text: t("mobile.settings.profile.signOut"),
+                style: "destructive",
+                onPress: () => void perform("sign-out", signOut),
+              },
             ])
           }
         >
-          <Typography.Paragraph className="text-danger-text">Sign out</Typography.Paragraph>
+          <Typography.Paragraph className="text-danger-text">
+            {t("mobile.settings.profile.signOut")}
+          </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
     </SheetScrollView>

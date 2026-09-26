@@ -1,6 +1,7 @@
 import { Button, Check, ChevronRight, Spinner, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createUniqueId, Match, Show, Switch } from "solid-js";
+import { useText } from "../../text";
 
 export interface ChatActionCardAction {
   label: string;
@@ -42,6 +43,7 @@ export interface ChatActionCardProps {
  * body, such as the schedule row of a routine, and map their own states onto `status`.
  */
 export function ChatActionCard(props: ChatActionCardProps) {
+  const { t } = useText();
   const titleId = createUniqueId();
   return (
     <article
@@ -73,7 +75,7 @@ export function ChatActionCard(props: ChatActionCardProps) {
             aria-label={props.openLabel}
             onClick={() => props.onOpen?.()}
           >
-            Open
+            {t("chat.actionCard.open")}
             <ChevronRight aria-hidden="true" />
           </Button>
         </Show>

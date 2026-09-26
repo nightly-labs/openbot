@@ -3,6 +3,7 @@ import type {
   AvatarImageInput,
   HostStatus,
   InviteSummary,
+  ServerConnectionIssueCode,
   ServerNotificationLevel,
   ServerSummary,
   TeamInviteSummary,
@@ -12,6 +13,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
   AlertActions,
@@ -66,10 +68,10 @@ import {
   UsersRound,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
-import { errorMessage } from "@openbot/ui/error-message";
 import { SERVER_NOTIFICATION_LEVEL_LABELS, serverMuteDescription } from "@openbot/ui/features/servers/ServerRail";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { useText } from "@openbot/ui/text";
 import { truncateMiddle } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
@@ -139,25 +141,29 @@ type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "import";
 type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
-const ROLE_OPTIONS = ["Member", "Admin"];
-const INVITE_LINK_PLACEHOLDER = "Create a private one-time link.";
-const sections: Record<Section, { title: string; description: string }> = {
-  general: { title: "General", description: "Manage this server’s identity and published access." },
-  members: { title: "Members", description: "Invite people and manage access to this server." },
-  desktop: { title: "Remote desktop", description: "Configure or connect to this server’s desktop." },
-  mcp: {
-    title: "MCP",
-    description: "Connect MCP servers and choose which ones this server’s agents can use.",
-  },
-  storage: {
-    title: "Storage",
-    description: "See what OpenBot keeps on this server’s disk, and free space.",
-  },
-  import: {
-    title: "Import",
-    description: "Move your agents from Grok Bot to this computer.",
-  },
-};
+const ROLE_OPTIONS: InviteRole[] = ["member", "admin"];
+const ROLE_LABELS = {
+  owner: "server.role.owner",
+  admin: "server.role.admin",
+  member: "server.role.member",
+} as const satisfies Record<TeamRole, AppTextKey>;
+const ISSUE_TITLES = {
+  client_update_required: "server.desktop.clientUpdateRequired",
+  host_update_required: "server.desktop.hostUpdateRequired",
+  protocol_error: "server.desktop.connectionUnavailable",
+  authentication_required: "server.desktop.connectionUnavailable",
+  network_unavailable: "server.desktop.connectionUnavailable",
+} as const satisfies Record<ServerConnectionIssueCode, AppTextKey>;
+const EMAIL_PLACEHOLDER = "person@company.com";
+const REMOTE_HOST_GATEWAY_NAME = "OpenBot Remote Host Gateway";
+const sections = {
+  general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
+  members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
+  desktop: { title: "server.settings.desktopTitle", description: "server.settings.desktopDescription" },
+  mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
+  storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
+  import: { title: "server.settings.importTitle", description: "server.settings.importDescription" },
+} as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
 /**
  * The identity form: the name and logo as the server last confirmed them, the draft the user is
@@ -207,6 +213,7 @@ interface ServerSettingsPanels {
 }
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
+  const { t, format, errorMessage, sourceText } = useText();
   const [panels, setPanels] = createStore<ServerSettingsPanels>({
     offerRemoteDesktopSetup: false,
     identity: {
@@ -276,9 +283,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const nameError = () => {
     if (!canEditIdentity()) return null;
     if (trimmedName().length < INPUT_LIMITS.serverNameMin)
-      return `Enter at least ${INPUT_LIMITS.serverNameMin} characters.`;
+      return t("server.settings.nameTooShort", { limit: INPUT_LIMITS.serverNameMin });
     if (trimmedName().length > INPUT_LIMITS.serverName)
-      return `Use no more than ${INPUT_LIMITS.serverName} characters.`;
+      return t("server.settings.nameTooLong", { limit: INPUT_LIMITS.serverName });
     return null;
   };
   const visibleNameError = () => (panels.identity.nameTouched ? nameError() : null);
@@ -455,8 +462,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       await action();
       return true;
     } catch (error) {
-      toast.error("Server action failed", {
-        description: errorMessage(error, "The server action failed."),
+      toast.error(t("server.settings.actionFailedTitle"), {
+        description: errorMessage(error, t("server.settings.actionFailed")),
       });
       return false;
     } finally {
@@ -495,7 +502,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       });
     } catch (error) {
       setPanels((state) => {
-        state.identity.logoError = errorMessage(error, "OpenBot could not read this image.");
+        state.identity.logoError = errorMessage(error, t("server.settings.imageReadFailed"));
       });
     }
   }
@@ -571,14 +578,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   }
 
   function showCopyError(): void {
-    toast.error("Copy failed", { description: "OpenBot could not copy this value." });
+    toast.error(t("server.settings.copyFailedTitle"), { description: t("server.settings.copyFailed") });
   }
 
   async function createInvite(): Promise<void> {
     const email = panels.invite.mode === "email" ? normalizeEmailAddress(panels.invite.email) : null;
     if (panels.invite.mode === "email" && !email) {
       setPanels((state) => {
-        state.invite.emailError = "Enter a valid email address.";
+        state.invite.emailError = t("server.invite.invalidEmail");
       });
       return;
     }
@@ -640,11 +647,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         open={props.open}
         onOpenChange={props.onOpenChange}
         title={
-          <Show when={section() === "mcp" && mcpDetail()} fallback={sections[section()].title}>
+          <Show when={section() === "mcp" && mcpDetail()} fallback={t(sections[section()].title)}>
             {(detail) => (
               <span class="settings-modal-crumbs">
                 <Button type="button" variant="ghost" class="settings-modal-crumb-parent" onClick={detail().back}>
-                  {sections.mcp.title}
+                  {t(sections.mcp.title)}
                 </Button>
                 <ChevronRight class="settings-modal-crumb-separator" aria-hidden="true" />
                 <span class="settings-modal-crumb-current">{detail().title}</span>
@@ -652,9 +659,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             )}
           </Show>
         }
-        description={sections[section()].description}
+        description={t(sections[section()].description)}
         contentKey={`${props.server.id}:${section()}`}
-        closeLabel="Close server settings"
+        closeLabel={t("server.settings.close")}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => setModalElement(element)}
         floatingContent={
@@ -670,7 +677,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <ShieldCheck />
               </AlertIcon>
               <AlertContent>
-                <AlertTitle>Server settings unavailable</AlertTitle>
+                <AlertTitle>{t("server.settings.unavailableTitle")}</AlertTitle>
                 <AlertDescription>{props.loadError}</AlertDescription>
               </AlertContent>
               <AlertActions>
@@ -682,7 +689,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   onClick={() => void run("retry", props.onRetry)}
                 >
                   <RefreshCw aria-hidden="true" />
-                  Retry
+                  {t("common.retry")}
                 </Button>
               </AlertActions>
             </Alert>
@@ -697,7 +704,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(detail) => (
                 <SaveBarDock value={detail().saveBar()}>
                   {(bar) => (
-                    <section class="settings-modal-save-bar" aria-label="Unsaved MCP changes">
+                    <section class="settings-modal-save-bar" aria-label={t("server.settings.unsavedMcpChanges")}>
                       <Show
                         when={bar().failed}
                         fallback={
@@ -718,18 +725,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                           disabled={bar().resetDisabled}
                           onClick={detail().reset}
                         >
-                          Reset
+                          {t("server.settings.reset")}
                         </Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="default"
                           loading={bar().saving}
-                          loadingLabel="Saving…"
+                          loadingLabel={t("common.saving")}
                           disabled={bar().saveDisabled}
                           onClick={detail().save}
                         >
-                          Save
+                          {t("common.save")}
                         </Button>
                       </div>
                     </section>
@@ -741,24 +748,24 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 something to show, so the bar's own markup stays as it was. */}
             <SaveBarDock value={section() === "general" && identityDirty() ? true : null}>
               {() => (
-                <section class="settings-modal-save-bar" aria-label="Unsaved changes">
+                <section class="settings-modal-save-bar" aria-label={t("server.settings.unsavedChanges")}>
                   <Text variant="caption" tone="muted">
-                    Changes not saved
+                    {t("server.settings.changesNotSaved")}
                   </Text>
                   <div class="settings-modal-save-actions">
                     <Button type="button" size="sm" variant="ghost" disabled={Boolean(busy())} onClick={resetIdentity}>
-                      Reset
+                      {t("server.settings.reset")}
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="default"
                       loading={busy() === "identity"}
-                      loadingLabel="Saving…"
+                      loadingLabel={t("common.saving")}
                       disabled={Boolean(busy())}
                       onClick={() => void saveIdentity()}
                     >
-                      Save
+                      {t("common.save")}
                     </Button>
                   </div>
                 </section>
@@ -767,37 +774,37 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </>
         }
         sidebar={
-          <Tabs.List class="settings-modal-nav" aria-label="Server settings sections">
+          <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
             <Tabs.Trigger class="settings-modal-nav-item" value="general">
               <Settings aria-hidden="true" />
-              <span>General</span>
+              <span>{t(sections.general.title)}</span>
             </Tabs.Trigger>
             <Tabs.Trigger class="settings-modal-nav-item" value="members">
               <UsersRound aria-hidden="true" />
-              <span>Members</span>
+              <span>{t(sections.members.title)}</span>
             </Tabs.Trigger>
             <Show when={props.platform === "darwin"}>
               <Tabs.Trigger class="settings-modal-nav-item" value="desktop">
                 <Monitor aria-hidden="true" />
-                <span>Remote desktop</span>
+                <span>{t(sections.desktop.title)}</span>
               </Tabs.Trigger>
             </Show>
             <Show when={props.mcpServers}>
               <Tabs.Trigger class="settings-modal-nav-item" value="mcp">
                 <Blocks aria-hidden="true" />
-                <span>MCP</span>
+                <span>{t(sections.mcp.title)}</span>
               </Tabs.Trigger>
             </Show>
             <Show when={props.storage}>
               <Tabs.Trigger class="settings-modal-nav-item" value="storage">
                 <HardDrive aria-hidden="true" />
-                <span>Storage</span>
+                <span>{t(sections.storage.title)}</span>
               </Tabs.Trigger>
             </Show>
             <Show when={props.agentImport}>
               <Tabs.Trigger class="settings-modal-nav-item" value="import">
                 <Download aria-hidden="true" />
-                <span>Import</span>
+                <span>{t(sections.import.title)}</span>
               </Tabs.Trigger>
             </Show>
           </Tabs.List>
@@ -828,7 +835,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 onSetEnabled={(id, enabled) => props.onSetMcpServerEnabled?.(id, enabled) ?? Promise.resolve()}
                 onTest={(config) =>
                   props.onTestMcpServer?.(config) ??
-                  Promise.resolve({ toolCount: 0, error: "This server cannot be tested here." })
+                  Promise.resolve({ toolCount: 0, error: t("mcp.panel.testUnavailable") })
                 }
               />
             </Tabs.Content>
@@ -858,10 +865,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             open
             initialFocus="cancel"
             pending={busy() === `remove:${member().id}`}
-            title={`Remove ${teamMemberName(member())}?`}
-            description="This person will lose access to the server and its shared conversations."
-            confirmLabel="Remove member"
-            pendingLabel="Removing…"
+            title={t("server.members.removeTitle", { name: teamMemberName(member()) })}
+            description={t("server.members.removeDescription")}
+            confirmLabel={t("server.members.remove")}
+            pendingLabel={t("common.removing")}
             onCancel={() =>
               setPanels((state) => {
                 state.members.removeId = null;
@@ -884,12 +891,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function GeneralPanel() {
     return (
       <>
-        <SettingsSection title="Identity">
+        <SettingsSection title={t("server.settings.identity")}>
           <Input
             ref={(element) => (logoInput = element)}
             hidden
             type="file"
-            aria-label="Server logo"
+            aria-label={t("server.settings.logo")}
             accept="image/png,image/jpeg,image/webp"
             disabled={!canEditIdentity()}
             onChange={(event) => {
@@ -903,8 +910,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               fallback={
                 <Item class="server-settings-readonly-name">
                   <ItemContent>
-                    <ItemTitle>Server name</ItemTitle>
-                    <ItemDescription>Only the server owner can change this name.</ItemDescription>
+                    <ItemTitle>{t("server.settings.name")}</ItemTitle>
+                    <ItemDescription>{t("server.settings.nameOwnerOnly")}</ItemDescription>
                   </ItemContent>
                   <ItemActions>
                     <Text as="span" class="server-settings-readonly-value" variant="body">
@@ -916,9 +923,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             >
               <Item class="settings-identity-name-row">
                 <ItemContent>
-                  <ItemTitle id="server-settings-name-label">Server name</ItemTitle>
+                  <ItemTitle id="server-settings-name-label">{t("server.settings.name")}</ItemTitle>
                   <ItemDescription id="server-settings-name-description">
-                    Shown in invitations and shared spaces.
+                    {t("server.settings.nameDescription")}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions class="settings-identity-name-control" data-invalid={visibleNameError() ? "" : undefined}>
@@ -932,7 +939,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     id="server-settings-name"
                     size="md"
                     maxlength={INPUT_LIMITS.serverName}
-                    placeholder="e.g. Design studio"
+                    placeholder={t("server.settings.namePlaceholder")}
                     value={panels.identity.name}
                     aria-labelledby="server-settings-name-label"
                     aria-describedby={
@@ -971,12 +978,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Show>
             <Item class="settings-identity-image-row">
               <ItemContent>
-                <ItemTitle>Server logo</ItemTitle>
+                <ItemTitle>{t("server.settings.logo")}</ItemTitle>
                 <ItemDescription class={panels.identity.logoError ? "server-settings-item-error" : undefined}>
                   {panels.identity.logoError ??
-                    (canEditIdentity()
-                      ? "Shown to everyone who connects."
-                      : "Only the server owner can change this logo.")}
+                    (canEditIdentity() ? t("server.settings.logoDescription") : t("server.settings.logoOwnerOnly"))}
                 </ItemDescription>
               </ItemContent>
               <ItemActions class="settings-identity-image-control">
@@ -992,7 +997,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                       variant="outline"
                       size="icon-lg"
                       class="settings-identity-image-trigger server-settings-logo-trigger"
-                      aria-label={panels.identity.logoUrl ? "Edit server logo" : "Add server logo"}
+                      aria-label={
+                        panels.identity.logoUrl ? t("server.settings.editLogo") : t("server.settings.addLogo")
+                      }
                       onClick={() => logoInput?.click()}
                     >
                       <Show
@@ -1005,7 +1012,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     <Show when={panels.identity.logoUrl}>
                       <ImageRemoveButton
                         class="server-settings-logo-remove"
-                        label="Remove server logo"
+                        label={t("server.settings.removeLogo")}
                         onClick={() => {
                           setPanels((state) => {
                             state.identity.editing = true;
@@ -1022,7 +1029,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </Item>
           </ItemGroup>
         </SettingsSection>
-        <SettingsSection title="Access">
+        <SettingsSection title={t("server.settings.access")}>
           <ItemGroup class="settings-modal-card">
             <SwitchField
               class="server-settings-publish-setting"
@@ -1030,19 +1037,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               checked={published()}
               disabled={!local() || !configured() || Boolean(busy())}
               onChange={(value) => void setPublished(value)}
-              label={local() ? "Publish this server" : "Server is published"}
+              label={local() ? t("server.settings.publish") : t("server.settings.published")}
               description={accessDescription()}
             />
             <Item class="server-settings-address-setting">
               <ItemContent>
-                <ItemTitle>Server address</ItemTitle>
-                <ItemDescription>Use this address to connect to the server.</ItemDescription>
+                <ItemTitle>{t("server.settings.address")}</ItemTitle>
+                <ItemDescription>{t("server.settings.addressDescription")}</ItemDescription>
               </ItemContent>
               <Show
                 when={address()}
                 fallback={
                   <Badge tone="neutral" size="md" shape="pill">
-                    Private
+                    {t("server.settings.private")}
                   </Badge>
                 }
               >
@@ -1050,8 +1057,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   <CopyButton
                     value={serverAddress()}
                     label={truncateMiddle(serverAddress(), 31)}
-                    copiedLabel="Copied"
-                    aria-label="Copy server address"
+                    copiedLabel={t("common.copied")}
+                    aria-label={t("server.settings.copyAddress")}
                     title={serverAddress()}
                     onCopyError={showCopyError}
                     class="server-settings-address-control"
@@ -1065,12 +1072,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <ItemGroup class="settings-modal-card">
             <Item>
               <ItemContent>
-                <ItemTitle>Set up remote desktop</ItemTitle>
-                <ItemDescription>View and control this Mac from another computer.</ItemDescription>
+                <ItemTitle>{t("server.settings.setUpDesktopTitle")}</ItemTitle>
+                <ItemDescription>{t("server.settings.setUpDesktopDescription")}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Button size="sm" variant="ghost" onClick={dismissRemoteDesktopSetup}>
-                  Later
+                  {t("server.settings.later")}
                 </Button>
                 <Button
                   size="sm"
@@ -1079,13 +1086,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     setSection("desktop");
                   }}
                 >
-                  Set up
+                  {t("server.settings.setUp")}
                 </Button>
               </ItemActions>
             </Item>
           </ItemGroup>
         </Show>
-        <SettingsSection title="Notifications">
+        <SettingsSection title={t("server.settings.notifications")}>
           <ItemGroup class="settings-modal-card">
             <SwitchField
               class="server-settings-mute-setting"
@@ -1093,17 +1100,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               checked={props.server.notificationsMuted}
               disabled={Boolean(busy())}
               onChange={(value) => void run("mute", () => props.onSetMuted(value))}
-              label="Mute notifications"
+              label={t("server.settings.muteNotifications")}
               description={
                 props.server.notificationsMutedUntil === null
-                  ? "Stop desktop notifications and MacBook notch updates from this server."
-                  : `${serverMuteDescription(props.server)}. Turn off to unmute now.`
+                  ? t("server.settings.muteDescription")
+                  : t("server.settings.mutedUntilDescription", {
+                      until: serverMuteDescription(props.server, t, format),
+                    })
               }
             />
             <Item>
               <ItemContent>
-                <ItemTitle id="server-settings-notification-level-label">Notify me about</ItemTitle>
-                <ItemDescription>Which agent events show a desktop notification.</ItemDescription>
+                <ItemTitle id="server-settings-notification-level-label">{t("server.settings.notifyAbout")}</ItemTitle>
+                <ItemDescription>{t("server.settings.notifyAboutDescription")}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Select<ServerNotificationLevel>
@@ -1115,12 +1124,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     if (level) void run("notification-level", () => props.onSetNotificationLevel(level));
                   }}
                   itemComponent={(item) => (
-                    <SelectItem item={item.item}>{SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue]}</SelectItem>
+                    <SelectItem item={item.item}>{t(SERVER_NOTIFICATION_LEVEL_LABELS[item.item.rawValue])}</SelectItem>
                   )}
                 >
                   <SelectTrigger size="sm" aria-labelledby="server-settings-notification-level-label">
                     <SelectValue<ServerNotificationLevel>>
-                      {(state) => SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()]}
+                      {(state) => t(SERVER_NOTIFICATION_LEVEL_LABELS[state.selectedOption()])}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent />
@@ -1142,11 +1151,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               <ShieldCheck />
             </AlertIcon>
             <AlertContent>
-              <AlertTitle>{configured() ? "Invitations are paused" : "Server setup is required"}</AlertTitle>
+              <AlertTitle>
+                {configured() ? t("server.members.invitationsPaused") : t("server.members.setupRequired")}
+              </AlertTitle>
               <AlertDescription>
-                {configured()
-                  ? "Publish the server in General to invite new people."
-                  : "Save the server identity in General first."}
+                {configured() ? t("server.members.publishToInvite") : t("server.members.saveIdentityFirst")}
               </AlertDescription>
             </AlertContent>
           </Alert>
@@ -1154,16 +1163,16 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={canManage()}>{inviteComposer()}</Show>
         <SettingsSection
           class="server-settings-members-section"
-          title="Server members"
-          description={<>{activeMembers().length} members</>}
+          title={t("server.members.title")}
+          description={t("server.members.count", { count: activeMembers().length })}
           actions={
             <label class="server-settings-search">
               <Search aria-hidden="true" />
-              <span class="sr-only">Search members</span>
+              <span class="sr-only">{t("server.members.search")}</span>
               <Input
                 size="sm"
                 type="search"
-                placeholder="Search members"
+                placeholder={t("server.members.search")}
                 value={panels.members.search}
                 onValueChange={(value) =>
                   setPanels((state) => {
@@ -1180,7 +1189,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               fallback={
                 <Item class="server-settings-empty-row">
                   <ItemContent>
-                    <ItemDescription>No members match this search.</ItemDescription>
+                    <ItemDescription>{t("server.members.noMatch")}</ItemDescription>
                   </ItemContent>
                 </Item>
               }
@@ -1190,7 +1199,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </ItemGroup>
         </SettingsSection>
         <Show when={canManage() && inactiveLegacyMembers().length > 0}>
-          <SettingsSection title="Inactive members" description="Remove an inactive member before inviting them again.">
+          <SettingsSection
+            title={t("server.members.inactiveTitle")}
+            description={t("server.members.inactiveDescription")}
+          >
             <ItemGroup class="settings-modal-card server-settings-members-list">
               <For each={inactiveLegacyMembers()}>{(member) => memberRow(member)}</For>
             </ItemGroup>
@@ -1206,14 +1218,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       <SlidingTabs.Root {...inviteTabsProps}>
         <SettingsSection
           class="server-settings-invite-section"
-          title="Invite people"
-          description="Single-use invitations expire after 24 hours. A permanent link never expires and works for anyone who has it."
+          title={t("server.invite.title")}
+          description={t("server.invite.description")}
           actions={
-            <SlidingTabs.List aria-label="Invitation method">
-              <SlidingTabs.Trigger value="email">Email</SlidingTabs.Trigger>
-              <SlidingTabs.Trigger value="link">Invite link</SlidingTabs.Trigger>
+            <SlidingTabs.List aria-label={t("server.invite.method")}>
+              <SlidingTabs.Trigger value="email">{t("server.invite.email")}</SlidingTabs.Trigger>
+              <SlidingTabs.Trigger value="link">{t("server.invite.link")}</SlidingTabs.Trigger>
               <Show when={permanentSupported()}>
-                <SlidingTabs.Trigger value="perma">Perma link</SlidingTabs.Trigger>
+                <SlidingTabs.Trigger value="perma">{t("server.invite.permaLink")}</SlidingTabs.Trigger>
               </Show>
             </SlidingTabs.List>
           }
@@ -1224,7 +1236,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <SlidingTabs.Content value="email" class="server-settings-invite-mode-panel">
                   <Field
                     class="server-settings-invite-email-field"
-                    label="Email address"
+                    label={t("server.invite.emailAddress")}
                     error={panels.invite.emailError}
                   >
                     <Input
@@ -1233,7 +1245,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                       autocomplete="email"
                       maxlength={INPUT_LIMITS.email}
                       disabled={!published()}
-                      placeholder="person@company.com"
+                      placeholder={EMAIL_PLACEHOLDER}
                       value={panels.invite.email}
                       onValueChange={(value) =>
                         setPanels((state) => {
@@ -1245,7 +1257,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                         panels.invite.email &&
                         !normalizeEmailAddress(panels.invite.email) &&
                         setPanels((state) => {
-                          state.invite.emailError = "Enter a valid email address.";
+                          state.invite.emailError = t("server.invite.invalidEmail");
                         })
                       }
                     />
@@ -1257,8 +1269,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     class="server-settings-invite-link-input t-text-swap"
                     size="md"
                     readonly
-                    aria-label="Invitation link"
-                    placeholder={INVITE_LINK_PLACEHOLDER}
+                    aria-label={t("server.invite.linkLabel")}
+                    placeholder={t("server.invite.linkPlaceholder")}
                     value={panels.invite.link}
                     title={panels.invite.link || undefined}
                     onFocus={(event) => event.currentTarget.select()}
@@ -1269,29 +1281,29 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     class="server-settings-invite-link-input"
                     size="md"
                     readonly
-                    aria-label="Permanent invitation link"
-                    placeholder={INVITE_LINK_PLACEHOLDER}
+                    aria-label={t("server.invite.permanentLink")}
+                    placeholder={t("server.invite.linkPlaceholder")}
                     value={panels.invite.link}
                     title={panels.invite.link || undefined}
                     onFocus={(event) => event.currentTarget.select()}
                   />
                 </SlidingTabs.Content>
               </SlidingTabs.ContentSlot>
-              <Select<string>
+              <Select<InviteRole>
                 options={ROLE_OPTIONS}
-                value={roleLabel(panels.invite.role)}
+                value={panels.invite.role}
                 disabled={!published()}
                 placement="bottom-end"
                 onChange={(value) =>
                   value &&
                   setPanels((state) => {
-                    state.invite.role = value === "Admin" ? "admin" : "member";
+                    state.invite.role = value;
                   })
                 }
-                itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue}</SelectItem>}
+                itemComponent={(item) => <SelectItem item={item.item}>{t(ROLE_LABELS[item.item.rawValue])}</SelectItem>}
               >
-                <SelectTrigger class="server-settings-role-select" size="sm" aria-label="Invitation role">
-                  <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
+                <SelectTrigger class="server-settings-role-select" size="sm" aria-label={t("server.invite.role")}>
+                  <SelectValue<InviteRole>>{(state) => t(ROLE_LABELS[state.selectedOption()])}</SelectValue>
                 </SelectTrigger>
                 <SelectContent />
               </Select>
@@ -1310,7 +1322,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                     disabled={!canInvite()}
                     onClick={() => void createInvite()}
                   >
-                    {panels.invite.mode === "email" ? "Send invite" : "Create link"}
+                    {panels.invite.mode === "email" ? t("server.invite.send") : t("server.invite.createLink")}
                   </Button>
                 }
               >
@@ -1320,21 +1332,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                       size="sm"
                       variant="ghost"
                       class="server-settings-invite-new-link"
-                      aria-label="Create new invitation link"
-                      title="Create new link"
+                      aria-label={t("server.invite.createNewLinkLabel")}
+                      title={t("server.invite.createNewLink")}
                       loading={busy() === "invite"}
                       disabled={!canInvite()}
                       onClick={() => void createInvite()}
                     >
                       <RefreshCw />
-                      New link
+                      {t("server.invite.newLink")}
                     </Button>
                     <Show when={!inviteUsed() && !inviteExpired()}>
                       <CopyButton
                         class="server-settings-invite-copy"
                         value={result().inviteUrl}
-                        label="Copy link"
-                        copiedLabel="Copied"
+                        label={t("server.invite.copyLink")}
+                        copiedLabel={t("common.copied")}
                         size="sm"
                         variant="default"
                         onCopyError={showCopyError}
@@ -1342,7 +1354,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                       <Button
                         size="icon-sm"
                         variant="default"
-                        aria-label="Show invitation QR code"
+                        aria-label={t("server.invite.showQr")}
                         aria-expanded={panels.invite.showQr ? "true" : "false"}
                         onClick={() =>
                           setPanels((state) => {
@@ -1359,7 +1371,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             </div>
             <Show when={panels.invite.mode === "perma"}>
               <Text variant="caption" tone="muted" class="server-settings-perma-hint">
-                Never expires and can be used many times. Anyone with this link can join; revoke it to disable.
+                {t("server.invite.permaHint")}
               </Text>
             </Show>
             <Show
@@ -1373,9 +1385,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             >
               {(result) => (
                 <div class="server-settings-invite-qr">
-                  <QrCode value={result().inviteUrl} label="Invitation QR code" />
+                  <QrCode value={result().inviteUrl} label={t("server.invite.qrLabel")} />
                   <Text variant="caption" tone="muted">
-                    Scan this code in OpenBot Mobile to join this server.
+                    {t("server.invite.qrDescription")}
                   </Text>
                 </div>
               )}
@@ -1389,19 +1401,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   <AlertContent>
                     <AlertTitle>
                       {inviteUsed()
-                        ? "Invitation accepted"
+                        ? t("server.invite.accepted")
                         : inviteExpired()
-                          ? "Invitation expired"
+                          ? t("server.invite.expired")
                           : result().email
-                            ? "Invitation sent"
-                            : "Invitation link ready"}
+                            ? t("server.invite.sent")
+                            : t("server.invite.linkReady")}
                     </AlertTitle>
                     <AlertDescription>
                       {inviteUsed()
-                        ? "The member joined this server. Create a new link to invite someone else."
+                        ? t("server.invite.acceptedDescription")
                         : inviteExpired()
-                          ? "Create a new link to invite someone."
-                          : result().email || "Share the link or scan the QR code in OpenBot Mobile."}
+                          ? t("server.invite.expiredDescription")
+                          : result().email || t("server.invite.linkReadyDescription")}
                     </AlertDescription>
                   </AlertContent>
                 </Alert>
@@ -1421,9 +1433,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <ItemDescription class="server-settings-member-meta">{member.email ?? member.username}</ItemDescription>
         </ItemContent>
         <ItemActions class="server-settings-member-actions">
-          <Show when={member.role !== "owner"} fallback={<Badge tone="accent">Owner</Badge>}>
+          <Show when={member.role !== "owner"} fallback={<Badge tone="accent">{t(ROLE_LABELS.owner)}</Badge>}>
             <Text variant="label-sm" tone="secondary">
-              {roleLabel(member.role)}
+              {t(ROLE_LABELS[member.role])}
             </Text>
             <Show when={canManage() && actionsAvailable()}>
               <MemberActionsMenu
@@ -1450,10 +1462,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function pendingInvites() {
     return (
       <SettingsSection
-        title="Pending invitations"
+        title={t("server.invite.pendingTitle")}
         actions={
           <Text variant="caption" tone="muted">
-            {activeInvites().length} pending
+            {t("server.invite.pendingCount", { total: activeInvites().length })}
           </Text>
         }
       >
@@ -1463,7 +1475,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             fallback={
               <Item class="server-settings-empty-row">
                 <ItemContent>
-                  <ItemDescription>No pending invitations.</ItemDescription>
+                  <ItemDescription>{t("server.invite.noPending")}</ItemDescription>
                 </ItemContent>
               </Item>
             }
@@ -1473,13 +1485,21 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <Item class="server-settings-invite-row">
                   <ItemContent>
                     <ItemTitle>
-                      {invite.email ?? (invite.permanent ? "Permanent invitation link" : "Private invitation link")}
+                      {invite.email ??
+                        (invite.permanent ? t("server.invite.permanentLink") : t("server.invite.privateLink"))}
                     </ItemTitle>
                     <ItemDescription>
-                      {roleLabel(invite.role)} ·{" "}
+                      {t(ROLE_LABELS[invite.role])} ·{" "}
                       {invite.permanent
-                        ? `Never expires · ${invite.useCount} ${invite.useCount === 1 ? "join" : "joins"}`
-                        : `Expires ${formatDate(invite.expiresAt)}`}
+                        ? t("server.invite.neverExpires", { count: invite.useCount })
+                        : t("server.invite.expires", {
+                            date: format.date(new Date(invite.expiresAt), {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }),
+                          })}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions>
@@ -1490,7 +1510,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                       disabled={!actionsAvailable() || Boolean(busy())}
                       onClick={() => void run(`invite:${invite.id}`, () => props.onRevokeInvite(invite.id))}
                     >
-                      Revoke
+                      {t("server.invite.revoke")}
                     </Button>
                   </ItemActions>
                 </Item>
@@ -1504,7 +1524,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
 
   function DesktopPanel() {
     return (
-      <SettingsSection title="Remote desktop access">
+      <SettingsSection title={t("server.desktop.accessTitle")}>
         <RemoteDesktopSetup server={props.server} platform={props.platform} />
         <ItemGroup class="settings-modal-card server-settings-desktop-card">
           <Show when={local()} fallback={remoteDesktopConnection()}>
@@ -1513,19 +1533,25 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <Monitor />
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>OpenBot Remote Host Gateway</ItemTitle>
+                <ItemTitle>{REMOTE_HOST_GATEWAY_NAME}</ItemTitle>
                 <ItemDescription class="server-settings-desktop-description">
-                  Every active server member can control this host. There is no separate remote desktop password.
+                  {t("server.desktop.gatewayDescription")}
                 </ItemDescription>
               </ItemContent>
               <ItemActions class="server-settings-desktop-meta">
                 <Badge tone={props.hostStatus?.remoteDesktopReady ? "success" : "warning"} shape="pill">
-                  {props.hostStatus?.remoteDesktopReady ? "Host component installed" : "Host component not installed"}
+                  {props.hostStatus?.remoteDesktopReady
+                    ? t("server.desktop.componentInstalled")
+                    : t("server.desktop.componentNotInstalled")}
                 </Badge>
                 <Text as="span" variant="caption" tone="muted">
-                  Unattended: {props.hostStatus?.remoteDesktopUnattended ? "enabled" : "not available"} · Active
-                  sessions: {props.hostStatus?.remoteDesktopActiveSessions ?? 0}/
-                  {props.hostStatus?.remoteDesktopMaxSessions ?? 4}
+                  {t("server.desktop.sessions", {
+                    unattended: props.hostStatus?.remoteDesktopUnattended
+                      ? t("server.desktop.unattendedEnabled")
+                      : t("server.desktop.unattendedUnavailable"),
+                    active: props.hostStatus?.remoteDesktopActiveSessions ?? 0,
+                    max: props.hostStatus?.remoteDesktopMaxSessions ?? 4,
+                  })}
                 </Text>
               </ItemActions>
             </Item>
@@ -1540,27 +1566,35 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       const server = props.server;
       if (server.issue) {
         return {
-          title:
-            server.issue.code === "client_update_required"
-              ? "Client update required"
-              : server.issue.code === "host_update_required"
-                ? "Host update required"
-                : "Connection unavailable",
-          message: server.issue.message,
+          title: t(ISSUE_TITLES[server.issue.code]),
+          message: sourceText(server.issue.message),
+          available: false,
         };
       }
       if (server.state !== "online") {
-        return { title: "Host is offline", message: "Reconnect to the host before you open its desktop." };
+        return {
+          title: t("server.desktop.hostOffline"),
+          message: t("server.desktop.hostOfflineDescription"),
+          available: false,
+        };
       }
       if (!serverSupportsCapability(server, "remote-desktop")) {
-        return { title: "Host update required", message: "Update OpenBot on the host to use remote control." };
+        return {
+          title: t("server.desktop.hostUpdateRequired"),
+          message: t("server.desktop.hostUpdateDescription"),
+          available: false,
+        };
       }
       return server.remoteDesktopAvailable
-        ? { title: "Service available", message: "WebRTC control is available for all active members." }
+        ? {
+            title: t("server.desktop.serviceAvailable"),
+            message: t("server.desktop.serviceAvailableDescription"),
+            available: true,
+          }
         : {
-            title: "Service not ready",
-            message:
-              "Start Remote Control to check the host components and permissions. The host will report any setup error.",
+            title: t("server.desktop.serviceNotReady"),
+            message: t("server.desktop.serviceNotReadyDescription"),
+            available: false,
           };
     };
     return (
@@ -1569,19 +1603,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <Monitor />
         </ItemMedia>
         <ItemContent>
-          <ItemTitle>Remote control</ItemTitle>
+          <ItemTitle>{t("server.desktop.remoteControl")}</ItemTitle>
           <ItemDescription class="server-settings-desktop-description">{status().message}</ItemDescription>
-          <Badge
-            class="server-settings-desktop-status"
-            tone={status().title === "Service available" ? "success" : "warning"}
-            shape="pill"
-          >
+          <Badge class="server-settings-desktop-status" tone={status().available ? "success" : "warning"} shape="pill">
             {status().title}
           </Badge>
         </ItemContent>
         <ItemActions class="server-settings-desktop-hint">
           <Text as="span" variant="caption" tone="muted">
-            Start Remote Control from the monitor button in the server header.
+            {t("server.desktop.startHint")}
           </Text>
         </ItemActions>
       </Item>
@@ -1589,14 +1619,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   }
 
   function accessDescription() {
-    if (!local())
-      return published()
-        ? "The host is online. Publication is controlled by its owner."
-        : "The host is offline. Publication is controlled by its owner.";
-    if (!configured()) return "Save the server identity before publishing.";
-    return published()
-      ? "Reachable online. Only invited people can sign in."
-      : "Not reachable online. Existing members and invitations remain.";
+    if (!local()) return published() ? t("server.settings.remoteOnline") : t("server.settings.remoteOffline");
+    if (!configured()) return t("server.settings.saveIdentityFirst");
+    return published() ? t("server.settings.reachable") : t("server.settings.notReachable");
   }
 }
 
@@ -1623,6 +1648,7 @@ function MemberActionsMenu(props: {
   onRoleChange: (role: InviteRole) => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
+  const { t } = useText();
   const name = () => teamMemberName(props.member);
   let triggerElement: HTMLElement | undefined;
   return (
@@ -1630,7 +1656,7 @@ function MemberActionsMenu(props: {
       <DropdownMenu.Trigger
         ref={(element) => (triggerElement = element)}
         class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button server-settings-member-menu-trigger`}
-        aria-label={`Actions for ${name()}`}
+        aria-label={t("server.members.actionsFor", { name: name() })}
       >
         <Ellipsis aria-hidden="true" />
       </DropdownMenu.Trigger>
@@ -1639,7 +1665,7 @@ function MemberActionsMenu(props: {
           <Show when={!props.member.disabled}>
             <DropdownMenu.Item onSelect={() => props.onRoleChange(props.member.role === "admin" ? "member" : "admin")}>
               {props.member.role === "admin" ? <UserRound aria-hidden="true" /> : <ShieldCheck aria-hidden="true" />}
-              {props.member.role === "admin" ? "Make member" : "Make admin"}
+              {props.member.role === "admin" ? t("server.members.makeMember") : t("server.members.makeAdmin")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
           </Show>
@@ -1648,21 +1674,12 @@ function MemberActionsMenu(props: {
             onSelect={() => triggerElement && props.onRemove(triggerElement)}
           >
             <Trash2 aria-hidden="true" />
-            Remove member
+            {t("server.members.remove")}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
-}
-
-function roleLabel(role: TeamRole): "Owner" | "Admin" | "Member" {
-  if (role === "owner") return "Owner";
-  return role === "admin" ? "Admin" : "Member";
-}
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function initials(value: string): string {

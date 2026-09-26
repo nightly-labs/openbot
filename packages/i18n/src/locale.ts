@@ -22,3 +22,21 @@ export function resolveLocale(language: AppLanguage, systemLocale: string): Tran
   const subtag = systemLocale.split("-")[0]?.toLowerCase() ?? "";
   return isTranslatedLocale(subtag) ? subtag : "en";
 }
+
+/**
+ * The locale for numbers and dates, given the same two values.
+ *
+ * The system preference keeps the computer's own locale, also when the text falls back to English:
+ * a computer set to Polish keeps its day-month dates. A chosen language keeps the computer's region
+ * only when it is the computer's language, so French on `fr-CA` formats as `fr-CA`.
+ */
+export function formatLocale(language: AppLanguage, systemLocale: string): string {
+  const locale = resolveLocale(language, systemLocale);
+  const subtag = systemLocale.split("-")[0]?.toLowerCase() ?? "";
+  if (language !== "system" && subtag !== locale) return locale;
+  try {
+    return Intl.getCanonicalLocales(systemLocale)[0] ?? locale;
+  } catch {
+    return locale;
+  }
+}

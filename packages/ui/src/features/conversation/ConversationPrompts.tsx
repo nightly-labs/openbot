@@ -8,9 +8,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import { Badge, Button, Check, Input, LoaderCircle, Maximize2, Monitor, RadioGroup, toast, X } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
-import { errorMessage } from "@openbot/ui/error-message";
 import { BrowserSecretCard } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
+import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
 
 export function ChoiceCard(props: {
@@ -21,6 +21,7 @@ export function ChoiceCard(props: {
   pending?: boolean;
   onSubmit: (answer: string) => Promise<boolean>;
 }) {
+  const { t } = useText();
   const [answer, setAnswer] = createSignal("");
   const [customSelected, setCustomSelected] = createSignal(false);
   let customInput: HTMLInputElement | undefined;
@@ -35,10 +36,10 @@ export function ChoiceCard(props: {
         <strong>{props.title}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
           <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {props.pending ? "Sending…" : "Input required"}
+          {props.pending ? t("common.sending") : t("prompt.inputRequired")}
         </Badge>
       </header>
-      <p class="choice-card-hint">{props.hint ?? "Pick whatever fits, or type your own."}</p>
+      <p class="choice-card-hint">{props.hint ?? t("prompt.choice.hint")}</p>
       <RadioGroup.Root
         class="choice-options"
         aria-label={props.title}
@@ -79,8 +80,8 @@ export function ChoiceCard(props: {
         ref={(element) => (customInput = element)}
         class="choice-input"
         value={answer()}
-        placeholder="Type your own answer"
-        aria-label="Custom answer"
+        placeholder={t("prompt.customPlaceholder")}
+        aria-label={t("prompt.choice.customLabel")}
         maxlength={INPUT_LIMITS.promptAnswerText}
         disabled={props.pending}
         onValueChange={(value) => {
@@ -108,6 +109,7 @@ export function ApprovalCard(props: {
   /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string;
 }) {
+  const { t, errorMessage } = useText();
   const [submitting, setSubmitting] = createSignal(false);
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
@@ -118,7 +120,7 @@ export function ApprovalCard(props: {
       const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
       if (!completed) setSubmitting(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Could not answer this approval. Try again."));
+      toast.error(errorMessage(error, t("prompt.approval.answerFailed")));
       setSubmitting(false);
     }
   };
@@ -131,7 +133,7 @@ export function ApprovalCard(props: {
       const completed = await grant();
       if (!completed) setSubmitting(false);
     } catch (error) {
-      toast.error(errorMessage(error, "Could not save the standing approval. Try again."));
+      toast.error(errorMessage(error, t("prompt.approval.grantFailed")));
       setSubmitting(false);
     }
   };
@@ -139,14 +141,14 @@ export function ApprovalCard(props: {
   return (
     <section
       class="approval-card conversation-interaction-card"
-      aria-label="Agent approval"
+      aria-label={t("prompt.approval.label")}
       aria-busy={submitting() ? "true" : undefined}
     >
       <header class="approval-card-header conversation-interaction-header">
-        <strong>{approvalTitle(props.approval)}</strong>
+        <strong>{t(approvalTitle(props.approval))}</strong>
         <Badge variant="warning-light" class="conversation-interaction-status" role="status">
           <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          Approval
+          {t("prompt.approval.badge")}
         </Badge>
       </header>
       <Show when={props.approval.reason}>{(reason) => <p class="approval-reason">{reason()}</p>}</Show>
@@ -163,8 +165,8 @@ export function ApprovalCard(props: {
         </Show>
         <Show when={props.approval.kind === "file-change"}>
           <div class="approval-detail-row">
-            <span class="approval-detail-label">Files</span>
-            <strong>{props.approval.grantRoot ?? "Agent workspace"}</strong>
+            <span class="approval-detail-label">{t("prompt.approval.files")}</span>
+            <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
           </div>
         </Show>
         <Show when={props.approval.kind === "permissions"}>
@@ -179,7 +181,7 @@ export function ApprovalCard(props: {
           disabled={submitting()}
           onClick={() => void submit("accept")}
         >
-          {submitting() ? "Sending…" : "Allow"}
+          {submitting() ? t("common.sending") : t("prompt.approval.allow")}
         </Button>
         <Show when={props.onAlwaysAllow}>
           <Button
@@ -190,7 +192,7 @@ export function ApprovalCard(props: {
             disabled={submitting()}
             onClick={() => setConfirmingAlways(true)}
           >
-            Always allow
+            {t("prompt.approval.alwaysAllow")}
           </Button>
         </Show>
         <Button
@@ -200,7 +202,7 @@ export function ApprovalCard(props: {
           disabled={submitting()}
           onClick={() => void submit("decline")}
         >
-          {submitting() ? "Waiting…" : "Deny"}
+          {submitting() ? t("prompt.approval.waiting") : t("prompt.approval.deny")}
         </Button>
       </footer>
       <StandingApprovalConfirmation
@@ -252,12 +254,19 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 }
 
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
+  const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
-  const pageDetails = createMemo(() => browserPageDetails(props.tab));
+  const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
   const accessibleLabel = () =>
-    completed() ? "Browser takeover complete" : cancelled() ? "Browser takeover cancelled" : "Browser takeover";
+    t(
+      completed()
+        ? "prompt.browser.label.complete"
+        : cancelled()
+          ? "prompt.browser.label.cancelled"
+          : "prompt.browser.label.pending",
+    );
   const submit = async (decision: "complete" | "cancel") => {
     if (submitting() || props.decision) return;
     setSubmitting(decision);
@@ -274,11 +283,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     >
       <header class="browser-takeover-header conversation-interaction-header">
         <h2>
-          {completed()
-            ? `Step completed on ${pageDetails().host}`
-            : cancelled()
-              ? `Step cancelled on ${pageDetails().host}`
-              : `Complete the step on ${pageDetails().host}`}
+          {t(
+            completed()
+              ? "prompt.browser.title.complete"
+              : cancelled()
+                ? "prompt.browser.title.cancelled"
+                : "prompt.browser.title.pending",
+            { host: pageDetails().host },
+          )}
         </h2>
         <Show
           when={!props.decision}
@@ -291,29 +303,26 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
               <Show when={completed()} fallback={<X data-icon="inline-start" aria-hidden="true" />}>
                 <Check data-icon="inline-start" aria-hidden="true" />
               </Show>
-              {completed() ? "Done" : "Cancelled"}
+              {completed() ? t("common.done") : t("prompt.browser.cancelled")}
             </Badge>
           }
         >
           <Badge variant="warning-light" class="conversation-interaction-status" role="status">
             <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-            Action required
+            {t("prompt.browser.actionRequired")}
           </Badge>
         </Show>
       </header>
       <Show when={props.request?.secret?.requiresReload}>
-        <p>
-          Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until
-          the page reloads.
-        </p>
+        <p>{t("prompt.browser.reload")}</p>
       </Show>
       <div class="browser-takeover-copy">
         <p>
           {completed()
-            ? `${props.agentName} is continuing.`
+            ? t("prompt.browser.continuing", { name: props.agentName })
             : cancelled()
-              ? "The browser step was cancelled."
-              : `Open the page to finish the sign-in, verification, or consent. Then let ${props.agentName} continue.`}
+              ? t("prompt.browser.cancelledBody")
+              : t("prompt.browser.pendingBody", { name: props.agentName })}
         </p>
       </div>
 
@@ -339,13 +348,13 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             variant="ghost"
             type="button"
             class="browser-takeover-preview-viewport browser-takeover-preview-open"
-            aria-label={`Open ${pageDetails().title}`}
+            aria-label={t("prompt.browser.openPage", { title: pageDetails().title })}
             onClick={() => props.onOpen?.()}
           >
             <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
             <span class="browser-takeover-preview-open-label" aria-hidden="true">
               <Maximize2 />
-              Open
+              {t("common.open")}
             </span>
           </Button>
         </Show>
@@ -359,11 +368,11 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="approval-button"
             loading={submitting() === "complete"}
-            loadingLabel="Returning…"
+            loadingLabel={t("prompt.browser.returning")}
             disabled={Boolean(submitting())}
             onClick={() => void submit("complete")}
           >
-            I’m done
+            {t("prompt.browser.done")}
           </Button>
           <Button
             variant="secondary"
@@ -371,11 +380,11 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="approval-button"
             loading={submitting() === "cancel"}
-            loadingLabel="Cancelling…"
+            loadingLabel={t("prompt.browser.cancelling")}
             disabled={Boolean(submitting())}
             onClick={() => void submit("cancel")}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
         </footer>
       </Show>
@@ -383,34 +392,35 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   );
 }
 
-function browserPageDetails(tab: BrowserTab | undefined): { title: string; host: string } {
-  const title = tab?.title.trim() || "Browser page";
-  if (!tab?.url) return { title, host: "the browser" };
+function browserPageDetails(tab: BrowserTab | undefined, t: TextValue["t"]): { title: string; host: string } {
+  const title = tab?.title.trim() || t("prompt.browser.pageFallback");
+  if (!tab?.url) return { title, host: t("prompt.browser.hostFallback") };
   try {
-    return { title, host: new URL(tab.url).hostname || "the browser" };
+    return { title, host: new URL(tab.url).hostname || t("prompt.browser.hostFallback") };
   } catch {
     return { title, host: tab.url };
   }
 }
 
 function approvalTitle(approval: AgentApproval | undefined) {
-  if (approval?.kind === "command") return "Run a command";
-  if (approval?.kind === "file-change") return "Change files";
-  return "Grant permissions";
+  if (approval?.kind === "command") return "prompt.approval.title.command";
+  if (approval?.kind === "file-change") return "prompt.approval.title.fileChange";
+  return "prompt.approval.title.permissions";
 }
 
 function PermissionDetails(props: { permissions: AgentApproval["permissions"] }) {
+  const { t } = useText();
   const details = createMemo(() => {
     const permissions = props.permissions;
     if (!permissions) return [];
     return [
-      ...(permissions.network ? ["Network access"] : []),
-      ...permissions.fileSystem.read.map((path) => `Read ${path}`),
-      ...permissions.fileSystem.write.map((path) => `Write ${path}`),
+      ...(permissions.network ? [t("prompt.approval.network")] : []),
+      ...permissions.fileSystem.read.map((path) => t("prompt.approval.read", { path })),
+      ...permissions.fileSystem.write.map((path) => t("prompt.approval.write", { path })),
     ];
   });
   return (
-    <section class="approval-permissions" aria-label="Requested permissions">
+    <section class="approval-permissions" aria-label={t("prompt.approval.permissions")}>
       <For each={details()}>{(detail) => <span>{detail}</span>}</For>
     </section>
   );

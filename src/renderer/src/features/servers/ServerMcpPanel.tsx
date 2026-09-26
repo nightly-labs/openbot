@@ -25,6 +25,7 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onCleanup, Show } from "solid-js";
 import {
@@ -114,10 +115,14 @@ interface McpPanelState {
   formTestConfig: McpServerConfig | null;
 }
 
-const CONNECT_TITLE = "Connect to a custom MCP";
-const EDIT_TITLE = "Edit MCP server";
+const STDIO_LABEL = "STDIO";
+const STREAMABLE_HTTP_LABEL = "Streamable HTTP";
+const COMMAND_PLACEHOLDER = "openai-dev-mcp";
+const WORKING_DIRECTORY_PLACEHOLDER = "~/code";
+const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 
 export function ServerMcpPanel(props: ServerMcpPanelProps) {
+  const { t, sourceText } = useText();
   const [state, setState] = createStore<McpPanelState>({
     view: "list",
     editingId: null,
@@ -164,7 +169,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       return true;
     } catch (error) {
       setState((current) => {
-        current.error = error instanceof Error ? error.message : "That change could not be saved.";
+        current.error = error instanceof Error ? sourceText(error.message) : t("mcp.panel.saveFailed");
       });
       return false;
     } finally {
@@ -175,13 +180,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   }
 
   /** Tests run without the busy latch so a slow server never blocks saving another. */
-  async function runTest(config: McpServerConfig): Promise<McpTestState> {
+  async function runTest(config: McpServerConfig): Promise<Exclude<McpTestState, { status: "testing" }>> {
     try {
       const result = await props.onTest(config);
-      if (result.error) return { status: "failed", error: result.error };
+      if (result.error) return { status: "failed", error: sourceText(result.error) };
       return { status: "passed", toolCount: result.toolCount };
     } catch (error) {
-      return { status: "failed", error: error instanceof Error ? error.message : "That server did not answer." };
+      return { status: "failed", error: error instanceof Error ? sourceText(error.message) : t("mcp.panel.noAnswer") };
     }
   }
 
@@ -230,7 +235,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     draftTestRun += 1;
     // Store writes are not visible to reads in the same tick: read from the argument.
     props.onDetailChange?.({
-      title: config ? EDIT_TITLE : CONNECT_TITLE,
+      title: config ? t("mcp.panel.editTitle") : t("mcp.panel.connectTitle"),
       back: backToList,
       saveBar,
       save: () => void save(),
@@ -283,7 +288,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   function saveBar(): McpPanelSaveBar | null {
     if (!mcpConfigChanged(state.draft, state.baseline)) return null;
     return {
-      message: state.error || "Changes not saved",
+      message: state.error || t("mcp.panel.changesNotSaved"),
       failed: Boolean(state.error),
       saving: state.busy === "save",
       resetDisabled: state.busy !== null,
@@ -295,7 +300,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
     return (
       <SettingsSection
         class="server-mcp-section"
-        title="MCP servers"
+        title={t("mcp.panel.title")}
         /*
          * The second sentence is the panel telling the truth about its own reach. Claude is
          * started with `strictMcpConfig` and Codex is started with the names in its own file
@@ -303,12 +308,12 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
          * no such flag, and guessing a key name would fail silently at the next turn, so the
          * limit is stated rather than hidden.
          */
-        description="Model Context Protocol servers give this server’s agents extra tools. Claude and Codex agents get only the servers in this list; OpenCode and Grok agents can also start servers from their own configuration files."
+        description={t("mcp.panel.description")}
         actions={
           <Show when={props.servers.length > 0}>
             <Button type="button" size="sm" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
               <Plus aria-hidden="true" />
-              Connect a custom MCP
+              {t("mcp.panel.connectCustom")}
             </Button>
           </Show>
         }
@@ -334,11 +339,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                 fallback={
                   <>
                     <Text variant="caption" tone="muted">
-                      No MCP servers yet.
+                      {t("mcp.panel.empty")}
                     </Text>
                     <Button type="button" variant="outline" disabled={disabled()} onClick={() => openForm(null)}>
                       <Plus aria-hidden="true" />
-                      Connect a custom MCP
+                      {t("mcp.panel.connectCustom")}
                     </Button>
                   </>
                 }
@@ -350,7 +355,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     </Text>
                     <Show when={props.onRetryLoad}>
                       <Button type="button" variant="outline" onClick={() => props.onRetryLoad?.()}>
-                        Retry
+                        {t("common.retry")}
                       </Button>
                     </Show>
                   </>
@@ -373,20 +378,20 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <ItemContent>
                       <div class="server-mcp-row-title">
                         <ItemTitle>{config().name}</ItemTitle>
-                        <Badge variant={mcpStatusVariant(test())}>{mcpStatusLabel(config(), test())}</Badge>
+                        <Badge variant={mcpStatusVariant(test())}>{mcpStatusLabel(config(), t, test())}</Badge>
                       </div>
                       <Show when={test()?.status === "failed" && test()}>
-                        {(failed) => <ItemDescription>{mcpTestMessage(failed())}</ItemDescription>}
+                        {(failed) => <ItemDescription>{mcpTestMessage(failed(), t)}</ItemDescription>}
                       </Show>
                       {/* Only when no failure is shown: a test the user just ran answers about this
                           server now, and the standing limit must not push it out of the slot. */}
-                      <Show when={test()?.status !== "failed" && mcpProviderLimitNote(config())}>
+                      <Show when={test()?.status !== "failed" && mcpProviderLimitNote(config(), t)}>
                         {(note) => <ItemDescription>{note()}</ItemDescription>}
                       </Show>
                     </ItemContent>
                     <ItemActions>
                       <Switch
-                        aria-label={`Enable ${config().name}`}
+                        aria-label={t("mcp.panel.enable", { name: config().name })}
                         checked={config().enabled}
                         disabled={disabled()}
                         onChange={(enabled) =>
@@ -433,19 +438,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
         {/* The dialog header already names the view, so this section only labels the group. */}
         <SettingsSection
           class="server-mcp-section"
-          title="Details"
-          description="Name this server and choose how OpenBot reaches it."
+          title={t("mcp.panel.detailsTitle")}
+          description={t("mcp.panel.detailsDescription")}
           actions={
-            <SlidingTabs.List aria-label="Transport">
-              <SlidingTabs.Trigger value="stdio">STDIO</SlidingTabs.Trigger>
-              <SlidingTabs.Trigger value="http">Streamable HTTP</SlidingTabs.Trigger>
+            <SlidingTabs.List aria-label={t("mcp.panel.transport")}>
+              <SlidingTabs.Trigger value="stdio">{STDIO_LABEL}</SlidingTabs.Trigger>
+              <SlidingTabs.Trigger value="http">{STREAMABLE_HTTP_LABEL}</SlidingTabs.Trigger>
             </SlidingTabs.List>
           }
         >
-          <Field label="Name" error={visible("name")}>
+          <Field label={t("mcp.panel.name")} error={visible("name")}>
             <Input
               size="md"
-              placeholder="MCP server name"
+              placeholder={t("mcp.panel.namePlaceholder")}
               value={state.draft.name}
               disabled={disabled()}
               onValueChange={(value) =>
@@ -464,15 +469,15 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
         <SlidingTabs.ContentSlot>
           <SlidingTabs.Content value="stdio" class="server-mcp-transport-panel">
-            <SettingsSection class="server-mcp-section" title="Launch">
+            <SettingsSection class="server-mcp-section" title={t("mcp.panel.launchTitle")}>
               <Field
-                label="Command to launch"
-                description="The program only. The launch does not read this field as a command line, so a word such as serve-sqlite goes in Arguments below."
+                label={t("mcp.panel.command")}
+                description={t("mcp.panel.commandDescription")}
                 error={visible("command")}
               >
                 <Input
                   size="md"
-                  placeholder="openai-dev-mcp"
+                  placeholder={COMMAND_PLACEHOLDER}
                   value={state.draft.command}
                   disabled={disabled()}
                   onValueChange={(value) =>
@@ -489,8 +494,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </Field>
 
               <McpRowList
-                label="Arguments"
-                addLabel="Add argument"
+                label={t("mcp.panel.arguments")}
+                addLabel={t("mcp.panel.addArgument")}
                 disabled={disabled()}
                 onAdd={() =>
                   setState((current) => {
@@ -503,7 +508,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <div class="server-mcp-repeat-row">
                       <Input
                         size="md"
-                        aria-label={`Argument ${index + 1}`}
+                        aria-label={t("mcp.panel.argument", { position: index + 1 })}
                         value={value()}
                         disabled={disabled()}
                         onValueChange={(next) =>
@@ -515,7 +520,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <IconButton
                         type="button"
                         variant="ghost"
-                        label={`Remove argument ${index + 1}`}
+                        label={t("mcp.panel.removeArgument", { position: index + 1 })}
                         disabled={disabled()}
                         onClick={() =>
                           setState((current) => {
@@ -531,8 +536,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </McpRowList>
 
               <McpRowList
-                label="Environment variables"
-                addLabel="Add environment variable"
+                label={t("mcp.panel.environmentVariables")}
+                addLabel={t("mcp.panel.addEnvironmentVariable")}
                 disabled={disabled()}
                 onAdd={() =>
                   setState((current) => {
@@ -545,8 +550,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <div class="server-mcp-repeat-row server-mcp-repeat-row-pair">
                       <Input
                         size="md"
-                        placeholder="Key"
-                        aria-label={`Environment variable ${index + 1} key`}
+                        placeholder={t("mcp.panel.key")}
+                        aria-label={t("mcp.panel.environmentVariableKey", { position: index + 1 })}
                         value={pair().key}
                         disabled={disabled()}
                         onValueChange={(next) =>
@@ -558,8 +563,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       />
                       <Input
                         size="md"
-                        placeholder="Value"
-                        aria-label={`Environment variable ${index + 1} value`}
+                        placeholder={t("mcp.panel.value")}
+                        aria-label={t("mcp.panel.environmentVariableValue", { position: index + 1 })}
                         type="password"
                         autocomplete="off"
                         spellcheck={false}
@@ -575,7 +580,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <IconButton
                         type="button"
                         variant="ghost"
-                        label={`Remove environment variable ${index + 1}`}
+                        label={t("mcp.panel.removeEnvironmentVariable", { position: index + 1 })}
                         disabled={disabled()}
                         onClick={() =>
                           setState((current) => {
@@ -591,8 +596,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </McpRowList>
 
               <McpRowList
-                label="Environment variable passthrough"
-                addLabel="Add variable"
+                label={t("mcp.panel.passthrough")}
+                addLabel={t("mcp.panel.addVariable")}
                 disabled={disabled()}
                 onAdd={() =>
                   setState((current) => {
@@ -605,7 +610,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <div class="server-mcp-repeat-row">
                       <Input
                         size="md"
-                        aria-label={`Passthrough variable ${index + 1}`}
+                        aria-label={t("mcp.panel.passthroughVariable", { position: index + 1 })}
                         value={value()}
                         disabled={disabled()}
                         onValueChange={(next) =>
@@ -617,7 +622,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <IconButton
                         type="button"
                         variant="ghost"
-                        label={`Remove passthrough variable ${index + 1}`}
+                        label={t("mcp.panel.removePassthroughVariable", { position: index + 1 })}
                         disabled={disabled()}
                         onClick={() =>
                           setState((current) => {
@@ -637,13 +642,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                   against the pinned Codex app-server, so only Claude and the test honour this
                   field. The other providers skip such a server rather than start it somewhere
                   else, and say so: the row keeps the note, and the hand-off reports the skip. */}
-              <Field
-                label="Working directory"
-                description="Claude agents and the connection test start the server here. Leave it empty to give this server to every provider: no other provider can set a directory, so it skips a server that names one."
-              >
+              <Field label={t("mcp.panel.workingDirectory")} description={t("mcp.panel.workingDirectoryDescription")}>
                 <Input
                   size="md"
-                  placeholder="~/code"
+                  placeholder={WORKING_DIRECTORY_PLACEHOLDER}
                   value={state.draft.workingDirectory}
                   disabled={disabled()}
                   onValueChange={(value) =>
@@ -659,14 +661,14 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
           <SlidingTabs.Content value="http" class="server-mcp-transport-panel">
             <SettingsSection
               class="server-mcp-section"
-              title="Endpoint"
-              description="Every provider can use an HTTP MCP server."
+              title={t("mcp.panel.endpointTitle")}
+              description={t("mcp.panel.endpointDescription")}
             >
-              <Field label="Server URL" error={visible("url")}>
+              <Field label={t("mcp.panel.serverUrl")} error={visible("url")}>
                 <Input
                   size="md"
                   type="url"
-                  placeholder="https://mcp.example.com/mcp"
+                  placeholder={URL_PLACEHOLDER}
                   value={state.draft.url}
                   disabled={disabled()}
                   onValueChange={(value) =>
@@ -683,8 +685,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               </Field>
 
               <McpRowList
-                label="Headers"
-                addLabel="Add header"
+                label={t("mcp.panel.headers")}
+                addLabel={t("mcp.panel.addHeader")}
                 disabled={disabled()}
                 onAdd={() =>
                   setState((current) => {
@@ -697,8 +699,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                     <div class="server-mcp-repeat-row server-mcp-repeat-row-pair">
                       <Input
                         size="md"
-                        placeholder="Key"
-                        aria-label={`Header ${index + 1} key`}
+                        placeholder={t("mcp.panel.key")}
+                        aria-label={t("mcp.panel.headerKey", { position: index + 1 })}
                         value={pair().key}
                         disabled={disabled()}
                         onValueChange={(next) =>
@@ -710,8 +712,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       />
                       <Input
                         size="md"
-                        placeholder="Value"
-                        aria-label={`Header ${index + 1} value`}
+                        placeholder={t("mcp.panel.value")}
+                        aria-label={t("mcp.panel.headerValue", { position: index + 1 })}
                         type="password"
                         autocomplete="off"
                         spellcheck={false}
@@ -727,7 +729,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                       <IconButton
                         type="button"
                         variant="ghost"
-                        label={`Remove header ${index + 1}`}
+                        label={t("mcp.panel.removeHeader", { position: index + 1 })}
                         disabled={disabled()}
                         onClick={() =>
                           setState((current) => {
@@ -747,8 +749,8 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
         <SettingsSection
           class="server-mcp-section"
-          title="Test"
-          description="Connects once with these settings and reports the tools it offers. Nothing is saved or kept."
+          title={t("mcp.panel.testTitle")}
+          description={t("mcp.panel.testDescription")}
           actions={
             <Button
               type="button"
@@ -756,11 +758,11 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
               variant="outline"
               disabled={!props.canManage || formTest()?.status === "testing"}
               loading={formTest()?.status === "testing"}
-              loadingLabel="Connecting…"
+              loadingLabel={t("common.connecting")}
               onClick={() => void testDraft()}
             >
               <Plug aria-hidden="true" />
-              Test connection
+              {t("mcp.panel.testConnection")}
             </Button>
           }
         >
@@ -768,13 +770,13 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             when={formTest()}
             fallback={
               <Text variant="caption" tone="muted">
-                Not tested yet.
+                {t("mcp.panel.notTested")}
               </Text>
             }
           >
             {(test) => (
               <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(test())} role="status">
-                {mcpTestMessage(test())}
+                {mcpTestMessage(test(), t)}
               </Text>
             )}
           </Show>
@@ -808,10 +810,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
             open
             initialFocus="cancel"
             pending={state.busy === `remove:${config().id}`}
-            title={`Remove ${config().name}?`}
-            description="Its tools stop being offered to this server’s agents. The configuration is not kept."
-            confirmLabel="Remove MCP server"
-            pendingLabel="Removing…"
+            title={t("mcp.panel.removeTitle", { name: config().name })}
+            description={t("mcp.panel.removeDescription")}
+            confirmLabel={t("mcp.panel.removeConfirm")}
+            pendingLabel={t("common.removing")}
             onCancel={() =>
               setState((current) => {
                 current.removeId = null;
@@ -874,13 +876,14 @@ function McpRowMenu(props: {
   onEdit: () => void;
   onRemove: (trigger: HTMLElement) => void;
 }) {
+  const { t } = useText();
   let triggerElement: HTMLElement | undefined;
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
       <DropdownMenu.Trigger
         ref={(element) => (triggerElement = element)}
         class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} ui-icon-button`}
-        aria-label={`Actions for ${props.name}`}
+        aria-label={t("mcp.panel.actionsFor", { name: props.name })}
         disabled={props.disabled}
       >
         <Ellipsis aria-hidden="true" />
@@ -889,11 +892,11 @@ function McpRowMenu(props: {
         <DropdownMenu.Content class="server-mcp-row-menu">
           <DropdownMenu.Item onSelect={() => props.onTest()}>
             <Plug aria-hidden="true" />
-            Test connection
+            {t("mcp.panel.testConnection")}
           </DropdownMenu.Item>
           <DropdownMenu.Item onSelect={() => props.onEdit()}>
             <Pencil aria-hidden="true" />
-            Edit
+            {t("common.edit")}
           </DropdownMenu.Item>
           <DropdownMenu.Separator />
           <DropdownMenu.Item
@@ -901,7 +904,7 @@ function McpRowMenu(props: {
             onSelect={() => triggerElement && props.onRemove(triggerElement)}
           >
             <Trash2 aria-hidden="true" />
-            Remove
+            {t("common.remove")}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

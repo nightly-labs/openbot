@@ -1,4 +1,81 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/customProvider";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "customProvider.error.providerIdRequired": "Saisissez un ID de fournisseur.",
+  "customProvider.error.providerIdPattern":
+    "Utilisez des lettres minuscules, des chiffres, des tirets ou des traits de soulignement, en commençant par une lettre ou un chiffre.",
+  "customProvider.error.providerIdLength": "L’ID du fournisseur doit faire moins de {max} caractères.",
+  "customProvider.error.providerIdBuiltIn": "OpenBot a déjà un fournisseur nommé {id}. Choisissez un autre ID.",
+  "customProvider.error.providerIdSaved":
+    "Un point de terminaison nommé {id} est déjà enregistré. Supprimez-le d’abord, ou choisissez un autre ID.",
+  "customProvider.error.displayNameRequired": "Saisissez un nom d’affichage.",
+  "customProvider.error.displayNameLength": "Le nom d’affichage doit faire moins de {max} caractères.",
+  "customProvider.error.apiKeyLength": "La clé API doit faire moins de {max} caractères.",
+  "customProvider.error.modelsRequired": "Ajoutez au moins un modèle.",
+  "customProvider.error.modelsLimit": "N’ajoutez pas plus de {max} modèles.",
+  "customProvider.error.modelIdRequired": "Saisissez un ID de modèle.",
+  "customProvider.error.modelIdDuplicate": "Ce fournisseur liste déjà {id}.",
+  "customProvider.error.modelIdInvalid":
+    "Cet ID de modèle n’est pas utilisable. Supprimez les espaces, les guillemets et les autres signes de ponctuation.",
+  "customProvider.error.headerNameRequired": "Saisissez un nom d’en-tête.",
+  "customProvider.error.headerNameInvalid": "Utilisez un nom d’en-tête HTTP valide.",
+  "customProvider.error.headerDuplicate": "Ce fournisseur définit déjà {name}.",
+  "customProvider.error.headerValueRequired": "Saisissez une valeur d’en-tête.",
+  "customProvider.error.headersLimit": "N’ajoutez pas plus de {max} en-têtes.",
+  "customProvider.error.baseUrlRequired": "Saisissez une URL de base.",
+  "customProvider.error.baseUrlLength": "L’URL de base doit faire moins de {max} caractères.",
+  "customProvider.error.baseUrlInvalid": "Saisissez une URL complète, par exemple {example}.",
+  "customProvider.error.baseUrlProtocol": "Utilisez une URL http:// ou https://.",
+  "customProvider.error.baseUrlCredential": "Mettez l’identifiant dans un en-tête, pas dans l’URL.",
+
+  "customProvider.saved.restarted": "Enregistré. OpenBot charge les modèles.",
+  "customProvider.saved.skippedBusy":
+    "Enregistré. OpenCode lit la liste quand la tâche en cours s’arrête. Appuyez alors sur Se connecter.",
+  "customProvider.saved.notRunning": "Enregistré. OpenCode lit la liste à son prochain démarrage.",
+  "customProvider.removed.restarted": "Supprimé. OpenBot charge les modèles.",
+  "customProvider.removed.skippedBusy":
+    "Supprimé. OpenCode lit la liste quand la tâche en cours s’arrête. Appuyez alors sur Se connecter.",
+  "customProvider.removed.notRunning": "Supprimé. OpenCode lit la liste à son prochain démarrage.",
+  "customProvider.saveFailed": "OpenBot n’a pas pu enregistrer ce point de terminaison.",
+  "customProvider.removeFailed": "OpenBot n’a pas pu supprimer {name}.",
+  "customProvider.saveUnavailable": "Cette version ne peut pas enregistrer de point de terminaison.",
+  "customProvider.removeUnavailable": "Cette version ne peut pas supprimer de point de terminaison.",
+
+  "customProvider.form.title": "Ajouter un fournisseur personnalisé",
+  "customProvider.form.description": "Décrivez un point de terminaison compatible OpenAI et les modèles qu’il propose.",
+  "customProvider.form.heading": "Fournisseur personnalisé",
+  "customProvider.form.subtitle": "Tout point de terminaison compatible OpenAI.",
+  "customProvider.field.providerId": "ID du fournisseur",
+  "customProvider.field.providerIdHint": "Lettres minuscules, chiffres, tirets ou traits de soulignement.",
+  "customProvider.field.displayName": "Nom d’affichage",
+  "customProvider.field.displayNamePlaceholder": "Mon fournisseur",
+  "customProvider.field.baseUrl": "URL de base",
+  "customProvider.field.apiKey": "Clé API",
+  "customProvider.field.apiKeyHint": "Facultatif. Laissez vide si vous gérez l’authentification avec des en-têtes.",
+  "customProvider.models": "Modèles",
+  "customProvider.model.id": "ID du modèle {number}",
+  "customProvider.model.name": "Nom d’affichage du modèle {number}",
+  "customProvider.model.namePlaceholder": "Nom d’affichage",
+  "customProvider.model.remove": "Supprimer le modèle {number}",
+  "customProvider.model.add": "Ajouter un modèle",
+  "customProvider.headers": "En-têtes",
+  "customProvider.header.name": "Nom de l’en-tête {number}",
+  "customProvider.header.value": "Valeur de l’en-tête {number}",
+  "customProvider.header.valuePlaceholder": "valeur",
+  "customProvider.header.remove": "Supprimer l’en-tête {number}",
+  "customProvider.header.add": "Ajouter un en-tête",
+  "customProvider.submit": "Envoyer",
+
+  "customProvider.list.title": "Fournisseurs personnalisés",
+  "customProvider.list.description":
+    "Les points de terminaison que vous avez enregistrés. Supprimez ceux que vous n’utilisez plus.",
+  "customProvider.list.subtitle": "Vos propres points de terminaison de modèle.",
+  "customProvider.list.empty": "Aucun point de terminaison personnalisé pour l’instant.",
+  "customProvider.list.label": "Points de terminaison personnalisés",
+  "customProvider.list.apiKeySaved": "Clé API enregistrée",
+  "customProvider.list.deleteLabel": "Supprimer {name}",
+  "customProvider.list.confirmTitle": "Supprimer {name} ?",
+  "customProvider.list.confirmDescription":
+    "Sa clé API est effacée, ses modèles disparaissent du sélecteur, et tout agent qui en utilise un revient à un modèle par défaut.",
+} as const satisfies PartialTranslation<typeof source>;

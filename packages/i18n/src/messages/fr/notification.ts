@@ -9,4 +9,7 @@ export const messages = {
   "notification.failed": "Arrêté à cause d’une erreur.",
   "notification.test": "Les notifications fonctionnent.",
   "notification.welcome": "OpenBot vous préviendra ici quand un agent aura besoin de vous.",
+  // The toast region in each window.
+  "notification.toast.region": "Notifications",
+  "notification.toast.close": "Fermer la notification",
 } as const satisfies PartialTranslation<typeof source>;

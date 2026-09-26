@@ -6,6 +6,7 @@ import type {
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { ChatSearchMatch } from "./chat-search";
 import {
@@ -155,7 +156,7 @@ export function createStableConversationState(props: Pick<ConversationProps, "on
         } catch {
           setConversationErrors((currentErrors) => ({
             ...currentErrors,
-            [composerDraftKey(current)]: "Could not save this edit on this computer.",
+            [composerDraftKey(current)]: currentText().t("composer.error.saveEditLocally"),
           }));
         }
       };

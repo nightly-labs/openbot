@@ -6,6 +6,7 @@
 
 import { ContextMenu, FolderPlus, Hash } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 import { SidebarChannelRow } from "./SidebarChannelRow";
 import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
@@ -29,10 +30,11 @@ export function SidebarNav() {
     startCreateSection,
     updateSidebarNativeDrag,
   } = useSidebarScope();
+  const { t } = useText();
   return (
     <nav
       ref={setAgentListElement}
-      aria-label="Chat list"
+      aria-label={t("sidebar.nav.label")}
       class={["agent-list", scrollFades.classes()]}
       data-sidebar-dragging={draggingKind()}
       onDragOver={updateSidebarNativeDrag}
@@ -54,9 +56,9 @@ export function SidebarNav() {
         <SidebarPinnedGroup />
         <SidebarSectionList />
         <Show when={props.showingArchivedChannels}>
-          <section class="sidebar-chat-group sidebar-section" aria-label="Deleted channels">
-            <h2 class="sidebar-section-name">Deleted channels</h2>
-            <For each={props.deletedChannels} fallback={<p>No deleted channels.</p>}>
+          <section class="sidebar-chat-group sidebar-section" aria-label={t("sidebar.deletedChannels.title")}>
+            <h2 class="sidebar-section-name">{t("sidebar.deletedChannels.title")}</h2>
+            <For each={props.deletedChannels} fallback={<p>{t("sidebar.deletedChannels.empty")}</p>}>
               {(channel) => <SidebarChannelRow channel={channel} />}
             </For>
           </section>
@@ -67,24 +69,26 @@ export function SidebarNav() {
       </div>
       <Show when={props.onCreateChannel || layoutMutable() || props.onToggleArchivedChannels}>
         <ContextMenu.Root modal={false}>
-          <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label="Sidebar free area" />
+          <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label={t("sidebar.nav.freeArea")} />
           <ContextMenu.Portal>
-            <ContextMenu.Content class="agent-context-menu" aria-label="Sidebar actions">
+            <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.nav.actions")}>
               <Show when={props.onCreateChannel}>
                 <ContextMenu.Item onSelect={() => props.onCreateChannel?.()}>
                   <Hash class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>New channel</span>
+                  <span>{t("sidebar.new.channel")}</span>
                 </ContextMenu.Item>
               </Show>
               <Show when={layoutMutable()}>
                 <ContextMenu.Item onSelect={() => startCreateSection()}>
                   <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
-                  <span>New section</span>
+                  <span>{t("sidebar.new.section")}</span>
                 </ContextMenu.Item>
               </Show>
               <Show when={props.onToggleArchivedChannels}>
                 <ContextMenu.Item onSelect={() => props.onToggleArchivedChannels?.()}>
-                  {props.showingArchivedChannels ? "Hide deleted channels" : "Deleted channels"}
+                  {props.showingArchivedChannels
+                    ? t("sidebar.deletedChannels.hide")
+                    : t("sidebar.deletedChannels.title")}
                 </ContextMenu.Item>
               </Show>
             </ContextMenu.Content>

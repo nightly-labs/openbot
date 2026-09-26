@@ -4,6 +4,7 @@ import { datePickerStyle, disabled as disabledModifier, fixedSize, labelsHidden 
 import { Typography } from "heroui-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { useText } from "@/shared/lib/text";
 
 export function RoutineTimePicker({
   time,
@@ -14,6 +15,7 @@ export function RoutineTimePicker({
   disabled: boolean;
   onChange: (time: string) => void;
 }) {
+  const { t } = useText();
   const { theme } = useUniwind();
   const [hour, minute] = time.split(":").map(Number);
   return (
@@ -26,7 +28,7 @@ export function RoutineTimePicker({
           style={{ marginRight: 12 }}
         >
           <DatePicker
-            title="Time"
+            title={t("mobile.agent.record.time")}
             selection={new Date(2000, 0, 1, hour, minute)}
             displayedComponents={["hourAndMinute"]}
             modifiers={[datePickerStyle("compact"), labelsHidden(), fixedSize(), disabledModifier(disabled)]}
@@ -37,7 +39,7 @@ export function RoutineTimePicker({
         </Host>
       }
     >
-      <Typography.Paragraph>Time</Typography.Paragraph>
+      <Typography.Paragraph>{t("mobile.agent.record.time")}</Typography.Paragraph>
     </SettingsRow>
   );
 }

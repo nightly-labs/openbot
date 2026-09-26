@@ -1,4 +1,71 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/webClient";
 
-export const messages = {} as const satisfies PartialTranslation<typeof source>;
+export const messages = {
+  "webClient.loading": "OpenBot を読み込んでいます…",
+  "webClient.login.failed": "サインインに失敗しました。",
+  "webClient.login.requestFailed": "アカウントのリクエストに失敗しました。",
+  "webClient.login.sessionFailed": "このセッションを確認できませんでした。",
+  "webClient.login.wait": "しばらく待ってから、別のコードをリクエストしてください。",
+  "webClient.pane.navigation": "ワークスペースのナビゲーション",
+  "webClient.pane.chat": "チャット",
+  "webClient.pane.workspace": "ワークスペース",
+  "webClient.notice.connecting": "コンピューターに接続しています",
+  "webClient.notice.disconnected": "コンピューターが切断されています",
+  "webClient.notice.findingHosts": "コンピューターを探しています",
+  "webClient.notice.hostsFailed": "コンピューターを読み込めませんでした",
+  "webClient.notice.connectComputer": "コンピューターを接続してください",
+  "webClient.notice.keepOpen":
+    "コンピューターで OpenBot を開いたままにしてください。再接続中も下書きはここに残ります。",
+  "webClient.notice.install":
+    "コンピューターに OpenBot をインストールして開き、同じメールアドレスでサインインしてリモートアクセスを有効にしてください。招待を使ってコンピューターに参加することもできます。",
+  "webClient.notice.download": "OpenBot をダウンロード",
+  "webClient.notice.join": "招待で参加",
+  "webClient.notice.reconnect": "再接続",
+  "webClient.notice.refreshHosts": "ホストを更新",
+  "webClient.uncertain.title": "メッセージが届いたか確認してください",
+  "webClient.uncertain.description":
+    "配信が確認される前に接続が切れました。もう一度送信する前に、更新して会話を確認してください。メッセージは自動では再送信されません。",
+  "webClient.uncertain.refresh": "会話を更新",
+  "webClient.uncertain.checked": "会話を確認しました",
+  "webClient.agent.modelsFailed": "ホストのモデルを読み込めませんでした。",
+  "webClient.agent.refreshFailed":
+    "エージェントは作成されましたが、ワークスペースを更新できませんでした。再試行する前に再読み込みしてください。",
+  "webClient.agent.unconfirmed": "結果が確認できません。再試行する前に、このフォームを閉じてホストを確認してください。",
+  "webClient.error.hostStatus": "ホストの状態を読み取れませんでした。",
+  "webClient.error.usageOffline": "使用量を表示するには、ホストに接続してください。",
+  "webClient.error.desktopOnly": "この操作はデスクトップアプリで使えます。",
+  "webClient.error.checkConversation": "もう一度送信する前に会話を確認してください。",
+  "webClient.error.hostReported": "ホストがエラーを報告しました。会話とホストの状態を確認してください。",
+  "webClient.error.requestFailed": "リクエストに失敗しました。",
+  "webClient.error.accessEnded": "このホストへのアクセスは終了しました。",
+  "webClient.error.hostsFailed": "ホストを読み込めませんでした。",
+  "webClient.error.enterInvitation": "招待リンクを入力してください。",
+  "webClient.error.invitationOffline": "招待は承認されましたが、ホストがオフラインです。もう一度お試しください。",
+  "webClient.error.otherConversation": "ホストが別の会話を返しました。",
+  "webClient.error.messageTooLong": "メッセージが長すぎます。",
+  "webClient.error.deliveryUnconfirmed":
+    "メッセージの配信が確認できません。もう一度送信する前に、更新して会話を確認してください。",
+  "webClient.error.sidebarLayout": "このホストはサイドバーのレイアウト変更に対応していません。",
+  "webClient.error.deleteOffline": "エージェントを削除する前に、ホストに接続してください。",
+  "webClient.error.attachmentLimit": "1 件のメッセージに添付できるファイルは {limit} 件までです。",
+  "webClient.error.linkBlocked": "このリンクは開けません。",
+  "webClient.error.fileTransfer": "ファイルの転送に失敗しました。",
+  "webClient.error.noLocks":
+    "このブラウザーはホストへの接続を保護できません。最新のデスクトップブラウザーを使ってください。",
+  "webClient.error.otherTab": "このホストは別のタブで開かれています。再試行する前に、その接続を閉じてください。",
+  "webClient.error.connectionClosed": "ブラウザーの接続は閉じられています。",
+  "webClient.error.hostChanged": "選択したホストが変わりました。",
+  "webClient.error.requestIncomplete": "ホストはこのリクエストを完了できませんでした。再試行する前に更新してください。",
+  "webClient.error.viewEnded": "ブラウザーのビューが終了しました。",
+  "webClient.error.viewChanged": "ブラウザーのビューが変わりました。",
+  "webClient.error.connectionChanging": "ホストへの接続が切り替わっています。",
+  "webClient.error.identityChanged": "ホストの ID が変わりました。接続を拒否しました。",
+  "webClient.error.connectionUnavailable": "ホストへの接続を利用できません。",
+  "webClient.error.incompatible":
+    "このホストは OpenBot web に対応していません。ホストをアップデートして、このページを再読み込みしてください。",
+  "webClient.error.sendUnconfirmed": "メッセージの配信が確認できません。もう一度送信する前に更新してください。",
+  "webClient.error.fileType": "この種類のファイルを添付するには、ホストをアップデートしてください。",
+  "webClient.error.uploadCancelled": "添付ファイルのアップロードはキャンセルされました。",
+  "webClient.error.duplication": "このホストはエージェントの複製に対応していません。",
+} as const satisfies PartialTranslation<typeof source>;

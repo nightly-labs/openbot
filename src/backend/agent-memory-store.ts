@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentMemory } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { MemoryStore, type MemoryTables } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
 
@@ -16,7 +17,7 @@ const AGENT_MEMORY_TABLES: MemoryTables = {
   ownerColumn: "agent_id",
   aggregateType: "agent-memory",
   limit: INPUT_LIMITS.agentMemories,
-  limitMessage: `An agent can have up to ${INPUT_LIMITS.agentMemories} memories.`,
+  limitMessage: sourceText("error.backend.agentMemoryLimit", { limit: INPUT_LIMITS.agentMemories }),
 };
 
 /**
