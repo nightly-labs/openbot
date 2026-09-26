@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot/contracts/ipc";
 import { normalizeAccountName, validateProfileName } from "@openbot/contracts/validation";
-import { createEffect, createMemo, createStore } from "solid-js";
+import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { normalizeAvatarFile } from "../../../avatar-image";
 import { currentText } from "../../../text";
 
@@ -124,7 +124,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
   createEffect(
     () => props.account.name,
     () => {
-      const name = accountName();
+      const name = untrack(accountName);
       setPanels((state) => {
         state.profile.savedName = normalizeAccountName(name);
         state.profile.name = name;

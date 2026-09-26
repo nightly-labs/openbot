@@ -1,6 +1,6 @@
 import type { AgentApproval, AgentEvent, QueueSnapshot, RoutineFields } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
 import { seededAttentionPrompts } from "./features/agents/agent-runtime-snapshot";
@@ -63,8 +63,10 @@ const Turns = createSimpleContext({
     const { activeAgent, activeAgentId, agentList, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
 
-    // The layer-2 seed: what this server was doing the last time it was open.
-    const seed = dynamicIslandCoordinator.serverState(activeServerId());
+    // The layer-2 seed: what this server was doing the last time it was open. The scope is keyed
+    // on the server, so its id and the seed are read once.
+    const scopeServerId = untrack(activeServerId);
+    const seed = dynamicIslandCoordinator.serverState(scopeServerId);
     const [activeTurns, setActiveTurns] = createSignal<Record<string, string | null>>(seed?.activeTurns ?? {});
     const [turnProgress, setTurnProgress] = createSignal<
       Record<string, { turnId: string; detail: string } | undefined>
@@ -79,10 +81,14 @@ const Turns = createSimpleContext({
       setPresentedPromptResolutions,
       submittedPromptRequests,
       setSubmittedPromptRequests,
-    } = useAnsweredPrompts().promptMarkersFor(activeServerId());
+    } = useAnsweredPrompts().promptMarkersFor(scopeServerId);
     const [pendingPrompts, setPendingPrompts] = createSignal<
       Record<string, PromptEvent | BrowserTakeoverEvent | undefined>
-    >(seededAttentionPrompts(seed?.pendingPrompts, presentedPromptResolutions(), submittedPromptRequests()));
+    >(
+      untrack(() =>
+        seededAttentionPrompts(seed?.pendingPrompts, presentedPromptResolutions(), submittedPromptRequests()),
+      ),
+    );
     const [pendingApprovals, setPendingApprovals] = createSignal<Record<string, AgentApproval | undefined>>(
       seed?.pendingApprovals ?? {},
     );

@@ -100,8 +100,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   createEffect(
     () => browserTabs().map((tab) => ({ id: tab.id, url: tab.url })),
     (tabs) => {
-      const serverId = deps.props.server?.id ?? "local";
-      const agentId = deps.props.agent?.id ?? null;
+      const serverId = untrack(() => deps.props.server?.id ?? "local");
+      const agentId = untrack(() => deps.props.agent?.id ?? null);
       for (const [requestKey, request] of deps.browserOpenRequests) {
         if (request.serverId !== serverId || request.agentId !== agentId) continue;
         const tabAppeared = tabs.some(
@@ -197,9 +197,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   };
   let previousBrowserTabCount = 0;
   createEffect(
-    () => ({ count: browserTabs().length, open: screenOpen() }),
-    ({ count, open }) => {
-      if (deps.props.browserEnabled === false) return;
+    () => ({ count: browserTabs().length, open: screenOpen(), enabled: deps.props.browserEnabled !== false }),
+    ({ count, open, enabled }) => {
+      if (!enabled) return;
       const browserWasClosed = open && previousBrowserTabCount > 0 && count === 0;
       previousBrowserTabCount = count;
       if (browserWasClosed) deps.panels.setActiveRightPanel("browser");
