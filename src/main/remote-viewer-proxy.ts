@@ -11,6 +11,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
+import { LifecycleGate } from "./lifecycle-gate";
 import {
   decodeRemoteDesktopSignalBinary,
   decodeRemoteDesktopSignalControl,
@@ -52,7 +53,7 @@ export class RemoteViewerProxy {
   readonly #streams = new Map<string, ViewerStream>();
   #server: Server | null = null;
   #port: number | null = null;
-  #starting: Promise<number> | null = null;
+  readonly #lifecycle = new LifecycleGate<number>();
 
   constructor(options: RemoteViewerProxyOptions) {
     this.#options = options;
@@ -60,11 +61,16 @@ export class RemoteViewerProxy {
   }
 
   async viewerUrl(serverId: string, upstreamPath: string): Promise<string> {
-    const port = await this.#start();
+    const port = await this.#lifecycle.start(() => this.#start());
     return `http://127.0.0.1:${port}${this.#basePath(serverId)}${upstreamPath}`;
   }
 
-  async stop(): Promise<void> {
+  // After a start that is still running, so the listener it opens does not stay open after the stop.
+  stop(): Promise<void> {
+    return this.#lifecycle.stop(() => this.#stop());
+  }
+
+  async #stop(): Promise<void> {
     this.#options.transport.off("desktopData", this.#onDesktopData);
     const streams = [...this.#streams.values()];
     for (const stream of streams) stream.socket.close(1001, "Remote viewer stopped");
@@ -79,8 +85,7 @@ export class RemoteViewerProxy {
 
   async #start(): Promise<number> {
     if (this.#port) return this.#port;
-    if (this.#starting) return this.#starting;
-    this.#starting = new Promise<number>((resolve, reject) => {
+    return new Promise<number>((resolve, reject) => {
       const server = createServer((request, response) => void this.#handleHttp(request, response));
       server.on("upgrade", (request, socket, head) => {
         const route = this.#route(request.url ?? "/");
@@ -106,10 +111,7 @@ export class RemoteViewerProxy {
         this.#port = address.port;
         resolve(address.port);
       });
-    }).finally(() => {
-      this.#starting = null;
     });
-    return this.#starting;
   }
 
   async #handleHttp(request: IncomingMessage, response: ServerResponse): Promise<void> {

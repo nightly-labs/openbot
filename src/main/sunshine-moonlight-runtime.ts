@@ -14,6 +14,7 @@ import type {
   RemoteDesktopTestStatus,
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
+import { LifecycleGate } from "./lifecycle-gate";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
@@ -292,7 +293,9 @@ export class SunshineMoonlightRuntime {
   #screenCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
-  #starting: Promise<SunshineMoonlightRuntimeState> | null = null;
+  readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState>();
+  /** Set by a stop that arrives while a start runs. The start then opens nothing more and fails. */
+  #stopRequested = false;
   #sunshineBasePort: number | null = null;
   #ownsSunshineAllocation = false;
   #moonlightPort: number | null = null;
@@ -333,15 +336,8 @@ export class SunshineMoonlightRuntime {
     return this.#screenCaptureDenied;
   }
 
-  async start(): Promise<SunshineMoonlightRuntimeState> {
-    if (this.#state) return { ...this.#state };
-    if (this.#starting) return this.#starting;
-    this.#starting = this.#start();
-    try {
-      return await this.#starting;
-    } finally {
-      this.#starting = null;
-    }
+  start(): Promise<SunshineMoonlightRuntimeState> {
+    return this.#lifecycle.start(async () => (this.#state ? { ...this.#state } : this.#start()));
   }
 
   async checkSetup(): Promise<
@@ -385,14 +381,21 @@ export class SunshineMoonlightRuntime {
     if (this.#state) this.#state = { ...this.#state, selectedDisplayId: displayId };
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    return this.#lifecycle.stop(
+      () => this.#stop(),
+      // A start can wait 20 seconds for each process. Stopping its processes now makes that wait fail
+      // at once, and the flag keeps it from starting a new one. Then `#stop` closes what it opened.
+      async () => {
+        this.#stopRequested = true;
+        await this.#stopChildren();
+      },
+    );
+  }
+
+  async #stop(): Promise<void> {
     this.#state = null;
-    await Promise.all([
-      this.#moonlight ? stopRemoteProcess(this.#moonlight) : Promise.resolve(),
-      this.#sunshine ? stopRemoteProcess(this.#sunshine) : Promise.resolve(),
-    ]);
-    this.#moonlight = null;
-    this.#sunshine = null;
+    await this.#stopChildren();
     const iceServer = this.#iceServer;
     this.#iceServer = null;
     if (iceServer) await new Promise<void>((resolve) => iceServer.close(() => resolve()));
@@ -424,7 +427,12 @@ export class SunshineMoonlightRuntime {
     return port;
   }
 
+  #throwIfStopRequested(): void {
+    if (this.#stopRequested) throw new Error("The remote desktop runtime was stopped while it started.");
+  }
+
   async #start(): Promise<SunshineMoonlightRuntimeState> {
+    this.#stopRequested = false;
     await mkdir(this.#options.stateDirectory, { recursive: true, mode: 0o700 });
     try {
       if (this.#sunshineBasePort === null) {
@@ -437,6 +445,7 @@ export class SunshineMoonlightRuntime {
       }
       await this.#writeSunshineConfig();
       const iceEndpoint = await this.#startIceServer();
+      this.#throwIfStopRequested();
       if (this.#moonlightPort === null) {
         this.#moonlightPort = await (this.#options.allocateMoonlightPort ?? reservePort)();
       }
@@ -458,6 +467,7 @@ export class SunshineMoonlightRuntime {
       }
       const moonlightPort = this.#moonlightPort;
       if (moonlightPort === null) throw new Error("Moonlight port has not been allocated yet.");
+      this.#throwIfStopRequested();
       this.#startMoonlight(moonlightPort, iceEndpoint);
       await waitForHttp(
         `http://127.0.0.1:${moonlightPort}/api/authenticate`,
@@ -468,6 +478,7 @@ export class SunshineMoonlightRuntime {
       );
       this.#options.onDiagnostic?.("moonlight", "OpenBot: Moonlight Web is ready.\n");
       const paired = await this.#bootstrapMoonlight(moonlightPort);
+      this.#throwIfStopRequested();
       this.#state = {
         baseUrl: `http://127.0.0.1:${moonlightPort}`,
         authHeader: this.#moonlightHeader,
@@ -483,13 +494,17 @@ export class SunshineMoonlightRuntime {
     }
   }
 
+  // The fields are cleared before the wait: a start that is still running can spawn a process during
+  // it, and clearing them after would lose that process without stopping it.
   async #stopChildren(): Promise<void> {
-    await Promise.all([
-      this.#moonlight ? stopRemoteProcess(this.#moonlight) : Promise.resolve(),
-      this.#sunshine ? stopRemoteProcess(this.#sunshine) : Promise.resolve(),
-    ]);
+    const moonlight = this.#moonlight;
+    const sunshine = this.#sunshine;
     this.#moonlight = null;
     this.#sunshine = null;
+    await Promise.all([
+      moonlight ? stopRemoteProcess(moonlight) : Promise.resolve(),
+      sunshine ? stopRemoteProcess(sunshine) : Promise.resolve(),
+    ]);
   }
 
   async #writeSunshineConfig(): Promise<void> {
@@ -604,6 +619,7 @@ export class SunshineMoonlightRuntime {
   async #startSunshineWithRetry(): Promise<void> {
     let lastError: unknown;
     for (let attempt = 0; attempt < SUNSHINE_START_ATTEMPTS; attempt += 1) {
+      this.#throwIfStopRequested();
       try {
         await this.#startSunshineOnce();
         return;
@@ -1014,15 +1030,18 @@ async function requestStream(url: string, headers: Record<string, string>, body:
   });
 }
 
-async function waitForHttps(
-  port: number,
-  certificatePath: string,
-  child?: { exitCode: number | null } | null,
-): Promise<void> {
+type WatchedChild = Pick<ChildProcess, "exitCode" | "signalCode">;
+
+// A child that a signal ended, such as the one a stop sends, has no exit code, only a signal code.
+function childEnded(child: WatchedChild | null | undefined): boolean {
+  return child !== null && child !== undefined && (child.exitCode !== null || child.signalCode !== null);
+}
+
+async function waitForHttps(port: number, certificatePath: string, child?: WatchedChild | null): Promise<void> {
   const deadline = Date.now() + 20_000;
   let lastError: unknown;
   while (Date.now() < deadline) {
-    if (child?.exitCode !== null && child?.exitCode !== undefined) {
+    if (childEnded(child)) {
       throw new Error(`Sunshine exited before its HTTPS API on port ${port} became ready.`, { cause: lastError });
     }
     try {
@@ -1067,10 +1086,10 @@ async function sunshineTlsOptions(certificatePath: string): Promise<{
   };
 }
 
-async function waitForHttp(url: string, init: RequestInit, child?: { exitCode: number | null } | null): Promise<void> {
+async function waitForHttp(url: string, init: RequestInit, child?: WatchedChild | null): Promise<void> {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (child?.exitCode !== null && child?.exitCode !== undefined) {
+    if (childEnded(child)) {
       throw new Error(`Moonlight Web exited before ${url} became ready.`);
     }
     try {
