@@ -1,7 +1,11 @@
 import type { Dirent } from "node:fs";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { type AgentProviderId, agentProviderCliName } from "@openbot/contracts/agent-providers";
+import {
+  AGENT_PROVIDER_DESCRIPTORS,
+  agentProviderCliName,
+  agentProviderDescriptor,
+} from "@openbot/contracts/agent-providers";
 import { type AgentSummary, type InstalledSkill, SKILL_DESCRIPTION_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -9,22 +13,13 @@ import { parse as parseYaml } from "yaml";
 import { OWNERSHIP_MARKER } from "./managed-skill-service";
 
 /**
- * The workspace skill folders each provider CLI reads by itself. OpenBot writes only `.agents/skills`
- * and `.claude/skills`. An agent keeps its workspace when its provider changes, so a skill can stay
- * in a folder the new provider does not read.
- * Sources: the Codex "build skills" guide, the Claude Code skills guide, the opencode skills guide and
- * the skill paths in Google's Antigravity ACP server.
+ * A skill in one of these workspace folders is listed even when the agent's provider does not read it.
+ * An agent keeps its workspace when its provider changes, so a skill can stay in a folder the new
+ * provider does not read.
  */
-const PROVIDER_SKILL_FOLDERS: Record<AgentProviderId, readonly [string, ...string[]]> = {
-  codex: [".agents/skills"],
-  claude: [".claude/skills"],
-  grok: [".agents/skills"],
-  opencode: [".opencode/skills", ".agents/skills", ".claude/skills"],
-  antigravity: [".gemini/skills", ".agents/skills"],
-};
-
-/** A skill in one of these workspace folders is listed even when the agent's provider does not read it. */
-const WORKSPACE_SKILL_FOLDERS = [".agents/skills", ".claude/skills", ".opencode/skills", ".gemini/skills"] as const;
+const WORKSPACE_SKILL_FOLDERS = [
+  ...new Set(AGENT_PROVIDER_DESCRIPTORS.flatMap((descriptor) => descriptor.skillFolders)),
+];
 const MAX_SKILLS_PER_FOLDER = 200;
 const MAX_SKILL_FILE_BYTES = 256 * 1024;
 
@@ -37,11 +32,11 @@ export async function listFolderSkills(
   agent: Pick<AgentSummary, "provider" | "workspacePath">,
   exclude: ReadonlySet<string>,
 ): Promise<InstalledSkill[]> {
-  const reads = PROVIDER_SKILL_FOLDERS[agent.provider];
+  const reads = agentProviderDescriptor(agent.provider).skillFolders;
   const skills: InstalledSkill[] = [];
   for (const [slug, folders] of await skillFolders(agent.workspacePath, exclude)) {
     const readable = folders.find((folder) => reads.includes(folder));
-    const folder = readable ?? folders[0] ?? WORKSPACE_SKILL_FOLDERS[0];
+    const folder = readable ?? folders[0] ?? reads[0];
     const skill = await readFolderSkill(agent.workspacePath, folder, slug);
     skills.push(
       readable || skill.problem

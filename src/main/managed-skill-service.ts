@@ -1,5 +1,6 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -9,6 +10,8 @@ import { isPathInside } from "../backend/path-containment";
 
 const MANAGED_SKILL_SLUG = "openbot-site-hosting";
 export const OWNERSHIP_MARKER = ".openbot-managed.json";
+/** The workspace skill folders OpenBot writes. Each provider reads at least one of them. */
+export const MANAGED_SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 
 const logger = createOpenBotLogger("managed-skill-service");
 
@@ -77,14 +80,8 @@ export class ManagedSkillService {
 
 async function syncTargets(workspacePath: string, content: string, slug: string): Promise<SyncTargetsResult> {
   const workspaceRoot = await realpath(resolve(workspacePath));
-  const targets = [
-    join(workspacePath, ".agents", "skills", slug, "SKILL.md"),
-    join(workspacePath, ".claude", "skills", slug, "SKILL.md"),
-  ];
-  const resolvedTargets = [
-    join(workspaceRoot, ".agents", "skills", slug, "SKILL.md"),
-    join(workspaceRoot, ".claude", "skills", slug, "SKILL.md"),
-  ];
+  const targets = MANAGED_SKILL_FOLDERS.map((folder) => join(workspacePath, folder, slug, "SKILL.md"));
+  const resolvedTargets = MANAGED_SKILL_FOLDERS.map((folder) => join(workspaceRoot, folder, slug, "SKILL.md"));
   const results = await Promise.allSettled(
     resolvedTargets.map((target) => syncTarget(workspaceRoot, target, content, slug)),
   );
@@ -227,7 +224,8 @@ function isFileExistsError(error: unknown): boolean {
 /** Read only OpenBot-owned skills from the active provider's skill folder. */
 export async function listManagedSkillsForChat(agent: AgentSummary): Promise<InstalledSkill[]> {
   const root = await realpath(agent.workspacePath);
-  const directory = join(root, agent.provider === "claude" ? ".claude" : ".agents", "skills");
+  const reads = agentProviderDescriptor(agent.provider).skillFolders;
+  const directory = join(root, MANAGED_SKILL_FOLDERS.find((folder) => reads.includes(folder)) ?? reads[0]);
   const skills: InstalledSkill[] = [];
   try {
     await verifySafeDirectory(root, directory);

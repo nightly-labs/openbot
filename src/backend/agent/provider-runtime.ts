@@ -74,6 +74,7 @@ import {
   waitForSuccessfulProcess,
 } from "./provider-status";
 import { providerForAgent, providerLabel } from "./thread-items";
+import { workspaceWritableRoots } from "./workspace-sandbox";
 
 const logger = createOpenBotLogger("provider-runtime");
 
@@ -861,8 +862,8 @@ export class ProviderRuntime implements ProviderPort {
   #confinementFor(agent: AgentSummary): ProcessConfinement | null {
     const provider = providerForAgent(agent);
     if (!workspaceAccessEnforced(agent)) return null;
-    if (!requireProviderDriver(provider).confinesProcess) return null;
-    return { writableRoots: [agent.workspacePath, this.#hooks.sharedRoot()] };
+    if (agentProviderDescriptor(provider).workspaceEnforcement !== "confined-process") return null;
+    return { writableRoots: workspaceWritableRoots(agent, this.#hooks.sharedRoot()) };
   }
 
   /**

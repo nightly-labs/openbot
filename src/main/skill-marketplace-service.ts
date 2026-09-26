@@ -31,7 +31,7 @@ import { parse as parseYaml } from "yaml";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { LocalSkillLibrary } from "./local-skill-library";
-import { listManagedSkillsForChat } from "./managed-skill-service";
+import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
 import { listFolderSkills } from "./skill-folder-discovery";
 import { archiveDirectory, inspectArchive, inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
@@ -472,7 +472,8 @@ export class SkillMarketplaceService {
 }
 
 function targetDirectories(workspace: string, slug: string): [string, string] {
-  return [join(workspace, ".agents", "skills", slug), join(workspace, ".claude", "skills", slug)];
+  const [agents, claude] = MANAGED_SKILL_FOLDERS;
+  return [join(workspace, agents, slug), join(workspace, claude, slug)];
 }
 
 function disabledDirectory(workspace: string, slug: string): string {

@@ -9,11 +9,17 @@ type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath"
  * says. A write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
  * Codex takes the mode itself. The Claude client reads `workspace-write` and applies its own
- * sandbox (`claude-workspace-sandbox.ts`). Grok and OpenCode ignore it: `ProviderRuntime` runs such
- * an agent in a sandboxed process of its own (`process-confinement.ts`).
+ * sandbox (`claude-workspace-sandbox.ts`). A provider whose `workspaceEnforcement` is
+ * `confined-process` ignores it: `ProviderRuntime` runs such an agent in a sandboxed process of its
+ * own (`process-confinement.ts`).
  */
 export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "danger-full-access" {
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
+}
+
+/** The folders a Workspace only agent may write, besides the temporary folders. */
+export function workspaceWritableRoots(agent: Pick<AgentSummary, "workspacePath">, sharedRoot: string) {
+  return [agent.workspacePath, sharedRoot];
 }
 
 export type CodexSandboxPolicy =
@@ -39,7 +45,7 @@ export function codexSandboxPolicy(agent: SandboxedAgent, sharedRoot: string): C
   if (!workspaceAccessEnforced(agent)) return { type: "dangerFullAccess" };
   return {
     type: "workspaceWrite",
-    writableRoots: [agent.workspacePath, sharedRoot],
+    writableRoots: workspaceWritableRoots(agent, sharedRoot),
     networkAccess: true,
     // Compilers, package managers and test runners write temporary files, so the temporary folders stay
     // writable. The settings note and the agent instructions name them. The `config.toml` defaults agree.
@@ -57,5 +63,7 @@ export function codexSandboxConfig(
   sharedRoot: string,
 ): { sandbox_workspace_write?: { writable_roots: string[]; network_access: boolean } } {
   if (!workspaceAccessEnforced(agent)) return {};
-  return { sandbox_workspace_write: { writable_roots: [agent.workspacePath, sharedRoot], network_access: true } };
+  return {
+    sandbox_workspace_write: { writable_roots: workspaceWritableRoots(agent, sharedRoot), network_access: true },
+  };
 }

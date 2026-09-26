@@ -1,4 +1,4 @@
-import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, agentProviderName } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_ACCESS_MODES,
@@ -154,6 +154,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     saveError: null,
   });
   const avatarUrl = () => props.agent.avatarUrl ?? null;
+
+  function workspaceEnforcementNote(provider: AgentProviderId): string {
+    switch (agentProviderDescriptor(provider).workspaceEnforcement) {
+      case "tool-sandbox":
+        return t("agentSettings.runtime.workspaceEnforcedClaude");
+      case "command-sandbox":
+        return t("agentSettings.runtime.workspaceEnforcedCommand");
+      case "confined-process":
+        return t("agentSettings.runtime.workspaceEnforcedProcess", { provider: agentProviderName(provider) });
+    }
+  }
 
   /** The message under the form: every save path clears it first and reports its failure through it. */
   function setSaveError(message: string | null): void {
@@ -860,14 +871,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </>
                 }
               >
-                {t("agentSettings.runtime.workspaceNote")}{" "}
-                {draft.runtime.provider === "claude"
-                  ? t("agentSettings.runtime.workspaceEnforcedClaude")
-                  : draft.runtime.provider === "codex"
-                    ? t("agentSettings.runtime.workspaceEnforcedCommand")
-                    : t("agentSettings.runtime.workspaceEnforcedProcess", {
-                        provider: agentProviderName(draft.runtime.provider),
-                      })}{" "}
+                {t("agentSettings.runtime.workspaceNote")} {workspaceEnforcementNote(draft.runtime.provider)}{" "}
                 {t("agentSettings.runtime.workspaceUnlimited")}
               </Show>
             </Text>

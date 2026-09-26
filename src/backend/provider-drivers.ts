@@ -161,11 +161,6 @@ export interface BuiltInProviderDriver {
     confinement?: ProcessConfinement,
   ): AgentClient;
   /**
-   * Whether a Workspace only agent needs a process of its own. Codex and Claude confine each session
-   * themselves; Grok and OpenCode take `confinement` above and confine the whole process.
-   */
-  confinesProcess?: true;
-  /**
    * The client that writes an agent profile, when the provider needs a different one. Profile
    * generation asks the model one question and must not let it act, so a provider that can be
    * started without tools starts that way here. Without this hook the normal client is used.
@@ -225,7 +220,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
     },
     resolveCli: resolveGrokCli,
-    confinesProcess: true,
     createClient: (cli, requestTimeoutMs, context, confinement) =>
       new GrokAgentClient(
         cli,
@@ -251,7 +245,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // Both clients read the key and the custom providers at spawn, and the profile client merges the
     // endpoints *into* the deny-all layer rather than beside it: the two share one environment
     // variable, so the layer would be lost if a custom provider config replaced it.
-    confinesProcess: true,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
         provider: "opencode",
@@ -297,7 +290,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
     resolveCli: resolveAntigravityCli,
-    confinesProcess: true,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
         provider: "antigravity",
