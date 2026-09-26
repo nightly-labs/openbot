@@ -1,10 +1,3 @@
-import { channelRequest, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
-import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
-import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
-import {
-  decodeTeamProtocolV4CurrentHttpResponse,
-  encodeTeamProtocolV4CurrentHttpRequest,
-} from "@openbot/contracts/team-protocol/v4-adapter";
 // Putting one Team API call on the wire, and reading what came back off it.
 //
 // HTTP uses the adapter for the negotiated protocol: V4 adds OpenCode, V3 adds duplication,
@@ -16,21 +9,15 @@ import {
 
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
-import {
-  decodeTeamProtocolV1CurrentHttpResponse,
-  encodeTeamProtocolV1CurrentHttpRequest,
-} from "@openbot/contracts/team-protocol/v1-adapter";
+import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import {
-  decodeTeamProtocolV3CurrentHttpResponse,
-  encodeTeamProtocolV3CurrentHttpRequest,
-} from "@openbot/contracts/team-protocol/v3-adapter";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
@@ -61,6 +48,8 @@ export async function requestJson<T>(
   } = {},
 ): Promise<T> {
   const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  const sideRoute = teamSideRouteCodec(path);
+  const codec = teamHttpCodec(options.protocol);
   const response = await remoteFetch(
     new URL(path, apiUrl),
     {
@@ -76,24 +65,12 @@ export async function requestJson<T>(
       body:
         options.body === undefined
           ? undefined
-          : isChannelRoute(path)
-            ? JSON.stringify(channelRequest(path, options.body))
-            : isMcpRoute(path)
-              ? JSON.stringify(mcpRequest(path, options.body))
-              : isStorageRoute(path)
-                ? JSON.stringify(storageRequest(path, options.body))
-                : options.protocol === 4
-                  ? encodeTeamProtocolV4CurrentHttpRequest(method, path, options.body, {
-                      preserveSemanticTags: options.preserveSemanticTags,
-                      agentCreateModel: options.agentCreateModel,
-                    })
-                  : options.protocol === TEAM_PROTOCOL_V3
-                    ? encodeTeamProtocolV3CurrentHttpRequest(method, path, options.body, {
-                        preserveSemanticTags: options.preserveSemanticTags,
-                      })
-                    : encodeTeamProtocolV1CurrentHttpRequest(method, path, options.body, {
-                        preserveSemanticTags: options.preserveSemanticTags,
-                      }),
+          : sideRoute
+            ? JSON.stringify(sideRoute.request(path, options.body))
+            : codec.encodeRequest(method, path, options.body, {
+                preserveSemanticTags: options.preserveSemanticTags,
+                agentCreateModel: options.agentCreateModel,
+              }),
     },
     options.timeoutMs,
   );
@@ -113,17 +90,9 @@ export async function requestJson<T>(
   }
   if (value !== undefined) {
     try {
-      value = isChannelRoute(path)
-        ? channelResponse(path, response.status, value)
-        : isMcpRoute(path)
-          ? mcpResponse(path, response.status, value)
-          : isStorageRoute(path)
-            ? storageResponse(path, response.status, value)
-            : options.protocol === 4
-              ? decodeTeamProtocolV4CurrentHttpResponse(method, path, response.status, value)
-              : options.protocol === TEAM_PROTOCOL_V3
-                ? decodeTeamProtocolV3CurrentHttpResponse(method, path, response.status, value)
-                : decodeTeamProtocolV1CurrentHttpResponse(method, path, response.status, value);
+      value = sideRoute
+        ? sideRoute.response(path, response.status, value)
+        : codec.decodeResponse(method, path, response.status, value);
     } catch (error) {
       throw new RemoteProtocolError(
         "protocol_error",

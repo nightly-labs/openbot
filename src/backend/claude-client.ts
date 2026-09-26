@@ -16,7 +16,7 @@ import {
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
@@ -332,7 +332,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 timeout = setTimeout(() => {
                   input.close();
                   claudeQuery.close();
-                  reject(new Error("Claude request timed out: model/list"));
+                  reject(new RequestTimeoutError("Claude", "model/list"));
                 }, timeoutMs);
               }),
             ]);
@@ -395,7 +395,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           timeout = setTimeout(() => {
             input.close();
             claudeQuery.close();
-            reject(new Error("Claude request timed out: account/rateLimits/read"));
+            reject(new RequestTimeoutError("Claude", "account/rateLimits/read"));
           }, timeoutMs);
         }),
       ]);

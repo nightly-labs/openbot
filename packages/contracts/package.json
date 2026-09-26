@@ -28,6 +28,8 @@
     "./team-protocol/queue-edit-v1": "./src/team-protocol/queue-edit-v1.ts",
     "./team-protocol/browser-view-v1": "./src/team-protocol/browser-view-v1.ts",
     "./team-protocol/current": "./src/team-protocol/current.ts",
+    "./team-protocol/http-codecs": "./src/team-protocol/http-codecs.ts",
+    "./team-protocol/side-routes": "./src/team-protocol/side-routes.ts",
     "./team-protocol/v1": "./src/team-protocol/v1.ts",
     "./team-protocol/v1-adapter": "./src/team-protocol/v1-adapter.ts",
     "./team-protocol/v2": "./src/team-protocol/v2.ts",

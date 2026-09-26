@@ -338,7 +338,7 @@ export class DrainScheduler {
         this.#channels?.deliveryUncertain(delivery.id);
         this.#hooks.emitError(
           "delivery_start_unconfirmed",
-          "Codex did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.",
+          `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
           delivery.recipientAgentId,
         );
         return;
