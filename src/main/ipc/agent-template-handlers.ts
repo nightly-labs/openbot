@@ -35,7 +35,7 @@ export function agentTemplateIpcHandlers({
   };
 }
 
-function parseInstallAgentTemplate(input: unknown): InstallAgentTemplateInput {
+export function parseInstallAgentTemplate(input: unknown): InstallAgentTemplateInput {
   if (!isObject(input)) throw new Error("Invalid agent installation.");
   return {
     templateId: requireString(input.templateId, "templateId"),

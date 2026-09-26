@@ -26,9 +26,15 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  AGENT_ADMIN_CAPABILITY,
+  AGENT_INSTALL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  HOST_ADMIN_CAPABILITY,
   isTeamCurrentCapability,
   MCP_SERVERS_CAPABILITY,
+  PROVIDERS_ADMIN_CAPABILITY,
+  SHARED_TABLES_CAPABILITY,
+  SKILLS_ADMIN_CAPABILITY,
   STORAGE_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
@@ -72,13 +78,19 @@ import {
   requestProtocol,
   stringField,
 } from "./team-api/request-helpers";
+import { routeAgentAdmin } from "./team-api/route-agent-admin";
+import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
 import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
+import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeMcpServers } from "./team-api/route-mcp";
+import { routeProviders } from "./team-api/route-providers";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
+import { routeSharedTables } from "./team-api/route-shared-tables";
+import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { TeamStoreError } from "./team-store";
@@ -560,6 +572,12 @@ export class TeamApiServer {
       )
         return;
       if ((await routeStorage(context, this.#options.storage)) === "handled") return;
+      if ((await routeAgentAdmin(context, this.#options.admin)) === "handled") return;
+      if ((await routeSkillsAdmin(context, this.#options.admin)) === "handled") return;
+      if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
+      if ((await routeAgentInstall(context, this.#options.admin)) === "handled") return;
+      if ((await routeProviders(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -1135,6 +1153,15 @@ export class TeamApiServer {
           return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
+        if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
+        if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
+        if (capability === SHARED_TABLES_CAPABILITY) return this.#options.admin?.sharedTables !== undefined;
+        if (capability === AGENT_INSTALL_CAPABILITY)
+          return (
+            this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
+          );
+        if (capability === PROVIDERS_ADMIN_CAPABILITY) return this.#options.admin?.providers !== undefined;
+        if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         return true;
       }),
     };

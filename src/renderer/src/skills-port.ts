@@ -1,4 +1,10 @@
-import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
+import type {
+  InstalledSkill,
+  InstallSkillInput,
+  OpenBotDesktopApi,
+  SetEnabledSkillInput,
+  UninstallSkillInput,
+} from "@openbot/contracts/ipc";
 
 /**
  * What the skill screens reach in main: the marketplace, the agent skills dialog and the local
@@ -8,7 +14,16 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface SkillsPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
-    "listInstalledSkills" | "listMcpServers" | "removeMcpServer" | "saveMcpServer" | "testMcpServer"
+    | "addMarketplaceAgent"
+    | "installAgentSkill"
+    | "listAgentSkills"
+    | "listInstalledSkills"
+    | "listMcpServers"
+    | "removeMcpServer"
+    | "saveMcpServer"
+    | "setAgentSkillEnabled"
+    | "testMcpServer"
+    | "uninstallAgentSkill"
   >;
   marketplaceAgents: Pick<
     OpenBotDesktopApi["marketplaceAgents"],
@@ -34,4 +49,27 @@ export interface SkillsPort {
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function skillsPort(): SkillsPort {
   return window.openbot;
+}
+
+/** The skills of one agent: read, install, remove and turn on or off. */
+export interface AgentSkillCalls {
+  listInstalled(agentId: string): Promise<InstalledSkill[]>;
+  install(input: InstallSkillInput): Promise<InstalledSkill>;
+  uninstall(input: UninstallSkillInput): Promise<void>;
+  setEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill>;
+}
+
+/**
+ * Without a server, the skills of this computer's agents. With one, the host of that joined server,
+ * which answers only an owner or admin, installs a marketplace skill with its own account.
+ */
+export function agentSkillCalls(hostServerId?: string): AgentSkillCalls {
+  const port = skillsPort();
+  if (!hostServerId) return port.skills;
+  return {
+    listInstalled: (agentId) => port.agent.listAgentSkills(agentId, hostServerId),
+    install: (input) => port.agent.installAgentSkill(input, hostServerId),
+    uninstall: (input) => port.agent.uninstallAgentSkill(input, hostServerId),
+    setEnabled: (input) => port.agent.setAgentSkillEnabled(input, hostServerId),
+  };
 }

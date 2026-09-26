@@ -62,7 +62,7 @@ function runtimeHarness(owners?: Parameters<typeof createProviderRuntimeStore>[1
   const onOpenChange = vi.fn();
   let store: ReturnType<typeof createProviderRuntimeStore> | undefined;
   render(() => {
-    const runtimes = createProviderRuntimeStore(api, owners);
+    const runtimes = createProviderRuntimeStore(() => api, owners);
     store = runtimes;
     return (
       <>

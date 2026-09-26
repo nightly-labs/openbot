@@ -602,6 +602,14 @@ export function installOpenbotStub(): void {
       removeMcpServer: notStubbed("agent.removeMcpServer"),
       setMcpServerEnabled: notStubbed("agent.setMcpServerEnabled"),
       testMcpServer: notStubbed("agent.testMcpServer"),
+      getAgentAdminSettings: notStubbed("agent.getAgentAdminSettings"),
+      updateAgentAdminSettings: notStubbed("agent.updateAgentAdminSettings"),
+      listAgentSkills: notStubbed("agent.listAgentSkills"),
+      installAgentSkill: notStubbed("agent.installAgentSkill"),
+      uninstallAgentSkill: notStubbed("agent.uninstallAgentSkill"),
+      setAgentSkillEnabled: notStubbed("agent.setAgentSkillEnabled"),
+      addMarketplaceAgent: notStubbed("agent.addMarketplaceAgent"),
+      addTemplateAgent: notStubbed("agent.addTemplateAgent"),
       getStatus: vi.fn().mockResolvedValue({
         phase: "ready",
         cliVersion: "0.144.1",
@@ -1078,6 +1086,8 @@ export function installOpenbotStub(): void {
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
     }),
+    providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),
+    hostAdmin: stubGroup(IPC_ENDPOINTS.hostAdmin, "hostAdmin", {}),
     // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is
     // absent, and these tests cover that flow. A stub member switches every screen to downloads.
   } satisfies Omit<OpenBotDesktopApi, "providerRuntimes">;

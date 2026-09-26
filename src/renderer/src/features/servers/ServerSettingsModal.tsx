@@ -77,7 +77,7 @@ import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
-import { serverSupportsCapability } from "./server-capabilities";
+import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "./server-capabilities";
 
 export interface ServerSettingsModalProps {
   open: boolean;
@@ -261,13 +261,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
    */
   const permanentSupported = () => local() || props.server.apiUrl === null;
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
-  const canEditIdentity = () => local();
-  const canManage = () => configured() && (local() || props.server.role === "admin" || props.server.role === "owner");
+  /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
+  const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
+  const canManage = () => configured() && serverRoleCanAdminister(props.server);
   /**
    * The same role check without `configured()`. MCP servers belong to this machine and are spawned
    * by the agents on it, so they are manageable before the user publishes a Team API host at all.
    */
-  const canManageMcp = () => local() || props.server.role === "admin" || props.server.role === "owner";
+  const canManageMcp = () => serverRoleCanAdminister(props.server);
   const actionsAvailable = () => local() || props.server.state === "online";
   const published = () => (local() ? props.hostStatus?.phase === "online" : props.server.state === "online");
   const address = () => (local() ? props.hostStatus?.apiUrl : props.server.apiUrl);

@@ -19,6 +19,7 @@ import {
 } from "./development-profile";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
+import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
 import { agentIpcHandlers } from "./ipc/agent-handlers";
 import { agentImportIpcHandlers } from "./ipc/agent-import-handlers";
 import { agentTemplateIpcHandlers } from "./ipc/agent-template-handlers";
@@ -31,12 +32,14 @@ import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
 import { dynamicIslandIpcHandlers } from "./ipc/dynamic-island-handlers";
+import { hostAdminIpcHandlers } from "./ipc/host-admin-handlers";
 import { hostedSiteIpcHandlers } from "./ipc/hosted-site-handlers";
 import { marketplaceAgentIpcHandlers } from "./ipc/marketplace-agent-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
+import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -331,6 +334,7 @@ function registerIpcHandlers({
   analyticsPreferenceFile,
   updatePreferenceFile,
   approvalAutomation,
+  agentAdminSettings,
   language,
   notificationPreference,
   agentInitialization,
@@ -341,7 +345,7 @@ function registerIpcHandlers({
   centralAuth,
   skills,
   hostedSites,
-  customProviders,
+  customProviderChanges,
   marketplaceAgents,
   agentTemplates,
   agentImport,
@@ -387,7 +391,7 @@ function registerIpcHandlers({
     ...accountIpcHandlers({ centralAuth, host }),
     ...skillIpcHandlers({ skills, getMainWindow }),
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
-    ...customProviderIpcHandlers({ service, customProviders }),
+    ...customProviderIpcHandlers(customProviderChanges),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,
@@ -417,10 +421,25 @@ function registerIpcHandlers({
       takePendingPluginSlug: () => takePendingDeepLink("plugin"),
     }),
     ...memoryIpcHandlers({ service, remoteServers }),
-    ...sharedTableIpcHandlers({ service }),
+    ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
+    ...agentAdminIpcHandlers({
+      settings: agentAdminSettings,
+      skills,
+      marketplaceAgents,
+      agentTemplates,
+      remoteServers,
+    }),
+    ...hostAdminIpcHandlers({ host, remoteServers }),
+    ...providerAdminIpcHandlers({
+      service,
+      credentials: providerCredentials,
+      runtimes: providerRuntimes,
+      customProviders: customProviderChanges,
+      remoteServers,
+    }),
     ...mcpServerIpcHandlers({
       service,
       remoteServers,

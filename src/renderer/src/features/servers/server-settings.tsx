@@ -11,6 +11,7 @@ import { errorMessage } from "@openbot/ui/error-message";
 import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
 
@@ -93,8 +94,7 @@ const ServerSettings = createSimpleContext({
             identityError = errorMessage(error, "The server identity could not refresh.");
           }
         }
-        const canManage =
-          server.kind === "local" ? hostStatus().configured : server.role === "admin" || server.role === "owner";
+        const canManage = server.kind === "local" ? hostStatus().configured : serverRoleCanAdminister(server);
         const canUseNetwork = server.kind === "local" || server.state === "online";
         const admin = serverAdminPort(server);
         const [presence, members, invites] = await Promise.all([
@@ -138,20 +138,26 @@ const ServerSettings = createSimpleContext({
 
     async function saveServerIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
       const server = serverSettingsTarget();
-      if (server?.kind !== "local") throw new Error("Only the local server identity can change here.");
+      if (!serverCanAdminister(server, "host-admin-v1"))
+        throw new Error("The name and logo of this server can only change on the computer that runs it.");
       const analytics = desktopAnalytics.scope();
+      const serverKind = server.kind;
       let operationSucceeded = false;
       try {
-        const status = hostStatus().configured
-          ? await serversPort().host.updateIdentity(input)
-          : await serversPort().host.configure(input);
+        if (serverKind === "local") {
+          const status = hostStatus().configured
+            ? await serversPort().host.updateIdentity(input)
+            : await serversPort().host.configure(input);
+          setHostStatus(status);
+        } else {
+          await serversPort().hostAdmin.updateIdentity(input, server.id);
+        }
         analytics.track("team_action", {
           action: "identity_saved",
           result: "succeeded",
-          server_kind: "local",
+          server_kind: serverKind,
         });
         operationSucceeded = true;
-        setHostStatus(status);
         setServers(await serversPort().servers.list());
         await refreshServerSettings(server.id);
       } catch (error) {
@@ -159,7 +165,7 @@ const ServerSettings = createSimpleContext({
           analytics.track("team_action", {
             action: "identity_saved",
             result: "failed",
-            server_kind: "local",
+            server_kind: serverKind,
             failure_code: "identity_save_failed",
           });
         }

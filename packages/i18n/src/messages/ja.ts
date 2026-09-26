@@ -130,6 +130,7 @@ export const ja = {
   "settings.save.saving": "保存中…",
   "settings.save.save": "保存",
   "provider.availableHere": "このコンピュータで利用できます",
+  "provider.availableOnHost": "{name} で実行されます",
   "provider.custom.name": "カスタムプロバイダー",
   "provider.custom.description": "自分のモデルエンドポイント",
   "provider.custom.addLabel": "カスタムプロバイダーを追加",

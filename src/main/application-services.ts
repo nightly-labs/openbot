@@ -1,6 +1,7 @@
 import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
+import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { LocalSkillLibrary } from "./local-skill-library";
 import { localSkillTools } from "./local-skill-tools";
@@ -74,6 +75,7 @@ import {
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
 import { CustomProviderStore } from "./custom-provider-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import {
@@ -239,6 +241,7 @@ export interface ApplicationServices {
   analyticsPreferenceFile: string;
   updatePreferenceFile: string;
   approvalAutomation: ApprovalAutomation;
+  agentAdminSettings: AgentAdminSettingsService;
   language: LanguageService;
   notificationPreference: NotificationPreferenceStore;
   agentInitialization: AgentInitializationGate;
@@ -250,6 +253,7 @@ export interface ApplicationServices {
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
+  customProviderChanges: CustomProviderChanges;
   marketplaceAgents: AgentMarketplaceService;
   agentTemplates: AgentTemplateService;
   agentImport: AgentImportService;
@@ -864,6 +868,8 @@ export async function createApplicationServices({
     architecture: process.arch,
     overrideRoot: process.env.OPENBOT_REMOTE_DESKTOP_RUNTIME_PATH,
   });
+  const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
+  const customProviderChanges = createCustomProviderChanges({ service, customProviders });
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -878,6 +884,20 @@ export async function createApplicationServices({
     mcpServers: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
+    // Each member present advertises its admin capability. Every admin route requires an owner or admin.
+    admin: {
+      agents: agentAdminSettings,
+      skills,
+      sharedTables: service,
+      marketplaceAgents,
+      agentTemplates,
+      providers: {
+        service,
+        credentials: providerCredentials,
+        runtimes: providerRuntimes,
+        customProviders: customProviderChanges,
+      },
+    },
     // The host's Team API routes share the IPC handlers' runtime preparation: a first server
     // saved, enabled, or tested remotely must start and await the managed download like a local one.
     mcpToolRuntimePreparation: {
@@ -1200,6 +1220,7 @@ export async function createApplicationServices({
     analyticsPreferenceFile,
     updatePreferenceFile,
     approvalAutomation,
+    agentAdminSettings,
     language,
     notificationPreference,
     agentInitialization,
@@ -1213,6 +1234,7 @@ export async function createApplicationServices({
     skills,
     hostedSites,
     customProviders,
+    customProviderChanges,
     marketplaceAgents,
     agentTemplates,
     agentImport,
