@@ -76,28 +76,24 @@ const UNSERIALIZABLE = "[unserializable]";
 
 // A value the owner knows is secret: a saved provider key, an MCP header. No rule above can
 // recognise `x7Kq…` as a credential, so each one is masked by its exact text. Short values are
-// refused because masking `true` or `8080` would erase ordinary diagnostics. Each owner replaces its
-// own values, so a rotated or removed key leaves the set, and no owner's values push out another's.
+// refused because masking `true` or `8080` would erase ordinary diagnostics. Nothing leaves the set:
+// a process started with a replaced key can still print it until it stops. The set grows only by
+// the secrets the user saves while the app runs.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
-const registeredSecretsByOwner = new Map<string, string[]>();
+const registeredSecrets = new Set<string>();
 // Longest first, so a secret that contains another one is masked whole, not in parts.
 let registeredSecretsByLength: string[] = [];
 
 /**
- * Makes `values` the secrets `owner` holds now. Every later log line, export and trace masks them
- * in their raw, JSON-escaped and URL-encoded forms. An empty list removes the owner.
+ * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
+ * URL-encoded forms.
  */
-export function setSecretValues(owner: string, values: Iterable<string>): void {
-  const forms = new Set<string>();
-  for (const value of values) {
-    if (value.length < MIN_REGISTERED_SECRET_LENGTH) continue;
-    forms.add(value).add(JSON.stringify(value).slice(1, -1)).add(encodeURIComponent(value));
-  }
-  if (forms.size === 0) registeredSecretsByOwner.delete(owner);
-  else registeredSecretsByOwner.set(owner, [...forms]);
-  registeredSecretsByLength = [...new Set([...registeredSecretsByOwner.values()].flat())].sort(
-    (left, right) => right.length - left.length,
-  );
+export function registerSecretValue(value: string): void {
+  if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
+  const size = registeredSecrets.size;
+  registeredSecrets.add(value).add(JSON.stringify(value).slice(1, -1)).add(encodeURIComponent(value));
+  if (registeredSecrets.size === size) return;
+  registeredSecretsByLength = [...registeredSecrets].sort((left, right) => right.length - left.length);
 }
 
 /** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */

@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { isSecretName, redactText, setSecretValues } from "@openbot/logging";
+import { isSecretName, redactText, registerSecretValue } from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -42,23 +42,12 @@ export function redactMcpValues(text: string, values: Iterable<string>): string 
  * `redactMcpSecrets` on the paths that know the configuration.
  */
 export function registerMcpSecretValues(config: McpServerConfig): void {
-  const values: string[] = [];
   for (const [name, value] of Object.entries(mcpEnvironment(config))) {
-    if (isSecretName(name)) values.push(value);
+    if (isSecretName(name)) registerSecretValue(value);
   }
   for (const pair of config.headers) {
-    if (isSecretName(pair.key)) values.push(pair.value);
+    if (isSecretName(pair.key)) registerSecretValue(pair.value);
   }
-  setSecretValues(mcpSecretOwner(config.id), values);
-}
-
-/** Stops masking a removed server's secrets. */
-export function forgetMcpSecretValues(mcpServerId: string): void {
-  setSecretValues(mcpSecretOwner(mcpServerId), []);
-}
-
-function mcpSecretOwner(mcpServerId: string): string {
-  return `mcp-server:${mcpServerId}`;
 }
 
 /**

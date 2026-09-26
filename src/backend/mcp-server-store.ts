@@ -10,7 +10,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database/database-rows";
-import { forgetMcpSecretValues, registerMcpSecretValues } from "./mcp-redaction";
+import { registerMcpSecretValues } from "./mcp-redaction";
 import type { OpenBotDatabase } from "./openbot-database";
 
 /**
@@ -140,7 +140,6 @@ export class McpServerStore {
 
   remove(mcpServerId: string): void {
     this.database.connection.prepare("DELETE FROM projection_mcp_servers WHERE mcp_server_id = ?").run(mcpServerId);
-    forgetMcpSecretValues(mcpServerId);
   }
 
   setEnabled(mcpServerId: string, enabled: boolean, now = new Date().toISOString()): McpServerConfig {

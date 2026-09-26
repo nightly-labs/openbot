@@ -94,6 +94,7 @@ export default defineConfig({
           // pattern, so a DOM test lands here wherever it lives: a page script the main process
           // injects needs a document as much as a renderer module does.
           include: ["src/renderer/**/*.test.tsx", "packages/ui/**/*.test.tsx", "**/*.dom.test.ts"],
+          globalSetup: ["./tools/vitest/hermetic-global-setup.ts"],
           setupFiles: ["./tools/vitest/hermetic-setup.ts", "./src/renderer/src/setupTests.ts"],
         },
       },

@@ -154,12 +154,16 @@ runs before each test file imports anything. It deletes credential-shaped variab
 `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_PRIVATE_KEY`, and `ANTHROPIC_*`, `OPENAI_*`, `OPENROUTER_*`,
 `XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `XDG_*`,
 and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME` and `USERPROFILE`
-at a temporary directory for the file, which it removes after the file.
+at a temporary directory for the file, which it removes after the file. The `renderer` project runs
+files in worker threads, and a thread's `process.env` does not reach the native `homedir()`, so
+`tools/vitest/hermetic-global-setup.ts` also moves `HOME` in the main process before the threads
+start.
 
 A key in the developer's shell could otherwise let a fake-provider test reach a real provider, and
 every profile path (`~/OpenBot`, the app data directory) comes from `homedir()`, so a path bug could
 write into the developer's own conversations. A test that needs a token or a directory sets it
-itself. `tools/vitest/hermetic-environment.test.ts` covers the guard.
+itself. `tools/vitest/hermetic-environment.test.ts` and `tools/vitest/hermetic-home.dom.test.ts`
+cover the guard.
 
 ## Why the jsdom projects use `vmThreads`
 
