@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { Message, PluralMessage } from "@openbot/i18n";
 import { TRANSLATED_LOCALES } from "@openbot/i18n";
@@ -40,7 +40,7 @@ function files(directory: string, match: RegExp): string[] {
 
 /** `mobile/settings` for messages/en/mobile/settings.ts. */
 function moduleName(locale: string, path: string): string {
-  return relative(resolve(MESSAGES, locale), path).replace(/\.ts$/, "");
+  return relative(resolve(MESSAGES, locale), path).replaceAll(sep, "/").replace(/\.ts$/, "");
 }
 
 function isMessage(value: unknown): value is Message {
