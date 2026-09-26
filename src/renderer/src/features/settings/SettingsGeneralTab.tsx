@@ -18,9 +18,9 @@ import {
   toast,
 } from "@openbot/ui";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { createSignal, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
-import { LanguageSelect } from "./LanguageSelect";
 import { ProviderSettingsSection, type ProviderSettingsSectionProps } from "./ProviderSettingsSection";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];

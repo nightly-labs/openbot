@@ -63,6 +63,7 @@ import type {
 } from "@openbot/ui/features/settings/marketplace-plugins";
 import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpConnectFlow } from "@openbot/ui/features/settings/mcp-connect-auth";
+import { PluginUninstallDialog, type PluginUninstallPlan } from "@openbot/ui/features/settings/PluginUninstallDialog";
 import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import {
@@ -83,8 +84,6 @@ import { writeClipboardText } from "../../clipboard";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
 import { desktopMarketplaceCalls, type MarketplaceCalls } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
-import type { PluginUninstallPlan } from "./PluginUninstallDialog";
-import { PluginUninstallDialog } from "./PluginUninstallDialog";
 
 /** Pending install connect; settle(null) on dismiss. */
 interface PendingConnect {
