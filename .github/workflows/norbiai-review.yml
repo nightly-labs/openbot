@@ -143,7 +143,7 @@ jobs:
       # What a pull request gets when it asks for nothing. Every other run is this pair
       # plus whatever the pull request or the review request overrode, and the override is
       # scoped to that one run: nothing here is written back, so the next pull request
-      # starts from these values again. `gpt-6-astra` runs at `DEFAULT_EFFORT` on Codex.
+      # starts from these values again. A Claude model here runs at `CLAUDE_DEFAULT_EFFORT`.
       # Name `claude-opus-5-5` to review on Claude Code instead.
       DEFAULT_MODEL: gpt-6-astra
       # The default instead, when every changed file is documentation, a story, a test or a
@@ -156,7 +156,7 @@ jobs:
       DEFAULT_EFFORT: low
       # An override is untrusted free text, and it reaches a command line. Membership in
       # these lists is the whole validation: anything else is refused and the default runs
-      # instead, so a typo reviews at full strength rather than silently at none. Extend a
+      # instead, so a typo reviews at the default rather than silently at none. Extend a
       # list here to offer a new choice — space separated, exact match.
       ALLOWED_MODELS: >-
         chatgpt-web/extra-high chatgpt-web/high chatgpt-web/medium chatgpt-web/pro

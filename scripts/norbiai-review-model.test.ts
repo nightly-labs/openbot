@@ -133,12 +133,12 @@ describe("NorbiAI reviewer selection", () => {
   // the list, so only the maintainer's request comment is honoured there.
   it("ignores a fork's description but still reads the maintainer's comment", () => {
     const { model, effort, log } = resolve({
-      description: "NorbiAI-Effort: medium",
-      comment: "NorbiAI-Model: claude-opus-5-5",
+      description: "NorbiAI-Model: chatgpt-web/medium",
+      comment: "NorbiAI-Model: claude-opus-5-5\nNorbiAI-Effort: xhigh",
       fork: true,
     });
 
-    expect({ model, effort }).toEqual({ model: "claude-opus-5-5", effort: job.env.CLAUDE_DEFAULT_EFFORT });
+    expect({ model, effort }).toEqual({ model: "claude-opus-5-5", effort: "xhigh" });
     expect(log).toContain("::warning title=NorbiAI ignored a fork's reviewer override");
   });
 
@@ -304,8 +304,8 @@ describe("NorbiAI reviewer selection", () => {
   it("reviews on Codex by default, and on Claude Code at the Claude default effort unless asked", () => {
     expect(resolve({ description: "Fixes a bug." })).toMatchObject({
       cli: "codex",
-      effort: job.env.DEFAULT_EFFORT,
-      reviewer: `gpt-6-astra, reasoning effort ${job.env.DEFAULT_EFFORT}`,
+      effort: "low",
+      reviewer: "gpt-6-astra, reasoning effort low",
     });
     expect(resolve({ description: "NorbiAI-Model: claude-opus-5-5" })).toMatchObject({
       cli: "claude",
