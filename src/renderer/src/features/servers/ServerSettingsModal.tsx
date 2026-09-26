@@ -68,7 +68,7 @@ import {
   UserRound,
   UsersRound,
 } from "@openbot/ui";
-import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
   SERVER_NOTIFICATION_LEVEL_LABELS,
   serverMuteDescription,
@@ -273,7 +273,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
   let expiryTimer: ReturnType<typeof setTimeout> | undefined;
   let inviteLinkSwapTimer: ReturnType<typeof setTimeout> | undefined;
-  const objectUrls: string[] = [];
 
   const local = () => props.server.kind === "local";
   /**
@@ -438,7 +437,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   onCleanup(() => {
     if (expiryTimer) clearTimeout(expiryTimer);
     if (inviteLinkSwapTimer) clearTimeout(inviteLinkSwapTimer);
-    for (const url of objectUrls) URL.revokeObjectURL(url);
   });
 
   function resetInviteLink(): void {
@@ -512,8 +510,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     });
     try {
       const image = await normalizeAvatarFile(file);
-      const url = URL.createObjectURL(file);
-      objectUrls.push(url);
+      const url = avatarImageDataUrl(image);
       setPanels((state) => {
         state.identity.editing = true;
         state.identity.logo = image;
