@@ -260,6 +260,8 @@ The workflow:
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
 3. runs the complete offline repository check;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on the same GitHub macOS runner;
+   when `hdiutil create` fails with "Device not configured" or "Resource busy", it builds again,
+   up to 3 attempts, because that runner error is not caused by the app;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
 6. builds unsigned Linux x64 and arm64 AppImages on GitHub Ubuntu 24.04 runners of each architecture,
    with the launch check under `xvfb-run`;
