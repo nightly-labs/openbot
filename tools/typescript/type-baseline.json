@@ -129,7 +129,7 @@
     "src/main/remote-server-client.ts": 3,
     "src/main/remote-server-event-refresh.test.ts": 1,
     "src/main/remote-server-host-directory.test.ts": 3,
-    "src/main/remote-server-http.ts": 4,
+    "src/main/remote-server-http.ts": 2,
     "src/main/remote-server-manager.ts": 1,
     "src/main/remote-server-test-harness.ts": 2,
     "src/main/remote-viewer-proxy.ts": 1,

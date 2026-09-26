@@ -24,7 +24,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { channelEvent, channelResponse, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
+import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   CHANNEL_DELETE_CAPABILITY,
   isTeamCurrentCapability,
@@ -35,8 +35,8 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
-import { isStorageRoute, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -48,12 +48,8 @@ import {
 import {
   decodeTeamProtocolV1CurrentClientEvent,
   encodeTeamProtocolV1CurrentEvent,
-  encodeTeamProtocolV1CurrentHttpResponse,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { encodeTeamProtocolV3CurrentHttpResponse } from "@openbot/contracts/team-protocol/v3-adapter";
 import { TEAM_PROTOCOL_V4 } from "@openbot/contracts/team-protocol/v4";
-import { encodeTeamProtocolV4CurrentHttpResponse } from "@openbot/contracts/team-protocol/v4-adapter";
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
@@ -1076,17 +1072,10 @@ export class TeamApiServer {
       status < 400 && route.hiddenAgentIds
         ? (route.protocol < 4 ? legacyProviderView : hiddenAgentView)(value, route.hiddenAgentIds)
         : value;
-    const body = isChannelRoute(route.path)
-      ? JSON.stringify(channelResponse(route.path, status, visibleValue))
-      : isMcpRoute(route.path)
-        ? JSON.stringify(mcpResponse(route.path, status, visibleValue))
-        : isStorageRoute(route.path)
-          ? JSON.stringify(storageResponse(route.path, status, visibleValue))
-          : route.protocol === TEAM_PROTOCOL_V4
-            ? encodeTeamProtocolV4CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-            : route.protocol === TEAM_PROTOCOL_V3
-              ? encodeTeamProtocolV3CurrentHttpResponse(route.method, route.path, status, visibleValue, options)
-              : encodeTeamProtocolV1CurrentHttpResponse(route.method, route.path, status, visibleValue, options);
+    const sideRoute = teamSideRouteCodec(route.path);
+    const body = sideRoute
+      ? JSON.stringify(sideRoute.response(route.path, status, visibleValue))
+      : teamHttpCodec(route.protocol).encodeResponse(route.method, route.path, status, visibleValue, options);
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -1102,17 +1091,12 @@ export class TeamApiServer {
     protocol: number,
     capabilities: ReadonlySet<string>,
   ): Set<string> {
-    const encode =
-      protocol === TEAM_PROTOCOL_V4
-        ? encodeTeamProtocolV4CurrentHttpResponse
-        : protocol === TEAM_PROTOCOL_V3
-          ? encodeTeamProtocolV3CurrentHttpResponse
-          : encodeTeamProtocolV1CurrentHttpResponse;
+    const codec = teamHttpCodec(protocol);
     const options = { preserveSemanticTags: supportsTeamSemanticTags(capabilities) };
     const hidden = new Set<string>();
     for (const agent of agents) {
       try {
-        encode("GET", TEAM_API_ROUTES.agents.all, 200, [agent], options);
+        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, [agent], options);
       } catch {
         hidden.add(agent.id);
         const key = `${protocol}:${agent.id}`;
