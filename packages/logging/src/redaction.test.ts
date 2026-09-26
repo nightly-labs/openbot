@@ -190,6 +190,20 @@ describe("registerSecretValue", () => {
     expect(redactText("password=opaque-value")).not.toContain("opaque-value");
     expect(redactText('{"password":"opaque-value"}')).not.toContain("opaque-value");
   });
+
+  // A label rule stops a value at the first space, so it must not run before the exact value.
+  it("masks a registered value whole when a label rule would cut it", () => {
+    registerSecretValue("hunter22 suffix99");
+
+    expect(redactText("password=hunter22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
+  });
+
+  it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
+    const secret = "12345678\uD800";
+    registerSecretValue(secret);
+
+    expect(redactText(`key ${secret} rejected`)).toBe("key [redacted] rejected");
+  });
 });
 
 describe("redactValue", () => {

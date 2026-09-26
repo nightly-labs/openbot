@@ -81,8 +81,12 @@ const UNSERIALIZABLE = "[unserializable]";
 // the secrets the user saves while the app runs.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
 const registeredSecrets = new Set<string>();
-// Longest first, so a secret that contains another one is masked whole, not in parts.
-let registeredSecretsByLength: string[] = [];
+// One alternation, longest first, so a secret that contains another one is masked whole, and one
+// pass, so a later secret cannot match inside the marker an earlier one left.
+let registeredSecretPattern: RegExp | null = null;
+// What a registered value becomes until the rules have run. It contains `secret`, so where the
+// value was a label, such as `password=…`, the label rules still hide the value after it.
+const REGISTERED_SECRET_MARKER = "__openbot_registered_secret__";
 
 /**
  * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
@@ -91,9 +95,24 @@ let registeredSecretsByLength: string[] = [];
 export function registerSecretValue(value: string): void {
   if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
   const size = registeredSecrets.size;
-  registeredSecrets.add(value).add(JSON.stringify(value).slice(1, -1)).add(encodeURIComponent(value));
+  registeredSecrets.add(value).add(JSON.stringify(value).slice(1, -1));
+  const encoded = uriEncoded(value);
+  if (encoded !== null) registeredSecrets.add(encoded);
   if (registeredSecrets.size === size) return;
-  registeredSecretsByLength = [...registeredSecrets].sort((left, right) => right.length - left.length);
+  const alternatives = [...registeredSecrets]
+    .sort((left, right) => right.length - left.length)
+    .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
+}
+
+// A lone surrogate cannot be URL-encoded. Such a value cannot appear in a URL either, and a
+// stored configuration that holds one must stay readable.
+function uriEncoded(value: string): string | null {
+  try {
+    return encodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 /** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */
@@ -101,19 +120,13 @@ export function isSecretName(name: string): boolean {
   return SECRET_KEY.test(name);
 }
 
-function maskRegisteredSecrets(value: string): string {
-  let result = value;
-  for (const secret of registeredSecretsByLength) {
-    if (result.includes(secret)) result = result.split(secret).join("[redacted]");
-  }
-  return result;
-}
-
-// The label rules run first: a registered value that is also a label, such as `password`, must
-// not erase the label before the rules can hide the value after it.
+// The exact values go first, so that no label rule can cut one and leave a part of it in the log.
 export function redactText(value: string): string {
-  const reparsed = redactSerializedJson(value);
-  return maskRegisteredSecrets(reparsed ?? applyTextRules(redactEmbeddedJson(value)));
+  const marked = registeredSecretPattern ? value.replace(registeredSecretPattern, REGISTERED_SECRET_MARKER) : value;
+  const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
+  return redacted.includes(REGISTERED_SECRET_MARKER)
+    ? redacted.split(REGISTERED_SECRET_MARKER).join("[redacted]")
+    : redacted;
 }
 
 function applyTextRules(value: string): string {

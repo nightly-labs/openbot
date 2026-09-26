@@ -10,6 +10,7 @@ describe("isolateTestEnvironment", () => {
       ANTHROPIC_BASE_URL: "https://api.anthropic.com",
       GITHUB_TOKEN: "ghp_planted",
       CODEX_HOME: "/Users/someone/.codex",
+      APPDATA: "C:\\Users\\someone\\AppData\\Roaming",
       ELECTRON_RUN_AS_NODE: "1",
       GITHUB_ACTIONS: "true",
       PATH: "/usr/bin",
@@ -22,6 +23,8 @@ describe("isolateTestEnvironment", () => {
       PATH: "/usr/bin",
       HOME: "/tmp/test-home",
       USERPROFILE: "/tmp/test-home",
+      APPDATA: join("/tmp/test-home", "AppData", "Roaming"),
+      LOCALAPPDATA: join("/tmp/test-home", "AppData", "Local"),
       TZ: "UTC",
       LANG: "C.UTF-8",
     });

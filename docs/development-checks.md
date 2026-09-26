@@ -153,8 +153,8 @@ restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no ca
 runs before each test file imports anything. It deletes credential-shaped variables (`*_API_KEY`,
 `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_PRIVATE_KEY`, and `ANTHROPIC_*`, `OPENAI_*`, `OPENROUTER_*`,
 `XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `XDG_*`,
-and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME` and `USERPROFILE`
-at a temporary directory for the file, which it removes after the file. The `renderer` project runs
+and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME`, `USERPROFILE`,
+`APPDATA` and `LOCALAPPDATA` at a temporary directory for the file, which it removes after the file. The `renderer` project runs
 files in worker threads, and a thread's `process.env` does not reach the native `homedir()`, so
 `tools/vitest/hermetic-global-setup.ts` also moves `HOME` in the main process before the threads
 start.

@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 // What a test process may inherit from the shell that started it.
 //
 // A developer runs the suite from a shell that holds provider keys, a real home
@@ -35,6 +37,9 @@ export function isolateTestEnvironment(env: NodeJS.ProcessEnv, home: string): vo
   delete env.ELECTRON_RUN_AS_NODE;
   env.HOME = home;
   env.USERPROFILE = home;
+  // Windows resolves application data from these, not from USERPROFILE.
+  env.APPDATA = join(home, "AppData", "Roaming");
+  env.LOCALAPPDATA = join(home, "AppData", "Local");
   env.TZ = "UTC";
   env.LANG = "C.UTF-8";
 }
