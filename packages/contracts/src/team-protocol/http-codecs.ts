@@ -2,8 +2,8 @@
 // protocol number takes its codec from `teamHttpCodec` instead of choosing an adapter itself. Routes
 // of a side protocol are not here: they use `teamSideRouteCodec`, which a caller checks first.
 //
-// Each entry only forwards to its frozen adapter, and passes it the options that adapter reads. A
-// protocol older than V3 is served by the V1 adapter, as it was before this table existed.
+// Each entry is its frozen adapter itself. An adapter reads only the options it declares, so V1 and V3
+// ignore `agentCreateModel`. A protocol older than V3 is served by the V1 adapter.
 import {
   decodeTeamProtocolV1CurrentHttpRequest,
   decodeTeamProtocolV1CurrentHttpResponse,
@@ -46,44 +46,24 @@ export interface TeamHttpCodec {
 }
 
 const V1_CODEC: TeamHttpCodec = {
-  encodeRequest: (method, path, value, options) =>
-    encodeTeamProtocolV1CurrentHttpRequest(method, path, value, { preserveSemanticTags: options.preserveSemanticTags }),
+  encodeRequest: encodeTeamProtocolV1CurrentHttpRequest,
   // The V1 request decoder takes no options.
   decodeRequest: (method, path, value) => decodeTeamProtocolV1CurrentHttpRequest(method, path, value),
-  encodeResponse: (method, path, status, value, options) =>
-    encodeTeamProtocolV1CurrentHttpResponse(method, path, status, value, {
-      preserveSemanticTags: options.preserveSemanticTags,
-    }),
+  encodeResponse: encodeTeamProtocolV1CurrentHttpResponse,
   decodeResponse: decodeTeamProtocolV1CurrentHttpResponse,
 };
 
 const V3_CODEC: TeamHttpCodec = {
-  encodeRequest: (method, path, value, options) =>
-    encodeTeamProtocolV3CurrentHttpRequest(method, path, value, { preserveSemanticTags: options.preserveSemanticTags }),
-  decodeRequest: (method, path, value, options) =>
-    decodeTeamProtocolV3CurrentHttpRequest(method, path, value, { preserveSemanticTags: options.preserveSemanticTags }),
-  encodeResponse: (method, path, status, value, options) =>
-    encodeTeamProtocolV3CurrentHttpResponse(method, path, status, value, {
-      preserveSemanticTags: options.preserveSemanticTags,
-    }),
+  encodeRequest: encodeTeamProtocolV3CurrentHttpRequest,
+  decodeRequest: decodeTeamProtocolV3CurrentHttpRequest,
+  encodeResponse: encodeTeamProtocolV3CurrentHttpResponse,
   decodeResponse: decodeTeamProtocolV3CurrentHttpResponse,
 };
 
 const V4_CODEC: TeamHttpCodec = {
-  encodeRequest: (method, path, value, options) =>
-    encodeTeamProtocolV4CurrentHttpRequest(method, path, value, {
-      preserveSemanticTags: options.preserveSemanticTags,
-      agentCreateModel: options.agentCreateModel,
-    }),
-  decodeRequest: (method, path, value, options) =>
-    decodeTeamProtocolV4CurrentHttpRequest(method, path, value, {
-      preserveSemanticTags: options.preserveSemanticTags,
-      agentCreateModel: options.agentCreateModel,
-    }),
-  encodeResponse: (method, path, status, value, options) =>
-    encodeTeamProtocolV4CurrentHttpResponse(method, path, status, value, {
-      preserveSemanticTags: options.preserveSemanticTags,
-    }),
+  encodeRequest: encodeTeamProtocolV4CurrentHttpRequest,
+  decodeRequest: decodeTeamProtocolV4CurrentHttpRequest,
+  encodeResponse: encodeTeamProtocolV4CurrentHttpResponse,
   decodeResponse: decodeTeamProtocolV4CurrentHttpResponse,
 };
 
