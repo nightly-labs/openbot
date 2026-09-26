@@ -44,6 +44,7 @@ import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
+import { createWebProviderSettings } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
 const CONNECTING_STATUS: AgentStatus = {
@@ -64,7 +65,8 @@ export function WebWorkspace(props: {
   onLogout: () => Promise<void>;
   createRuntime?: WebRuntimeFactory;
 }) {
-  const workspace = createWebWorkspace(props);
+  const [status, setStatus] = createSignal<AgentStatus>(CONNECTING_STATUS);
+  const workspace = createWebWorkspace(props, { onStatus: setStatus });
   const controller = createConversationController({ onTypingChange: () => {} }, false);
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
@@ -84,7 +86,6 @@ export function WebWorkspace(props: {
   const [accountUsage, setAccountUsage] = createSignal<AccountUsage | null>(null);
   let usageGeneration = 0;
   const [models, setModels] = createSignal<AgentModelOption[]>([]);
-  const [status, setStatus] = createSignal<AgentStatus>(CONNECTING_STATUS);
   const [joinOpen, setJoinOpen] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
   const [mobilePane, setMobilePane] = createSignal<WebMobilePane>("conversation");
@@ -122,6 +123,13 @@ export function WebWorkspace(props: {
       throw new Error("Connect to this server first.");
     return admin.request;
   }
+  const providerSettings = createWebProviderSettings({
+    server: () => (workspace.runtime.admin ? server() : undefined),
+    request: hostRequest,
+    status,
+    setStatus,
+    readStatus: () => workspace.runtime.status(),
+  });
   const runtime = createWebConversationRuntime(
     workspace.runtime,
     () => workspace.state.host?.hostId ?? "",
@@ -693,6 +701,7 @@ export function WebWorkspace(props: {
                       }
                     : undefined
                 }
+                providers={providerSettings()}
               />
             </Loading>
           )}

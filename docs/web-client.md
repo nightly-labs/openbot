@@ -52,8 +52,9 @@ mock. The separate web preview implements the browser runtime with that same moc
 - Capability checks hide unavailable browser-view and creation-model controls. Hosts without
   pagination use their full conversation endpoint. Unsupported media and EML uploads are refused
   before transfer. Host authorization remains the final decision for every action.
-- Teammate creation and editing follow the host's existing member permissions. This client does
-  not offer host administration, provider installation, or provider sign-in. Agent deletion uses
+- Teammate creation and editing follow the host's existing member permissions. Host
+  administration, provider installation, and provider sign-in are only for an owner or admin whose
+  host serves the related route; a member does not see them. Agent deletion uses
   the shared confirmation and is hidden for members; the host also enforces the role restriction.
 - Uploads and downloads retain the shared client's 10 MB limit. Message attachment count uses the
   shared contract limit. Cancelling a transfer sends the existing file-cancel frame. If the host

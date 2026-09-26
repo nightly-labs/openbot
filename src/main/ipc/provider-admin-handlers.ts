@@ -5,16 +5,12 @@
 import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AgentStatus,
-  type CustomProviderResult,
-  type CustomProviderSummary,
-  isCustomProviderResult,
-  isCustomProviderSummary,
-  type ProviderApiKeyStatus,
-  type ProviderCodeLoginStart,
-  type ProviderRuntimeSnapshot,
-  type ProviderRuntimeStatus,
+  decodeCustomProviderResult,
+  decodeCustomProviderSummaries,
+  decodeProviderApiKeyStatus,
+  decodeProviderCodeLoginStart,
+  decodeProviderRuntimeSnapshot,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -47,75 +43,6 @@ interface ProviderAdminIpcDependencies {
 // The providers-v1 codec has already checked the fields of every reply below.
 const acceptEmpty = (): undefined => undefined;
 
-/** The verification URL becomes a link the admin opens, so it is held to https here as well. */
-function decodeRemoteCodeLogin(value: unknown): ProviderCodeLoginStart {
-  if (!isDynamicRecord(value)) throw new Error("Invalid code login.");
-  if (value.kind === "connected") return { kind: "connected" };
-  if (!isString(value.userCode) || !isString(value.verificationUrl) || !isNumber(value.expiresAt))
-    throw new Error("Invalid code login.");
-  if (new URL(value.verificationUrl).protocol !== "https:") throw new Error("Invalid code login.");
-  return { kind: "code", userCode: value.userCode, verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
-}
-
-function decodeRemoteKeyStatus(value: unknown): ProviderApiKeyStatus {
-  if (!isDynamicRecord(value) || !isOneOf(["missing", "saved", "unreadable"] as const, value.status))
-    throw new Error("Invalid provider key state.");
-  return value.status;
-}
-
-function decodeRemoteRuntimeStatus(value: unknown): ProviderRuntimeStatus {
-  if (
-    !isDynamicRecord(value) ||
-    !isOneOf(["not-downloaded", "downloading", "finishing", "ready", "download-error"] as const, value.phase) ||
-    (value.progress !== null && !isNumber(value.progress)) ||
-    (value.message !== null && !isString(value.message)) ||
-    (value.version !== null && !isString(value.version)) ||
-    (value.availableVersion !== undefined && value.availableVersion !== null && !isString(value.availableVersion))
-  ) {
-    throw new Error("Invalid provider runtime.");
-  }
-  return {
-    phase: value.phase,
-    progress: value.progress,
-    message: value.message,
-    version: value.version,
-    availableVersion: value.availableVersion ?? null,
-  };
-}
-
-function decodeRemoteRuntimes(value: unknown): ProviderRuntimeSnapshot {
-  if (
-    !isDynamicRecord(value) ||
-    !isNumber(value.revision) ||
-    !isDynamicRecord(value.providers) ||
-    !isDynamicRecord(value.toolRuntimes)
-  ) {
-    throw new Error("Invalid provider runtimes.");
-  }
-  const { providers, toolRuntimes } = value;
-  return {
-    revision: value.revision,
-    providers: {
-      codex: decodeRemoteRuntimeStatus(providers.codex),
-      claude: decodeRemoteRuntimeStatus(providers.claude),
-      grok: decodeRemoteRuntimeStatus(providers.grok),
-      opencode: decodeRemoteRuntimeStatus(providers.opencode),
-    },
-    toolRuntimes: { bun: decodeRemoteRuntimeStatus(toolRuntimes.bun) },
-  };
-}
-
-// The contract guard asserts that a summary carries no key, and fails closed on the whole list.
-function decodeRemoteCustomProviders(value: unknown): CustomProviderSummary[] {
-  if (!Array.isArray(value) || !value.every(isCustomProviderSummary)) throw new Error("Invalid custom providers.");
-  return value;
-}
-
-function decodeRemoteCustomProviderResult(value: unknown): CustomProviderResult {
-  if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider result.");
-  return value;
-}
-
 export function providerAdminIpcHandlers({
   service,
   credentials,
@@ -136,14 +63,14 @@ export function providerAdminIpcHandlers({
   }
 
   const runtime = (path: string) => (provider: ManagedProviderId, serverId: string) =>
-    remote(serverId, path, { provider }, decodeRemoteRuntimes);
+    remote(serverId, path, { provider }, decodeProviderRuntimeSnapshot);
 
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
         local: (provider) => service.startProviderCodeLogin(provider),
         remote: (provider, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.codeLoginStart, { provider }, decodeRemoteCodeLogin),
+          remote(serverId, PROVIDERS_ADMIN_ROUTES.codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),
       cancelCodeLogin: scopedHandler(parseProviderId, {
         local: (provider) => service.cancelProviderCodeLogin(provider),
@@ -153,7 +80,7 @@ export function providerAdminIpcHandlers({
         local: (provider) => ({ provider, status: credentials.status(provider) }),
         remote: async (provider, serverId) => ({
           provider,
-          status: await remote(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyState, { provider }, decodeRemoteKeyStatus),
+          status: await remote(serverId, PROVIDERS_ADMIN_ROUTES.apiKeyState, { provider }, decodeProviderApiKeyStatus),
         }),
       }),
       setApiKey: scopedHandler(parseProviderApiKeyInput, {
@@ -166,7 +93,8 @@ export function providerAdminIpcHandlers({
       }),
       getRuntimes: scopedQueryHandler({
         local: () => runtimes.getStatus(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesStatus, {}, decodeRemoteRuntimes),
+        remote: (serverId) =>
+          remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesStatus, {}, decodeProviderRuntimeSnapshot),
       }),
       downloadRuntime: scopedHandler(parseManagedProviderId, {
         local: (provider) => runtimes.download(provider),
@@ -178,21 +106,21 @@ export function providerAdminIpcHandlers({
       }),
       checkRuntimeUpdates: scopedQueryHandler({
         local: () => runtimes.checkForUpdates(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesCheck, {}, decodeRemoteRuntimes),
+        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesCheck, {}, decodeProviderRuntimeSnapshot),
       }),
       listCustomProviders: scopedQueryHandler({
         local: () => customProviders.list(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeRemoteCustomProviders),
+        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.customList, {}, decodeCustomProviderSummaries),
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
         local: (input) => customProviders.save(input),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeRemoteCustomProviderResult),
+          remote(serverId, PROVIDERS_ADMIN_ROUTES.customSave, input, decodeCustomProviderResult),
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {
         local: ({ id }) => customProviders.remove(id),
         remote: (input, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeRemoteCustomProviderResult),
+          remote(serverId, PROVIDERS_ADMIN_ROUTES.customDelete, input, decodeCustomProviderResult),
       }),
     },
   };
