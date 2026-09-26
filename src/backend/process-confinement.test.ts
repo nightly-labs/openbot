@@ -63,6 +63,25 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(confinedWrite(join(grokHome, "trusted_folders.toml"))).toBe(false);
     expect(confinedWrite(join(workspace, ".grok", "config.toml"))).toBe(false);
   });
+
+  it("denies Claude's and Codex's project settings in a root, also through a renamed folder", async () => {
+    expect(confinedWrite(join(workspace, ".claude", "settings.local.json"))).toBe(false);
+    expect(confinedWrite(join(shared, ".codex", "config.toml"))).toBe(false);
+    await mkdir(join(workspace, "staged"));
+    expect(confinedWrite(join(workspace, "staged", "settings.json"))).toBe(true);
+    const target = confineSpawnTarget(
+      {
+        command: "/bin/mv",
+        args: [join(workspace, "staged"), join(workspace, ".claude")],
+        windowsVerbatimArguments: false,
+      },
+      { writableRoots: [workspace, shared] },
+      grokStatePaths({ GROK_HOME: grokHome }, root),
+      "darwin",
+    );
+    expect(spawnSync(target.command, target.args).status).not.toBe(0);
+    expect(existsSync(join(workspace, ".claude"))).toBe(false);
+  });
 });
 
 describe("confineSpawnTarget", () => {

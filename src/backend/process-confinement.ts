@@ -91,6 +91,15 @@ const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 
 /**
+ * The project settings of the providers whose sandbox follows settings, in each root. Claude loads
+ * `.claude/settings*.json` in a Workspace only session, and they can widen its sandbox. Codex keeps
+ * `.codex` read-only in its own sandbox for the same reason. An agent that moves to one of them later
+ * must not find settings that it wrote here. The whole folder is denied, because a folder renamed to
+ * `.claude` would bring a settings file past a rule for the file alone.
+ */
+const SANDBOXED_PROVIDER_SETTINGS = [".claude", ".codex"];
+
+/**
  * The command that starts `target` inside the sandbox. It throws when this computer cannot make the
  * sandbox, because a Workspace only agent must not run with full access.
  */
@@ -101,9 +110,10 @@ export function confineSpawnTarget(
   platform: NodeJS.Platform = process.platform,
 ): SpawnTarget {
   const writable = [...confinement.writableRoots, ...state.writable, ...workspaceTemporaryPaths(platform)];
+  const inRoots = [...state.protectedInRoots, ...SANDBOXED_PROVIDER_SETTINGS];
   const protectedPaths = [
     ...state.protected,
-    ...confinement.writableRoots.flatMap((root) => state.protectedInRoots.map((name) => join(root, name))),
+    ...confinement.writableRoots.flatMap((root) => inRoots.map((name) => join(root, name))),
   ];
   if (platform === "darwin") {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
