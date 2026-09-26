@@ -64,9 +64,13 @@ describe.runIf(process.platform === "darwin")("confineSpawnTarget on macOS", () 
     expect(confinedWrite(join(workspace, ".grok", "config.toml"))).toBe(false);
   });
 
-  it("denies Claude's and Codex's project settings in a root, also through a renamed folder", async () => {
+  it("denies every provider's project settings in a root, also through a renamed folder", async () => {
     expect(confinedWrite(join(workspace, ".claude", "settings.local.json"))).toBe(false);
     expect(confinedWrite(join(shared, ".codex", "config.toml"))).toBe(false);
+    // The Grok process below must not leave OpenCode settings for a later Full access session.
+    expect(confinedWrite(join(workspace, "opencode.json"))).toBe(false);
+    await mkdir(join(shared, ".opencode"));
+    expect(confinedWrite(join(shared, ".opencode", "opencode.json"))).toBe(false);
     await mkdir(join(workspace, "staged"));
     expect(confinedWrite(join(workspace, "staged", "settings.json"))).toBe(true);
     const target = confineSpawnTarget(

@@ -25,11 +25,6 @@ export interface ProviderStatePaths {
    * not confined. A confined agent that wrote them would reach outside at the next start of one.
    */
   readonly protected: readonly string[];
-  /**
-   * The provider's project settings, by name, in each writable root. A process that is not confined
-   * and starts in that folder later would load them.
-   */
-  readonly protectedInRoots: readonly string[];
 }
 
 export interface SpawnTarget {
@@ -67,7 +62,6 @@ export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
       "bin",
       "bundled",
     ].map((name) => join(grokHome, name)),
-    protectedInRoots: [".grok"],
   };
 }
 
@@ -81,7 +75,6 @@ export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = 
   return {
     writable: [xdg("XDG_DATA_HOME", ".local/share"), xdg("XDG_STATE_HOME", ".local/state"), OPENCODE_CONFINED_CACHE],
     protected: [],
-    protectedInRoots: [".opencode", "opencode.json", "opencode.jsonc"],
   };
 }
 
@@ -91,14 +84,14 @@ const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 
 /**
- * The project settings of the providers whose sandbox follows settings, in each root. A Workspace
- * only Claude session ignores `.claude/settings*.json`, but a Full access session or Claude in a
- * terminal loads them and runs their hooks. Codex keeps `.codex` read-only in its own sandbox for the
- * same reason. An agent that moves to one of them later
- * must not find settings that it wrote here. The whole folder is denied, because a folder renamed to
+ * The project settings of every provider, in each root, whatever the provider of this process. A
+ * process that is not confined and starts in that folder later loads them and runs their hooks,
+ * plugins and commands: a Full access session of any provider, or the provider's CLI in a terminal.
+ * A Workspace only Claude session ignores `.claude/settings*.json`, and Codex keeps `.codex` read-only
+ * in its own sandbox for the same reason. A whole folder is denied, because a folder renamed to
  * `.claude` would bring a settings file past a rule for the file alone.
  */
-const SANDBOXED_PROVIDER_SETTINGS = [".claude", ".codex"];
+const PROJECT_SETTINGS = [".claude", ".codex", ".grok", ".opencode", "opencode.json", "opencode.jsonc"];
 
 /**
  * The command that starts `target` inside the sandbox. It throws when this computer cannot make the
@@ -111,10 +104,9 @@ export function confineSpawnTarget(
   platform: NodeJS.Platform = process.platform,
 ): SpawnTarget {
   const writable = [...confinement.writableRoots, ...state.writable, ...workspaceTemporaryPaths(platform)];
-  const inRoots = [...state.protectedInRoots, ...SANDBOXED_PROVIDER_SETTINGS];
   const protectedPaths = [
     ...state.protected,
-    ...confinement.writableRoots.flatMap((root) => inRoots.map((name) => join(root, name))),
+    ...confinement.writableRoots.flatMap((root) => PROJECT_SETTINGS.map((name) => join(root, name))),
   ];
   if (platform === "darwin") {
     if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
@@ -140,7 +132,7 @@ function unavailable(tool: string): string {
  * in a Seatbelt profile the last rule that matches wins. Everything else stays open, as the Access
  * setting says: reads, the network and process starts.
  */
-export function seatbeltProfile(writable: readonly string[], protectedPaths: readonly string[]): string {
+function seatbeltProfile(writable: readonly string[], protectedPaths: readonly string[]): string {
   const allowed = unique(writable.flatMap(realPaths)).map((path) => `(subpath ${sbplString(path)})`);
   const denied = unique(protectedPaths.flatMap(realPaths)).map(
     (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
