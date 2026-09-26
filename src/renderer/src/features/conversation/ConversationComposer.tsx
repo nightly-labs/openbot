@@ -17,6 +17,7 @@ import {
   Plus,
   Puzzle,
 } from "@openbot/ui";
+import { accountUsageCoversModel } from "@openbot/ui/features/account/account-usage-view";
 import { fileBadge, formatFileSize } from "@openbot/ui/features/conversation/AttachmentCards";
 import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -103,7 +104,7 @@ export function ConversationComposer() {
    */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
-    if (!provider || signInRequired()) return null;
+    if (!provider || signInRequired() || !accountUsageCoversModel(provider, props.agent?.model)) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
       if (limit.id !== provider) continue;
       for (const plan of [limit.primary, limit.secondary]) {

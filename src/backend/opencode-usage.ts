@@ -35,19 +35,29 @@ export async function readOpenCodeGoUsage(apiKey: string | null): Promise<Accoun
 
 /**
  * The account usage contract holds two windows, so the monthly and weekly readings share the second
- * one: whichever is closer to its limit, since that is the one that stops a turn first.
+ * one: whichever is closer to its limit, since that is the one that stops a turn first. When both
+ * are spent, the one that resets later, since turns stay stopped until then.
  */
 function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usage = getRecord(value, "usage");
   const rolling = usageWindow(getRecord(usage, "rolling"), ROLLING_WINDOW_MINS);
   const weekly = usageWindow(getRecord(usage, "weekly"), WEEKLY_WINDOW_MINS);
   const monthly = usageWindow(getRecord(usage, "monthly"), MONTHLY_WINDOW_MINS);
-  const secondary = monthly && (!weekly || monthly.usedPercent > weekly.usedPercent) ? monthly : weekly;
+  const secondary = weekly && monthly ? bindingWindow(weekly, monthly) : (weekly ?? monthly);
   if (!rolling && !secondary) return NO_USAGE;
   return {
     rateLimits: { limitId: "opencode", primary: rolling, secondary },
     rateLimitsByLimitId: null,
   };
+}
+
+function bindingWindow<T extends { usedPercent: number; resetsAt?: number | null }>(weekly: T, monthly: T): T {
+  if (weekly.usedPercent >= 100 && monthly.usedPercent >= 100) {
+    return (monthly.resetsAt ?? Number.POSITIVE_INFINITY) >= (weekly.resetsAt ?? Number.POSITIVE_INFINITY)
+      ? monthly
+      : weekly;
+  }
+  return monthly.usedPercent > weekly.usedPercent ? monthly : weekly;
 }
 
 function usageWindow(

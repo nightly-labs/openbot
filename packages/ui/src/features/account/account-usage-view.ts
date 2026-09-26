@@ -67,14 +67,26 @@ function usageRow(provider: AgentProviderId, limit: AccountUsageLimit | null): A
 }
 
 /**
+ * Whether the provider's account quota limits this model. OpenCode reports only the Go quota, and
+ * OpenCode also runs free, custom and own-sign-in models that the Go quota does not limit.
+ */
+export function accountUsageCoversModel(provider: AgentProviderId, model: string | null | undefined): boolean {
+  return provider !== "opencode" || Boolean(model?.toLowerCase().startsWith("opencode-go/"));
+}
+
+/**
  * The row the dock chip shows. With an active agent it is that agent's provider only, so a spent
  * Grok quota does not show as the limit of a ChatGPT agent. With no agent it is the lowest row.
  */
 export function accountUsageSummary(
   rows: AccountUsageProviderRow[],
   provider?: AgentProviderId | null,
+  model?: string | null,
 ): AccountUsageProviderRow | null {
-  if (provider) return rows.find((row) => row.provider === provider) ?? null;
+  if (provider) {
+    if (!accountUsageCoversModel(provider, model)) return null;
+    return rows.find((row) => row.provider === provider) ?? null;
+  }
   let lowest: AccountUsageProviderRow | null = null;
   for (const row of rows) {
     if (row.remainingPercent === null) continue;
