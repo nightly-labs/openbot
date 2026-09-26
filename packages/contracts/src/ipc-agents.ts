@@ -25,23 +25,19 @@ export function isAgentAccess(value: unknown): value is AgentAccess {
   return isOneOf(AGENT_ACCESS_MODES, value);
 }
 
-/**
- * Whether the provider enforces `workspace` access. Codex runs the agent in its `workspace-write`
- * sandbox. Claude runs Bash in its sandbox and asks before a file edit outside the roots. Grok and
- * OpenCode do not enforce it yet, so their agents keep full access.
- */
-export function enforcesWorkspaceAccess(provider: AgentProviderId): boolean {
-  return provider === "codex" || provider === "claude";
-}
-
 /** Whether the agent may use Computer Use. Absent means on, as for every agent before the setting existed. */
 export function agentComputerUseEnabled(agent: Pick<AgentSummary, "computerUse">): boolean {
   return agent.computerUse !== false;
 }
 
-/** Whether this agent runs inside the workspace sandbox now. */
-export function workspaceAccessEnforced(agent: Pick<AgentSummary, "access" | "provider">): boolean {
-  return agent.access === "workspace" && enforcesWorkspaceAccess(agent.provider);
+/**
+ * Whether this agent runs inside the workspace sandbox now. Every provider enforces it. Codex runs the
+ * agent in its `workspace-write` sandbox. Claude runs Bash in its sandbox and asks before a file edit
+ * outside the roots. Grok and OpenCode run the agent in a provider process of its own, inside an
+ * operating system sandbox (`process-confinement.ts`); on Linux and Windows that process does not start.
+ */
+export function workspaceAccessEnforced(agent: Pick<AgentSummary, "access">): boolean {
+  return agent.access === "workspace";
 }
 
 function isMarketplaceSource(value: unknown): value is NonNullable<AgentSummary["marketplaceSource"]> {

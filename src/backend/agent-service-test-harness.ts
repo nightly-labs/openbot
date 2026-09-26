@@ -103,6 +103,8 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
   readonly errors: Array<{ id: RequestId; error: RpcError }> = [];
   readonly releasedThreads: string[] = [];
   #threadCounter = 0;
+  /** Starts each session id. A second client of the same provider needs another, as real ids never repeat. */
+  sessionIdPrefix: string | null = null;
   running = false;
   responseError: Error | null = null;
   modelList: ((params: unknown) => unknown) | undefined;
@@ -201,7 +203,7 @@ export class FakeAgentClient extends EventEmitter implements AgentClient {
     if (method === "config/read") result = this.configRead;
     if (method === "thread/start") {
       this.#threadCounter += 1;
-      result = { thread: { id: `${this.provider}-session-${this.#threadCounter}` } };
+      result = { thread: { id: `${this.sessionIdPrefix ?? this.provider}-session-${this.#threadCounter}` } };
     }
     if (method === "thread/resume") {
       result = { thread: { id: stringParam(params, "threadId") } };

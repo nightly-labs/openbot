@@ -223,8 +223,7 @@ export class DrainScheduler {
       requireServedModel();
       this.#threads.applyPendingRuntimeRefresh(agent, delivery.id);
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id);
-      await this.#providers.ensureProvider(providerForAgent(agent));
-      const client = this.#providers.requireReadyClient(providerForAgent(agent));
+      const client = await this.#providers.ensureAgentClient(agent);
       const execution = this.#channels ? await this.#channels.prepare(context) : null;
       if (channelDelivery && !execution) {
         const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
