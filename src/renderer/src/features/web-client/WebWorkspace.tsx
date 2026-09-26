@@ -81,7 +81,6 @@ export function WebWorkspace(props: {
       controller.setEditingDeliveryId(null);
     },
   );
-  const runtime = createWebConversationRuntime(workspace.runtime, () => workspace.state.host?.hostId ?? "");
   const [accountUsage, setAccountUsage] = createSignal<AccountUsage | null>(null);
   let usageGeneration = 0;
   const [models, setModels] = createSignal<AgentModelOption[]>([]);
@@ -123,6 +122,11 @@ export function WebWorkspace(props: {
       throw new Error("Connect to this server first.");
     return admin.request;
   }
+  const runtime = createWebConversationRuntime(
+    workspace.runtime,
+    () => workspace.state.host?.hostId ?? "",
+    workspace.runtime.admin ? () => hostRequest() : undefined,
+  );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {
       const current = server();
@@ -208,6 +212,23 @@ export function WebWorkspace(props: {
       (item) => item.agentId === workspace.state.selectedId && item.threadId === workspace.selected()?.threadId,
     ),
   );
+  /** "Always allow", for an owner or admin whose host answered. The grant is written on the host. */
+  const alwaysAllowApproval = createMemo(() => {
+    const agent = workspace.selected();
+    const item = approval();
+    if (!agent || !item || !remoteAgentAdmin.settings()) return undefined;
+    return async () => {
+      await remoteAgentAdmin.update({ agentId: agent.id, autoApprove: true });
+      if (approval()?.requestId !== item.requestId) return false;
+      await workspace.approve({ requestId: item.requestId, decision: "accept" });
+      return true;
+    };
+  });
+  const setAgentAutoApprove = createMemo(() => {
+    const agent = workspace.selected();
+    if (!agent || !remoteAgentAdmin.settings()) return undefined;
+    return (autoApprove: boolean) => remoteAgentAdmin.update({ agentId: agent.id, autoApprove });
+  });
   const prompt = createMemo<Extract<AgentEvent, { type: "prompt" }> | undefined>(() => {
     if (workspace.state.status !== "online") return;
     const page = workspace.conversation()?.page;
@@ -586,6 +607,10 @@ export function WebWorkspace(props: {
                 await workspace.approve({ requestId: item.requestId, decision });
                 return true;
               }}
+              onAlwaysAllowApproval={alwaysAllowApproval()}
+              agentAutoApproves={remoteAgentAdmin.settings()?.autoApprove ?? false}
+              agentAutoApproveLocked={remoteAgentAdmin.settings()?.autoApproveLocked ?? false}
+              onSetAgentAutoApprove={setAgentAutoApprove()}
               onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
               onCancelQueuedMessage={() => {}}
               onSteerQueuedMessage={() => {}}
