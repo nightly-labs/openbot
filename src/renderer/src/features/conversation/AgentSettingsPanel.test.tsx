@@ -52,6 +52,36 @@ describe("AgentSettingsPanel", () => {
     }
   });
 
+  it("asks the agent to generate an avatar from the description", async () => {
+    const onGenerateAvatar = vi.fn(async () => true);
+    render(() => (
+      <SharedAgentSettingsPanel
+        agent={firstAgent}
+        runtimeSettings={{ provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }}
+        agentStatus={STORY_AGENT_STATUS}
+        modelOptions={STORY_MODELS}
+        working={false}
+        width={296}
+        maxWidth={() => 640}
+        onClose={vi.fn()}
+        onResize={vi.fn()}
+        onResizeEnd={vi.fn()}
+        onUpdateAgent={vi.fn(async () => undefined)}
+        onUpdateRuntimeSettings={vi.fn(async () => true)}
+        onSetAgentAvatar={vi.fn(async () => undefined)}
+        onGenerateAvatar={onGenerateAvatar}
+      />
+    ));
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit agent avatar" }));
+    const generate = await screen.findByRole("button", { name: "Generate" });
+    expect(generate).toBeDisabled();
+    const description = screen.getByRole("textbox", { name: "Avatar description" });
+    await fireEvent.input(description, { target: { value: "  A red fox astronaut  " } });
+    await fireEvent.click(generate);
+    await waitFor(() => expect(onGenerateAvatar).toHaveBeenCalledWith(firstAgent.id, "A red fox astronaut"));
+    await waitFor(() => expect(description).toHaveValue(""));
+  });
+
   it("saves edited instructions while the field stays focused", async () => {
     vi.useFakeTimers();
     try {

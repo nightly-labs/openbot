@@ -403,9 +403,18 @@ export async function createApplicationServices({
     undefined,
     "openbot-data",
   );
+  const avatarSkill = new ManagedSkillService(
+    app.isPackaged
+      ? join(process.resourcesPath, "managed-skills", "openbot-avatar", "SKILL.md")
+      : resolve(__dirname, "../../resources/managed-skills/openbot-avatar/SKILL.md"),
+    undefined,
+    undefined,
+    "openbot-avatar",
+  );
   await managedSkills.syncAll(store.list());
   await skillCreator.syncAll(store.list());
   await dataSkill.syncAll(store.list());
+  await avatarSkill.syncAll(store.list());
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
@@ -701,6 +710,7 @@ export async function createApplicationServices({
       await managedSkills.syncAgent(agent);
       await skillCreator.syncAgent(agent);
       await dataSkill.syncAgent(agent);
+      await avatarSkill.syncAgent(agent);
     },
     hostedSites,
     sidebarLayout,
