@@ -27,6 +27,19 @@ export interface AgentClient {
   once(event: "exit", listener: (error: Error) => void): this;
 }
 
+/**
+ * A provider request that got no answer in time. The provider can still have received it, so a
+ * caller that must not repeat the work tests for this class, not for the message text.
+ */
+export class RequestTimeoutError extends Error {
+  constructor(
+    readonly providerName: string,
+    readonly method: string,
+  ) {
+    super(`${providerName} request timed out: ${method}`);
+  }
+}
+
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;
 

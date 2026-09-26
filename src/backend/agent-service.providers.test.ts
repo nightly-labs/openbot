@@ -12,7 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import type { AgentService } from "./agent-service";
 import {
   CREATE_AGENT_INPUT,
@@ -1022,7 +1022,7 @@ describe.sequential("AgentService: providers", () => {
     const client = new FakeAgentClient("codex", "CODEX_DONE", true, true, {}, async (method) => {
       if (method !== "turn/start" || timedOut) return;
       timedOut = true;
-      throw new Error("Codex request timed out: turn/start");
+      throw new RequestTimeoutError("Codex", "turn/start");
     });
     service = createTestService({
       store,
