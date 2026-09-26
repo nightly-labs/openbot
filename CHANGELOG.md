@@ -5,6 +5,52 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-26
+
+### Added
+
+- Use Gemini with a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity server to
+  this computer and signs in through your browser. Members of a joined server do not see Gemini
+  agents.
+- Select More providers on the onboarding screen to add Gemini or a custom provider.
+- Turn Computer Use off for one agent in its settings. Existing agents keep Computer Use on.
+- Let owners and admins of a joined server manage the host from their desktop: agent access, auto
+  approve, skills, shared tables, marketplace agents, provider keys and downloads, custom
+  endpoints, and the server name and logo. Members can only read.
+- Let owners and admins in the browser client use server settings, providers, the marketplace,
+  agent skills, shared tables, auto approve, Try skill, plugin prompts and shared agents.
+- Update an agent that was added from a marketplace listing to the current version of the listing,
+  from the web client or from a joined desktop.
+- Show the OpenCode Go quota in Usage when you save a Go key.
+- Show the servers in a menu instead of the server rail. Select the layout in the server name menu.
+  OpenBot keeps the layout for each device.
+- Select the interface language on mobile.
+
+### Changed
+
+- **Workspace only is now enforced. An agent with Workspace only can write only in its workspace,
+  the shared folder and the temporary folders. On Windows and Linux, a Grok, OpenCode or Gemini
+  agent with Workspace only does not start. To use it, select Full access in the agent settings.
+  Agents with Full access, which is the default, do not change.**
+- Show more of the interface in French and Japanese.
+- Install the latest provider CLI on a first download. If the release check is slow or fails,
+  OpenBot installs the pinned version.
+- Fade streamed text as a trail, and keep the fade across Markdown blocks.
+- Show the server rail and the top row on one surface.
+- Hide saved secret values in all logs, and write a local trace line when the main process fails.
+
+### Fixed
+
+- End the turns of a provider client that stopped. Before, these turns stayed in progress until
+  OpenBot restarted.
+- Keep queued messages when a file delete fails.
+- Show a request timeout from any provider as a timeout.
+- Sign out and revoke sessions correctly while remote sessions are open. Before, this failed with
+  an error and the browser kept its session.
+- Stop an error after sign-out in the web client.
+- Move the focus back to the server name after a server row closes the menu.
+- Correct one Japanese sentence.
+
 ## [0.21.2] - 2026-09-26
 
 Version 0.21.1 was not published because its macOS and Windows builds failed. This version also
