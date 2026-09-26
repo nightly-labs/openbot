@@ -1,5 +1,4 @@
 import { decodeAgentAnalytics } from "../ipc-agent-analytics";
-import { isAgentModel, isReasoningEffort } from "../ipc-agent-identity";
 import {
   decodeAgentProfileDraft,
   decodeSaveAgentProfileResult,
@@ -301,16 +300,19 @@ function decodeUnreadRequest(value: unknown): TeamProtocolV4BaseJsonObject {
 }
 
 /**
+ * The providers, model ids and reasoning efforts v4 shipped with, as in the `v4-base.ts` agent
+ * validator. They are not the app's lists: a value the app adds later is not part of this frozen
+ * protocol, so a v4 request cannot name it.
+ */
+const V4_AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
+const V4_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,159}$/u;
+const V4_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/**
  * The provider, model and reasoning effort of an agent creation request, validated and fail-closed:
  * a present field with the wrong shape rejects the request rather than silently starting the agent
  * on the host default. Absent fields stay absent, so the host default still applies.
  */
-/**
- * The providers v4 shipped with. It is not the app's provider list: a provider the app adds later
- * is not part of this frozen protocol, so a v4 request cannot name it.
- */
-const V4_AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode"] as const;
-
 function decodeAgentCreateModel(value: unknown): TeamProtocolV4BaseJsonObject {
   if (!isDynamicRecord(value)) throw new Error("Invalid agent creation request.");
   const result: TeamProtocolV4BaseJsonObject = {};
@@ -319,11 +321,11 @@ function decodeAgentCreateModel(value: unknown): TeamProtocolV4BaseJsonObject {
     result.provider = value.provider;
   }
   if (value.model !== undefined) {
-    if (!isAgentModel(value.model)) throw new Error("Invalid agent model.");
+    if (!isString(value.model) || !V4_AGENT_MODEL.test(value.model)) throw new Error("Invalid agent model.");
     result.model = value.model;
   }
   if (value.reasoningEffort !== undefined) {
-    if (!isReasoningEffort(value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
+    if (!isOneOf(V4_REASONING_EFFORTS, value.reasoningEffort)) throw new Error("Invalid reasoning effort.");
     result.reasoningEffort = value.reasoningEffort;
   }
   return result;

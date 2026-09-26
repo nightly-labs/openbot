@@ -129,6 +129,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",

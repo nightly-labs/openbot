@@ -314,11 +314,13 @@ export class AgentMarketplace {
     if (row.status !== "pending")
       throw new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed.");
     const now = Date.now();
-    await this.bindings.DB.prepare(
-      "UPDATE marketplace_agent_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ?",
+    // The status guard and RETURNING make a second, concurrent review lose instead of overwriting.
+    const reviewed = await this.bindings.DB.prepare(
+      "UPDATE marketplace_agent_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' RETURNING id",
     )
       .bind(status, status === "rejected" ? note : null, now, versionId)
-      .run();
+      .first<{ id: string }>();
+    if (!reviewed) throw new AgentMarketplaceError(409, "already_reviewed", "The submission was already reviewed.");
     if (status === "approved")
       await this.bindings.DB.prepare(
         "UPDATE marketplace_agents SET approved_version_id = ?, updated_at = ? WHERE id = ?",

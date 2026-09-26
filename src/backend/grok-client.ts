@@ -1,6 +1,7 @@
 import type { ClientSideConnection, InitializeResponse } from "@agentclientprotocol/sdk";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type DynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "./acp-client";
 import type { GrokCliInfo } from "./cli";
 import type {
@@ -39,7 +40,7 @@ export class GrokAgentClient extends AcpAgentClient {
         "stdio",
       ],
       env: { GROK_OAUTH2_REFERRER: "openbot" },
-      signInMessage: "Run `grok login` or set XAI_API_KEY to use Grok.",
+      signInMessage: sourceText("error.provider.grokSignIn"),
       authenticate,
       readAccount: async (connection) => grokAccount(await connection.extMethod("_x.ai/auth/info", {})),
       readRateLimits: async (connection) => grokRateLimits(await connection.extMethod("_x.ai/billing", {})),

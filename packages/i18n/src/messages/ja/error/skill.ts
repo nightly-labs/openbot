@@ -57,4 +57,6 @@ export const messages = {
   "error.skill.localSourceNotFolder": "スキルのソースはフォルダーである必要があります。",
   "error.skill.localMissingSkillFile": "スキルフォルダーのルートに SKILL.md が必要です。",
   "error.skill.pathSymlink": "スキルのパスにシンボリックリンクを含めることはできません。",
+  "error.skill.folderNotRead":
+    "{provider} は {folder} を読み込みません。このフォルダーを {target} にコピーしてください。",
 } as const satisfies PartialTranslation<typeof source>;

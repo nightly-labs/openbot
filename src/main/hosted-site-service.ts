@@ -328,7 +328,6 @@ function decodeSite(value: unknown): HostedSiteSummary {
     !isString(value.title) ||
     !isString(value.description) ||
     (value.framework !== "vanilla" && value.framework !== "astro") ||
-    !["active", "deleted", "expired", "blocked", "uploading"].includes(String(value.status)) ||
     !isNumber(value.fileCount) ||
     !isNumber(value.size) ||
     (value.expiresAt !== null && !isString(value.expiresAt)) ||

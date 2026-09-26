@@ -1,21 +1,23 @@
 // @vitest-environment node
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { translateFor } from "@openbot/i18n";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type Invoke = (event: { senderFrame: { url: string } }, payload: unknown) => Promise<void>;
-const { bound, saveDialog } = vi.hoisted(() => ({
+const { bound, saveDialog, openPath, userData } = vi.hoisted(() => ({
   bound: new Map<string, Invoke>(),
   saveDialog: vi.fn<(options?: unknown) => Promise<{ canceled: boolean; filePath?: string }>>(),
+  openPath: vi.fn(async (_path: string) => ""),
+  userData: { path: "" },
 }));
 vi.mock("electron", () => ({
-  app: { getPath: () => tmpdir() },
+  app: { getPath: () => userData.path || tmpdir() },
   dialog: { showSaveDialog: saveDialog },
-  shell: {},
+  shell: { openPath },
   ipcMain: { handle: (channel: string, invoke: Invoke) => bound.set(channel, invoke) },
 }));
 const { saveAttachmentArchive, attachmentIpcHandlers } = await import("./attachment-handlers");
@@ -140,7 +142,7 @@ describe("ZIP attachment IPC", () => {
 });
 
 describe("single attachment download", () => {
-  function registerSingle(resolved: { path: string; mimeType: string; name: string }) {
+  function registerSingle(resolved: { path: string; mimeType: string; name: string }, downloadAttachment = vi.fn()) {
     const handlers = attachmentIpcHandlers({
       getMainWindow: () => null,
       translate: translateFor("en"),
@@ -158,7 +160,7 @@ describe("single attachment download", () => {
         downloadSharedFile: vi.fn(),
         downloadWorkspaceFile: vi.fn(),
         uploadAttachment: vi.fn(),
-        downloadAttachment: vi.fn(),
+        downloadAttachment,
       },
     });
     handlers.agentAttachments.openAttachment("single-download");
@@ -183,5 +185,27 @@ describe("single attachment download", () => {
     expect(saveDialog).toHaveBeenCalledOnce();
     expect(saveDialog.mock.calls[0]?.[0]).toMatchObject({ defaultPath: expect.stringMatching(/launch-brief\.md$/) });
     expect(await readFile(targetPath, "utf8")).toBe("brief");
+  });
+
+  it("keeps a remote attachment inside the cache folder when its id is a path", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "attachment-remote-"));
+    directories.push(directory);
+    userData.path = directory;
+    const invoke = registerSingle(
+      { path: "unused", mimeType: "text/plain", name: "unused" },
+      vi.fn(async () => ({ name: "report.pdf", mimeType: "application/pdf", bytes: new Uint8Array([1]) })),
+    );
+    try {
+      await invoke(
+        { senderFrame: { url: "openbot-app://app/index.html" } },
+        { serverId: "remote-host", payload: { attachmentId: "../../escaped", action: "open" } },
+      );
+    } finally {
+      userData.path = "";
+    }
+    const opened = openPath.mock.lastCall?.[0] ?? "";
+    expect(dirname(opened)).toBe(join(directory, "remote-attachments"));
+    expect(await readFile(opened)).toEqual(Buffer.from([1]));
+    expect(await readdir(directory)).toEqual(["remote-attachments"]);
   });
 });
