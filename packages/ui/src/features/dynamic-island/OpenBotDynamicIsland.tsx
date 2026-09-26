@@ -403,7 +403,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
     ({ nextPresentation, currentPresentation }) => {
       if (nextPresentation.mode === currentPresentation.mode) {
         setVisiblePresentation(nextPresentation);
-        if (props.state === "compact") setCompactLayoutPresentation(nextPresentation);
+        if (untrack(() => props.state) === "compact") setCompactLayoutPresentation(nextPresentation);
         return;
       }
 

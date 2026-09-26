@@ -23,7 +23,7 @@ export const messages = {
   "import.guide.skillCopied": "スキルをコピーしました",
   "import.guide.saveFile": "ファイルを保存…",
   "import.guide.skillNote":
-    "このスキルを、エクスポート専用の新しいエージェントとして Grok Bot に追加します。エクスポートには含まれません。",
+    "このスキルを、Grok Bot でエクスポート専用に作った新しいエージェントに追加します。エクスポートには含まれません。",
   "import.guide.step2": "このメッセージを送信します",
   "import.guide.copyMessage": "メッセージをコピー",
   "import.guide.messageCopied": "メッセージをコピーしました",

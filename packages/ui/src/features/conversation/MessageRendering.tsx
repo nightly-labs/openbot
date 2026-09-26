@@ -54,12 +54,13 @@ function streamingTimings() {
 function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   const initialMessage = untrack(message);
   const animateInitialText =
-    initialMessage.author === "agent" && (animate ?? initialMessage.animate) === true && !prefersReducedMotion();
-  let targetBody = initialMessage.body;
-  let targetStreaming = initialMessage.author === "agent" && initialMessage.streaming === true;
+    untrack(() => initialMessage.author === "agent" && (animate ?? initialMessage.animate) === true) &&
+    !prefersReducedMotion();
+  let targetBody = untrack(() => initialMessage.body);
+  let targetStreaming = untrack(() => initialMessage.author === "agent" && initialMessage.streaming === true);
   /* A plain copy of `body`, because the signal can still hold its earlier value until the
      next flush. */
-  let shownBody = animateInitialText ? "" : initialMessage.body;
+  let shownBody = animateInitialText ? "" : targetBody;
   const [body, setBody] = createSignal(shownBody);
   const [trail, setTrail] = createSignal<StreamingRevealChunk[]>([]);
   const [animateTail, setAnimateTail] = createSignal(false);
@@ -356,7 +357,7 @@ export function MessageBody(props: {
                     </Match>
                     <Match when={textContent(block())}>
                       {(text) => {
-                        if (props.message.author === "agent") {
+                        if (untrack(() => props.message.author) === "agent") {
                           return (
                             <div
                               class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
@@ -523,7 +524,7 @@ export function MessageActions(props: {
           <DropdownMenu.Root
             open={props.pickerOpen}
             onOpenChange={props.onTogglePicker}
-            placement={props.message.author === "you" ? "top-end" : "top-start"}
+            placement={untrack(() => props.message.author) === "you" ? "top-end" : "top-start"}
             gutter={6}
             modal={false}
           >

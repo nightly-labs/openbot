@@ -5,6 +5,8 @@ linker = "hoisted"
 # Do not resolve a version that is less than 3 days old (259200 seconds). Most
 # malicious releases are found and removed from the registry in that time.
 minimumReleaseAge = 259200
+# The OpenBot maintainer owns and publishes bloub, so a new release does not wait.
+minimumReleaseAgeExcludes = ["@norbert_bodziony/bloub"]
 
 # `trustedDependencies` in package.json replaces the default Bun trust list.
 # Only these packages can run install scripts. Each one downloads or selects

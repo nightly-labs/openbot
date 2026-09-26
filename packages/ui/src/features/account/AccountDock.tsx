@@ -24,7 +24,7 @@ import {
   Tooltip,
   UserAvatar,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { TypingDots } from "../../components/TypingDots";
 import { useText } from "../../text";
 import { presentUpdateStatus } from "../updates/update-status";
@@ -185,7 +185,7 @@ export function AccountDock(props: AccountDockProps) {
       if (!ready) return;
       if (!hybrid && !menu && !usage) return;
       if (usageRequestTargetKey === targetKey) return;
-      void refreshUsage();
+      void untrack(refreshUsage);
     },
   );
 
@@ -208,7 +208,7 @@ export function AccountDock(props: AccountDockProps) {
       if (Date.now() - lastUsageRefreshAt < USAGE_AUTO_REFRESH_MS) return;
       void refreshUsage();
     }
-    refreshWhenDue();
+    untrack(refreshWhenDue);
     const timer = window.setInterval(refreshWhenDue, USAGE_AUTO_REFRESH_CHECK_MS);
     document.addEventListener("visibilitychange", refreshWhenDue);
     return () => {

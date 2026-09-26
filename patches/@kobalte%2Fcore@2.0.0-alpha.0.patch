@@ -1,7 +1,183 @@
+diff --git a/dist/button/BF7G04C6.js b/dist/button/BF7G04C6.js
+index 0b6db4ca43a66b973904697dcfbcf35bcea0e37e..04e535550b74cebef929fc483377550f2fa46803 100644
+--- a/dist/button/BF7G04C6.js
++++ b/dist/button/BF7G04C6.js
+@@ -2,7 +2,7 @@ import { t as __exportAll } from "../rolldown-runtime/BBjsoOtd.js";
+ import { Polymorphic } from "../polymorphic/index.js";
+ import { t as createTagName } from "../create-tag-name/D6_aBB9R.js";
+ import { createComponent, memo, mergeProps } from "@solidjs/web";
+-import { createMemo, createSignal, merge, omit } from "solid-js";
++import { createMemo, createSignal, merge, omit, untrack } from "solid-js";
+ //#region src/button/is-button.ts
+ const BUTTON_INPUT_TYPES = [
+ 	"button",
+@@ -55,7 +55,7 @@ function ButtonRoot(props) {
+ 	});
+ 	return createComponent(Polymorphic, mergeProps({
+ 		as: "button",
+-		ref: [setRef, mergedProps.ref],
++		ref: [setRef, untrack(() => mergedProps.ref)],
+ 		get type() {
+ 			return memo(() => !!(isNativeButton() || isNativeInput()))() ? mergedProps.type : void 0;
+ 		},
+diff --git a/dist/button/DvspU6cJ.jsx b/dist/button/DvspU6cJ.jsx
+index 5000f2871ccda16662437b482ecb25609fa1fd2f..13093280d271cd2ae4e1aa98f8892b1f8dd7db32 100644
+--- a/dist/button/DvspU6cJ.jsx
++++ b/dist/button/DvspU6cJ.jsx
+@@ -1,7 +1,7 @@
+ import { t as __exportAll } from "../rolldown-runtime/BBjsoOtd.jsx";
+ import { Polymorphic } from "../polymorphic/index.jsx";
+ import { t as createTagName } from "../create-tag-name/D6_aBB9R.jsx";
+-import { createMemo, createSignal, merge, omit } from "solid-js";
++import { createMemo, createSignal, merge, omit, untrack } from "solid-js";
+ //#region src/button/is-button.ts
+ const BUTTON_INPUT_TYPES = [
+ 	"button",
+@@ -52,7 +52,7 @@ function ButtonRoot(props) {
+ 	const isNativeLink = createMemo(() => {
+ 		return tagName() === "a" && ref()?.getAttribute("href") != null;
+ 	});
+-	return <Polymorphic as="button" ref={[setRef, mergedProps.ref]} type={isNativeButton() || isNativeInput() ? mergedProps.type : void 0} role={!isNativeButton() && !isNativeLink() ? "button" : void 0} tabindex={!isNativeButton() && !isNativeLink() && !mergedProps.disabled ? 0 : void 0} disabled={isNativeButton() || isNativeInput() ? mergedProps.disabled : void 0} aria-disabled={!isNativeButton() && !isNativeInput() && mergedProps.disabled ? "true" : void 0} data-disabled={mergedProps.disabled ? "" : void 0} {...others} />;
++	return <Polymorphic as="button" ref={[setRef, untrack(() => mergedProps.ref)]} type={isNativeButton() || isNativeInput() ? mergedProps.type : void 0} role={!isNativeButton() && !isNativeLink() ? "button" : void 0} tabindex={!isNativeButton() && !isNativeLink() && !mergedProps.disabled ? 0 : void 0} disabled={isNativeButton() || isNativeInput() ? mergedProps.disabled : void 0} aria-disabled={!isNativeButton() && !isNativeInput() && mergedProps.disabled ? "true" : void 0} data-disabled={mergedProps.disabled ? "" : void 0} {...others} />;
+ }
+ //#endregion
+ //#region src/button/index.tsx
+diff --git a/dist/combobox-base/BFUCtj_r.jsx b/dist/combobox-base/BFUCtj_r.jsx
+index b07ca00acb0bac67977b00a8d747032ef016105c..051897ba34d6e85c5982fd33abc8f8470132c11a 100644
+--- a/dist/combobox-base/BFUCtj_r.jsx
++++ b/dist/combobox-base/BFUCtj_r.jsx
+@@ -14,7 +14,7 @@ import { n as listbox_exports } from "../listbox/BNC6ufaz.jsx";
+ import { t as HiddenSelectBase } from "../hidden-select-base/jSgZ_i04.jsx";
+ import { n as announce } from "../live-announcer/DugqoFo-.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { Portal } from "@solidjs/web";
+ import { access } from "@solid-primitives/utils";
+@@ -502,7 +502,7 @@ function ComboboxBase(props) {
+ 		return mergedProps.sectionComponent?.({ section });
+ 	};
+ 	createEffect(() => [filteredOptions(), showAllOptions()], (input, prevInput) => {
+-		if (disclosureState.isOpen() && prevInput != null) {
++		if (untrack(() => disclosureState.isOpen()) && prevInput != null) {
+ 			const [prevFilteredOptions, prevShowAllOptions] = prevInput;
+ 			setLastDisplayedOptions(prevShowAllOptions ? mergedProps.options : prevFilteredOptions);
+ 		} else {
+@@ -547,7 +547,7 @@ function ComboboxBase(props) {
+ 			lastSelectedItem: listState.collection().getItem(lastSelectedKey)
+ 		};
+ 	}, ({ lastSelectedKey, lastSelectedItem }) => {
+-		if (isAppleDevice && isInputFocused() && lastSelectedItem && lastSelectedKey !== lastAnnouncedSelectedKey) announce(mergedProps.translations?.selectedAnnouncement(lastSelectedItem?.textValue || "") ?? "");
++		if (isAppleDevice && untrack(isInputFocused) && lastSelectedItem && lastSelectedKey !== lastAnnouncedSelectedKey) announce(mergedProps.translations?.selectedAnnouncement(lastSelectedItem?.textValue || "") ?? "");
+ 		if (lastSelectedKey) lastAnnouncedSelectedKey = lastSelectedKey;
+ 	});
+ 	const dataset = createMemo(() => ({
+diff --git a/dist/combobox-base/pqkzvj0_.js b/dist/combobox-base/pqkzvj0_.js
+index 839d79ad6ae08342ddca0b8bf2782f81e77fb66c..652237085ecf7f9bb340d27d811c0ed78354b6a0 100644
+--- a/dist/combobox-base/pqkzvj0_.js
++++ b/dist/combobox-base/pqkzvj0_.js
+@@ -15,7 +15,7 @@ import { t as HiddenSelectBase } from "../hidden-select-base/DZDStUWy.js";
+ import { n as announce } from "../live-announcer/DugqoFo-.js";
+ import { Portal, createComponent, memo, mergeProps } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler } from "@kobalte/utils";
+@@ -639,7 +639,7 @@ function ComboboxBase(props) {
+ 		return mergedProps.sectionComponent?.({ section });
+ 	};
+ 	createEffect(() => [filteredOptions(), showAllOptions()], (input, prevInput) => {
+-		if (disclosureState.isOpen() && prevInput != null) {
++		if (untrack(() => disclosureState.isOpen()) && prevInput != null) {
+ 			const [prevFilteredOptions, prevShowAllOptions] = prevInput;
+ 			setLastDisplayedOptions(prevShowAllOptions ? mergedProps.options : prevFilteredOptions);
+ 		} else {
+@@ -684,7 +684,7 @@ function ComboboxBase(props) {
+ 			lastSelectedItem: listState.collection().getItem(lastSelectedKey)
+ 		};
+ 	}, ({ lastSelectedKey, lastSelectedItem }) => {
+-		if (isAppleDevice && isInputFocused() && lastSelectedItem && lastSelectedKey !== lastAnnouncedSelectedKey) announce(mergedProps.translations?.selectedAnnouncement(lastSelectedItem?.textValue || "") ?? "");
++		if (isAppleDevice && untrack(isInputFocused) && lastSelectedItem && lastSelectedKey !== lastAnnouncedSelectedKey) announce(mergedProps.translations?.selectedAnnouncement(lastSelectedItem?.textValue || "") ?? "");
+ 		if (lastSelectedKey) lastAnnouncedSelectedKey = lastSelectedKey;
+ 	});
+ 	const dataset = createMemo(() => ({
 diff --git a/dist/create-dom-collection/OK7882aq.js b/dist/create-dom-collection/OK7882aq.js
-index 6b8a3617f27946fec9535b14e108400de48a4bf2..5f82241798c3a67d64be6c373b4718551418cb9b 100644
+index 6b8a3617f27946fec9535b14e108400de48a4bf2..a85c7f25ba6bcba2378334683a24ccec9478ff76 100644
 --- a/dist/create-dom-collection/OK7882aq.js
 +++ b/dist/create-dom-collection/OK7882aq.js
+@@ -1,4 +1,4 @@
+-import { createComponent, createContext, createEffect, createSignal, merge, useContext } from "solid-js";
++import { createComponent, createContext, createEffect, createSignal, merge, untrack, useContext } from "solid-js";
+ //#region src/primitives/create-dom-collection/dom-collection-context.ts
+ const DomCollectionContext = createContext(null);
+ function useOptionalDomCollectionContext() {
+@@ -15,12 +15,12 @@ function isElementPreceding(a, b) {
+ 	return Boolean(b.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_PRECEDING);
+ }
+ function findDOMIndex(items, item) {
+-	const itemEl = item.ref();
++	const itemEl = untrack(() => item.ref());
+ 	if (!itemEl) return -1;
+ 	let length = items.length;
+ 	if (!length) return -1;
+ 	while (length--) {
+-		const currentItemEl = items[length]?.ref();
++		const currentItemEl = untrack(() => items[length]?.ref());
+ 		if (!currentItemEl) continue;
+ 		if (isElementPreceding(currentItemEl, itemEl)) return length + 1;
+ 	}
+@@ -30,8 +30,8 @@ function sortBasedOnDOMPosition(items) {
+ 	const pairs = items.map((item, index) => [index, item]);
+ 	let isOrderDifferent = false;
+ 	pairs.sort(([indexA, a], [indexB, b]) => {
+-		const elementA = a.ref();
+-		const elementB = b.ref();
++		const elementA = untrack(() => a.ref());
++		const elementB = untrack(() => b.ref());
+ 		if (elementA === elementB) return 0;
+ 		if (!elementA || !elementB) return 0;
+ 		if (isElementPreceding(elementA, elementB)) {
+@@ -50,8 +50,8 @@ function setItemsBasedOnDOMPosition(items, setItems) {
+ }
+ function getCommonParent(items) {
+ 	const firstItem = items[0];
+-	const lastItemEl = items[items.length - 1]?.ref();
+-	let parentEl = firstItem?.ref()?.parentElement;
++	const lastItemEl = untrack(() => items[items.length - 1]?.ref());
++	let parentEl = untrack(() => firstItem?.ref()?.parentElement);
+ 	while (parentEl) {
+ 		if (lastItemEl && parentEl.contains(lastItemEl)) return parentEl;
+ 		parentEl = parentEl.parentElement;
+@@ -61,7 +61,7 @@ function getCommonParent(items) {
+ function createTimeoutObserver(items, setItems) {
+ 	createEffect(() => {}, () => {
+ 		const timeout = setTimeout(() => {
+-			setItemsBasedOnDOMPosition(items(), setItems);
++			setItemsBasedOnDOMPosition(untrack(() => items()), setItems);
+ 		});
+ 		return () => clearTimeout(timeout);
+ 	});
+@@ -75,14 +75,14 @@ function createSortBasedOnDOMPosition(items, setItems) {
+ 	createEffect(() => items(), (currentItems) => {
+ 		const callback = () => {
+ 			const hasPreviousItems = !!previousItems.length;
+-			previousItems = items();
++			previousItems = untrack(() => items());
+ 			if (!hasPreviousItems) return;
+-			setItemsBasedOnDOMPosition(items(), setItems);
++			setItemsBasedOnDOMPosition(untrack(() => items()), setItems);
+ 		};
+ 		const root = getCommonParent(currentItems);
+ 		const observer = new IntersectionObserver(callback, { root });
+ 		for (const item of currentItems) {
+-			const itemEl = item.ref();
++			const itemEl = untrack(() => item.ref());
+ 			if (itemEl) observer.observe(itemEl);
+ 		}
+ 		return () => observer.disconnect();
 @@ -91,7 +91,7 @@ function createSortBasedOnDOMPosition(items, setItems) {
  //#endregion
  //#region src/primitives/create-dom-collection/create-dom-collection.ts
@@ -11,10 +187,89 @@ index 6b8a3617f27946fec9535b14e108400de48a4bf2..5f82241798c3a67d64be6c373b471855
  	createSortBasedOnDOMPosition(items, setItems);
  	createEffect(() => items(), (currentItems) => {
  		props.onItemsChange?.(currentItems);
+@@ -107,7 +107,7 @@ function createDomCollection(props = {}) {
+ 		});
+ 		return () => {
+ 			setItems((prevItems) => {
+-				const nextItems = prevItems.filter((prevItem) => prevItem.ref() !== item.ref());
++				const nextItems = prevItems.filter((prevItem) => untrack(() => prevItem.ref()) !== untrack(() => item.ref()));
+ 				if (prevItems.length === nextItems.length) return prevItems;
+ 				return nextItems;
+ 			});
 diff --git a/dist/create-dom-collection/OK7882aq.jsx b/dist/create-dom-collection/OK7882aq.jsx
-index 6b8a3617f27946fec9535b14e108400de48a4bf2..5f82241798c3a67d64be6c373b4718551418cb9b 100644
+index 6b8a3617f27946fec9535b14e108400de48a4bf2..a85c7f25ba6bcba2378334683a24ccec9478ff76 100644
 --- a/dist/create-dom-collection/OK7882aq.jsx
 +++ b/dist/create-dom-collection/OK7882aq.jsx
+@@ -1,4 +1,4 @@
+-import { createComponent, createContext, createEffect, createSignal, merge, useContext } from "solid-js";
++import { createComponent, createContext, createEffect, createSignal, merge, untrack, useContext } from "solid-js";
+ //#region src/primitives/create-dom-collection/dom-collection-context.ts
+ const DomCollectionContext = createContext(null);
+ function useOptionalDomCollectionContext() {
+@@ -15,12 +15,12 @@ function isElementPreceding(a, b) {
+ 	return Boolean(b.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_PRECEDING);
+ }
+ function findDOMIndex(items, item) {
+-	const itemEl = item.ref();
++	const itemEl = untrack(() => item.ref());
+ 	if (!itemEl) return -1;
+ 	let length = items.length;
+ 	if (!length) return -1;
+ 	while (length--) {
+-		const currentItemEl = items[length]?.ref();
++		const currentItemEl = untrack(() => items[length]?.ref());
+ 		if (!currentItemEl) continue;
+ 		if (isElementPreceding(currentItemEl, itemEl)) return length + 1;
+ 	}
+@@ -30,8 +30,8 @@ function sortBasedOnDOMPosition(items) {
+ 	const pairs = items.map((item, index) => [index, item]);
+ 	let isOrderDifferent = false;
+ 	pairs.sort(([indexA, a], [indexB, b]) => {
+-		const elementA = a.ref();
+-		const elementB = b.ref();
++		const elementA = untrack(() => a.ref());
++		const elementB = untrack(() => b.ref());
+ 		if (elementA === elementB) return 0;
+ 		if (!elementA || !elementB) return 0;
+ 		if (isElementPreceding(elementA, elementB)) {
+@@ -50,8 +50,8 @@ function setItemsBasedOnDOMPosition(items, setItems) {
+ }
+ function getCommonParent(items) {
+ 	const firstItem = items[0];
+-	const lastItemEl = items[items.length - 1]?.ref();
+-	let parentEl = firstItem?.ref()?.parentElement;
++	const lastItemEl = untrack(() => items[items.length - 1]?.ref());
++	let parentEl = untrack(() => firstItem?.ref()?.parentElement);
+ 	while (parentEl) {
+ 		if (lastItemEl && parentEl.contains(lastItemEl)) return parentEl;
+ 		parentEl = parentEl.parentElement;
+@@ -61,7 +61,7 @@ function getCommonParent(items) {
+ function createTimeoutObserver(items, setItems) {
+ 	createEffect(() => {}, () => {
+ 		const timeout = setTimeout(() => {
+-			setItemsBasedOnDOMPosition(items(), setItems);
++			setItemsBasedOnDOMPosition(untrack(() => items()), setItems);
+ 		});
+ 		return () => clearTimeout(timeout);
+ 	});
+@@ -75,14 +75,14 @@ function createSortBasedOnDOMPosition(items, setItems) {
+ 	createEffect(() => items(), (currentItems) => {
+ 		const callback = () => {
+ 			const hasPreviousItems = !!previousItems.length;
+-			previousItems = items();
++			previousItems = untrack(() => items());
+ 			if (!hasPreviousItems) return;
+-			setItemsBasedOnDOMPosition(items(), setItems);
++			setItemsBasedOnDOMPosition(untrack(() => items()), setItems);
+ 		};
+ 		const root = getCommonParent(currentItems);
+ 		const observer = new IntersectionObserver(callback, { root });
+ 		for (const item of currentItems) {
+-			const itemEl = item.ref();
++			const itemEl = untrack(() => item.ref());
+ 			if (itemEl) observer.observe(itemEl);
+ 		}
+ 		return () => observer.disconnect();
 @@ -91,7 +91,7 @@ function createSortBasedOnDOMPosition(items, setItems) {
  //#endregion
  //#region src/primitives/create-dom-collection/create-dom-collection.ts
@@ -24,8 +279,70 @@ index 6b8a3617f27946fec9535b14e108400de48a4bf2..5f82241798c3a67d64be6c373b471855
  	createSortBasedOnDOMPosition(items, setItems);
  	createEffect(() => items(), (currentItems) => {
  		props.onItemsChange?.(currentItems);
+@@ -107,7 +107,7 @@ function createDomCollection(props = {}) {
+ 		});
+ 		return () => {
+ 			setItems((prevItems) => {
+-				const nextItems = prevItems.filter((prevItem) => prevItem.ref() !== item.ref());
++				const nextItems = prevItems.filter((prevItem) => untrack(() => prevItem.ref()) !== untrack(() => item.ref()));
+ 				if (prevItems.length === nextItems.length) return prevItems;
+ 				return nextItems;
+ 			});
+diff --git a/dist/hidden-select-base/DZDStUWy.js b/dist/hidden-select-base/DZDStUWy.js
+index 1de7ae73fc0f9f87874450396bf6e1972f9910e5..6b581d1fddcfd705ac860d43a1fa727eb0e3a7f0 100644
+--- a/dist/hidden-select-base/DZDStUWy.js
++++ b/dist/hidden-select-base/DZDStUWy.js
+@@ -1,7 +1,7 @@
+ import { c as isSameSelection } from "../create-list-state/C8P6E0Wr.js";
+ import { r as useFormControlContext } from "../form-control-description/BQ1mcKaU.js";
+ import { createComponent, effect, insert, mergeProps, ref, setAttribute, spread, style, template } from "@solidjs/web";
+-import { For, Show, createEffect, createSignal, omit } from "solid-js";
++import { For, Show, createEffect, createSignal, omit, untrack } from "solid-js";
+ import { callHandler, visuallyHiddenStyles } from "@kobalte/utils";
+ //#region src/select/hidden-select-base.tsx
+ var _tmpl$ = /*#__PURE__*/ template(`<option>`);
+@@ -35,11 +35,11 @@ function HiddenSelectBase(props) {
+ 	createEffect(() => props.selectionManager.selectedKeys(), (keys, prevKeys) => {
+ 		if (prevKeys && isSameSelection(keys, prevKeys)) return;
+ 		isInternalChangeEvent = true;
+-		ref$1()?.dispatchEvent(new Event("input", {
++		untrack(ref$1)?.dispatchEvent(new Event("input", {
+ 			bubbles: true,
+ 			cancelable: true
+ 		}));
+-		ref$1()?.dispatchEvent(new Event("change", {
++		untrack(ref$1)?.dispatchEvent(new Event("change", {
+ 			bubbles: true,
+ 			cancelable: true
+ 		}));
+diff --git a/dist/hidden-select-base/jSgZ_i04.jsx b/dist/hidden-select-base/jSgZ_i04.jsx
+index 52f73307c4ea3f22ea36f3ab05379730b2e116bd..862a2d44793ee509e75cd24d3270609fd416c506 100644
+--- a/dist/hidden-select-base/jSgZ_i04.jsx
++++ b/dist/hidden-select-base/jSgZ_i04.jsx
+@@ -1,6 +1,6 @@
+ import { c as isSameSelection } from "../create-list-state/CgkAj-2j.jsx";
+ import { r as useFormControlContext } from "../form-control-description/Dc7vmdKW.jsx";
+-import { For, Show, createEffect, createSignal, omit } from "solid-js";
++import { For, Show, createEffect, createSignal, omit, untrack } from "solid-js";
+ import { callHandler, visuallyHiddenStyles } from "@kobalte/utils";
+ //#region src/select/hidden-select-base.tsx
+ /**
+@@ -23,11 +23,11 @@ function HiddenSelectBase(props) {
+ 	createEffect(() => props.selectionManager.selectedKeys(), (keys, prevKeys) => {
+ 		if (prevKeys && isSameSelection(keys, prevKeys)) return;
+ 		isInternalChangeEvent = true;
+-		ref()?.dispatchEvent(new Event("input", {
++		untrack(ref)?.dispatchEvent(new Event("input", {
+ 			bubbles: true,
+ 			cancelable: true
+ 		}));
+-		ref()?.dispatchEvent(new Event("change", {
++		untrack(ref)?.dispatchEvent(new Event("change", {
+ 			bubbles: true,
+ 			cancelable: true
+ 		}));
 diff --git a/dist/menu-sub-trigger/CUZ7UcrE.js b/dist/menu-sub-trigger/CUZ7UcrE.js
-index 2304a4c0cedafe7d0b501e14a6097c19cc1de6ab..a045f64440f9cbc973ed9698ee69dd08dfc86781 100644
+index 2304a4c0cedafe7d0b501e14a6097c19cc1de6ab..5e8f60fb17c0acc4ef5f68cef2ddc5330fa13130 100644
 --- a/dist/menu-sub-trigger/CUZ7UcrE.js
 +++ b/dist/menu-sub-trigger/CUZ7UcrE.js
 @@ -129,7 +129,7 @@ function Menu(props) {
@@ -37,8 +354,28 @@ index 2304a4c0cedafe7d0b501e14a6097c19cc1de6ab..a045f64440f9cbc973ed9698ee69dd08
  	const { DomCollectionProvider } = createDomCollection({
  		items,
  		onItemsChange: setItems
+@@ -502,8 +502,8 @@ function MenuTrigger(props) {
+ 		return tagName() === "a" && context.triggerRef()?.getAttribute("href") != null;
+ 	});
+ 	createEffect(() => optionalMenubarContext?.value(), (value) => {
+-		if (!isNativeLink()) return;
+-		if (value === key()) context.triggerRef()?.focus();
++		if (!untrack(isNativeLink)) return;
++		if (value === untrack(key)) untrack(() => context.triggerRef())?.focus();
+ 	});
+ 	const handleClick = () => {
+ 		if (optionalMenubarContext !== void 0) {
+@@ -1187,7 +1187,7 @@ function MenuSubTrigger(props) {
+ 	createEffect(() => context.parentMenuContext()?.pointerGraceTimeoutId(), (pointerGraceTimer) => {
+ 		return () => {
+ 			window.clearTimeout(pointerGraceTimer);
+-			context.parentMenuContext()?.setPointerGraceIntent(null);
++			untrack(() => context.parentMenuContext())?.setPointerGraceIntent(null);
+ 		};
+ 	});
+ 	createEffect(() => mergedProps.id, (id) => context.registerTriggerId(id));
 diff --git a/dist/menu-sub-trigger/Cj4RVVP4.jsx b/dist/menu-sub-trigger/Cj4RVVP4.jsx
-index b0a38568346e4997cc03f97803f316dd5cdebae1..2dc530b10b317d5ee1ab0131d84b5f6b216fd49c 100644
+index b0a38568346e4997cc03f97803f316dd5cdebae1..8246fd0e5ef76aeccef54d3d3e40fd179594866c 100644
 --- a/dist/menu-sub-trigger/Cj4RVVP4.jsx
 +++ b/dist/menu-sub-trigger/Cj4RVVP4.jsx
 @@ -129,7 +129,7 @@ function Menu(props) {
@@ -50,6 +387,114 @@ index b0a38568346e4997cc03f97803f316dd5cdebae1..2dc530b10b317d5ee1ab0131d84b5f6b
  	const { DomCollectionProvider } = createDomCollection({
  		items,
  		onItemsChange: setItems
+@@ -440,8 +440,8 @@ function MenuTrigger(props) {
+ 		return tagName() === "a" && context.triggerRef()?.getAttribute("href") != null;
+ 	});
+ 	createEffect(() => optionalMenubarContext?.value(), (value) => {
+-		if (!isNativeLink()) return;
+-		if (value === key()) context.triggerRef()?.focus();
++		if (!untrack(isNativeLink)) return;
++		if (value === untrack(key)) untrack(() => context.triggerRef())?.focus();
+ 	});
+ 	const handleClick = () => {
+ 		if (optionalMenubarContext !== void 0) {
+@@ -998,7 +998,7 @@ function MenuSubTrigger(props) {
+ 	createEffect(() => context.parentMenuContext()?.pointerGraceTimeoutId(), (pointerGraceTimer) => {
+ 		return () => {
+ 			window.clearTimeout(pointerGraceTimer);
+-			context.parentMenuContext()?.setPointerGraceIntent(null);
++			untrack(() => context.parentMenuContext())?.setPointerGraceIntent(null);
+ 		};
+ 	});
+ 	createEffect(() => mergedProps.id, (id) => context.registerTriggerId(id));
+diff --git a/dist/popper/BzGqGM_d.jsx b/dist/popper/BzGqGM_d.jsx
+index 59a51a1abef975b10524d0eb99a2acdea8669fab..2bc6364286aafb2697203865f4996fe18363f170 100644
+--- a/dist/popper/BzGqGM_d.jsx
++++ b/dist/popper/BzGqGM_d.jsx
+@@ -1,7 +1,7 @@
+ import { Polymorphic } from "../polymorphic/index.jsx";
+ import { useLocale } from "../i18n/index.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { createContext, createEffect, createSignal, createTrackedEffect, merge, omit, useContext } from "solid-js";
++import { createContext, createEffect, createSignal, createTrackedEffect, merge, omit, untrack, useContext } from "solid-js";
+ import { arrow, autoUpdate, computePosition, flip, hide, offset, platform, shift, size } from "@floating-ui/dom";
+ //#region src/popper/popper-context.tsx
+ const PopperContext = createContext();
+@@ -151,7 +151,7 @@ function PopperRoot(props) {
+ 	}, props);
+ 	const [positionerRef, setPositionerRef] = createSignal();
+ 	const [arrowRef, setArrowRef] = createSignal();
+-	const [currentPlacement, setCurrentPlacement] = createSignal(mergedProps.placement);
++	const [currentPlacement, setCurrentPlacement] = createSignal(untrack(() => mergedProps.placement));
+ 	const anchorRef = () => getAnchorElement(mergedProps.anchorRef?.(), mergedProps.getAnchorRect);
+ 	const { direction } = useLocale();
+ 	async function updatePosition() {
+diff --git a/dist/popper/CfE13srM.js b/dist/popper/CfE13srM.js
+index 5d13a2135a9e2772caf8388ddf129bdd1355f41b..af03868659847e1aa6650b618040baf3645ec5d6 100644
+--- a/dist/popper/CfE13srM.js
++++ b/dist/popper/CfE13srM.js
+@@ -2,7 +2,7 @@ import { Polymorphic } from "../polymorphic/index.js";
+ import { useLocale } from "../i18n/index.js";
+ import { createComponent, effect, mergeProps, setAttribute, template } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { createContext, createEffect, createSignal, createTrackedEffect, merge, omit, useContext } from "solid-js";
++import { createContext, createEffect, createSignal, createTrackedEffect, merge, omit, untrack, useContext } from "solid-js";
+ import { arrow, autoUpdate, computePosition, flip, hide, offset, platform, shift, size } from "@floating-ui/dom";
+ //#region src/popper/popper-context.tsx
+ const PopperContext = createContext();
+@@ -166,7 +166,7 @@ function PopperRoot(props) {
+ 	}, props);
+ 	const [positionerRef, setPositionerRef] = createSignal();
+ 	const [arrowRef, setArrowRef] = createSignal();
+-	const [currentPlacement, setCurrentPlacement] = createSignal(mergedProps.placement);
++	const [currentPlacement, setCurrentPlacement] = createSignal(untrack(() => mergedProps.placement));
+ 	const anchorRef = () => getAnchorElement(mergedProps.anchorRef?.(), mergedProps.getAnchorRect);
+ 	const { direction } = useLocale();
+ 	async function updatePosition() {
+diff --git a/dist/radio-group/Bpz3OGAn.jsx b/dist/radio-group/Bpz3OGAn.jsx
+index 4bea7d4bf444635c89f9bb5417cc54e1db6896d2..8cf41967407c919096187ab797ed593fa35dbaef 100644
+--- a/dist/radio-group/Bpz3OGAn.jsx
++++ b/dist/radio-group/Bpz3OGAn.jsx
+@@ -6,7 +6,7 @@ import { a as createFormControl, i as FORM_CONTROL_PROP_NAMES, n as FormControlC
+ import { t as FormControlErrorMessage } from "../form-control-error-message/B1cNIdVV.jsx";
+ import { t as FormControlLabel } from "../form-control-label/Czoesrj9.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler, visuallyHiddenStyles } from "@kobalte/utils";
+@@ -178,7 +178,7 @@ function RadioGroupItemInput(props) {
+ 	createEffect(() => [radioContext.isSelected(), radioContext.value()], ([isSelected]) => {
+ 		if (!isSelected) return;
+ 		setIsInternalChangeEvent(true);
+-		const ref = radioContext.inputRef();
++		const ref = untrack(() => radioContext.inputRef());
+ 		ref?.dispatchEvent(new Event("input", {
+ 			bubbles: true,
+ 			cancelable: true
+diff --git a/dist/radio-group/CTAjhsHl.js b/dist/radio-group/CTAjhsHl.js
+index 804ec784ee3663f7e724b9e18a64ff9a383bc127..ee2e36017a711fa88db66928e743bafa5b004ec2 100644
+--- a/dist/radio-group/CTAjhsHl.js
++++ b/dist/radio-group/CTAjhsHl.js
+@@ -7,7 +7,7 @@ import { t as FormControlErrorMessage } from "../form-control-error-message/D9jU
+ import { t as FormControlLabel } from "../form-control-label/DqQ24y8m.js";
+ import { createComponent, mergeProps } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler, visuallyHiddenStyles } from "@kobalte/utils";
+@@ -197,7 +197,7 @@ function RadioGroupItemInput(props) {
+ 	createEffect(() => [radioContext.isSelected(), radioContext.value()], ([isSelected]) => {
+ 		if (!isSelected) return;
+ 		setIsInternalChangeEvent(true);
+-		const ref = radioContext.inputRef();
++		const ref = untrack(() => radioContext.inputRef());
+ 		ref?.dispatchEvent(new Event("input", {
+ 			bubbles: true,
+ 			cancelable: true
 diff --git a/dist/rating/index.js b/dist/rating/index.js
 index 51d9efaf61c467b127ffbc21b9719c632c8bc931..afb1a2e131c915ac00a1e76fe7ec4307d44584c4 100644
 --- a/dist/rating/index.js
@@ -76,10 +521,198 @@ index 37fab336dc4866a58d11de9d0953319b51bb61f2..1add17f7eb3dc64697b6a7b76da22606
  	const { DomCollectionProvider } = createDomCollection({
  		items,
  		onItemsChange: setItems
+diff --git a/dist/select/C2EhSCqp.jsx b/dist/select/C2EhSCqp.jsx
+index c59f01b8f5d79f3d349b315a7b131100cf2a0033..a851c2a92b7009c589e4e6cd90635836ebb41ecb 100644
+--- a/dist/select/C2EhSCqp.jsx
++++ b/dist/select/C2EhSCqp.jsx
+@@ -15,7 +15,7 @@ import { i as PopperArrow, t as Popper } from "../popper/BzGqGM_d.jsx";
+ import { a as ListboxItemLabel, c as ListboxItem, n as listbox_exports, o as ListboxItemIndicator, r as ListboxSection, s as ListboxItemDescription } from "../listbox/BNC6ufaz.jsx";
+ import { t as HiddenSelectBase } from "../hidden-select-base/jSgZ_i04.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { Portal } from "@solidjs/web";
+ import { access } from "@solid-primitives/utils";
+@@ -279,8 +279,9 @@ function SelectBase(props) {
+ 		return mergedProps.sectionComponent?.({ section });
+ 	};
+ 	createEffect(() => flattenOptionKeys(), (keys) => {
+-		const keysToKeep = [...listState.selectionManager().selectedKeys()].filter((key) => keys.includes(key));
+-		listState.selectionManager().setSelectedKeys(keysToKeep);
++		const selectionManager = untrack(() => listState.selectionManager());
++		const keysToKeep = [...untrack(() => selectionManager.selectedKeys())].filter((key) => keys.includes(key));
++		selectionManager.setSelectedKeys(keysToKeep);
+ 	}, { defer: true });
+ 	const dataset = createMemo(() => ({
+ 		"data-expanded": disclosureState.isOpen() ? "" : void 0,
+diff --git a/dist/select/DuH3IApm.js b/dist/select/DuH3IApm.js
+index f74d54461295486ec063fd32d5dfe5489be7a339..9086cac82421234bb0adda512792439a0e23a7ec 100644
+--- a/dist/select/DuH3IApm.js
++++ b/dist/select/DuH3IApm.js
+@@ -16,7 +16,7 @@ import { a as ListboxItemLabel, c as ListboxItem, i as ListboxRoot, o as Listbox
+ import { t as HiddenSelectBase } from "../hidden-select-base/DZDStUWy.js";
+ import { Portal, createComponent, memo, mergeProps } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, useContext } from "solid-js";
++import { Show, children, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler } from "@kobalte/utils";
+@@ -359,8 +359,9 @@ function SelectBase(props) {
+ 		return mergedProps.sectionComponent?.({ section });
+ 	};
+ 	createEffect(() => flattenOptionKeys(), (keys) => {
+-		const keysToKeep = [...listState.selectionManager().selectedKeys()].filter((key) => keys.includes(key));
+-		listState.selectionManager().setSelectedKeys(keysToKeep);
++		const selectionManager = untrack(() => listState.selectionManager());
++		const keysToKeep = [...untrack(() => selectionManager.selectedKeys())].filter((key) => keys.includes(key));
++		selectionManager.setSelectedKeys(keysToKeep);
+ 	}, { defer: true });
+ 	const dataset = createMemo(() => ({
+ 		"data-expanded": disclosureState.isOpen() ? "" : void 0,
+diff --git a/dist/slider/DP6fmlOK.jsx b/dist/slider/DP6fmlOK.jsx
+index 99232b6df91ac600326db388fdd42a96e396c343..5437bd312ab7b10c94b819fae5ec1b9433bbb2be 100644
+--- a/dist/slider/DP6fmlOK.jsx
++++ b/dist/slider/DP6fmlOK.jsx
+@@ -9,7 +9,7 @@ import { t as FormControlErrorMessage } from "../form-control-error-message/B1cN
+ import { t as FormControlLabel } from "../form-control-label/Czoesrj9.jsx";
+ import { a as stopEventDefaultAndPropagation, i as linearScale, n as getNextSortedValues, r as hasMinStepsBetweenValues, t as getClosestValueIndex } from "../utils/9uVKQNrd.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, useContext } from "solid-js";
++import { createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, untrack, useContext } from "solid-js";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler, clamp, snapValueToStep, visuallyHiddenStyles } from "@kobalte/utils";
+ import { createFormResetListener } from "@solid-primitives/form";
+@@ -115,7 +115,7 @@ function SliderThumb(props) {
+ 		context.state.setThumbEditable(index(), !context.state.isDisabled());
+ 	});
+ 	return <ThumbContext value={{ index }}>
+-			<Polymorphic as="span" ref={[setRef, mergedProps.ref]} role="slider" id={fieldProps.id()} tabindex={context.state.isDisabled() ? void 0 : 0} style={combineStyle({
++			<Polymorphic as="span" ref={[setRef, untrack(() => mergedProps.ref)]} role="slider" id={fieldProps.id()} tabindex={context.state.isDisabled() ? void 0 : 0} style={combineStyle({
+ 		display: value() === void 0 ? "none" : void 0,
+ 		position: "absolute",
+ 		[context.startEdge()]: `calc(${position() * 100}%)`,
+@@ -180,8 +180,8 @@ function createSliderState(props) {
+ 		defaultValue,
+ 		onChange: (values) => mergedProps.onChange?.(values)
+ 	});
+-	const [isDragging, setIsDragging] = createSignal(new Array(values().length).fill(false));
+-	const [isEditables, setEditables] = createSignal(new Array(values().length).fill(false));
++	const [isDragging, setIsDragging] = createSignal(new Array(untrack(() => values().length)).fill(false));
++	const [isEditables, setEditables] = createSignal(new Array(untrack(() => values().length)).fill(false));
+ 	const [focusedIndex, setFocusedIndex] = createSignal(void 0);
+ 	const resetValues = () => {
+ 		setValues(defaultValue());
+@@ -311,7 +311,7 @@ function SliderRoot(props) {
+ 		isDisabled: () => formControlContext.isDisabled() ?? false,
+ 		orientation: () => mergedProps.orientation,
+ 		step: () => mergedProps.step,
+-		numberFormatter: defaultFormatter(),
++		numberFormatter: untrack(defaultFormatter),
+ 		onChange: mergedProps.onChange,
+ 		onChangeEnd: mergedProps.onChangeEnd
+ 	});
+@@ -436,7 +436,7 @@ function SliderRoot(props) {
+ 	return <DomCollectionProvider>
+ 			<FormControlContext value={formControlContext}>
+ 				<SliderContext value={context}>
+-					<Polymorphic as="div" ref={[setRef, mergedProps.ref]} role="group" id={access(mergedProps.id)} {...dataset()} {...others} />
++					<Polymorphic as="div" ref={[setRef, untrack(() => mergedProps.ref)]} role="group" id={access(mergedProps.id)} {...dataset()} {...others} />
+ 				</SliderContext>
+ 			</FormControlContext>
+ 		</DomCollectionProvider>;
+diff --git a/dist/slider/DnOXsb56.js b/dist/slider/DnOXsb56.js
+index 5cf493ce13b9a9fa42bb01b383ac28bd4520fa09..93507225596660e81dc89f6a7aa2bf9dba5ed5f4 100644
+--- a/dist/slider/DnOXsb56.js
++++ b/dist/slider/DnOXsb56.js
+@@ -10,7 +10,7 @@ import { t as FormControlLabel } from "../form-control-label/DqQ24y8m.js";
+ import { a as stopEventDefaultAndPropagation, i as linearScale, n as getNextSortedValues, r as hasMinStepsBetweenValues, t as getClosestValueIndex } from "../utils/9uVKQNrd.js";
+ import { createComponent, mergeProps, spread, template } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, useContext } from "solid-js";
++import { createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, untrack, useContext } from "solid-js";
+ import { access } from "@solid-primitives/utils";
+ import { callHandler, clamp, snapValueToStep, visuallyHiddenStyles } from "@kobalte/utils";
+ import { createFormResetListener } from "@solid-primitives/form";
+@@ -125,7 +125,7 @@ function SliderThumb(props) {
+ 		get children() {
+ 			return createComponent(Polymorphic, mergeProps({
+ 				as: "span",
+-				ref: [setRef, mergedProps.ref],
++				ref: [setRef, untrack(() => mergedProps.ref)],
+ 				role: "slider",
+ 				get id() {
+ 					return fieldProps.id();
+@@ -295,8 +295,8 @@ function createSliderState(props) {
+ 		defaultValue,
+ 		onChange: (values) => mergedProps.onChange?.(values)
+ 	});
+-	const [isDragging, setIsDragging] = createSignal(new Array(values().length).fill(false));
+-	const [isEditables, setEditables] = createSignal(new Array(values().length).fill(false));
++	const [isDragging, setIsDragging] = createSignal(new Array(untrack(() => values().length)).fill(false));
++	const [isEditables, setEditables] = createSignal(new Array(untrack(() => values().length)).fill(false));
+ 	const [focusedIndex, setFocusedIndex] = createSignal(void 0);
+ 	const resetValues = () => {
+ 		setValues(defaultValue());
+@@ -426,7 +426,7 @@ function SliderRoot(props) {
+ 		isDisabled: () => formControlContext.isDisabled() ?? false,
+ 		orientation: () => mergedProps.orientation,
+ 		step: () => mergedProps.step,
+-		numberFormatter: defaultFormatter(),
++		numberFormatter: untrack(defaultFormatter),
+ 		onChange: mergedProps.onChange,
+ 		onChangeEnd: mergedProps.onChangeEnd
+ 	});
+@@ -557,7 +557,7 @@ function SliderRoot(props) {
+ 					get children() {
+ 						return createComponent(Polymorphic, mergeProps({
+ 							as: "div",
+-							ref: [setRef, mergedProps.ref],
++							ref: [setRef, untrack(() => mergedProps.ref)],
+ 							role: "group",
+ 							get id() {
+ 								return access(mergedProps.id);
 diff --git a/dist/tabs/Bcy3rD0-.js b/dist/tabs/Bcy3rD0-.js
-index b50c5e60030cac03d97ab8f0b3749004568625f8..60fcab2897a2006c6b22a59b34bb91593fb542c5 100644
+index b50c5e60030cac03d97ab8f0b3749004568625f8..ebefc11fb327b83e1b516bf8f21d1c382025cd8e 100644
 --- a/dist/tabs/Bcy3rD0-.js
 +++ b/dist/tabs/Bcy3rD0-.js
+@@ -7,7 +7,7 @@ import { n as createDomCollection, t as createDomCollectionItem } from "../creat
+ import { t as TabsKeyboardDelegate } from "../tabs-keyboard-delegate/DOO8PEm5.js";
+ import { createComponent, memo, mergeProps } from "@solidjs/web";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, useContext } from "solid-js";
++import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { composeEventHandlers } from "@kobalte/utils";
+@@ -150,7 +150,7 @@ function TabsIndicator(props) {
+ 	};
+ 	onSettled(() => {
+ 		queueMicrotask(() => {
+-			computeStyle();
++			untrack(() => computeStyle());
+ 		});
+ 	});
+ 	createEffect(() => [
+@@ -158,7 +158,7 @@ function TabsIndicator(props) {
+ 		context.orientation(),
+ 		direction()
+ 	], () => {
+-		computeStyle();
++		untrack(() => computeStyle());
+ 	}, { defer: true });
+ 	const [resizing, setResizing] = createSignal(false);
+ 	let timeout = null;
+@@ -174,7 +174,7 @@ function TabsIndicator(props) {
+ 			timeout = null;
+ 			setResizing(false);
+ 		}, 1);
+-		computeStyle();
++		untrack(() => computeStyle());
+ 	});
+ 	return createComponent(Polymorphic, mergeProps({
+ 		as: "div",
 @@ -251,7 +251,7 @@ function TabsRoot(props) {
  		activationMode: "automatic"
  	}, props);
@@ -89,10 +722,72 @@ index b50c5e60030cac03d97ab8f0b3749004568625f8..60fcab2897a2006c6b22a59b34bb9159
  	const [selectedTab, setSelectedTab] = createSignal();
  	const { DomCollectionProvider } = createDomCollection({
  		items,
+@@ -263,14 +263,14 @@ function TabsRoot(props) {
+ 		onSelectionChange: (key) => mergedProps.onChange?.(String(key)),
+ 		dataSource: items
+ 	});
+-	let lastSelectedKey = listState.selectedKey();
++	let lastSelectedKey = untrack(() => listState.selectedKey());
+ 	createEffect(() => ({
+ 		selectionManager: listState.selectionManager(),
+ 		collection: listState.collection(),
+ 		currentSelectedKey: listState.selectedKey()
+ 	}), ({ selectionManager, collection, currentSelectedKey }) => {
+ 		let selectedKey = currentSelectedKey;
+-		if (selectionManager.isEmpty() || selectedKey == null || !collection.getItem(selectedKey)) {
++		if (untrack(() => selectionManager.isEmpty()) || selectedKey == null || !collection.getItem(selectedKey)) {
+ 			selectedKey = collection.getFirstKey();
+ 			let selectedItem = selectedKey != null ? collection.getItem(selectedKey) : void 0;
+ 			while (selectedItem?.disabled && selectedItem.key !== collection.getLastKey()) {
+@@ -280,7 +280,7 @@ function TabsRoot(props) {
+ 			if (selectedItem?.disabled && selectedKey === collection.getLastKey()) selectedKey = collection.getFirstKey();
+ 			if (selectedKey != null) selectionManager.setSelectedKeys([selectedKey]);
+ 		}
+-		if (selectionManager.focusedKey() == null || !selectionManager.isFocused() && selectedKey !== lastSelectedKey) selectionManager.setFocusedKey(selectedKey);
++		if (untrack(() => selectionManager.focusedKey()) == null || !untrack(() => selectionManager.isFocused()) && selectedKey !== lastSelectedKey) untrack(() => selectionManager.setFocusedKey(selectedKey));
+ 		lastSelectedKey = selectedKey;
+ 	});
+ 	const triggerIdsMap = /* @__PURE__ */ new Map();
 diff --git a/dist/tabs/CezyXMlG.jsx b/dist/tabs/CezyXMlG.jsx
-index 6386365bd6e1ef3d76be952cd214f54dfa53e937..1340875aca7764e70cbb93093254e51cac13658b 100644
+index 6386365bd6e1ef3d76be952cd214f54dfa53e937..0e042d04291724842f5f1cf65487eec93e91e6b6 100644
 --- a/dist/tabs/CezyXMlG.jsx
 +++ b/dist/tabs/CezyXMlG.jsx
+@@ -6,7 +6,7 @@ import { useLocale } from "../i18n/index.jsx";
+ import { n as createDomCollection, t as createDomCollectionItem } from "../create-dom-collection/OK7882aq.jsx";
+ import { t as TabsKeyboardDelegate } from "../tabs-keyboard-delegate/DOO8PEm5.jsx";
+ import { combineStyle } from "@solid-primitives/props";
+-import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, useContext } from "solid-js";
++import { Show, createContext, createEffect, createMemo, createSignal, createUniqueId, merge, omit, onSettled, untrack, useContext } from "solid-js";
+ import { createPresence } from "@solid-primitives/presence";
+ import { access } from "@solid-primitives/utils";
+ import { composeEventHandlers } from "@kobalte/utils";
+@@ -125,7 +125,7 @@ function TabsIndicator(props) {
+ 	};
+ 	onSettled(() => {
+ 		queueMicrotask(() => {
+-			computeStyle();
++			untrack(() => computeStyle());
+ 		});
+ 	});
+ 	createEffect(() => [
+@@ -133,7 +133,7 @@ function TabsIndicator(props) {
+ 		context.orientation(),
+ 		direction()
+ 	], () => {
+-		computeStyle();
++		untrack(() => computeStyle());
+ 	}, { defer: true });
+ 	const [resizing, setResizing] = createSignal(false);
+ 	let timeout = null;
+@@ -149,7 +149,7 @@ function TabsIndicator(props) {
+ 			timeout = null;
+ 			setResizing(false);
+ 		}, 1);
+-		computeStyle();
++		untrack(() => computeStyle());
+ 	});
+ 	return <Polymorphic as="div" role="presentation" style={combineStyle(style(), props.style)} data-orientation={context.orientation()} data-resizing={resizing()} {...others} />;
+ }
 @@ -192,7 +192,7 @@ function TabsRoot(props) {
  		activationMode: "automatic"
  	}, props);
@@ -102,6 +797,32 @@ index 6386365bd6e1ef3d76be952cd214f54dfa53e937..1340875aca7764e70cbb93093254e51c
  	const [selectedTab, setSelectedTab] = createSignal();
  	const { DomCollectionProvider } = createDomCollection({
  		items,
+@@ -204,14 +204,14 @@ function TabsRoot(props) {
+ 		onSelectionChange: (key) => mergedProps.onChange?.(String(key)),
+ 		dataSource: items
+ 	});
+-	let lastSelectedKey = listState.selectedKey();
++	let lastSelectedKey = untrack(() => listState.selectedKey());
+ 	createEffect(() => ({
+ 		selectionManager: listState.selectionManager(),
+ 		collection: listState.collection(),
+ 		currentSelectedKey: listState.selectedKey()
+ 	}), ({ selectionManager, collection, currentSelectedKey }) => {
+ 		let selectedKey = currentSelectedKey;
+-		if (selectionManager.isEmpty() || selectedKey == null || !collection.getItem(selectedKey)) {
++		if (untrack(() => selectionManager.isEmpty()) || selectedKey == null || !collection.getItem(selectedKey)) {
+ 			selectedKey = collection.getFirstKey();
+ 			let selectedItem = selectedKey != null ? collection.getItem(selectedKey) : void 0;
+ 			while (selectedItem?.disabled && selectedItem.key !== collection.getLastKey()) {
+@@ -221,7 +221,7 @@ function TabsRoot(props) {
+ 			if (selectedItem?.disabled && selectedKey === collection.getLastKey()) selectedKey = collection.getFirstKey();
+ 			if (selectedKey != null) selectionManager.setSelectedKeys([selectedKey]);
+ 		}
+-		if (selectionManager.focusedKey() == null || !selectionManager.isFocused() && selectedKey !== lastSelectedKey) selectionManager.setFocusedKey(selectedKey);
++		if (untrack(() => selectionManager.focusedKey()) == null || !untrack(() => selectionManager.isFocused()) && selectedKey !== lastSelectedKey) untrack(() => selectionManager.setFocusedKey(selectedKey));
+ 		lastSelectedKey = selectedKey;
+ 	});
+ 	const triggerIdsMap = /* @__PURE__ */ new Map();
 diff --git a/dist/toggle-group/BlH1G1LS.js b/dist/toggle-group/BlH1G1LS.js
 index 4f4e9ab172a08be4772adda3b49a05bdeb233cf2..639f8bc6de5882b0fbbab4c508b6a3d3f6b2b1a9 100644
 --- a/dist/toggle-group/BlH1G1LS.js
