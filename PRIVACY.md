@@ -255,10 +255,12 @@ provider logs are outside the OpenBot application database and its daily mainten
   system's secret storage in the same way as provider API keys. One record per server address holds
   the client registration and the access and refresh tokens. Removing the server in settings deletes
   its record. These values are redacted from logs, exports and diagnostics.
-- `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls and
-  provider turns. Each line holds a time, the IPC channel name or the turn origin, the duration, and
-  the outcome word. It holds no payloads, messages, URLs, paths, or identifiers, and it goes through
-  log redaction before it is written. It is kept to two files of 2 MB each and is never sent.
+- `~/Library/Application Support/OpenBot/logs/trace.ndjson` is a local trace of IPC calls,
+  provider turns, and main-process failures. Each line holds a time, the IPC channel name, the turn
+  origin or the failure origin (`uncaughtException` or `unhandledRejection`), the duration, and the
+  outcome word. The failure's error text goes only to the redacted log. The trace holds no payloads,
+  messages, URLs, paths, or identifiers, and it goes through log redaction before it is written. It
+  is kept to two files of 2 MB each and is never sent.
 
 Attachments copied into OpenBot remain in managed storage after their original file is moved or
 deleted. All agents share the embedded browser profile, including cookies and website sessions.
@@ -349,9 +351,9 @@ and managed message attachments. It intentionally excludes CLI credentials, brow
 agent workspace files.
 
 The diagnostics export contains application and CLI versions, capability states, aggregate queue
-counts, and a summary of the local trace: counts, outcomes, and durations for each IPC channel and
-turn origin. It contains no conversations, visited URLs, account email, file contents, or local file
-paths.
+counts, and a summary of the local trace: counts, outcomes, and durations for each IPC channel,
+turn origin, and failure origin. It contains no conversations, visited URLs, account email, file
+contents, or local file paths.
 
 ## Delete local data
 

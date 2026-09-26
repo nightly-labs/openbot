@@ -47,6 +47,9 @@ export default defineConfig({
           // with the predicate that never held rather than with vitest's
           // generic "test timed out" - see src/backend/test-deadlines.ts.
           testTimeout: TEST_TIMEOUT_MS,
+          // No test inherits the developer's HOME, provider keys or time zone -
+          // see tools/vitest/hermetic-environment.ts.
+          setupFiles: ["./tools/vitest/hermetic-setup.ts"],
           // The file name routes the file, so the project is never a decision:
           // `*.test.ts` runs here without a DOM, `*.test.tsx` needs JSX and
           // gets jsdom, and `*.dom.test.ts` is the narrow case of needing a DOM
@@ -58,6 +61,7 @@ export default defineConfig({
             "src/preload/**/*.test.ts",
             "src/renderer/**/*.test.ts",
             "scripts/**/*.test.ts",
+            "tools/vitest/**/*.test.ts",
             "packages/brand/**/*.test.ts",
             "packages/contracts/**/*.test.ts",
             "packages/i18n/**/*.test.ts",
@@ -90,7 +94,8 @@ export default defineConfig({
           // pattern, so a DOM test lands here wherever it lives: a page script the main process
           // injects needs a document as much as a renderer module does.
           include: ["src/renderer/**/*.test.tsx", "packages/ui/**/*.test.tsx", "**/*.dom.test.ts"],
-          setupFiles: ["./src/renderer/src/setupTests.ts"],
+          globalSetup: ["./tools/vitest/hermetic-global-setup.ts"],
+          setupFiles: ["./tools/vitest/hermetic-setup.ts", "./src/renderer/src/setupTests.ts"],
         },
       },
     ],

@@ -1,7 +1,15 @@
 // Automation and diagnostic logs must never leak tokens or emails,
 // even when a caller passes them as structured params.
 import { describe, expect, it, vi } from "vitest";
-import { createOpenBotLogger, type LogValue, redactText, redactValue, resolveLogLevel, toLogValue } from "./index";
+import {
+  createOpenBotLogger,
+  type LogValue,
+  redactText,
+  redactValue,
+  registerSecretValue,
+  resolveLogLevel,
+  toLogValue,
+} from "./index";
 
 describe("redactText", () => {
   it("redacts bearer tokens while keeping surrounding text", () => {
@@ -154,6 +162,65 @@ describe("redactText", () => {
 
   it("keeps the text around an embedded payload", () => {
     expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
+  });
+});
+
+describe("registerSecretValue", () => {
+  // A saved key has no prefix or label that a rule can match, so only its exact text can mask it.
+  it("masks a registered value in every form a log line can carry it", () => {
+    const secret = 'x7Kq"9Lm/2Pz';
+    registerSecretValue(secret);
+
+    expect(redactText(`provider said ${secret} was refused`)).toBe("provider said [redacted] was refused");
+    expect(redactText(`body ${JSON.stringify({ note: secret })}`)).toBe('body {"note":"[redacted]"}');
+    expect(redactText(`GET /v1?k=${encodeURIComponent(secret)} failed`)).toBe("GET /v1?k=[redacted] failed");
+    expect(redactValue({ detail: [`retry ${secret}`] })).toEqual({ detail: ["retry [redacted]"] });
+  });
+
+  it("does not register a value too short to be a secret", () => {
+    registerSecretValue("8080");
+
+    expect(redactText("listening on 8080")).toBe("listening on 8080");
+  });
+
+  // A registered value can also be a label or a scheme. Masking it first would erase what the rules need.
+  it("keeps label rules working when a registered value is a label", () => {
+    registerSecretValue("password");
+
+    expect(redactText("password=opaque-value")).not.toContain("opaque-value");
+    expect(redactText('{"password":"opaque-value"}')).not.toContain("opaque-value");
+    registerSecretValue("Authorization");
+    expect(redactText("Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l")).not.toContain("YWxhZGRpbjpvcGVuc2VzYW1l");
+  });
+
+  // A label rule stops a value at the first space, so it must not run before the exact value.
+  it("masks a registered value whole when a label rule would cut it", () => {
+    registerSecretValue("hunter22 suffix99");
+
+    expect(redactText("password=hunter22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
+    registerSecretValue("monkey22 suffix99");
+    expect(redactText("password=monkey22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
+  });
+
+  // The marker hides the scheme a rule would have matched, so the token it sits in goes with it.
+  it("masks a longer credential that starts with a registered value", () => {
+    registerSecretValue("Bearer abc");
+
+    expect(redactText("sent Bearer abcdefghijklmnop to the server")).toBe("sent [redacted] to the server");
+  });
+
+  it("masks a registered value that starts inside the token of another", () => {
+    registerSecretValue("prefix88");
+    registerSecretValue("Basic c2VjcmV0");
+
+    expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
+  });
+
+  it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
+    const secret = "12345678\uD800";
+    registerSecretValue(secret);
+
+    expect(redactText(`key ${secret} rejected`)).toBe("key [redacted] rejected");
   });
 });
 

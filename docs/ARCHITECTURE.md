@@ -495,7 +495,10 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
     exempt: any edit to them, cosmetic or not, forces `remoteDesktop.recipeVersion` up and a full
     native runtime rebuild, so their logging is frozen until the recipe changes for a real reason. Every line is timestamped, prefixed and
     secret-redacted, and redaction covers a serialized payload passed as one string, not only a
-    structured param. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
+    structured param. Patterns cannot find a secret with no label, such as a token in an error
+    text, so a store that loads a secret passes the value to `registerSecretValue`, and every later
+    line masks that exact value. The provider credential store and the MCP store (for header and
+    environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` lowers the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
     `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its

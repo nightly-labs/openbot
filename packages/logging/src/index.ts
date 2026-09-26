@@ -74,10 +74,97 @@ const MAX_PARAM_LENGTH = 2_000;
 // caller-controlled getter and would leak what redaction just refused to read.
 const UNSERIALIZABLE = "[unserializable]";
 
+// A value the owner knows is secret: a saved provider key, an MCP header. No rule above can
+// recognise `x7Kq…` as a credential, so each one is masked by its exact text. Short values are
+// refused because masking `true` or `8080` would erase ordinary diagnostics. Nothing leaves the set:
+// a process started with a replaced key can still print it until it stops. The set grows only by
+// the secrets the user saves while the app runs.
+//
+// Every value is masked before the rules run, in one pass, so no rule can cut one and leave a part
+// of it in the log. A match grows to the whole token around it: a longer credential that starts or
+// ends with a registered value, such as `Bearer abc…` after `Bearer abc` was saved, must not keep
+// its unregistered part once the marker has hidden the part a rule would have matched. The token is
+// replaced by a marker the rules read as one value. A token that holds a word the rules read, such
+// as `password` or `Authorization`, may be the label or header name that hides the next value, so
+// its marker is itself a secret label that ends in `authorization`.
+const MIN_REGISTERED_SECRET_LENGTH = 8;
+const RULE_WORD =
+  /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
+// The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
+// label before a value stays readable.
+const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
+const VALUE_MARKER = "__openbot_registered_value__";
+const LABEL_MARKER = "__openbot_registered_secret_authorization";
+const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
+const registeredSecrets = new Set<string>();
+// One alternation, longest first, so a secret that contains another one is masked whole.
+let registeredSecretPattern: RegExp | null = null;
+
+/**
+ * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
+ * URL-encoded forms.
+ */
+export function registerSecretValue(value: string): void {
+  if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
+  const size = registeredSecrets.size;
+  for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
+    if (form !== null) registeredSecrets.add(form);
+  }
+  if (registeredSecrets.size === size) return;
+  const alternatives = [...registeredSecrets]
+    .sort((left, right) => right.length - left.length)
+    .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
+}
+
+// A lone surrogate cannot be URL-encoded. Such a value cannot appear in a URL either, and a
+// stored configuration that holds one must stay readable.
+function uriEncoded(value: string): string | null {
+  try {
+    return encodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */
+export function isSecretName(name: string): boolean {
+  return SECRET_KEY.test(name);
+}
+
 export function redactText(value: string): string {
-  const reparsed = redactSerializedJson(value);
-  if (reparsed !== null) return reparsed;
-  return applyTextRules(redactEmbeddedJson(value));
+  const marked = markRegisteredSecrets(value);
+  const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
+  return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
+}
+
+// Every exact match is found before any grows, so a match inside the token an earlier one grew to
+// still extends the range past it. Ranges that overlap or touch become one token.
+function markRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  pattern.lastIndex = 0;
+  const ranges: Array<{ start: number; end: number }> = [];
+  for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
+    let start = match.index;
+    let end = start + match[0].length;
+    const previous = ranges.at(-1);
+    const floor = previous?.end ?? 0;
+    while (start > floor && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    if (previous && end <= previous.end) continue;
+    while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    if (previous && start <= previous.end) previous.end = end;
+    else ranges.push({ start, end });
+  }
+  if (ranges.length === 0) return value;
+  let result = "";
+  let copied = 0;
+  for (const { start, end } of ranges) {
+    const token = value.slice(start, end);
+    result += value.slice(copied, start) + (RULE_WORD.test(token) ? LABEL_MARKER : VALUE_MARKER);
+    copied = end;
+  }
+  return result + value.slice(copied);
 }
 
 function applyTextRules(value: string): string {
