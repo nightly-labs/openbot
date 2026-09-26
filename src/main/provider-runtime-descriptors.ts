@@ -410,8 +410,9 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         throw new Error(sourceText("error.provider.antigravityChecksum"));
       }
     },
-    // The server takes no `--version`: it starts and waits for ACP on stdin. The manifest is covered
-    // by the same file hashes as the programs, so it cannot report a version the files are not.
+    // The server takes no `--version`: it starts and waits for ACP on stdin. OpenBot writes the
+    // manifest at install. `verify` hashes only the programs, so the version check compares the
+    // manifest with the version that OpenBot wrote, not with the programs.
     versionFile: ANTIGRAVITY_MANIFEST,
     parseVersion: parseAntigravityVersion,
   },
