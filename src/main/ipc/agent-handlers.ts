@@ -217,6 +217,9 @@ export function agentIpcHandlers({
           if (input.access !== undefined) {
             throw new Error("Agent access can only be changed on the computer that runs the agent.");
           }
+          if (input.computerUse !== undefined) {
+            throw new Error("Computer Use can only be changed on the computer that runs the agent.");
+          }
           return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
             method: "PATCH",
             body: input,

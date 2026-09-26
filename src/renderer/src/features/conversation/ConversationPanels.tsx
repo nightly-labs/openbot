@@ -263,6 +263,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 serverCanAdminister(props.server, "shared-tables-v1")
               }
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
+              computerUseEditable={props.server?.kind === "local"}
               agents={props.agents}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&

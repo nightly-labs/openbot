@@ -21,7 +21,9 @@ import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-t
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
+  agentMcpServers,
   claudeMcpServers,
+  computerUseParam,
   type McpAuthorizationSource,
   type McpDropReporter,
   type McpServerSource,
@@ -65,6 +67,8 @@ interface ThreadConfig {
   additionalDirectories: string[];
   persistSession: boolean;
   profileGeneration: boolean;
+  /** Part of the config so that a change restarts the query with the new servers. */
+  computerUse: boolean;
 }
 
 interface ActiveTurn {
@@ -475,7 +479,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // asks one question and must not act, so it gets neither set.
     const handoff = config.profileGeneration
       ? null
-      : claudeMcpServers(await usableMcpServers(this.#mcpServers(), this.#mcpToolRuntimes?.(), this.#mcpAuthorization));
+      : claudeMcpServers(
+          await usableMcpServers(
+            agentMcpServers(this.#mcpServers(), config.computerUse),
+            this.#mcpToolRuntimes?.(),
+            this.#mcpAuthorization,
+          ),
+        );
     // `stop()` may have run during the await: a query created now would outlive the client.
     if (!this.#running) throw new Error("Claude Agent SDK is not running.");
     if (handoff) this.#reportMcpDrops?.(this.provider, handoff.dropped);
@@ -1189,6 +1199,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     additionalDirectories: [...new Set([cwd, ...roots])],
     persistSession: !isRecord(params) || params.persistSession !== false,
     profileGeneration: isRecord(params) && params.profileGeneration === true,
+    computerUse: computerUseParam(params),
   };
 }
 

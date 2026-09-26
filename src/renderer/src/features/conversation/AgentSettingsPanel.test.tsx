@@ -609,7 +609,7 @@ describe("AgentSettingsPanel", () => {
         onSetAgentAvatar={vi.fn(async () => undefined)}
       />
     ));
-    expect(await screen.findByText(/Not enforced yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/asks you first, also when Auto approve is on/)).toBeInTheDocument();
     const chooseFullAccess = async () => {
       await fireEvent.pointerDown(screen.getByRole("button", { name: /Agent access/ }), {
         pointerType: "mouse",

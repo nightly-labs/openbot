@@ -795,6 +795,17 @@ describe.sequential("AgentService: providers", () => {
       },
     });
 
+    // The user turns Computer Use off for this agent. Codex ignores MCP changes on resume, so the
+    // session must be replaced without the server.
+    await service.updateAgent({ agentId: "chief", computerUse: false });
+    await service.sendMessage({ agentId: "chief", text: "Continue." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const restart = paramsRecord(client.requests.filter((request) => request.method === "thread/start")[1]?.params);
+    expect(restart?.config).toBeUndefined();
+    expect(restart?.developerInstructions).toContain("The user turned Computer Use off for you.");
+
     driverRunning = false;
     expect(service.enabledMcpServers()).toEqual([]);
   });

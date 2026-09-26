@@ -22,8 +22,8 @@ export interface AttachmentGatewayHooks {
  * `allowAnyReadablePath` is the browser-upload policy. `openbot_browser.upload_files` hands a local
  * file to a page, and the file the user names is almost never one the agent already copied into its
  * workspace, so containment would make the tool unusable. It grants no capability an agent does not
- * already have -- agents run with `danger-full-access` and could copy the file into the workspace first
- * and reach the same bytes -- and it drops exactly two checks: the containment guard, and the symlink
+ * already have -- every agent can read any file its user can, and Workspace only limits writes, not
+ * reads -- and it drops exactly two checks: the containment guard, and the symlink
  * pre-check that would refuse a path reached through a link the agent does not own. Everything that
  * makes the open itself safe still runs: the file must be a regular file, it is opened `O_NOFOLLOW` on
  * its fully resolved path, and its dev/ino are re-validated after the open, so a path swapped

@@ -4,6 +4,7 @@ import { Badge, buttonVariants, ContextMenu, Lock } from "@openbot/ui";
 import { Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { agentAccessLockLabel } from "../agents/agent-access";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator } from "./SidebarAgentIndicator";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
@@ -20,7 +21,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
     startChatDragging,
   } = useSidebarScope();
   const title = () => rowProps.agent.title.trim();
-  const accessLabel = () => (rowProps.agent.access === "workspace" ? ". Workspace only (not enforced yet)" : "");
+  const lockLabel = () => agentAccessLockLabel(rowProps.agent);
+  const accessLabel = () => (lockLabel() ? `. ${lockLabel()}` : "");
   const routineLabel = () => {
     const state = props.agentStates[rowProps.agent.id];
     return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
@@ -69,8 +71,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile }) {
               <span class="agent-row-title">
                 <span class="agent-row-name">
                   <strong>{rowProps.agent.name}</strong>
-                  <Show when={rowProps.agent.access === "workspace"}>
-                    <span class="agent-row-access" title="Workspace only (not enforced yet)">
+                  <Show when={lockLabel()}>
+                    <span class="agent-row-access" title={lockLabel()}>
                       <Lock aria-hidden="true" />
                     </span>
                   </Show>

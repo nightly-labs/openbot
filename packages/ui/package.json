@@ -208,6 +208,7 @@
     "./features/browser/BrowserLiveView": "./src/features/browser/BrowserLiveView.tsx",
     "./features/browser/BrowserPanel": "./src/features/browser/BrowserPanel.tsx",
     "./features/sidebar/sidebar-agent-states": "./src/features/sidebar/sidebar-agent-states.ts",
+    "./features/agents/agent-access": "./src/features/agents/agent-access.ts",
     "./features/agents/agent-avatar-mood": "./src/features/agents/agent-avatar-mood.ts",
     "./features/conversation/conversation.css": "./src/features/conversation/conversation.css",
     "./features/files/files.css": "./src/features/files/files.css",
