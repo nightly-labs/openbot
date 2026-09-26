@@ -15,6 +15,7 @@ import { ImageGeneration } from "./ImageGeneration";
 import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
+import { nextStreamingReveal, type StreamingRevealChunk, StreamingRevealContext } from "./streamingReveal";
 
 export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
   if (message.author === "you") return "secondary";
@@ -24,24 +25,23 @@ export function conversationBubbleVariant(message: AgentMessage): BubbleVariant 
   return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
 }
 
-const STREAMING_TEXT_GAP_FALLBACK_MS = 60;
-const STREAMING_WORD_WITH_SEPARATOR = /^(?:\s*(?:(?:#{1,6}|[-+*>]|\d+[.)])\s+)?\S+\s+)/u;
-
-function nextStreamingText(current: string, target: string, streaming: boolean): string {
-  if (!target.startsWith(current)) return target;
-  const remaining = target.slice(current.length);
-  if (!remaining) return current;
-  const nextWord = remaining.match(STREAMING_WORD_WITH_SEPARATOR)?.[0];
-  if (nextWord) return current + nextWord;
-  return streaming ? current : target;
-}
-
-function streamingTextDurationMs(property = "--stream-gap", fallback = STREAMING_TEXT_GAP_FALLBACK_MS): number {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(property).trim();
+function cssDurationMs(style: CSSStyleDeclaration, property: string, fallback: number): number {
+  const value = style.getPropertyValue(property).trim();
   if (!value) return fallback;
   const amount = Number.parseFloat(value);
   if (!Number.isFinite(amount)) return fallback;
   return value.endsWith("s") && !value.endsWith("ms") ? amount * 1000 : amount;
+}
+
+/* Read once per message: the tokens do not change while it streams, and reading computed style
+   on each step forces the browser to recalculate style. */
+function streamingTimings() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    stepMs: Math.max(16, cssDurationMs(style, "--stream-gap", 40)),
+    fadeMs: cssDurationMs(style, "--stream-fade", 300),
+    catchUpMs: cssDurationMs(style, "--stream-catch-up", 400),
+  };
 }
 
 function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
@@ -50,13 +50,27 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
     initialMessage.author === "agent" && (animate ?? initialMessage.animate) === true && !prefersReducedMotion();
   let targetBody = initialMessage.body;
   let targetStreaming = initialMessage.author === "agent" && initialMessage.streaming === true;
-  const [body, setBody] = createSignal(animateInitialText ? "" : initialMessage.body);
+  /* A plain copy of `body`, because the signal can still hold its earlier value until the
+     next flush. */
+  let shownBody = animateInitialText ? "" : initialMessage.body;
+  const [body, setBody] = createSignal(shownBody);
+  const [trail, setTrail] = createSignal<StreamingRevealChunk[]>([]);
   const [animateTail, setAnimateTail] = createSignal(false);
   const [smoothHeight, setSmoothHeight] = createSignal(targetStreaming || animateInitialText);
   let smoothingActive = targetStreaming || animateInitialText;
+  let timings: ReturnType<typeof streamingTimings> | undefined;
+  const timing = () => {
+    timings ??= streamingTimings();
+    return timings;
+  };
+  let revealBudget = 0;
   let revealTimer: number | undefined;
   let smoothHeightTimer: number | undefined;
 
+  const showBody = (next: string) => {
+    shownBody = next;
+    setBody(next);
+  };
   const clearRevealTimer = () => {
     if (revealTimer === undefined) return;
     window.clearTimeout(revealTimer);
@@ -74,26 +88,45 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
         smoothHeightTimer = undefined;
         setSmoothHeight(false);
         setAnimateTail(false);
+        setTrail([]);
       },
-      Math.max(streamingTextDurationMs() * 2, streamingTextDurationMs("--stream-fade", 350)),
+      Math.max(timing().stepMs * 2, timing().fadeMs),
     );
+  };
+  const revealStep = () => {
+    const { stepMs, fadeMs, catchUpMs } = timing();
+    const step = nextStreamingReveal({
+      shownLength: shownBody.length,
+      target: targetBody,
+      streaming: targetStreaming,
+      budget: revealBudget,
+      stepMs,
+      catchUpMs,
+    });
+    revealBudget = step.budget;
+    if (step.length <= shownBody.length) return false;
+    const now = performance.now();
+    setTrail((steps) => [
+      ...steps.filter((chunk) => now - chunk.revealedAt < fadeMs),
+      { length: step.length - shownBody.length, revealedAt: now },
+    ]);
+    setAnimateTail(true);
+    showBody(targetBody.slice(0, step.length));
+    return true;
   };
   const scheduleReveal = () => {
     if (revealTimer !== undefined) return;
     revealTimer = window.setTimeout(() => {
       revealTimer = undefined;
-      const current = untrack(body);
-      const next = nextStreamingText(current, targetBody, targetStreaming);
-      if (next === current) return;
-      setAnimateTail(true);
-      setBody(next);
-      if (next !== targetBody) {
-        scheduleReveal();
+      const advanced = revealStep();
+      if (shownBody !== targetBody) {
+        // With no step and no debt, the last word is still incomplete: the next body restarts this.
+        if (advanced || revealBudget < 0) scheduleReveal();
       } else if (!targetStreaming) {
         smoothingActive = false;
         settleHeightSmoothing();
       }
-    }, streamingTextDurationMs());
+    }, timing().stepMs);
   };
 
   createEffect(
@@ -108,16 +141,17 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
         smoothingActive = true;
         keepHeightSmoothingActive();
       }
-      const current = untrack(body);
-      if (prefersReducedMotion() || !nextBody.startsWith(current) || (!streaming && !smoothingActive)) {
+      if (prefersReducedMotion() || !nextBody.startsWith(shownBody) || (!streaming && !smoothingActive)) {
         clearRevealTimer();
+        revealBudget = 0;
         setAnimateTail(false);
-        setBody(nextBody);
+        setTrail([]);
+        showBody(nextBody);
         smoothingActive = false;
         settleHeightSmoothing();
         return;
       }
-      if (current !== nextBody) {
+      if (shownBody !== nextBody) {
         scheduleReveal();
       } else if (!streaming) {
         smoothingActive = false;
@@ -130,7 +164,7 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
     if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
   });
   const revealing = createMemo(() => message().streaming === true || body() !== message().body);
-  return { animateTail, body, smoothHeight, revealing };
+  return { animateTail, body, smoothHeight, revealing, trail };
 }
 
 const comparisonTableContent = (block: MessageContentBlock) => (block.type === "comparison-table" ? block : undefined);
@@ -264,34 +298,66 @@ export function MessageBody(props: {
       </Show>
       <div class="message-content-resize" ref={(element) => (messageContentResize = element)}>
         <div class="message-content-blocks" ref={(element) => (messageContent = element)}>
-          <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
-            {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
-            <For each={contentBlocks()} keyed={false}>
-              {(block, index) => (
-                <Switch>
-                  <Match when={comparisonTableContent(block())}>
-                    {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
-                  </Match>
-                  <Match when={dataTableContent(block())}>
-                    {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
-                  </Match>
-                  <Match when={codeContent(block())}>
-                    {(code) => (
-                      <CodeBlock
-                        block={code()}
-                        streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                      />
-                    )}
-                  </Match>
-                  <Match when={textContent(block())}>
-                    {(text) => {
-                      if (props.message.author === "agent") {
+          <StreamingRevealContext value={streamingBody.trail}>
+            <Show when={props.message.author === "agent" ? streamedBody() : props.message.body}>
+              {/* Unkeyed, so a growing reply keeps each block mounted and updates only the block that grew. */}
+              <For each={contentBlocks()} keyed={false}>
+                {(block, index) => (
+                  <Switch>
+                    <Match when={comparisonTableContent(block())}>
+                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                    </Match>
+                    <Match when={dataTableContent(block())}>
+                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                    </Match>
+                    <Match when={codeContent(block())}>
+                      {(code) => (
+                        <CodeBlock
+                          block={code()}
+                          streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                        />
+                      )}
+                    </Match>
+                    <Match when={textContent(block())}>
+                      {(text) => {
+                        if (props.message.author === "agent") {
+                          return (
+                            <div
+                              class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                              data-selection-message-id={
+                                props.message.streaming !== true ? props.message.id : undefined
+                              }
+                            >
+                              <MarkdownMessageText
+                                body={text().text}
+                                agents={props.agents}
+                                skills={props.skills}
+                                attachments={props.message.attachments}
+                                citations={props.message.citations}
+                                onSelectAgent={props.onSelectAgent}
+                                onOpenLink={props.onOpenLink}
+                                onOpenAttachment={(attachment) =>
+                                  !canPreviewAttachment(attachment)
+                                    ? props.onAttachmentAction(attachment, "open")
+                                    : props.onPreview(attachment)
+                                }
+                                onOpenSharedFile={props.onOpenSharedFile}
+                                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                                showCitationFooter={index === lastTextBlockIndex()}
+                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                                // Only the last block holds the newest text. While a code block after it
+                                // streams, a tail here would fade words that are already shown.
+                                streamingTail={streamingBody.animateTail() && index === contentBlocks().length - 1}
+                              />
+                            </div>
+                          );
+                        }
                         return (
-                          <div
-                            class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                          <p
+                            class="message-copy"
                             data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
                           >
-                            <MarkdownMessageText
+                            <RichMessageText
                               body={text().text}
                               agents={props.agents}
                               skills={props.skills}
@@ -306,45 +372,19 @@ export function MessageBody(props: {
                               }
                               onOpenSharedFile={props.onOpenSharedFile}
                               onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                              showCitationFooter={index === lastTextBlockIndex()}
-                              streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                              streamingTail={streamingBody.animateTail() && index === lastTextBlockIndex()}
                             />
-                          </div>
+                          </p>
                         );
-                      }
-                      return (
-                        <p
-                          class="message-copy"
-                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                        >
-                          <RichMessageText
-                            body={text().text}
-                            agents={props.agents}
-                            skills={props.skills}
-                            attachments={props.message.attachments}
-                            citations={props.message.citations}
-                            onSelectAgent={props.onSelectAgent}
-                            onOpenLink={props.onOpenLink}
-                            onOpenAttachment={(attachment) =>
-                              !canPreviewAttachment(attachment)
-                                ? props.onAttachmentAction(attachment, "open")
-                                : props.onPreview(attachment)
-                            }
-                            onOpenSharedFile={props.onOpenSharedFile}
-                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                          />
-                        </p>
-                      );
-                    }}
-                  </Match>
-                </Switch>
-              )}
-            </For>
-            <Show when={selectionInstruction()}>
-              {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
+                      }}
+                    </Match>
+                  </Switch>
+                )}
+              </For>
+              <Show when={selectionInstruction()}>
+                {(selection) => <blockquote class="message-selection-quote">{selection().quote}</blockquote>}
+              </Show>
             </Show>
-          </Show>
+          </StreamingRevealContext>
         </div>
       </div>
       <Show when={props.message.imageGeneration}>
