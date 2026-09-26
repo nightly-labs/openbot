@@ -210,3 +210,11 @@ const FREE_TIER_MODEL_IDS = new Set(["opencode/big-pickle"]);
 export function isFreeOpencodeModel(id: string, name: string): boolean {
   return FREE_TIER_MODEL_IDS.has(id.trim().toLowerCase()) || isFreeOpencodeModelName(name);
 }
+
+/**
+ * Whether the provider's account quota limits this model. OpenCode reports only the Go quota, and
+ * OpenCode also runs free, custom and own-sign-in models that the Go quota does not limit.
+ */
+export function accountUsageCoversModel(provider: AgentProviderId, model: string | null | undefined): boolean {
+  return provider !== "opencode" || Boolean(model?.toLowerCase().startsWith("opencode-go/"));
+}

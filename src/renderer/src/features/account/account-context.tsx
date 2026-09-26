@@ -64,6 +64,8 @@ const Auth = createSimpleContext({
       refreshRevision: number;
     }>({ targetKey: null, data: null, refreshRevision: 0 });
     let accountUsageRequestGeneration = 0;
+    /** The providers an event updated while the current refresh runs. Their rows are newer than it. */
+    let accountUsageEventIds = new Set<string>();
     let authSuccessTimer: ReturnType<typeof setTimeout> | undefined;
 
     onCleanup(() => {
@@ -203,12 +205,15 @@ const Auth = createSimpleContext({
     }
 
     function applyAccountUsage(usage: AccountUsage): void {
-      accountUsageRequestGeneration += 1;
-      setAccountUsageState((state) => {
-        if (usage.limits.length === 0) {
+      if (usage.limits.length === 0) {
+        accountUsageRequestGeneration += 1;
+        setAccountUsageState((state) => {
           state.data = usage;
-          return;
-        }
+        });
+        return;
+      }
+      for (const limit of usage.limits) accountUsageEventIds.add(limit.id);
+      setAccountUsageState((state) => {
         const byId = new Map((state.data?.limits ?? []).map((limit) => [limit.id, limit]));
         for (const limit of usage.limits) byId.set(limit.id, limit);
         state.data = { limits: [...byId.values()] };
@@ -218,10 +223,17 @@ const Auth = createSimpleContext({
     async function refreshAccountUsage(targetKey: string): Promise<AccountUsage> {
       selectAccountUsageTarget(targetKey);
       const generation = ++accountUsageRequestGeneration;
+      accountUsageEventIds = new Set();
       const usage = await accountPort().agent.getUsage();
       if (generation === accountUsageRequestGeneration && accountUsageState.targetKey === targetKey) {
+        // The refresh reads every provider, so a row it omits has stopped reporting, such as a revoked
+        // OpenCode Go key. It keeps only the rows an event updated after it started.
         setAccountUsageState((state) => {
-          state.data = usage;
+          const byId = new Map(usage.limits.map((limit) => [limit.id, limit]));
+          for (const limit of state.data?.limits ?? []) {
+            if (accountUsageEventIds.has(limit.id)) byId.set(limit.id, limit);
+          }
+          state.data = { limits: [...byId.values()] };
         });
       }
       return usage;

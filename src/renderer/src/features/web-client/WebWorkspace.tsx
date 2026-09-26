@@ -286,6 +286,7 @@ export function WebWorkspace(props: {
           agentStatus={status()}
           accountUsage={accountUsage()}
           usageProvider={workspace.selected()?.provider ?? null}
+          usageModel={workspace.selected()?.model ?? null}
           usageTargetKey={
             workspace.runtime.accountUsage && workspace.state.status === "online"
               ? (workspace.state.host?.hostId ?? null)

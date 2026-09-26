@@ -11,7 +11,12 @@ import type {
   CustomProviderRestart,
   ProviderCodeLoginStart,
 } from "@openbot/contracts/ipc";
-import { agentProviderDescriptor, isAgentProvider, isReasoningEffort } from "@openbot/contracts/ipc";
+import {
+  accountUsageCoversModel,
+  agentProviderDescriptor,
+  isAgentProvider,
+  isReasoningEffort,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -24,6 +29,7 @@ import {
 } from "./../cli";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { openCodeSignInMessage } from "./../opencode-config";
+import { readOpenCodeGoUsage } from "./../opencode-usage";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
@@ -427,24 +433,35 @@ export class ProviderRuntime implements ProviderPort {
       const collected = new Map<AgentProvider, AccountUsage["limits"][number]>();
       await Promise.all(
         providers.map(async (provider) => {
-          if (provider === "opencode") return;
           try {
-            const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
-            if (kept && !usageWindowHasReset(kept)) {
-              collected.set(provider, kept);
-              this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
-              return;
+            let usage: AccountUsage;
+            if (provider === "opencode") {
+              // The Go quota is one HTTPS request with the saved key, so do not start OpenCode for it.
+              usage = normalizeAccountUsage(
+                await withTimeout(
+                  readOpenCodeGoUsage(this.#credentials.apiKey("opencode")),
+                  ACCOUNT_USAGE_READ_TIMEOUT_MS,
+                  "Usage read timed out.",
+                ),
+              );
+            } else {
+              const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
+              if (kept && !usageWindowHasReset(kept)) {
+                collected.set(provider, kept);
+                this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
+                return;
+              }
+              if (!this.#clients.has(provider)) await this.ensureProvider(provider);
+              const client = this.#clients.get(provider);
+              if (!client) return;
+              const model =
+                provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
+              usage = await withTimeout(
+                this.#refreshUsage(client, model, false),
+                ACCOUNT_USAGE_READ_TIMEOUT_MS,
+                "Usage read timed out.",
+              );
             }
-            if (!this.#clients.has(provider)) await this.ensureProvider(provider);
-            const client = this.#clients.get(provider);
-            if (!client) return;
-            const model =
-              provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
-            const usage = await withTimeout(
-              this.#refreshUsage(client, model, false),
-              ACCOUNT_USAGE_READ_TIMEOUT_MS,
-              "Usage read timed out.",
-            );
             const limit = usage.limits[0];
             if (!limit || (!limit.primary && !limit.secondary)) return;
             collected.set(provider, { ...limit, id: provider });
@@ -464,7 +481,8 @@ export class ProviderRuntime implements ProviderPort {
       return { limits: structuredClone([...collected.values()]) };
     }
     const client = this.#clients.get(scope.provider);
-    return client ? this.#refreshUsage(client, scope.model, false) : { limits: [] };
+    if (!client || !accountUsageCoversModel(scope.provider, scope.model)) return { limits: [] };
+    return this.#refreshUsage(client, scope.model, false);
   }
 
   async start(): Promise<void> {

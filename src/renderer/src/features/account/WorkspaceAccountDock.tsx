@@ -67,6 +67,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         agentStatus={agentStatus()}
         accountUsage={auth.accountUsage()}
         usageProvider={activeAgent()?.provider ?? null}
+        usageModel={activeAgent()?.model ?? null}
         usageTargetKey={usageTargetKey()}
         usageRefreshRevision={auth.accountUsageRefreshRevision()}
         usageReady={usageReady()}

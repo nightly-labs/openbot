@@ -3,6 +3,7 @@ import {
   type AccountUsageLimit,
   type AccountUsageWindow,
   type AgentProviderId,
+  accountUsageCoversModel,
   agentProviderDescriptor,
   agentProviderName,
   isAgentProvider,
@@ -73,8 +74,12 @@ function usageRow(provider: AgentProviderId, limit: AccountUsageLimit | null): A
 export function accountUsageSummary(
   rows: AccountUsageProviderRow[],
   provider?: AgentProviderId | null,
+  model?: string | null,
 ): AccountUsageProviderRow | null {
-  if (provider) return rows.find((row) => row.provider === provider) ?? null;
+  if (provider) {
+    if (!accountUsageCoversModel(provider, model)) return null;
+    return rows.find((row) => row.provider === provider) ?? null;
+  }
   let lowest: AccountUsageProviderRow | null = null;
   for (const row of rows) {
     if (row.remainingPercent === null) continue;

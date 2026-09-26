@@ -1,5 +1,5 @@
 import { IMAGE_ATTACHMENT_ACCEPT, supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
-import { canPreviewAttachment } from "@openbot/contracts/ipc";
+import { accountUsageCoversModel, canPreviewAttachment } from "@openbot/contracts/ipc";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -103,7 +103,7 @@ export function ConversationComposer() {
    */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
-    if (!provider || signInRequired()) return null;
+    if (!provider || signInRequired() || !accountUsageCoversModel(provider, props.agent?.model)) return null;
     for (const limit of props.accountUsage?.limits ?? []) {
       if (limit.id !== provider) continue;
       for (const plan of [limit.primary, limit.secondary]) {
