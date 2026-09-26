@@ -102,17 +102,17 @@ interface SkillsMarketplaceModalProps {
   /** Host server id for plugin app installs. */
   pluginServerId?: string;
   /** The joined server that keeps a plugin's credential. Absent when this computer keeps it. */
-  pluginHostName?: string;
+  pluginHostName?: string | undefined;
   /**
    * The joined server whose agents `agents` lists, when this account is its owner or admin. Skills
    * then install on that host, which downloads them with its own account. Absent: this computer.
    */
-  hostServerId?: string;
+  hostServerId?: string | undefined;
   /**
    * The joined server a marketplace agent is added to, when this account is its owner or admin and
    * the host serves `agent-install-v1`. Absent: this computer.
    */
-  agentServerId?: string;
+  agentServerId?: string | undefined;
   /** Insert a listing's example question into the chosen agent's composer. */
   onRunPluginPrompt?: (agentId: string, prompt: MarketplacePluginPrompt) => void;
   /**

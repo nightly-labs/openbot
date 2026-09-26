@@ -84,7 +84,7 @@ export interface SettingsModalProps {
    */
   providerKeys?: ProviderKeyApi;
   /** The joined server whose host runs the listed providers. Absent when this computer runs them. */
-  providerHostName?: string;
+  providerHostName?: string | undefined;
   /**
    * The code sign-in, for the providers that offer one. Absent for the same reason as
    * `providerKeys`.

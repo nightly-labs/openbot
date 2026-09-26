@@ -14,7 +14,7 @@ export interface McpKeyDialogProps extends McpConnectBaseProps {
   /** Opens the page the key is created on. Without it the dialog shows no link. */
   onOpenUrl?: (url: string) => void;
   /** The joined server whose host keeps the credential. Absent when this computer keeps it. */
-  hostName?: string;
+  hostName?: string | undefined;
 }
 
 export function McpKeyDialog(props: McpKeyDialogProps) {

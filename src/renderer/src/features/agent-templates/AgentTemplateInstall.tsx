@@ -17,7 +17,7 @@ interface InstallState {
  */
 export function AgentTemplateInstall(props: {
   templateId: string | null;
-  server?: ServerSummary;
+  server?: ServerSummary | undefined;
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {

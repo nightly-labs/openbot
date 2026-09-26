@@ -23,7 +23,7 @@ interface GeneralStoreProps {
    */
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
   /** The joined server whose host runs these providers. Absent when this computer runs them. */
-  providerHostName?: string;
+  providerHostName?: string | undefined;
 }
 
 /**
