@@ -17,6 +17,7 @@ export interface AgentDesktopApi
     GroupApi<IpcEndpoints["channelMemories"]>,
     GroupApi<IpcEndpoints["channelRoutines"]>,
     GroupApi<IpcEndpoints["mcpServers"]>,
+    GroupApi<IpcEndpoints["agentAdmin"]>,
     GroupApi<IpcEndpoints["agentAttachments"]> {
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
@@ -89,6 +90,19 @@ export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]>;
 
 /**
+ * The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
+ * endpoints. Every method names its server. A remote host answers only an owner or admin, and only
+ * when it advertises `providers-v1`.
+ */
+export type ProviderAdminDesktopApi = GroupApi<IpcEndpoints["providerAdmin"]>;
+
+/**
+ * The server name and logo of one server's host. A remote host answers only an owner or admin, and
+ * only when it advertises `host-admin-v1`.
+ */
+export type HostAdminDesktopApi = GroupApi<IpcEndpoints["hostAdmin"]>;
+
+/**
  * Storage and files of one host. Every scoped method names its server, because the settings modal can
  * be open for a server the user has not switched to. A remote host without `storage-v1` answers null.
  */
@@ -108,6 +122,8 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
+  providerAdmin: ProviderAdminDesktopApi;
+  hostAdmin: HostAdminDesktopApi;
   storage: StorageDesktopApi;
   agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;

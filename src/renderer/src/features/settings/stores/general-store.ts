@@ -22,6 +22,8 @@ interface GeneralStoreProps {
    * read, so the row shows no key badge rather than a wrong one.
    */
   openCodeKeyStatus?: () => ProviderApiKeyStatus | undefined;
+  /** The joined server whose host runs these providers. Absent when this computer runs them. */
+  providerHostName?: string;
 }
 
 /**
@@ -39,7 +41,9 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
       return {
         id: provider,
         name: agentProviderName(provider),
-        description: i18n.t("provider.availableHere"),
+        description: props.providerHostName
+          ? i18n.t("provider.availableOnHost", { name: props.providerHostName })
+          : i18n.t("provider.availableHere"),
         state: agent?.state ?? "not-installed",
         message: agent?.message,
         email: agent?.email,

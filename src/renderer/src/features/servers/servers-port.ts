@@ -2,7 +2,8 @@ import type { OpenBotDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 
 /**
  * What the servers domain reaches in main: the server list and selection, the local host, the
- * settings dialog of one server, and the remote desktop setup of a server.
+ * settings dialog of one server, the name and logo of a joined server's host, and the remote desktop
+ * setup of a server.
  */
 export interface ServersPort {
   agent: Pick<
@@ -18,6 +19,7 @@ export interface ServersPort {
     | "testMcpServer"
   >;
   browser: Pick<OpenBotDesktopApi["browser"], "setVisible">;
+  hostAdmin: Pick<OpenBotDesktopApi["hostAdmin"], "updateIdentity">;
   host: Pick<
     OpenBotDesktopApi["host"],
     "configure" | "getStatus" | "onEvent" | "recheckScreenRecording" | "start" | "stop" | "updateIdentity"

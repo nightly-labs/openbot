@@ -978,6 +978,27 @@ renderer hides those controls from a member. The wire carries no absolute paths,
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
 
+### Admin capabilities
+
+An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
+Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
+`team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`. The
+host advertises a capability only when its `TeamApiAdmin` member exists.
+
+| Capability | Grants | IPC group |
+| --- | --- | --- |
+| `agent-admin-v1` | Agent access and auto-approve | `agentAdmin` |
+| `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
+| `shared-tables-v1` | List and delete shared tables | `agentAdmin` |
+| `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
+| `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
+| `host-admin-v1` | Server name and logo | `hostAdmin` |
+
+These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
+the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
+status again every second while a host download runs. Publishing, macOS permissions, the browser
+sign-in, folder import and the host app update stay on the host.
+
 ## OpenCode and ACP
 
 `src/backend/acp-client.ts` owns ACP process transport, model discovery, session start/load,

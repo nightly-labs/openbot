@@ -1,13 +1,18 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
-import { createEffect, createSignal, flush, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import type { ProviderCodeLoginApi } from "./components/provider-code-login-api";
 import { useAgents } from "./features/agents/agents-context";
+import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
+import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
 import { createProviderRuntimeStore } from "./features/provider-updates/provider-runtime-store";
+import { remoteProviderRuntimes } from "./features/provider-updates/remote-provider-runtimes";
+import { remoteAdminServer } from "./features/servers/server-capabilities";
 import { useServers } from "./features/servers/servers-context";
+import { hostProviderKeyApi, providerKeyApi } from "./features/settings/provider-key-api";
 import { providersPort } from "./providers-port";
 import { createSimpleContext } from "./simple-context";
 
@@ -32,9 +37,39 @@ const Providers = createSimpleContext({
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
       return row?.cliSource === "system" ? (row.version ?? null) : null;
     }
-    const runtimes = createProviderRuntimeStore(providersPort().providerRuntimes, {
-      systemCliVersion,
-      isLocalServer: () => activeServer()?.kind === "local",
+    /**
+     * The joined server whose host this window manages, when the account administers it and the host
+     * serves `providers-v1`. A memo, not a value: the host's capabilities arrive after this mounts.
+     */
+    const providerAdminServerId = createMemo(() => remoteAdminServer(activeServer(), "providers-v1")?.id);
+    const providerAdmin = () => providersPort().providerAdmin;
+    const runtimes = createProviderRuntimeStore(
+      createMemo(() => {
+        const serverId = providerAdminServerId();
+        return serverId ? remoteProviderRuntimes(providerAdmin, serverId) : providersPort().providerRuntimes;
+      }),
+      {
+        systemCliVersion,
+        isLocalServer: () => activeServer()?.kind === "local",
+        managesRuntimes: () => activeServer()?.kind === "local" || providerAdminServerId() !== undefined,
+      },
+    );
+    /** The provider keys of the computer the providers run on. */
+    const providerKeys = createMemo(() => {
+      const serverId = providerAdminServerId();
+      return serverId ? hostProviderKeyApi(providerAdmin, serverId) : providerKeyApi;
+    });
+    /**
+     * The host's own endpoints, for Settings. The machine-local list in `CustomProvidersProvider`
+     * stays what the model picker reads.
+     */
+    const hostCustomProviders = createCustomProvidersStore(() => {
+      const serverId = providerAdminServerId();
+      return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
+    });
+    createEffect(providerAdminServerId, (serverId) => {
+      // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
+      if (serverId) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
     });
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<AgentProviderId, ReturnType<typeof desktopAnalytics.scope>>();
@@ -46,6 +81,8 @@ const Providers = createSimpleContext({
     let codeLoginStarted = false;
     let codeLoginGeneration = 0;
     let codeLoginCancellation: Promise<void> = Promise.resolve();
+    /** The joined server whose host runs the open code sign-in, or undefined for this computer. */
+    let codeLoginServerId: string | undefined;
 
     /**
      * The status is the completion signal for every connect started here: main
@@ -135,6 +172,10 @@ const Providers = createSimpleContext({
       const generation = ++codeLoginGeneration;
       clearCodeLoginExpiry();
       codeLoginStarted = false;
+      // The code is issued by the computer the providers run on; the admin types it in the browser of
+      // this one.
+      const serverId = providerAdminServerId();
+      codeLoginServerId = serverId;
       setCodeLoginProvider(provider);
       setCodeLoginState({ phase: "starting" });
       const analytics = beginProviderConnection(provider);
@@ -142,7 +183,9 @@ const Providers = createSimpleContext({
         // Cancellation emits a terminal status. Finish it before the next attempt can wait.
         await codeLoginCancellation;
         if (generation !== codeLoginGeneration) return;
-        const started = await providersPort().startProviderCodeLogin(provider);
+        const started = serverId
+          ? await providerAdmin().startCodeLogin(provider, serverId)
+          : await providersPort().startProviderCodeLogin(provider);
         // A dialog the user closed while the provider was answering: the login was cancelled with
         // it, so there is nobody left to show a code to.
         if (generation !== codeLoginGeneration) return;
@@ -191,8 +234,12 @@ const Providers = createSimpleContext({
       setCodeLoginProvider(null);
       if (!provider) return;
       pendingProviderConnections.delete(provider);
-      codeLoginCancellation = providersPort()
-        .cancelProviderCodeLogin(provider)
+      const serverId = codeLoginServerId;
+      codeLoginCancellation = (
+        serverId
+          ? providerAdmin().cancelCodeLogin(provider, serverId)
+          : providersPort().cancelProviderCodeLogin(provider)
+      )
         .then((status) => {
           if (generation === codeLoginGeneration) flush(() => applyAgentStatus(status));
         })
@@ -331,6 +378,9 @@ const Providers = createSimpleContext({
 
     return {
       ...runtimes,
+      providerAdminServerId,
+      providerKeys,
+      hostCustomProviders,
       refreshingProviders,
       applyAgentStatus,
       connectProvider,

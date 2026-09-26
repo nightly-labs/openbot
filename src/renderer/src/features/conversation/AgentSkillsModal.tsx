@@ -21,10 +21,14 @@ import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibr
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { SkillPreview } from "../../components/SkillPreview";
-import { skillsPort } from "../../skills-port";
+import { agentSkillCalls, skillsPort } from "../../skills-port";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
 
-export type AgentSkillsMode = "mutable" | "readonly" | "hidden";
+/**
+ * `mutable`: an agent on this computer. `host`: an agent on a joined server where this account is an
+ * owner or admin; the host installs and removes, and its local skills library stays on the host.
+ */
+export type AgentSkillsMode = "mutable" | "host" | "readonly" | "hidden";
 
 interface AgentSkillsModalProps {
   selectionRequest?: { skillId: string } | null;
@@ -34,6 +38,8 @@ interface AgentSkillsModalProps {
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
   skillsMode?: AgentSkillsMode;
+  /** The joined server that runs the agent. Read in `host` mode only. */
+  serverId?: string;
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
@@ -65,7 +71,10 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   let modalContent: HTMLDivElement | undefined;
   let confirmationTrigger: HTMLButtonElement | undefined;
   const skillsMode = () => props.skillsMode ?? "mutable";
-  const mutable = () => skillsMode() === "mutable";
+  const mutable = () => skillsMode() === "mutable" || skillsMode() === "host";
+  /** The local skills library is on this computer, so only its own agents can use it. */
+  const localLibrary = () => skillsMode() === "mutable";
+  const calls = () => agentSkillCalls(skillsMode() === "host" ? props.serverId : undefined);
   const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
@@ -89,7 +98,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       const next = userAssignedSkills(
         skillsMode() === "readonly"
           ? await skillsPort().agent.listInstalledSkills(agentId)
-          : await skillsPort().skills.listInstalled(agentId),
+          : await calls().listInstalled(agentId),
       );
       if (request !== listRequest || agentId !== props.agentId || !props.open) return;
       setSkills(next);
@@ -98,7 +107,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       if (showLoading && targetId) {
         const target = next.find((skill) => skill.skillId === targetId);
         if (target) await openDetail(target);
-        else if (mutable()) setFilter("local");
+        else if (localLibrary()) setFilter("local");
       }
     } catch (caught) {
       if (request === listRequest) setError(errorMessage(caught, "Could not load skills."));
@@ -127,7 +136,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     try {
       const [marketplace, local] = await Promise.allSettled([
         skillsPort().skills.list({ limit: 50 }),
-        mutable() ? skillsPort().skills.localList() : Promise.resolve([]),
+        localLibrary() ? skillsPort().skills.localList() : Promise.resolve([]),
       ]);
       const page = {
         skills: [
@@ -158,7 +167,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetail(null);
     setDetailLoading(true);
     setError(null);
-    if (isFolderSkill(skill) || (!mutable() && skill.skillId.startsWith("local-skill-"))) {
+    if (isFolderSkill(skill) || (!localLibrary() && skill.skillId.startsWith("local-skill-"))) {
       setDetailLoading(false);
       return;
     }
@@ -194,7 +203,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await skillsPort().skills.setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
+      await calls().setEnabled({ agentId: props.agentId, skillId: skill.skillId, enabled });
       analytics.track("marketplace_action", { entity: "skill", action, result: "succeeded" });
       operationSucceeded = true;
       await loadSkills(false);
@@ -221,7 +230,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await skillsPort().skills.uninstall({
+      await calls().uninstall({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(removeModified ? { removeModified: true } : {}),
@@ -252,7 +261,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setSavingId(skill.skillId);
     setError(null);
     try {
-      await skillsPort().skills.install({
+      await calls().install({
         agentId: props.agentId,
         skillId: skill.skillId,
         ...(replaceModified ? { replaceModified: true } : {}),
@@ -368,6 +377,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
             >
               <Show when={!selectedSkill() && mutable()}>
                 <SkillLibraryToolbar
+                  localTab={localLibrary()}
                   canCreate={Boolean(props.onCreateSkill) && !atCap()}
                   onCreate={() => {
                     props.onCreateSkill?.();
@@ -540,7 +550,7 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                       OpenBot did not install this skill. Edit or remove it in {skill().location}.
                                     </p>
                                   </Show>
-                                  <Show when={!mutable() && skill().skillId.startsWith("local-skill-")}>
+                                  <Show when={!localLibrary() && skill().skillId.startsWith("local-skill-")}>
                                     <p class="agent-memory-state" role="status">
                                       This local skill is stored on the host. Open its details on that computer.
                                     </p>

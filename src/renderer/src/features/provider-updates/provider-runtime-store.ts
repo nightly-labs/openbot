@@ -31,17 +31,30 @@ export interface ProviderCliOwners {
   /**
    * Whether the workspace on screen is this computer. Left out, it is.
    *
-   * Every runtime this store reaches is local - `window.openbot.providerRuntimes` addresses no other
-   * computer - while the agent status beside it describes whichever server is open. A remote
-   * workspace therefore has no offer to make here, and an Update button it raised would change a
-   * runtime the user is not looking at.
+   * Update offers are announced only for this computer: a notification about a joined server's
+   * host would outlive the switch away from it and then name the wrong machine.
    */
   isLocalServer?: () => boolean;
+  /**
+   * Whether the runtimes `api` reaches belong to the workspace on screen. Left out, it is
+   * `isLocalServer`.
+   *
+   * `window.openbot.providerRuntimes` addresses only this computer, while the agent status beside it
+   * describes whichever server is open. An Update button raised for a joined server would then
+   * change a runtime the user is not looking at, unless `api` reaches that server's host.
+   */
+  managesRuntimes?: () => boolean;
 }
 
-/** The real download flow, shared by Settings and the other local provider controls. */
+/**
+ * The real download flow, shared by Settings and the other provider controls.
+ *
+ * `api` is read again when it changes: a joined server's host can be managed only once its
+ * capabilities have arrived, which is after this store is built. A change starts from an empty
+ * snapshot, so nothing from the previous computer is shown for the next one.
+ */
 export function createProviderRuntimeStore(
-  api: ProviderRuntimesDesktopApi | undefined,
+  api: () => ProviderRuntimesDesktopApi | undefined,
   owners: ProviderCliOwners = {},
 ) {
   const [providerRuntimeSnapshot, setProviderRuntimeSnapshot] =
@@ -51,6 +64,7 @@ export function createProviderRuntimeStore(
   let announced: ProviderUpdate[] = [];
   let disposed = false;
   const isLocalServer = owners.isLocalServer ?? (() => true);
+  const managesRuntimes = owners.managesRuntimes ?? isLocalServer;
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
     if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
     const runtime = snapshot.providers[provider];
@@ -82,7 +96,8 @@ export function createProviderRuntimeStore(
   }
 
   function runProviderUpdate(provider: AgentProviderId): Promise<void> {
-    if (!isLocalServer()) return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
+    if (!managesRuntimes())
+      return Promise.reject(new Error("Provider CLI updates run on the computer that hosts them."));
     const update = providerUpdate(provider);
     // A CLI the user installed is not downloaded, but it has a version, and the row offers it the
     // same check as a managed runtime. Only a newer version is a reason to download.
@@ -101,10 +116,11 @@ export function createProviderRuntimeStore(
    * checks again.
    */
   async function checkProviderUpdates(provider: AgentProviderId): Promise<void> {
-    if (!api) throw new Error("Provider updates are unavailable.");
+    const source = api();
+    if (!source) throw new Error("Provider updates are unavailable.");
     showProviderUpdateToast({ ...providerUpdate(provider), checking: true }, () => {});
-    applyProviderRuntimeSnapshot(await api.checkForUpdates());
-    if (disposed) return;
+    applyFrom(source, await source.checkForUpdates());
+    if (disposed || source !== api()) return;
     const update = providerUpdate(provider);
     if (providerUpdateAvailable(update.runtime, update.availableVersion)) {
       showProviderUpdateToast(update, () => void startProviderUpdate(provider));
@@ -164,8 +180,14 @@ export function createProviderRuntimeStore(
     }
   }
 
+  /** Drops an answer that arrives after `api` moved to another computer. */
+  function applyFrom(source: ProviderRuntimesDesktopApi, snapshot: ProviderRuntimeSnapshot): void {
+    if (source === api()) applyProviderRuntimeSnapshot(snapshot);
+  }
+
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
-    if (!api) throw new Error("Provider downloads are unavailable.");
+    const source = api();
+    if (!source) throw new Error("Provider downloads are unavailable.");
     const update = providerUpdate(provider);
     const isUpdate = update.availableVersion !== null;
     if (isUpdate) {
@@ -178,7 +200,7 @@ export function createProviderRuntimeStore(
     const analytics = desktopAnalytics.scope();
     analytics.track("provider_action", { provider, action: "download_started", result: "succeeded" });
     try {
-      applyProviderRuntimeSnapshot(await api.download(provider));
+      applyFrom(source, await source.download(provider));
     } catch (error) {
       analytics.track("provider_action", {
         provider,
@@ -207,11 +229,12 @@ export function createProviderRuntimeStore(
   }
 
   async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
-    if (!api) throw new Error("Provider downloads are unavailable.");
-    const snapshot = await api.cancel(provider);
+    const source = api();
+    if (!source) throw new Error("Provider downloads are unavailable.");
+    const snapshot = await source.cancel(provider);
     updating.delete(provider);
     dismissProviderUpdateToast(provider);
-    applyProviderRuntimeSnapshot(snapshot);
+    applyFrom(source, snapshot);
     desktopAnalytics.scope().track("provider_action", {
       provider,
       action: "download_cancelled",
@@ -246,15 +269,25 @@ export function createProviderRuntimeStore(
     },
   );
 
-  onSettled(() => {
-    const unsubscribe = api?.onEvent((snapshot) => flush(() => applyProviderRuntimeSnapshot(snapshot)));
-    void api
-      ?.getStatus()
-      .then(applyProviderRuntimeSnapshot)
+  createEffect(api, (source, previous) => {
+    if (previous !== undefined) {
+      // Another computer: its revisions count from its own start, and nothing shown so far is its.
+      updating.clear();
+      for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
+      setProviderRuntimeSnapshot(FALLBACK_PROVIDER_RUNTIMES);
+    }
+    if (!source) return;
+    const unsubscribe = source.onEvent((snapshot) => flush(() => applyFrom(source, snapshot)));
+    source
+      .getStatus()
+      .then((snapshot) => applyFrom(source, snapshot))
       .catch(() => undefined);
+    return unsubscribe;
+  });
+
+  onSettled(() => {
     return () => {
       disposed = true;
-      unsubscribe?.();
       updating.clear();
       // Hidden, not dismissed: the offer outlives the workspace this store was built for.
       for (const provider of MANAGED_RUNTIME_PROVIDERS) hideProviderUpdateToast(provider);
@@ -264,8 +297,8 @@ export function createProviderRuntimeStore(
     providerRuntimeStatuses: () => providerRuntimeSnapshot().providers,
     /**
      * The runtimes the MCP servers are started with, which no provider card shows. They belong to
-     * this computer and not to the workspace on screen, so a reader that draws them for a remote
-     * server has to gate on `isLocalServer` itself, as the update offers above do.
+     * the computer `api` reaches, so a reader that draws them for a server checks that it is that
+     * computer.
      */
     toolRuntimeStatuses: () => providerRuntimeSnapshot().toolRuntimes,
     providerAvailableVersions: () => ({
@@ -273,7 +306,7 @@ export function createProviderRuntimeStore(
       claude: providerUpdate("claude").availableVersion,
       grok: providerUpdate("grok").availableVersion,
     }),
-    providerRuntimeDownloadsAvailable: () => Boolean(api),
+    providerRuntimeDownloadsAvailable: () => Boolean(api()),
     applyProviderRuntimeSnapshot,
     startProviderUpdate,
     downloadProviderRuntime,

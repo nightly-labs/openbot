@@ -14,6 +14,7 @@ import {
   type ApprovalAutomationPreference,
   type AppSetupState,
   type AttachmentImportEvent,
+  agentAutoApprovalEnabled,
   type CentralAuthState,
   type ComputerUseState,
   type ConversationMessage,
@@ -21,6 +22,7 @@ import {
   type CustomProviderSummary,
   composedCustomModelId,
   createMcpServerId,
+  DEFAULT_AGENT_ACCESS,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   type DirectConversationSnapshot,
@@ -561,6 +563,21 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return { providers: clone(customProviders), restart: "restarted" };
       },
     },
+    // Preview has one host, so every server answers from the same providers as this computer.
+    providerAdmin: {
+      startCodeLogin: (provider) => api.startProviderCodeLogin(provider),
+      cancelCodeLogin: (provider) => api.cancelProviderCodeLogin(provider),
+      getApiKeyState: (provider) => api.getProviderApiKeyState(provider),
+      setApiKey: (input) => api.setProviderApiKey(input),
+      clearApiKey: (provider) => api.clearProviderApiKey(provider),
+      getRuntimes: () => api.providerRuntimes.getStatus(),
+      downloadRuntime: (provider) => api.providerRuntimes.download(provider),
+      cancelRuntime: (provider) => api.providerRuntimes.cancel(provider),
+      checkRuntimeUpdates: () => api.providerRuntimes.checkForUpdates(),
+      listCustomProviders: () => api.customProviders.list(),
+      saveCustomProvider: (input) => api.customProviders.save(input),
+      deleteCustomProvider: (input) => api.customProviders.delete(input),
+    },
     agentTemplates: {
       // One published template per local agent. The preview shows the agent's own identity with the
       // fixture skills and routines, so every state of the dialog has content.
@@ -772,6 +789,47 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listAgents: async () => clone(agents),
       listInstalledSkills: async (agentId) => clone(readInstalledSkills(agentId)),
       ...mockChannels,
+      getAgentAdminSettings: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return {
+          access: agent.access ?? DEFAULT_AGENT_ACCESS,
+          autoApprove: agentAutoApprovalEnabled(approvalAutomation, agentId),
+          autoApproveLocked: approvalAutomation.turbo,
+        };
+      },
+      updateAgentAdminSettings: async ({ agentId, access, autoApprove }) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        if (access !== undefined) {
+          agents = agents.map((candidate) => (candidate.id === agentId ? { ...candidate, access } : candidate));
+          emitAgentEvent({ type: "agents-changed", agents });
+        }
+        if (autoApprove !== undefined) {
+          approvalAutomation = {
+            ...approvalAutomation,
+            autoApproveOverrides: { ...approvalAutomation.autoApproveOverrides, [agentId]: autoApprove },
+          };
+        }
+        return {
+          access: access ?? agent.access ?? DEFAULT_AGENT_ACCESS,
+          autoApprove: agentAutoApprovalEnabled(approvalAutomation, agentId),
+          autoApproveLocked: approvalAutomation.turbo,
+        };
+      },
+      // The preview is one computer, so the host skills are its own.
+      listAgentSkills: (agentId) => mockSkills.skills.listInstalled(agentId),
+      installAgentSkill: (input) => mockSkills.skills.install(input),
+      uninstallAgentSkill: (input) => mockSkills.skills.uninstall(input),
+      setAgentSkillEnabled: (input) => mockSkills.skills.setEnabled(input),
+      addMarketplaceAgent: async (input) => {
+        const { agent } = await api.marketplaceAgents.install(input);
+        return { id: agent.id, name: agent.name };
+      },
+      addTemplateAgent: async (input) => {
+        const { agent } = await api.agentTemplates.install(input);
+        return { id: agent.id, name: agent.name };
+      },
       listMcpServers: async () => clone(mcpServers),
       saveMcpServer: async ({ config }) => {
         const normalized = normalizeMcpConfig(config);
@@ -1375,6 +1433,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
     },
     host: mockTeam.host,
+    // Preview has one host, so every server's name and logo are this computer's.
+    hostAdmin: {
+      updateIdentity: async (input, serverId) => {
+        await mockTeam.host.updateIdentity(input);
+        const server = (await mockTeam.servers.list()).find((candidate) => candidate.id === serverId);
+        if (!server) throw new Error("Server not found");
+        return server;
+      },
+    },
     storage: createMockStorage(),
     agentImport: {
       choose: async () => clone(AGENT_IMPORT_PREVIEW),

@@ -144,6 +144,7 @@ export const fr = {
   "settings.save.save": "Enregistrer",
   // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Disponible sur cet ordinateur",
+  "provider.availableOnHost": "S’exécute sur {name}",
   "provider.custom.name": "Fournisseur personnalisé",
   "provider.custom.description": "Votre propre point de terminaison de modèle",
   "provider.custom.addLabel": "Ajouter un fournisseur personnalisé",

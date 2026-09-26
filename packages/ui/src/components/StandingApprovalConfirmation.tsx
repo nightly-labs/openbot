@@ -14,7 +14,7 @@ export function StandingApprovalConfirmation(props: {
       tone="default"
       initialFocus="cancel"
       title={`Always allow ${props.agentName ?? "this agent"}?`}
-      description={`${props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and network access on this computer without asking again. Publishing, replacing and deleting public sites still require approval unless Turbo mode is on. You can turn off Auto approve in this agent's model menu.`}
+      description={`${props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and network access on the computer that runs it without asking again. Publishing, replacing and deleting public sites still require approval unless Turbo mode is on. You can turn off Auto approve in this agent's model menu.`}
       confirmLabel="Always allow"
       restoreFocusTarget={props.restoreFocusTarget}
       onCancel={props.onCancel}

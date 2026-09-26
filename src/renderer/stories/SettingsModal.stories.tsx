@@ -127,7 +127,7 @@ function SettingsModalStory(props: {
       : undefined,
     providerRuntimeFailure: props.providerUpdateFailure,
   });
-  const runtimes = createProviderRuntimeStore(props.providerUpdate ? mock.api.providerRuntimes : undefined);
+  const runtimes = createProviderRuntimeStore(() => (props.providerUpdate ? mock.api.providerRuntimes : undefined));
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();

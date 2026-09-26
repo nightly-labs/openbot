@@ -16,6 +16,7 @@
 
 import type { ManagedProviderId } from "./agent-providers";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
+import type { AddedAgent, AgentAdminSettings, UpdateAgentAdminSettingsInput } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type { AgentIpcRequest, ScopedAgentEvent } from "./ipc-agent-events";
 import type { AgentModelOption } from "./ipc-agent-identity";
@@ -462,6 +463,41 @@ export const IPC_ENDPOINTS = {
     save: request<SaveCustomProviderInput, CustomProviderResult>()("custom-providers:save"),
     delete: request<DeleteCustomProviderInput, CustomProviderResult>()("custom-providers:delete"),
   },
+  // The providers of the computer that runs the agents. `providers`, `providerRuntimes` and
+  // `customProviders` reach this computer only; these take the server, so a remote admin reaches the
+  // host. As there, a key only travels towards the host, and no result carries one.
+  providerAdmin: {
+    startCodeLogin: scopedRequest<AgentProviderId, ProviderCodeLoginStart, "required">()(
+      "provider-admin:start-code-login",
+    ),
+    cancelCodeLogin: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:cancel-code-login"),
+    getApiKeyState: scopedRequest<AgentProviderId, ProviderApiKeyState, "required">()(
+      "provider-admin:get-api-key-state",
+    ),
+    setApiKey: scopedRequest<SetProviderApiKeyInput, AgentStatus, "required">()("provider-admin:set-api-key"),
+    clearApiKey: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:clear-api-key"),
+    getRuntimes: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:get-runtimes"),
+    downloadRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+      "provider-admin:download-runtime",
+    ),
+    cancelRuntime: scopedRequest<ManagedProviderId, ProviderRuntimeSnapshot, "required">()(
+      "provider-admin:cancel-runtime",
+    ),
+    checkRuntimeUpdates: scopedQuery<ProviderRuntimeSnapshot, "required">()("provider-admin:check-runtime-updates"),
+    listCustomProviders: scopedQuery<CustomProviderSummary[], "required">()("provider-admin:list-custom-providers"),
+    saveCustomProvider: scopedRequest<SaveCustomProviderInput, CustomProviderResult, "required">()(
+      "provider-admin:save-custom-provider",
+    ),
+    deleteCustomProvider: scopedRequest<DeleteCustomProviderInput, CustomProviderResult, "required">()(
+      "provider-admin:delete-custom-provider",
+    ),
+  },
+  // The server name and logo of one server's host. `host.updateIdentity` changes this computer's
+  // only; this takes the server, so a remote admin changes the host's. The result is the server as
+  // the list shows it after the change.
+  hostAdmin: {
+    updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
+  },
   hostedSites: {
     list: request<undefined, HostedSiteSummary[]>()("hosted-sites:list"),
     chooseDirectory: request<undefined, string | null>()("hosted-sites:choose-directory"),
@@ -684,6 +720,30 @@ export const IPC_ENDPOINTS = {
     scopedDirectTyping: event<ScopedDirectTypingEvent>()("servers:direct-typing"),
     event: event<ServerSummary[]>()("servers:event"),
     invite: event<string>()("servers:invite"),
+  },
+  // Access and auto-approve of one agent, read and written on the computer that runs it. A joined
+  // server answers only an owner or admin, and only when it advertises `agent-admin-v1`.
+  agentAdmin: {
+    getAgentAdminSettings: scopedRequest<string, AgentAdminSettings>()("agent:admin:get-settings"),
+    updateAgentAdminSettings: scopedRequest<UpdateAgentAdminSettingsInput, AgentAdminSettings>()(
+      "agent:admin:update-settings",
+    ),
+    // The skills of one agent, on the computer that runs it. The `skills` group reads and writes
+    // this computer only; these take the server, so a remote admin reaches the host.
+    listAgentSkills: scopedRequest<string, InstalledSkill[], "required">()("agent:admin:list-skills"),
+    installAgentSkill: scopedRequest<InstallSkillInput, InstalledSkill, "required">()("agent:admin:install-skill"),
+    uninstallAgentSkill: scopedRequest<UninstallSkillInput, void, "required">()("agent:admin:uninstall-skill"),
+    setAgentSkillEnabled: scopedRequest<SetEnabledSkillInput, InstalledSkill, "required">()(
+      "agent:admin:set-skill-enabled",
+    ),
+    // A new agent from a marketplace listing or a shared template, added on the computer that runs
+    // it. The `marketplaceAgents` and `agentTemplates` installs stay for this computer.
+    addMarketplaceAgent: scopedRequest<InstallMarketplaceAgentInput, AddedAgent, "required">()(
+      "agent:admin:add-marketplace-agent",
+    ),
+    addTemplateAgent: scopedRequest<InstallAgentTemplateInput, AddedAgent, "required">()(
+      "agent:admin:add-template-agent",
+    ),
   },
   // A separate group, not part of `servers`: a group is what one registrar covers in full, and
   // `servers` is bound against `RemoteServerManager` while these are bound against `AgentService`.
