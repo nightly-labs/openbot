@@ -1,11 +1,40 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AttachmentImportEvent, type AttachmentSummary, filePreviewKindForFile } from "@openbot/contracts/ipc";
+import {
+  deleteSharedTable,
+  installAgentSkill,
+  listAgentSkills,
+  listSharedTables,
+  setAgentSkillEnabled,
+  uninstallAgentSkill,
+} from "@openbot/team-client/team-admin-requests";
+import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
-export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId: () => string): ConversationRuntime {
+/** Skills and shared tables on the connected host. The host answers only an owner or admin. */
+function webHostAdmin(request: () => TeamApiRequest): NonNullable<ConversationRuntime["admin"]> {
+  return {
+    skills: {
+      listInstalled: (agentId) => listAgentSkills(request(), agentId),
+      install: (input) => installAgentSkill(request(), input),
+      uninstall: (input) => uninstallAgentSkill(request(), input),
+      setEnabled: (input) => setAgentSkillEnabled(request(), input),
+    },
+    sharedTables: {
+      listTables: () => listSharedTables(request()),
+      deleteTable: ({ name }) => deleteSharedTable(request(), name),
+    },
+  };
+}
+
+export function createWebConversationRuntime(
+  remote: WebWorkspaceRuntime,
+  hostId: () => string,
+  adminRequest?: () => TeamApiRequest,
+): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
@@ -119,5 +148,6 @@ export function createWebConversationRuntime(remote: WebWorkspaceRuntime, hostId
       }
     },
     cancelImportFiles,
+    admin: adminRequest ? webHostAdmin(adminRequest) : undefined,
   };
 }

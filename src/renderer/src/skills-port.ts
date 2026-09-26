@@ -51,6 +51,9 @@ export function skillsPort(): SkillsPort {
   return window.openbot;
 }
 
+/** The marketplace reads the agent skills dialog uses for descriptions and details. */
+export type SkillCatalogCalls = Pick<SkillsPort["skills"], "get" | "list">;
+
 /** The skills of one agent: read, install, remove and turn on or off. */
 export interface AgentSkillCalls {
   listInstalled(agentId: string): Promise<InstalledSkill[]>;
