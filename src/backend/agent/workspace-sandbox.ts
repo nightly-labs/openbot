@@ -3,8 +3,8 @@ import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/i
 type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
 
 /**
- * The Codex sandbox for one agent. A `workspace` agent can write only in its workspace and the
- * shared folder. Reads and the network stay open, as the Access setting says. A command that must
+ * The Codex sandbox for one agent. A `workspace` agent can write only in its workspace, the shared
+ * folder and the temporary folders. Reads and the network stay open, as the Access setting says. A command that must
  * write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
  * The other providers ignore these fields, so their agents keep full access.
@@ -30,6 +30,8 @@ export function codexSandboxPolicy(agent: SandboxedAgent, sharedRoot: string): C
     type: "workspaceWrite",
     writableRoots: [agent.workspacePath, sharedRoot],
     networkAccess: true,
+    // Compilers, package managers and test runners write temporary files, so the temporary folders stay
+    // writable. The settings note and the agent instructions name them. The `config.toml` defaults agree.
     excludeTmpdirEnvVar: false,
     excludeSlashTmp: false,
   };

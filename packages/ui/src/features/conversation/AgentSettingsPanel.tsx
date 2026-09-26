@@ -848,8 +848,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </>
                 }
               >
-                Workspace only limits writes to this agent's workspace and the shared folder. Reads and network stay
-                available.{" "}
+                Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders.
+                Reads and network stay available.{" "}
                 <Show
                   when={enforcesWorkspaceAccess(draft.runtime.provider)}
                   fallback={

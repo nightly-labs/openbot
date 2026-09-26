@@ -14,8 +14,8 @@ import type { SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 /**
- * How far an agent may reach on this computer. `workspace` limits writes to the agent's workspace and
- * the shared folder; `full` is the unrestricted access every agent had before the setting existed.
+ * How far an agent may reach on this computer. `workspace` limits writes to the agent's workspace, the
+ * shared folder and the temporary folders; `full` is the unrestricted access every agent had before the setting existed.
  */
 export const AGENT_ACCESS_MODES = ["full", "workspace"] as const;
 export type AgentAccess = (typeof AGENT_ACCESS_MODES)[number];
