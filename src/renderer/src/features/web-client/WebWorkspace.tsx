@@ -32,7 +32,7 @@ import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show, untrack } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
 import { AgentTemplateInstall, ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
@@ -144,7 +144,7 @@ export function WebWorkspace(props: {
   /** The admin requests of the connected host. A call for another server is refused, not redirected. */
   function hostRequest(serverId?: string): TeamApiRequest {
     const admin = workspace.runtime.admin;
-    const current = server();
+    const current = untrack(server);
     if (!admin || !current || (serverId !== undefined && serverId !== current.id))
       throw new Error(t("webClient.error.connectServerFirst"));
     return admin.request;

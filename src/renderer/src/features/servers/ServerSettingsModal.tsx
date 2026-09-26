@@ -416,11 +416,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   createEffect(
     () => ({ invites: props.invites, currentTime: now() }),
     ({ invites, currentTime }) => {
-      const nextExpiry = invites
-        .filter((item) => !item.permanent && item.usedAt === null)
-        .map((item) => Date.parse(item.expiresAt))
-        .filter((value) => value > currentTime)
-        .sort((left, right) => left - right)[0];
+      const nextExpiry = untrack(
+        () =>
+          invites
+            .filter((item) => !item.permanent && item.usedAt === null)
+            .map((item) => Date.parse(item.expiresAt))
+            .filter((value) => value > currentTime)
+            .sort((left, right) => left - right)[0],
+      );
       if (expiryTimer) clearTimeout(expiryTimer);
       expiryTimer = nextExpiry
         ? setTimeout(() => setNow(Date.now()), Math.min(nextExpiry - currentTime + 1, 2_147_483_647))
