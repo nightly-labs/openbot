@@ -1,7 +1,3 @@
-import { channelRequest, isChannelRoute } from "@openbot/contracts/team-protocol/channels-v1";
-import { isMcpRoute, mcpRequest } from "@openbot/contracts/team-protocol/mcp-v1";
-import { isStorageRoute, storageRequest } from "@openbot/contracts/team-protocol/storage-v1";
-import { decodeTeamProtocolV4CurrentHttpRequest } from "@openbot/contracts/team-protocol/v4-adapter";
 // Reading a Team API request: the parsers, the validators and the capability filters that every
 // route module needs and none of them owns.
 //
@@ -37,14 +33,13 @@ import {
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_V1,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
-import { decodeTeamProtocolV1CurrentHttpRequest } from "@openbot/contracts/team-protocol/v1-adapter";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
-import { decodeTeamProtocolV3CurrentHttpRequest } from "@openbot/contracts/team-protocol/v3-adapter";
 import { HttpError } from "./http-error";
 
 export const JSON_LIMIT = 1024 * 1024;
@@ -184,31 +179,18 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
   }
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    if (isMcpRoute(request.url ?? "/")) {
-      const input = mcpRequest(request.url ?? "/", value);
-      if (!isDynamicRecord(input)) throw new Error("Invalid MCP request.");
+    const path = request.url ?? "/";
+    const sideRoute = teamSideRouteCodec(path);
+    if (sideRoute) {
+      const input = sideRoute.request(path, value);
+      if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;
     }
-    if (isStorageRoute(request.url ?? "/")) {
-      const input = storageRequest(request.url ?? "/", value);
-      if (!isDynamicRecord(input)) throw new Error("Invalid storage request.");
-      return input;
-    }
-    if (isChannelRoute(request.url ?? "/")) {
-      const input = channelRequest(request.url ?? "/", value);
-      if (!isDynamicRecord(input)) throw new Error("Invalid channel request.");
-      return input;
-    }
-    if (requestProtocol(request) === 4)
-      return decodeTeamProtocolV4CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
-        preserveSemanticTags: supportsTeamSemanticTags(requestCapabilities(request)),
-        agentCreateModel: requestCapabilities(request).has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-      });
-    return requestProtocol(request) === TEAM_PROTOCOL_V3
-      ? decodeTeamProtocolV3CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value, {
-          preserveSemanticTags: supportsTeamSemanticTags(requestCapabilities(request)),
-        })
-      : decodeTeamProtocolV1CurrentHttpRequest(request.method ?? "GET", request.url ?? "/", value);
+    const capabilities = requestCapabilities(request);
+    return teamHttpCodec(requestProtocol(request)).decodeRequest(request.method ?? "GET", path, value, {
+      preserveSemanticTags: supportsTeamSemanticTags(capabilities),
+      agentCreateModel: capabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+    });
   } catch {
     throw new HttpError(400, "A valid JSON object is required.");
   }

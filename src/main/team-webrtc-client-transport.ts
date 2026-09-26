@@ -2,15 +2,9 @@ import { generateKeyPairSync, randomBytes, sign, verify } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import {
-  channelEvent,
-  channelRequest,
-  channelResponse,
-  isChannelRoute,
-} from "@openbot/contracts/team-protocol/channels-v1";
+import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
-import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   type TeamProtocolV1CurrentEventControl,
   toWireTeamProtocolV1ClientEvent,
@@ -257,6 +251,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     await this.#ensureConnected(hostId);
     const method = (init.method ?? "GET").toUpperCase();
     const binary = binaryBody(init.body);
+    const sideRoute = teamSideRouteCodec(path);
     const bodyTransferId = binary
       ? await this.#files.send(hostId, {
           name: "upload",
@@ -275,16 +270,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         path,
         body: binary
           ? null
-          : isChannelRoute(path)
-            ? channelRequest(path, init.body)
-            : isMcpRoute(path)
-              ? mcpRequest(path, init.body)
-              : isStorageRoute(path)
-                ? storageRequest(path, init.body)
-                : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
-                    preserveSemanticTags: init.preserveSemanticTags,
-                    agentCreateModel: init.agentCreateModel,
-                  }),
+          : sideRoute
+            ? sideRoute.request(path, init.body)
+            : encodeTeamProtocolV4WebRtcHttpRequest(method, path, init.body, {
+                preserveSemanticTags: init.preserveSemanticTags,
+                agentCreateModel: init.agentCreateModel,
+              }),
         capabilities: [...TEAM_CURRENT_CAPABILITIES],
         ...(bodyTransferId ? { bodyTransferId } : {}),
         ...(init.contentType ? { contentType: init.contentType } : {}),
@@ -323,13 +314,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     let body: ReturnType<typeof decodeTeamProtocolV4WebRtcHttpResponse> = null;
     if (!file) {
       try {
-        body = isChannelRoute(path)
-          ? channelResponse(path, envelope.status, envelope.body)
-          : isMcpRoute(path)
-            ? mcpResponse(path, envelope.status, envelope.body)
-            : isStorageRoute(path)
-              ? storageResponse(path, envelope.status, envelope.body)
-              : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
+        body = sideRoute
+          ? sideRoute.response(path, envelope.status, envelope.body)
+          : decodeTeamProtocolV4WebRtcHttpResponse(method, path, envelope.status, envelope.body);
       } catch {
         throw new TeamWebRtcRequestError(502, "protocol_error", "The host returned an invalid response body.");
       }

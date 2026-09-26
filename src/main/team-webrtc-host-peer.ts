@@ -4,19 +4,13 @@ import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
-import {
-  channelEvent,
-  channelRequest,
-  channelResponse,
-  isChannelRoute,
-} from "@openbot/contracts/team-protocol/channels-v1";
+import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
 } from "@openbot/contracts/team-protocol/current";
-import { isMcpRoute, mcpRequest, mcpResponse } from "@openbot/contracts/team-protocol/mcp-v1";
-import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
   decodeTeamProtocolV2AuthFrame,
@@ -435,6 +429,7 @@ export class TeamWebRtcHostPeer {
     this.#peerCapabilities = peerCapabilities;
     if (capabilitiesChanged) this.#sendAgentEventScope();
     const preserveSemanticTags = supportsTeamSemanticTags(this.#peerCapabilities);
+    const sideRoute = teamSideRouteCodec(input.path);
     const uploaded = input.bodyTransferId ? await this.#files.consume(peerId, input.bodyTransferId) : null;
     const response = await fetch(url, {
       method: input.method,
@@ -458,18 +453,14 @@ export class TeamWebRtcHostPeer {
             : input.body === null
               ? undefined
               : JSON.stringify(
-                  (isChannelRoute(input.path)
-                    ? channelRequestForMethod
-                    : isMcpRoute(input.path)
-                      ? mcpRequestForMethod
-                      : isStorageRoute(input.path)
-                        ? storageRequestForMethod
-                        : peerCapabilities.has("opencode")
-                          ? decodeTeamProtocolV4WebRtcHttpRequest
-                          : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
-                    preserveSemanticTags,
-                    agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-                  }),
+                  sideRoute
+                    ? sideRoute.request(input.path, input.body)
+                    : (peerCapabilities.has("opencode")
+                        ? decodeTeamProtocolV4WebRtcHttpRequest
+                        : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                        preserveSemanticTags,
+                        agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
+                      }),
                 ),
     });
     const contentType = response.headers.get("content-type") ?? "";
@@ -499,17 +490,13 @@ export class TeamWebRtcHostPeer {
     }
     return {
       status: response.status,
-      body: (isChannelRoute(input.path)
-        ? channelResponseForMethod
-        : isMcpRoute(input.path)
-          ? mcpResponseForMethod
-          : isStorageRoute(input.path)
-            ? storageResponseForMethod
-            : peerCapabilities.has("opencode")
-              ? encodeTeamProtocolV4WebRtcHttpResponse
-              : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
-        preserveSemanticTags,
-      }),
+      body: sideRoute
+        ? sideRoute.response(input.path, response.status, body)
+        : (peerCapabilities.has("opencode")
+            ? encodeTeamProtocolV4WebRtcHttpResponse
+            : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+            preserveSemanticTags,
+          }),
     };
   }
 
@@ -796,23 +783,4 @@ class GatewayError extends Error {
   ) {
     super(message);
   }
-}
-
-function channelRequestForMethod(_method: string, path: string, value: unknown) {
-  return channelRequest(path, value);
-}
-function channelResponseForMethod(_method: string, path: string, status: number, value: unknown) {
-  return channelResponse(path, status, value);
-}
-function mcpRequestForMethod(_method: string, path: string, value: unknown) {
-  return mcpRequest(path, value);
-}
-function mcpResponseForMethod(_method: string, path: string, status: number, value: unknown) {
-  return mcpResponse(path, status, value);
-}
-function storageRequestForMethod(_method: string, path: string, value: unknown) {
-  return storageRequest(path, value);
-}
-function storageResponseForMethod(_method: string, path: string, status: number, value: unknown) {
-  return storageResponse(path, status, value);
 }

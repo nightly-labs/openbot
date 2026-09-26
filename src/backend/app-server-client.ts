@@ -1,7 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { JsonLineDecoder } from "./jsonl";
 import {
   type AppServerNotification,
@@ -153,7 +153,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.#pending.delete(id);
-        reject(new Error(`Codex request timed out: ${method}`));
+        reject(new RequestTimeoutError("Codex", method));
       }, timeoutMs);
 
       this.#pending.set(id, {

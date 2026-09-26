@@ -22,13 +22,8 @@ import {
   type TeamProtocolV2Json,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
-import {
-  channelEvent,
-  channelRequest,
-  channelResponse,
-  isChannelRoute,
-} from "@openbot/contracts/team-protocol/channels-v1";
-import { isStorageRoute, storageRequest, storageResponse } from "@openbot/contracts/team-protocol/storage-v1";
+import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
+import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 import { createRemoteFileReceiver } from "./file-download";
 import { createRemoteFileSender, type RemoteFileUpload } from "./file-upload";
@@ -682,18 +677,17 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           pending.reject(error instanceof Error ? error : new Error("The attachment download failed."));
         }
       } else {
+        const sideRoute = teamSideRouteCodec(pending.path);
         pending.resolve({
           status: frame.result.status,
-          body: isChannelRoute(pending.path)
-            ? channelResponse(pending.path, frame.result.status, frame.result.body)
-            : isStorageRoute(pending.path)
-              ? storageResponse(pending.path, frame.result.status, frame.result.body)
-              : decodeTeamProtocolV4WebRtcHttpResponse(
-                  pending.method,
-                  pending.path,
-                  frame.result.status,
-                  frame.result.body,
-                ),
+          body: sideRoute
+            ? sideRoute.response(pending.path, frame.result.status, frame.result.body)
+            : decodeTeamProtocolV4WebRtcHttpResponse(
+                pending.method,
+                pending.path,
+                frame.result.status,
+                frame.result.body,
+              ),
         });
       }
       // Keep the request registered until decoding succeeds, so failPeer can
@@ -803,13 +797,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }
     // Validate before registering a pending promise. A rejected local payload must not leave
     // an unobserved promise to reject again on timeout or disconnection.
+    const sideRoute = teamSideRouteCodec(path);
     const payloadBody = upload
       ? null
-      : isChannelRoute(path)
-        ? channelRequest(path, body)
-        : isStorageRoute(path)
-          ? storageRequest(path, body)
-          : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
+      : sideRoute
+        ? sideRoute.request(path, body)
+        : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
