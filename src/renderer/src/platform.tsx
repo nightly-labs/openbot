@@ -60,13 +60,10 @@ const Platform = createSimpleContext({
       appInfo,
       appFocused,
       /**
-       * Whether the window draws the vertical server rail. Every desktop
-       * platform does; the memo exists because three components need the answer
-       * once the view is split along context boundaries - the frame class, the
-       * rail itself and the account dock - and because `appInfo` is null until
-       * main answers, which is the state that actually has to be handled.
+       * Whether the window draws the vertical server rail. Hidden in favor of the
+       * topbar server dropdown to maximize sidebar and workspace horizontal room.
        */
-      serverRailVisible: createMemo(() => appInfo() !== null),
+      serverRailVisible: createMemo(() => false),
       appInfoLoadedFromHost: () => infoFromHost,
       landingPreview: props.landingPreview === true,
       peopleEnabled: props.peopleEnabled === true,

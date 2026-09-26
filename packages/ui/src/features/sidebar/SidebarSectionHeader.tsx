@@ -34,26 +34,29 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
   const position = () => sectionPosition(headerProps.sectionId);
   return (
     <Show when={!editing()} fallback={<SidebarSectionEditor />}>
-      <header>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */}
+      <header
+        class="sidebar-section-header sidebar-section-drag-handle"
+        draggable={!layoutMutable() || props.compact ? "false" : "true"}
+        title={!layoutMutable() ? "This host does not support sidebar layout changes." : undefined}
+        onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) =>
+          startSectionDragging(event, headerProps.sectionId)
+        }
+        onDragEnd={stopSidebarDragging}
+      >
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger
             as="button"
             type="button"
             class={buttonVariants({
               variant: "ghost",
-              class: "sidebar-section-toggle sidebar-section-drag-handle",
+              class: "sidebar-section-toggle",
             })}
-            draggable={!layoutMutable() || props.compact ? "false" : "true"}
-            title={!layoutMutable() ? "This host does not support sidebar layout changes." : undefined}
             aria-expanded={collapsed() ? "false" : "true"}
             aria-controls={`sidebar-section-body-${headerProps.sectionId}`}
             onClick={(event: MouseEvent) => {
               if (!sidebarClickIsSuppressed(event)) props.onToggleSection(headerProps.sectionId);
             }}
-            onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) =>
-              startSectionDragging(event, headerProps.sectionId)
-            }
-            onDragEnd={stopSidebarDragging}
           >
             <span class="sidebar-section-name" title={headerProps.name}>
               {headerProps.name}

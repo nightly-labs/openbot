@@ -2,6 +2,7 @@ import type {
   AvatarHue,
   ChannelSummary,
   DirectThreadSummary,
+  ServerSummary,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   TeamPresenceMember,
@@ -30,7 +31,10 @@ export interface SidebarProps {
   onEditChannel?: (channelId: string) => void;
   onDeleteChannel?: (channelId: string) => Promise<void>;
   serverName: string;
-  onOpenServerSettings?: (trigger: HTMLElement) => void;
+  servers?: ServerSummary[];
+  onSelectServer?: (serverId: string) => void;
+  onJoinServer?: () => void;
+  onOpenServerSettings?: (trigger: HTMLElement | null) => void;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean;

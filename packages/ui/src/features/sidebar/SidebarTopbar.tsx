@@ -1,7 +1,18 @@
-/** The server name, the marketplace or expand toggle, and new agent - plus the window drag region. */
-
-import { Bot, Button, DropdownMenu, FolderPlus, Hash, Puzzle } from "@openbot/ui";
-import { Show } from "solid-js";
+import {
+  Bot,
+  Button,
+  buttonVariants,
+  Check,
+  ChevronDown,
+  DropdownMenu,
+  FolderPlus,
+  Hash,
+  Plus,
+  Puzzle,
+  ServerGradientLogo,
+  Settings,
+} from "@openbot/ui";
+import { For, Show } from "solid-js";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -9,20 +20,61 @@ export function SidebarTopbar() {
   const { layoutMutable, props, startCreateSection } = useSidebarScope();
   return (
     <div class="window-drag sidebar-topbar">
-      <Button
-        variant="ghost"
-        size="sm"
-        type="button"
-        class="sidebar-server-name no-drag"
-        aria-label={`Open settings for ${props.serverName}`}
-        aria-hidden={props.compact ? "true" : undefined}
-        tabindex={props.compact ? -1 : 0}
-        disabled={!props.onOpenServerSettings}
-        title={props.serverName}
-        onClick={(event) => props.onOpenServerSettings?.(event.currentTarget)}
-      >
-        <span class="sidebar-server-name-label">{props.serverName}</span>
-      </Button>
+      <DropdownMenu.Root placement="bottom-start" gutter={4}>
+        <DropdownMenu.Trigger
+          class={buttonVariants({
+            variant: "ghost",
+            size: "sm",
+            class: "sidebar-server-name no-drag",
+          })}
+          aria-label={`Server menu for ${props.serverName}`}
+          aria-hidden={props.compact ? "true" : undefined}
+          tabindex={props.compact ? -1 : 0}
+          title={props.serverName}
+        >
+          <span class="sidebar-server-name-label">{props.serverName}</span>
+          <ChevronDown class="sidebar-server-chevron size-4" aria-hidden="true" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class="ui-action-menu sidebar-server-menu">
+            <For each={props.servers ?? []}>
+              {(server) => (
+                <DropdownMenu.Item
+                  class="sidebar-server-menu-item"
+                  onSelect={() => {
+                    if (!server.active) {
+                      props.onSelectServer?.(server.id);
+                    }
+                  }}
+                >
+                  <span class="sidebar-server-menu-logo">
+                    <ServerGradientLogo seed={server.id} />
+                  </span>
+                  <span class="sidebar-server-menu-name">{server.name}</span>
+                  <Show when={server.active}>
+                    <Check class="sidebar-server-menu-check size-4" aria-hidden="true" />
+                  </Show>
+                </DropdownMenu.Item>
+              )}
+            </For>
+            <Show when={(props.servers?.length ?? 0) > 0 && Boolean(props.onOpenServerSettings || props.onJoinServer)}>
+              <DropdownMenu.Separator />
+            </Show>
+            <Show when={props.onOpenServerSettings}>
+              <DropdownMenu.Item onSelect={() => props.onOpenServerSettings?.(null)}>
+                <Settings class="size-4" aria-hidden="true" />
+                <span>Server settings</span>
+              </DropdownMenu.Item>
+            </Show>
+            <Show when={props.onJoinServer}>
+              <DropdownMenu.Item onSelect={() => props.onJoinServer?.()}>
+                <Plus class="size-4" aria-hidden="true" />
+                <span>Join or create server</span>
+              </DropdownMenu.Item>
+            </Show>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
       <div class="sidebar-topbar-actions">
         <Show when={props.compact || props.marketplaceSupported !== false}>
           <Button

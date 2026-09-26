@@ -333,8 +333,8 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   // The Linux package carries no whisper binary, so the composer must not offer a control that
-  // always fails. Everything else about the window, the server rail included, stays the same.
-  it("offers no microphone on Linux and still draws the server rail", async () => {
+  // always fails. Everything else about the window stays the same.
+  it("offers no microphone on Linux", async () => {
     vi.mocked(window.openbot.getAppInfo).mockResolvedValue({
       name: "OpenBot",
       version: "0.1.0",
@@ -345,7 +345,7 @@ describe("OpenBot connected desktop shell", () => {
 
     await screen.findByRole("heading", { name: "Chief" });
 
-    expect(await screen.findByRole("complementary", { name: "Servers" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Server menu for Local" })).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "Message Chief" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create prompt with voice" })).not.toBeInTheDocument();
   });

@@ -804,6 +804,57 @@ textarea {
   white-space: nowrap;
 }
 
+.sidebar-server-chevron {
+  flex-shrink: 0;
+  margin-left: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.sidebar-server-name[aria-expanded="true"] .sidebar-server-chevron {
+  transform: rotate(180deg);
+}
+
+.sidebar-server-menu {
+  min-width: 220px;
+}
+
+.sidebar-server-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.sidebar-server-menu-logo {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-xs);
+  overflow: hidden;
+}
+
+.sidebar-server-menu-logo > * {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-server-menu-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-server-menu-check {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--openbot-accent-text);
+}
+
 .sidebar-topbar-actions {
   display: flex;
   flex: 0 0 auto;
@@ -1076,7 +1127,6 @@ textarea {
 
 .sidebar-section-dragging {
   opacity: 0;
-  pointer-events: none;
   transition: none;
 }
 
@@ -1103,6 +1153,7 @@ textarea {
     transform var(--openbot-duration-slow) cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+.sidebar-section-header,
 .sidebar-section-drag-handle,
 .sidebar-agent-item .agent-row,
 .sidebar-person-item .person-row {
@@ -1111,6 +1162,7 @@ textarea {
 }
 
 .agent-list[data-sidebar-dragging],
+.agent-list[data-sidebar-dragging] .sidebar-section-header,
 .agent-list[data-sidebar-dragging] .sidebar-section-drag-handle,
 .agent-list[data-sidebar-dragging] .sidebar-section-toggle,
 .agent-list[data-sidebar-dragging] .agent-row,
@@ -1118,7 +1170,8 @@ textarea {
   cursor: grabbing;
 }
 
-.agent-list[data-sidebar-dragging] .sidebar-section-toggle {
+.agent-list[data-sidebar-dragging="chat"] .sidebar-section-toggle,
+.agent-list[data-sidebar-dragging="person"] .sidebar-section-toggle {
   pointer-events: none;
 }
 
@@ -1271,6 +1324,7 @@ textarea {
   transition: none;
 }
 
+.sidebar-section-drag-preview.sidebar-section-header,
 .sidebar-section-drag-preview.sidebar-section-toggle {
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);

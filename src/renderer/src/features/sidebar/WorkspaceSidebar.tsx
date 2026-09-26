@@ -1,3 +1,5 @@
+import { toast } from "@openbot/ui";
+import { errorMessage } from "@openbot/ui/error-message";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
@@ -11,6 +13,7 @@ import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { useServerSelection } from "../servers/server-selection";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -30,7 +33,8 @@ import { useSidebar } from "./sidebar-context";
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const layout = useLayout();
   const channels = useChannels();
-  const { activeServer, activeServerSupportsCapability } = useServers();
+  const { activeServer, activeServerSupportsCapability, servers, setJoinServerOpen } = useServers();
+  const { selectServer } = useServerSelection();
   const { openServerSettings } = useServerSettings();
   const { setSkillsMarketplaceOpen } = useSettings();
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
@@ -40,6 +44,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember } = useNavigation();
+
+  function handleSelectServer(serverId: string): void {
+    void selectServer(serverId).catch((error) => {
+      toast.error("Could not select the server", {
+        description: errorMessage(error, "Could not switch servers. Try again."),
+      });
+    });
+  }
   const {
     sidebarLayout,
     collapsedSidebarSectionIds,
@@ -98,6 +110,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}
       serverName={activeServer()?.name ?? "Local"}
+      servers={servers()}
+      onSelectServer={handleSelectServer}
+      onJoinServer={() => setJoinServerOpen(true)}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();
         if (server) openServerSettings(server.id, trigger);
