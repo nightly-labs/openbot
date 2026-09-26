@@ -1,4 +1,5 @@
 export { default as AlarmClock } from "lucide-solid/icons/alarm-clock";
+export { default as AppWindow } from "lucide-solid/icons/app-window";
 export { default as ArrowDown } from "lucide-solid/icons/arrow-down";
 export { default as ArrowLeft } from "lucide-solid/icons/arrow-left";
 export { default as ArrowRight } from "lucide-solid/icons/arrow-right";
@@ -16,6 +17,7 @@ export { default as ChevronDown } from "lucide-solid/icons/chevron-down";
 export { default as ChevronLeft } from "lucide-solid/icons/chevron-left";
 export { default as ChevronRight } from "lucide-solid/icons/chevron-right";
 export { default as ChevronUp } from "lucide-solid/icons/chevron-up";
+export { default as ChevronsUpDown } from "lucide-solid/icons/chevrons-up-down";
 export { default as CircleArrowDown } from "lucide-solid/icons/circle-arrow-down";
 export { default as CircleCheck } from "lucide-solid/icons/circle-check";
 export { default as CircleDot } from "lucide-solid/icons/circle-dot";
@@ -59,6 +61,7 @@ export { default as MonitorSmartphone } from "lucide-solid/icons/monitor-smartph
 export { default as MousePointer2 } from "lucide-solid/icons/mouse-pointer-2";
 export { default as OctagonX } from "lucide-solid/icons/octagon-x";
 export { default as Palette } from "lucide-solid/icons/palette";
+export { default as PanelLeft } from "lucide-solid/icons/panel-left";
 export { default as PanelRight } from "lucide-solid/icons/panel-right";
 export { default as PanelTop } from "lucide-solid/icons/panel-top";
 export { default as Pause } from "lucide-solid/icons/pause";

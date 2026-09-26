@@ -73,7 +73,7 @@ const meta = {
   component: ServerRail,
   render: (storyArgs) => <InteractiveServerRail {...storyArgs} />,
   args,
-  decorators: [(Story) => <div class="app-frame app-frame-with-server-rail">{Story()}</div>],
+  decorators: [(Story) => <div class="app-frame app-frame-edge app-frame-with-server-rail">{Story()}</div>],
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof ServerRail>;
 

@@ -127,7 +127,7 @@ export function AccountDock(props: AccountDockProps) {
   let usageTrigger: HTMLButtonElement | undefined;
   let settingsTrigger: HTMLButtonElement | undefined;
 
-  const hybridLayout = createMemo(() => props.appInfo?.platform === "darwin" && props.withServerRail && !props.compact);
+  const hybridLayout = createMemo(() => props.appInfo?.platform === "darwin" && !props.compact);
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );

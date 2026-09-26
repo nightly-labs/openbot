@@ -66,7 +66,8 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
         "app-frame",
         {
           "app-frame-sidebar-compact": layout.leftPanelCompact(),
-          "app-frame-with-server-rail": platform.serverRailVisible(),
+          "app-frame-edge": platform.appInfo() !== null,
+          "app-frame-with-server-rail": layout.serverRailVisible(),
           "app-frame-usage-open": !!usage.state.serverId,
           "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
         },
