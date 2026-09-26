@@ -49,13 +49,13 @@ export const list =
     return value.map(decode);
   };
 
-export function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Json> {
+function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Json> {
   if (!isDynamicRecord(value)) throw new Error("Invalid admin record.");
   return Object.fromEntries(Object.entries(fields).map(([key, decode]) => [key, decode(value[key])]));
 }
 
 /** An absent optional field stays absent, so the IPC parser on the far side sees the shape the client built. */
-export function sparseRecord(value: unknown, required: Fields, optional: Fields): Record<string, TeamProtocolV2Json> {
+function sparseRecord(value: unknown, required: Fields, optional: Fields): Record<string, TeamProtocolV2Json> {
   if (!isDynamicRecord(value)) throw new Error("Invalid admin record.");
   const decoded = record(value, required);
   for (const [key, decode] of Object.entries(optional)) if (value[key] !== undefined) decoded[key] = decode(value[key]);

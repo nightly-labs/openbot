@@ -144,11 +144,11 @@ export interface TeamApiAdmin {
   identity?: TeamApiHostIdentity;
 }
 
-export interface TeamApiHostIdentity {
+interface TeamApiHostIdentity {
   updateIdentity(input: UpdateHostIdentityInput): Promise<unknown>;
 }
 
-export interface TeamApiProviders {
+interface TeamApiProviders {
   service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;

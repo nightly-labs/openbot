@@ -123,7 +123,7 @@ const GITHUB: MarketplacePluginDetail = {
   name: "GitHub",
   tagline: "Issues, pull requests and code",
   description:
-    "GitHub lets agents review pull requests, open and triage issues, search code, and manage releases in the repositories a personal access token can reach. The token stays on the computer that runs the agents and travels as one Authorization header.",
+    "GitHub lets agents review pull requests, open and triage issues, search code, and manage releases in the repositories a personal access token can reach. The token stays on this computer and travels as one Authorization header.",
   category: "coding",
   creatorName: "github.com",
   iconUrl: "https://github.com/fluidicon.png",
