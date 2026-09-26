@@ -1,5 +1,5 @@
 import type { MobileConnectedDevice, MobileConnectTicket } from "@openbot/contracts/ipc";
-import { createEffect, createMemo, createSignal, createStore, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, onCleanup, untrack } from "solid-js";
 import { currentText } from "../../../text";
 
 const MOBILE_CONNECT_SUCCESS_FEEDBACK_MS = 900;
@@ -92,8 +92,8 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
         }, MOBILE_CONNECT_PENDING_REFRESH_INTERVAL_MS);
       };
 
-      void refreshDevices(true);
-      scheduleRefresh();
+      void untrack(() => refreshDevices(true));
+      untrack(scheduleRefresh);
       return () => {
         running = false;
         devicesRequestRevision += 1;

@@ -14,7 +14,7 @@ import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -154,7 +154,7 @@ export function createProviderKeyState(props: {
     () => (props.open ? props.providerKeys : undefined),
     (keys) => {
       setOpenCodeKeyStatus(undefined);
-      if (keys) void refreshOpenCodeKeyStatus();
+      if (keys) void untrack(refreshOpenCodeKeyStatus);
     },
   );
   return {
