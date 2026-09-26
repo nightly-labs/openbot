@@ -1244,7 +1244,7 @@ describe("OpenBot connected desktop shell", () => {
   it("shows the server rail and opens the join flow", async () => {
     render(() => <App />);
     expect(await screen.findByRole("complementary", { name: "Servers" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open settings for Local" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open server menu for Local" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Add remote server" }));
     expect(await screen.findByRole("dialog", { name: "Join a server" })).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "Invite link" })).toBeInTheDocument();

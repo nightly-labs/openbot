@@ -1053,8 +1053,10 @@ textarea:focus-visible {
   background: var(--openbot-accent-strong);
 }
 
+/* No vertical scroll bar: the wheel, the trackpad and the keyboard still scroll. Horizontal bars
+ * stay, because a mouse wheel cannot scroll a code block or a table sideways. */
 ::-webkit-scrollbar {
-  width: var(--openbot-scrollbar-size);
+  width: 0;
 }
 
 ::-webkit-scrollbar-track {

@@ -7,7 +7,7 @@ import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
-import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE } from "./fixtures";
+import { requireFixture, STORY_AGENTS, STORY_DIRECT_THREADS, STORY_PRESENCE, STORY_SERVERS } from "./fixtures";
 
 const agentStates: Record<string, SidebarAgentState> = {
   chief: { kind: "working" },
@@ -415,6 +415,25 @@ export const Compact: Story = {
 export const LongServerName: Story = {
   args: { serverName: "Synthetify production workspace with a long name" },
   decorators: [(Story) => <div style={{ width: "240px", height: "100vh" }}>{Story()}</div>],
+};
+
+const serverMenu = {
+  servers: STORY_SERVERS,
+  onViewChange: fn(),
+  onSelect: fn(),
+  onAdd: fn(),
+  onSetMuted: fn(),
+  onSetNotificationLevel: fn(),
+  onOpenUsage: fn(),
+  onOpenSettings: fn(),
+};
+
+export const ServerMenuRailView: Story = {
+  args: { serverMenu: { ...serverMenu, view: "rail" } },
+};
+
+export const ServerMenuMenuView: Story = {
+  args: { serverMenu: { ...serverMenu, view: "menu" } },
 };
 
 export const EmptyPinDropTarget: Story = {

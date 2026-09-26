@@ -115,6 +115,8 @@
     "./features/dynamic-island/openbot-dynamic-island-motion": "./src/features/dynamic-island/openbot-dynamic-island-motion.ts",
     "./features/remote-desktop/RemoteCompatibilityScreen": "./src/features/remote-desktop/RemoteCompatibilityScreen.tsx",
     "./features/servers/JoinServerDialog": "./src/features/servers/JoinServerDialog.tsx",
+    "./features/servers/ServerActionItems": "./src/features/servers/ServerActionItems.tsx",
+    "./features/servers/ServerMenu": "./src/features/servers/ServerMenu.tsx",
     "./features/servers/ServerRail": "./src/features/servers/ServerRail.tsx",
     "./features/settings/AgentSelect": "./src/features/settings/AgentSelect.tsx",
     "./features/settings/MarketplaceCatalog": "./src/features/settings/MarketplaceCatalog.tsx",

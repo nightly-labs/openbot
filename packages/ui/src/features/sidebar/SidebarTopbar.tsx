@@ -3,6 +3,7 @@
 import { Bot, Button, DropdownMenu, FolderPlus, Hash, Puzzle } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
+import { ServerMenu } from "../servers/ServerMenu";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -11,22 +12,37 @@ export function SidebarTopbar() {
   const { t } = useText();
   return (
     <div class="window-drag sidebar-topbar">
-      <Button
-        variant="ghost"
-        size="sm"
-        type="button"
-        class="sidebar-server-name no-drag"
-        aria-label={t("sidebar.topbar.openSettings", { name: props.serverName })}
-        aria-hidden={props.compact ? "true" : undefined}
-        tabindex={props.compact ? -1 : 0}
-        disabled={!props.onOpenServerSettings}
-        title={props.serverName}
-        onClick={(event) => props.onOpenServerSettings?.(event.currentTarget)}
+      <Show
+        when={props.serverMenu}
+        fallback={
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            class="sidebar-server-name no-drag"
+            aria-label={t("sidebar.topbar.openSettings", { name: props.serverName })}
+            aria-hidden={props.compact ? "true" : undefined}
+            tabindex={props.compact ? -1 : 0}
+            disabled={!props.onOpenServerSettings}
+            title={props.serverName}
+            onClick={(event) => props.onOpenServerSettings?.(event.currentTarget)}
+          >
+            <span class="sidebar-server-name-label">{props.serverName}</span>
+          </Button>
+        }
       >
-        <span class="sidebar-server-name-label">{props.serverName}</span>
-      </Button>
+        {(serverMenu) => (
+          <ServerMenu
+            {...serverMenu()}
+            serverName={props.serverName}
+            compact={props.compact}
+            onOpenMarketplace={props.marketplaceSupported !== false ? props.onOpenMarketplace : undefined}
+          />
+        )}
+      </Show>
       <div class="sidebar-topbar-actions">
-        <Show when={props.compact || props.marketplaceSupported !== false}>
+        {/* The menu view needs the room for the server name, so its menu holds the marketplace. */}
+        <Show when={props.compact || (props.marketplaceSupported !== false && props.serverMenu?.view !== "menu")}>
           <Button
             variant="ghost"
             type="button"

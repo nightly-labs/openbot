@@ -69,7 +69,10 @@ import {
   UsersRound,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
-import { SERVER_NOTIFICATION_LEVEL_LABELS, serverMuteDescription } from "@openbot/ui/features/servers/ServerRail";
+import {
+  SERVER_NOTIFICATION_LEVEL_LABELS,
+  serverMuteDescription,
+} from "@openbot/ui/features/servers/ServerActionItems";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";

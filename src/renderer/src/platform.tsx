@@ -1,5 +1,5 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
-import { createMemo, createSignal, flush, onSettled } from "solid-js";
+import { createSignal, flush, onSettled } from "solid-js";
 import { appPort } from "./app-port";
 import type { AppProps } from "./app-providers";
 import { createSimpleContext } from "./simple-context";
@@ -59,14 +59,6 @@ const Platform = createSimpleContext({
     return {
       appInfo,
       appFocused,
-      /**
-       * Whether the window draws the vertical server rail. Every desktop
-       * platform does; the memo exists because three components need the answer
-       * once the view is split along context boundaries - the frame class, the
-       * rail itself and the account dock - and because `appInfo` is null until
-       * main answers, which is the state that actually has to be handled.
-       */
-      serverRailVisible: createMemo(() => appInfo() !== null),
       appInfoLoadedFromHost: () => infoFromHost,
       landingPreview: props.landingPreview === true,
       peopleEnabled: props.peopleEnabled === true,

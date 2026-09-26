@@ -1,4 +1,5 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
+import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { readPanelWidth } from "./components/panel-width-storage";
 import {
@@ -11,6 +12,7 @@ import {
   MAC_SERVER_RAIL_WIDTH,
   NARROW_SERVER_RAIL_WIDTH,
   SERVER_RAIL_WIDTH,
+  SERVER_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
 import { createSimpleContext } from "./simple-context";
@@ -20,12 +22,16 @@ import { createSimpleContext } from "./simple-context";
  * server rail is part of the arithmetic rather than a style detail, and its
  * width depends on the platform: macOS reserves space for the traffic lights,
  * while the two platforms that draw a standard OS frame narrow the rail on a
- * small window. A width of `0` means the rail is not drawn yet, which is only
- * true before main reports the platform.
+ * small window. A width of `0` means the rail is not drawn: main has not reported
+ * the platform yet, or the user chose the server menu.
  */
-function shouldAutoCompactSidebar(platform: AppInfo["platform"] | undefined, panelWidth: number): boolean {
+function shouldAutoCompactSidebar(
+  platform: AppInfo["platform"] | undefined,
+  panelWidth: number,
+  serverView: ServerView,
+): boolean {
   const serverRailWidth =
-    platform === undefined
+    platform === undefined || serverView === "menu"
       ? 0
       : platform === "darwin"
         ? MAC_SERVER_RAIL_WIDTH
@@ -45,6 +51,11 @@ function shouldAutoCompactSidebar(platform: AppInfo["platform"] | undefined, pan
  * `expandSidebar` clears both, because a user asking for the sidebar back means
  * both reasons at once.
  *
+ * The user also chooses how servers are switched: the rail down the left edge,
+ * which is the default, or a menu on the server name. That choice is persisted
+ * on this computer. A compact sidebar hides the server name, so in the menu view
+ * the user expands the sidebar to switch servers; the rail does not come back.
+ *
  * The geometry itself is in `layout-constants.ts`; the view imports it directly
  * rather than reading constants through a context.
  */
@@ -58,17 +69,26 @@ const Layout = createSimpleContext({
     const [leftPanelCollapsed, setLeftPanelCollapsed] = createSignal(
       window.localStorage.getItem(LEFT_PANEL_COLLAPSED_STORAGE_KEY) === "true",
     );
+    const [serverView, setServerViewSignal] = createSignal<ServerView>(
+      window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "menu" ? "menu" : "rail",
+    );
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
     const leftPanelCompact = createMemo(() => leftPanelCollapsed() || leftPanelAutoCompact());
+    /**
+     * Whether the window draws the vertical server rail. The frame class, the
+     * rail itself and the account dock all need the answer. `appInfo` is null
+     * until main answers, and no rail is drawn before then.
+     */
+    const serverRailVisible = createMemo(() => platform.appInfo() !== null && serverView() === "rail");
 
     function updateResponsiveSidebar(): void {
-      setLeftPanelAutoCompact(shouldAutoCompactSidebar(platform.appInfo()?.platform, leftPanelWidth()));
+      setLeftPanelAutoCompact(shouldAutoCompactSidebar(platform.appInfo()?.platform, leftPanelWidth(), serverView()));
     }
 
     createEffect(
-      () => ({ osPlatform: platform.appInfo()?.platform, panelWidth: leftPanelWidth() }),
-      ({ osPlatform, panelWidth }) => {
-        setLeftPanelAutoCompact(shouldAutoCompactSidebar(osPlatform, panelWidth));
+      () => ({ osPlatform: platform.appInfo()?.platform, panelWidth: leftPanelWidth(), view: serverView() }),
+      ({ osPlatform, panelWidth, view }) => {
+        setLeftPanelAutoCompact(shouldAutoCompactSidebar(osPlatform, panelWidth, view));
       },
     );
 
@@ -82,6 +102,11 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(LEFT_PANEL_COLLAPSED_STORAGE_KEY, String(collapsed));
     }
 
+    function setServerView(view: ServerView): void {
+      setServerViewSignal(view);
+      window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
+    }
+
     function expandSidebar(): void {
       setSidebarCollapsed(false);
       setLeftPanelAutoCompact(false);
@@ -93,6 +118,9 @@ const Layout = createSimpleContext({
       leftPanelCompact,
       setSidebarCollapsed,
       expandSidebar,
+      serverView,
+      setServerView,
+      serverRailVisible,
     };
   },
 });

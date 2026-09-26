@@ -57,7 +57,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
           account={props.account()}
           compact={layout.leftPanelCompact()}
           hybrid={platform.appInfo()?.platform === "darwin" && !layout.leftPanelCompact()}
-          withServerRail={platform.serverRailVisible()}
+          withServerRail={layout.serverRailVisible()}
         />
       }
     >
@@ -73,7 +73,7 @@ export function WorkspaceAccountDock(props: { account: () => CentralAuthUser }) 
         usageReady={usageReady()}
         updateStatus={updates.status()}
         compact={layout.leftPanelCompact()}
-        withServerRail={platform.serverRailVisible()}
+        withServerRail={layout.serverRailVisible()}
         onRefreshUsage={() => {
           const targetKey = usageTargetKey();
           return targetKey ? auth.refreshAccountUsage(targetKey) : Promise.resolve({ limits: [] });
