@@ -19,6 +19,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
+import { LifecycleGate } from "./lifecycle-gate";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
@@ -276,8 +277,7 @@ export class CuaDriverRuntime {
   /** What the proxies are told to run: the alias once it is linked, the executable otherwise. */
   #command: string | null = null;
   #child: ChildProcess | null = null;
-  #starting: Promise<void> | null = null;
-  #stopping: Promise<void> | null = null;
+  readonly #lifecycle = new LifecycleGate<void>();
   #state: ComputerUseState;
   /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
@@ -410,31 +410,19 @@ export class CuaDriverRuntime {
    * agent that reaches for the tools, and `warmUp`, which keeps it only for a user who granted
    * them already.
    */
-  async start(): Promise<void> {
-    // After a stop that is still running. Both own the socket path: a start that overtook a stop
-    // would have its own socket removed by it, and the daemon would then serve an address no client
-    // can reach, with nothing to say it had happened.
-    if (this.#stopping) await this.#stopping.catch(() => undefined);
-    if (this.#starting) return this.#starting;
-    if (this.running()) return;
-    this.#starting = this.#start();
-    try {
-      await this.#starting;
+  start(): Promise<void> {
+    // The gate starts only after a stop that is still running. Both own the socket path: a start
+    // that overtook a stop would have its own socket removed by it, and the daemon would then serve
+    // an address no client can reach, with nothing to say it had happened.
+    return this.#lifecycle.start(async () => {
+      if (this.running()) return;
+      await this.#start();
       this.#announceMcpServer();
-    } finally {
-      this.#starting = null;
-    }
+    });
   }
 
-  async stop(): Promise<void> {
-    if (this.#starting) await this.#starting.catch(() => undefined);
-    if (this.#stopping) return this.#stopping;
-    this.#stopping = this.#stop();
-    try {
-      await this.#stopping;
-    } finally {
-      this.#stopping = null;
-    }
+  stop(): Promise<void> {
+    return this.#lifecycle.stop(() => this.#stop());
   }
 
   /** The panel's answer: starts the daemon if it is not running, then asks it what it may do. */

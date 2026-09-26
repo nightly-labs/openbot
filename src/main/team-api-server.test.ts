@@ -17,8 +17,11 @@ import {
 import { createOpenBotLogger } from "@openbot/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
+import { TeamApiServer } from "./team-api-server";
 import {
   createAgents,
+  createBrowser,
+  createMailbox,
   createTeamApiFixture,
   rawRequest,
   stopTeamApiFixtures,
@@ -57,6 +60,24 @@ describe("TeamApiServer teardown", () => {
     // Its heartbeat and event listeners are already gone, so a listener still answering here
     // is one that no longer notices a revoked session - and the next start would hand it back.
     await expect(fetch(`http://127.0.0.1:${port}/v1/compatibility`)).rejects.toThrow();
+  });
+
+  it("opens one listener for two starts, and closes it for a stop that arrives during them", async () => {
+    const { store } = await createTeamApiFixture("start-race");
+    const api = new TeamApiServer({
+      store,
+      agents: createAgents(),
+      mailbox: createMailbox(),
+      browser: createBrowser(),
+    });
+
+    const starts = Promise.all([api.start(), api.start()]);
+    await api.stop();
+    const [first, second] = await starts;
+
+    expect(second).toBe(first);
+    expect(api.port).toBeNull();
+    await expect(fetch(`http://127.0.0.1:${first}/v1/compatibility`)).rejects.toThrow();
   });
 });
 

@@ -55,6 +55,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
 import { McpServerError } from "../backend/mcp-server-store";
 import type { TeamChatStore } from "../backend/team-chat-store";
+import { LifecycleGate } from "./lifecycle-gate";
 import { RemoteScreenError } from "./remote-screen-gateway";
 import type { TeamApiOptions, TeamApiSidebarLayout } from "./team-api/dependencies";
 import { HttpError } from "./team-api/http-error";
@@ -149,6 +150,7 @@ export class TeamApiServer {
   readonly #rateLimitCapacity: number;
   readonly #now: () => number;
   #server: Server | null = null;
+  readonly #lifecycle = new LifecycleGate<number>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
   #agentListener: ((event: AgentEvent) => void) | null = null;
@@ -167,7 +169,17 @@ export class TeamApiServer {
     return this.#port;
   }
 
-  async start(): Promise<number> {
+  // Without the gate, two starts at once open two listeners and lose one, and a stop during a start
+  // runs before the listener exists. A listener lost that way stays open for the previous account.
+  start(): Promise<number> {
+    return this.#lifecycle.start(() => this.#start());
+  }
+
+  stop(): Promise<void> {
+    return this.#lifecycle.stop(() => this.#stop());
+  }
+
+  async #start(): Promise<number> {
     if (this.#server && this.#port) return this.#port;
     this.#server = createServer((request, response) => void this.#handle(request, response));
     this.#server.on("upgrade", (request, socket, head) => {
@@ -248,7 +260,7 @@ export class TeamApiServer {
     return this.#port;
   }
 
-  async stop(): Promise<void> {
+  async #stop(): Promise<void> {
     if (this.#heartbeat) clearInterval(this.#heartbeat);
     this.#heartbeat = null;
     if (this.#agentListener) this.#options.agents.off("event", this.#agentListener);

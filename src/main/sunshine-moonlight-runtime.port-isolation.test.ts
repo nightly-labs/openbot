@@ -716,3 +716,39 @@ describe("Sunshine port isolation", () => {
     }
   });
 });
+
+describe("Sunshine runtime lifecycle", () => {
+  it("leaves no process and no port claim after a stop that arrives during a start", async () => {
+    const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-sunshine-stop-test-"));
+    const harness = createHarness(stateDirectory);
+    const children: ChildProcess[] = [];
+    const stops: Promise<void>[] = [];
+    const runtime = new SunshineMoonlightRuntime({
+      paths: TEST_PATHS,
+      stateDirectory,
+      platform: "darwin",
+      credentials: { username: "openbot-test", password: "test-password" },
+      getDisplays: () => structuredClone(TEST_DISPLAYS),
+      getIceServers: async () => [],
+      // The stop arrives while the start spawns Moonlight, after Sunshine already runs.
+      spawnProcess: (executable, args, options) => {
+        const child = harness.spawn(executable, args, options);
+        children.push(child);
+        if (executable === TEST_PATHS.moonlightWebServer) stops.push(runtime.stop());
+        return child;
+      },
+    });
+    try {
+      await expect(runtime.start()).rejects.toThrow();
+      await Promise.all(stops);
+
+      expect(stops).toHaveLength(1);
+      expect(children.map((child) => child.exitCode !== null)).toEqual([true, true]);
+      expect(runtime.state).toBeNull();
+      expect(runtime.sunshineBasePort).toBeNull();
+    } finally {
+      harness.pinSubmitted.resolve();
+      await disposeRuntime(runtime, harness);
+    }
+  });
+});
