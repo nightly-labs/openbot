@@ -27,10 +27,11 @@ export function isAgentAccess(value: unknown): value is AgentAccess {
 
 /**
  * Whether the provider enforces `workspace` access. Codex runs the agent in its `workspace-write`
- * sandbox. The other providers do not enforce it yet, so their agents keep full access.
+ * sandbox. Claude runs Bash in its sandbox and asks before a file edit outside the roots. Grok and
+ * OpenCode do not enforce it yet, so their agents keep full access.
  */
 export function enforcesWorkspaceAccess(provider: AgentProviderId): boolean {
-  return provider === "codex";
+  return provider === "codex" || provider === "claude";
 }
 
 /** Whether the agent may use Computer Use. Absent means on, as for every agent before the setting existed. */

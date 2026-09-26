@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readlink, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CanUseTool, ModelInfo, SDKUserMessage, SessionMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -13,6 +13,7 @@ import { CLAUDE_IDLE_THREAD_LIMIT, CLAUDE_THREAD_IDLE_RELEASE_MS, ClaudeAgentCli
 import { mergeProviderHistory, newAssistantMessage, snapshotFromThread } from "./conversation-snapshots";
 import { loginShellPath } from "./mcp-provider-shapes";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
+import { isPathInside } from "./path-containment";
 import {
   decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
@@ -1673,6 +1674,43 @@ it("hands the enabled MCP servers to the spawn and keeps the bridge names", asyn
     expect(started?.settingSources).toEqual(["user", "project", "local"]);
   } finally {
     await client.stop();
+  }
+});
+
+// Another provider can write `.claude/settings.json` in the workspace. Its `allowWrite`, `Edit(...)`
+// rules and hooks would widen the Workspace only sandbox, so only the skills of that folder load.
+it("keeps the workspace settings out of a Workspace only thread and still loads its skills", async () => {
+  const query = new TestQuery(new TestQueue<TestStreamMessage>());
+  const spawned: DynamicRecord[] = [];
+  const root = await mkdtemp(join(tmpdir(), "openbot-claude-workspace-only-"));
+  const cwd = join(root, "workspace");
+  const client = new ClaudeAgentClient(
+    { executable: "/bin/true", version: "2.1.251" },
+    (params) => {
+      if (isDynamicRecord(params.options)) spawned.push(params.options);
+      return query;
+    },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    join(root, "provider-state"),
+  );
+  client.start();
+  try {
+    await client.request("thread/start", { cwd, sandbox: "workspace-write" }, decodeThreadResponse);
+    const started = spawned.at(-1);
+    expect(started?.settingSources).toEqual(["user"]);
+    expect(started?.managedSettings).toEqual({ allowManagedHooksOnly: true });
+    const plugin = Array.isArray(started?.plugins) ? started.plugins[0] : null;
+    const pluginPath = isDynamicRecord(plugin) && isString(plugin.path) ? plugin.path : "";
+    expect(isPathInside(join(root, "provider-state"), pluginPath)).toBe(true);
+    expect(await readlink(join(pluginPath, "skills"))).toBe(join(cwd, ".claude", "skills"));
+  } finally {
+    await client.stop();
+    await rm(root, { recursive: true, force: true });
   }
 });
 

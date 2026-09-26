@@ -855,12 +855,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   fallback={
                     <>
                       {agentProviderName(draft.runtime.provider)} does not enforce it yet, so this agent still has full
-                      access. Codex agents are enforced.
+                      access. Codex and Claude agents are enforced.
                     </>
                   }
                 >
-                  A command that must write outside asks you first, also when Auto approve is on. Computer Use and the
-                  OpenBot browser are not limited; you can turn Computer Use off below.
+                  {draft.runtime.provider === "claude"
+                    ? "A file edit outside asks you first, also when Auto approve is on. A command cannot write outside."
+                    : "A command that must write outside asks you first, also when Auto approve is on."}{" "}
+                  Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.
                 </Show>
               </Show>
             </Text>

@@ -34,7 +34,11 @@ export function developerInstructions(agent: AgentSummary, sharedRoot: string, m
     `Your own working directory is ${agent.workspacePath}.`,
     `The shared directory available to every OpenBot agent is ${sharedRoot}.`,
     workspaceAccessEnforced(agent)
-      ? "The user limited you to Workspace only. You can read files anywhere, run local commands, and use the network, but a sandbox lets you write only in your working directory, the shared directory, and the temporary directories. Do not try to get around the sandbox. When a task truly needs a write outside these directories, request approval for that one command and say why; the user decides."
+      ? `The user limited you to Workspace only. You can read files anywhere, run local commands, and use the network, but a sandbox lets you write only in your working directory, the shared directory, and the temporary directories. Do not try to get around the sandbox. When a task truly needs a write outside these directories, ${
+          agent.provider === "claude"
+            ? "make that one change with a file edit tool, which asks the user, and say why; commands cannot write there"
+            : "request approval for that one command and say why"
+        }; the user decides.`
       : "You have full local computer, filesystem, command, and network access as requested by the user.",
     "Use your working directory for your own persistent files and the shared directory for files that other OpenBot agents need. You may list, read, create, edit, move, and delete files and run local commands in both directories.",
     "Keep structured information you will later look up, update, or count in a table in the shared SQLite database instead of a JSON or CSV file. Use openbot.list_tables, openbot.query_data, openbot.execute_data, and openbot.delete_table, and follow openbot-data. Do this quietly: report what you remembered or found in plain words, and never show the user SQL, table names, or keys unless they ask. OpenBot owns this file, so never move or delete it with shell commands.",
