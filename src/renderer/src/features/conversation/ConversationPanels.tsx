@@ -241,13 +241,16 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           <Loading>
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
+              adminCalls={props.runtime?.admin}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
               onAddFromMarketplace={
                 serverCanAdminister(props.server, "skills-admin-v1") ? props.onOpenMarketplace : undefined
               }
               skillsMode={
                 props.runtime
-                  ? "hidden"
+                  ? props.runtime.admin && serverCanAdminister(props.server, "skills-admin-v1")
+                    ? "host"
+                    : "hidden"
                   : props.server?.kind === "local"
                     ? "mutable"
                     : serverCanAdminister(props.server, "skills-admin-v1")
@@ -255,7 +258,10 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                       : "readonly"
               }
               skillsServerId={props.server?.id}
-              tablesVisible={!props.runtime && serverCanAdminister(props.server, "shared-tables-v1")}
+              tablesVisible={
+                (!props.runtime || props.runtime.admin !== undefined) &&
+                serverCanAdminister(props.server, "shared-tables-v1")
+              }
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               agents={props.agents}
               onCreateSkill={

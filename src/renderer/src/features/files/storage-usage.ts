@@ -10,7 +10,7 @@ import { errorMessage } from "@openbot/ui/error-message";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { createEffect, createStore } from "solid-js";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
-import { filesPort } from "./files-port";
+import { type FilesPort, filesPort } from "./files-port";
 
 /** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
 export function serverHasStorage(server: ServerSummary | undefined): server is ServerSummary {
@@ -52,7 +52,7 @@ function targetKey(target: StorageTarget | null): string | null {
  * The storage of one scope, read when the target appears or changes. The host caches a scan for a
  * minute, so a surface that opens again is quick; a change here asks for a new scan.
  */
-export function createStorageUsage(target: () => StorageTarget | null) {
+export function createStorageUsage(target: () => StorageTarget | null, calls: () => FilesPort = filesPort) {
   const [state, setState] = createStore<StorageUsageState>({
     usage: null,
     loaded: false,
@@ -79,7 +79,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     });
     try {
       const input = force ? { ...current.input, force: true } : current.input;
-      const usage = await filesPort().storage.getUsage(input, current.serverId);
+      const usage = await calls().storage.getUsage(input, current.serverId);
       if (id !== request) return;
       setState((draft) => {
         draft.usage = usage;
@@ -112,7 +112,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     const current = target();
     if (!current) return;
     try {
-      await filesPort().storage.clear({ category }, current.serverId);
+      await calls().storage.clear({ category }, current.serverId);
     } finally {
       await refresh(true);
     }
@@ -127,7 +127,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     if (!current) return;
     if (action === "delete") {
       try {
-        await filesPort().storage.deleteFile({ fileId: file.id }, current.serverId);
+        await calls().storage.deleteFile({ fileId: file.id }, current.serverId);
       } finally {
         await refresh(true);
       }
@@ -136,7 +136,7 @@ export function createStorageUsage(target: () => StorageTarget | null) {
     if (action === "retry") return refresh(true);
     if (action === "show-in-chat") return handlers.onShowInChat(file);
     try {
-      await filesPort().storage.openFile({ fileId: file.id, action }, current.serverId);
+      await calls().storage.openFile({ fileId: file.id, action }, current.serverId);
     } catch (error) {
       toast.error(`Could not open “${file.name}”`, { description: errorMessage(error, "Try again.") });
     }

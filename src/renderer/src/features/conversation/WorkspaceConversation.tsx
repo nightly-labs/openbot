@@ -8,7 +8,7 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
-import { createRemoteAgentAdmin } from "../agents/remote-agent-admin";
+import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
@@ -178,10 +178,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
 
   /** Access of a joined server's agent goes to its host; every other field keeps the Team API route. */
   async function updateConversationAgent(agentId: string, updates: Omit<UpdateAgentInput, "agentId">): Promise<void> {
-    const { access, ...rest } = updates;
-    if (access === undefined || activeServer()?.kind === "local") return updateAgent(agentId, updates);
-    await remoteAgentAdmin.update({ agentId, access });
-    if (Object.keys(rest).length) await updateAgent(agentId, rest);
+    if (activeServer()?.kind === "local") return updateAgent(agentId, updates);
+    await updateRemoteAgent(remoteAgentAdmin, { agentId, ...updates }, ({ agentId: id, ...rest }) =>
+      updateAgent(id, rest),
+    );
   }
 
   /**

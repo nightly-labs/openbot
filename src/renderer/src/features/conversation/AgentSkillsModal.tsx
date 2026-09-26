@@ -21,7 +21,7 @@ import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibr
 import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { SkillPreview } from "../../components/SkillPreview";
-import { agentSkillCalls, skillsPort } from "../../skills-port";
+import { type AgentSkillCalls, agentSkillCalls, type SkillCatalogCalls, skillsPort } from "../../skills-port";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
 
 /**
@@ -39,7 +39,11 @@ interface AgentSkillsModalProps {
   onCountChange: (count: number) => void;
   skillsMode?: AgentSkillsMode;
   /** The joined server that runs the agent. Read in `host` mode only. */
-  serverId?: string;
+  serverId?: string | undefined;
+  /** Replaces the desktop calls, for a client that reaches the host another way. */
+  calls?: AgentSkillCalls | undefined;
+  /** `null`: no marketplace catalog, so the list and details show only what the host sends. */
+  catalog?: SkillCatalogCalls | null | undefined;
   onCreateSkill?: () => void;
   onTrySkill?: (skill: MarketplaceSkillDetail) => void;
   onAddFromMarketplace?: (agentId: string) => void;
@@ -74,7 +78,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   const mutable = () => skillsMode() === "mutable" || skillsMode() === "host";
   /** The local skills library is on this computer, so only its own agents can use it. */
   const localLibrary = () => skillsMode() === "mutable";
-  const calls = () => agentSkillCalls(skillsMode() === "host" ? props.serverId : undefined);
+  const calls = () => props.calls ?? agentSkillCalls(skillsMode() === "host" ? props.serverId : undefined);
+  const catalogCalls = () => (props.catalog === undefined ? skillsPort().skills : props.catalog);
   const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
@@ -133,9 +138,14 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   );
 
   async function loadCatalog(): Promise<void> {
+    const catalogPort = catalogCalls();
+    if (!catalogPort) {
+      setCatalog({});
+      return;
+    }
     try {
       const [marketplace, local] = await Promise.allSettled([
-        skillsPort().skills.list({ limit: 50 }),
+        catalogPort.list({ limit: 50 }),
         localLibrary() ? skillsPort().skills.localList() : Promise.resolve([]),
       ]);
       const page = {
@@ -167,14 +177,15 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetail(null);
     setDetailLoading(true);
     setError(null);
-    if (isFolderSkill(skill) || (!localLibrary() && skill.skillId.startsWith("local-skill-"))) {
+    const catalogPort = catalogCalls();
+    if (isFolderSkill(skill) || !catalogPort || (!localLibrary() && skill.skillId.startsWith("local-skill-"))) {
       setDetailLoading(false);
       return;
     }
     try {
       const next = skill.skillId.startsWith("local-skill-")
         ? await skillsPort().skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
-        : await skillsPort().skills.get(skill.skillId);
+        : await catalogPort.get(skill.skillId);
       if (request === detailRequest) setDetail(next);
     } catch (caught) {
       if (request === detailRequest) setError(errorMessage(caught, "Could not load skill details."));
@@ -549,6 +560,9 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                     <p class="agent-memory-state">
                                       OpenBot did not install this skill. Edit or remove it in {skill().location}.
                                     </p>
+                                  </Show>
+                                  <Show when={!catalogCalls() && !isFolderSkill(skill())}>
+                                    <p class="agent-memory-state">{skill().description ?? skillMeta(skill())}</p>
                                   </Show>
                                   <Show when={!localLibrary() && skill().skillId.startsWith("local-skill-")}>
                                     <p class="agent-memory-state" role="status">

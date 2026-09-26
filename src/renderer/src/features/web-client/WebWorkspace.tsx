@@ -1,4 +1,19 @@
-import type { AccountUsage, AgentEvent, AgentModelOption, AgentStatus, ServerSummary } from "@openbot/contracts/ipc";
+import {
+  type AccountUsage,
+  type AgentEvent,
+  type AgentModelOption,
+  type AgentStatus,
+  MCP_SERVERS_CAPABILITY,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
+import {
+  clearStorage,
+  deleteStoredFile,
+  getAgentAdminSettings,
+  getStorageUsage,
+  updateAgentAdminSettings,
+} from "@openbot/team-client/team-admin-requests";
+import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import {
   Alert,
   AlertActions,
@@ -15,14 +30,21 @@ import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog"
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
+import { ServerSettingsModal } from "../../lazy-views";
+import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
+import type { FilesPort } from "../files/files-port";
+import { canManageStorage, serverHasStorage } from "../files/storage-usage";
+import { serverCanAdminister } from "../servers/server-capabilities";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
+import { createWebFileSaver } from "./web-file-download";
+import { createWebServerSettings } from "./web-server-settings";
 
 const CONNECTING_STATUS: AgentStatus = {
   phase: "starting",
@@ -59,7 +81,6 @@ export function WebWorkspace(props: {
       controller.setEditingDeliveryId(null);
     },
   );
-  const runtime = createWebConversationRuntime(workspace.runtime, () => workspace.state.host?.hostId ?? "");
   const [accountUsage, setAccountUsage] = createSignal<AccountUsage | null>(null);
   let usageGeneration = 0;
   const [models, setModels] = createSignal<AgentModelOption[]>([]);
@@ -93,6 +114,69 @@ export function WebWorkspace(props: {
     })),
   );
   const server = createMemo(() => servers().find((item) => item.active));
+  /** The admin requests of the connected host. A call for another server is refused, not redirected. */
+  function hostRequest(serverId?: string): TeamApiRequest {
+    const admin = workspace.runtime.admin;
+    const current = server();
+    if (!admin || !current || (serverId !== undefined && serverId !== current.id))
+      throw new Error("Connect to this server first.");
+    return admin.request;
+  }
+  const runtime = createWebConversationRuntime(
+    workspace.runtime,
+    () => workspace.state.host?.hostId ?? "",
+    workspace.runtime.admin ? () => hostRequest() : undefined,
+  );
+  const remoteAgentAdmin = createRemoteAgentAdmin(
+    () => {
+      const current = server();
+      const agent = workspace.selected();
+      return current && agent ? { server: current, agentId: agent.id } : null;
+    },
+    () => ({
+      getAgentAdminSettings: (agentId, serverId) => getAgentAdminSettings(hostRequest(serverId), agentId),
+      updateAgentAdminSettings: (input, serverId) => updateAgentAdminSettings(hostRequest(serverId), input),
+    }),
+  );
+  /** The Team API agent summary has no access, so the agent shows the host's answer. */
+  const conversationAgent = createMemo(() => {
+    const agent = workspace.selected();
+    const settings = remoteAgentAdmin.settings();
+    return agent && settings ? { ...agent, access: settings.access } : agent;
+  });
+  const serverSettings = createWebServerSettings({
+    server,
+    admin: () => workspace.runtime.admin,
+    presence: () => workspace.state.presence,
+    refreshHosts: () => workspace.refreshHosts(),
+  });
+  const saveFile = createWebFileSaver();
+  const storageCalls: FilesPort = {
+    agent: { listAgents: () => workspace.runtime.listAgents() },
+    storage: {
+      // The host names previews with the desktop `openbot-attachment:` scheme, as it does in chat.
+      getUsage: async (input, serverId) => {
+        const usage = await getStorageUsage(hostRequest(serverId), input);
+        return { ...usage, files: usage.files.map((file) => ({ ...file, previewUrl: null })) };
+      },
+      deleteFile: (input, serverId) => deleteStoredFile(hostRequest(serverId), input),
+      clear: (input, serverId) => clearStorage(hostRequest(serverId), input),
+      // A stored file is an attachment. The browser has no app to open it in, so it downloads.
+      openFile: async (input, serverId) => {
+        hostRequest(serverId);
+        saveFile(await workspace.runtime.download(input.fileId));
+      },
+    },
+  };
+  async function openServerSettings(serverId: string, trigger: HTMLElement | null): Promise<void> {
+    if (server()?.id !== serverId || workspace.state.status !== "online") {
+      const host = workspace.state.hosts.find((item) => item.hostId === serverId);
+      if (!host) return;
+      await workspace.connect(host);
+      if (server()?.id !== serverId || workspace.state.status !== "online") return;
+    }
+    serverSettings.open(trigger);
+  }
   const sidebarActivity = createMemo(() => ({
     agentIds: workspace.state.agents.map((agent) => agent.id),
     activeTurns: Object.fromEntries(
@@ -128,6 +212,23 @@ export function WebWorkspace(props: {
       (item) => item.agentId === workspace.state.selectedId && item.threadId === workspace.selected()?.threadId,
     ),
   );
+  /** "Always allow", for an owner or admin whose host answered. The grant is written on the host. */
+  const alwaysAllowApproval = createMemo(() => {
+    const agent = workspace.selected();
+    const item = approval();
+    if (!agent || !item || !remoteAgentAdmin.settings()) return undefined;
+    return async () => {
+      await remoteAgentAdmin.update({ agentId: agent.id, autoApprove: true });
+      if (approval()?.requestId !== item.requestId) return false;
+      await workspace.approve({ requestId: item.requestId, decision: "accept" });
+      return true;
+    };
+  });
+  const setAgentAutoApprove = createMemo(() => {
+    const agent = workspace.selected();
+    if (!agent || !remoteAgentAdmin.settings()) return undefined;
+    return (autoApprove: boolean) => remoteAgentAdmin.update({ agentId: agent.id, autoApprove });
+  });
   const prompt = createMemo<Extract<AgentEvent, { type: "prompt" }> | undefined>(() => {
     if (workspace.state.status !== "online") return;
     const page = workspace.conversation()?.page;
@@ -222,9 +323,14 @@ export function WebWorkspace(props: {
           }}
           onReorder={() => {}}
           onAdd={() => setJoinOpen(true)}
+          onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
         />
         <Sidebar
           serverName={workspace.state.host?.name ?? "OpenBot"}
+          onOpenServerSettings={(trigger) => {
+            const host = workspace.state.host;
+            if (host) void openServerSettings(host.hostId, trigger);
+          }}
           agents={workspace.profiles()}
           activeAgentId={workspace.state.selectedId ?? ""}
           people={[]}
@@ -425,7 +531,7 @@ export function WebWorkspace(props: {
                 </>
               }
               agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
-              agent={workspace.selected()}
+              agent={conversationAgent()}
               agents={workspace.profiles()}
               modelOptions={models()}
               messages={messages()}
@@ -435,7 +541,7 @@ export function WebWorkspace(props: {
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
-              globalOverlayOpen={joinOpen()}
+              globalOverlayOpen={joinOpen() || serverSettings.state.open}
               settingsRequest={settingsRequest()}
               messageFocusRequest={null}
               queue={undefined}
@@ -445,7 +551,7 @@ export function WebWorkspace(props: {
               browserVisibilitySuspended={workspace.state.status !== "online"}
               browserControlState={workspace.state.browserControlState}
               server={server()}
-              presence={{ serverId: server()?.id ?? null, members: [], updatedAt: "" }}
+              presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}
               currentUserEmail={props.accountEmail ?? ""}
               browserEnabled={browserEnabled()}
               remoteDesktopEnabled={false}
@@ -459,7 +565,7 @@ export function WebWorkspace(props: {
                 void select(id);
               }}
               onUpdateAgent={async (agentId, updates) => {
-                await workspace.runtime.updateAgent({ agentId, ...updates });
+                await updateRemoteAgent(remoteAgentAdmin, { agentId, ...updates }, workspace.runtime.updateAgent);
                 await workspace.refresh();
               }}
               onSetAgentAvatar={async (agentId, image) => {
@@ -501,6 +607,10 @@ export function WebWorkspace(props: {
                 await workspace.approve({ requestId: item.requestId, decision });
                 return true;
               }}
+              onAlwaysAllowApproval={alwaysAllowApproval()}
+              agentAutoApproves={remoteAgentAdmin.settings()?.autoApprove ?? false}
+              agentAutoApproveLocked={remoteAgentAdmin.settings()?.autoApproveLocked ?? false}
+              onSetAgentAutoApprove={setAgentAutoApprove()}
               onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
               onCancelQueuedMessage={() => {}}
               onSteerQueuedMessage={() => {}}
@@ -525,6 +635,67 @@ export function WebWorkspace(props: {
             onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
             onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
           />
+        </Show>
+        <Show when={serverSettings.state.open && server()}>
+          {(target) => (
+            <Loading>
+              <ServerSettingsModal
+                open={serverSettings.state.open}
+                onOpenChange={serverSettings.setOpen}
+                restoreFocusTarget={serverSettings.restoreTarget()}
+                platform="darwin"
+                remoteDesktopSupported={false}
+                server={target()}
+                hostStatus={null}
+                members={serverSettings.state.members}
+                invites={serverSettings.state.invites}
+                loading={serverSettings.state.loading}
+                loadError={serverSettings.state.error}
+                onRetry={serverSettings.refresh}
+                onSaveIdentity={serverSettings.saveIdentity}
+                // Publication and screen recording belong to the computer that runs the server.
+                onSetPublished={unavailable}
+                onCreateInvite={serverSettings.createInvite}
+                onUpdateMember={serverSettings.updateMember}
+                onRemoveMember={serverSettings.removeMember}
+                onRevokeInvite={serverSettings.revokeInvite}
+                onOpenScreenRecordingSettings={unavailable}
+                onRecheckScreenRecording={unavailable}
+                mcpServers={
+                  serverCanAdminister(target(), MCP_SERVERS_CAPABILITY) ? serverSettings.state.mcp : undefined
+                }
+                mcpLoadError={serverSettings.state.mcpError}
+                onMcpSectionShown={() => void serverSettings.refreshMcp()}
+                onRetryMcpServers={() => void serverSettings.refreshMcp()}
+                onSaveMcpServer={serverSettings.saveMcpServer}
+                onRemoveMcpServer={serverSettings.removeMcpServer}
+                onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
+                onTestMcpServer={serverSettings.testMcpServer}
+                storage={
+                  serverHasStorage(target())
+                    ? {
+                        hostName: target().name,
+                        canManage: canManageStorage(target()),
+                        calls: storageCalls,
+                        onOpenAgent: (agentId) => {
+                          serverSettings.setOpen(false);
+                          setMobilePane("conversation");
+                          void select(agentId);
+                        },
+                        onShowMessage: (agentId, messageId) => {
+                          serverSettings.setOpen(false);
+                          setMobilePane("conversation");
+                          void workspace.run(async () => {
+                            await select(agentId);
+                            await workspace.openSearchMessage(messageId);
+                          });
+                        },
+                      }
+                    : undefined
+                }
+              />
+            </Loading>
+          )}
         </Show>
       </div>
     </ConversationControllerProvider>
