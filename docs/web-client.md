@@ -56,6 +56,10 @@ mock. The separate web preview implements the browser runtime with that same moc
   administration, provider installation, and provider sign-in are only for an owner or admin whose
   host serves the related route; a member does not see them. Agent deletion uses
   the shared confirmation and is hidden for members; the host also enforces the role restriction.
+- The marketplace reads the public catalog on its own origin. An owner or admin installs skills,
+  plugin apps, and new agents on the connected host. Submissions, package choice, agent updates,
+  and the example-prompt and try-skill actions are desktop only. A plugin app that needs a browser
+  sign-in is installed on the host computer, as for a desktop remote admin.
 - Uploads and downloads retain the shared client's 10 MB limit. Message attachment count uses the
   shared contract limit. Cancelling a transfer sends the existing file-cancel frame. If the host
   has already committed an attachment, cancellation removes that draft after the response.

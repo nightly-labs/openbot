@@ -89,7 +89,10 @@ routes. A member or role change revokes every session on the host; the browser r
 the directory still lists the host. `ConversationRuntime.admin` carries the skills and shared-table
 calls to the agent settings panel, which shows only Skills and Tables in the browser. Memories,
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
-route. The skills dialog has no marketplace catalog in the browser yet.
+route. `web-marketplace.ts` gives `SkillsMarketplaceModal` its calls: the public catalog routes of
+the account service that serves `/app` (`@openbot/team-client/marketplace-catalog`), and installs on
+the host over `skills-admin-v1`, `agent-install-v1`, and `mcp-servers-v1`. A browser publishes
+nothing and updates no installed agent; those stay on the desktop.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
 the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
 sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The

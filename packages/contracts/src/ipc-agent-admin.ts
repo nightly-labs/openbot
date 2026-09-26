@@ -58,6 +58,13 @@ export interface AddedAgent {
   name: string;
 }
 
+/** The agent-install-v1 answer, which names the new agent `agentId`. */
+export function decodeHostAddedAgent(value: unknown): AddedAgent {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || typeof value.name !== "string")
+    throw new Error("Invalid added agent.");
+  return { id: value.agentId, name: value.name };
+}
+
 export function decodeAddedAgent(value: unknown): AddedAgent {
   if (!isDynamicRecord(value) || !isIdentifier(value.id) || typeof value.name !== "string")
     throw new Error("Invalid added agent response.");

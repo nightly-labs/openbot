@@ -32,18 +32,20 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
-import { ServerSettingsModal } from "../../lazy-views";
+import { ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import type { FilesPort } from "../files/files-port";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
-import { serverCanAdminister } from "../servers/server-capabilities";
+import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabilities";
+import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
+import { createWebMarketplaceCalls } from "./web-marketplace";
 import { createWebProviderSettings } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
@@ -174,6 +176,10 @@ export function WebWorkspace(props: {
     presence: () => workspace.state.presence,
     refreshHosts: () => workspace.refreshHosts(),
   });
+  const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest);
+  const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
+  /* As in the desktop app: an owner or admin installs on the host's agents, and a member browses. */
+  const manageSkills = createMemo(() => serverCanAdminister(server(), "skills-admin-v1"));
   const saveFile = createWebFileSaver();
   const storageCalls: FilesPort = {
     agent: { listAgents: () => workspace.runtime.listAgents() },
@@ -399,11 +405,11 @@ export function WebWorkspace(props: {
             Boolean(workspace.state.host) &&
             workspace.state.host?.role !== "member"
           }
-          marketplaceSupported={false}
+          marketplaceSupported={workspace.state.status === "online"}
           onDeleteAgent={workspace.deleteAgent}
           compact={false}
           onExpand={() => {}}
-          onOpenMarketplace={() => {}}
+          onOpenMarketplace={() => setMarketplaceOpen(true)}
         />
         <AccountDock
           remoteClient
@@ -462,6 +468,7 @@ export function WebWorkspace(props: {
           >
             <Conversation
               runtime={runtime}
+              onOpenMarketplace={() => setMarketplaceOpen(true)}
               notice={
                 <>
                   <Show when={workspace.state.status !== "online"}>
@@ -660,6 +667,32 @@ export function WebWorkspace(props: {
             onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
             onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
           />
+        </Show>
+        <Show when={marketplaceOpen()}>
+          <Loading>
+            <SkillsMarketplaceModal
+              open={true}
+              calls={marketplaceCalls}
+              agents={manageSkills() ? workspace.state.agents : []}
+              activeAgentId={manageSkills() ? (workspace.state.selectedId ?? "") : ""}
+              hostServerId={remoteAdminServer(server(), "skills-admin-v1")?.id}
+              agentServerId={remoteAdminServer(server(), "agent-install-v1")?.id}
+              onOpenChange={setMarketplaceOpen}
+              onAgentInstalled={async (agent) => {
+                setMarketplaceOpen(false);
+                setMobilePane("conversation");
+                await workspace.run(async () => {
+                  await workspace.refresh();
+                  await select(agent.id);
+                });
+              }}
+              plugins={MARKETPLACE_PLUGINS}
+              pluginServerId={
+                manageSkills() && serverCanAdminister(server(), MCP_SERVERS_CAPABILITY) ? server()?.id : undefined
+              }
+              pluginHostName={manageSkills() ? remoteAdminServer(server(), MCP_SERVERS_CAPABILITY)?.name : undefined}
+            />
+          </Loading>
         </Show>
         <Show when={serverSettings.state.open && server()}>
           {(target) => (
