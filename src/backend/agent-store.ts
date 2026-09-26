@@ -52,12 +52,14 @@ import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 
-type StoredAgent = AgentSummary & { access: AgentAccess };
-type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access"> & {
+type StoredAgent = AgentSummary & { access: AgentAccess; computerUse: boolean };
+type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access" | "computerUse"> & {
   avatarUrl?: string | null;
   provider?: AgentProviderId;
   // Absent on every agent stored before the setting existed, which keeps the access it always had.
   access?: AgentAccess;
+  // Absent on every agent stored before the setting existed, which keeps Computer Use on.
+  computerUse?: boolean;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
 
@@ -314,6 +316,7 @@ export class AgentStore {
     record.model = source.model;
     record.reasoningEffort = source.reasoningEffort;
     record.access = source.access;
+    record.computerUse = source.computerUse;
     record.avatarSeed = source.avatarSeed;
     record.avatarHue = source.avatarHue;
 
@@ -531,6 +534,10 @@ export class AgentStore {
     if (input.access !== undefined) {
       if (!isAgentAccess(input.access)) throw new Error("Invalid agent access.");
       next.access = input.access;
+    }
+    if (input.computerUse !== undefined) {
+      if (!isBoolean(input.computerUse)) throw new Error("Invalid Computer Use value.");
+      next.computerUse = input.computerUse;
     }
     if (input.avatarSeed !== undefined) {
       if (!isAvatarSeed(input.avatarSeed)) throw new Error("Invalid avatar seed.");
@@ -1124,6 +1131,7 @@ export class AgentStore {
       model: DEFAULT_AGENT_MODEL,
       reasoningEffort: DEFAULT_REASONING_EFFORT,
       access: DEFAULT_AGENT_ACCESS,
+      computerUse: true,
       threadId: null,
       workspacePath: join(this.#agentsRoot, id),
       preview: NEW_AGENT_PREVIEW,
@@ -1331,6 +1339,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
   return (
     (record.provider === undefined || isOneOf(AGENT_PROVIDERS, record.provider)) &&
     (record.access === undefined || isAgentAccess(record.access)) &&
+    (record.computerUse === undefined || isBoolean(record.computerUse)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
     isMarketplaceSource(record.marketplaceSource)
@@ -1383,6 +1392,8 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
   const access =
     value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
+  const computerUse =
+    value.computerUse === undefined || isBoolean(value.computerUse) ? value.computerUse : reset("computerUse", true);
   let marketplaceSource: StoredAgent["marketplaceSource"];
   if (value.marketplaceSource !== undefined) {
     if (isMarketplaceSource(value.marketplaceSource)) {
@@ -1413,6 +1424,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
     ...(access === undefined ? {} : { access }),
+    ...(computerUse === undefined ? {} : { computerUse }),
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
   };
   return { agent, repaired };
@@ -1471,6 +1483,7 @@ function migrateLegacyAgent(agent: LegacyStoredAgent): StoredAgent {
     model: agent.model,
     reasoningEffort: agent.reasoningEffort,
     access: DEFAULT_AGENT_ACCESS,
+    computerUse: true,
     threadId: agent.threadId,
     workspacePath: agent.workspacePath,
     preview: agent.preview,
@@ -1486,6 +1499,7 @@ function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {
     ...agent,
     provider: agent.provider ?? providerForLegacyModel(agent.model),
     access: agent.access ?? DEFAULT_AGENT_ACCESS,
+    computerUse: agent.computerUse ?? true,
     avatarUrl: isString(agent.avatarUrl) && parseAgentAvatarUrl(agent.avatarUrl, agent.id) ? agent.avatarUrl : null,
     ...(agent.marketplaceSource === undefined
       ? {}

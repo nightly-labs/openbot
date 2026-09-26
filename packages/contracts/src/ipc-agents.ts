@@ -25,6 +25,24 @@ export function isAgentAccess(value: unknown): value is AgentAccess {
   return isOneOf(AGENT_ACCESS_MODES, value);
 }
 
+/**
+ * Whether the provider enforces `workspace` access. Codex runs the agent in its `workspace-write`
+ * sandbox. The other providers do not enforce it yet, so their agents keep full access.
+ */
+export function enforcesWorkspaceAccess(provider: AgentProviderId): boolean {
+  return provider === "codex";
+}
+
+/** Whether the agent may use Computer Use. Absent means on, as for every agent before the setting existed. */
+export function agentComputerUseEnabled(agent: Pick<AgentSummary, "computerUse">): boolean {
+  return agent.computerUse !== false;
+}
+
+/** Whether this agent runs inside the workspace sandbox now. */
+export function workspaceAccessEnforced(agent: Pick<AgentSummary, "access" | "provider">): boolean {
+  return agent.access === "workspace" && enforcesWorkspaceAccess(agent.provider);
+}
+
 function isMarketplaceSource(value: unknown): value is NonNullable<AgentSummary["marketplaceSource"]> {
   return (
     isDynamicRecord(value) &&
@@ -55,6 +73,11 @@ export interface AgentSummary {
    * has none. Absent means `DEFAULT_AGENT_ACCESS`.
    */
   access?: AgentAccess;
+  /**
+   * Whether the agent gets the Computer Use tools. Local-only, like `access`. Absent means on; see
+   * `agentComputerUseEnabled`.
+   */
+  computerUse?: boolean;
   threadId: string | null;
   workspacePath: string;
   preview: string;
@@ -83,6 +106,7 @@ export function isAgentSummary(value: unknown): value is AgentSummary {
     isAgentModel(value.model) &&
     isReasoningEffort(value.reasoningEffort) &&
     (value.access === undefined || isAgentAccess(value.access)) &&
+    (value.computerUse === undefined || isBoolean(value.computerUse)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
     isBoundedString(value.preview, INPUT_LIMITS.messageText) &&
@@ -121,6 +145,7 @@ export interface UpdateAgentInput {
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
   access?: AgentAccess;
+  computerUse?: boolean;
   avatarSeed?: string;
   avatarHue?: AvatarHue | null;
 }

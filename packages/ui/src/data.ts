@@ -151,6 +151,8 @@ export interface AgentProfile {
   reasoningEffort: AgentReasoningEffort;
   /** Absent for an agent on a remote host, which does not share it; the host then decides. */
   access?: AgentAccess;
+  /** Absent means on. Absent for an agent on a remote host too, which does not share it. */
+  computerUse?: boolean;
   threadId: string | null;
   /** The agent's working directory. Absent for profiles built before it was tracked. */
   workspacePath?: string;

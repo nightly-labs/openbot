@@ -1063,6 +1063,51 @@ describe.sequential("AttentionRegistry: prompts, approvals and browser takeovers
     await waitFor(() => events.some((event) => event.type === "approval"));
     expect(client.responses).toHaveLength(0);
   });
+
+  it("sandboxes a Workspace only Codex agent and asks before it leaves the sandbox, even when granted", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      approvalAutomation: { turboEnabled: () => true, autoApproves: () => true },
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const agent = await service.updateAgent({ agentId: "chief", access: "workspace" });
+    await service.sendMessage({ agentId: "chief", text: "Write outside the workspace" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+
+    const client = clients.get("codex");
+    if (!client) throw new Error("Codex client was not created.");
+    const writableRoots = [agent.workspacePath, store.sharedRoot];
+    expect(client.requests.find((request) => request.method === "thread/start")?.params).toMatchObject({
+      sandbox: "workspace-write",
+      config: { sandbox_workspace_write: { writable_roots: writableRoots, network_access: true } },
+    });
+    expect(client.requests.find((request) => request.method === "turn/start")?.params).toMatchObject({
+      sandboxPolicy: { type: "workspaceWrite", writableRoots, networkAccess: true },
+    });
+
+    const turnId = events.find((event) => event.type === "turn-started")?.turnId;
+    const externalId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!turnId || !externalId) throw new Error("Turn did not start.");
+    client.emit("request", {
+      method: "item/commandExecution/requestApproval",
+      id: "escalated-command",
+      params: { threadId: externalId, turnId, command: ["touch", "/Users/me/Documents/note"] },
+    });
+    await waitFor(() => events.some((event) => event.type === "approval"));
+    expect(client.responses).toHaveLength(0);
+  });
 });
 
 it.each(["submitted", "takeover"] as const)(
