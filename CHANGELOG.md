@@ -5,6 +5,39 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-09-26
+
+Version 0.21.1 was not published because its macOS and Windows builds failed. This version also
+contains all changes of 0.21.1.
+
+### Added
+
+- Keep a local trace of IPC calls and provider turns in `logs/trace.ndjson`. Each line has only a
+  time, a name, a duration and an outcome. The file stays on this computer. The diagnostics export
+  adds a summary for each name.
+- Add a test run to a saved routine on mobile, and show routine events in the mobile chat.
+- Show the agent name and the latest message when you long-press an agent on mobile.
+- Change the order of servers on mobile. Long-press a server and select Edit order.
+
+### Changed
+
+- Retry an offline remote host every 5 minutes while the app has focus, and every 15 minutes without
+  focus. Before, OpenBot retried every minute.
+- Send sign-in and invitation emails as HTML with a plain-text part. Out-of-office replies no longer
+  answer these emails.
+- Show a new design for the mobile server list and the agent appearance picker.
+- Open the mobile photo picker faster, and move and scale an avatar photo in the app.
+
+### Fixed
+
+- Keep both keys when two providers save a key at the same time.
+- Keep the stored session when you type a wrong sign-in code for a new challenge.
+- Close the live browser view when its screencast cannot start again. Before, the view stopped on
+  its last frame.
+- Stop an error in the sidebar when you switch servers.
+- Send desktop host analytics events with the app origin. Before, the analytics server refused all
+  of them. When you turn analytics off, OpenBot does not send these events.
+
 ## [0.21.1] - 2026-09-25
 
 ### Added
