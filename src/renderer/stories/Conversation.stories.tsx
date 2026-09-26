@@ -797,8 +797,8 @@ function queueWithItems(count: number, text = "Add the final checklist and verif
 const queueReferenceMessages = [
   "Improve how right-clicking an agent works in the sidebar. It should match the app…",
   "The inputs are still not right. Check exactly how they work in the application…",
-  "Add Command+F to chat, like in Grok Bot, and keep message reordering consistent…",
-  "Add the same search modal as Grok Bot for messages and agents…",
+  "Add Command+F to chat, and keep message reordering consistent…",
+  "Add one search modal for messages and agents…",
   "The latest chat message is too low. Move it up so it stays visible…",
   "Run all checks and fix every failure",
   "Push the final changes to main",

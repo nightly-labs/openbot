@@ -24,7 +24,7 @@
   --openbot-border-grouped: #333335;
   --openbot-radius-grouped: 16px;
 
-  /* Grok Bot-inspired neutral system. Keep UI colors here, not in components. */
+  /* Neutral color system. Keep UI colors here, not in components. */
   --openbot-bg-canvas: #1a1a1a;
   --openbot-bg-canvas-clear: rgba(26, 26, 26, 0);
   --openbot-bg-sidebar: #1a1a1a;
