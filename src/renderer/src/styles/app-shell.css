@@ -723,6 +723,14 @@ textarea {
     border-bottom: 1px solid var(--openbot-border-strong);
   }
 
+  /* An open panel's toggle. The faint fill it has elsewhere disappears on the edge, so it takes the
+   * ghost button's open fill. An agent at the controls keeps its accent. */
+  .app-frame-with-server-rail .header-panel-toggle[aria-expanded="true"]:not(.computer-button-agent-active) {
+    border-color: var(--openbot-border-strong);
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+
   /* A direct conversation's header is taller on its own, so its line would miss the panel's. */
   .app-frame-with-server-rail .direct-conversation-header {
     height: var(--left-header-height);
