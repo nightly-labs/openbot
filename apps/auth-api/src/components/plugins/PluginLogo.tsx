@@ -1,6 +1,6 @@
+import { cx } from "@openbot/ui/utils";
 import { Match, Switch } from "solid-js";
 import { pluginMonogram } from "../../lib/plugins";
-import { cx } from "../../lib/utils";
 
 // The marks the public listings draw, as path data rather than as files.
 //

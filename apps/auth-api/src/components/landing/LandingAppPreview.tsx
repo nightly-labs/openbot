@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { onSettled } from "solid-js";
 
 const LANDING_PREVIEW_READY_MESSAGE = "openbot:landing-preview-ready";
@@ -35,7 +36,7 @@ export function LandingAppPreview() {
     if (!preview || !loadingPlaceholder || !previewFrame) return;
 
     const origin = window.location.origin;
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const reducedMotion = prefersReducedMotion();
     let loading = false;
     let ready = false;
     let started = false;

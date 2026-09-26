@@ -12,14 +12,6 @@
 import type { McpServerConfig, McpTransport, SkillCategory } from "@openbot/contracts/ipc";
 import { isListingUrl, type McpAuth, mcpFlowFields } from "./mcp-connect-auth";
 
-/**
- * Where a shared plugin link points. Derived from the slug rather than carried as catalog data, so
- * a listing can never put a foreign address behind the button that says it copies its own link.
- */
-export function createPluginShareUrl(slug: string): string {
-  return `https://openbot.run/plugins/${slug}`;
-}
-
 /** One of the example questions a plugin listing opens with. */
 export interface MarketplacePluginPrompt {
   id: string;
