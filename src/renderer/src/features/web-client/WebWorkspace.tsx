@@ -66,7 +66,24 @@ export function WebWorkspace(props: {
   createRuntime?: WebRuntimeFactory;
 }) {
   const [status, setStatus] = createSignal<AgentStatus>(CONNECTING_STATUS);
-  const workspace = createWebWorkspace(props, { onStatus: setStatus });
+  const [models, setModels] = createSignal<AgentModelOption[]>([]);
+  /** Bumped on each host change, so a model list read for the previous host is dropped. */
+  let modelsGeneration = 0;
+  const workspace = createWebWorkspace(props, {
+    onStatus: (next) => {
+      setStatus(next);
+      // As in the desktop app: a ready status can follow a provider sign-in or a new endpoint, so
+      // the models are read again.
+      if (next.phase !== "ready") return;
+      const generation = modelsGeneration;
+      workspace.runtime.models().then(
+        (list) => {
+          if (generation === modelsGeneration) setModels(list);
+        },
+        () => undefined,
+      );
+    },
+  });
   const controller = createConversationController({ onTypingChange: () => {} }, false);
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
@@ -85,7 +102,6 @@ export function WebWorkspace(props: {
   );
   const [accountUsage, setAccountUsage] = createSignal<AccountUsage | null>(null);
   let usageGeneration = 0;
-  const [models, setModels] = createSignal<AgentModelOption[]>([]);
   const [joinOpen, setJoinOpen] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
   const [mobilePane, setMobilePane] = createSignal<WebMobilePane>("conversation");
@@ -280,6 +296,7 @@ export function WebWorkspace(props: {
       usageGeneration += 1;
       setAccountUsage(null);
       setCreating(false);
+      modelsGeneration += 1;
       setModels([]);
       setStatus(CONNECTING_STATUS);
       if (host && state === "online") {

@@ -99,13 +99,15 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
       managesRuntimes: () => serverId() !== undefined,
     },
   );
-  const customProviders = createCustomProvidersStore(() => {
+  // One store for each host: a list read or changed on the previous host stays in its own store, so
+  // it is never shown next to a Delete that goes to this one.
+  const customProviders = createMemo(() => {
     const id = serverId();
-    return id ? hostCustomProvidersApi(() => admin, id) : undefined;
-  });
-  createEffect(serverId, (id) => {
+    if (!id) return undefined;
+    const store = createCustomProvidersStore(() => hostCustomProvidersApi(() => admin, id));
     // As in the desktop app: a failure leaves the list empty, and nothing retries it from here.
-    if (id) void customProviders.refreshCustomProviders().catch(() => undefined);
+    void store.refreshCustomProviders().catch(() => undefined);
+    return store;
   });
   const providerKeys = createMemo(() => {
     const id = serverId();
@@ -157,10 +159,18 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
     onCancelProviderDownload: (provider) => runtimes.cancelProviderRuntimeDownload(provider),
     onUpdateProvider: (provider) => runtimes.startProviderUpdate(provider),
     get customProviders() {
-      return customProviders.customProviders();
+      return customProviders()?.customProviders() ?? [];
     },
-    onAddCustomProvider: (value) => customProviders.saveCustomProvider(value),
-    onDeleteCustomProvider: (id) => customProviders.deleteCustomProvider(id),
+    onAddCustomProvider: async (value) => {
+      const store = customProviders();
+      if (!store) throw new Error("Connect to your host to save an endpoint.");
+      return store.saveCustomProvider(value);
+    },
+    onDeleteCustomProvider: async (id) => {
+      const store = customProviders();
+      if (!store) throw new Error("Connect to your host to remove an endpoint.");
+      return store.deleteCustomProvider(id);
+    },
     get providerKeys() {
       return providerKeys();
     },
