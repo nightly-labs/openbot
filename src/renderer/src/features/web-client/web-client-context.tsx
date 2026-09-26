@@ -3,6 +3,7 @@ import type {
   AgentApproval,
   AgentEvent,
   AgentRuntimeApproval,
+  AgentStatus,
   AgentSummary,
   AttachmentSummary,
   BrowserControlState,
@@ -67,12 +68,18 @@ export type WebRuntimeFactory = (
   accountFetch: typeof fetch,
 ) => WebWorkspaceRuntime;
 
-export function createWebWorkspace(props: {
-  accountId: string;
-  accountFetch: typeof fetch;
-  onSessionCheck: () => Promise<void>;
-  createRuntime?: WebRuntimeFactory;
-}) {
+export function createWebWorkspace(
+  props: {
+    accountId: string;
+    accountFetch: typeof fetch;
+    onSessionCheck: () => Promise<void>;
+    createRuntime?: WebRuntimeFactory;
+  },
+  hooks: {
+    /** A new agent status of the connected host, such as the end of a provider sign-in. */
+    onStatus?: (status: AgentStatus) => void;
+  } = {},
+) {
   const [state, setState] = createStore<WebWorkspaceState>({
     hosts: [],
     host: null,
@@ -184,6 +191,7 @@ export function createWebWorkspace(props: {
           setState((draft) => {
             draft.presence = event.snapshot;
           });
+        if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {

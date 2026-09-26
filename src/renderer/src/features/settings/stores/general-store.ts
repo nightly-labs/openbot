@@ -12,9 +12,9 @@ import { useI18n } from "../../../i18n-context";
 
 interface GeneralStoreProps {
   agentStatus?: AgentStatus;
-  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
+  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /** The newer runtime main says exists, per provider. Decided there, never worked out here. */
-  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
+  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>> | undefined;
   /**
    * Whether the optional OpenCode key is saved. An accessor, because the modal refreshes it after
    * the key dialog closes and the options memo has to recompute. Read by the modal through the key
