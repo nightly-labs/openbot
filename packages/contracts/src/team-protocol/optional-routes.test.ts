@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
+import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
@@ -96,6 +97,23 @@ describe("agent-install-v1", () => {
     expect(() => codec(AGENT_INSTALL_ROUTES.marketplace).request({ ...listing, receiptId: "" })).toThrow();
     expect(() => codec(AGENT_INSTALL_ROUTES.template).request({ templateId: "writer", timezone: "UTC" })).toThrow();
     expect(() => codec(AGENT_INSTALL_ROUTES.template).response(200, { name: "Writer" })).toThrow();
+  });
+});
+
+describe("agent-update-v1", () => {
+  const update = { agentId: "chief", listingId: "researcher", timezone: "Europe/Warsaw" };
+
+  it("carries only ids to the host and only the agent's id and name back", () => {
+    expect(codec(AGENT_UPDATE_ROUTES.marketplace).request({ ...update, receiptId: "receipt-1" })).toEqual(update);
+    expect(
+      codec(AGENT_UPDATE_ROUTES.marketplace).response(200, { agentId: "chief", name: "Chief", workspacePath: "/x" }),
+    ).toEqual({ agentId: "chief", name: "Chief" });
+  });
+
+  it("rejects an update without the agent to update", () => {
+    expect(() =>
+      codec(AGENT_UPDATE_ROUTES.marketplace).request({ listingId: "researcher", timezone: "UTC" }),
+    ).toThrow();
   });
 });
 

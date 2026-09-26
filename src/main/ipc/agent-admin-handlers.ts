@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
@@ -79,6 +80,15 @@ export function agentAdminIpcHandlers({
     return remoteServers.request(serverId, path, decodeHostAddedAgent, { method: "POST", body });
   }
 
+  function remoteUpdate(serverId: string, body: unknown): Promise<AddedAgent> {
+    if (!remoteServers.supportsCapability(serverId, AGENT_UPDATE_CAPABILITY))
+      throw new Error("An agent on a joined server cannot be updated from here.");
+    return remoteServers.request(serverId, AGENT_UPDATE_ROUTES.marketplace, decodeHostAddedAgent, {
+      method: "POST",
+      body,
+    });
+  }
+
   return {
     agentAdmin: {
       getAgentAdminSettings: scopedHandler((value) => requireString(value, "agentId"), {
@@ -110,11 +120,12 @@ export function agentAdminIpcHandlers({
       }),
       addMarketplaceAgent: scopedHandler(parseInstallMarketplaceAgent, {
         local: async (input) => addedAgent(await marketplaceAgents.install(input)),
-        remote: ({ agentId, ...input }, serverId) => {
-          // agent-install-v1 only adds a new agent. Dropping the id would add a copy instead of updating.
-          if (agentId !== undefined) throw new Error("An agent on a joined server cannot be updated from here.");
-          return remoteAdd(serverId, AGENT_INSTALL_ROUTES.marketplace, input);
-        },
+        // agent-install-v1 only adds a new agent, so an update goes to its own route: dropping the id
+        // would add a copy instead of updating.
+        remote: (input, serverId) =>
+          input.agentId === undefined
+            ? remoteAdd(serverId, AGENT_INSTALL_ROUTES.marketplace, input)
+            : remoteUpdate(serverId, input),
       }),
       addTemplateAgent: scopedHandler(parseInstallAgentTemplate, {
         local: async (input) => addedAgent(await agentTemplates.install(input)),
