@@ -4,6 +4,7 @@ import { type BubbleVariant, Button, DropdownMenu } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import type { AgentMessage, AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AttachmentCards, AttachmentDownloadAll } from "./AttachmentCards";
 import { CodeBlock } from "./CodeBlock";
 import { ComparisonTable } from "./ComparisonTable";
@@ -213,6 +214,7 @@ export function MessageBody(props: {
   onDownloadAttachments?: (attachments: AttachmentSummary[]) => Promise<void>;
   onDownload?: (attachment: AttachmentSummary) => void;
 }) {
+  const { t } = useText();
   const streamingBody = createStreamingBody(
     () => props.message,
     untrack(() => props.animate),
@@ -304,10 +306,14 @@ export function MessageBody(props: {
       <Show when={props.referencedMessage}>
         {(referenced) => (
           <div class="message-reply-context">
-            <span>{referenced().author === "you" ? "You" : (props.referencedAuthorName ?? "Agent")}</span>
+            <span>
+              {referenced().author === "you"
+                ? t("chat.message.you")
+                : (props.referencedAuthorName ?? t("chat.message.agentFallback"))}
+            </span>
             <p>
               <RichMessageText
-                body={referenced().body || "Attachment"}
+                body={referenced().body || t("chat.message.attachment")}
                 agents={props.agents}
                 skills={props.skills}
                 attachments={referenced().attachments}
@@ -503,11 +509,15 @@ export function MessageActions(props: {
   onReply?: () => void;
   onCopy: () => void;
 }) {
+  const { t } = useText();
+  const authorName = () => props.authorName ?? t("chat.message.agentFallback");
   return (
     <div
       class={["message-actions", { "message-actions-open": props.pickerOpen || props.moreOpen }]}
       role="toolbar"
-      aria-label={`${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message actions`}
+      aria-label={
+        props.message.author === "you" ? t("chat.actions.userLabel") : t("chat.actions.label", { name: authorName() })
+      }
     >
       <Show when={props.reactions !== false}>
         <div class="message-action-popover-anchor">
@@ -518,13 +528,13 @@ export function MessageActions(props: {
             gutter={6}
             modal={false}
           >
-            <DropdownMenu.Trigger class="message-action-button" aria-label="Add reaction">
+            <DropdownMenu.Trigger class="message-action-button" aria-label={t("chat.actions.addReaction")}>
               <ReactionIcon />
             </DropdownMenu.Trigger>
             <DropdownMenu.Content
               class="reaction-picker"
               data-menu-layout="grid"
-              aria-label="Choose a reaction"
+              aria-label={t("chat.actions.chooseReaction")}
               aria-hidden={props.pickerOpen ? undefined : "true"}
             >
               <div class="reaction-picker-row">
@@ -533,7 +543,7 @@ export function MessageActions(props: {
                     {(emoji) => (
                       <DropdownMenu.RadioItem
                         value={emoji}
-                        aria-label={`React with ${emoji}`}
+                        aria-label={t("chat.actions.react", { emoji })}
                         onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
                       >
                         {emoji}
@@ -543,7 +553,7 @@ export function MessageActions(props: {
                 </DropdownMenu.RadioGroup>
                 <DropdownMenu.Item
                   class="reaction-more-button"
-                  aria-label="More emoji"
+                  aria-label={t("chat.actions.moreEmoji")}
                   closeOnSelect={false}
                   onSelect={props.onExpandEmoji}
                 >
@@ -557,7 +567,7 @@ export function MessageActions(props: {
                       {(emoji) => (
                         <DropdownMenu.RadioItem
                           value={emoji}
-                          aria-label={`React with ${emoji}`}
+                          aria-label={t("chat.actions.react", { emoji })}
                           onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
                         >
                           {emoji}
@@ -576,7 +586,11 @@ export function MessageActions(props: {
           variant="ghost"
           type="button"
           class="message-action-button"
-          aria-label={`Reply to ${props.message.author === "you" ? "User" : (props.authorName ?? "Agent")} message`}
+          aria-label={
+            props.message.author === "you"
+              ? t("chat.actions.replyUser")
+              : t("chat.actions.reply", { name: authorName() })
+          }
           onClick={props.onReply}
         >
           <ReplyIcon />
@@ -590,13 +604,13 @@ export function MessageActions(props: {
           gutter={6}
           modal={false}
         >
-          <DropdownMenu.Trigger class="message-action-button" aria-label="More message actions">
+          <DropdownMenu.Trigger class="message-action-button" aria-label={t("chat.actions.more")}>
             <MoreIcon />
           </DropdownMenu.Trigger>
           <DropdownMenu.Content class="message-more-menu" aria-hidden={props.moreOpen ? undefined : "true"}>
             <DropdownMenu.Item onSelect={props.onCopy}>
               {props.copied ? <CheckIcon /> : <CopyIcon />}
-              <span>{props.copied ? "Copied" : "Copy"}</span>
+              <span>{props.copied ? t("common.copied") : t("common.copy")}</span>
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Root>

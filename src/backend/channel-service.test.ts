@@ -350,6 +350,18 @@ describe("shared channel coordination", () => {
     expect(service.store.tasks("channel-1")[0]?.error).toContain("no confirmed result");
     expect(data.mailbox.nextQueued("agent-a")).toBeNull();
   });
+  it("keeps a live turn running when a provider becomes ready again", async () => {
+    await send("Write a file");
+    const assignment = required(service.store.assignments("channel-1")[0]);
+    const deliveryId = required(assignment.deliveryId);
+    await service.prepare(required(data.mailbox.getDelivery(deliveryId)));
+    await data.mailbox.markStarting(deliveryId);
+    await data.mailbox.markRunning(deliveryId, "turn-1");
+    service.accepted(deliveryId, "session-1", "turn-1");
+    await service.recover();
+    expect(service.store.assignments("channel-1")[0]?.state).not.toBe("interrupted");
+    expect(service.store.tasks("channel-1")[0]?.state).toBe("running");
+  });
   it("asks one visible question for ambiguous routing and never broadcasts", async () => {
     generate.mockResolvedValueOnce(JSON.stringify({ question: "Which member should own this?" }));
     await service.command(

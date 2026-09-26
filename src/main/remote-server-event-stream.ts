@@ -38,6 +38,7 @@ import {
   encodeTeamProtocolV1CurrentClientEvent,
   type TeamProtocolV1CurrentClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 import { requestJson } from "./remote-server-http";
 import type { RemoteServerDirectory, StoredRemoteServerView } from "./remote-server-store";
@@ -397,7 +398,7 @@ export class RemoteEventStream {
             protocolFailed = true;
             this.#connections.reportError(
               serverId,
-              new RemoteProtocolError("protocol_error", "The host sent a binary event."),
+              new RemoteProtocolError("protocol_error", sourceText("error.remote.binaryEvent")),
             );
             socket.close(1003, "Text event payloads are required");
             return;
@@ -406,7 +407,7 @@ export class RemoteEventStream {
             protocolFailed = true;
             this.#connections.reportError(
               serverId,
-              new RemoteProtocolError("protocol_error", "The host event was too large."),
+              new RemoteProtocolError("protocol_error", sourceText("error.remote.eventTooLarge")),
             );
             socket.close(1009, "Event payload is too large");
             return;
@@ -422,7 +423,7 @@ export class RemoteEventStream {
               protocolFailed = true;
               this.#connections.reportError(
                 serverId,
-                new RemoteProtocolError("protocol_error", "The host returned an invalid known event."),
+                new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidKnownEvent")),
               );
               socket.close(1003, "Invalid known event payload");
               return;
@@ -451,7 +452,7 @@ export class RemoteEventStream {
             protocolFailed = true;
             this.#connections.reportError(
               serverId,
-              new RemoteProtocolError("protocol_error", "The host returned invalid JSON."),
+              new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidJson")),
             );
             socket.close(1003, "Invalid event payload");
           }
@@ -460,7 +461,7 @@ export class RemoteEventStream {
           "error",
           () => {
             socket.close(1011, "Remote events are unavailable");
-            reject(new Error("Remote events are unavailable."));
+            reject(new Error(sourceText("error.remote.eventsUnavailable")));
           },
           { once: true },
         );
@@ -488,7 +489,10 @@ export class RemoteEventStream {
         } else {
           authenticationFailed = !opened && (await this.#hasRejectedEventCredentials(server));
           if (authenticationFailed) {
-            this.#connections.reportError(serverId, new RemoteRequestError(401, "Sign in again."));
+            this.#connections.reportError(
+              serverId,
+              new RemoteRequestError(401, sourceText("error.remote.signInAgain")),
+            );
           } else {
             this.#connections.reportUnreachable(serverId);
             this.#onOffline(serverId);

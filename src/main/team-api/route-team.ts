@@ -10,6 +10,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CreateTeamInviteInput, InviteSummary, TeamPresenceSnapshot } from "@openbot/contracts/ipc";
 import { isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamStore } from "../team-store";
 import type { TeamApiRemoteScreen } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -69,7 +70,7 @@ export async function routeTeam(
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.logo) {
     const logo = store.resolveLogo();
     if (!logo || (url.searchParams.get("v") && url.searchParams.get("v") !== logo.version)) {
-      return json(404, { error: "Server logo not found." });
+      return json(404, { error: sourceText("error.team.logoNotFound") });
     }
     const bytes = await readFile(logo.path);
     response.writeHead(200, {
@@ -88,10 +89,10 @@ export async function routeTeam(
   // shows "update the host" instead of treating the host as broken; the features behind them are
   // gone, and the wire protocol is frozen, so the tombstones stay.
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.host.remoteMac) {
-    return json(426, { error: "Update required.", code: "protocol_mismatch" });
+    return json(426, { error: sourceText("error.team.updateRequired"), code: "protocol_mismatch" });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.host.remoteDesktopAccess) {
-    return json(426, { error: "Update required.", code: "protocol_mismatch" });
+    return json(426, { error: sourceText("error.team.updateRequired"), code: "protocol_mismatch" });
   }
 
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.members) {
@@ -137,7 +138,7 @@ export async function routeTeam(
     // link back as single-use; joining with it still works, and IPC callers see the full shape.
     const permanent = body.permanent === undefined ? undefined : body.permanent === true;
     if (body.permanent !== undefined && !isBoolean(body.permanent)) throw new HttpError(400, "Invalid invitation.");
-    if (!createInvite) throw new HttpError(503, "Invitation service is unavailable.");
+    if (!createInvite) throw new HttpError(503, sourceText("error.team.inviteServiceUnavailable"));
     return json(201, await createInvite({ role, ...(email ? { email } : {}), ...(permanent ? { permanent } : {}) }));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.team.invites) {

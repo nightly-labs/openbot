@@ -1,6 +1,6 @@
 import type { DynamicIslandAction } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { createEffect, onSettled, untrack } from "solid-js";
 import { withoutAgent } from "../../app-message-projection";
 import { useNavigation } from "../../navigation";
@@ -28,6 +28,7 @@ import { dynamicIslandPort } from "./dynamic-island-port";
  * against the coordinator so the island reflects before the renderer catches up.
  */
 export function DynamicIslandBridge() {
+  const { t, errorMessage } = useText();
   const platform = usePlatform();
   const { activeServerId } = useServers();
   const { dynamicIslandCoordinator, publishDynamicIslandPresentation } = useDynamicIsland();
@@ -110,8 +111,8 @@ export function DynamicIslandBridge() {
     if (platform.landingPreview) return;
     return dynamicIslandPort().dynamicIsland.onAction((action) => {
       void handleDynamicIslandAction(action).catch((error) => {
-        toast.error("Could not open this remote item", {
-          description: errorMessage(error, "Could not open this item. Try again."),
+        toast.error(t("island.error.openRemoteTitle"), {
+          description: errorMessage(error, t("island.error.openRemote")),
         });
       });
     });
@@ -174,7 +175,7 @@ export function DynamicIslandBridge() {
       try {
         await dynamicIslandPort().agent.acknowledgeFailedTurn({ agentId: action.agentId, turnId: action.turnId });
       } catch (error) {
-        appendUiError(action.agentId, error, "Acknowledge failed", action.serverId);
+        appendUiError(action.agentId, error, t("app.errorStatus.acknowledge"), action.serverId);
         return;
       }
       setFailedTurns((current) =>

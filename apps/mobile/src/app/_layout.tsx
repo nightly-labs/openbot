@@ -16,6 +16,7 @@ import { useCSSVariable, useUniwind, withUniwind } from "uniwind";
 import { MobileAnalyticsLifecycle } from "@/features/analytics/lifecycle";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
@@ -25,6 +26,7 @@ import { SplashBackdrop } from "@/shared/components/splash-backdrop";
 import { nativeSplash } from "@/shared/lib/native-splash";
 import { isIOS } from "@/shared/lib/platform";
 import { queryClient } from "@/shared/lib/query-client";
+import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import {
   SplashContentReadyContext,
@@ -41,6 +43,7 @@ export const unstable_settings = {
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 
 function RootNavigator() {
+  const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
@@ -100,7 +103,7 @@ function RootNavigator() {
                     <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen
                       name="scan-qr-code"
-                      options={{ animation: "slide_from_right", title: "Scan QR code" }}
+                      options={{ animation: "slide_from_right", title: t("mobile.app.route.scanQrCode") }}
                     />
                   </Stack.Protected>
                   <Stack.Protected guard={Boolean(session)}>
@@ -144,6 +147,7 @@ export default function RootLayout() {
     void loadAppearance().catch(() => undefined);
     void loadHapticsPreference().catch(() => undefined);
     void loadDictationLanguage().catch(() => undefined);
+    void loadAppLanguage().catch(() => undefined);
   }, []);
 
   return (

@@ -1,4 +1,5 @@
 import { type AgentProviderId, type AgentStatus, agentProviderDescriptor } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
@@ -103,7 +104,7 @@ const Providers = createSimpleContext({
     function openProviderInstallGuide(provider: AgentProviderId): Promise<void> {
       const descriptor = agentProviderDescriptor(provider);
       if (descriptor.installGuideLink === null) {
-        return Promise.reject(new Error(`${descriptor.displayName} is included with OpenBot.`));
+        return Promise.reject(new Error(currentText().t("app.provider.included", { name: descriptor.displayName })));
       }
       return appPort().openExternal(descriptor.installGuideLink);
     }

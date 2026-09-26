@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 
 /** Explains the same standing grant from the approval card and the model picker. */
 export function StandingApprovalConfirmation(props: {
@@ -8,14 +9,23 @@ export function StandingApprovalConfirmation(props: {
   onConfirm: () => void;
   restoreFocusTarget?: HTMLElement;
 }) {
+  const { t } = useText();
   return (
     <ConfirmDialog
       open={props.open}
       tone="default"
       initialFocus="cancel"
-      title={`Always allow ${props.agentName ?? "this agent"}?`}
-      description={`${props.agentName ?? "This agent"} will run commands, change files and widen its own filesystem and network access on the computer that runs it without asking again. Publishing, replacing and deleting public sites still require approval unless Turbo mode is on. You can turn off Auto approve in this agent's model menu.`}
-      confirmLabel="Always allow"
+      title={
+        props.agentName === undefined
+          ? t("app.standingApproval.titleUnnamed")
+          : t("app.standingApproval.title", { name: props.agentName })
+      }
+      description={
+        props.agentName === undefined
+          ? t("app.standingApproval.descriptionUnnamed")
+          : t("app.standingApproval.description", { name: props.agentName })
+      }
+      confirmLabel={t("prompt.approval.alwaysAllow")}
       restoreFocusTarget={props.restoreFocusTarget}
       onCancel={props.onCancel}
       onConfirm={props.onConfirm}

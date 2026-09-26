@@ -2,6 +2,7 @@ import { AppLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isNeverExpiringInvite } from "@openbot/contracts/invite-links";
 import type { InvitePreview, JoinServerInput } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
   Alert,
   AlertContent,
@@ -20,7 +21,7 @@ import {
 } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
-import { errorMessage } from "../../error-message";
+import { useText } from "../../text";
 
 interface JoinServerDialogProps {
   inviteUrl: string;
@@ -32,7 +33,10 @@ interface JoinServerDialogProps {
 
 type DialogPhase = "idle" | "previewing" | "joining";
 
+const INVITE_URL_PLACEHOLDER = "https://openbot.run/join?…";
+
 export function JoinServerDialog(props: JoinServerDialogProps) {
+  const { t, errorMessage } = useText();
   const [inviteUrl, setInviteUrl] = createSignal(untrack(() => props.inviteUrl));
   const [preview, setPreview] = createSignal<InvitePreview | null>(null);
   const [phase, setPhase] = createSignal<DialogPhase>("idle");
@@ -53,10 +57,10 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
   const page = () => (preview() ? "2" : "1");
   const previewError = () => (preview() ? null : error());
   const joinError = () => (preview() ? error() : null);
-  const dialogTitle = () => preview()?.serverName ?? "Join a server";
+  const dialogTitle = () => preview()?.serverName ?? t("server.join.title");
   const dialogDescription = () => {
     const item = preview();
-    return item ? `Verified invitation from ${item.apiHostname}.` : "Paste an invite link to continue.";
+    return item ? t("server.join.verifiedFrom", { hostname: item.apiHostname }) : t("server.join.pasteToContinue");
   };
 
   onSettled(() => {
@@ -84,7 +88,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
       setPreview(await props.onPreview({ inviteUrl: normalizedInviteUrl }));
     } catch (cause) {
       setPreview(null);
-      setError(errorMessage(cause, "Could not verify this invitation."));
+      setError(errorMessage(cause, t("server.join.verifyFailed")));
       queueMicrotask(showInputError);
     } finally {
       setPhase("idle");
@@ -106,7 +110,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
       setPhase("idle");
       startClose();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not join the host."));
+      setError(errorMessage(cause, t("server.join.joinFailed")));
       setPhase("idle");
       queueMicrotask(showJoinError);
     }
@@ -193,8 +197,8 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
 
             <IconButton
               class="join-server-close"
-              label="Close"
-              tooltip="Close"
+              label={t("common.close")}
+              tooltip={t("common.close")}
               variant="ghost"
               disabled={busy()}
               onClick={requestClose}
@@ -222,14 +226,14 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                   <header class="join-server-header join-server-header-entry">
                     <AppLogo variant="production" class="join-server-entry-logo" />
                     <Heading as="h2" size="lg">
-                      Join a server
+                      {t("server.join.title")}
                     </Heading>
-                    <Text tone="muted">Paste the invitation you received from a server owner.</Text>
+                    <Text tone="muted">{t("server.join.description")}</Text>
                   </header>
 
                   <Field
                     class={`join-server-field t-input-wrap${previewError() ? " is-error" : ""}`}
-                    label="Invite link"
+                    label={t("server.join.inviteLink")}
                     htmlFor="join-server-invite-url"
                     error={previewError() ? <span class="t-error-msg">{previewError()}</span> : undefined}
                   >
@@ -240,7 +244,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                       type="text"
                       inputmode="url"
                       autocomplete="off"
-                      placeholder="https://openbot.run/join?…"
+                      placeholder={INVITE_URL_PLACEHOLDER}
                       value={inviteUrl()}
                       onValueChange={(value) => {
                         clearInputMotion();
@@ -262,13 +266,13 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                       variant="default"
                       fullWidth
                       loading={phase() === "previewing"}
-                      loadingLabel="Checking…"
+                      loadingLabel={t("server.join.checking")}
                       disabled={!inviteUrl().trim() || busy()}
                     >
-                      Review invite
+                      {t("server.join.review")}
                     </Button>
                     <Button type="button" variant="ghost" disabled={busy()} onClick={requestClose}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </footer>
                 </form>
@@ -285,10 +289,13 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                 >
                   <Show when={preview()}>
                     {(item) => (
-                      <section class="join-server-header join-server-header-verified" aria-label="Verified invitation">
+                      <section
+                        class="join-server-header join-server-header-verified"
+                        aria-label={t("server.join.verifiedInvitation")}
+                      >
                         <AppLogo variant="production" class="join-server-identity-logo" />
                         <Text class="join-server-invite-eyebrow" tone="secondary">
-                          You’ve been invited to join
+                          {t("server.join.invitedToJoin")}
                         </Text>
                         <Heading as="h2" size="lg">
                           {item().serverName}
@@ -312,7 +319,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                           <OctagonX />
                         </AlertIcon>
                         <AlertContent>
-                          <AlertTitle>Connection failed</AlertTitle>
+                          <AlertTitle>{t("server.join.connectionFailed")}</AlertTitle>
                           <AlertDescription>{message()}</AlertDescription>
                         </AlertContent>
                       </Alert>
@@ -326,13 +333,13 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                       variant="default"
                       fullWidth
                       loading={phase() === "joining"}
-                      loadingLabel="Connecting…"
+                      loadingLabel={t("common.connecting")}
                       disabled={busy()}
                     >
-                      Connect
+                      {t("server.join.connect")}
                     </Button>
                     <Button type="button" variant="ghost" disabled={busy()} onClick={resetInvite}>
-                      Use another invite
+                      {t("server.join.useAnother")}
                     </Button>
                   </footer>
                 </form>
@@ -351,37 +358,38 @@ interface InvitePreviewCardProps {
 }
 
 export function InvitePreviewCard(props: InvitePreviewCardProps) {
+  const { t, format } = useText();
   return (
-    <section class="join-server-preview" data-variant="embedded" aria-label="Verified invitation">
+    <section class="join-server-preview" data-variant="embedded" aria-label={t("server.join.verifiedInvitation")}>
       <div class="join-server-preview-signal" aria-hidden="true">
         <i />
         <span />
       </div>
       <div class="join-server-preview-heading">
-        <span class="join-server-verified">Verified host</span>
+        <span class="join-server-verified">{t("server.join.verifiedHost")}</span>
         <strong>{props.preview.serverName}</strong>
         <small>{props.preview.apiHostname}</small>
       </div>
       <dl>
         <div>
-          <dt>Access</dt>
-          <dd>{props.preview.role === "admin" ? "Admin" : "Member"}</dd>
+          <dt>{t("server.join.access")}</dt>
+          <dd>{props.preview.role === "admin" ? t("server.role.admin") : t("server.role.member")}</dd>
         </div>
         <div>
-          <dt>Expires</dt>
+          <dt>{t("server.join.expires")}</dt>
           <dd>
             {props.preview.permanent || isNeverExpiringInvite(props.preview.expiresAt)
-              ? "Never"
-              : formatInviteDate(props.preview.expiresAt)}
+              ? t("server.join.never")
+              : formatInviteDate(props.preview.expiresAt, t, format)}
           </dd>
         </div>
         <div>
-          <dt>Account</dt>
+          <dt>{t("server.join.account")}</dt>
           <dd>{props.accountEmail}</dd>
         </div>
       </dl>
       <Show when={props.preview.emailBound}>
-        <p>This invitation only works for its email recipient.</p>
+        <p>{t("server.join.emailBound")}</p>
       </Show>
     </section>
   );
@@ -398,9 +406,9 @@ function shakeDuration(): number {
   return motionDuration("--shake-dur-a", 80) * 2 + motionDuration("--shake-dur-b", 60) * 2;
 }
 
-function formatInviteDate(value: string): string {
+function formatInviteDate(value: string, t: AppTranslate, format: AppFormat): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Unknown"
-    : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+    ? t("server.join.unknownDate")
+    : format.date(date, { dateStyle: "medium", timeStyle: "short" });
 }

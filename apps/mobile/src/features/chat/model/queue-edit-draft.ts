@@ -37,6 +37,16 @@ export interface QueueEditDraft {
   pendingSave?: Extract<QueueEditRequest, { action: "save" }>;
 }
 
+/** A saved edit that does not decode. `part` names what the phone could not read. */
+export class QueueEditDraftError extends Error {
+  constructor(
+    readonly part: "edit" | "attachments" | "pendingSave",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export function decodeQueueEditDraft(raw: string | null): QueueEditDraft | null {
   if (!raw) return null;
   return parseQueueEditDraft(JSON.parse(raw));
@@ -52,24 +62,24 @@ function parseQueueEditDraft(value: unknown): QueueEditDraft {
     !value.keepAttachmentIds.every(isString) ||
     !isDynamicRecord(value.delivery)
   )
-    throw new Error("Could not read the saved queue edit.");
+    throw new QueueEditDraftError("edit", "Could not read the saved queue edit.");
   const addedAttachments = value.addedAttachments ?? [];
   if (
     !Array.isArray(addedAttachments) ||
     addedAttachments.length > INPUT_LIMITS.attachments ||
     !addedAttachments.every(isStoredQueueAttachment)
   )
-    throw new Error("Could not read the saved edit attachments.");
+    throw new QueueEditDraftError("attachments", "Could not read the saved edit attachments.");
   const snapshot = { agentId: value.delivery.recipientAgentId, deliveries: [value.delivery] };
-  if (!isQueueSnapshot(snapshot)) throw new Error("Could not read the saved queue edit.");
+  if (!isQueueSnapshot(snapshot)) throw new QueueEditDraftError("edit", "Could not read the saved queue edit.");
   const [delivery] = snapshot.deliveries;
-  if (!delivery) throw new Error("Could not read the saved queue edit.");
+  if (!delivery) throw new QueueEditDraftError("edit", "Could not read the saved queue edit.");
   const pendingSave = value.pendingSave === undefined ? undefined : decodeQueueEditRequest(value.pendingSave);
   if (
     pendingSave &&
     (pendingSave.action !== "save" || pendingSave.editId !== value.editId || pendingSave.deliveryId !== delivery.id)
   )
-    throw new Error("Could not read the pending queue save.");
+    throw new QueueEditDraftError("pendingSave", "Could not read the pending queue save.");
   return {
     editId: value.editId,
     initialized: value.initialized,

@@ -1,5 +1,6 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { useQuery } from "@tanstack/react-query";
 import { File, Paths } from "expo-file-system";
@@ -10,6 +11,7 @@ import { FileText } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, View } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 
@@ -28,11 +30,11 @@ export function rememberImageDimensions(id: string, dimensions: ImageDimensions)
 }
 
 /** The short type a file card shows, such as PDF or CSV, from the name the user sees. */
-export function attachmentTypeLabel(name: string, mimeType: string): string {
+export function attachmentTypeLabel(name: string, mimeType: string, t: MobileTranslate): string {
   const extension = attachmentFileExtension(name);
   if (extension && extension.length <= 5) return extension.toUpperCase();
-  if (mimeType.startsWith("text/")) return "TEXT";
-  return "FILE";
+  if (mimeType.startsWith("text/")) return t("mobile.chat.attachment.typeText");
+  return t("mobile.chat.attachment.typeFile");
 }
 
 /** A list entry shows what the file is: an image shows itself, every other file shows its icon. */
@@ -70,6 +72,7 @@ export function localAttachmentPreview(file: { mimeType: string; base64: string;
  */
 export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
   const { downloadAttachment } = useMobileWorkspace();
+  const { t, sourceText } = useText();
   const [sharing, setSharing] = useState(false);
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
   const local =
@@ -79,8 +82,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   const query = useQuery({
     queryKey: ["chat-attachment", serverId, attachment.id],
     queryFn: (): Promise<RemoteFileUpload & { localUri?: string }> => {
-      if (attachment.size > MOBILE_ATTACHMENT_BYTES)
-        throw new Error("This file exceeds the mobile 10 MB limit. Open it on desktop.");
+      if (attachment.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLargeForMobile"));
       return downloadAttachment(serverId, attachment.id);
     },
     enabled: preview && !local && !pending,
@@ -102,16 +104,19 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     setSharing(true);
     let file: File | null = null;
     try {
-      if (!(await Sharing.isAvailableAsync())) throw new Error("File sharing is unavailable on this device.");
+      if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
       const result = query.data ? { data: query.data, error: null } : await query.refetch();
       if (result.error) throw result.error;
-      if (!result.data) throw new Error("The attachment is unavailable. Try again.");
+      if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       const name = attachment.name.replace(/[/\\\p{Cc}]/gu, "_");
       file = new File(Paths.cache, `${Date.now()}-${name}`);
       file.write(result.data.base64, { encoding: "base64" });
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
-      Alert.alert("Could not open attachment", error instanceof Error ? error.message : "Try again.");
+      Alert.alert(
+        t("mobile.chat.attachment.openFailed"),
+        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
+      );
     } finally {
       if (file?.exists) file.delete();
       setSharing(false);
@@ -125,12 +130,12 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       // Loaded on use: an app build made before this module was added has no native side for it,
       // and a top-level import would break every chat instead of this one action.
       const MediaLibrary = await import("expo-media-library").catch(() => null);
-      if (!MediaLibrary) throw new Error("Saving photos needs the latest version of the app.");
+      if (!MediaLibrary) throw new Error(t("mobile.chat.attachment.photosNeedUpdate"));
       if (!(await MediaLibrary.requestPermissionsAsync(true, ["photo"])).granted)
-        throw new Error("Allow OpenBot to add photos in Settings to save this image.");
+        throw new Error(t("mobile.chat.attachment.photosPermission"));
       const result = query.data ? { data: query.data, error: null } : await query.refetch();
       if (result.error) throw result.error;
-      if (!result.data) throw new Error("The image is unavailable. Try again.");
+      if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
       // The photo library reads the type from the extension, so the file keeps one.
       const extension = attachmentFileExtension(attachment.name) ?? result.data.mimeType.split("/")[1] ?? "png";
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
@@ -138,7 +143,10 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
-      Alert.alert("Could not save image", error instanceof Error ? error.message : "Try again.");
+      Alert.alert(
+        t("mobile.chat.attachment.saveImageFailed"),
+        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
+      );
       return false;
     } finally {
       if (file?.exists) file.delete();
@@ -163,9 +171,10 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
  * before sending. A pasted file has no path, so it gets a temporary one that is removed after.
  */
 export async function shareLocalAttachment(file: { name: string; mimeType: string; base64: string; uri?: string }) {
+  const { t, sourceText } = currentText();
   let temporary: File | null = null;
   try {
-    if (!(await Sharing.isAvailableAsync())) throw new Error("File sharing is unavailable on this device.");
+    if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
     let uri = file.uri;
     if (!uri) {
       temporary = new File(Paths.cache, `${Date.now()}-${file.name.replace(/[/\\\p{Cc}]/gu, "_")}`);
@@ -174,15 +183,11 @@ export async function shareLocalAttachment(file: { name: string; mimeType: strin
     }
     await Sharing.shareAsync(uri, { mimeType: file.mimeType, dialogTitle: file.name });
   } catch (error) {
-    Alert.alert("Could not open attachment", error instanceof Error ? error.message : "Try again.");
+    Alert.alert(
+      t("mobile.chat.attachment.openFailed"),
+      error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
+    );
   } finally {
     if (temporary?.exists) temporary.delete();
   }
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }

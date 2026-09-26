@@ -57,6 +57,7 @@ export function decodeQueueEditRequest(value: unknown): QueueEditRequest {
 }
 
 export class QueueEditRejectedError extends Error {
+  // A screen translates this text through the "error.agent.queueEditRejected" source template.
   constructor(message: string) {
     super(`Queue edit rejected: ${message}`);
   }

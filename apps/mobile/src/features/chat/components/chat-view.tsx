@@ -1,4 +1,3 @@
-import { userErrorMessage } from "@openbot/user-errors";
 import { useQueryClient } from "@tanstack/react-query";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { router, useIsFocused } from "expo-router";
@@ -32,6 +31,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
@@ -119,6 +119,7 @@ export function ChatView({
   needsAction = false,
   notice,
 }: ChatViewProps) {
+  const { t, errorMessage } = useText();
   const { respondToBrowserSecret, respondToBrowserTakeover, attachmentSupport } = useMobileWorkspace();
   const browserRequests = useBrowserRequests(target.serverId);
   const isFocused = useIsFocused();
@@ -305,7 +306,7 @@ export function ChatView({
       setHistoryReceipt(null);
       setSendError(null);
     } catch (error) {
-      setSendError({ agentId: target.id, message: userErrorMessage(error, "Could not refresh chat history.") });
+      setSendError({ agentId: target.id, message: errorMessage(error, t("mobile.chat.history.refreshFailed")) });
     } finally {
       setRefreshingHistory(false);
     }
@@ -327,11 +328,11 @@ export function ChatView({
         setStoppingTurnId((current) => (current === turnId ? null : current));
         setSendError({
           agentId: target.id,
-          message: userErrorMessage(error, "Could not stop the agent. It may have finished already."),
+          message: errorMessage(error, t("mobile.chat.composer.stopFailed")),
         });
       });
     };
-  }, [stopTurn, activeTurnId, target.id]);
+  }, [stopTurn, activeTurnId, target.id, errorMessage, t]);
 
   function sendMessage(value: string): void {
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
@@ -414,10 +415,7 @@ export function ChatView({
         if (!uploadCancelled.current)
           setSendError({
             agentId: target.id,
-            message: userErrorMessage(
-              error,
-              "Could not send the message. Check the conversation before you send it again.",
-            ),
+            message: errorMessage(error, t("mobile.chat.composer.sendFailed")),
           });
       } finally {
         sendingRef.current = false;
@@ -543,7 +541,7 @@ export function ChatView({
               {!atLatest && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
                   <ChatGlassIconButton
-                    accessibilityLabel="Scroll to latest message"
+                    accessibilityLabel={t("mobile.chat.scrollToLatest")}
                     fallbackBackground={fieldBackground}
                     liquidGlassAvailable={liquidGlassAvailable}
                     onPress={motion.scrollToLatest}
@@ -579,14 +577,16 @@ export function ChatView({
               {historyReceipt ? (
                 <View className="bg-background px-4 py-2">
                   <Typography.Paragraph className="text-muted">
-                    Message sent. Refresh history to show it.
+                    {t("mobile.chat.history.sentRefresh")}
                   </Typography.Paragraph>
                   <Button
                     variant="tertiary"
                     isDisabled={!serverOnline || refreshingHistory}
                     onPress={() => void retryAcceptedHistory()}
                   >
-                    <Button.Label>{refreshingHistory ? "Refreshing…" : "Refresh history"}</Button.Label>
+                    <Button.Label>
+                      {refreshingHistory ? t("mobile.chat.history.refreshing") : t("mobile.chat.history.refresh")}
+                    </Button.Label>
                   </Button>
                 </View>
               ) : null}
@@ -606,7 +606,6 @@ export function ChatView({
               {!readOnly ? (
                 <ChatComposer
                   sendRetryVersion={sendRetryVersion}
-                  sendLabel="Send message"
                   replyTarget={replyTarget}
                   replyFocusVersion={replyFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}

@@ -13,6 +13,7 @@ import { TEAM_PROTOCOL_V4 } from "@openbot/contracts/team-protocol/v4";
 import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V1, type TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
+import { sourceText } from "@openbot/i18n/source";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
@@ -48,7 +49,7 @@ const NO_OUTCOME: RemoteConnectionOutcome = { issue: null, state: null, suspendR
 // object there would be one mutation away from being every server's issue.
 export function hostUnreachable(): RemoteConnectionOutcome {
   return {
-    issue: { code: "network_unavailable", message: "The host is not reachable.", retryable: true },
+    issue: { code: "network_unavailable", message: sourceText("error.remote.hostUnreachable"), retryable: true },
     state: "offline",
     suspendReconnect: false,
     hostSupport: null,
@@ -87,7 +88,11 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
       // Deliberately not the host's own message: a 401 body is written for a developer, and the one
       // thing the user can do about it is sign in again.
       return {
-        issue: { code: "authentication_required", message: "Sign in to this host again.", retryable: true },
+        issue: {
+          code: "authentication_required",
+          message: sourceText("error.remote.signInToHostAgain"),
+          retryable: true,
+        },
         state: "error",
         suspendReconnect: true,
         hostSupport: null,
@@ -99,7 +104,7 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
   }
   if (error instanceof SyntaxError) {
     return {
-      issue: { code: "protocol_error", message: "The host returned invalid data.", retryable: true },
+      issue: { code: "protocol_error", message: sourceText("error.remote.invalidData"), retryable: true },
       state: "error",
       suspendReconnect: true,
       hostSupport: null,

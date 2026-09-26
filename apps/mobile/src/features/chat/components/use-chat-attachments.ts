@@ -4,7 +4,6 @@ import {
   attachmentMimeTypeForName,
   isSupportedAttachmentName,
   isSupportedAttachmentNameFor,
-  SUPPORTED_ATTACHMENT_DESCRIPTION,
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
@@ -16,6 +15,7 @@ import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 
 /**
@@ -38,8 +38,6 @@ export interface ChatAttachment extends RemoteFileUpload {
   dimensions?: ImageDimensions;
 }
 
-const LIMIT_MESSAGE = "You can attach up to 10 files.";
-
 function base64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -52,6 +50,8 @@ export function useChatAttachments(
   /** What the receiving host accepts. Read on each selection, because it loads with the connection. */
   support?: () => AttachmentSupport,
 ) {
+  const { t } = useText();
+  const limitMessage = () => t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments });
   // The plus's rect while the attachment card is open, and null while it is
   // not: one value, so the card can never be open without an anchor to grow
   // out of and collapse back into.
@@ -90,22 +90,26 @@ export function useChatAttachments(
   // The same checks as desktop, named per file: one selection can hold several, and the user
   // needs to know which one to fix.
   function assertSupported(name: string) {
-    if (!isSupportedAttachmentName(name)) throw new Error(`${name}: choose ${SUPPORTED_ATTACHMENT_DESCRIPTION}.`);
-    if (support && !isSupportedAttachmentNameFor(name, support()))
+    if (!isSupportedAttachmentName(name)) throw new Error(t("mobile.chat.attachment.unsupported", { name }));
+    if (support && !isSupportedAttachmentNameFor(name, support())) {
+      const type = attachmentFileExtension(name)?.toUpperCase();
       throw new Error(
-        `${name}: the host computer does not accept ${attachmentFileExtension(name)?.toUpperCase() ?? "these"} files. Update OpenBot there to attach them.`,
+        type
+          ? t("mobile.chat.attachment.hostRejectsType", { name, type })
+          : t("mobile.chat.attachment.hostRejects", { name }),
       );
+    }
   }
   function prepare(input: RemoteFileUpload & { uri?: string }): ChatAttachment {
     assertSupported(input.name);
     if (!input.name.trim() || input.name.length > INPUT_LIMITS.attachmentName)
-      throw new Error("Choose a file with a shorter name.");
+      throw new Error(t("mobile.chat.attachment.nameTooLong"));
     if (input.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(input.base64))
-      throw new Error("The attachment is damaged. Select it again.");
+      throw new Error(t("mobile.chat.attachment.damaged"));
     const size =
       Math.floor((input.base64.length * 3) / 4) -
       (input.base64.endsWith("==") ? 2 : input.base64.endsWith("=") ? 1 : 0);
-    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error(`${input.name} is larger than 10 MB.`);
+    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: input.name }));
     const dimensions = input.mimeType.startsWith("image/") ? imageDimensions(input.base64) : null;
     return {
       ...input,
@@ -123,7 +127,7 @@ export function useChatAttachments(
     });
   }
   function add(input: RemoteFileUpload & { uri?: string }) {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     const item = prepare(input);
     const saved = persistItems([...itemsRef.current, item]);
     trackSelected(item.size);
@@ -133,12 +137,12 @@ export function useChatAttachments(
     const file = new File(uri);
     const safeName = name.replace(/[/\\]/gu, "_");
     // Check before reading: a rejected file should not be copied into memory first.
-    if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(`${safeName} is larger than 10 MB.`);
+    if (file.size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: safeName }));
     assertSupported(safeName);
     return { name: safeName, mimeType: attachmentMimeTypeForName(safeName), base64: await file.base64(), uri };
   }
   async function addFile(uri: string, name: string) {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     await add(await readFile(uri, name));
   }
   function photoName(asset: ImagePicker.ImagePickerAsset) {
@@ -184,22 +188,25 @@ export function useChatAttachments(
   // for the caller's error path to unwind.
   async function requestCamera(): Promise<boolean> {
     try {
-      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
       if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
-        throw new Error("Allow camera access in Settings to take a photo.");
+        throw new Error(t("mobile.chat.attachment.cameraPermission"));
     } catch (error) {
       mobileAnalytics.track("attachment_action", {
         action: "select",
         result: "failed",
         failure_code: "operation_failed",
       });
-      Alert.alert("Could not add attachment", error instanceof Error ? error.message : "Try again.");
+      Alert.alert(
+        t("mobile.chat.attachment.addFailed"),
+        error instanceof Error ? error.message : t("mobile.chat.tryAgain"),
+      );
       return false;
     }
     return true;
   }
   async function choosePhotos() {
-    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(LIMIT_MESSAGE);
+    if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
@@ -238,7 +245,10 @@ export function useChatAttachments(
           result: "failed",
           failure_code: "operation_failed",
         });
-        Alert.alert("Could not add attachment", error instanceof Error ? error.message : "Try again.");
+        Alert.alert(
+          t("mobile.chat.attachment.addFailed"),
+          error instanceof Error ? error.message : t("mobile.chat.tryAgain"),
+        );
       })
       .finally(() => {
         busyRef.current = false;

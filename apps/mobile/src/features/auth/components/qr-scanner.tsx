@@ -1,4 +1,3 @@
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { CameraView, type CameraViewProps, useCameraPermissions } from "expo-camera";
 import { Stack } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -20,6 +19,7 @@ import Animated, {
 
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 type ScanState =
   | { status: "idle" }
@@ -36,6 +36,7 @@ function ScannerStatus({
   scanState: ScanState;
   onRetry: () => void;
 }) {
+  const { t } = useText();
   const [foreground, accent] = useThemeColor(["foreground", "accent"]);
 
   if (scanState.status === "error") {
@@ -44,12 +45,14 @@ function ScannerStatus({
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>{pairing ? "Couldn’t connect" : "Couldn’t use this code"}</Alert.Title>
+            <Alert.Title>
+              {pairing ? t("mobile.auth.scanner.connectFailed") : t("mobile.auth.scanner.codeFailed")}
+            </Alert.Title>
             <Alert.Description selectable>{scanState.message}</Alert.Description>
           </Alert.Content>
         </Alert>
         <Button size="md" variant="secondary" onPress={onRetry}>
-          <Button.Label>Scan again</Button.Label>
+          <Button.Label>{t("mobile.auth.scanner.scanAgain")}</Button.Label>
         </Button>
       </Card>
     );
@@ -71,18 +74,18 @@ function ScannerStatus({
           <Card.Title className="font-sans text-body font-semibold">
             {scanState.status === "connecting"
               ? pairing
-                ? "Connecting your phone…"
-                : "Reading the invitation…"
+                ? t("mobile.auth.scanner.connecting")
+                : t("mobile.auth.scanner.readingInvitation")
               : pairing
-                ? "Scan the desktop code"
-                : "Scan the invitation code"}
+                ? t("mobile.auth.scanner.scanDesktop")
+                : t("mobile.auth.scanner.scanInvitation")}
           </Card.Title>
           <Card.Description className="font-sans text-caption">
             {scanState.status === "connecting"
               ? pairing
-                ? "Verifying the one-time code."
-                : "Checking the server identity."
-              : "Keep the QR code centered inside the frame."}
+                ? t("mobile.auth.scanner.verifying")
+                : t("mobile.auth.scanner.checkingServer")
+              : t("mobile.auth.scanner.keepCentered")}
           </Card.Description>
         </View>
       </Card.Body>
@@ -131,6 +134,7 @@ export function QrScanner({
   onPreviewReady?: () => void;
   renderOverlay?: (camera: boolean) => ReactNode;
 }) {
+  const { t, errorMessage } = useText();
   const scanLocked = useRef(false);
   const completed = useRef(false);
   const scanPending = useRef(false);
@@ -202,7 +206,7 @@ export function QrScanner({
       setScanState({
         status: "error",
         source: "connection",
-        message: errorMessage(error, "OpenBot could not connect this phone."),
+        message: errorMessage(error, t("mobile.auth.scanner.connectFallback")),
       });
     } finally {
       scanPending.current = false;
@@ -241,14 +245,14 @@ export function QrScanner({
 
               <Card.Body className="gap-2">
                 <Card.Title accessibilityRole="header" className="font-sans text-title font-semibold">
-                  Camera access required
+                  {t("mobile.auth.camera.title")}
                 </Card.Title>
                 <Card.Description className="font-sans text-body leading-6 text-text-secondary">
                   {canRequestPermission
                     ? pairing
-                      ? "OpenBot uses the camera only to scan the one-time QR code shown in the desktop app."
-                      : "OpenBot uses the camera only to scan the invitation QR code."
-                    : "Camera access is blocked. Enable it for OpenBot in device settings, then return here to scan the code."}
+                      ? t("mobile.auth.camera.pairingReason")
+                      : t("mobile.auth.camera.invitationReason")
+                    : t("mobile.auth.camera.blocked")}
                 </Card.Description>
               </Card.Body>
 
@@ -282,7 +286,7 @@ export function QrScanner({
                 >
                   <Camera size={19} color={accentForeground} strokeWidth={2} />
                   <Button.Label className="font-sans font-semibold">
-                    {canRequestPermission ? "Allow camera access" : "Open settings"}
+                    {canRequestPermission ? t("mobile.auth.camera.allow") : t("mobile.auth.camera.openSettings")}
                   </Button.Label>
                 </Button>
               </Card.Footer>
@@ -312,7 +316,7 @@ export function QrScanner({
             key={cameraAttempt}
             onCameraReady={onPreviewReady}
             onMountError={() => {
-              setScanState({ status: "error", source: "camera", message: "Could not start the camera. Try again." });
+              setScanState({ status: "error", source: "camera", message: t("mobile.auth.scanner.cameraFailed") });
               onPreviewReady?.();
             }}
             // Expo enables native scanning from the presence of this callback.

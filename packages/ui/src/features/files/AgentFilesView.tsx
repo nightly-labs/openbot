@@ -1,7 +1,7 @@
 import { Button, FolderOpen, IconButton, Skeleton } from "@openbot/ui";
 import { SettingsPanelHeader } from "@openbot/ui/components/SettingsPanel";
+import { currentText, useText } from "@openbot/ui/text";
 import { createMemo, createUniqueId, For, Show } from "solid-js";
-import { formatFileSize } from "../conversation/AttachmentCards";
 import { FileList } from "./FileList";
 import {
   type ConversationStorageRow,
@@ -38,7 +38,7 @@ const CHAT_ROWS = 4;
 
 /** The value on the Files row of the agent settings, such as "1.4 GB". */
 export function agentFilesLinkValue(breakdown: readonly StorageBreakdown[]): string {
-  return formatFileSize(storageTotal(breakdown));
+  return currentText().format.fileSize(storageTotal(breakdown));
 }
 
 /**
@@ -46,16 +46,17 @@ export function agentFilesLinkValue(breakdown: readonly StorageBreakdown[]): str
  * Routines and uses the same header, so Back returns to the settings.
  */
 export function AgentFilesView(props: AgentFilesViewProps) {
+  const { t, format } = useText();
   const headingId = `agent-files-${createUniqueId()}`;
   const tiles = createMemo(() => [
     {
-      label: "Workspace",
+      label: t("files.agent.workspace"),
       bytes: storageBytes(props.breakdown, "workspaces"),
       openable: Boolean(props.onOpenWorkspace),
     },
-    { label: "Attachments", bytes: storageBytes(props.breakdown, "attachments") },
-    { label: "Files from agents", bytes: storageBytes(props.breakdown, "generated") },
-    { label: "Chat history", bytes: storageBytes(props.breakdown, "chats") },
+    { label: t("files.category.attachments"), bytes: storageBytes(props.breakdown, "attachments") },
+    { label: t("files.category.generated"), bytes: storageBytes(props.breakdown, "generated") },
+    { label: t("files.category.chats"), bytes: storageBytes(props.breakdown, "chats") },
   ]);
   const chats = createMemo(() =>
     [...props.conversations].sort((left, right) => right.bytes - left.bytes).slice(0, CHAT_ROWS),
@@ -64,20 +65,20 @@ export function AgentFilesView(props: AgentFilesViewProps) {
   return (
     <div class="agent-files-view">
       <SettingsPanelHeader
-        title="Files"
+        title={t("files.agent.title")}
         onBack={props.onBack}
-        backLabel="Back to settings"
+        backLabel={t("files.agent.back")}
         onClose={props.onClose}
-        closeLabel="Close details"
+        closeLabel={t("files.agent.close")}
       />
       <div class="agent-files-body">
         <section class="agent-files-summary" aria-labelledby={`${headingId}-total`}>
           <div>
             <h3 id={`${headingId}-total`} class="agent-files-total-label">
-              {props.agentName} uses
+              {t("files.agent.uses", { name: props.agentName })}
             </h3>
             <Show when={!props.loading} fallback={<Skeleton class="agent-files-total-skeleton" />}>
-              <p class="agent-files-total">{formatFileSize(storageTotal(props.breakdown))}</p>
+              <p class="agent-files-total">{format.fileSize(storageTotal(props.breakdown))}</p>
             </Show>
           </div>
           <dl class="agent-files-tiles">
@@ -91,7 +92,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
                         variant="ghost"
                         size="icon-xs"
                         class="agent-files-tile-action"
-                        label="Open workspace folder"
+                        label={t("files.agent.openWorkspace")}
                         onClick={() => props.onOpenWorkspace?.()}
                       >
                         <FolderOpen aria-hidden="true" />
@@ -100,7 +101,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
                   </dt>
                   <dd>
                     <Show when={!props.loading} fallback={<Skeleton class="agent-files-tile-skeleton" />}>
-                      {formatFileSize(tile.bytes)}
+                      {format.fileSize(tile.bytes)}
                     </Show>
                   </dd>
                 </div>
@@ -112,7 +113,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
         <Show when={!props.loading && chats().length > 0}>
           <section class="agent-files-section" aria-labelledby={`${headingId}-chats`}>
             <h3 id={`${headingId}-chats`} class="storage-section-heading">
-              Chats by size
+              {t("files.agent.chatsBySize")}
             </h3>
             <ul class="storage-rows">
               <For each={chats()}>
@@ -122,7 +123,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
                       type="button"
                       variant="ghost"
                       class="storage-row"
-                      aria-label={`${chat.title}, ${formatFileSize(chat.bytes)}`}
+                      aria-label={t("files.storage.rowLabel", { name: chat.title, size: format.fileSize(chat.bytes) })}
                       onClick={() => props.onOpenConversation(chat.id)}
                     >
                       <span class="storage-row-copy">
@@ -130,11 +131,10 @@ export function AgentFilesView(props: AgentFilesViewProps) {
                           {chat.title}
                         </span>
                         <span class="storage-row-meta">
-                          {fileCountLabel(chat.fileCount)} · {chat.messageCount}{" "}
-                          {chat.messageCount === 1 ? "message" : "messages"}
+                          {fileCountLabel(chat.fileCount, t)} · {t("files.messageCount", { count: chat.messageCount })}
                         </span>
                       </span>
-                      <span class="storage-row-size">{formatFileSize(chat.bytes)}</span>
+                      <span class="storage-row-size">{format.fileSize(chat.bytes)}</span>
                     </Button>
                   </li>
                 )}
@@ -144,7 +144,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
         </Show>
 
         <FileList
-          label={`Files of ${props.agentName}`}
+          label={t("files.agent.listLabel", { name: props.agentName })}
           files={props.files}
           compact
           loading={props.loading}
@@ -152,8 +152,8 @@ export function AgentFilesView(props: AgentFilesViewProps) {
           onRetry={props.onRetry}
           now={props.now}
           canDelete={props.canDelete}
-          emptyTitle="No files yet"
-          emptyDescription={`Files you send to ${props.agentName} and files it makes show here.`}
+          emptyTitle={t("files.list.emptyTitle")}
+          emptyDescription={t("files.agent.emptyDescription", { name: props.agentName })}
           onPreview={props.onPreviewFile}
           onAction={props.onFileAction}
         />

@@ -10,6 +10,7 @@
 
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import { For, Match, Show, Switch } from "solid-js";
+import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarPinnedAvatar } from "./SidebarAgentIndicator";
@@ -32,6 +33,7 @@ export function SidebarPinnedGroup() {
     startNativeItemDragging,
     stopSidebarDragging,
   } = useSidebarScope();
+  const { t } = useText();
   const chatName = (chat: SidebarChatItem) => (chat.kind === "agent" ? chat.agent.name : chat.channel.name);
   const chatIsActive = (chat: SidebarChatItem) =>
     chat.kind === "agent" ? props.activeAgentId === chat.id : props.activeChannelId === chat.id;
@@ -49,11 +51,11 @@ export function SidebarPinnedGroup() {
             "sidebar-pinned-group-empty-target": emptyPinnedDropVisible(),
           },
         ]}
-        aria-label="Pinned chats"
+        aria-label={t("sidebar.pinned.label")}
       >
         <ul class="sidebar-pinned-list" data-dragging={draggedPinnedKey() ? "" : undefined}>
           <Show when={emptyPinnedDropVisible()}>
-            <li class="sidebar-pinned-empty-drop">Drag here to pin</li>
+            <li class="sidebar-pinned-empty-drop">{t("sidebar.pinned.dropHint")}</li>
           </Show>
           <For each={resolvedPinnedItems()}>
             {(item) => {
@@ -63,7 +65,13 @@ export function SidebarPinnedGroup() {
               const routineLabel = () => {
                 if (item.chat.kind !== "agent") return "";
                 const state = props.agentStates[item.chat.id];
-                return state?.kind === "routine" ? sidebarAgentStateLabel(state) : "";
+                return state?.kind === "routine" ? sidebarAgentStateLabel(state, t) : "";
+              };
+              const rowLabel = () => {
+                if (item.chat.kind === "channel") return t("sidebar.pinned.channel", { name: name() });
+                return routineLabel()
+                  ? t("sidebar.pinned.agentWithState", { name: name(), state: routineLabel() })
+                  : t("sidebar.pinned.agent", { name: name() });
               };
               return (
                 <li
@@ -105,7 +113,7 @@ export function SidebarPinnedGroup() {
                         "agent-row sidebar-pinned-row",
                         { "agent-row-active": active() },
                       ]}
-                      aria-label={`${name()}, pinned ${item.chat.kind}${routineLabel() ? `. ${routineLabel()}` : ""}`}
+                      aria-label={rowLabel()}
                       title={routineLabel() || undefined}
                       aria-pressed={active() ? "true" : "false"}
                       onClick={() => selectChat(item.chat)}
@@ -132,7 +140,7 @@ export function SidebarPinnedGroup() {
                                 </Show>
                               </span>
                               <Show when={props.agentStates[agent().id]}>
-                                {(state) => <span class="sr-only">{sidebarAgentStateLabel(state())}</span>}
+                                {(state) => <span class="sr-only">{sidebarAgentStateLabel(state(), t)}</span>}
                               </Show>
                             </>
                           )}
@@ -156,7 +164,9 @@ export function SidebarPinnedGroup() {
                                 </Show>
                               </span>
                               <Show when={channel().unreadCount > 0}>
-                                <span class="sr-only">{channel().unreadCount} unread messages</span>
+                                <span class="sr-only">
+                                  {t("sidebar.channel.unread", { count: channel().unreadCount })}
+                                </span>
                               </Show>
                             </>
                           )}

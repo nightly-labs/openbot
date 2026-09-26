@@ -4,6 +4,7 @@ import {
   type ChannelPage,
   type ChannelSummary,
 } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, flush, onSettled, reconcile, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -178,7 +179,7 @@ const Channels = createSimpleContext({
         if (!disposed && account === accountKey() && id === refreshId)
           setState((state) => {
             Object.assign(state, {
-              error: error instanceof Error ? error.message : "Could not load channels.",
+              error: error instanceof Error ? error.message : currentText().t("channel.error.load"),
               loading: false,
             });
           });
@@ -209,7 +210,7 @@ const Channels = createSimpleContext({
       } catch (error) {
         if (!disposed && account === accountKey())
           setState((state) => {
-            state.error = error instanceof Error ? error.message : "The channel action failed.";
+            state.error = error instanceof Error ? error.message : currentText().t("channel.error.action");
           });
         return false;
       }
@@ -263,7 +264,7 @@ const Channels = createSimpleContext({
           failedCommand = attempt;
           setState((state) => {
             Object.assign(state, {
-              error: error instanceof Error ? error.message : "The channel could not be updated.",
+              error: error instanceof Error ? error.message : currentText().t("channel.error.update"),
             });
           });
         }
@@ -294,7 +295,7 @@ const Channels = createSimpleContext({
       } catch (error) {
         if (!disposed && account === accountKey() && state.selectedId === channelId)
           setState((state) => {
-            state.error = error instanceof Error ? error.message : "Could not load earlier messages.";
+            state.error = error instanceof Error ? error.message : currentText().t("channel.error.loadOlder");
           });
       }
     }
@@ -352,7 +353,7 @@ const Channels = createSimpleContext({
       },
       remove: async (channelId: string) => {
         if (!(await command({ type: "archive", channelId, operationId: crypto.randomUUID() }))) {
-          throw new Error(state.error ?? "Could not delete this channel.");
+          throw new Error(state.error ?? currentText().t("channel.error.delete"));
         }
       },
       command,

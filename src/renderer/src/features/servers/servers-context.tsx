@@ -1,7 +1,7 @@
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
@@ -94,8 +94,13 @@ const Servers = createSimpleContext({
           compatibility?.hostAppVersion &&
           compatibility.hostAppVersion !== compatibility.localAppVersion
         ) {
-          toast.warning(`Different OpenBot versions on ${server.name}`, {
-            description: `The connection uses protocol ${compatibility.negotiatedProtocol}. Some newer features may be unavailable. Client ${compatibility.localAppVersion}; host ${compatibility.hostAppVersion}.`,
+          const { t } = currentText();
+          toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
+            description: t("server.compatibility.versionMismatchDescription", {
+              protocol: String(compatibility.negotiatedProtocol),
+              clientVersion: compatibility.localAppVersion,
+              hostVersion: compatibility.hostAppVersion,
+            }),
           });
         }
       }
@@ -168,11 +173,9 @@ const Servers = createSimpleContext({
         await serversPort().servers.retryConnection(serverId);
       } catch (error) {
         pendingCompatibilityRetryServerId = null;
-        toast.error("The connection failed", {
-          description: errorMessage(
-            error,
-            "Could not connect to this server. Check that the host is online and try again.",
-          ),
+        const text = currentText();
+        toast.error(text.t("server.connection.failedTitle"), {
+          description: text.errorMessage(error, text.t("server.connection.failedDescription")),
         });
       }
     }
@@ -186,8 +189,9 @@ const Servers = createSimpleContext({
           ),
         );
       } catch (error) {
-        toast.error("Could not change server notifications", {
-          description: errorMessage(error, "Could not save the setting. Try again."),
+        const text = currentText();
+        toast.error(text.t("server.notifications.changeFailedTitle"), {
+          description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
         });
       }
     }
@@ -196,8 +200,9 @@ const Servers = createSimpleContext({
       try {
         applyServerSummaries(await serversPort().servers.setNotificationLevel({ serverId, level }));
       } catch (error) {
-        toast.error("Could not change server notifications", {
-          description: errorMessage(error, "Could not save the setting. Try again."),
+        const text = currentText();
+        toast.error(text.t("server.notifications.changeFailedTitle"), {
+          description: text.errorMessage(error, text.t("server.notifications.changeFailedDescription")),
         });
       }
     }

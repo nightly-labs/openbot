@@ -11,7 +11,7 @@ import {
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamClientFetch } from "./index";
 
 export interface RemoteTeamHost {
@@ -103,7 +103,7 @@ export class RemoteTeamDirectoryClient {
     } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
   ) {
     this.#apiUrl = input.apiUrl;
-    if (!input.authentication && !input.token) throw new Error("Account authentication is required.");
+    if (!input.authentication && !input.token) throw new Error(sourceText("error.remote.accountAuthRequired"));
     this.#authentication = input.authentication ?? { kind: "bearer", token: input.token ?? "" };
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
@@ -135,7 +135,7 @@ export class RemoteTeamDirectoryClient {
         }
         const pinnedKey = await this.#hostKeys.get(candidate.hostId);
         if (pinnedKey && remoteHostFingerprint(candidate.devicePublicKey) !== remoteHostFingerprint(pinnedKey)) {
-          throw new Error("The server identity changed. Refusing to replace the trusted host key.");
+          throw new Error(sourceText("error.remote.serverIdentityChanged"));
         }
         return [
           {
@@ -153,7 +153,7 @@ export class RemoteTeamDirectoryClient {
     if (this.#pairedHost) {
       const paired = directory.find((host) => host.hostId === this.#pairedHost?.hostId);
       if (paired && remoteHostFingerprint(paired.devicePublicKey) !== this.#pairedHost.fingerprint) {
-        throw new Error("The paired desktop identity is missing or changed. Scan a new code from that desktop.");
+        throw new Error(sourceText("error.remote.pairedIdentityChanged"));
       }
       if (paired) await this.#pinHostKey(paired.hostId, paired.devicePublicKey);
     }
@@ -176,7 +176,7 @@ export class RemoteTeamDirectoryClient {
     host: { hostId: string; devicePublicKey: string },
     input: { role: "admin" | "member"; email?: string; permanent?: boolean },
   ): Promise<{ inviteId: string; inviteUrl: string; expiresAt: number }> {
-    if (input.permanent && input.email) throw new Error("Permanent invitations cannot be sent by email.");
+    if (input.permanent && input.email) throw new Error(sourceText("error.remote.permanentInviteNoEmail"));
     // Validate the URL before creating an invitation.
     const payload = {
       apiUrl: this.#inviteApiUrl(),
@@ -306,7 +306,7 @@ export class RemoteTeamDirectoryClient {
       origin === "https://openbot.run" &&
       inviteOrigin === "https://api.openbot.run";
     if (inviteOrigin !== origin && !publicWebsiteInvite) {
-      throw new Error("This invitation belongs to another OpenBot service.");
+      throw new Error(sourceText("error.remote.inviteOtherService"));
     }
     const value = await this.#request("/v2/remote/invites/preview", {
       method: "POST",
@@ -315,7 +315,7 @@ export class RemoteTeamDirectoryClient {
     });
     const preview = decodeInvitePreview(value, invite.serverId);
     if (!preview.devicePublicKey || remoteHostFingerprint(preview.devicePublicKey) !== invite.fingerprint) {
-      throw new Error("The invitation host identity does not match its fingerprint.");
+      throw new Error(sourceText("error.remote.inviteFingerprintMismatch"));
     }
     return preview;
   }
@@ -323,7 +323,7 @@ export class RemoteTeamDirectoryClient {
   async acceptInvite(inviteUrl: string): Promise<RemoteTeamHost> {
     const invite = parseInviteUrl(inviteUrl, this.#inviteLinks);
     const preview = await this.previewInvite(inviteUrl);
-    if (!preview.devicePublicKey) throw new Error("The invitation host key is missing.");
+    if (!preview.devicePublicKey) throw new Error(sourceText("error.remote.inviteHostKeyMissing"));
     // Save the pin before consuming the one-use token, including across app restarts.
     await this.#pinHostKey(invite.serverId, preview.devicePublicKey);
     const accepted = await this.#request("/v2/remote/invites/accept", {
@@ -352,7 +352,7 @@ export class RemoteTeamDirectoryClient {
     const operation = this.#pinTail.then(async () => {
       const pinned = await this.#hostKeys.get(hostId);
       if (pinned && remoteHostFingerprint(pinned) !== remoteHostFingerprint(publicKey)) {
-        throw new Error("The invitation conflicts with the trusted host key.");
+        throw new Error(sourceText("error.remote.inviteKeyConflict"));
       }
       await this.#hostKeys.set(hostId, publicKey);
     });
@@ -421,7 +421,7 @@ function errorMessage(value: unknown): string {
     if (isString(value.error)) return value.error;
     if (isDynamicRecord(value.error) && isString(value.error.message)) return value.error.message;
   }
-  return "The OpenBot service request failed.";
+  return sourceText("error.remote.serviceRequestFailed");
 }
 
 function decodeMember(value: unknown): RemoteTeamMember {

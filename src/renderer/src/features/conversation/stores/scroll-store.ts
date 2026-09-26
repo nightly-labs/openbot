@@ -1,5 +1,4 @@
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
-import { errorMessage } from "@openbot/ui/error-message";
 import {
   calculateChatScrollMargin,
   chatHistoryBoundaryReached,
@@ -16,6 +15,7 @@ import {
   scrollToUnreadBoundary,
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeRoutineRunMessages } from "../routine-run-timeline";
@@ -173,7 +173,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     try {
       await deps.props.onMarkRead();
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not mark messages as read."), target);
+      deps.setComposerError(currentText().errorMessage(error, currentText().t("chat.unread.markReadFailed")), target);
     } finally {
       deps.setMarkingRead(false);
     }

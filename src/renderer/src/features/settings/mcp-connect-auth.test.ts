@@ -4,6 +4,7 @@
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { isPluginAppConfig } from "@openbot/ui/features/settings/marketplace-plugins";
 import {
   applyMcpFlow,
@@ -101,9 +102,9 @@ describe("a link the user brings", () => {
   });
 
   it("refuses a link from another host or without https", () => {
-    expect(mcpFlowError(COMPOSIO, LINK, { url: link })).toBeNull();
+    expect(mcpFlowError(COMPOSIO, LINK, { url: link }, translateFor("en"))).toBeNull();
     for (const url of ["https://composio.dev.example.com/mcp", "http://backend.composio.dev/mcp", "not a link"]) {
-      expect(mcpFlowError(COMPOSIO, LINK, { url })).toBe("Enter an https link from composio.dev.");
+      expect(mcpFlowError(COMPOSIO, LINK, { url }, translateFor("en"))).toBe("Enter an https link from composio.dev.");
     }
   });
 });

@@ -14,6 +14,7 @@ import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentMessage, AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 
@@ -79,6 +80,7 @@ export interface ChatMessageRowProps {
  * conversation arrives as a prop.
  */
 export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
+  const { t } = useText();
   const own = () => props.author.kind === "you";
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
@@ -93,7 +95,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     <Message
       role="article"
       align={own() ? "end" : "start"}
-      aria-label={`Message from ${props.author.name}`}
+      aria-label={t("chat.row.label", { name: props.author.name })}
       data-author={own() ? "user" : "assistant"}
       data-chat-search-message={props["data-chat-search-message"]}
       style={authorStyle()}
@@ -115,7 +117,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
               <Button
                 variant="ghost"
                 class="message-author-avatar-button"
-                aria-label={`Open ${props.author.name}'s chat`}
+                aria-label={t("chat.row.openChat", { name: props.author.name })}
                 onClick={() => props.onSelectAgent(agent().id)}
               >
                 <AgentAvatar agent={agent()} seed={seed()} />
@@ -135,7 +137,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 <Button
                   variant="ghost"
                   class="message-author-name-button"
-                  aria-label={`Open ${props.author.name}'s chat`}
+                  aria-label={t("chat.row.openChat", { name: props.author.name })}
                   onClick={() => props.onSelectAgent(agent().id)}
                 >
                   {props.author.name}
@@ -186,7 +188,9 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                 align={own() ? "start" : "end"}
                 overflowCount={props.reactionOverflowCount}
                 role="group"
-                aria-label={`Reactions: ${(props.reactions ?? []).map((reaction) => reaction.emoji).join(", ")}`}
+                aria-label={t("chat.row.reactions", {
+                  emoji: (props.reactions ?? []).map((reaction) => reaction.emoji).join(", "),
+                })}
               >
                 <For each={props.reactions ?? []}>
                   {(reaction) => (
@@ -196,11 +200,13 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                         <span
                           class="message-reaction-pill message-reaction-pill-readonly"
                           role="img"
-                          aria-label={`${
-                            props.agents.find(
-                              (agent) => reaction.actor.kind === "agent" && agent.id === reaction.actor.agentId,
-                            )?.name ?? "Agent"
-                          } reacted with ${reaction.emoji}`}
+                          aria-label={t("chat.row.agentReaction", {
+                            name:
+                              props.agents.find(
+                                (agent) => reaction.actor.kind === "agent" && agent.id === reaction.actor.agentId,
+                              )?.name ?? t("chat.message.agentFallback"),
+                            emoji: reaction.emoji,
+                          })}
                         >
                           <span aria-hidden="true">{reaction.emoji}</span>
                         </span>
@@ -210,7 +216,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
                         variant="ghost"
                         type="button"
                         class="message-reaction-pill"
-                        aria-label={`Remove your reaction ${reaction.emoji}`}
+                        aria-label={t("chat.row.removeReaction", { emoji: reaction.emoji })}
                         onClick={() => props.onRemoveReaction?.()}
                       >
                         <span aria-hidden="true">{reaction.emoji}</span>

@@ -1,5 +1,5 @@
 import type { HostedSiteSummary, HostedSitesDesktopApi } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 
@@ -51,7 +51,8 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
             }
           } catch (error) {
             setHosting((state) => {
-              state.error = errorMessage(error, "Could not load hosted sites.");
+              const text = currentText();
+              state.error = text.errorMessage(error, text.t("settings.hostedSites.loadFailed"));
             });
           }
         }
@@ -107,7 +108,8 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
           failure_code: "delete_failed",
         });
         setHosting((state) => {
-          state.deleteError = errorMessage(error, "Could not delete the site.");
+          const text = currentText();
+          state.deleteError = text.errorMessage(error, text.t("settings.hostedSites.deleteFailed"));
         });
         return;
       }
@@ -122,7 +124,8 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
       await load();
     } catch (error) {
       setHosting((state) => {
-        state.error = errorMessage(error, "Could not reload hosted sites.");
+        const text = currentText();
+        state.error = text.errorMessage(error, text.t("settings.hostedSites.reloadFailed"));
       });
     } finally {
       setHosting((state) => {

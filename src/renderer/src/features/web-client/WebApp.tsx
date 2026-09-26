@@ -1,9 +1,12 @@
 import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@openbot/contracts/agent-template-links";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { Toaster } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
+import { currentText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled, Show } from "solid-js";
+import { StaticI18nProvider } from "../../i18n-context";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";
 
@@ -24,6 +27,8 @@ function takeAgentTemplateLink(): string | null {
 }
 
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
+  // This component renders the text provider, so it reads the text of the last provider that rendered.
+  const text = currentText();
   const [state, setState] = createStore<{
     account: CentralAuthUser | null;
     loaded: boolean;
@@ -89,7 +94,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
           message:
             isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
               ? value.error.message
-              : "Sign-in failed.",
+              : text.t("webClient.login.failed"),
           ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
         };
         setState((draft) => {
@@ -100,7 +105,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       throw new Error(
         isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
           ? value.error.message
-          : "The account request failed.",
+          : text.t("webClient.login.requestFailed"),
       );
     }
     return value;
@@ -141,7 +146,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     } catch (error) {
       if (!disposed && generation === sessionGeneration)
         setState((draft) => {
-          draft.error = error instanceof Error ? error.message : "Could not check this session.";
+          draft.error = error instanceof Error ? error.message : text.t("webClient.login.sessionFailed");
         });
     } finally {
       if (!disposed)
@@ -160,7 +165,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       await work();
     } catch (error) {
       setState((draft) => {
-        draft.error = error instanceof Error ? error.message : "Sign-in failed.";
+        draft.error = error instanceof Error ? error.message : text.t("webClient.login.failed");
       });
     } finally {
       setState((draft) => {
@@ -169,7 +174,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     }
   }
   async function start(email: string) {
-    if (Date.now() < state.resendAt) throw new Error("Wait before requesting another code.");
+    if (Date.now() < state.resendAt) throw new Error(text.t("webClient.login.wait"));
     const value = await signInRequest("email/start", { email });
     if (value === null) return;
     if (!isDynamicRecord(value) || !isString(value.challengeId) || typeof value.resendAt !== "number")
@@ -222,50 +227,56 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       window.removeEventListener("pageshow", restore);
     };
   });
+  // The web client has no saved language setting, so it follows the browser.
   return (
-    <div class="web-app">
-      <Toaster />
-      <Show when={state.loaded} fallback={<p role="status">Loading OpenBot…</p>}>
-        <Show
-          keyed
-          when={state.account?.id}
-          fallback={
-            <AccountLogin
-              variant="production"
-              state={state.login}
-              onRetry={checkSession}
-              onRequestEmailCode={start}
-              onVerifyEmailCode={verify}
-              onReset={async () => {
-                clearSession();
-                setState((draft) => {
-                  draft.resendAt = 0;
-                });
-              }}
-            />
-          }
-        >
-          {(accountId) => (
-            <>
-              <Show when={state.error}>
-                <p role="alert">{state.error}</p>
-              </Show>
-              <WebWorkspace
-                accountId={accountId}
-                accountEmail={state.account?.email ?? ""}
-                accountName={state.account?.name ?? null}
-                accountAvatarUrl={state.account?.avatarUrl ?? null}
-                accountFetch={accountFetch}
-                onSessionCheck={checkSession}
-                onLogout={() => action(logout)}
-                createRuntime={props.createRuntime}
-                agentTemplateId={agentTemplateId()}
-                onAgentTemplateClose={() => setAgentTemplateId(null)}
+    <StaticI18nProvider
+      locale={resolveLocale("system", navigator.language)}
+      formatLocale={formatLocale("system", navigator.language)}
+    >
+      <div class="web-app">
+        <Toaster />
+        <Show when={state.loaded} fallback={<p role="status">{text.t("webClient.loading")}</p>}>
+          <Show
+            keyed
+            when={state.account?.id}
+            fallback={
+              <AccountLogin
+                variant="production"
+                state={state.login}
+                onRetry={checkSession}
+                onRequestEmailCode={start}
+                onVerifyEmailCode={verify}
+                onReset={async () => {
+                  clearSession();
+                  setState((draft) => {
+                    draft.resendAt = 0;
+                  });
+                }}
               />
-            </>
-          )}
+            }
+          >
+            {(accountId) => (
+              <>
+                <Show when={state.error}>
+                  <p role="alert">{text.sourceText(state.error ?? "")}</p>
+                </Show>
+                <WebWorkspace
+                  accountId={accountId}
+                  accountEmail={state.account?.email ?? ""}
+                  accountName={state.account?.name ?? null}
+                  accountAvatarUrl={state.account?.avatarUrl ?? null}
+                  accountFetch={accountFetch}
+                  onSessionCheck={checkSession}
+                  onLogout={() => action(logout)}
+                  createRuntime={props.createRuntime}
+                  agentTemplateId={agentTemplateId()}
+                  onAgentTemplateClose={() => setAgentTemplateId(null)}
+                />
+              </>
+            )}
+          </Show>
         </Show>
-      </Show>
-    </div>
+      </div>
+    </StaticI18nProvider>
   );
 }

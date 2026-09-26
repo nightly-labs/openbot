@@ -3,6 +3,7 @@ import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import type { OpenBotSiblingInstance } from "./update-sibling-instances";
@@ -197,7 +198,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       availableVersion: null,
       progress: null,
       checkedAt: null,
-      message: options.enabled ? null : "Updates are available in installed desktop builds.",
+      message: options.enabled ? null : sourceText("error.update.unsupported"),
       errorCode: null,
     };
     this.#recordStatus();
@@ -418,7 +419,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
   async installUpdate(): Promise<void> {
     if (!this.#canInstall() || this.#installStarted) {
-      throw new Error("An update is not ready to install.");
+      throw new Error(sourceText("error.update.notReady"));
     }
     // Host-managed tenants never install on their own, even with no sibling in sight: the
     // host owns the timing. Like the sibling refusal this throws before the latch, so the
@@ -438,7 +439,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       throw new Error(SIBLING_SESSION_MESSAGE);
     }
     if (this.#managedByHost) throw new Error(MANAGED_HOST_MESSAGE);
-    if (!this.#canInstall() || this.#installStarted) throw new Error("An update is not ready to install.");
+    if (!this.#canInstall() || this.#installStarted) throw new Error(sourceText("error.update.notReady"));
     const generation = ++this.#installGeneration;
     this.#activeInstall = generation;
     this.#installStarted = true;
@@ -461,7 +462,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     } catch {
       if (this.#installGeneration !== generation) return;
       this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
-      throw new Error("OpenBot could not restart to install the update.");
+      throw new Error(sourceText("error.update.restartFailed"));
     }
   }
 
@@ -589,7 +590,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#activeDownload = null;
       this.#cancellationToken?.cancel();
       this.#cancellationToken = null;
-      this.#setError("download_failed", "The update download stopped responding. Try again.");
+      this.#setError("download_failed", sourceText("error.update.downloadStalled"));
       return;
     }
     if (this.#status.phase === "installing") {
@@ -628,16 +629,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   }
 }
 
-const INSTALL_FAILED_MESSAGE = "Could not install the update. Quit and reopen OpenBot, then try again.";
-const MANAGED_HOST_MESSAGE =
-  "Updates on this Mac are installed by the host. The update stays ready until the host's maintenance runs.";
-const SIBLING_SESSION_MESSAGE =
-  "Another OpenBot session is still running from this application. Stop OpenBot in every other macOS user account first, then install the update again.";
-const CHECK_STALLED_MESSAGE = "The update check stopped responding. Try again.";
-const CHECK_OFFLINE_MESSAGE = "Could not reach the update service. Check your internet connection, then try again.";
-const CHECK_SERVICE_MESSAGE = "The update service did not answer. OpenBot tries again on its own in a few minutes.";
-const CHECK_NO_RELEASE_MESSAGE =
-  "No published update was found for this platform. OpenBot tries again on its own in a few minutes.";
+const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
+const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
+const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
+const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
+const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");
+const CHECK_SERVICE_MESSAGE = sourceText("error.update.checkUnavailable");
+const CHECK_NO_RELEASE_MESSAGE = sourceText("error.update.checkNoRelease");
 
 /**
  * Node reports a link that never carried the request through `error.code`. electron-updater wraps
@@ -687,9 +685,9 @@ function describeCheckFailure(error: unknown) {
 }
 
 function errorMessage(code: UpdateFailureCode) {
-  if (code === "download_failed") return "Could not download the update. Try again.";
+  if (code === "download_failed") return sourceText("error.update.downloadFailed");
   if (code === "install_failed") return INSTALL_FAILED_MESSAGE;
-  return "Could not check for updates. Try again.";
+  return sourceText("error.update.checkFailed");
 }
 
 async function appendUpdateLog(directory: string, event: UpdateDiagnosticEvent): Promise<void> {

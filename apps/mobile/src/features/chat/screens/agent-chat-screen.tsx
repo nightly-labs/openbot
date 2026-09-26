@@ -6,8 +6,10 @@ import { Pressable, View } from "react-native";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useText } from "@/shared/lib/text";
 
 export function AgentChatScreen() {
+  const { t } = useText();
   usePreventZoomTransitionDismissal({
     unstable_dismissalBoundsRect: { minX: 0, maxX: 24 },
   });
@@ -32,10 +34,10 @@ export function AgentChatScreen() {
   return (
     <View className="flex-1 items-center justify-center gap-5 bg-background px-8">
       <Typography.Heading type="h4" align="center">
-        Agent unavailable
+        {t("mobile.chat.agentUnavailable.title")}
       </Typography.Heading>
       <Typography.Paragraph align="center" className="text-text-secondary">
-        This agent is no longer available on the selected server.
+        {t("mobile.chat.agentUnavailable.body")}
       </Typography.Paragraph>
       <Pressable
         accessibilityRole="button"
@@ -43,7 +45,7 @@ export function AgentChatScreen() {
         onPress={() => (router.canGoBack() ? router.back() : router.replace("/connected"))}
       >
         <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
-        <Typography.Paragraph weight="semibold">Go back</Typography.Paragraph>
+        <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>
       </Pressable>
     </View>
   );

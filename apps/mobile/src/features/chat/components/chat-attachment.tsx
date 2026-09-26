@@ -7,8 +7,9 @@ import { ExternalLink, ImageOff } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { useText } from "@/shared/lib/text";
 import type { ImageDimensions } from "../model/image-dimensions";
-import { attachmentTypeLabel, formatFileSize, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
+import { attachmentTypeLabel, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
 import { ImageViewer } from "./image-viewer";
 import { UPLOAD_BLUR_RADIUS, UPLOAD_SETTLE_MS, UploadProgressCircle, useUploadRevealStyle } from "./upload-progress";
 
@@ -54,6 +55,7 @@ export function ChatAttachmentView({
   /** The sent fraction of this file, from 0 to 1, while the message that carries it is sending. */
   upload?: number;
 }) {
+  const { t, format, sourceText } = useText();
   const [fileColor, muted] = useThemeColor(["success", "muted"]);
   const [decoded, setDecoded] = useState<ImageDimensions | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -108,7 +110,7 @@ export function ChatAttachmentView({
                 pushed the image off the frame's right edge. Every layer here fills the frame. */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Preview ${attachment.name}`}
+              accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
               accessibilityState={{ disabled: pending || !uri || failed }}
               disabled={pending || !uri || failed}
               onPress={() => setViewing(true)}
@@ -118,7 +120,7 @@ export function ChatAttachmentView({
                 <View className="items-center justify-center gap-2 p-3" style={FILL}>
                   <ImageOff size={24} color={String(muted)} />
                   <Typography.Paragraph type="body-xs" align="center" className="text-muted">
-                    {query.error?.message ?? "Could not display this image."}
+                    {query.error ? sourceText(query.error.message) : t("mobile.chat.attachment.displayFailed")}
                   </Typography.Paragraph>
                 </View>
               ) : (
@@ -128,7 +130,7 @@ export function ChatAttachmentView({
                   <Skeleton
                     isLoading={!imageLoaded}
                     accessible
-                    accessibilityLabel="Loading image"
+                    accessibilityLabel={t("mobile.chat.attachment.loadingImage")}
                     className="rounded-none"
                     style={FILL}
                   />
@@ -176,7 +178,7 @@ export function ChatAttachmentView({
               pointerEvents="none"
               accessible
               accessibilityRole="progressbar"
-              accessibilityLabel={`Uploading ${attachment.name}`}
+              accessibilityLabel={t("mobile.chat.attachment.uploading", { name: attachment.name })}
               accessibilityValue={{ min: 0, max: 100, now: Math.round(upload * 100) }}
               style={FILL}
             />
@@ -191,7 +193,7 @@ export function ChatAttachmentView({
               void query.refetch();
             }}
           >
-            <Button.Label>Retry image</Button.Label>
+            <Button.Label>{t("mobile.chat.attachment.retryImage")}</Button.Label>
           </Button>
         ) : null}
         {viewing && uri ? (
@@ -218,13 +220,14 @@ export function ChatAttachmentView({
       </View>
     );
 
+  const typeLabel = attachmentTypeLabel(attachment.name, attachment.mimeType, t);
   const detail = tooLarge
-    ? `${formatFileSize(attachment.size)} · Open it on desktop`
+    ? t("mobile.chat.attachment.openOnDesktopDetail", { size: format.fileSize(attachment.size) })
     : upload !== undefined
-      ? `Uploading · ${Math.round(upload * 100)}%`
+      ? t("mobile.chat.attachment.uploadingPercent", { percent: format.percent(upload) })
       : busy
-        ? "Downloading…"
-        : `${attachmentTypeLabel(attachment.name, attachment.mimeType)} · ${formatFileSize(attachment.size)}`;
+        ? t("mobile.chat.attachment.downloading")
+        : `${typeLabel} · ${format.fileSize(attachment.size)}`;
   return (
     <View className={`max-w-full ${alignment === "right" ? "items-end" : "items-start"}`}>
       <Button
@@ -232,15 +235,15 @@ export function ChatAttachmentView({
         className="h-auto flex-row justify-start gap-3 rounded-2xl border border-border bg-control p-3"
         style={{ width: maxWidth, maxWidth: "100%" }}
         isDisabled={pending || busy || tooLarge}
-        accessibilityLabel={`Open or save ${attachment.name}`}
-        accessibilityHint={tooLarge ? "This file is larger than 10 MB. Open it on desktop." : undefined}
+        accessibilityLabel={t("mobile.chat.attachment.openOrSave", { name: attachment.name })}
+        accessibilityHint={tooLarge ? t("mobile.chat.attachment.tooLargeHint") : undefined}
         // The card is one element to a screen reader, so the progress inside it is read from here.
         accessibilityValue={upload !== undefined ? { min: 0, max: 100, now: Math.round(upload * 100) } : undefined}
         onPress={share}
       >
         <View className="size-11 items-center justify-center rounded-xl bg-success/15">
           <Typography.Paragraph type="body-xs" className="font-semibold" style={{ color: fileColor }}>
-            {attachmentTypeLabel(attachment.name, attachment.mimeType)}
+            {typeLabel}
           </Typography.Paragraph>
         </View>
         <View className="min-w-0 flex-1 gap-1">

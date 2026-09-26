@@ -20,6 +20,7 @@ import {
   startProviderCodeLogin,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo } from "solid-js";
 import { hostCustomProvidersApi } from "../custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "../custom-providers/stores/custom-providers-store";
@@ -43,7 +44,7 @@ const WEB_EXTERNAL_DESTINATIONS: Partial<Record<ExternalDestination, string>> = 
 
 function openWebDestination(destination: ExternalDestination): Promise<void> {
   const url = WEB_EXTERNAL_DESTINATIONS[destination];
-  if (!url) return Promise.reject(new Error("This link opens only in the desktop app."));
+  if (!url) return Promise.reject(new Error(currentText().t("webClient.error.linkDesktopOnly")));
   window.open(url, "_blank", "noopener");
   return Promise.resolve();
 }
@@ -163,12 +164,12 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions): 
     },
     onAddCustomProvider: async (value) => {
       const store = customProviders();
-      if (!store) throw new Error("Connect to your host to save an endpoint.");
+      if (!store) throw new Error(currentText().t("webClient.error.saveEndpointOffline"));
       return store.saveCustomProvider(value);
     },
     onDeleteCustomProvider: async (id) => {
       const store = customProviders();
-      if (!store) throw new Error("Connect to your host to remove an endpoint.");
+      if (!store) throw new Error(currentText().t("webClient.error.removeEndpointOffline"));
       return store.deleteCustomProvider(id);
     },
     get providerKeys() {

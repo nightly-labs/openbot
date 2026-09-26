@@ -18,6 +18,7 @@
     "@norbert_bodziony/bloub": "catalog:",
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
+    "@openbot/i18n": "workspace:*",
     "@openbot/team-client": "workspace:*",
     "@openbot/user-errors": "workspace:*",
     "@openpanel/react-native": "1.4.1",

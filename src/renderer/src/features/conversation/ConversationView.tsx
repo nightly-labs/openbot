@@ -1,4 +1,5 @@
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
+import { useText } from "@openbot/ui/text";
 import { createEffect, Show } from "solid-js";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHeader } from "./ConversationHeader";
@@ -28,6 +29,7 @@ export function ConversationView(props: ConversationProps) {
     settingsPanelWidth,
     submitting,
   } = scope;
+  const { t } = useText();
   createEffect(
     () => props.globalOverlayOpen,
     (open) => {
@@ -38,7 +40,7 @@ export function ConversationView(props: ConversationProps) {
     <ConversationViewScopeContext value={scope}>
       <main
         ref={setConversationPanelElement}
-        aria-label="Conversation"
+        aria-label={t("conversation.view.label")}
         onKeyDown={handleChatSearchShortcut}
         class={[
           "conversation-panel",
@@ -68,7 +70,7 @@ export function ConversationView(props: ConversationProps) {
           onSend={sendSelectionInstruction}
         />
         <Show when={dropActive()}>
-          <div class="attachment-drop-overlay">Drop files to attach</div>
+          <div class="attachment-drop-overlay">{t("conversation.view.drop")}</div>
         </Show>
         <ConversationHeader />
         {props.notice}

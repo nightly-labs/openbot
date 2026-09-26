@@ -8,6 +8,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { translateFor } from "@openbot/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Invoke = (event: unknown, request?: unknown) => unknown;
@@ -53,7 +54,8 @@ beforeEach(async () => {
   );
   registerIpcGroup(
     "agentImport",
-    agentImportIpcHandlers({ agentImport, getMainWindow: () => null, exportSkillPath }).agentImport,
+    agentImportIpcHandlers({ agentImport, getMainWindow: () => null, exportSkillPath, translate: translateFor("en") })
+      .agentImport,
   );
 });
 

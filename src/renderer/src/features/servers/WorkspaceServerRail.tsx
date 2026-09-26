@@ -1,6 +1,6 @@
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
+import { useText } from "@openbot/ui/text";
 import { onSettled, Show } from "solid-js";
 import { usePlatform } from "../../platform";
 import { useUsage } from "../usage/usage-context";
@@ -15,6 +15,7 @@ import { useServers } from "./servers-context";
  */
 export function WorkspaceServerRail() {
   const platform = usePlatform();
+  const { t, errorMessage } = useText();
   const { openUsage } = useUsage();
   const { servers, reorderServers, setServerMuted, setServerNotificationLevel, setJoinServerOpen } = useServers();
   const { selectServer } = useServerSelection();
@@ -22,8 +23,8 @@ export function WorkspaceServerRail() {
 
   function handleSelect(serverId: string): void {
     void selectServer(serverId).catch((error) => {
-      toast.error("Could not select the server", {
-        description: errorMessage(error, "Could not switch servers. Try again."),
+      toast.error(t("server.select.failedTitle"), {
+        description: errorMessage(error, t("server.select.failedDescription")),
       });
     });
   }

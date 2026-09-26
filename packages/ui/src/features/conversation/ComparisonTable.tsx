@@ -1,12 +1,14 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
+import { useText } from "../../text";
 import type { ComparisonTableBlock } from "./DataTable";
 
 export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
+  const { t } = useText();
   return (
     <section
       class="message-data-table-scroll message-comparison-table-scroll"
-      aria-label="Comparison table"
+      aria-label={t("chat.table.comparison")}
       tabindex="0"
     >
       <table

@@ -1,5 +1,4 @@
 import type { RoutineFields, RoutineSchedule } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
 import {
   RoutineScheduleCard,
   type RoutineScheduleCardState,
@@ -11,6 +10,7 @@ import {
   routineScheduleFromDraft,
   routineScheduleToDraft,
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
+import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
 import { agentRoutinesPort } from "./routines-port";
 
@@ -35,6 +35,7 @@ type CardSave = { status: "idle" } | { status: "saving" } | { status: "saved" } 
  * here; the change saves at once, like a chip in the settings panel followed by Save.
  */
 export function RoutineChatCard(props: RoutineChatCardProps) {
+  const text = useText();
   const [save, setSave] = createSignal<CardSave>({ status: "idle" });
   // The save result is newer than the routine list until the list loads again. It stays while a
   // later save runs, so the card does not go back to an older list.
@@ -97,7 +98,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     } catch (caught) {
       if (request !== saveRequest) return;
       requested = undefined;
-      setSave({ status: "error", message: errorMessage(caught, "Could not save the schedule.") });
+      setSave({ status: "error", message: text.errorMessage(caught, text.t("routine.card.saveFailed")) });
       setDraft(routineScheduleToDraft(routine().trigger.schedule));
     }
   }
@@ -116,8 +117,8 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
       kinds={ROUTINE_SAVED_DRAFT_KINDS}
       state={state()}
       errorText={errorText()}
-      nextRunLabel={nextRunLabel(routine())}
-      timeZoneLabel={timeZoneLabel(routine())}
+      nextRunLabel={nextRunLabel(routine(), text)}
+      timeZoneLabel={timeZoneLabel(routine(), text)}
       onChange={(next) => {
         pending = next;
         setDraft(next);
@@ -126,7 +127,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         const next = pending;
         pending = undefined;
         if (!next) return;
-        const problem = routineDraftProblem(next);
+        const problem = routineDraftProblem(next, text.t);
         if (problem) {
           // Keep the edit on screen, so the person can correct it.
           pending = next;
@@ -156,23 +157,23 @@ function localTimeZone(): string {
 }
 
 /** "Thu, Sep 25 at 8:20 AM", in the zone the routine runs in. */
-function nextRunLabel(routine: RoutineFields): string | undefined {
+function nextRunLabel(routine: RoutineFields, text: Pick<TextValue, "t" | "format">): string | undefined {
   const nextRunAt = routine.trigger.nextRunAt;
   if (!routine.active || !nextRunAt) return undefined;
   const date = new Date(nextRunAt);
   if (Number.isNaN(date.getTime())) return undefined;
   const timeZone = knownTimeZone(routine.timezone) ?? localTimeZone();
-  const day = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone });
-  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone });
-  return `${day.format(date)} at ${time.format(date)}`;
+  const day = text.format.date(date, { weekday: "short", month: "short", day: "numeric", timeZone });
+  const time = text.format.date(date, { hour: "numeric", minute: "2-digit", timeZone });
+  return text.t("routine.card.nextRunAt", { day, time });
 }
 
 /** "Warsaw time", only when the routine does not run in the viewer's zone. */
-function timeZoneLabel(routine: RoutineFields): string | undefined {
+function timeZoneLabel(routine: RoutineFields, text: Pick<TextValue, "t">): string | undefined {
   const timeZone = knownTimeZone(routine.timezone);
   if (!timeZone || timeZone === localTimeZone()) return undefined;
   const city = timeZone.split("/").at(-1)?.replaceAll("_", " ");
-  return `${city ?? timeZone} time`;
+  return text.t("routine.card.timeZone", { city: city ?? timeZone });
 }
 
 function knownTimeZone(timeZone: string | undefined): string | undefined {

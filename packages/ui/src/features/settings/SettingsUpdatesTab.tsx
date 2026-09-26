@@ -1,3 +1,4 @@
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   Item,
@@ -15,11 +16,16 @@ import {
   SwitchField,
 } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import type { GeneralSettingsValue } from "./app-settings";
 import type { SettingsUpdatesStore } from "./stores/updates-store";
 
 type UpdateTrack = "Stable";
 const updateTrackOptions: UpdateTrack[] = ["Stable"];
+const UPDATE_TRACK_LABELS = { Stable: "settings.updates.track.stable" } as const satisfies Record<
+  UpdateTrack,
+  AppTextKey
+>;
 
 interface SettingsUpdatesTabProps {
   store: SettingsUpdatesStore;
@@ -30,15 +36,16 @@ interface SettingsUpdatesTabProps {
 }
 
 export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
+  const { t } = useText();
   const managed = () => props.store.presentation().managed;
 
   return (
-    <SettingsSection title="OpenBot updates">
+    <SettingsSection title={t("settings.updates.title")}>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row settings-modal-update-track-row">
           <ItemContent>
-            <ItemTitle>Update track</ItemTitle>
-            <ItemDescription>Stable receives tested OpenBot releases.</ItemDescription>
+            <ItemTitle>{t("settings.updates.track.title")}</ItemTitle>
+            <ItemDescription>{t("settings.updates.track.description")}</ItemDescription>
           </ItemContent>
           <ItemActions>
             <Select<UpdateTrack>
@@ -48,11 +55,11 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
               onChange={() => undefined}
               placement="bottom-end"
               itemComponent={(selectProps) => (
-                <SelectItem item={selectProps.item}>{selectProps.item.rawValue}</SelectItem>
+                <SelectItem item={selectProps.item}>{t(UPDATE_TRACK_LABELS[selectProps.item.rawValue])}</SelectItem>
               )}
             >
-              <SelectTrigger size="sm" aria-label="Update track">
-                <SelectValue<UpdateTrack>>{(state) => state.selectedOption()}</SelectValue>
+              <SelectTrigger size="sm" aria-label={t("settings.updates.track.title")}>
+                <SelectValue<UpdateTrack>>{(state) => t(UPDATE_TRACK_LABELS[state.selectedOption()])}</SelectValue>
               </SelectTrigger>
               <SelectContent mount={props.selectMount} />
             </Select>
@@ -60,9 +67,9 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
         </Item>
         <Item class="settings-modal-row settings-modal-update-row">
           <ItemContent>
-            <ItemTitle>Version {props.store.installedVersion()}</ItemTitle>
+            <ItemTitle>{t("settings.updates.version", { version: props.store.installedVersion() })}</ItemTitle>
             <Show when={!managed()}>
-              <ItemDescription>Updates follow the Stable track.</ItemDescription>
+              <ItemDescription>{t("settings.updates.followsStable")}</ItemDescription>
             </Show>
             <ItemDescription class={props.store.messageClass()}>{props.store.message()}</ItemDescription>
           </ItemContent>
@@ -78,7 +85,9 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
                 disabled={!props.store.presentation().supported}
                 onClick={() => void props.store.runAction()}
               >
-                {props.store.presentation().supported ? props.store.presentation().actionLabel : "Updates unavailable"}
+                {props.store.presentation().supported
+                  ? props.store.presentation().actionLabel
+                  : t("settings.updates.unavailable")}
               </Button>
             </ItemActions>
           </Show>
@@ -89,19 +98,16 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             <SwitchField
               checked={props.value.autoDownloadUpdates}
               onChange={(checked) => props.onUpdateSetting("autoDownloadUpdates", checked)}
-              label="Automatically download updates"
-              description="Download new versions when they become available."
+              label={t("settings.updates.autoDownload.title")}
+              description={t("settings.updates.autoDownload.description")}
             />
           }
         >
           {/* Host management is machine state an administrator owns. Report it; never offer it. */}
           <Item class="settings-modal-row">
             <ItemContent>
-              <ItemTitle>Managed by Host</ItemTitle>
-              <ItemDescription>
-                Updates for this Mac are managed automatically by OpenBot Host Manager. All users share the same OpenBot
-                application and are updated together when registered users are idle.
-              </ItemDescription>
+              <ItemTitle>{t("settings.updates.managed.title")}</ItemTitle>
+              <ItemDescription>{t("settings.updates.managed.description")}</ItemDescription>
             </ItemContent>
           </Item>
         </Show>

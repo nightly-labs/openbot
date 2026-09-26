@@ -6,8 +6,10 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { useText } from "@/shared/lib/text";
 
 export function ChannelRecordsScreen({ section }: { section: "memories" | "memory" | "routines" | "routine" }) {
+  const { t } = useText();
   const { channelId, serverId, recordId } = useLocalSearchParams<{
     channelId: string;
     serverId: string;
@@ -40,18 +42,20 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
   const routine = routines.data?.find((item) => item.id === recordId);
   return (
     <SettingsContent>
-      {!available ? <Typography.Paragraph>Connect to the server to edit this channel.</Typography.Paragraph> : null}
+      {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}
       {query.isPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
-        <Typography.Paragraph>Loading…</Typography.Paragraph>
+        <Typography.Paragraph>{t("common.loading")}</Typography.Paragraph>
       ) : query.isError && !query.data ? (
         <>
-          <Typography.Paragraph accessibilityRole="alert">Could not load channel settings.</Typography.Paragraph>
+          <Typography.Paragraph accessibilityRole="alert">
+            {t("mobile.channel.records.loadFailed")}
+          </Typography.Paragraph>
           <Button onPress={() => void query.refetch()}>
-            <Button.Label>Try again</Button.Label>
+            <Button.Label>{t("common.tryAgain")}</Button.Label>
           </Button>
         </>
       ) : recordId && !memory && !routine ? (
-        <Typography.Paragraph>This item is no longer available.</Typography.Paragraph>
+        <Typography.Paragraph>{t("mobile.channel.records.gone")}</Typography.Paragraph>
       ) : section === "memory" ? (
         <MemoryEditor
           agent={target}
@@ -95,7 +99,7 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
             : routines.data?.map((item) => (
                 <SettingsRow
                   key={item.id}
-                  supportingText={item.active ? "Enabled" : "Paused"}
+                  supportingText={t(item.active ? "mobile.channel.records.enabled" : "mobile.channel.records.paused")}
                   onPress={() =>
                     router.push({
                       pathname: "/channel-info/[channelId]/routine",
@@ -108,7 +112,9 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
               ))}
           {!query.data?.length ? (
             <SettingsRow>
-              <Typography.Paragraph>{memorySection ? "No memories yet." : "No routines yet."}</Typography.Paragraph>
+              <Typography.Paragraph>
+                {t(memorySection ? "mobile.channel.records.noMemories" : "mobile.channel.records.noRoutines")}
+              </Typography.Paragraph>
             </SettingsRow>
           ) : null}
           <SettingsRow
@@ -119,7 +125,9 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
               })
             }
           >
-            <Typography.Paragraph>{memorySection ? "Add memory" : "Add routine"}</Typography.Paragraph>
+            <Typography.Paragraph>
+              {t(memorySection ? "mobile.channel.records.addMemory" : "mobile.channel.records.addRoutine")}
+            </Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       )}

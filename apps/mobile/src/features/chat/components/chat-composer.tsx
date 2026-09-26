@@ -33,11 +33,12 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import type { ChatBubbleMessage } from "@/features/chat/context/message-actions-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
 import { composerAction } from "../model/voice-dictation";
-import { attachmentTypeLabel, formatFileSize, shareLocalAttachment } from "./attachment-preview";
+import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
 import type { ChatAttachments } from "./use-chat-attachments";
@@ -113,7 +114,7 @@ interface ChatComposerProps {
 }
 
 export function ChatComposer({
-  sendLabel = "Send message",
+  sendLabel,
   action,
   actionForeground,
   agentName,
@@ -140,6 +141,7 @@ export function ChatComposer({
   replyFocusVersion,
   onCancelReply,
 }: ChatComposerProps) {
+  const { t, format, sourceText } = useText();
   const display = mentionDraft(draft);
   const displayText = display.text;
   const [cursor, setCursor] = useState(0);
@@ -456,10 +458,10 @@ export function ChatComposer({
   }
 
   const controlLabel = {
-    send: sendLabel,
-    stop: `Stop ${agentName}`,
-    dictate: "Dictate message",
-    "finish-dictation": "Stop dictation",
+    send: sendLabel ?? t("mobile.chat.composer.send"),
+    stop: t("mobile.chat.composer.stop", { name: agentName }),
+    dictate: t("mobile.chat.composer.dictate"),
+    "finish-dictation": t("mobile.chat.composer.stopDictation"),
   }[control.mode];
 
   const focusInput = useCallback(() => {
@@ -499,7 +501,7 @@ export function ChatComposer({
                 key={agent.id}
                 variant="ghost"
                 className="min-h-12 flex-row justify-start gap-3 rounded-none px-4"
-                accessibilityLabel={`Mention ${agent.name}`}
+                accessibilityLabel={t("mobile.chat.composer.mention", { name: agent.name })}
                 onPress={() => {
                   const next = insertMention(latestTextRef.current, query, agent);
                   latestTextRef.current = next;
@@ -550,7 +552,7 @@ export function ChatComposer({
             )
           }
         >
-          {`Ask ${agentName}`}
+          {t("mobile.chat.composer.ask", { name: agentName })}
         </NativeText>
         <GestureDetector gesture={pan}>
           <AnimatedGlassView
@@ -597,9 +599,15 @@ export function ChatComposer({
               <View className="flex-row items-center gap-2 pt-2 pl-4 pr-2">
                 <Reply color={String(muted)} size={16} />
                 <Typography.Paragraph numberOfLines={1} type="body-sm" className="flex-1 text-text-secondary">
-                  {mentionDraft(replyTarget.body).text || "Attachment"}
+                  {mentionDraft(replyTarget.body).text || t("mobile.chat.reply.attachment")}
                 </Typography.Paragraph>
-                <Button isIconOnly size="sm" variant="ghost" accessibilityLabel="Cancel reply" onPress={onCancelReply}>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  accessibilityLabel={t("mobile.chat.composer.cancelReply")}
+                  onPress={onCancelReply}
+                >
                   <X color={String(muted)} size={16} />
                 </Button>
               </View>
@@ -653,7 +661,7 @@ export function ChatComposer({
                   <TextInput
                     ref={inputRef}
                     nativeID="chat-composer-input"
-                    accessibilityLabel={`Message ${agentName}`}
+                    accessibilityLabel={t("mobile.chat.composer.messageAgent", { name: agentName })}
                     accessibilityState={{ disabled: disabled || dictating }}
                     editable={!disabled && !dictating}
                     showSoftInputOnFocus={!disabled && !dictating}
@@ -699,8 +707,8 @@ export function ChatComposer({
                           })
                           .catch((error) => {
                             Alert.alert(
-                              "Could not attach pasted text",
-                              error instanceof Error ? error.message : "Try again.",
+                              t("mobile.chat.composer.pasteFailed"),
+                              error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
                             );
                           });
                         return;
@@ -762,7 +770,7 @@ export function ChatComposer({
                       className="font-sans"
                       style={{ color: String(muted), fontSize: 16, lineHeight: 22 }}
                     >
-                      {`Ask ${agentName}`}
+                      {t("mobile.chat.composer.ask", { name: agentName })}
                     </NativeText>
                   </Animated.View>
                 )}
@@ -850,7 +858,9 @@ export function ChatComposer({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={dictating ? "Cancel dictation" : "Add attachment"}
+            accessibilityLabel={
+              dictating ? t("mobile.chat.composer.cancelDictation") : t("mobile.chat.composer.addAttachment")
+            }
             accessibilityState={{ disabled: leadingBlocked }}
             disabled={leadingBlocked}
             hitSlop={4}
@@ -881,8 +891,8 @@ export function ChatComposer({
             ? {
                 name: previewItem.name,
                 uri: localPreviewUri(previewItem),
-                type: attachmentTypeLabel(previewItem.name, previewItem.mimeType),
-                size: formatFileSize(previewItem.size),
+                type: attachmentTypeLabel(previewItem.name, previewItem.mimeType, t),
+                size: format.fileSize(previewItem.size),
               }
             : null
         }
@@ -891,14 +901,14 @@ export function ChatComposer({
             ? [
                 ...(localPreviewUri(previewItem)
                   ? []
-                  : [{ label: "Open", onPress: () => void shareLocalAttachment(previewItem) }]),
+                  : [{ label: t("common.open"), onPress: () => void shareLocalAttachment(previewItem) }]),
                 {
-                  label: "Replace",
+                  label: t("mobile.chat.attachment.replace"),
                   disabled: sending || attachments.preparing,
                   onPress: () => void attachments.replace(previewItem.id),
                 },
                 {
-                  label: "Remove",
+                  label: t("common.remove"),
                   variant: "danger-soft" as const,
                   disabled: sending || attachments.preparing,
                   onPress: () => attachments.remove(previewItem.id),

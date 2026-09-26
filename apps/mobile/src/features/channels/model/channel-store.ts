@@ -17,8 +17,8 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { userErrorMessage } from "@openbot/user-errors";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 
@@ -37,7 +37,8 @@ export interface ChannelState {
   supported: boolean;
   canDelete: boolean;
   loading: boolean;
-  error: string | null;
+  /** The last load failure. A screen renders it in the interface language. */
+  error: { cause: unknown } | null;
 }
 const EMPTY: ChannelState = {
   channels: [],
@@ -246,7 +247,7 @@ export class MobileChannelStore {
           ]);
           for (const result of results) if (result.status === "rejected") throw result.reason;
         } catch (error) {
-          this.publish(entry, { error: userErrorMessage(error, "Could not load channels. Try again.") });
+          this.publish(entry, { error: { cause: error } });
         } finally {
           this.publish(entry, { loading: false });
         }
@@ -266,7 +267,7 @@ export class MobileChannelStore {
   refreshHistory(
     serverId: string,
     channelId: string,
-    failureMessage = "The message was sent, but chat history could not refresh.",
+    failureMessage = sourceText("error.remote.historyRefreshFailed"),
   ): Promise<void> {
     const entry = this.entry(serverId);
     return new Promise((resolve, reject) => {
@@ -322,7 +323,7 @@ export class MobileChannelStore {
         !item.message.questionPrompt.resolution,
     );
     const prompt = message?.message.questionPrompt;
-    if (!prompt || page?.channel.archived) throw new Error("This form is no longer available.");
+    if (!prompt || page?.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
     await this.request(
       "POST",
       TEAM_API_ROUTES.respond.prompt,
@@ -361,7 +362,7 @@ export class MobileChannelStore {
   }
   async command(serverId: string, command: ChannelCommand, options?: { waitForRefresh: boolean }) {
     const entry = this.entry(serverId);
-    if (!entry.state.supported) throw new Error("Update this desktop server to use channels.");
+    if (!entry.state.supported) throw new Error(sourceText("error.remote.channelsUnsupported"));
     const unreadChannel =
       command.type === "read" ? entry.state.channels.find((channel) => channel.id === command.channelId) : undefined;
     const result = await this.request(
@@ -396,7 +397,7 @@ export class MobileChannelStore {
       }
       if (options?.waitForRefresh && command.type === "send") await this.refreshHistory(serverId, result.id);
       else if (options?.waitForRefresh && (command.type === "resume" || command.type === "reassign"))
-        await this.refreshHistory(serverId, result.id, "The task was changed, but chat history could not refresh.");
+        await this.refreshHistory(serverId, result.id, sourceText("error.remote.taskHistoryRefreshFailed"));
       else {
         const refresh = this.refresh(serverId);
         if (options?.waitForRefresh) await refresh;
@@ -466,7 +467,7 @@ export class MobileChannelStore {
   }
   async delete(serverId: string, channelId: string) {
     const entry = this.entry(serverId);
-    if (!entry.state.canDelete) throw new Error("Update this desktop server to delete channels.");
+    if (!entry.state.canDelete) throw new Error(sourceText("error.remote.channelDeleteUnsupported"));
     await this.request("POST", CHANNEL_ROUTES.delete, () => undefined, { channelId }, serverId);
     entry.writes += 1;
     const pages = new Map(entry.state.pages);

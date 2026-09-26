@@ -1,0 +1,81 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/customProvider";
+
+export const messages = {
+  "customProvider.error.providerIdRequired": "プロバイダー ID を入力してください。",
+  "customProvider.error.providerIdPattern":
+    "小文字の英字、数字、ハイフン、アンダースコアを使い、英字か数字で始めてください。",
+  "customProvider.error.providerIdLength": "プロバイダー ID は {max} 文字未満にしてください。",
+  "customProvider.error.providerIdBuiltIn":
+    "OpenBot には {id} という名前のプロバイダーがすでにあります。別の ID を選んでください。",
+  "customProvider.error.providerIdSaved":
+    "{id} という名前のエンドポイントはすでに保存されています。先に削除するか、別の ID を選んでください。",
+  "customProvider.error.displayNameRequired": "表示名を入力してください。",
+  "customProvider.error.displayNameLength": "表示名は {max} 文字未満にしてください。",
+  "customProvider.error.apiKeyLength": "API キーは {max} 文字未満にしてください。",
+  "customProvider.error.modelsRequired": "モデルを 1 つ以上追加してください。",
+  "customProvider.error.modelsLimit": "追加できるモデルは {max} 個までです。",
+  "customProvider.error.modelIdRequired": "モデル ID を入力してください。",
+  "customProvider.error.modelIdDuplicate": "このプロバイダーにはすでに {id} があります。",
+  "customProvider.error.modelIdInvalid":
+    "このモデル ID は使えません。スペース、引用符、その他の記号を削除してください。",
+  "customProvider.error.headerNameRequired": "ヘッダー名を入力してください。",
+  "customProvider.error.headerNameInvalid": "有効な HTTP ヘッダー名を使ってください。",
+  "customProvider.error.headerDuplicate": "このプロバイダーはすでに {name} を設定しています。",
+  "customProvider.error.headerValueRequired": "ヘッダーの値を入力してください。",
+  "customProvider.error.headersLimit": "追加できるヘッダーは {max} 個までです。",
+  "customProvider.error.baseUrlRequired": "ベース URL を入力してください。",
+  "customProvider.error.baseUrlLength": "ベース URL は {max} 文字未満にしてください。",
+  "customProvider.error.baseUrlInvalid": "完全な URL を入力してください（例：{example}）。",
+  "customProvider.error.baseUrlProtocol": "http:// または https:// の URL を使ってください。",
+  "customProvider.error.baseUrlCredential": "認証情報は URL ではなくヘッダーに入れてください。",
+
+  "customProvider.saved.restarted": "保存しました。OpenBot がモデルを読み込んでいます。",
+  "customProvider.saved.skippedBusy":
+    "保存しました。OpenCode は現在のタスクが止まったあとで一覧を読み込みます。そのときに接続を押してください。",
+  "customProvider.saved.notRunning": "保存しました。OpenCode は次回の起動時に一覧を読み込みます。",
+  "customProvider.removed.restarted": "削除しました。OpenBot がモデルを読み込んでいます。",
+  "customProvider.removed.skippedBusy":
+    "削除しました。OpenCode は現在のタスクが止まったあとで一覧を読み込みます。そのときに接続を押してください。",
+  "customProvider.removed.notRunning": "削除しました。OpenCode は次回の起動時に一覧を読み込みます。",
+  "customProvider.saveFailed": "OpenBot はこのエンドポイントを保存できませんでした。",
+  "customProvider.removeFailed": "OpenBot は {name} を削除できませんでした。",
+  "customProvider.saveUnavailable": "このビルドではエンドポイントを保存できません。",
+  "customProvider.removeUnavailable": "このビルドではエンドポイントを削除できません。",
+
+  "customProvider.form.title": "カスタムプロバイダーを追加",
+  "customProvider.form.description": "OpenAI 互換のエンドポイントと、それが提供するモデルを入力してください。",
+  "customProvider.form.heading": "カスタムプロバイダー",
+  "customProvider.form.subtitle": "OpenAI 互換のエンドポイントなら何でも使えます。",
+  "customProvider.field.providerId": "プロバイダー ID",
+  "customProvider.field.providerIdHint": "小文字の英字、数字、ハイフン、アンダースコア。",
+  "customProvider.field.displayName": "表示名",
+  "customProvider.field.displayNamePlaceholder": "マイプロバイダー",
+  "customProvider.field.baseUrl": "ベース URL",
+  "customProvider.field.apiKey": "API キー",
+  "customProvider.field.apiKeyHint": "省略できます。ヘッダーで認証する場合は空のままにしてください。",
+  "customProvider.models": "モデル",
+  "customProvider.model.id": "モデル {number} の ID",
+  "customProvider.model.name": "モデル {number} の表示名",
+  "customProvider.model.namePlaceholder": "表示名",
+  "customProvider.model.remove": "モデル {number} を削除",
+  "customProvider.model.add": "モデルを追加",
+  "customProvider.headers": "ヘッダー",
+  "customProvider.header.name": "ヘッダー {number} の名前",
+  "customProvider.header.value": "ヘッダー {number} の値",
+  "customProvider.header.valuePlaceholder": "値",
+  "customProvider.header.remove": "ヘッダー {number} を削除",
+  "customProvider.header.add": "ヘッダーを追加",
+  "customProvider.submit": "送信",
+
+  "customProvider.list.title": "カスタムプロバイダー",
+  "customProvider.list.description": "保存したエンドポイントです。使わなくなったものは削除してください。",
+  "customProvider.list.subtitle": "自分のモデルエンドポイントです。",
+  "customProvider.list.empty": "カスタムエンドポイントはまだありません。",
+  "customProvider.list.label": "カスタムエンドポイント",
+  "customProvider.list.apiKeySaved": "API キー保存済み",
+  "customProvider.list.deleteLabel": "{name} を削除",
+  "customProvider.list.confirmTitle": "{name} を削除しますか？",
+  "customProvider.list.confirmDescription":
+    "API キーは破棄され、モデルは選択肢から消えます。それを使っているエージェントはデフォルトのモデルに戻ります。",
+} as const satisfies PartialTranslation<typeof source>;

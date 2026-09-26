@@ -9,6 +9,7 @@ import type {
   ReplaceHostedSiteInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { isMissingFileError } from "../backend/file-errors";
 
 const MAX_FILES = 20;
@@ -192,16 +193,16 @@ export class HostedSiteDesktopService {
 }
 
 export async function prepareSite(sourcePath: string, allowedRoots?: readonly string[]): Promise<PreparedSite> {
-  if (!isAbsolute(sourcePath)) throw new Error("Choose an absolute site directory path.");
+  if (!isAbsolute(sourcePath)) throw new Error(sourceText("error.site.absolutePath"));
   const selectedRoot = resolve(sourcePath);
   const selectedRootStats = await lstat(selectedRoot);
-  if (selectedRootStats.isSymbolicLink()) throw new Error("Symlinks are not allowed in hosted sites.");
-  if (!selectedRootStats.isDirectory()) throw new Error("The site source must be a directory.");
+  if (selectedRootStats.isSymbolicLink()) throw new Error(sourceText("error.site.rootSymlink"));
+  if (!selectedRootStats.isDirectory()) throw new Error(sourceText("error.site.notDirectory"));
   const root = await realpath(selectedRoot);
   if (allowedRoots?.length) {
     const roots = await Promise.all(allowedRoots.map((candidate) => realpath(resolve(candidate))));
     if (!roots.some((candidate) => isInside(candidate, root))) {
-      throw new Error("The site must be inside this agent's workspace or OpenBot Shared.");
+      throw new Error(sourceText("error.site.outsideWorkspace"));
     }
   }
   const framework = await detectFramework(root);
@@ -220,7 +221,7 @@ async function detectFramework(root: string): Promise<HostedSiteFramework> {
       return "astro";
     }
   } catch (error) {
-    if (!isMissingFileError(error)) throw new Error("The site package.json is invalid.");
+    if (!isMissingFileError(error)) throw new Error(sourceText("error.site.packageJsonInvalid"));
   }
   for (const name of ["astro.config.mjs", "astro.config.js", "astro.config.ts"]) {
     try {
@@ -239,28 +240,28 @@ async function staticAstroOutput(root: string): Promise<string> {
   );
   if (configPath) {
     const config = await readFile(configPath, "utf8");
-    if (/output\s*:\s*["'](?:server|hybrid)["']/u.test(config)) throw new Error("Astro must use static output.");
+    if (/output\s*:\s*["'](?:server|hybrid)["']/u.test(config))
+      throw new Error(sourceText("error.site.astroServerOutput"));
     if (/adapter|@astrojs\/react|integrations\s*:\s*\[[^\]]*react/isu.test(config)) {
-      throw new Error("Astro server adapters and React integration are not allowed.");
+      throw new Error(sourceText("error.site.astroAdapter"));
     }
   }
   const forbidden = [join(root, "src", "pages", "api"), join(root, "src", "actions")];
   for (const path of forbidden) {
-    if (await exists(path)) throw new Error("Astro API routes and server actions are not allowed.");
+    if (await exists(path)) throw new Error(sourceText("error.site.astroApiRoutes"));
   }
   const sourceEntries = await readdir(join(root, "src"), { recursive: true }).catch(() => []);
   if (sourceEntries.some((entry) => /(^|\/)(?:middleware|[^/]+\.server)\.[cm]?[jt]s$/u.test(String(entry)))) {
-    throw new Error("Astro middleware and server source are not allowed.");
+    throw new Error(sourceText("error.site.astroMiddleware"));
   }
   const output = join(root, "dist");
   const stats = await lstat(output).catch((error: unknown) => {
-    if (isMissingFileError(error))
-      throw new Error("Build the Astro project first. Its existing dist/ directory is required.");
+    if (isMissingFileError(error)) throw new Error(sourceText("error.site.astroNotBuilt"));
     throw error;
   });
-  if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error("Astro dist/ must be a real directory.");
+  if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error(sourceText("error.site.astroDistNotDirectory"));
   const canonicalOutput = await realpath(output);
-  if (!isInside(root, canonicalOutput)) throw new Error("Astro dist/ must stay inside the project directory.");
+  if (!isInside(root, canonicalOutput)) throw new Error(sourceText("error.site.astroDistOutside"));
   return canonicalOutput;
 }
 
@@ -269,39 +270,39 @@ async function collectFiles(root: string): Promise<PreparedFile[]> {
   let total = 0;
   async function visit(directory: string): Promise<void> {
     const canonicalDirectory = await realpath(directory);
-    if (!isInside(root, canonicalDirectory)) throw new Error("Site directories must stay inside the source root.");
+    if (!isInside(root, canonicalDirectory)) throw new Error(sourceText("error.site.directoryOutsideRoot"));
     const entries = await readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const absolute = join(directory, entry.name);
       const stats = await lstat(absolute);
-      if (stats.isSymbolicLink()) throw new Error(`Symlinks are not allowed: ${entry.name}`);
+      if (stats.isSymbolicLink()) throw new Error(sourceText("error.site.symlink", { name: entry.name }));
       if (stats.isDirectory()) {
         await visit(absolute);
         continue;
       }
-      if (!stats.isFile()) throw new Error(`Unsupported site entry: ${entry.name}`);
-      if (files.length >= MAX_FILES) throw new Error(`A site can contain at most ${MAX_FILES} files.`);
+      if (!stats.isFile()) throw new Error(sourceText("error.site.unsupportedEntry", { name: entry.name }));
+      if (files.length >= MAX_FILES) throw new Error(sourceText("error.site.tooManyFiles", { limit: MAX_FILES }));
       const path = relative(root, absolute).split("\\").join("/");
       if (path.split("/").some((segment) => segment.startsWith("."))) {
-        throw new Error(`Hidden files are not allowed: ${path}`);
+        throw new Error(sourceText("error.site.hiddenFile", { path }));
       }
       if (UNSAFE_FILE_NAME.test(entry.name) || SERVER_SOURCE_NAME.test(entry.name)) {
-        throw new Error(`Credentials, private keys, and server source are not allowed: ${path}`);
+        throw new Error(sourceText("error.site.secretFile", { path }));
       }
       const extension = extname(path).toLowerCase();
       const mimeType = MIME_TYPES[extension];
-      if (!mimeType) throw new Error(`This file type is not allowed: ${path}`);
+      if (!mimeType) throw new Error(sourceText("error.site.fileType", { path }));
       const handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
         const openedStats = await handle.stat();
         const canonicalFile = await realpath(absolute);
         if (!openedStats.isFile() || !isInside(root, canonicalFile) || canonicalFile !== absolute) {
-          throw new Error(`Site files must stay inside the source root: ${path}`);
+          throw new Error(sourceText("error.site.fileOutsideRoot", { path }));
         }
-        if (openedStats.size > MAX_FILE_BYTES) throw new Error(`A file exceeds the 1 MB limit: ${path}`);
+        if (openedStats.size > MAX_FILE_BYTES) throw new Error(sourceText("error.site.fileTooLarge", { path }));
         total += openedStats.size;
-        if (total > MAX_TOTAL_BYTES) throw new Error("The site exceeds the 2 MB limit.");
+        if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.site.siteTooLarge"));
         files.push({ path, size: openedStats.size, mimeType, bytes: new Uint8Array(await handle.readFile()) });
       } finally {
         await handle.close();
@@ -309,7 +310,7 @@ async function collectFiles(root: string): Promise<PreparedFile[]> {
     }
   }
   await visit(root);
-  if (!files.some((file) => file.path === "index.html")) throw new Error("The site root must contain index.html.");
+  if (!files.some((file) => file.path === "index.html")) throw new Error(sourceText("error.site.missingIndex"));
   return files;
 }
 

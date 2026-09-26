@@ -10,9 +10,9 @@ import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show
 import { createStaticAvatarSvg } from "../../bloub-avatar";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { AgentProfile } from "../../data";
+import { currentText, type TextValue, useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
-import { formatFileSize } from "./AttachmentCards";
 import { AttachmentReferenceVisual, appendAttachmentReferenceVisual } from "./AttachmentReference";
 
 interface ComposerEditorProps {
@@ -73,10 +73,12 @@ function pickerOptionKey(option: PickerOption): string {
   return option.type === "mcp" ? `mcp:${option.server.id}` : `attachment:${option.attachment.id}`;
 }
 
-function pickerOptionText(option: PickerOption): string {
-  if (option.type === "agent") return `${option.agent.name} Agent`;
-  if (option.type === "skill") return `${option.skill.name} Skill`;
-  return option.type === "mcp" ? `${option.server.name} MCP server` : `${option.attachment.name} File`;
+function pickerOptionText(option: PickerOption, t: TextValue["t"]): string {
+  if (option.type === "agent") return t("composer.picker.option.agent", { name: option.agent.name });
+  if (option.type === "skill") return t("composer.picker.option.skill", { name: option.skill.name });
+  return option.type === "mcp"
+    ? t("composer.picker.option.mcp", { name: option.server.name })
+    : t("composer.picker.option.file", { name: option.attachment.name });
 }
 
 function pickerOptionName(option: PickerOption): string {
@@ -85,8 +87,8 @@ function pickerOptionName(option: PickerOption): string {
   return option.type === "mcp" ? option.server.name : option.attachment.name;
 }
 
-function pickerOptionDescription(option: PickerOption): string | undefined {
-  if (option.type === "attachment") return formatFileSize(option.attachment.size);
+function pickerOptionDescription(option: PickerOption, format: TextValue["format"]): string | undefined {
+  if (option.type === "attachment") return format.fileSize(option.attachment.size);
   if (option.type === "skill") return skillDescription(option.skill);
   if (option.type === "mcp") return mcpServerDescription(option.server);
   return option.agent.description.trim() || option.agent.title.trim() || undefined;
@@ -110,23 +112,27 @@ function measurePickerFrame(editor: HTMLElement): PickerFrame {
  * The badge carries the option type, and for a skill where it came from. Every row in a skill list
  * is a skill, so the badge names only the source.
  */
-function pickerOptionBadge(option: PickerOption): { label: string; icon: typeof Puzzle } {
-  if (option.type === "agent") return { label: "Agent", icon: Bot };
-  if (option.type === "attachment") return { label: "File", icon: File };
-  if (option.type === "mcp") return { label: "MCP", icon: Plug };
+function pickerOptionBadge(option: PickerOption, t: TextValue["t"]): { label: string; icon: typeof Puzzle } {
+  if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
+  if (option.type === "attachment") return { label: t("composer.picker.badge.file"), icon: File };
+  if (option.type === "mcp") return { label: MCP_BADGE, icon: Plug };
   switch (option.skill.origin ?? "marketplace") {
     case "local":
-      return { label: "Custom", icon: Folder };
+      return { label: t("composer.picker.badge.custom"), icon: Folder };
     case "managed":
-      return { label: "System", icon: ShieldCheck };
+      return { label: t("composer.picker.badge.system"), icon: ShieldCheck };
     case "workspace":
-      return { label: "Workspace", icon: Folder };
+      return { label: t("composer.picker.badge.workspace"), icon: Folder };
     default:
-      return { label: "Marketplace", icon: Store };
+      return { label: t("composer.picker.badge.marketplace"), icon: Store };
   }
 }
 
+/** The protocol name. It is not translated. */
+const MCP_BADGE = "MCP";
+
 export function ComposerEditor(props: ComposerEditorProps) {
+  const { t, format } = useText();
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
   const [attachmentTooltip, setAttachmentTooltip] = createSignal<{
@@ -640,10 +646,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
               ref={pickerFades.bind}
               class={["mention-picker-list", pickerFades.classes()]}
               onScroll={pickerFades.measure}
-              aria-label={mention()?.trigger === "$" ? "Insert skill or MCP server" : "Insert mention"}
+              aria-label={t(mention()?.trigger === "$" ? "composer.picker.skillLabel" : "composer.picker.mentionLabel")}
               options={matchingOptions()}
               optionValue={pickerOptionKey}
-              optionTextValue={pickerOptionText}
+              optionTextValue={(option) => pickerOptionText(option, t)}
               selectionMode="single"
               disallowEmptySelection={true}
               allowDuplicateSelectionEvents={true}
@@ -660,12 +666,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 const option = item.rawValue;
                 const optionIndex = () =>
                   matchingOptions().findIndex((candidate) => pickerOptionKey(candidate) === item.key);
-                const badge = pickerOptionBadge(option);
+                const badge = pickerOptionBadge(option, t);
                 return (
                   <Listbox.Item
                     ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
                     item={item}
-                    aria-label={pickerOptionText(option)}
+                    aria-label={pickerOptionText(option, t)}
                     class={[
                       "mention-picker-option",
                       {
@@ -694,7 +700,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       <AttachmentReferenceVisual name={option.attachment.name} />
                     )}
                     <strong>{pickerOptionName(option)}</strong>
-                    <Show when={pickerOptionDescription(option)}>
+                    <Show when={pickerOptionDescription(option, format)}>
                       {(description) => <span class="mention-picker-description">{description()}</span>}
                     </Show>
                     <Badge class="mention-picker-badge" variant="ghost">
@@ -751,7 +757,7 @@ function createAttachmentToken(attachment: DraftAttachment, actions: AttachmentT
   token.dataset.attachmentReferenceName = attachment.name;
   token.setAttribute("role", "button");
   token.setAttribute("tabindex", "0");
-  token.setAttribute("aria-label", `Open attached file ${attachment.name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.attachment", { name: attachment.name }));
   token.setAttribute("aria-describedby", actions.tooltipId);
   appendAttachmentReferenceVisual(token, attachment.name);
   const name = document.createElement("span");
@@ -797,7 +803,7 @@ function createMentionToken(agent: AgentProfile): HTMLSpanElement {
   token.contentEditable = "false";
   token.dataset.mentionId = agent.id;
   token.dataset.mentionName = agent.name;
-  token.setAttribute("aria-label", `Agent ${agent.name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.agent", { name: agent.name }));
   const avatar = document.createElement("span");
   avatar.className = `composer-mention-avatar agent-avatar-motion-hover ${referenceChipClasses.icon}`;
   if (agent.avatarUrl) {
@@ -832,7 +838,7 @@ function updateSkillToken(token: HTMLSpanElement, skill: InstalledSkill): void {
   token.contentEditable = "false";
   token.dataset.skillId = skill.skillId;
   token.dataset.skillName = skill.name;
-  token.setAttribute("aria-label", `Skill ${skill.name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.skill", { name: skill.name }));
   const iconWrap = document.createElement("span");
   iconWrap.className = referenceChipClasses.icon;
   iconWrap.setAttribute("aria-hidden", "true");
@@ -858,7 +864,7 @@ function updateMcpToken(token: HTMLSpanElement, server: McpServerConfig): void {
   token.contentEditable = "false";
   token.dataset.mcpId = server.id;
   token.dataset.mcpName = server.name;
-  token.setAttribute("aria-label", `MCP server ${server.name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.mcp", { name: server.name }));
   const iconWrap = document.createElement("span");
   iconWrap.className = referenceChipClasses.icon;
   iconWrap.setAttribute("aria-hidden", "true");
@@ -890,7 +896,7 @@ function createUnavailableTagToken(kind: ChatTagKind, id: string, name: string):
   token.contentEditable = "false";
   token.dataset.mentionId = id;
   token.dataset.mentionName = name;
-  token.setAttribute("aria-label", `Unavailable ${kind} ${name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.unavailableAgent", { name }));
   token.textContent = name;
   return token;
 }
@@ -900,7 +906,7 @@ function updateUnavailableSkillToken(token: HTMLSpanElement, id: string, name: s
   token.contentEditable = "false";
   token.dataset.skillId = id;
   token.dataset.skillName = name;
-  token.setAttribute("aria-label", `Unavailable skill ${name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.unavailableSkill", { name }));
   token.textContent = name;
 }
 
@@ -909,7 +915,7 @@ function updateUnavailableMcpToken(token: HTMLSpanElement, id: string, name: str
   token.contentEditable = "false";
   token.dataset.mcpId = id;
   token.dataset.mcpName = name;
-  token.setAttribute("aria-label", `Unavailable MCP server ${name}`);
+  token.setAttribute("aria-label", currentText().t("composer.token.unavailableMcp", { name }));
   token.textContent = name;
 }
 

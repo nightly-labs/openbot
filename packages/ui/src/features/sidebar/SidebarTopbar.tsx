@@ -2,11 +2,13 @@
 
 import { Bot, Button, DropdownMenu, FolderPlus, Hash, Puzzle } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import { PlusIcon, SidebarToggleIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarTopbar() {
   const { layoutMutable, props, startCreateSection } = useSidebarScope();
+  const { t } = useText();
   return (
     <div class="window-drag sidebar-topbar">
       <Button
@@ -14,7 +16,7 @@ export function SidebarTopbar() {
         size="sm"
         type="button"
         class="sidebar-server-name no-drag"
-        aria-label={`Open settings for ${props.serverName}`}
+        aria-label={t("sidebar.topbar.openSettings", { name: props.serverName })}
         aria-hidden={props.compact ? "true" : undefined}
         tabindex={props.compact ? -1 : 0}
         disabled={!props.onOpenServerSettings}
@@ -33,10 +35,10 @@ export function SidebarTopbar() {
               props.compact ? "sidebar-toggle-button" : "sidebar-marketplace-button",
             ]}
             onClick={() => (props.compact ? props.onExpand() : props.onOpenMarketplace())}
-            aria-label={props.compact ? "Expand sidebar" : "Open Marketplace"}
+            aria-label={props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.openMarketplace")}
             aria-controls={props.compact ? "agent-sidebar" : undefined}
             aria-expanded={props.compact ? "false" : undefined}
-            title={props.compact ? "Expand sidebar" : "Marketplace"}
+            title={props.compact ? t("sidebar.topbar.expand") : t("sidebar.topbar.marketplace")}
           >
             <Show when={props.compact} fallback={<Puzzle aria-hidden="true" />}>
               <SidebarToggleIcon />
@@ -47,7 +49,7 @@ export function SidebarTopbar() {
           <DropdownMenu.Root placement="bottom-end" gutter={4}>
             <DropdownMenu.Trigger
               class="sidebar-icon-button sidebar-new-button no-drag"
-              aria-label="New agent or channel"
+              aria-label={t("sidebar.new.menu")}
               aria-hidden={props.compact ? "true" : undefined}
               tabindex={props.compact ? -1 : 0}
             >
@@ -58,13 +60,13 @@ export function SidebarTopbar() {
                 <Show when={props.createSupported !== false}>
                   <DropdownMenu.Item onSelect={props.onCreateAgent}>
                     <Bot aria-hidden="true" />
-                    New agent
+                    {t("sidebar.new.agent")}
                   </DropdownMenu.Item>
                 </Show>
                 <Show when={props.onCreateChannel}>
                   <DropdownMenu.Item onSelect={() => props.onCreateChannel?.()}>
                     <Hash aria-hidden="true" />
-                    New channel
+                    {t("sidebar.new.channel")}
                   </DropdownMenu.Item>
                 </Show>
                 <Show when={layoutMutable()}>
@@ -81,7 +83,7 @@ export function SidebarTopbar() {
                     }}
                   >
                     <FolderPlus aria-hidden="true" />
-                    New section
+                    {t("sidebar.new.section")}
                   </DropdownMenu.Item>
                 </Show>
               </DropdownMenu.Content>

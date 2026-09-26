@@ -13,6 +13,7 @@ import type {
   RemoteDesktopSetupStatus,
   RemoteDesktopTestStatus,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { LifecycleGate } from "./lifecycle-gate";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
@@ -20,7 +21,7 @@ import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics"
 
 export class SunshineApiError extends Error {
   constructor(readonly status: number) {
-    super(`Sunshine API failed with HTTP ${status}.`);
+    super(sourceText("error.backend.sunshineApiHttp", { status }));
     this.name = "SunshineApiError";
   }
 }
@@ -120,7 +121,7 @@ export async function allocateSunshineBasePort(): Promise<number> {
     }
     candidate += SUNSHINE_BASE_PORT_STEP;
   }
-  throw new Error("Could not reserve a free Sunshine port family for Remote Desktop.");
+  throw new Error(sourceText("error.backend.sunshinePortsUnavailable"));
 }
 
 export function releaseSunshineBasePort(basePort: number): void {
@@ -146,7 +147,7 @@ export async function allocateWebRtcPortRange(): Promise<MoonlightWebRtcPortRang
     }
     if (reservation) await new Promise<void>((resolve) => reservation?.close(() => resolve()));
   }
-  throw new Error("Could not reserve a free Moonlight WebRTC port range for Remote Desktop.");
+  throw new Error(sourceText("error.backend.moonlightPortsUnavailable"));
 }
 
 export function releaseWebRtcPortRange(range: MoonlightWebRtcPortRange): void {
@@ -428,7 +429,7 @@ export class SunshineMoonlightRuntime {
   }
 
   #throwIfStopRequested(): void {
-    if (this.#stopRequested) throw new Error("The remote desktop runtime was stopped while it started.");
+    if (this.#stopRequested) throw new Error(sourceText("error.backend.remoteDesktopStoppedWhileStarting"));
   }
 
   async #start(): Promise<SunshineMoonlightRuntimeState> {
@@ -637,7 +638,7 @@ export class SunshineMoonlightRuntime {
         await this.#writeSunshineConfig();
       }
     }
-    throw new Error("Sunshine did not start on a reserved port family.", { cause: lastError });
+    throw new Error(sourceText("error.backend.sunshineNotStarted"), { cause: lastError });
   }
 
   async #startSunshineOnce(): Promise<void> {
@@ -738,7 +739,7 @@ export class SunshineMoonlightRuntime {
       hostIds.push(host.host_id);
     }
     const [hostId] = hostIds;
-    if (hostId === undefined) throw new Error("Moonlight has no paired local host.");
+    if (hostId === undefined) throw new Error(sourceText("error.backend.moonlightNoHost"));
     const apps = (
       await moonlightJson(
         baseUrl,
@@ -750,7 +751,7 @@ export class SunshineMoonlightRuntime {
       )
     ).apps;
     const desktop = apps.find((app) => app.title.toLowerCase() === "desktop") ?? apps[0];
-    if (!desktop) throw new Error("Sunshine did not publish the Desktop application.");
+    if (!desktop) throw new Error(sourceText("error.backend.sunshineNoDesktop"));
     await writeFile(endpointPath, JSON.stringify({ port: this.#requireSunshineHttpPort() }), { mode: 0o600 });
     return { hostId, hostIds, desktopAppId: desktop.app_id };
   }
@@ -796,11 +797,11 @@ export class SunshineMoonlightRuntime {
           pairing.name === this.#pairingName && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(pairing.address),
       );
       const [match, ...others] = matches;
-      if (others.length > 0) throw new Error("Sunshine returned ambiguous local pairing requests.");
+      if (others.length > 0) throw new Error(sourceText("error.backend.sunshineAmbiguousPairing"));
       if (match) return match.id;
       await shortDelay();
     }
-    throw new Error("Sunshine did not receive the expected local pairing request.");
+    throw new Error(sourceText("error.backend.sunshineNoPairingRequest"));
   }
 
   async #pairMoonlight(baseUrl: string, hostId: number, user: string): Promise<void> {
@@ -816,7 +817,7 @@ export class SunshineMoonlightRuntime {
     );
     if (response.statusCode !== 200) {
       response.resume();
-      throw new Error(`Moonlight pairing failed with HTTP ${response.statusCode ?? 0}.`);
+      throw new Error(sourceText("error.backend.moonlightPairingHttp", { status: response.statusCode ?? 0 }));
     }
     let buffer = "";
     let pinSubmitted = false;
@@ -843,17 +844,17 @@ export class SunshineMoonlightRuntime {
           continue;
         }
         if (message.kind === "paired") return;
-        throw new Error("Moonlight rejected Sunshine pairing.");
+        throw new Error(sourceText("error.backend.moonlightRejectedPairing"));
       }
     }
-    if (!pinSubmitted) throw new Error("Moonlight did not return a pairing PIN.");
-    throw new Error("Moonlight pairing did not complete.");
+    if (!pinSubmitted) throw new Error(sourceText("error.backend.moonlightNoPin"));
+    throw new Error(sourceText("error.backend.moonlightPairingIncomplete"));
   }
 
   async #assertEmbeddedPermissions(baseUrl: string, user: string): Promise<void> {
     const { role } = await moonlightJson(baseUrl, "/api/role", moonlightRoleSchema, this.#moonlightHeader, {}, user);
     if (role.permissions.allow_transport_webrtc !== true || role.permissions.allow_transport_websockets !== false) {
-      throw new Error("Moonlight Web is not an OpenBot embedded build.");
+      throw new Error(sourceText("error.backend.moonlightWebNotEmbedded"));
     }
   }
 
@@ -917,7 +918,7 @@ async function moonlightJson<T>(
       return schema.parse(JSON.parse(buffer.slice(0, newline)));
     }
   }
-  if (!buffer.trim()) throw new Error("Moonlight returned an empty response.");
+  if (!buffer.trim()) throw new Error(sourceText("error.backend.moonlightEmptyResponse"));
   return schema.parse(JSON.parse(buffer));
 }
 
@@ -936,13 +937,13 @@ async function moonlightHttpResponse(
   };
   const response = await new Promise<IncomingMessage>((resolve, reject) => {
     const request = httpRequest(`${baseUrl}${path}`, { method: init.method ?? "GET", headers }, resolve);
-    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
+    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
     request.once("error", reject);
     request.end(body);
   });
   if (!response.statusCode || response.statusCode >= 300) {
     response.resume();
-    throw new Error(`Moonlight API failed with HTTP ${response.statusCode ?? 0}.`);
+    throw new Error(sourceText("error.backend.moonlightApiHttp", { status: response.statusCode ?? 0 }));
   }
   return response;
 }
@@ -975,7 +976,7 @@ async function sunshineRequest(
         );
       },
     );
-    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
+    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
     request.once("error", reject);
     request.end(body);
   });
@@ -1016,7 +1017,7 @@ async function sunshineJson<T>(
         });
       },
     );
-    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
+    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
     request.once("error", reject);
   });
 }
@@ -1024,7 +1025,7 @@ async function sunshineJson<T>(
 async function requestStream(url: string, headers: Record<string, string>, body: string): Promise<IncomingMessage> {
   return new Promise<IncomingMessage>((resolve, reject) => {
     const request = httpRequest(url, { method: "POST", headers }, resolve);
-    request.setTimeout(10_000, () => request.destroy(new Error("Remote desktop request timed out.")));
+    request.setTimeout(10_000, () => request.destroy(new Error(sourceText("error.backend.remoteDesktopTimeout"))));
     request.once("error", reject);
     request.end(body);
   });
@@ -1042,7 +1043,7 @@ async function waitForHttps(port: number, certificatePath: string, child?: Watch
   let lastError: unknown;
   while (Date.now() < deadline) {
     if (childEnded(child)) {
-      throw new Error(`Sunshine exited before its HTTPS API on port ${port} became ready.`, { cause: lastError });
+      throw new Error(sourceText("error.backend.sunshineExited", { port }), { cause: lastError });
     }
     try {
       const tls = await sunshineTlsOptions(certificatePath);
@@ -1052,7 +1053,7 @@ async function waitForHttps(port: number, certificatePath: string, child?: Watch
           resolve();
         });
         request.setTimeout(readinessAttemptTimeout(deadline), () =>
-          request.destroy(new Error("Sunshine did not answer.")),
+          request.destroy(new Error(sourceText("error.backend.sunshineNoAnswer"))),
         );
         request.once("error", reject);
       });
@@ -1062,8 +1063,11 @@ async function waitForHttps(port: number, certificatePath: string, child?: Watch
       await shortDelay();
     }
   }
-  const detail = lastError instanceof Error ? ` ${lastError.message}` : "";
-  throw new Error(`Sunshine did not become ready.${detail}`, { cause: lastError });
+  const message =
+    lastError instanceof Error
+      ? sourceText("error.backend.sunshineNotReadyReason", { reason: lastError.message })
+      : sourceText("error.backend.sunshineNotReady");
+  throw new Error(message, { cause: lastError });
 }
 
 async function sunshineTlsOptions(certificatePath: string): Promise<{
@@ -1081,7 +1085,7 @@ async function sunshineTlsOptions(certificatePath: string): Promise<{
     checkServerIdentity: (_hostname, certificate) => {
       const presented = certificate.raw;
       if (presented.length === expected.length && timingSafeEqual(presented, expected)) return undefined;
-      return new Error("Sunshine returned an unexpected TLS certificate.");
+      return new Error(sourceText("error.backend.sunshineTlsUnexpected"));
     },
   };
 }
@@ -1090,7 +1094,7 @@ async function waitForHttp(url: string, init: RequestInit, child?: WatchedChild 
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (childEnded(child)) {
-      throw new Error(`Moonlight Web exited before ${url} became ready.`);
+      throw new Error(sourceText("error.backend.moonlightWebExited", { url }));
     }
     try {
       const response = await fetch(url, { ...init, signal: AbortSignal.timeout(readinessAttemptTimeout(deadline)) });
@@ -1100,7 +1104,7 @@ async function waitForHttp(url: string, init: RequestInit, child?: WatchedChild 
     }
     await shortDelay();
   }
-  throw new Error("Moonlight Web did not become ready.");
+  throw new Error(sourceText("error.backend.moonlightWebNotReady"));
 }
 
 /**

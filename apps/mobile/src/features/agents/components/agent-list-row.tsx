@@ -29,6 +29,7 @@ import { useChatSectionMenu } from "@/features/agents/components/use-chat-sectio
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { useText } from "@/shared/lib/text";
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -103,6 +104,7 @@ export function AgentListRow({
   leftInset = 20,
   rightInset = 20,
 }: AgentListRowProps) {
+  const { t } = useText();
   const { theme } = useUniwind();
   const [background] = useThemeColor(["background"]);
   const { pinnedAgentIds, pinnedChannelIds } = useMobileWorkspace();
@@ -133,9 +135,15 @@ export function AgentListRow({
   const linkTrigger = (
     <Link.Trigger>
       <ChatLinkPressable
-        accessibilityLabel={`Open chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
+        accessibilityLabel={
+          agent.title.trim()
+            ? t("mobile.agent.list.openWithTitle", { name: agent.name, title: agent.title.trim() })
+            : t("mobile.agent.list.open", { name: agent.name })
+        }
         accessibilityRole="button"
-        accessibilityActions={enableActions ? [{ name: "pin", label: `Pin ${agent.name}` }] : undefined}
+        accessibilityActions={
+          enableActions ? [{ name: "pin", label: t("mobile.agent.pin.pinNamed", { name: agent.name }) }] : undefined
+        }
         onAccessibilityAction={
           enableActions
             ? (event) => {
@@ -217,7 +225,7 @@ export function AgentListRow({
           ref={editMenu}
           colorScheme={theme === "dark" ? "dark" : "light"}
           shouldOpenOnLongPress
-          actions={[...sectionMenu.androidActions, { id: "edit", title: "Info" }]}
+          actions={[...sectionMenu.androidActions, { id: "edit", title: t("mobile.agent.menu.info") }]}
           onPressAction={({ nativeEvent }) => {
             sectionMenu.onAction(nativeEvent.event);
             if (nativeEvent.event === "edit")

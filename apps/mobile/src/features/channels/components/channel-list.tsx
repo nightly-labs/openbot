@@ -1,6 +1,5 @@
 import { type MenuComponentRef, MenuView } from "@expo/ui/community/menu";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
-import { userErrorMessage } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
@@ -20,6 +19,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
+import { currentText, useText } from "@/shared/lib/text";
 import { ChannelAvatar } from "./channel-avatar";
 
 export const ChannelListRow = memo(function ChannelListRow({
@@ -33,6 +33,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   agents: ReadonlyMap<string, MobileAgent>;
   pinned?: boolean;
 }) {
+  const { t, format } = useText();
   const { pinnedAgentIds, pinnedChannelIds, hideChannel, servers, channelStore } = useMobileWorkspace();
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const { theme } = useUniwind();
@@ -53,45 +54,54 @@ export const ChannelListRow = memo(function ChannelListRow({
   const info = () =>
     router.push({ pathname: "/channel-info/[channelId]", params: { channelId: channel.id, serverId } });
   const remove = () =>
-    Alert.alert(
-      `Delete ${channel.name}?`,
-      "This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Agents are kept.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            if (deleting.current) return;
-            deleting.current = true;
-            channelStore
-              .command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId: channel.id })
-              .then(() => haptics.notification())
-              .catch((cause: unknown) =>
-                Alert.alert(
-                  "Could not delete channel",
-                  userErrorMessage(cause, "Could not delete this channel. Try again."),
-                ),
-              )
-              .finally(() => {
-                deleting.current = false;
-              });
-          },
+    Alert.alert(t("mobile.channel.list.deleteTitle", { name: channel.name }), t("mobile.channel.list.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("common.delete"),
+        style: "destructive",
+        onPress: () => {
+          if (deleting.current) return;
+          deleting.current = true;
+          channelStore
+            .command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId: channel.id })
+            .then(() => haptics.notification())
+            .catch((cause: unknown) => {
+              const text = currentText();
+              Alert.alert(
+                text.t("mobile.channel.list.deleteFailed"),
+                text.errorMessage(cause, text.t("mobile.channel.list.deleteFailedBody")),
+              );
+            })
+            .finally(() => {
+              deleting.current = false;
+            });
         },
-      ],
-    );
+      },
+    ]);
   const copyId = () => {
     void Clipboard.setStringAsync(channel.id).then(() => haptics.notification());
   };
+  const openLabel = channel.title.trim()
+    ? t("mobile.channel.list.openWithTitle", { name: channel.name, title: channel.title.trim() })
+    : t("mobile.channel.list.open", { name: channel.name });
   const link = (
     <Link href={{ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } }} asChild>
       <Link.Trigger>
         <ChatLinkPressable
           accessibilityRole="button"
-          accessibilityLabel={`Open channel ${channel.name}${channel.title.trim() ? `, ${channel.title.trim()}` : ""}${channel.unreadCount ? `, ${channel.unreadCount} unread messages` : ""}`}
+          accessibilityLabel={
+            channel.unreadCount
+              ? `${openLabel}, ${t("mobile.channel.list.unread", { count: channel.unreadCount })}`
+              : openLabel
+          }
           className="w-full"
           onLongPress={isAndroid ? () => menu.current?.show() : undefined}
-          accessibilityActions={[{ name: "pin", label: `${isPinned ? "Unpin" : "Pin"} ${channel.name}` }]}
+          accessibilityActions={[
+            {
+              name: "pin",
+              label: t(isPinned ? "mobile.agent.pin.unpinNamed" : "mobile.agent.pin.pinNamed", { name: channel.name }),
+            },
+          ]}
           onAccessibilityAction={(event) => {
             if (event.nativeEvent.actionName === "pin") togglePin();
           }}
@@ -143,7 +153,7 @@ export const ChannelListRow = memo(function ChannelListRow({
                         {channel.name}
                       </Typography.Paragraph>
                       <Typography.Paragraph type="body-xs" className="text-muted">
-                        {formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt)}
+                        {formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt, format)}
                       </Typography.Paragraph>
                     </View>
                     {channel.title.trim() ? (
@@ -153,7 +163,7 @@ export const ChannelListRow = memo(function ChannelListRow({
                     ) : null}
                   </View>
                   <Typography.Paragraph type="body-xs" className="text-text-secondary -mt-1" numberOfLines={1}>
-                    {channel.lastMessage?.text ?? "No messages yet"}
+                    {channel.lastMessage?.text ?? t("mobile.channel.list.noMessages")}
                   </Typography.Paragraph>
                 </View>
               )}
@@ -169,21 +179,21 @@ export const ChannelListRow = memo(function ChannelListRow({
             disabled={!canPin}
             onPress={() => togglePin()}
           >
-            {isPinned ? "Unpin" : "Pin"}
+            {t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin")}
           </Link.MenuAction>
           <Link.MenuAction icon="eye.slash" onPress={hide}>
-            Hide
+            {t("mobile.agent.menu.hide")}
           </Link.MenuAction>
           <Link.MenuAction icon="info.circle" onPress={info}>
-            Info
+            {t("mobile.agent.menu.info")}
           </Link.MenuAction>
           {sectionMenu.menu}
           <Link.MenuAction icon="doc.on.doc" onPress={copyId}>
-            Copy ID
+            {t("mobile.agent.menu.copyId")}
           </Link.MenuAction>
           {canDelete ? (
             <Link.MenuAction destructive icon="trash" onPress={remove}>
-              Delete
+              {t("common.delete")}
             </Link.MenuAction>
           ) : null}
         </Link.Menu>
@@ -197,11 +207,15 @@ export const ChannelListRow = memo(function ChannelListRow({
       shouldOpenOnLongPress
       actions={[
         ...sectionMenu.androidActions,
-        { id: "pin", title: isPinned ? "Unpin" : "Pin", attributes: { disabled: !canPin } },
-        { id: "hide", title: "Hide" },
-        { id: "info", title: "Info" },
-        { id: "copy", title: "Copy ID" },
-        { id: "delete", title: "Delete", attributes: { destructive: true, hidden: !canDelete } },
+        {
+          id: "pin",
+          title: t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin"),
+          attributes: { disabled: !canPin },
+        },
+        { id: "hide", title: t("mobile.agent.menu.hide") },
+        { id: "info", title: t("mobile.agent.menu.info") },
+        { id: "copy", title: t("mobile.agent.menu.copyId") },
+        { id: "delete", title: t("common.delete"), attributes: { destructive: true, hidden: !canDelete } },
       ]}
       onPressAction={({ nativeEvent }) => {
         sectionMenu.onAction(nativeEvent.event);

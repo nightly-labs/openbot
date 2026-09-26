@@ -10,6 +10,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
 
@@ -195,7 +196,12 @@ export async function usableMcpServer(
   const configured = mcpEnvironment(config).PATH;
   const path = appendToolRuntimes(configured ?? (await loginShellPath()), tools.binDirectories);
   const command = (await resolveMcpCommand(config.command, path)) ?? tools.commandAliases[config.command.trim()];
-  if (!command) return { config, error: `Command not found: ${config.command}`, reason: "command_not_found" };
+  if (!command)
+    return {
+      config,
+      error: sourceText("error.backend.mcpCommandNotFound", { command: config.command }),
+      reason: "command_not_found",
+    };
   return {
     config,
     command,

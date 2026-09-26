@@ -48,7 +48,7 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
     Authorization: `Bearer ${await fixture.signIn()}`,
     "OpenBot-Protocol-Version": "3",
     "OpenBot-Capabilities":
-      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, providers-v1, host-admin-v1",
+      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1",
     "Content-Type": "application/json",
   };
   const invite = await fixture.store.createInvite("member");
@@ -261,6 +261,42 @@ describe("Team API agent-install-v1", () => {
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("agent-install-v1");
+  });
+});
+
+describe("Team API agent-update-v1", () => {
+  it("lets only an admin update an agent from its listing", async () => {
+    const updated: Array<{ listingId: string; agentId?: string }> = [];
+    const marketplaceAgents = {
+      install: async (input: { listingId: string; agentId?: string }) => {
+        if (input.agentId !== "chief")
+          throw new Error("This local agent was installed from a different marketplace agent.");
+        updated.push({ listingId: input.listingId, agentId: input.agentId });
+        return { agent: { ...CHIEF, name: "Chief v2" } };
+      },
+    };
+    // Update needs only the listing service, so a host without shared templates still offers it.
+    const { base, admin, asMember, post } = await signedIn("agent-update", { admin: { marketplaceAgents } });
+    const update = { agentId: "chief", listingId: "researcher", timezone: "Europe/Warsaw" };
+    const path = "/v1/admin/agents/update-marketplace";
+
+    expect((await post(path, update, { ...admin, "OpenBot-Capabilities": "agent-install-v1" })).status).toBe(400);
+    expect((await post(path, update, asMember)).status).toBe(403);
+    expect((await post(path, { listingId: "researcher", timezone: "UTC" })).status).toBe(400);
+    expect(updated).toEqual([]);
+
+    expect(await (await post(path, update)).json()).toEqual({ agentId: "chief", name: "Chief v2" });
+    expect(updated).toEqual([{ listingId: "researcher", agentId: "chief" }]);
+
+    const refused = await post(path, { ...update, agentId: "writer" });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "This local agent was installed from a different marketplace agent.",
+    });
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("agent-update-v1");
+    expect(compatibility.capabilities).not.toContain("agent-install-v1");
   });
 });
 

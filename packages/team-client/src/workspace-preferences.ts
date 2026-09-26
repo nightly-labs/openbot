@@ -1,4 +1,5 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { remoteHostFingerprint } from "./remote-directory";
 
 export interface RemoteWorkspacePreferences {
@@ -47,7 +48,7 @@ function decodePreferences(value: unknown): RemoteWorkspacePreferences {
     (value.hiddenChannels !== undefined &&
       (!Array.isArray(value.hiddenChannels) || !value.hiddenChannels.every(isString)))
   ) {
-    throw new Error("The saved chat preferences could not be read.");
+    throw new Error(sourceText("error.remote.preferencesUnreadable"));
   }
   return {
     hidden: value.hidden,

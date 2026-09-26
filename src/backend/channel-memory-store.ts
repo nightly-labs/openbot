@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ChannelMemory } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { MemoryStore, type MemoryTables } from "./memory-store";
 import type { OpenBotDatabase } from "./openbot-database";
 
@@ -8,7 +9,7 @@ const CHANNEL_MEMORY_TABLES: MemoryTables = {
   ownerColumn: "channel_id",
   aggregateType: "channel-memory",
   limit: INPUT_LIMITS.channelMemories,
-  limitMessage: `A channel can have up to ${INPUT_LIMITS.channelMemories} memories.`,
+  limitMessage: sourceText("error.backend.channelMemoryLimit", { limit: INPUT_LIMITS.channelMemories }),
 };
 
 /** The channel twin of `AgentMemoryStore`: the same `MemoryStore`, with a channel for an owner. */
@@ -40,7 +41,7 @@ export class ChannelMemoryStore extends MemoryStore {
    */
   saveFromTool(channelId: string, text: string, sourceTurnId: string, commandId: string): ChannelMemory {
     const memory = this.saveAutomaticEntry(channelId, { text, sourceTurnId, commandId });
-    if (!memory) throw new Error("This memory no longer exists.");
+    if (!memory) throw new Error(sourceText("error.backend.memoryGone"));
     return { ...memory, channelId };
   }
 

@@ -20,6 +20,7 @@ import {
   Spinner,
   X,
 } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 
 export interface QuestionPromptBubbleProps {
@@ -67,18 +68,19 @@ function summaryResolution(questions: AgentPromptQuestion[], answers: Record<str
 }
 
 function CompletedQuestionPrompt(props: { questions: AgentPromptQuestion[]; resolution: AgentPromptResolution }) {
+  const { t } = useText();
   const title = () => {
-    if (props.resolution.status === "cancelled") return "Questions cancelled";
-    if (props.resolution.status === "expired") return "Questions expired";
-    return "Answers sent";
+    if (props.resolution.status === "cancelled") return t("prompt.question.cancelled");
+    if (props.resolution.status === "expired") return t("prompt.question.expired");
+    return t("prompt.question.answersSent");
   };
 
   function answerLabel(question: AgentPromptQuestion): string {
     if (props.resolution.status !== "answered") return "";
     const response = props.resolution.responses[question.id];
-    if (!response || response.status === "skipped") return "Skipped";
-    if (question.isSecret || !response.answers) return "Private answer";
-    return response.answers.length > 0 ? response.answers.join(", ") : "Skipped";
+    if (!response || response.status === "skipped") return t("prompt.question.skipped");
+    if (question.isSecret || !response.answers) return t("prompt.question.privateAnswer");
+    return response.answers.length > 0 ? response.answers.join(", ") : t("prompt.question.skipped");
   }
 
   return (
@@ -109,6 +111,7 @@ function CompletedQuestionPrompt(props: { questions: AgentPromptQuestion[]; reso
 }
 
 export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
+  const { t } = useText();
   const initialContent = (): PageContent | null => {
     if (props.resolution) return { kind: "resolution", resolution: props.resolution };
     return props.questions.length > 0 ? { kind: "question", index: 0 } : null;
@@ -335,38 +338,38 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
         total={questionCount()}
         disabled={busy()}
         class="question-prompt-navigation-root"
-        aria-label="Question controls"
+        aria-label={t("prompt.question.controls")}
         onPrevious={() => moveTo(step() - 1)}
         onNext={() => moveTo(step() + 1)}
         onCancel={() => performWhenReady(() => void submit({}))}
         onSubmit={(event) => event.preventDefault()}
       >
-        <nav class="question-prompt-navigation" aria-label="Question navigation">
+        <nav class="question-prompt-navigation" aria-label={t("prompt.question.navigation")}>
           <Questionnaire.Previous
             size="icon-xs"
             class="question-prompt-navigation-button"
-            aria-label="Previous question"
-            title="Previous question"
+            aria-label={t("prompt.question.previous")}
+            title={t("prompt.question.previous")}
           >
             <ChevronLeft aria-hidden="true" />
           </Questionnaire.Previous>
           <Questionnaire.Progress>
-            {step() + 1} of {questionCount()}
+            {t("prompt.question.progress", { current: step() + 1, total: questionCount() })}
           </Questionnaire.Progress>
           <Questionnaire.Next
             variant="ghost"
             size="icon-xs"
             class="question-prompt-navigation-button"
-            aria-label="Next question"
-            title="Next question"
+            aria-label={t("prompt.question.next")}
+            title={t("prompt.question.next")}
           >
             <ChevronRight aria-hidden="true" />
           </Questionnaire.Next>
           <Questionnaire.Cancel
             size="icon-xs"
             class="question-prompt-navigation-button question-prompt-cancel"
-            aria-label="Cancel questions"
-            title="Cancel questions"
+            aria-label={t("prompt.question.cancel")}
+            title={t("prompt.question.cancel")}
           >
             <X aria-hidden="true" />
           </Questionnaire.Cancel>
@@ -384,7 +387,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
             current={pageProps.index + 1}
             total={questionCount()}
             disabled={busy()}
-            aria-label="Agent questions"
+            aria-label={t("prompt.question.label")}
             onPrevious={() => moveTo(pageProps.index - 1)}
             onNext={() => moveTo(pageProps.index + 1)}
             onSkip={() => skipQuestion(current(), pageProps.index)}
@@ -396,7 +399,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
               <Questionnaire.Title>{current().question}</Questionnaire.Title>
               <Badge variant="warning-light" class="conversation-interaction-status">
                 <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-                Input required
+                {t("prompt.inputRequired")}
               </Badge>
             </header>
             <Questionnaire.Choices role="radiogroup" aria-label={current().question}>
@@ -436,8 +439,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     ref={(element) => customInputs.set(current().id, element)}
                     type={current().isSecret ? "password" : "text"}
                     value={customDrafts()[current().id] ?? ""}
-                    placeholder={current().isSecret ? "Enter a private answer" : "Type your own answer"}
-                    aria-label={`Custom answer for: ${current().question}`}
+                    placeholder={
+                      current().isSecret ? t("prompt.question.privatePlaceholder") : t("prompt.customPlaceholder")
+                    }
+                    aria-label={t("prompt.question.customAnswerFor", { question: current().question })}
                     maxlength={INPUT_LIMITS.promptAnswerText}
                     disabled={busy()}
                     onValueChange={(value) => setCustomDrafts((drafts) => ({ ...drafts, [current().id]: value }))}
@@ -451,10 +456,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
                     <Show when={submitting() || props.pending}>
                       <span class="question-prompt-sending" role="status">
                         <Spinner size="sm" />
-                        Sending…
+                        {t("common.sending")}
                       </span>
                     </Show>
-                    <Questionnaire.Skip size="xs">Skip</Questionnaire.Skip>
+                    <Questionnaire.Skip size="xs">{t("prompt.question.skip")}</Questionnaire.Skip>
                   </div>
                 </div>
               </ItemGroup>
@@ -476,9 +481,9 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
         <Show
           when={initialContent()}
           fallback={
-            <section class="question-prompt-empty" aria-label="Agent questions">
-              <strong>No questions are waiting.</strong>
-              <span>The agent will continue when it needs another decision.</span>
+            <section class="question-prompt-empty" aria-label={t("prompt.question.label")}>
+              <strong>{t("prompt.question.emptyTitle")}</strong>
+              <span>{t("prompt.question.emptyBody")}</span>
             </section>
           }
         >

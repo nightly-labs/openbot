@@ -13,11 +13,13 @@ import {
 } from "@/features/settings/components/settings-content";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { AttachmentThumbnail, formatFileSize, useAttachmentFile } from "../components/attachment-preview";
+import { useText } from "@/shared/lib/text";
+import { AttachmentThumbnail, useAttachmentFile } from "../components/attachment-preview";
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessagePreview } from "../model/queued-message-view";
 
 export function QueuedMessageActionsScreen() {
+  const { t, format } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
   const foreground = useThemeColor("foreground");
@@ -29,7 +31,7 @@ export function QueuedMessageActionsScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          This message is no longer queued.
+          {t("mobile.chat.queue.noLongerQueued")}
         </Typography.Paragraph>
       </SettingsContent>
     );
@@ -49,14 +51,19 @@ export function QueuedMessageActionsScreen() {
 
   return (
     <SettingsContent>
-      <SettingsSection title={`Position ${delivery.position ?? "–"} · ${formatUpdatedAt(delivery.createdAt)}`}>
+      <SettingsSection
+        title={t("mobile.chat.queue.position", {
+          position: delivery.position ?? "–",
+          date: formatUpdatedAt(delivery.createdAt, format),
+        })}
+      >
         <SettingsRow>
           <Typography>{queuedMessagePreview(delivery)}</Typography>
         </SettingsRow>
       </SettingsSection>
 
       {delivery.attachments.length > 0 ? (
-        <SettingsSection title="Attachments">
+        <SettingsSection title={t("mobile.chat.queue.attachments")}>
           {delivery.attachments.map((file) => (
             <QueuedAttachmentRow key={file.id} attachment={file} serverId={queue.serverId} />
           ))}
@@ -72,7 +79,7 @@ export function QueuedMessageActionsScreen() {
             router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } });
           }}
         >
-          <Typography>Edit</Typography>
+          <Typography>{t("common.edit")}</Typography>
         </SettingsRow>
         <SettingsRow
           leading={<CornerDownRight color={foreground} size={22} />}
@@ -80,7 +87,7 @@ export function QueuedMessageActionsScreen() {
           disabled={locked || editedElsewhere || !queue.activeTurnId}
           onPress={() => finish(queue.steer(delivery))}
         >
-          <Typography>Steer</Typography>
+          <Typography>{t("mobile.chat.queue.steer")}</Typography>
         </SettingsRow>
         <SettingsRow
           leading={<ArrowUpToLine color={foreground} size={22} />}
@@ -88,7 +95,7 @@ export function QueuedMessageActionsScreen() {
           disabled={locked || editedElsewhere || delivery.position === 1}
           onPress={() => finish(queue.moveFirst(delivery))}
         >
-          <Typography>Move to first</Typography>
+          <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
         </SettingsRow>
       </SettingsSection>
 
@@ -98,18 +105,18 @@ export function QueuedMessageActionsScreen() {
           disclosure={false}
           disabled={locked}
           onPress={() =>
-            Alert.alert("Delete queued message?", "The agent never receives it.", [
-              { text: "Keep", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: () => finish(queue.remove(delivery)) },
+            Alert.alert(t("mobile.chat.queue.deleteTitle"), t("mobile.chat.queue.deleteMessage"), [
+              { text: t("mobile.chat.queue.keep"), style: "cancel" },
+              { text: t("common.delete"), style: "destructive", onPress: () => finish(queue.remove(delivery)) },
             ])
           }
         >
-          <Typography className="text-danger-text">Delete</Typography>
+          <Typography className="text-danger-text">{t("common.delete")}</Typography>
         </SettingsRow>
       </SettingsSection>
 
-      {editedElsewhere ? <SettingsNote>Another device is editing this message.</SettingsNote> : null}
-      {queue.activeTurnId ? null : <SettingsNote>Steer needs a running turn.</SettingsNote>}
+      {editedElsewhere ? <SettingsNote>{t("mobile.chat.queue.editedElsewhere")}</SettingsNote> : null}
+      {queue.activeTurnId ? null : <SettingsNote>{t("mobile.chat.queue.steerNeedsTurn")}</SettingsNote>}
       {queue.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
           {queue.error}
@@ -121,6 +128,7 @@ export function QueuedMessageActionsScreen() {
 
 /** A queued file: an image shows its own thumbnail, and every file opens in the share sheet. */
 function QueuedAttachmentRow({ attachment, serverId }: { attachment: AttachmentSummary; serverId: string }) {
+  const { t, format } = useText();
   const muted = useThemeColor("muted");
   const image = attachment.kind === "image";
   const file = useAttachmentFile(serverId, attachment, image);
@@ -128,7 +136,7 @@ function QueuedAttachmentRow({ attachment, serverId }: { attachment: AttachmentS
     <SettingsRow
       disclosure={false}
       leading={<AttachmentThumbnail name={attachment.name} uri={image ? file.uri : null} />}
-      supportingText={file.busy ? "Downloading…" : formatFileSize(attachment.size)}
+      supportingText={file.busy ? t("mobile.chat.attachment.downloading") : format.fileSize(attachment.size)}
       trailing={<ExternalLink size={18} color={String(muted)} />}
       onPress={file.share}
     >

@@ -3,6 +3,7 @@ import type {
   AgentRuntimeSettings,
   AgentRuntimeSettingsPatch,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
+import { currentText } from "@openbot/ui/text";
 import { agentConversationKey } from "../conversation-keys";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 
@@ -149,7 +150,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     return saveRuntimeSettings(
       { provider, model, reasoningEffort },
       { provider, model, reasoningEffort },
-      reportComposerError ? "Could not change model. Try again." : null,
+      reportComposerError ? currentText().t("composer.error.changeModel") : null,
     );
   }
 
@@ -168,7 +169,7 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       reasoningEffort: effort,
     };
     deps.setSettingsReasoning(effort);
-    await saveRuntimeSettings(settings, { reasoningEffort: effort }, "Could not change effort. Try again.");
+    await saveRuntimeSettings(settings, { reasoningEffort: effort }, currentText().t("composer.error.changeEffort"));
   }
 
   return {

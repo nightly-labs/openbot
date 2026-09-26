@@ -10,11 +10,11 @@ import type {
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { SettingsSection, Text } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createSignal, Show } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";

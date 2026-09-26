@@ -6,6 +6,7 @@ import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar"
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { useText } from "@/shared/lib/text";
 
 type TaskCommand = (taskId: string, type: "resume" | "reassign", recipientAgentId?: string | null) => void;
 
@@ -50,8 +51,9 @@ function TaskActionCard({
   disabled: boolean;
   onCommand: TaskCommand;
 }) {
+  const { t, sourceText } = useText();
   const agent = members.find((member) => member.id === task.ownerAgentId);
-  const name = agent?.name ?? "Task";
+  const name = agent?.name ?? t("mobile.channel.task.task");
   return (
     <SettingsSection>
       <View className="gap-3 p-4">
@@ -69,7 +71,7 @@ function TaskActionCard({
             {name}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
-            {task.state === "failed" ? "Failed" : "Paused"}
+            {t(task.state === "failed" ? "mobile.channel.task.failed" : "mobile.channel.task.paused")}
           </Typography.Paragraph>
         </View>
         {task.instruction ? (
@@ -77,7 +79,7 @@ function TaskActionCard({
         ) : null}
         {task.error ? (
           <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
-            {task.error}
+            {sourceText(task.error)}
           </Typography.Paragraph>
         ) : null}
         <View className="flex-row items-center gap-3">
@@ -88,7 +90,7 @@ function TaskActionCard({
             isDisabled={disabled}
             onPress={() => onCommand(task.id, "resume")}
           >
-            <Button.Label>Resume</Button.Label>
+            <Button.Label>{t("mobile.channel.task.resume")}</Button.Label>
           </Button>
           <View className="flex-1" pointerEvents={disabled || !members.length ? "none" : "auto"}>
             <MenuView
@@ -106,7 +108,7 @@ function TaskActionCard({
                 isDisabled={disabled || !members.length}
                 pointerEvents="none"
               >
-                <Button.Label>Reassign</Button.Label>
+                <Button.Label>{t("mobile.channel.task.reassign")}</Button.Label>
               </Button>
             </MenuView>
           </View>

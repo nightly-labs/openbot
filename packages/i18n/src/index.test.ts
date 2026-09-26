@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveLocale, translateFor } from "./index";
 import { createTranslate } from "./message";
 
@@ -76,5 +76,38 @@ describe("createTranslate", () => {
   it("renders readable text for a locale tag Intl rejects", () => {
     const broken = createTranslate({ source, locale: "not a locale", sourceLocale: "en" });
     expect(broken("replies", { count: 2 })).toBe("2 replies");
+  });
+});
+
+describe("plural forms without Intl.PluralRules", () => {
+  // Hermes, which runs the mobile app, may not ship Intl.PluralRules. Without the built-in rules a
+  // plural message would throw and blank the screen.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uses the built-in rule for each translated language", () => {
+    vi.stubGlobal("Intl", { ...Intl, PluralRules: undefined });
+    const source = { replies: { one: "{count} reply", other: "{count} replies" } } as const;
+    const english = createTranslate({ source, locale: "en", sourceLocale: "en" });
+    expect(english("replies", { count: 1 })).toBe("1 reply");
+    expect(english("replies", { count: 0 })).toBe("0 replies");
+
+    const french = createTranslate({
+      source,
+      translation: { replies: { one: "{count} réponse", other: "{count} réponses" } },
+      locale: "fr",
+      sourceLocale: "en",
+    });
+    expect(french("replies", { count: 0 })).toBe("0 réponse");
+    expect(french("replies", { count: 2 })).toBe("2 réponses");
+
+    const japanese = createTranslate({
+      source,
+      translation: { replies: { one: "wrong", other: "{count} 件の返信" } },
+      locale: "ja",
+      sourceLocale: "en",
+    });
+    expect(japanese("replies", { count: 1 })).toBe("1 件の返信");
   });
 });

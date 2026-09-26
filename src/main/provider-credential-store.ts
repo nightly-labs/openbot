@@ -2,6 +2,7 @@
 
 import { readFile, rm } from "node:fs/promises";
 import type { AgentProviderId, ProviderApiKeyStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
@@ -60,7 +61,8 @@ export class ProviderCredentialStore {
     try {
       this.#keys = await this.#read();
     } catch (error) {
-      this.#loadError = error instanceof Error ? error : new Error("The provider credential file is unreadable.");
+      this.#loadError =
+        error instanceof Error ? error : new Error(sourceText("error.provider.credentialFileUnreadable"));
     }
     this.#loaded = true;
     return this.#loadError;
@@ -139,7 +141,7 @@ export class ProviderCredentialStore {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return new Map();
       throw error;
     }
-    if (source.length > MAX_ENVELOPE_BYTES) throw new Error("The provider credential file is too large.");
+    if (source.length > MAX_ENVELOPE_BYTES) throw new Error(sourceText("error.provider.credentialFileTooLarge"));
     const envelope = envelopeSchema.parse(JSON.parse(source));
     const keys = new Map<string, string>();
     for (const [provider, encrypted] of Object.entries(envelope.credentials)) {

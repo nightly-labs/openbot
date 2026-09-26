@@ -10,9 +10,13 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
+
+const PRODUCT_NAME = "OpenBot";
 
 export function AboutSettingsScreen() {
-  const version = Constants.expoConfig?.version ?? "Development";
+  const { t } = useText();
+  const version = Constants.expoConfig?.version ?? t("mobile.settings.about.development");
   const build = isIOS
     ? Constants.platform?.ios?.buildNumber
     : isAndroid
@@ -22,16 +26,16 @@ export function AboutSettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   function open(url: string) {
     setError(null);
-    void Linking.openURL(url).catch(() => setError("Could not open the link. Try again."));
+    void Linking.openURL(url).catch(() => setError(t("mobile.settings.about.openFailed")));
   }
   return (
     <SettingsContent>
-      <SettingsSection title="Resources">
+      <SettingsSection title={t("mobile.settings.about.resources")}>
         <SettingsRow onPress={() => open("https://openbot.run")}>
-          <Typography.Paragraph type="body-sm">Website</Typography.Paragraph>
+          <Typography.Paragraph type="body-sm">{t("mobile.settings.about.website")}</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow onPress={() => open("https://github.com/nightly-labs/openbot/blob/main/PRIVACY.md")}>
-          <Typography.Paragraph type="body-sm">Privacy policy</Typography.Paragraph>
+          <Typography.Paragraph type="body-sm">{t("mobile.settings.about.privacy")}</Typography.Paragraph>
         </SettingsRow>
         {error ? <SettingsNote>{error}</SettingsNote> : null}
       </SettingsSection>
@@ -39,7 +43,7 @@ export function AboutSettingsScreen() {
         <AppLogo size={56} interactive />
         <View className="items-center gap-1">
           <Typography.Heading type="h4" align="center">
-            OpenBot
+            {PRODUCT_NAME}
           </Typography.Heading>
           <Typography.Paragraph type="body-xs" align="center" className="text-grouped-secondary" selectable>
             {versionLabel}

@@ -9,6 +9,7 @@ import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/Conversat
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
+import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
@@ -115,6 +116,7 @@ export function ConversationTimeline() {
     setUnreadMessagesDividerElement,
     setVirtualRootElement,
   } = useConversationViewScope();
+  const { t, format } = useText();
   const runtime = conversationRuntime(props);
   /**
    * An agent's record of a routine it created or changed is a card whose schedule the person can
@@ -158,7 +160,9 @@ export function ConversationTimeline() {
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {keyedPrompt() ? `Input required. ${keyedPrompt()?.prompt.questions[0]?.question ?? ""}` : ""}
+        {keyedPrompt()
+          ? t("prompt.inputRequiredAnnouncement", { question: keyedPrompt()?.prompt.questions[0]?.question ?? "" })
+          : ""}
       </span>
       <Show when={chatSearchOpen()}>
         <ChatSearch
@@ -202,10 +206,10 @@ export function ConversationTimeline() {
         <Show when={props.loaded}>
           <Show when={props.loadingOlder || props.olderError}>
             <div class="conversation-history-status" role={props.olderError ? "alert" : "status"}>
-              <Show when={props.olderError} fallback="Loading older messages…">
+              <Show when={props.olderError} fallback={t("chat.history.loadingOlder")}>
                 <span>{props.olderError}</span>
                 <Button type="button" variant="ghost" size="xs" onClick={() => props.onLoadOlder?.()}>
-                  Retry
+                  {t("common.retry")}
                 </Button>
               </Show>
             </div>
@@ -233,8 +237,8 @@ export function ConversationTimeline() {
                   const current = message();
                   if (!current) return null;
                   const previous = timelineMessages()[virtualRow.index - 1];
-                  if (current.createdAt) return dayMarkerLabel(previous?.createdAt, current.createdAt);
-                  return previous === undefined ? (current.time ?? "now") : null;
+                  if (current.createdAt) return dayMarkerLabel(previous?.createdAt, current.createdAt, { t, format });
+                  return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });
                 /*
                  * A row that continues a run by the same sender draws no time: the run carries one
@@ -417,7 +421,10 @@ export function ConversationTimeline() {
                             message={message() ?? initialMessage}
                             author={{
                               kind: message()?.author === "you" ? "you" : "agent",
-                              name: message()?.author === "you" ? "You" : (props.agent?.name ?? "Agent"),
+                              name:
+                                message()?.author === "you"
+                                  ? t("chat.message.you")
+                                  : (props.agent?.name ?? t("chat.message.agentFallback")),
                             }}
                             showTime={!continuesRun()}
                             animate={animateEntrance}

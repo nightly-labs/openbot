@@ -1,4 +1,5 @@
 import type { AgentApproval, AgentEvent, QueueSnapshot, RoutineFields } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
@@ -129,7 +130,7 @@ const Turns = createSimpleContext({
           setQueues((current) => ({ ...current, [agentId]: queue }));
         })
         .catch((error) => {
-          if (scopeIsCurrent()) appendUiError(agentId, error, "Queue load failed", serverId);
+          if (scopeIsCurrent()) appendUiError(agentId, error, currentText().t("app.errorStatus.queueLoad"), serverId);
         });
     }
 
@@ -201,7 +202,7 @@ const Turns = createSimpleContext({
           result: "failed",
           failure_code: "response_failed",
         });
-        appendUiError(agentId, error, "Answer failed", serverId);
+        appendUiError(agentId, error, currentText().t("app.errorStatus.answer"), serverId);
         return false;
       }
     }
@@ -230,7 +231,7 @@ const Turns = createSimpleContext({
           result: "failed",
           failure_code: "response_failed",
         });
-        appendUiError(agentId, error, "Approval failed", serverId);
+        appendUiError(agentId, error, currentText().t("app.errorStatus.approval"), serverId);
         return false;
       }
     }
@@ -252,7 +253,7 @@ const Turns = createSimpleContext({
         setPendingPrompts((current) => ({ ...current, [agent.id]: undefined }));
         return true;
       } catch (error) {
-        appendUiError(agent.id, error, "Browser takeover failed", serverId);
+        appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
         return false;
       }
     }
@@ -267,7 +268,7 @@ const Turns = createSimpleContext({
         .then(() => analytics.track("queue_action", { action: "cancel", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "cancel", result: "failed", failure_code: "cancel_failed" });
-          appendUiError(agent.id, error, "Cancel failed", serverId);
+          appendUiError(agent.id, error, currentText().t("app.errorStatus.cancel"), serverId);
         });
     }
 
@@ -282,7 +283,7 @@ const Turns = createSimpleContext({
         .then(() => analytics.track("queue_action", { action: "steer", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
-          appendUiError(agent.id, error, "Steer failed", serverId);
+          appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
 
@@ -310,7 +311,7 @@ const Turns = createSimpleContext({
         return true;
       } catch (error) {
         analytics.track("queue_action", { action: "edit", result: "failed", failure_code: "edit_failed" });
-        appendUiError(agentId, error, "Edit failed", serverId);
+        appendUiError(agentId, error, currentText().t("app.errorStatus.edit"), serverId);
         return false;
       }
     }
@@ -325,7 +326,7 @@ const Turns = createSimpleContext({
         .then(() => analytics.track("queue_action", { action: "reorder", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "reorder", result: "failed", failure_code: "reorder_failed" });
-          appendUiError(agent.id, error, "Reorder failed", serverId);
+          appendUiError(agent.id, error, currentText().t("app.errorStatus.reorder"), serverId);
         });
     }
 
@@ -344,7 +345,7 @@ const Turns = createSimpleContext({
             result: "failed",
             failure_code: "interrupt_failed",
           });
-          appendUiError(agent.id, error, "Stop failed", serverId);
+          appendUiError(agent.id, error, currentText().t("app.errorStatus.stop"), serverId);
         });
     }
 

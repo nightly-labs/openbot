@@ -1,4 +1,5 @@
 import type { AgentPromptQuestion, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { mobileTranslateFor } from "@openbot/i18n/mobile";
 import { assert, describe, expect, it } from "vitest";
 import {
   indexChatMessages,
@@ -232,8 +233,8 @@ describe("mobile question forms", () => {
         extra: { status: "skipped" },
       },
     });
-    expect(promptAnswerLabel(questions[1], resolution)).toBe("Private answer");
-    expect(promptAnswerLabel(questions[2], resolution)).toBe("Skipped");
+    expect(promptAnswerLabel(questions[1], resolution, mobileTranslateFor("en"))).toBe("Private answer");
+    expect(promptAnswerLabel(questions[2], resolution, mobileTranslateFor("en"))).toBe("Skipped");
     expect(answeredPromptResolution(questions, {})).toEqual({ status: "cancelled" });
     expect(answers.token).toEqual(["private-value"]);
   });

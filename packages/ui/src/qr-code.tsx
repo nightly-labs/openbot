@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import QRCode from "qrcode";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { Spinner } from "./surface";
+import { useText } from "./text";
 import { cx } from "./utils";
 
 export interface QrCodeProps {
@@ -12,6 +13,7 @@ export interface QrCodeProps {
 }
 
 export function QrCode(props: QrCodeProps): JSX.Element {
+  const { t } = useText();
   const size = () => props.size ?? 196;
   const [source, setSource] = createSignal<string | null>(null);
   const [error, setError] = createSignal(false);
@@ -49,14 +51,14 @@ export function QrCode(props: QrCodeProps): JSX.Element {
       class={cx("ui-qr-code", props.class)}
       style={{ width: `${size()}px`, height: `${size()}px` }}
       role="img"
-      aria-label={props.label ?? "QR code"}
+      aria-label={props.label ?? t("app.qrCode.label")}
       aria-busy={!source() && !error() ? "true" : undefined}
     >
       <Show
         when={source()}
         fallback={
           <Show when={error()} fallback={<Spinner size="sm" />}>
-            <span class="sr-only">QR code unavailable</span>
+            <span class="sr-only">{t("app.qrCode.unavailable")}</span>
           </Show>
         }
       >

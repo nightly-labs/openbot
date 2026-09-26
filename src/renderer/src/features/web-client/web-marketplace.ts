@@ -12,11 +12,12 @@ import {
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { currentText } from "@openbot/ui/text";
 import type { AgentTemplateInstallCalls } from "../agent-templates/agent-templates-port";
 import type { MarketplaceCalls } from "../settings/marketplace-calls";
 
 /** No server id: the account is a member, or the host runs an OpenBot without agent-install-v1. */
-const NO_AGENT_INSTALL = "Only an owner or admin can add an agent here, and the host must run a current OpenBot.";
+const noAgentInstall = () => currentText().t("webClient.error.agentInstallNotAllowed");
 
 /**
  * The marketplace of the browser client. The catalog comes from the account service that serves
@@ -46,7 +47,7 @@ export function createWebMarketplaceCalls(
       removeMcpServer: async (input, serverId) => removeMcpServer(request(serverId), input),
     },
     addAgent: async (input, serverId) => {
-      if (!serverId) throw new Error(NO_AGENT_INSTALL);
+      if (!serverId) throw new Error(noAgentInstall());
       return installMarketplaceAgent(request(serverId), input);
     },
     openUrl: async (url) => {
@@ -70,12 +71,12 @@ export function createWebAgentTemplateCalls(
     agentTemplates: {
       get: catalog.templates.get,
       install: async () => {
-        throw new Error(NO_AGENT_INSTALL);
+        throw new Error(noAgentInstall());
       },
     },
     agent: {
       addTemplateAgent: async (input, serverId) => {
-        if (!serverId) throw new Error(NO_AGENT_INSTALL);
+        if (!serverId) throw new Error(noAgentInstall());
         return installAgentTemplate(request(serverId), input);
       },
     },

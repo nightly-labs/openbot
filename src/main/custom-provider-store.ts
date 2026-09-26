@@ -9,6 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import type { CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import type { CustomProviderConfig } from "../backend/opencode-config";
@@ -57,11 +58,9 @@ interface Entry {
   readonly secret: ProviderSecret | null;
 }
 
-const READ_ONLY_MESSAGE =
-  "The saved endpoints were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.";
-const NO_SECURE_STORAGE_MESSAGE =
-  "This computer has no secure storage, so an API key or a header cannot be saved. Remove them, or use an endpoint that needs no credentials.";
-const DUPLICATE_MESSAGE = "An endpoint with this provider ID is already saved. Remove it first, or use another ID.";
+const READ_ONLY_MESSAGE = sourceText("error.provider.endpointsReadOnly");
+const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.endpointNoSecureStorage");
+const DUPLICATE_MESSAGE = sourceText("error.provider.endpointDuplicate");
 
 export class CustomProviderStore {
   readonly #path: string;

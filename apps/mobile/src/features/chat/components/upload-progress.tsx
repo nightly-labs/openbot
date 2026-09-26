@@ -13,6 +13,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
+import { useText } from "@/shared/lib/text";
 
 // Between two reported percents the value glides for this long, so it never ticks.
 const GLIDE = 180;
@@ -58,6 +59,7 @@ const CROSSFADE: CSSTransitionProperties = {
 
 /** A small circle beside a file that fills as it uploads, and becomes a check when it is done. */
 export function UploadProgressCircle({ progress }: { progress: number }) {
+  const { t } = useText();
   const [accent, track] = useThemeColor(["accent", "border"]);
   const value = useGlidingProgress(progress);
   const done = progress >= 1;
@@ -70,7 +72,7 @@ export function UploadProgressCircle({ progress }: { progress: number }) {
     <View
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={done ? "Uploaded" : "Uploading"}
+      accessibilityLabel={done ? t("mobile.chat.upload.uploaded") : t("mobile.chat.upload.uploadingLabel")}
       accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
       className="items-center justify-center"
       style={{ width: CIRCLE_SIZE, height: CIRCLE_SIZE }}

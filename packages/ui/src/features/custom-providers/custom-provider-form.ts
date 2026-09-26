@@ -12,6 +12,8 @@ import {
   isAgentModel,
   isCustomProviderHeaderName,
 } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
+import { currentText } from "../../text";
 
 export interface CustomModelDraft {
   id: string;
@@ -67,6 +69,7 @@ function blankHeader(header: CustomHeaderDraft): boolean {
 export function validateCustomProvider(
   draft: CustomProviderDraft,
   takenProviderIds: readonly string[] = [],
+  t: AppTranslate = currentText().t,
 ): CustomProviderErrors {
   const providerId = draft.providerId.trim();
   const errors: CustomProviderErrors = {
@@ -74,35 +77,35 @@ export function validateCustomProvider(
     headerRows: draft.headers.map(() => undefined),
   };
 
-  if (!providerId) errors.providerId = "Enter a provider ID.";
+  if (!providerId) errors.providerId = t("customProvider.error.providerIdRequired");
   else if (!CUSTOM_PROVIDER_ID_PATTERN.test(providerId)) {
-    errors.providerId = "Use lowercase letters, numbers, hyphens or underscores, starting with a letter or number.";
+    errors.providerId = t("customProvider.error.providerIdPattern");
   } else if (providerId.length > INPUT_LIMITS.identifier) {
-    errors.providerId = `Keep the provider ID under ${INPUT_LIMITS.identifier} characters.`;
+    errors.providerId = t("customProvider.error.providerIdLength", { max: INPUT_LIMITS.identifier });
   } else if (AGENT_PROVIDERS.some((provider) => provider === providerId)) {
-    errors.providerId = `OpenBot already has a provider called ${providerId}. Choose another ID.`;
+    errors.providerId = t("customProvider.error.providerIdBuiltIn", { id: providerId });
   } else if (takenProviderIds.includes(providerId)) {
     // There is no edit path, so a saved ID is not a field the user can overwrite: main refuses the
     // save, and this says so before the round trip.
-    errors.providerId = `An endpoint called ${providerId} is already saved. Remove it first, or choose another ID.`;
+    errors.providerId = t("customProvider.error.providerIdSaved", { id: providerId });
   }
 
   const displayName = draft.displayName.trim();
-  if (!displayName) errors.displayName = "Enter a display name.";
+  if (!displayName) errors.displayName = t("customProvider.error.displayNameRequired");
   else if (displayName.length > INPUT_LIMITS.agentName) {
-    errors.displayName = `Keep the display name under ${INPUT_LIMITS.agentName} characters.`;
+    errors.displayName = t("customProvider.error.displayNameLength", { max: INPUT_LIMITS.agentName });
   }
 
-  errors.baseUrl = baseUrlError(draft.baseUrl.trim());
+  errors.baseUrl = baseUrlError(draft.baseUrl.trim(), t);
 
   if (draft.apiKey.length > CUSTOM_PROVIDER_LIMITS.apiKey) {
-    errors.apiKey = `Keep the API key under ${CUSTOM_PROVIDER_LIMITS.apiKey} characters.`;
+    errors.apiKey = t("customProvider.error.apiKeyLength", { max: CUSTOM_PROVIDER_LIMITS.apiKey });
   }
 
   const filled = draft.models.filter((model) => !blankModel(model));
-  if (filled.length === 0) errors.models = "Add at least one model.";
+  if (filled.length === 0) errors.models = t("customProvider.error.modelsRequired");
   else if (filled.length > CUSTOM_PROVIDER_LIMITS.models) {
-    errors.models = `Add no more than ${CUSTOM_PROVIDER_LIMITS.models} models.`;
+    errors.models = t("customProvider.error.modelsLimit", { max: CUSTOM_PROVIDER_LIMITS.models });
   }
 
   const seen = new Set<string>();
@@ -110,23 +113,23 @@ export function validateCustomProvider(
     if (blankModel(model)) return;
     const id = model.id.trim();
     if (!id) {
-      errors.modelRows[index] = "Enter a model ID.";
+      errors.modelRows[index] = t("customProvider.error.modelIdRequired");
       return;
     }
     if (seen.has(id)) {
-      errors.modelRows[index] = `This provider already lists ${id}.`;
+      errors.modelRows[index] = t("customProvider.error.modelIdDuplicate", { id });
       return;
     }
     seen.add(id);
     if (model.name.trim().length > INPUT_LIMITS.modelName) {
-      errors.modelRows[index] = `Keep the display name under ${INPUT_LIMITS.modelName} characters.`;
+      errors.modelRows[index] = t("customProvider.error.displayNameLength", { max: INPUT_LIMITS.modelName });
       return;
     }
     // OpenCode reports this model as `<provider id>/<model id>`, and both the IPC and Team API list
     // decoders fail closed on the whole array when one id is malformed - which empties the picker
     // rather than hiding one row. So the composed id is checked here, where the user can still fix it.
     if (!errors.providerId && !isAgentModel(composedCustomModelId(providerId, id))) {
-      errors.modelRows[index] = "This model ID cannot be used. Remove spaces, quotes and other punctuation.";
+      errors.modelRows[index] = t("customProvider.error.modelIdInvalid");
     }
   });
 
@@ -134,14 +137,17 @@ export function validateCustomProvider(
   draft.headers.forEach((header, index) => {
     if (blankHeader(header)) return;
     const name = header.name.trim();
-    if (!name) errors.headerRows[index] = "Enter a header name.";
-    else if (!isCustomProviderHeaderName(name)) errors.headerRows[index] = "Use a valid HTTP header name.";
-    else if (headerNames.has(name.toLowerCase())) errors.headerRows[index] = `This provider already sets ${name}.`;
-    else if (!header.value.trim()) errors.headerRows[index] = "Enter a header value.";
+    if (!name) errors.headerRows[index] = t("customProvider.error.headerNameRequired");
+    else if (!isCustomProviderHeaderName(name)) errors.headerRows[index] = t("customProvider.error.headerNameInvalid");
+    else if (headerNames.has(name.toLowerCase()))
+      errors.headerRows[index] = t("customProvider.error.headerDuplicate", { name });
+    else if (!header.value.trim()) errors.headerRows[index] = t("customProvider.error.headerValueRequired");
     else headerNames.add(name.toLowerCase());
   });
   if (draft.headers.filter((header) => !blankHeader(header)).length > CUSTOM_PROVIDER_LIMITS.headers) {
-    errors.headerRows[CUSTOM_PROVIDER_LIMITS.headers] = `Add no more than ${CUSTOM_PROVIDER_LIMITS.headers} headers.`;
+    errors.headerRows[CUSTOM_PROVIDER_LIMITS.headers] = t("customProvider.error.headersLimit", {
+      max: CUSTOM_PROVIDER_LIMITS.headers,
+    });
   }
 
   return errors;
@@ -155,20 +161,20 @@ function parseUrl(value: string): URL | null {
   }
 }
 
-function baseUrlError(baseUrl: string): string | undefined {
-  if (!baseUrl) return "Enter a base URL.";
+function baseUrlError(baseUrl: string, t: AppTranslate): string | undefined {
+  if (!baseUrl) return t("customProvider.error.baseUrlRequired");
   if (baseUrl.length > CUSTOM_PROVIDER_LIMITS.baseUrl) {
-    return `Keep the base URL under ${CUSTOM_PROVIDER_LIMITS.baseUrl} characters.`;
+    return t("customProvider.error.baseUrlLength", { max: CUSTOM_PROVIDER_LIMITS.baseUrl });
   }
   const parsed = parseUrl(baseUrl);
-  if (!parsed) return "Enter a full URL, such as http://127.0.0.1:11434/v1.";
+  if (!parsed) return t("customProvider.error.baseUrlInvalid", { example: "http://127.0.0.1:11434/v1" });
   // `http:` is the main case, not the exception: a custom provider is usually a model server on this
   // computer, which has no certificate. Anything else - `file:`, `ws:`, `javascript:` - is not an
   // endpoint OpenCode can call.
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "Use an http:// or https:// URL.";
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return t("customProvider.error.baseUrlProtocol");
   // A credential in the URL is stored and listed as plain text, because only the key and the headers
   // are encrypted. The user is told where it belongs instead.
-  if (parsed.username || parsed.password) return "Put the credential in a header, not in the URL.";
+  if (parsed.username || parsed.password) return t("customProvider.error.baseUrlCredential");
   return undefined;
 }
 

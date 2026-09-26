@@ -13,6 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
+import { sourceText } from "@openbot/i18n/source";
 import { writeJsonFileAtomically } from "./atomic-json-file";
 import { isMissingFileError } from "./file-errors";
 
@@ -219,7 +220,7 @@ function applySidebarLayoutAction(
   switch (action.type) {
     case "create": {
       if (current.sections.length >= INPUT_LIMITS.sidebarSections) {
-        throw new Error(`A server can have up to ${INPUT_LIMITS.sidebarSections} sidebar sections.`);
+        throw new Error(sourceText("error.backend.sidebarSectionLimit", { limit: INPUT_LIMITS.sidebarSections }));
       }
       const name = validSectionName(action.name, current.sections);
       if (action.agentId !== undefined && !agentIds.has(action.agentId)) throw new Error("Unknown agent.");
@@ -338,10 +339,10 @@ function arraysEqual(left: readonly string[], right: readonly string[]): boolean
 
 function validSectionName(name: string, existing: readonly SidebarSection[]): string {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("Section name is required.");
-  if (trimmed.length > INPUT_LIMITS.sidebarSectionName) throw new Error("Section name is too long.");
+  if (!trimmed) throw new Error(sourceText("error.backend.sectionNameRequired"));
+  if (trimmed.length > INPUT_LIMITS.sidebarSectionName) throw new Error(sourceText("error.backend.sectionNameTooLong"));
   if (existing.some((section) => section.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) {
-    throw new Error("Section names must be unique.");
+    throw new Error(sourceText("error.backend.sectionNameDuplicate"));
   }
   return trimmed;
 }

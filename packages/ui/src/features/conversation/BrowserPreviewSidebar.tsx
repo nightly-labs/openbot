@@ -1,6 +1,7 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { Button, ChevronRight, Maximize2, Monitor, Plus, Skeleton, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 
 const BROWSER_PANEL_MIN = 220;
@@ -26,6 +27,7 @@ interface BrowserPreviewSidebarProps {
 }
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
+  const { t } = useText();
   const defaultPanelWidth = () =>
     Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
   const storedPanelWidth = props.readCustomWidth();
@@ -68,12 +70,12 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     <aside
       id="browser-side-panel"
       class="browser-panel browser-preview-sidebar"
-      aria-label="Browser previews"
+      aria-label={t("browser.previews.label")}
       hidden={props.hidden}
     >
       <PanelResizer
         class="right-panel-resizer"
-        label="Resize right panel"
+        label={t("browser.previews.resize")}
         controls="browser-side-panel"
         direction="right"
         value={panelWidth()}
@@ -87,13 +89,13 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
       />
 
       <header class="browser-preview-header">
-        <span>Browser</span>
+        <span>{t("browser.panel.label")}</span>
         <Show when={props.onNewTab}>
-          <Button variant="ghost" size="icon-sm" aria-label="New browser tab" onClick={() => props.onNewTab?.()}>
+          <Button variant="ghost" size="icon-sm" aria-label={t("browser.newTab")} onClick={() => props.onNewTab?.()}>
             <Plus />
           </Button>
         </Show>
-        <Button variant="ghost" size="icon-sm" aria-label="Collapse browser previews" onClick={props.onCollapse}>
+        <Button variant="ghost" size="icon-sm" aria-label={t("browser.previews.collapse")} onClick={props.onCollapse}>
           <ChevronRight />
         </Button>
       </header>
@@ -113,10 +115,10 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         <Show when={props.tabs.length === 0}>
           <div class="browser-empty-state">
             <Monitor aria-hidden="true" />
-            <strong>No browser tabs</strong>
+            <strong>{t("browser.previews.empty")}</strong>
             <Show when={props.onNewTab}>
               <Button variant="secondary" size="sm" onClick={() => props.onNewTab?.()}>
-                Open a page
+                {t("browser.previews.openPage")}
               </Button>
             </Show>
           </div>
@@ -134,6 +136,7 @@ export function BrowserPreviewCard(props: {
   onOpen: (tabId: string, trigger: HTMLButtonElement) => void;
   onClose?: (tabId: string) => void;
 }) {
+  const { t } = useText();
   const [state, setState] = createStore<{ preview: BrowserPreview | null; failed: boolean }>({
     preview: null,
     failed: false,
@@ -142,7 +145,7 @@ export function BrowserPreviewCard(props: {
   const [documentVisible, setDocumentVisible] = createSignal(!document.hidden);
   let element: HTMLDivElement | undefined;
   let pending: Promise<void> | undefined;
-  const title = () => props.tab.title || props.tab.url || "Browser page";
+  const title = () => props.tab.title || props.tab.url || t("browser.preview.pageFallback");
 
   onSettled(() => {
     const observer = new IntersectionObserver((entries) => setVisible(entries.some((entry) => entry.isIntersecting)));
@@ -201,7 +204,7 @@ export function BrowserPreviewCard(props: {
       <Button
         variant="ghost"
         class="browser-preview-open"
-        aria-label={`Open ${title()}`}
+        aria-label={t("browser.preview.open", { title: title() })}
         onClick={(event) => props.onOpen(props.tab.id, event.currentTarget)}
       >
         <span class="browser-preview-image">
@@ -214,13 +217,13 @@ export function BrowserPreviewCard(props: {
                 src={preview().dataUrl}
                 width={preview().width}
                 height={preview().height}
-                alt={`Preview of ${title()}`}
+                alt={t("browser.preview.image", { title: title() })}
               />
             )}
           </Show>
           <span class="browser-preview-open-label" aria-hidden="true">
             <Maximize2 />
-            Open
+            {t("browser.preview.openLabel")}
           </span>
         </span>
         <span class="browser-preview-title" title={title()}>
@@ -232,7 +235,7 @@ export function BrowserPreviewCard(props: {
           variant="secondary"
           size="icon-xs"
           class="browser-preview-close"
-          aria-label={`Close ${title()}`}
+          aria-label={t("browser.preview.close", { title: title() })}
           onClick={() => props.onClose?.(props.tab.id)}
         >
           <X />

@@ -1,4 +1,5 @@
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { parseInstallSkill, parseSetEnabledSkill, parseUninstallSkill } from "../ipc/app-inputs";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -22,7 +23,7 @@ export async function routeSkillsAdmin(
   if (!list && !install && !uninstall && !setEnabled) return "unmatched";
   const skills = admin?.skills;
   if (!skills || !capabilities.has(SKILLS_ADMIN_CAPABILITY))
-    throw new HttpError(400, "Skills are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.skillsUnsupported"));
   requireAdmin(member);
   // `readJson` has already run the body through the skills-admin wire codec.
   const body = await readJson(request);

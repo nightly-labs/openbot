@@ -14,6 +14,7 @@ import type {
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_RUNTIME_ATTENTION_LIMIT } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { PreparedBrowserSecret } from "../browser-host";
@@ -210,10 +211,10 @@ export class AttentionRegistry {
 
   async respondToPrompt(input: RespondToPromptInput): Promise<void> {
     const pending = this.#prompts.get(input.requestId);
-    if (!pending) throw new Error("This prompt is no longer active.");
+    if (!pending) throw new Error(sourceText("error.backend.promptInactive"));
     const questionIds = new Set(pending.questions.map((question) => question.id));
     if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
-      throw new Error("A prompt answer does not match an active question.");
+      throw new Error(sourceText("error.backend.promptAnswerMismatch"));
     }
     this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
@@ -240,7 +241,7 @@ export class AttentionRegistry {
 
   async respondToApproval(input: RespondToApprovalInput): Promise<void> {
     const pending = this.#approvals.get(input.requestId);
-    if (!pending) throw new Error("This approval is no longer active.");
+    if (!pending) throw new Error(sourceText("error.backend.approvalInactive"));
     this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
     if (pending.hostedSiteMutation) {
@@ -280,8 +281,8 @@ export class AttentionRegistry {
 
   async respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Promise<void> {
     const pending = this.#takeovers.get(input.requestId);
-    if (!pending) throw new Error("This browser takeover is no longer active.");
-    if (pending.submitting) throw new Error("Authentication submission is already in progress.");
+    if (!pending) throw new Error(sourceText("error.backend.takeoverInactive"));
+    if (pending.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
     pending.secret?.cancel();
     this.#routines.markRunningForTurn(pending.request.turnId);
     this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
@@ -290,7 +291,7 @@ export class AttentionRegistry {
   async respondToBrowserSecret(input: RespondToBrowserSecretInput): Promise<void> {
     const pending = this.#takeovers.get(input.requestId);
     if (!pending?.secret || pending.request.agentId !== input.agentId || pending.submitting)
-      throw new Error("This secure authentication request is no longer active.");
+      throw new Error(sourceText("error.backend.authRequestInactive"));
     if (input.decision === "cancel") {
       pending.secret.cancel();
       this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
@@ -483,7 +484,7 @@ export class AttentionRegistry {
       // give them would leave the agent acting on the page underneath them.
       const prepare = async () => {
         if (params.tool === "submit_secret") {
-          if (!this.#browser.prepareSecret) throw new Error("Secure authentication is unavailable.");
+          if (!this.#browser.prepareSecret) throw new Error(sourceText("error.backend.secureAuthUnavailable"));
           const secret = await this.#browser.prepareSecret({
             ...params,
             threadId: publicThreadId,

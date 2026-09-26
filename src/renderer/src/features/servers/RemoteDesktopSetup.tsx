@@ -8,6 +8,7 @@ import {
   type RemoteDesktopTestStatus,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
   AlertContent,
@@ -22,27 +23,27 @@ import {
   ItemTitle,
   Text,
 } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { RemoteDesktopWorkspace } from "@openbot/ui/features/remote-desktop/RemoteDesktopWorkspace";
+import { useText } from "@openbot/ui/text";
 import { createStore, For, onSettled, Show } from "solid-js";
 import { serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
 
 const CHECKS = [
-  ["screenRecording", "Screen Recording"],
-  ["accessibility", "Accessibility"],
-  ["service", "Sunshine service"],
-  ["displays", "Display availability"],
-  ["guiSession", "macOS user session"],
-] as const;
-const LABELS: Record<RemoteDesktopCheckState, string> = {
-  "not-checked": "Not checked",
-  checking: "Checking…",
-  allowed: "Allowed",
-  blocked: "Blocked",
-  unavailable: "Unavailable",
-  failed: "Check failed",
-};
+  ["screenRecording", "remoteDesktop.setup.check.screenRecording"],
+  ["accessibility", "remoteDesktop.setup.check.accessibility"],
+  ["service", "remoteDesktop.setup.check.service"],
+  ["displays", "remoteDesktop.setup.check.displays"],
+  ["guiSession", "remoteDesktop.setup.check.guiSession"],
+] as const satisfies readonly (readonly [string, AppTextKey])[];
+const LABELS = {
+  "not-checked": "remoteDesktop.setup.state.notChecked",
+  checking: "remoteDesktop.setup.state.checking",
+  allowed: "remoteDesktop.setup.state.allowed",
+  blocked: "remoteDesktop.setup.state.blocked",
+  unavailable: "remoteDesktop.setup.state.unavailable",
+  failed: "remoteDesktop.setup.state.failed",
+} as const satisfies Record<RemoteDesktopCheckState, AppTextKey>;
 
 interface SetupState {
   result: RemoteDesktopSetupStatus | null;
@@ -58,6 +59,7 @@ interface SetupState {
 }
 
 export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "darwin" | "win32" | "linux" }) {
+  const { t, format, errorMessage, sourceText } = useText();
   const [state, setState] = createStore<SetupState>({
     result: null,
     checking: false,
@@ -97,7 +99,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
           Object.assign(draft, {
             result: null,
             checkFailed: true,
-            error: errorMessage(error, "Could not check remote desktop setup."),
+            error: errorMessage(error, t("remoteDesktop.setup.checkFailed")),
           });
         });
     } finally {
@@ -118,7 +120,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
       await serversPort().remoteDesktop.openSetup(action);
     } catch (error) {
       setState((draft) => {
-        Object.assign(draft, { error: errorMessage(error, "Could not open macOS setup.") });
+        Object.assign(draft, { error: errorMessage(error, t("remoteDesktop.setup.openFailed")) });
       });
     } finally {
       setState((draft) => {
@@ -152,7 +154,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
         if (!disposed)
           setState((draft) => {
             Object.assign(draft, {
-              error: errorMessage(error, "The test connection ended before cleanup was confirmed."),
+              error: errorMessage(error, t("remoteDesktop.setup.cleanupUnconfirmed")),
             });
           });
       }
@@ -175,7 +177,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     try {
       const sessions = await serversPort().remoteDesktop.list();
       if (sessions.some((session) => session.serverId === props.server.id))
-        throw new Error("End this computer's remote desktop session before you start a test.");
+        throw new Error(t("remoteDesktop.setup.endSessionFirst"));
       const connection = await serversPort().remoteDesktop.connect({ serverId: props.server.id });
       if (connection.status !== "connected") throw new Error(connection.message);
       ownedSession = connection.session;
@@ -203,7 +205,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
       if (ownedSession) await finish();
       if (!disposed)
         setState((draft) => {
-          Object.assign(draft, { error: errorMessage(error, "Could not start the remote desktop test.") });
+          Object.assign(draft, { error: errorMessage(error, t("remoteDesktop.setup.startFailed")) });
         });
     } finally {
       if (!disposed)
@@ -231,7 +233,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     } catch (error) {
       if (!disposed && ownedSession?.id === session.id) {
         setState((draft) => {
-          Object.assign(draft, { error: errorMessage(error, "The test connection was lost.") });
+          Object.assign(draft, { error: errorMessage(error, t("remoteDesktop.setup.connectionLost")) });
         });
         await finish();
       }
@@ -265,24 +267,29 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
     !state.result.restartRequired;
 
   return (
-    <Show
-      when={supported()}
-      fallback={<Text>Update OpenBot on the host to check permissions and test remote desktop.</Text>}
-    >
+    <Show when={supported()} fallback={<Text>{t("remoteDesktop.setup.hostUpdateRequired")}</Text>}>
       <Show when={!local() || props.platform === "darwin"}>
         <ItemGroup class="settings-modal-card">
           <Item>
             <ItemContent>
-              <ItemTitle>Permissions</ItemTitle>
+              <ItemTitle>{t("remoteDesktop.setup.permissions")}</ItemTitle>
               <ItemDescription>
                 {state.result ? `${state.result.hostName} · ${state.result.username}` : props.server.name}
                 <Show when={state.result?.checkedAt}>
-                  {" · Checked "}
+                  {" · "}
+                  {t("remoteDesktop.setup.checked")}{" "}
                   <time
                     datetime={state.result?.checkedAt ?? undefined}
-                    title={new Date(state.result?.checkedAt ?? "").toLocaleString()}
+                    title={format.date(new Date(state.result?.checkedAt ?? ""), {
+                      year: "numeric",
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "numeric",
+                      second: "numeric",
+                    })}
                   >
-                    {new Date(state.result?.checkedAt ?? "").toLocaleTimeString([], {
+                    {format.date(new Date(state.result?.checkedAt ?? ""), {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
@@ -298,7 +305,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                 disabled={state.busy || Boolean(state.session)}
                 onClick={() => void check()}
               >
-                Check again
+                {t("remoteDesktop.setup.checkAgain")}
               </Button>
             </ItemActions>
           </Item>
@@ -309,23 +316,23 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
               return (
                 <Item>
                   <ItemContent>
-                    <ItemTitle>{label}</ItemTitle>
+                    <ItemTitle>{t(label)}</ItemTitle>
                   </ItemContent>
                   <ItemActions>
                     <Badge tone={status() === "allowed" ? "success" : "warning"}>
                       {status() === "allowed" && key !== "screenRecording" && key !== "accessibility"
-                        ? "Available"
-                        : LABELS[status()]}
+                        ? t("remoteDesktop.setup.state.available")
+                        : t(LABELS[status()])}
                     </Badge>
                     <Show when={local() && (key === "screenRecording" || key === "accessibility")}>
                       <Button
                         size="sm"
                         variant="default"
-                        aria-label={`Grant ${label} access`}
+                        aria-label={t("remoteDesktop.setup.grantAccess", { name: t(label) })}
                         disabled={state.busy}
                         onClick={() => void open(key === "screenRecording" ? "screen-recording" : "accessibility")}
                       >
-                        Grant
+                        {t("remoteDesktop.setup.grant")}
                       </Button>
                     </Show>
                   </ItemActions>
@@ -335,42 +342,48 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
           </For>
           <Item>
             <ItemContent>
-              <ItemDescription>
-                Keep the Sunshine account logged in on the Mac. In that account, grant access in System Settings →
-                Privacy &amp; Security. Grant opens a helper window. Drag Sunshine.app into the permission list.
-              </ItemDescription>
+              <ItemDescription>{t("remoteDesktop.setup.grantHelp")}</ItemDescription>
               <Show when={state.result?.restartRequired}>
-                <ItemDescription>
-                  Sunshine needs a restart. End active remote desktop sessions, then check again. Active sessions will
-                  not be restarted.
-                </ItemDescription>
+                <ItemDescription>{t("remoteDesktop.setup.restartRequired")}</ItemDescription>
               </Show>
               <Show when={state.result?.message}>
-                <ItemDescription>{state.result?.message}</ItemDescription>
+                <ItemDescription>{sourceText(state.result?.message ?? "")}</ItemDescription>
               </Show>
             </ItemContent>
             <Show when={local()}>
               <ItemActions>
                 <Button size="sm" variant="ghost" disabled={state.busy} onClick={() => void open("reveal")}>
-                  Show Sunshine in Finder
+                  {t("remoteDesktop.setup.showInFinder")}
                 </Button>
               </ItemActions>
             </Show>
           </Item>
           <Item>
             <ItemContent>
-              <ItemTitle>Live connection test</ItemTitle>
+              <ItemTitle>{t("remoteDesktop.setup.liveTest")}</ItemTitle>
               <ItemDescription>
-                {local()
-                  ? "Test the picture, mouse, and keyboard on this Mac."
-                  : "The test opens a temporary panel on the host. Other remote sessions must end first. Input stays inside the panel."}
+                {local() ? t("remoteDesktop.setup.liveTestLocal") : t("remoteDesktop.setup.liveTestRemote")}
               </ItemDescription>
               <Show when={state.test || state.videoOnly}>
                 <ItemDescription>
-                  Video: {state.video ? "received" : "not received"} · Picture:{" "}
-                  {state.picture ? "confirmed" : "not confirmed"} · Mouse:{" "}
-                  {state.videoOnly ? "not tested" : state.test?.mouse ? "received" : "not received"} · Keyboard:{" "}
-                  {state.videoOnly ? "not tested" : state.test?.keyboard ? "received" : "not received"}
+                  {t("remoteDesktop.setup.testSummary", {
+                    video: t(state.video ? "remoteDesktop.setup.received" : "remoteDesktop.setup.notReceived"),
+                    picture: t(state.picture ? "remoteDesktop.setup.confirmed" : "remoteDesktop.setup.notConfirmed"),
+                    mouse: t(
+                      state.videoOnly
+                        ? "remoteDesktop.setup.notTested"
+                        : state.test?.mouse
+                          ? "remoteDesktop.setup.received"
+                          : "remoteDesktop.setup.notReceived",
+                    ),
+                    keyboard: t(
+                      state.videoOnly
+                        ? "remoteDesktop.setup.notTested"
+                        : state.test?.keyboard
+                          ? "remoteDesktop.setup.received"
+                          : "remoteDesktop.setup.notReceived",
+                    ),
+                  })}
                 </ItemDescription>
               </Show>
             </ItemContent>
@@ -382,7 +395,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                 loading={state.busy}
                 onClick={() => void start()}
               >
-                {local() ? "Test on this Mac" : "Test remote desktop"}
+                {local() ? t("remoteDesktop.setup.testLocal") : t("remoteDesktop.setup.testRemote")}
               </Button>
             </ItemActions>
           </Item>
@@ -418,7 +431,7 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                   });
                 if (value === "error") {
                   setState((draft) => {
-                    Object.assign(draft, { error: "The test video connection failed." });
+                    Object.assign(draft, { error: t("remoteDesktop.setup.videoFailed") });
                   });
                   void finish();
                 }
@@ -429,13 +442,17 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                     when={state.videoOnly}
                     fallback={
                       <Text>
-                        Click the host target, then type {state.test?.code}. Mouse:{" "}
-                        {state.test?.mouse ? "received" : "waiting"}. Keyboard:{" "}
-                        {state.test?.keyboard ? "received" : "waiting"}.
+                        {t("remoteDesktop.setup.inputInstructions", {
+                          code: state.test?.code ?? "",
+                          mouse: t(state.test?.mouse ? "remoteDesktop.setup.received" : "remoteDesktop.setup.waiting"),
+                          keyboard: t(
+                            state.test?.keyboard ? "remoteDesktop.setup.received" : "remoteDesktop.setup.waiting",
+                          ),
+                        })}
                       </Text>
                     }
                   >
-                    <Text>Video test only. Mouse and keyboard testing needs the updated Sunshine runtime.</Text>
+                    <Text>{t("remoteDesktop.setup.videoOnly")}</Text>
                   </Show>
                   <Button
                     size="sm"
@@ -447,13 +464,13 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                     }
                   >
                     {state.picture
-                      ? "Picture confirmed"
+                      ? t("remoteDesktop.setup.pictureConfirmed")
                       : state.videoOnly
-                        ? "I can see my desktop"
-                        : "I can see the test panel"}
+                        ? t("remoteDesktop.setup.seeDesktop")
+                        : t("remoteDesktop.setup.seeTestPanel")}
                   </Button>
                   <Button size="sm" onClick={() => void finish()}>
-                    Finish test
+                    {t("remoteDesktop.setup.finishTest")}
                   </Button>
                 </>
               }

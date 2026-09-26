@@ -17,6 +17,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { useText } from "../../text";
 import {
   type CustomProviderDraft,
   type CustomProviderErrors,
@@ -25,6 +26,12 @@ import {
   hasCustomProviderError,
   validateCustomProvider,
 } from "./custom-provider-form";
+
+// Examples of identifiers and addresses. They are not words, so they are the same in each language.
+const PROVIDER_ID_PLACEHOLDER = "my-provider";
+const BASE_URL_PLACEHOLDER = "http://127.0.0.1:11434/v1";
+const MODEL_ID_PLACEHOLDER = "model-id";
+const HEADER_NAME_PLACEHOLDER = "Header-Name";
 
 type ModelRow = CustomProviderDraft["models"][number];
 type HeaderRow = CustomProviderDraft["headers"][number];
@@ -46,9 +53,9 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
  * so the shared markup below reaches a field without an index signature or a cast.
  */
 interface RepeatableColumn<T> {
-  /** Completes the accessible name, as `Model 1 ID`. */
-  suffix: string;
-  placeholder: string;
+  /** The accessible name of the field in row `number`, as `Model 1 ID`. */
+  label: (number: number) => string;
+  placeholder: () => string;
   maxlength: number;
   /** An identifier must not be autocorrected. A display name is prose and may be. */
   identifier?: boolean;
@@ -59,8 +66,9 @@ interface RepeatableColumn<T> {
 interface RepeatableRowsProps<T> {
   /** Names the section, as `Models`. */
   label: string;
-  /** Names one row, as `Model 1 ID` and `Remove model 1`. */
-  singular: string;
+  /** Names the remove control of row `number`, as `Remove model 1`. */
+  removeLabel: (number: number) => string;
+  addLabel: string;
   columns: readonly [RepeatableColumn<T>, RepeatableColumn<T>];
   rows: readonly T[];
   limit: number;
@@ -76,7 +84,6 @@ interface RepeatableRowsProps<T> {
  * share one row, error and add-button shape instead of keeping two copies that drift apart.
  */
 function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
-  const lower = () => props.singular.toLowerCase();
   return (
     <section class="custom-provider-rows" aria-label={props.label}>
       <div class="custom-provider-rows-heading">
@@ -96,10 +103,10 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
               <For each={props.columns}>
                 {(column) => (
                   <Input
-                    aria-label={`${props.singular} ${index() + 1} ${column.suffix}`}
+                    aria-label={column.label(index() + 1)}
                     value={column.read(row)}
                     onValueChange={(value) => column.write(index(), value)}
-                    placeholder={column.placeholder}
+                    placeholder={column.placeholder()}
                     autocomplete={column.identifier ? "off" : undefined}
                     spellcheck={column.identifier ? false : undefined}
                     maxlength={column.maxlength}
@@ -108,7 +115,7 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                 )}
               </For>
               <IconButton
-                label={`Remove ${lower()} ${index() + 1}`}
+                label={props.removeLabel(index() + 1)}
                 variant="ghost"
                 disabled={props.busy || props.rows.length < 2}
                 onClick={() => props.onRemove(index())}
@@ -134,7 +141,7 @@ function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
         onClick={() => props.onAdd()}
       >
         <Plus />
-        Add {lower()}
+        {props.addLabel}
       </Button>
     </section>
   );
@@ -159,6 +166,7 @@ interface CustomProviderDialogProps {
 }
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {
+  const { t } = useText();
   // The form owns its state from here on: the incoming draft is read once, as a snapshot, so later
   // edits by the caller do not reach in and overwrite what the user is typing.
   const [draft, setDraft] = createStore<CustomProviderDraft>(
@@ -182,7 +190,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     },
   );
 
-  const errors = () => validateCustomProvider(draft, props.takenProviderIds);
+  const errors = () => validateCustomProvider(draft, props.takenProviderIds, t);
   const shown = (): CustomProviderErrors | null => (submitted() ? errors() : null);
   const busy = () => Boolean(props.busy);
 
@@ -197,8 +205,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
 
   const modelColumns: readonly [RepeatableColumn<ModelRow>, RepeatableColumn<ModelRow>] = [
     {
-      suffix: "ID",
-      placeholder: "model-id",
+      label: (number) => t("customProvider.model.id", { number }),
+      placeholder: () => MODEL_ID_PLACEHOLDER,
       maxlength: INPUT_LIMITS.modelName,
       identifier: true,
       read: (row) => row.id,
@@ -209,8 +217,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         }),
     },
     {
-      suffix: "display name",
-      placeholder: "Display Name",
+      label: (number) => t("customProvider.model.name", { number }),
+      placeholder: () => t("customProvider.model.namePlaceholder"),
       maxlength: INPUT_LIMITS.modelName,
       read: (row) => row.name,
       write: (index, value) =>
@@ -223,8 +231,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
 
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {
-      suffix: "name",
-      placeholder: "Header-Name",
+      label: (number) => t("customProvider.header.name", { number }),
+      placeholder: () => HEADER_NAME_PLACEHOLDER,
       maxlength: INPUT_LIMITS.identifier,
       identifier: true,
       read: (row) => row.name,
@@ -235,8 +243,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         }),
     },
     {
-      suffix: "value",
-      placeholder: "value",
+      label: (number) => t("customProvider.header.value", { number }),
+      placeholder: () => t("customProvider.header.valuePlaceholder"),
       maxlength: CUSTOM_PROVIDER_LIMITS.apiKey,
       identifier: true,
       read: (row) => row.value,
@@ -259,14 +267,12 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="custom-provider-backdrop">
           <Dialog.Content as="section" class="custom-provider-dialog" aria-busy={busy() ? "true" : undefined}>
-            <Dialog.Title class="sr-only">Add a custom provider</Dialog.Title>
-            <Dialog.Description class="sr-only">
-              Describe an OpenAI-compatible endpoint and the models it serves.
-            </Dialog.Description>
+            <Dialog.Title class="sr-only">{t("customProvider.form.title")}</Dialog.Title>
+            <Dialog.Description class="sr-only">{t("customProvider.form.description")}</Dialog.Description>
 
             <header class="custom-provider-header">
               <Show when={props.onBack}>
-                <IconButton label="Back" variant="ghost" disabled={busy()} onClick={() => props.onBack?.()}>
+                <IconButton label={t("common.back")} variant="ghost" disabled={busy()} onClick={() => props.onBack?.()}>
                   <ArrowLeft />
                 </IconButton>
               </Show>
@@ -275,15 +281,15 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
               </span>
               <div class="custom-provider-title">
                 <Heading as="h2" size="md">
-                  Custom provider
+                  {t("customProvider.form.heading")}
                 </Heading>
                 <Text tone="muted" variant="caption">
-                  Any OpenAI-compatible endpoint.
+                  {t("customProvider.form.subtitle")}
                 </Text>
               </div>
               <IconButton
                 class="custom-provider-close"
-                label="Close"
+                label={t("common.close")}
                 variant="ghost"
                 disabled={busy()}
                 onClick={props.onCancel}
@@ -306,8 +312,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
             >
               <div class={["custom-provider-form", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
                 <Field
-                  label="Provider ID"
-                  description="Lowercase letters, numbers, hyphens, or underscores."
+                  label={t("customProvider.field.providerId")}
+                  description={t("customProvider.field.providerIdHint")}
                   error={shown()?.providerId}
                   required
                 >
@@ -318,7 +324,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                         state.providerId = value;
                       })
                     }
-                    placeholder="my-provider"
+                    placeholder={PROVIDER_ID_PLACEHOLDER}
                     autocomplete="off"
                     spellcheck={false}
                     maxlength={INPUT_LIMITS.identifier}
@@ -326,7 +332,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   />
                 </Field>
 
-                <Field label="Display name" error={shown()?.displayName} required>
+                <Field label={t("customProvider.field.displayName")} error={shown()?.displayName} required>
                   <Input
                     value={draft.displayName}
                     onValueChange={(value) =>
@@ -334,13 +340,13 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                         state.displayName = value;
                       })
                     }
-                    placeholder="My Provider"
+                    placeholder={t("customProvider.field.displayNamePlaceholder")}
                     maxlength={INPUT_LIMITS.agentName}
                     disabled={busy()}
                   />
                 </Field>
 
-                <Field label="Base URL" error={shown()?.baseUrl} required>
+                <Field label={t("customProvider.field.baseUrl")} error={shown()?.baseUrl} required>
                   <Input
                     value={draft.baseUrl}
                     onValueChange={(value) =>
@@ -348,7 +354,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                         state.baseUrl = value;
                       })
                     }
-                    placeholder="http://127.0.0.1:11434/v1"
+                    placeholder={BASE_URL_PLACEHOLDER}
                     inputmode="url"
                     autocomplete="off"
                     spellcheck={false}
@@ -358,8 +364,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 </Field>
 
                 <Field
-                  label="API key"
-                  description="Optional. Leave empty if you manage auth via headers."
+                  label={t("customProvider.field.apiKey")}
+                  description={t("customProvider.field.apiKeyHint")}
                   error={shown()?.apiKey}
                 >
                   <Input
@@ -378,8 +384,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 </Field>
 
                 <RepeatableRows
-                  label="Models"
-                  singular="Model"
+                  label={t("customProvider.models")}
+                  removeLabel={(number) => t("customProvider.model.remove", { number })}
+                  addLabel={t("customProvider.model.add")}
                   columns={modelColumns}
                   rows={draft.models}
                   limit={CUSTOM_PROVIDER_LIMITS.models}
@@ -399,8 +406,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                 />
 
                 <RepeatableRows
-                  label="Headers"
-                  singular="Header"
+                  label={t("customProvider.headers")}
+                  removeLabel={(number) => t("customProvider.header.remove", { number })}
+                  addLabel={t("customProvider.header.add")}
                   columns={headerColumns}
                   rows={draft.headers}
                   limit={CUSTOM_PROVIDER_LIMITS.headers}
@@ -427,8 +435,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     </Text>
                   )}
                 </Show>
-                <Button type="submit" variant="default" loading={busy()} loadingLabel="Saving…">
-                  Submit
+                <Button type="submit" variant="default" loading={busy()} loadingLabel={t("common.saving")}>
+                  {t("customProvider.submit")}
                 </Button>
               </footer>
             </form>

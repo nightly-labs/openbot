@@ -1,5 +1,6 @@
 import type { AddedAgent, AgentProviderId, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
+import { currentText } from "@openbot/ui/text";
 import { onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
@@ -125,7 +126,7 @@ const ServerSelection = createSimpleContext({
       try {
         if (!(await selectServer(serverId, false))) return;
       } catch {
-        toast.error(`Could not open ${agent.name}. Find it in the sidebar.`);
+        toast.error(currentText().t("server.select.openAgentFailed", { name: agent.name }));
         return;
       }
       // Published rather than called: if this was a switch, the navigation

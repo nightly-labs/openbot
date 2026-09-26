@@ -1,11 +1,11 @@
 import type { AgentImportPreview, AgentImportResult } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import {
   type AgentImportPhase,
   type AgentImportSetup,
   AgentImportView,
 } from "@openbot/ui/features/import/AgentImportView";
+import { useText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled } from "solid-js";
 
 /** The way into Grok Bot this viewer chose last, so a user who set up the skill starts there. */
@@ -38,6 +38,7 @@ interface ImportState {
  * the panel closes is released.
  */
 export function ServerImportPanel(props: ServerImportOptions) {
+  const { t, errorMessage } = useText();
   const [state, setState] = createStore<ImportState>({ phase: "idle", error: null, preview: null, result: null });
   const show = (next: ImportState) =>
     setState((draft) => {
@@ -73,7 +74,9 @@ export function ServerImportPanel(props: ServerImportOptions) {
     try {
       await window.openbot.agentImport.saveSkill();
     } catch (error) {
-      toast.error("The skill was not saved", { description: errorMessage(error, "Try again.") });
+      toast.error(t("server.import.skillSaveFailed"), {
+        description: errorMessage(error, t("server.import.tryAgain")),
+      });
     }
   };
 
@@ -89,7 +92,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       show({ phase: preview ? "review" : "idle", error: null, preview, result: null });
     } catch (error) {
       // Main released the open export when it started to read the new one.
-      show({ phase: "idle", error: errorMessage(error, "The export could not be read."), preview: null, result: null });
+      show({ phase: "idle", error: errorMessage(error, t("server.import.readFailed")), preview: null, result: null });
     }
   };
 
@@ -105,7 +108,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       show({ phase: "done", error: null, preview: null, result });
     } catch (error) {
       // The token is spent either way, so the user chooses the export again.
-      show({ phase: "idle", error: errorMessage(error, "The import did not finish."), preview: null, result: null });
+      show({ phase: "idle", error: errorMessage(error, t("server.import.applyFailed")), preview: null, result: null });
     }
   };
 

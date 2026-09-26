@@ -4,10 +4,12 @@ import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
+import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
-  const displayName = session ? mobileUserName(session.user) : "Profile";
+  const { t } = useText();
+  const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
   return (
     <SettingsContent>
       <SettingsSection>
@@ -26,14 +28,17 @@ export function SettingsScreen() {
           <Typography.Paragraph type="body-sm">{displayName}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      <SettingsSection title="Preferences">
-        <SettingsRow onPress={() => router.push("/settings/general")} supportingText="Appearance and conversations">
-          <Typography.Paragraph type="body-sm">General</Typography.Paragraph>
+      <SettingsSection title={t("mobile.settings.home.preferences")}>
+        <SettingsRow
+          onPress={() => router.push("/settings/general")}
+          supportingText={t("mobile.settings.home.generalHint")}
+        >
+          <Typography.Paragraph type="body-sm">{t("mobile.settings.home.general")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SettingsSection>
         <SettingsRow onPress={() => router.push("/settings/about")}>
-          <Typography.Paragraph type="body-sm">About OpenBot</Typography.Paragraph>
+          <Typography.Paragraph type="body-sm">{t("mobile.settings.home.about")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
     </SettingsContent>

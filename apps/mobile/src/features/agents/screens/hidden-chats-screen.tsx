@@ -10,8 +10,10 @@ import { useChannels } from "@/features/channels/components/use-channels";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 
 export function HiddenChatsScreen() {
+  const { t } = useText();
   const { hiddenAgents, unhideAgent, agents, activeServer, hiddenChannelIds, unhideChannel } = useMobileWorkspace();
   const channels = useChannels(activeServer.id);
   const hiddenChannels = channels.channels.filter(
@@ -63,10 +65,10 @@ export function HiddenChatsScreen() {
     <SheetScrollView contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-7">
       <View className="items-center gap-2 px-4">
         <Typography.Heading type="h4" align="center">
-          Hidden chats
+          {t("mobile.agent.hidden.title")}
         </Typography.Heading>
         <Typography.Paragraph type="body-xs" align="center" className="text-text-secondary">
-          Hidden chats keep working. They&apos;re just not shown on the home screen.
+          {t("mobile.agent.hidden.body")}
         </Typography.Paragraph>
       </View>
 
@@ -84,7 +86,7 @@ export function HiddenChatsScreen() {
               <Link.Trigger>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Open chat with ${item.name}`}
+                  accessibilityLabel={t("mobile.agent.list.open", { name: item.name })}
                   className="min-w-0 flex-1 flex-row items-center gap-3 rounded-2xl px-1 py-1"
                   style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
                 >
@@ -97,13 +99,13 @@ export function HiddenChatsScreen() {
             </Link>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Show ${item.name}`}
+              accessibilityLabel={t("mobile.agent.hidden.showNamed", { name: item.name })}
               className="min-h-10 flex-row items-center gap-1.5 rounded-full bg-control-active px-3"
               onPress={item.show}
             >
               <Eye color={String(foreground)} size={16} strokeWidth={1.9} />
               <Typography.Paragraph type="body-xs" weight="semibold">
-                Show
+                {t("mobile.agent.hidden.show")}
               </Typography.Paragraph>
             </Pressable>
           </View>

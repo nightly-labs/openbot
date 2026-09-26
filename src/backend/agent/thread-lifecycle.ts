@@ -8,6 +8,7 @@ import {
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { BROWSER_DYNAMIC_TOOLS } from "../browser-tools";
@@ -134,7 +135,7 @@ export class ThreadLifecycle {
 
   refreshAgentRuntime(agentId: string): void {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error("The selected agent no longer exists.");
+    if (!agent) throw new Error(sourceText("error.agent.selectedGone"));
     this.#pendingRuntimeRefreshes.add(agentId);
     this.applyPendingRuntimeRefresh(agent);
   }

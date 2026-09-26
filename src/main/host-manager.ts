@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { sourceText } from "@openbot/i18n/source";
 import type { HostManagerConfig, HostTenantStatus, HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { isMissingFileError } from "../backend/file-errors";
 import {
@@ -87,10 +88,7 @@ export class HostManager {
       this.#initialized = true;
       // No replay of an interrupted install. An administrator must verify and recover it.
       if (["stopping", "installing", "failed"].includes(this.#state.phase)) {
-        await this.#publish(
-          "failed",
-          "Interrupted host maintenance. Verify the application and reset host state before retrying.",
-        );
+        await this.#publish("failed", sourceText("error.host.maintenanceInterrupted"));
         return;
       }
       if (this.#state.phase !== "released") await this.#publish("idle");
@@ -119,7 +117,7 @@ export class HostManager {
       else if (this.#state.phase === "stopping") await this.#waitForExit(config);
     } catch {
       // Deliberately omit exception text: OS command output and tenant input are not diagnostics.
-      const message = `Host update failed during ${this.#state.phase}. Verify bundle ownership, signing, tenant status and free disk space before resetting state.`;
+      const message = sourceText("error.host.updateFailed", { phase: this.#state.phase });
       if (this.#state.phase === "installing") await this.#publish("failed", message);
       else await this.#abort(message);
     }
@@ -142,7 +140,7 @@ export class HostManager {
       this.#idle.clear();
     this.#lastTick = now;
     if (now - this.#phaseStartedAt > 7_200_000) {
-      await this.#abort("Tenants did not remain idle for five minutes within two hours.");
+      await this.#abort(sourceText("error.host.tenantsNotIdle"));
       return;
     }
     const running = await this.#operations.runningTenants();
@@ -179,7 +177,7 @@ export class HostManager {
 
   async #waitForExit(config: HostManagerConfig): Promise<void> {
     if (this.#now() - this.#phaseStartedAt > 120_000) {
-      await this.#abort("Tenant shutdown timed out. No application replacement was started.");
+      await this.#abort(sourceText("error.host.tenantShutdownTimeout"));
       return;
     }
     // A stopped marker is not proof. Wait for the real OS process list, including unregistered users.
@@ -210,10 +208,7 @@ export class HostManager {
       await this.#publish("idle");
       this.#nextCheck = this.#now() + 240_000;
     } else if (this.#now() - this.#phaseStartedAt > 600_000) {
-      await this.#publish(
-        "failed",
-        "Tenant health reports are missing or unhealthy after restart. Inspect tenant sessions before another update.",
-      );
+      await this.#publish("failed", sourceText("error.host.tenantHealthMissing"));
     }
   }
 }

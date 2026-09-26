@@ -1,4 +1,5 @@
 import type { AgentPromptQuestion, AgentPromptResolution } from "@openbot/contracts/ipc";
+import type { MobileTranslate } from "@openbot/i18n/mobile";
 
 export function nextUnansweredQuestion(
   questions: AgentPromptQuestion[],
@@ -30,10 +31,17 @@ export function answeredPromptResolution(
   };
 }
 
-export function promptAnswerLabel(question: AgentPromptQuestion, resolution: AgentPromptResolution): string {
-  if (resolution.status !== "answered") return resolution.status === "cancelled" ? "Cancelled" : "Expired";
+export function promptAnswerLabel(
+  question: AgentPromptQuestion,
+  resolution: AgentPromptResolution,
+  t: MobileTranslate,
+): string {
+  if (resolution.status !== "answered")
+    return resolution.status === "cancelled"
+      ? t("mobile.chat.question.answerCancelled")
+      : t("mobile.chat.question.answerExpired");
   const response = resolution.responses[question.id];
-  if (!response || response.status === "skipped") return "Skipped";
-  if (question.isSecret || !response.answers) return "Private answer";
-  return response.answers.join(", ") || "Skipped";
+  if (!response || response.status === "skipped") return t("mobile.chat.question.answerSkipped");
+  if (question.isSecret || !response.answers) return t("mobile.chat.question.privateAnswer");
+  return response.answers.join(", ") || t("mobile.chat.question.answerSkipped");
 }

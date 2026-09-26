@@ -1,4 +1,5 @@
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { useText } from "@openbot/ui/text";
 import { savePanelWidth } from "./components/panel-width-storage";
 import { useLayout } from "./layout";
 import {
@@ -19,11 +20,12 @@ import {
  */
 export function WorkspaceLeftPanelResizer() {
   const layout = useLayout();
+  const { t } = useText();
 
   return (
     <PanelResizer
       class="left-panel-resizer"
-      label="Resize left sidebar"
+      label={t("app.leftPanel.resize")}
       controls="agent-sidebar"
       direction="left"
       value={layout.leftPanelWidth()}

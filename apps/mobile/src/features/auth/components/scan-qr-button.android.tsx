@@ -4,8 +4,10 @@ import { fillMaxWidth, height } from "@expo/ui/jetpack-compose/modifiers";
 import { useCSSVariable } from "uniwind";
 
 import type { ScanQrButtonProps } from "@/features/auth/components/scan-qr-button.types";
+import { useText } from "@/shared/lib/text";
 
 export function ScanQrButton({ onPress, width }: ScanQrButtonProps) {
+  const { t } = useText();
   const brandColor = String(useCSSVariable("--openbot-logo-production") ?? "#cdadec");
   const labelColor = String(useCSSVariable("--openbot-logo-eye") ?? "#040007");
 
@@ -27,7 +29,7 @@ export function ScanQrButton({ onPress, width }: ScanQrButtonProps) {
         onClick={onPress}
       >
         <Text color={labelColor} style={{ fontSize: 16, fontWeight: "600", typography: "labelLarge" }}>
-          Scan QR code
+          {t("mobile.auth.scanQrCode")}
         </Text>
       </FilledTonalButton>
     </Host>

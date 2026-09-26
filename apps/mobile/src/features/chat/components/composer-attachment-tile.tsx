@@ -4,7 +4,8 @@ import { X } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, Keyframe, LinearTransition, ReduceMotion } from "react-native-reanimated";
-import { attachmentTypeLabel, formatFileSize } from "./attachment-preview";
+import { useText } from "@/shared/lib/text";
+import { attachmentTypeLabel } from "./attachment-preview";
 import type { ChatAttachment } from "./use-chat-attachments";
 
 const ATTACHMENT_TILE_SIZE = 112;
@@ -55,8 +56,9 @@ export function ComposerAttachmentTile({
   onPreview: () => void;
   onRemove: () => void;
 }) {
+  const { t, format } = useText();
   const image = localPreviewUri(item);
-  const type = attachmentTypeLabel(item.name, item.mimeType);
+  const type = attachmentTypeLabel(item.name, item.mimeType, t);
   const [pressed, setPressed] = useState(false);
   return (
     <Animated.View
@@ -67,8 +69,13 @@ export function ComposerAttachmentTile({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Preview ${item.name}`}
-        accessibilityHint={`${type}, ${formatFileSize(item.size)}, attachment ${index + 1} of ${count}`}
+        accessibilityLabel={t("mobile.chat.attachment.preview", { name: item.name })}
+        accessibilityHint={t("mobile.chat.attachment.tileHint", {
+          type,
+          size: format.fileSize(item.size),
+          position: index + 1,
+          total: count,
+        })}
         onPress={onPreview}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
@@ -102,7 +109,7 @@ export function ComposerAttachmentTile({
                 {item.name}
               </Typography.Paragraph>
               <Typography.Paragraph type="body-xs" className="text-muted">
-                {formatFileSize(item.size)}
+                {format.fileSize(item.size)}
               </Typography.Paragraph>
             </>
           )}
@@ -110,7 +117,7 @@ export function ComposerAttachmentTile({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Remove ${item.name}`}
+        accessibilityLabel={t("mobile.chat.attachment.remove", { name: item.name })}
         accessibilityState={{ disabled }}
         disabled={disabled}
         hitSlop={8}

@@ -4,40 +4,39 @@
  */
 
 import type { ChannelSummary, DirectThreadSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
+import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import type { AgentProfile } from "../../data";
 import { teamMemberName } from "../team/TeamPersonAvatar";
 import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
 
-export function sidebarAgentStateLabel(state: SidebarAgentState): string {
-  if (state.kind === "working") return "Thinking";
-  if (state.kind === "responded") return "Responded";
-  if (state.kind === "routine") return routineStateLabel(state.phase, state.count);
-  return `${state.count} new ${state.count === 1 ? "reply" : "replies"}`;
+export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate): string {
+  if (state.kind === "working") return t("sidebar.state.working");
+  if (state.kind === "responded") return t("sidebar.state.responded");
+  if (state.kind === "routine") return routineStateLabel(state.phase, state.count, t);
+  return t("sidebar.state.unread", { count: state.count });
 }
 
-function routineStateLabel(phase: SidebarRoutinePhase, count: number): string {
-  if (phase === "needs-attention") {
-    return count === 1 ? "Routine needs attention" : `${count} routines need attention`;
-  }
-  if (phase === "failed") return count === 1 ? "Routine failed" : `${count} routines failed`;
-  if (phase === "queued") return count === 1 ? "Routine waiting" : `${count} routines waiting`;
-  return count === 1 ? "Routine running" : `${count} routines running`;
+function routineStateLabel(phase: SidebarRoutinePhase, count: number, t: AppTranslate): string {
+  if (phase === "needs-attention") return t("sidebar.state.routineAttention", { count });
+  if (phase === "failed") return t("sidebar.state.routineFailed", { count });
+  if (phase === "queued") return t("sidebar.state.routineWaiting", { count });
+  return t("sidebar.state.routineRunning", { count });
 }
 
-export function sidebarMessageTime(value: string): string {
+export function sidebarMessageTime(value: string, format: AppFormat): string {
   if (!value) return "";
   const date = new Date(value);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) {
-    return new Intl.DateTimeFormat(undefined, {
+    return format.date(date, {
       hour: "2-digit",
       minute: "2-digit",
-    }).format(date);
+    });
   }
-  return new Intl.DateTimeFormat(undefined, {
+  return format.date(date, {
     month: "short",
     day: "numeric",
-  }).format(date);
+  });
 }
 
 export function agentMatchesQuery(agent: AgentProfile, query: string): boolean {

@@ -17,6 +17,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
 import { LifecycleGate } from "./lifecycle-gate";
@@ -439,7 +440,7 @@ export class CuaDriverRuntime {
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: `The Computer Use driver did not start. ${describe(error)}`,
+        message: sourceText("status.computerUse.driverNotStarted", { reason: describe(error) }),
       });
     }
 
@@ -448,7 +449,7 @@ export class CuaDriverRuntime {
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: "The Computer Use driver stopped before it could answer.",
+        message: sourceText("status.computerUse.driverStoppedBeforeAnswer"),
       });
     }
 
@@ -468,7 +469,7 @@ export class CuaDriverRuntime {
       return this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: `The Computer Use driver did not answer. ${describe(error)}`,
+        message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(error) }),
       });
     }
   }
@@ -507,16 +508,14 @@ export class CuaDriverRuntime {
 
   async #start(): Promise<void> {
     const executable = this.#executable;
-    if (!executable) throw new Error("This computer has no Computer Use driver.");
+    if (!executable) throw new Error(sourceText("error.computerUse.noDriver"));
 
     const socketPath = this.socketPath();
     const endpoint = this.#options.endpoint;
     if (endpoint.kind === "unix-socket") {
       const limit = MAX_SOCKET_PATH_LENGTH[this.#options.platform];
       if (limit !== undefined && socketPath.length > limit) {
-        throw new Error(
-          `The Computer Use socket path is ${socketPath.length} characters, and this system allows ${limit}.`,
-        );
+        throw new Error(sourceText("error.computerUse.socketPathTooLong", { length: socketPath.length, limit }));
       }
 
       // `0o700`, because the socket inside is a control channel to a process that can drive the
@@ -564,7 +563,7 @@ export class CuaDriverRuntime {
       this.#publish({
         status: "error",
         permissions: ungranted(this.#options.platform),
-        message: "The Computer Use driver stopped.",
+        message: sourceText("status.computerUse.driverStopped"),
       });
     });
 
@@ -684,7 +683,7 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
     return {
       status: "unsupported",
       permissions: ungranted(platform),
-      message: "Computer Use is available on macOS, Windows and Linux.",
+      message: sourceText("status.computerUse.unsupported"),
     };
   }
   if (!executable) {
@@ -693,7 +692,7 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
       permissions: ungranted(platform),
       // Never an instruction to install one: every release carries the driver, so a build without
       // it is a broken build. The message says what is wrong and leaves the fix to the developer.
-      message: "This build of OpenBot carries no Computer Use driver.",
+      message: sourceText("status.computerUse.driverMissing"),
     };
   }
   return { status: "permissions-required", permissions: ungranted(platform), message: null };
@@ -740,15 +739,15 @@ function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
 async function assertPrivateDirectory(directory: string): Promise<void> {
   const stats = await lstat(directory);
   if (!stats.isDirectory()) {
-    throw new Error(`The Computer Use socket directory ${directory} is not a directory.`);
+    throw new Error(sourceText("error.computerUse.socketDirectoryNotDirectory", { path: directory }));
   }
   // `getuid` is absent on Windows, which never calls this.
   const uid = process.getuid?.();
   if (uid !== undefined && stats.uid !== uid) {
-    throw new Error(`The Computer Use socket directory ${directory} belongs to another user.`);
+    throw new Error(sourceText("error.computerUse.socketDirectoryOtherOwner", { path: directory }));
   }
   if ((stats.mode & 0o077) !== 0) {
-    throw new Error(`The Computer Use socket directory ${directory} is open to other users.`);
+    throw new Error(sourceText("error.computerUse.socketDirectoryShared", { path: directory }));
   }
 }
 
@@ -777,7 +776,9 @@ async function waitForSocket(path: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, READY_POLL_MS));
     }
   }
-  throw new Error(`It did not accept a connection in ${READY_TIMEOUT_MS / 1000} seconds. ${describe(lastError)}`);
+  throw new Error(
+    sourceText("error.computerUse.socketNotReady", { seconds: READY_TIMEOUT_MS / 1000, reason: describe(lastError) }),
+  );
 }
 
 /**

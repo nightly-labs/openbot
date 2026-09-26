@@ -1,10 +1,13 @@
 import type { BrowserDisplayState } from "@openbot/contracts/ipc";
+import { useText } from "@openbot/ui/text";
 import { render } from "@solidjs/web";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import "../../styles.css";
+import { I18nProvider } from "../../i18n-context";
 import { browserPort } from "./browser-port";
 
 function BrowserPictureInPicture() {
+  const { t } = useText();
   const [state, setState] = createSignal<BrowserDisplayState>({ tabs: [], activeTabId: null });
   let surface: HTMLDivElement | undefined;
   let stateRevision = 0;
@@ -59,12 +62,12 @@ function BrowserPictureInPicture() {
   });
 
   return (
-    <aside class="browser-pip-window" aria-label="Browser Picture in Picture">
+    <aside class="browser-pip-window" aria-label={t("browser.pip.window")}>
       <div class="browser-surface browser-pip-surface" ref={surface}>
         <Show when={state().tabs.length === 0}>
           <div class="browser-empty-state">
-            <strong>Open a page</strong>
-            <span>The agent can browse here while it works.</span>
+            <strong>{t("browser.empty.title")}</strong>
+            <span>{t("browser.empty.description")}</span>
           </div>
         </Show>
       </div>
@@ -74,4 +77,11 @@ function BrowserPictureInPicture() {
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Browser Picture in Picture root element was not found.");
-render(() => <BrowserPictureInPicture />, root);
+render(
+  () => (
+    <I18nProvider>
+      <BrowserPictureInPicture />
+    </I18nProvider>
+  ),
+  root,
+);

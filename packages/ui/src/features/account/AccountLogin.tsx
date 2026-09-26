@@ -4,6 +4,7 @@ import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/co
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
 import { ArrowLeft, Button, Input, RefreshCw } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { useText } from "../../text";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
 
 interface AccountLoginProps {
@@ -32,7 +33,12 @@ const UNCERTAIN_EMAIL_DELIVERY_ISSUES = new Set([
   "email_delivery_unknown",
 ]);
 
+const PRODUCT_NAME = "OpenBot";
+const EMAIL_PLACEHOLDER = "you@example.com";
+const EMAIL_MARKER = "\u0000";
+
 export function AccountLogin(props: AccountLoginProps) {
+  const { t, sourceText } = useText();
   const [email, setEmail] = createSignal("");
   const [code, setCode] = createSignal("");
   const [presentedEmailError, setPresentedEmailError] = createSignal<string | null>(null);
@@ -106,8 +112,12 @@ export function AccountLogin(props: AccountLoginProps) {
   };
   const emailSubmitLabel = () => {
     const retryIn = emailRetryIn();
-    if (emailDeliveryUncertain()) return retryIn > 0 ? `Check again in ${formatTimer(retryIn)}` : "Check delivery";
-    return retryIn > 0 ? `Try again in ${formatTimer(retryIn)}` : "Send sign-in code";
+    if (emailDeliveryUncertain()) {
+      return retryIn > 0
+        ? t("account.login.checkAgainIn", { time: formatTimer(retryIn) })
+        : t("account.login.checkDelivery");
+    }
+    return retryIn > 0 ? t("account.login.tryAgainIn", { time: formatTimer(retryIn) }) : t("account.login.sendCode");
   };
   const emailBusy = () =>
     pendingAction() === "send" || pendingAction() === "check" || props.state.status === "signing_in";
@@ -121,8 +131,12 @@ export function AccountLogin(props: AccountLoginProps) {
     const visibleIssue = displayedIssue();
     const issue = currentIssue();
     if (codeError()) return codeError();
-    if (visibleIssue?.code === "invalid_sign_in_code") return visibleIssue.message;
-    return issue && NEW_CODE_ISSUES.has(issue.code) ? issue.message : null;
+    if (visibleIssue?.code === "invalid_sign_in_code") return sourceText(visibleIssue.message);
+    return issue && NEW_CODE_ISSUES.has(issue.code) ? sourceText(issue.message) : null;
+  };
+  const codeSentParts = () => {
+    const [before = "", after = ""] = t("account.login.codeSent", { email: EMAIL_MARKER }).split(EMAIL_MARKER);
+    return [before, after] as const;
   };
   const otpStatus = (): OtpInputStatus => {
     if (verified()) return "success";
@@ -145,7 +159,7 @@ export function AccountLogin(props: AccountLoginProps) {
       setNow(Date.now());
       setIssueVisible(true);
       setIssueBlockedUntil(issue?.retryAfterSeconds ? Date.now() + issue.retryAfterSeconds * 1_000 : 0);
-      if (issue?.code === "invalid_email") showEmailError(issue.message);
+      if (issue?.code === "invalid_email") showEmailError(sourceText(issue.message));
     },
   );
 
@@ -171,8 +185,8 @@ export function AccountLogin(props: AccountLoginProps) {
   );
 
   function validateEmail(value: string): string | null {
-    if (!value.trim()) return "Enter your email address.";
-    return normalizeEmailAddress(value) ? null : "Enter a valid email address.";
+    if (!value.trim()) return t("account.login.emailRequired");
+    return normalizeEmailAddress(value) ? null : t("account.login.emailInvalid");
   }
 
   function clearEmailErrorTimers(): void {
@@ -262,7 +276,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRequestEmailCode(normalizedEmail);
     } catch {
-      setLocalError("Something went wrong while sending the code. Try again.");
+      setLocalError(t("account.login.sendFailed"));
     } finally {
       setPendingAction(null);
     }
@@ -272,7 +286,7 @@ export function AccountLogin(props: AccountLoginProps) {
     if (props.state.status !== "code_sent" || pendingAction() || codeBusy() || codeNeedsReplacement()) return;
     const normalizedCode = normalizeOneTimeCode(value);
     if (!normalizedCode) {
-      setCodeError("Enter the full 8-character code.");
+      setCodeError(t("account.login.codeIncomplete"));
       return;
     }
     setCodeError(null);
@@ -282,7 +296,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onVerifyEmailCode(props.state.challengeId, formatCode(normalizedCode));
     } catch {
-      setLocalError("Something went wrong while verifying the code. Try again.");
+      setLocalError(t("account.login.verifyFailed"));
     } finally {
       setPendingAction(null);
     }
@@ -296,7 +310,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRequestEmailCode(props.state.email);
     } catch {
-      setLocalError("Something went wrong while sending a new code. Try again.");
+      setLocalError(t("account.login.resendFailed"));
     } finally {
       setPendingAction(null);
     }
@@ -309,7 +323,7 @@ export function AccountLogin(props: AccountLoginProps) {
     try {
       await props.onRetry();
     } catch {
-      setLocalError("OpenBot still can’t reach the account service.");
+      setLocalError(t("account.login.stillUnreachable"));
     } finally {
       setPendingAction(null);
     }
@@ -325,7 +339,7 @@ export function AccountLogin(props: AccountLoginProps) {
       setCodeError(null);
       setIssueVisible(false);
     } catch {
-      setLocalError("OpenBot couldn’t restart sign in. Try again.");
+      setLocalError(t("account.login.resetFailed"));
     } finally {
       setPendingAction(null);
     }
@@ -336,7 +350,7 @@ export function AccountLogin(props: AccountLoginProps) {
       <div class="account-login-shell">
         <header class="account-login-brand-lockup">
           <AppLogo variant={props.variant} animation="blink" interactive class="account-login-logo" />
-          <span class="account-login-wordmark">OpenBot</span>
+          <span class="account-login-wordmark">{PRODUCT_NAME}</span>
         </header>
 
         <section
@@ -348,31 +362,33 @@ export function AccountLogin(props: AccountLoginProps) {
         >
           <h1 id="account-login-title" class="account-login-title">
             {connecting()
-              ? "Connecting to OpenBot"
+              ? t("account.login.connectingTitle")
               : unavailable()
-                ? "Service unavailable"
+                ? t("account.login.unavailableTitle")
                 : verified()
-                  ? "You’re signed in"
+                  ? t("account.login.signedInTitle")
                   : codeSent()
-                    ? "Check your inbox"
-                    : "Sign in to OpenBot"}
+                    ? t("account.login.checkInboxTitle")
+                    : t("account.login.signInTitle")}
           </h1>
           <p id="account-login-description" class="account-login-description">
             <Show
               when={challenge() || verified()}
               fallback={
                 connecting()
-                  ? "Starting the account service. This usually takes a moment."
+                  ? t("account.login.connectingDescription")
                   : unavailable()
-                    ? (currentIssue()?.message ?? "OpenBot can’t reach the account service right now.")
-                    : "We’ll email you a one-time code."
+                    ? sourceText(currentIssue()?.message ?? t("account.login.unavailableDescription"))
+                    : t("account.login.signInDescription")
               }
             >
               {verified() ? (
-                "Your code was accepted."
+                t("account.login.codeAccepted")
               ) : (
                 <>
-                  We sent a code to <strong>{challenge()?.email}</strong>.
+                  {codeSentParts()[0]}
+                  <strong>{challenge()?.email}</strong>
+                  {codeSentParts()[1]}
                 </>
               )}
             </Show>
@@ -381,7 +397,7 @@ export function AccountLogin(props: AccountLoginProps) {
           <Show when={connecting()}>
             <div class="account-login-loader" role="status" aria-live="polite">
               <span class="account-login-spinner" aria-hidden="true" />
-              <span>Connecting securely…</span>
+              <span>{t("account.login.connectingSecurely")}</span>
             </div>
           </Show>
 
@@ -400,9 +416,9 @@ export function AccountLogin(props: AccountLoginProps) {
               disabled={pendingAction() === "retry"}
               onClick={() => void retryConnection()}
             >
-              <Show when={pendingAction() === "retry"} fallback="Try again">
+              <Show when={pendingAction() === "retry"} fallback={t("common.tryAgain")}>
                 <span class="account-login-button-spinner" aria-hidden="true" />
-                Connecting…
+                {t("common.connecting")}
               </Show>
             </Button>
           </Show>
@@ -422,7 +438,7 @@ export function AccountLogin(props: AccountLoginProps) {
                   }}
                 >
                   <label class="sr-only" for="account-email">
-                    Email
+                    {t("account.login.email")}
                   </label>
                   <div class={`account-login-email-field t-input-wrap${emailErrorActive() ? " is-error" : ""}`}>
                     <Input
@@ -434,7 +450,7 @@ export function AccountLogin(props: AccountLoginProps) {
                       autocapitalize="none"
                       inputmode="email"
                       spellcheck={false}
-                      placeholder="you@example.com"
+                      placeholder={EMAIL_PLACEHOLDER}
                       maxlength={INPUT_LIMITS.email}
                       value={email()}
                       aria-invalid={emailErrorActive() ? "true" : undefined}
@@ -460,7 +476,7 @@ export function AccountLogin(props: AccountLoginProps) {
                   <Show when={formIssue()}>
                     {(issue) => (
                       <p class="account-login-error" role="alert">
-                        {issue().message}
+                        {sourceText(issue().message)}
                       </p>
                     )}
                   </Show>
@@ -480,7 +496,9 @@ export function AccountLogin(props: AccountLoginProps) {
                   >
                     <Show when={emailBusy()} fallback={emailSubmitLabel()}>
                       <span class="account-login-button-spinner" aria-hidden="true" />
-                      {pendingAction() === "check" ? "Checking delivery…" : "Sending code…"}
+                      {pendingAction() === "check"
+                        ? t("account.login.checkingDelivery")
+                        : t("account.login.sendingCode")}
                     </Show>
                   </Button>
                 </form>
@@ -494,9 +512,9 @@ export function AccountLogin(props: AccountLoginProps) {
                 <OtpInput
                   value={code()}
                   status={otpStatus()}
-                  hint="Enter all 8 characters to continue."
+                  hint={t("account.login.codeHint")}
                   errorMessage={displayedCodeError()}
-                  successMessage="Verified. Opening OpenBot…"
+                  successMessage={t("account.login.verified")}
                   disabled={codeNeedsReplacement() || resendBusy()}
                   autofocus
                   onChange={handleCodeInput}
@@ -505,13 +523,15 @@ export function AccountLogin(props: AccountLoginProps) {
 
                 <Show when={challenge()?.developmentCode}>
                   {(developmentCode) => (
-                    <p class="account-login-development-code">Development code: {developmentCode()}</p>
+                    <p class="account-login-development-code">
+                      {t("account.login.developmentCode", { code: developmentCode() })}
+                    </p>
                   )}
                 </Show>
                 <Show when={formIssue()}>
                   {(issue) => (
                     <p class="account-login-error" role="alert">
-                      {issue().message}
+                      {sourceText(issue().message)}
                     </p>
                   )}
                 </Show>
@@ -536,12 +556,12 @@ export function AccountLogin(props: AccountLoginProps) {
                         when={resendBusy()}
                         fallback={
                           resendAvailableIn() > 0
-                            ? `Send a new code in ${formatTimer(resendAvailableIn())}`
-                            : "Send a new code"
+                            ? t("account.login.sendNewCodeIn", { time: formatTimer(resendAvailableIn()) })
+                            : t("account.login.sendNewCode")
                         }
                       >
                         <span class="account-login-button-spinner" aria-hidden="true" />
-                        Sending new code…
+                        {t("account.login.sendingNewCode")}
                       </Show>
                     </Button>
                   </Show>
@@ -556,7 +576,7 @@ export function AccountLogin(props: AccountLoginProps) {
                       onClick={() => void resetEmail()}
                     >
                       <ArrowLeft size={14} aria-hidden="true" />
-                      Change email
+                      {t("account.login.changeEmail")}
                     </Button>
                     <Show when={!codeNeedsReplacement()}>
                       <Button
@@ -566,11 +586,13 @@ export function AccountLogin(props: AccountLoginProps) {
                         size="sm"
                         disabled={pendingAction() !== null || resendAvailableIn() > 0}
                         loading={resendBusy()}
-                        loadingLabel="Sending…"
+                        loadingLabel={t("common.sending")}
                         onClick={() => void resendCode()}
                       >
                         <RefreshCw size={14} aria-hidden="true" />
-                        {resendAvailableIn() > 0 ? `Resend in ${formatTimer(resendAvailableIn())}` : "Resend code"}
+                        {resendAvailableIn() > 0
+                          ? t("account.login.resendIn", { time: formatTimer(resendAvailableIn()) })
+                          : t("account.login.resend")}
                       </Button>
                     </Show>
                   </div>

@@ -1,6 +1,5 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
 import type { SidebarLayoutAction } from "@openbot/contracts/ipc";
-import { userErrorMessage } from "@openbot/user-errors";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -9,6 +8,7 @@ import { useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { currentText, useText } from "@/shared/lib/text";
 
 export function SidebarSectionHeader({
   id,
@@ -25,6 +25,7 @@ export function SidebarSectionHeader({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useText();
   const { activeServer, sidebarByServer, mutateSidebarLayout } = useMobileWorkspace();
   const muted = String(useThemeColor("muted"));
   const reducedMotion = useReducedMotion();
@@ -42,23 +43,27 @@ export function SidebarSectionHeader({
     try {
       await mutateSidebarLayout(activeServer.id, action);
     } catch (error) {
-      Alert.alert("Could not change section", userErrorMessage(error, "Please try again."));
+      const text = currentText();
+      Alert.alert(
+        text.t("mobile.agent.section.changeFailed"),
+        text.errorMessage(error, text.t("mobile.agent.section.tryAgain")),
+      );
     } finally {
       pending.current = false;
       setSaving(false);
     }
   }
   const actions: MenuAction[] = [
-    { id: "up", title: "Move up", attributes: { disabled: disabled || visibleIndex <= 0 } },
+    { id: "up", title: t("mobile.agent.section.moveUp"), attributes: { disabled: disabled || visibleIndex <= 0 } },
     {
       id: "down",
-      title: "Move down",
+      title: t("mobile.agent.section.moveDown"),
       attributes: { disabled: disabled || visibleIndex >= visibleSectionIds.length - 1 },
     },
     ...(custom
       ? [
-          { id: "rename", title: "Rename", attributes: { disabled } },
-          { id: "delete", title: "Delete section", attributes: { disabled, destructive: true } },
+          { id: "rename", title: t("common.rename"), attributes: { disabled } },
+          { id: "delete", title: t("mobile.agent.section.delete"), attributes: { disabled, destructive: true } },
         ]
       : []),
   ];
@@ -67,7 +72,7 @@ export function SidebarSectionHeader({
       <View className="flex-row items-center">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${collapsed ? "Expand" : "Collapse"} ${name}`}
+          accessibilityLabel={t(collapsed ? "mobile.agent.section.expand" : "mobile.agent.section.collapse", { name })}
           accessibilityState={{ expanded: !collapsed }}
           onPress={onToggle}
           className="min-h-12 flex-1 flex-row items-center gap-2"
@@ -103,16 +108,20 @@ export function SidebarSectionHeader({
             if (action === "rename")
               router.push({ pathname: "/section-form", params: { serverId: activeServer.id, sectionId: id } });
             if (action === "delete")
-              Alert.alert(`Delete ${name}?`, "Chats in this section will move to Agents.", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => void run({ type: "delete", sectionId: id }) },
+              Alert.alert(t("mobile.agent.section.deleteTitle", { name }), t("mobile.agent.section.deleteBody"), [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                  text: t("common.delete"),
+                  style: "destructive",
+                  onPress: () => void run({ type: "delete", sectionId: id }),
+                },
               ]);
           }}
         >
           <View
             accessible
             accessibilityRole="button"
-            accessibilityLabel={`${name} section options`}
+            accessibilityLabel={t("mobile.agent.section.options", { name })}
             className="size-12 items-center justify-center"
           >
             <Ellipsis size={20} color={muted} />
@@ -121,7 +130,7 @@ export function SidebarSectionHeader({
       </View>
       {empty && !collapsed ? (
         <Typography.Paragraph type="body-sm" className="text-muted">
-          No chats in this section
+          {t("mobile.agent.section.empty")}
         </Typography.Paragraph>
       ) : null}
     </View>

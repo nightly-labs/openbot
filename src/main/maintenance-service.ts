@@ -5,6 +5,7 @@ import { arch, release as osRelease, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import type { AgentSummary, ExportResult } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import { app, type BrowserWindow, dialog } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
@@ -21,15 +22,16 @@ interface MaintenanceContext {
   updater: UpdateService;
   trace: TraceFile;
   parentWindow: BrowserWindow | null;
+  translate: AppTranslate;
 }
 
 export async function exportOpenBotData(
-  context: Pick<MaintenanceContext, "service" | "mailbox" | "parentWindow">,
+  context: Pick<MaintenanceContext, "service" | "mailbox" | "parentWindow" | "translate">,
 ): Promise<ExportResult> {
   const destination = await chooseExportDestination(
     context.parentWindow,
     `OpenBot-backup-${new Date().toISOString().slice(0, 10)}.zip`,
-    [{ name: "ZIP archive", extensions: ["zip"] }],
+    [{ name: context.translate("dialog.filter.zipArchive"), extensions: ["zip"] }],
   );
   if (!destination) return { saved: false };
 
@@ -97,12 +99,12 @@ function powerShellLiteral(value: string): string {
 }
 
 export async function exportDiagnostics(
-  context: Pick<MaintenanceContext, "service" | "browser" | "updater" | "trace" | "parentWindow">,
+  context: Pick<MaintenanceContext, "service" | "browser" | "updater" | "trace" | "parentWindow" | "translate">,
 ): Promise<ExportResult> {
   const destination = await chooseExportDestination(
     context.parentWindow,
     `OpenBot-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
-    [{ name: "JSON document", extensions: ["json"] }],
+    [{ name: context.translate("dialog.filter.jsonDocument"), extensions: ["json"] }],
   );
   if (!destination) return { saved: false };
 

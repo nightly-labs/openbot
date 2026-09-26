@@ -34,7 +34,7 @@ import {
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createStore, Show } from "solid-js";
-import { errorMessage } from "../../error-message";
+import { useText } from "../../text";
 import { PluginIcon } from "./MarketplacePluginDetail";
 
 /** What is being connected, in the words the listing uses for it. */
@@ -78,6 +78,7 @@ export interface ConnectState {
  * not what is on screen.
  */
 export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "onConnected">) {
+  const { t, errorMessage, sourceText } = useText();
   const [state, setState] = createStore<ConnectState>({ phase: "idle", error: "" });
   let run = 0;
   const busy = () => state.phase === "connecting";
@@ -105,7 +106,7 @@ export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "on
       if (result.error) {
         setState((current) => {
           current.phase = "failed";
-          current.error = result.error ?? "";
+          current.error = sourceText(result.error ?? "");
         });
         return;
       }
@@ -114,7 +115,7 @@ export function createConnectRun(props: Pick<McpConnectBaseProps, "onTest" | "on
       if (started !== run) return;
       setState((current) => {
         current.phase = "failed";
-        current.error = errorMessage(cause, "That server could not be reached.");
+        current.error = errorMessage(cause, t("mcp.connect.unreachable"));
       });
     }
   }
@@ -136,6 +137,7 @@ export interface McpConnectShellProps extends Pick<McpConnectBaseProps, "open" |
 
 /** The parts both dialogs show: the two ends of the connection, the header, the failure, the button. */
 export function McpConnectShell(props: McpConnectShellProps) {
+  const { t } = useText();
   return (
     <Dialog.Root
       open={props.open}
@@ -156,7 +158,9 @@ export function McpConnectShell(props: McpConnectShellProps) {
                 <span class="mcp-connect-dots" />
                 <PluginIcon iconUrl={props.subject.iconUrl} class="mcp-connect-mark-icon" />
               </div>
-              <Dialog.Title class="mcp-connect-title">Connect {props.subject.name}</Dialog.Title>
+              <Dialog.Title class="mcp-connect-title">
+                {t("mcp.connect.title", { name: props.subject.name })}
+              </Dialog.Title>
               <Dialog.Description class="mcp-connect-description">{props.description}</Dialog.Description>
             </header>
 
@@ -180,7 +184,7 @@ export function McpConnectShell(props: McpConnectShellProps) {
                       <OctagonX />
                     </AlertIcon>
                     <AlertContent>
-                      <AlertTitle>Not connected</AlertTitle>
+                      <AlertTitle>{t("mcp.connect.notConnected")}</AlertTitle>
                       <AlertDescription>{props.state.error}</AlertDescription>
                     </AlertContent>
                   </Alert>
@@ -194,7 +198,7 @@ export function McpConnectShell(props: McpConnectShellProps) {
                 focused, not with the way out focused. */}
             <IconButton
               class="mcp-connect-close"
-              label={`Close connect ${props.subject.name}`}
+              label={t("mcp.connect.close", { name: props.subject.name })}
               variant="ghost"
               disabled={props.busy()}
               onClick={props.onCancel}

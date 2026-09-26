@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onCleanup } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 
@@ -102,7 +103,9 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
         message:
           error instanceof Error && error.message
             ? error.message
-            : `OpenBot could not connect ${agentProviderDescriptor(provider).displayName}. Try again.`,
+            : currentText().t("app.provider.connectFailedRetry", {
+                name: agentProviderDescriptor(provider).displayName,
+              }),
       });
     }
   }
@@ -147,25 +150,26 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
     codeLoginStarted = false;
     flush(() => setCodeLoginProvider(null));
     const name = agentProviderDescriptor(provider).displayName;
+    const { t, sourceText } = currentText();
     if (outcome.kind === "connected") {
-      toast.success(`${name} connected`, {
+      toast.success(t("app.provider.connected", { name }), {
         description: outcome.accountLabel
-          ? `Signed in as ${outcome.accountLabel}.`
-          : "The sign-in finished on the other device.",
+          ? t("app.provider.signedInAs", { account: outcome.accountLabel })
+          : t("app.provider.signedInElsewhere"),
       });
       return;
     }
-    const retry = { label: "Get a new code", onClick: () => void startProviderCodeLogin(provider) };
+    const retry = { label: t("app.provider.newCode"), onClick: () => void startProviderCodeLogin(provider) };
     if (outcome.kind === "expired") {
-      toast.warning(`The ${name} code expired`, {
-        description: "Nobody entered it in time. That code no longer works.",
+      toast.warning(t("app.provider.codeExpired", { name }), {
+        description: t("app.provider.codeExpiredDescription"),
         action: retry,
       });
       return;
     }
-    toast.error(`Could not connect ${name}`, {
-      description: outcome.message,
-      action: { ...retry, label: "Try again" },
+    toast.error(t("app.provider.connectFailed", { name }), {
+      description: sourceText(outcome.message),
+      action: { ...retry, label: t("common.tryAgain") },
     });
   }
 
@@ -207,7 +211,10 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
         endProviderCodeLogin(row.id, {
           kind: "failed",
           message:
-            row.message ?? `OpenBot could not connect ${agentProviderDescriptor(row.id).displayName}. Try again.`,
+            row.message ??
+            currentText().t("app.provider.connectFailedRetry", {
+              name: agentProviderDescriptor(row.id).displayName,
+            }),
         });
       }
     },

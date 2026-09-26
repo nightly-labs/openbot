@@ -1,5 +1,5 @@
 import type { AgentMessage } from "@openbot/ui/data";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { formatMessageTime } from "./app-message-projection";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
@@ -24,7 +24,8 @@ const UiErrors = createSimpleContext({
     const [uiErrors, setUiErrors] = createSignal<Record<string, AgentMessage[]>>({});
 
     function appendUiError(agentId: string, error: unknown, status: string, serverId: string): void {
-      const body = errorMessage(error, "The action could not be completed. Try again.");
+      const { t, errorMessage } = currentText();
+      const body = errorMessage(error, t("app.error.actionFailed"));
       const errorKey = agentConversationKey(serverId, agentId);
       setUiErrors((current) => ({
         ...current,

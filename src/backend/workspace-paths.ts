@@ -2,6 +2,7 @@ import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { legacyAgentId } from "@openbot/contracts/validation";
+import { sourceText } from "@openbot/i18n/source";
 import { isRecord } from "./protocol";
 
 export interface ResolvedSharedFile {
@@ -92,10 +93,10 @@ export async function resolveSharedFile(sharedRootPath: string, inputPath: strin
   const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
   const resolvedPath = await realpath(candidatePath);
   if (!isWithin(sharedRoot, resolvedPath)) {
-    throw new Error("Shared file must be inside the shared directory.");
+    throw new Error(sourceText("error.backend.sharedFileOutside"));
   }
   const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error("Shared path is not a file.");
+  if (!metadata.isFile()) throw new Error(sourceText("error.backend.sharedPathNotFile"));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
 }
 
@@ -116,9 +117,9 @@ export async function resolveWorkspaceFile(
     return await realpath(rebased);
   });
   if (!isWithin(workspaceRoot, resolvedPath)) {
-    throw new Error("Workspace file must be inside the agent workspace.");
+    throw new Error(sourceText("error.backend.workspaceFileOutside"));
   }
   const metadata = await stat(resolvedPath);
-  if (!metadata.isFile()) throw new Error("Workspace path is not a file.");
+  if (!metadata.isFile()) throw new Error(sourceText("error.backend.workspacePathNotFile"));
   return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size };
 }

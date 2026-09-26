@@ -14,6 +14,7 @@ import {
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot } from "solid-js";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "./channels-context";
@@ -27,6 +28,7 @@ import { emptyChannelDraft, toggleChannelMember } from "./channels-draft";
  */
 export function ChannelCreateDialog() {
   const channels = useChannels();
+  const { t, sourceText } = useText();
   const { agentList } = useAgents();
   const channelId = crypto.randomUUID();
   const [draft, setDraft] = createStore<ChannelDraft>(emptyChannelDraft());
@@ -66,8 +68,8 @@ export function ChannelCreateDialog() {
         <Dialog.Overlay class="channel-dialog-backdrop">
           <Dialog.Content class="channel-create-dialog">
             <header class="channel-dialog-header">
-              <Dialog.Title>New channel</Dialog.Title>
-              <IconButton label="Close new channel" variant="ghost" onClick={channels.closeEditor}>
+              <Dialog.Title>{t("sidebar.new.channel")}</Dialog.Title>
+              <IconButton label={t("channel.create.close")} variant="ghost" onClick={channels.closeEditor}>
                 <X />
               </IconButton>
             </header>
@@ -86,14 +88,14 @@ export function ChannelCreateDialog() {
               <Show when={channels.state.error}>
                 {(message) => (
                   <Alert tone="danger" role="alert">
-                    <AlertDescription>{message()}</AlertDescription>
+                    <AlertDescription>{sourceText(message())}</AlertDescription>
                   </Alert>
                 )}
               </Show>
-              <Field label="Channel name">
+              <Field label={t("channel.form.name")}>
                 <Input
                   size="lg"
-                  placeholder="Ex: Project Falcon"
+                  placeholder={t("channel.form.namePlaceholder")}
                   required
                   value={draft.name}
                   onValueChange={(name) =>
@@ -104,14 +106,14 @@ export function ChannelCreateDialog() {
                 />
               </Field>
               <fieldset class="channel-picker">
-                <legend>Add agents</legend>
+                <legend>{t("channel.create.addAgents")}</legend>
                 <label class="search-field channel-member-search">
-                  <span class="sr-only">Search agents</span>
+                  <span class="sr-only">{t("channel.create.searchAgents")}</span>
                   <Search class="channel-search-icon" aria-hidden="true" />
                   <Input
                     type="search"
-                    aria-label="Search agents"
-                    placeholder="Search agents"
+                    aria-label={t("channel.create.searchAgents")}
+                    placeholder={t("channel.create.searchAgents")}
                     value={view.search}
                     onValueChange={(search) =>
                       setView((state) => {
@@ -152,9 +154,9 @@ export function ChannelCreateDialog() {
                         <Show when={!agentList().length}>
                           <UsersRound aria-hidden="true" />
                         </Show>
-                        <p>{agentList().length ? "No agents match this search." : "No agents yet"}</p>
+                        <p>{agentList().length ? t("channel.create.noMatches") : t("sidebar.empty.noAgents")}</p>
                         <Show when={!agentList().length}>
-                          <span>Create an agent to add it to this channel.</span>
+                          <span>{t("channel.create.noAgentsHint")}</span>
                         </Show>
                       </div>
                     </Show>
@@ -163,7 +165,7 @@ export function ChannelCreateDialog() {
               </fieldset>
               <footer class="channel-editor-footer">
                 <Button type="submit" disabled={channels.state.pending || !draft.name.trim() || !draft.members.length}>
-                  Create
+                  {t("common.create")}
                 </Button>
               </footer>
             </form>

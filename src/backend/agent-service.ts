@@ -76,6 +76,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval } from "./agent/agent-removal";
@@ -342,7 +343,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
         onProviderLost: (client) => {
-          this.#boot.orphanDeliveriesOf(client.provider);
+          this.#boot.orphanDeliveriesOf(client.provider, (agentId) => this.#providers.runsOnOwnProcess(agentId));
           this.#compaction.dispose();
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
@@ -355,20 +356,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#attention.clearApprovals(client);
           this.#turn.interruptTurnsOf(client);
         },
+        onAgentClientLost: (agentId, client) => {
+          this.#attention.clearPrompts(client);
+          this.#attention.clearBrowserTakeovers(client);
+          this.#attention.clearApprovals(client);
+          this.#boot.orphanDeliveriesOfAgent(agentId);
+          void this.#boot
+            .reconcileUnresolvedDeliveries()
+            .catch((error) => this.#emitError("delivery_reconcile_failed", error, agentId))
+            .finally(() => this.#drain.scheduleDrain(agentId));
+        },
+        sharedRoot: () => this.#store.sharedRoot,
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) =>
           this.#drain.hasStartingDeliveries(provider) ||
-          this.#store.list().some(
-            (agent) =>
-              providerForAgent(agent) === provider &&
-              // A channel turn runs on a thread of its own, so the agent's own conversation holds no
-              // turn id while the CLI works. `workingSnapshot` reads the execution threads as well.
-              //
-              // A compaction is a provider turn as well, and it holds no active turn id: its
-              // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
-              // it away. Only its own guard reports the turn the CLI is running.
-              (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
-          ),
+          this.#store.list().some((agent) => providerForAgent(agent) === provider && this.#runsTurn(agent.id)),
+        isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         onProviderActivated: (provider, configRevision) => {
@@ -549,7 +552,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const model = this.#endpoints
           .available()
           .find((item) => item.provider === lead.provider && item.id === lead.model);
-        if (!model) throw new Error("The channel lead model is unavailable.");
+        if (!model) throw new Error(sourceText("error.backend.channelLeadModelUnavailable"));
         const client = this.#providers.createProfileClient(lead.provider);
         return this.#profileClients.run(client, (cancelled) =>
           generateTextWithoutTools(
@@ -743,20 +746,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   getAnalytics(input: AgentAnalyticsInput) {
-    if (!this.listAgents().some((agent) => agent.id === input.agentId)) throw new Error("Agent not found.");
+    if (!this.listAgents().some((agent) => agent.id === input.agentId))
+      throw new Error(sourceText("error.team.agentNotFound"));
     return this.#store.database.usage.read(input);
   }
 
   getHostAnalytics(input: HostAnalyticsInput) {
     if (input.agentId && !this.listAgents().some((agent) => agent.id === input.agentId))
-      throw new Error("Agent not found.");
+      throw new Error(sourceText("error.team.agentNotFound"));
     return this.#store.database.usage.readHost(input);
   }
 
   async getUsage(agentId?: string): Promise<AccountUsage> {
     if (!agentId) return this.#providers.usage();
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error("Agent not found.");
+    if (!agent) throw new Error(sourceText("error.team.agentNotFound"));
     return this.#providers.usage({ provider: agent.provider, model: agent.model });
   }
 
@@ -845,7 +849,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async deleteTable(input: DeleteSharedTableInput): Promise<void> {
-    if (!this.#tables) throw new Error("Shared data is unavailable.");
+    if (!this.#tables) throw new Error(sourceText("error.backend.sharedDataUnavailable"));
     await this.#tables.removeAsUser(input.name);
   }
 
@@ -984,18 +988,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async generateProfile(input: GenerateAgentProfileInput, sections: SidebarSection[]): Promise<AgentProfileDraft> {
     const agent = input.agentId ? this.listAgents().find((candidate) => candidate.id === input.agentId) : null;
-    if (input.agentId && !agent) throw new Error("This agent no longer exists.");
-    if (this.#stopping) throw new Error("OpenBot is shutting down.");
-    if (this.#profileClients.busy()) throw new Error("Profile generation is busy. Try again shortly.");
+    if (input.agentId && !agent) throw new Error(sourceText("error.agent.gone"));
+    if (this.#stopping) throw new Error(sourceText("error.backend.shuttingDown"));
+    if (this.#profileClients.busy()) throw new Error(sourceText("error.agent.profileGenerationBusy"));
     const provider = agent?.provider ?? this.#providers.preferredProvider();
     await this.ensureProvider(provider);
     const models = this.#endpoints.available();
     const model = agent
       ? models.find((candidate) => candidate.id === agent.model && candidate.provider === provider)
       : startingModel(provider, models, this.#preference());
-    if (!model) throw new Error("The selected provider has no available model.");
-    if (this.#stopping) throw new Error("OpenBot is shutting down.");
-    if (this.#profileClients.busy()) throw new Error("Profile generation is busy. Try again shortly.");
+    if (!model) throw new Error(sourceText("error.provider.noModel"));
+    if (this.#stopping) throw new Error(sourceText("error.backend.shuttingDown"));
+    if (this.#profileClients.busy()) throw new Error(sourceText("error.agent.profileGenerationBusy"));
     const client = this.#providers.createProfileClient(provider);
     return this.#profileClients.run(client, (cancelled) => generateProfile(client, model, input, sections, cancelled));
   }
@@ -1022,8 +1026,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     profileOperationId?: string,
   ): Promise<AgentSummary> {
     const initialMessage = input.initialMessage.trim();
-    if (!initialMessage) throw new Error("Initial message is required.");
-    if (input.initialMessage.length > INPUT_LIMITS.messageText) throw new Error("Initial message is too long.");
+    if (!initialMessage) throw new Error(sourceText("error.agent.initialMessageRequired"));
+    if (input.initialMessage.length > INPUT_LIMITS.messageText)
+      throw new Error(sourceText("error.agent.initialMessageTooLong"));
     let agent = await this.#store.createAgent(input, profileOperationId);
     try {
       await this.#prepareAgentWorkspace(agent);
@@ -1074,10 +1079,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       if (rollbackError) {
-        throw new AggregateError(
-          [error, rollbackError],
-          "Agent setup failed and the incomplete agent could not be removed.",
-        );
+        throw new AggregateError([error, rollbackError], sourceText("error.agent.setupCleanupFailed"));
       }
       throw error;
     }
@@ -1128,10 +1130,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           .available()
           .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider))
       : undefined;
-    if (input.model && !requestedModel) throw new Error("The selected agent model is unavailable.");
+    if (input.model && !requestedModel) throw new Error(sourceText("error.agent.modelUnavailable"));
     const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
     if (input.provider && requestedModel && requestedModel.provider !== input.provider) {
-      throw new Error("The selected model does not belong to that provider.");
+      throw new Error(sourceText("error.agent.modelProviderMismatch"));
     }
     if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
       if (!input.model || !input.provider) {
@@ -1144,7 +1146,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ? this.#store.database.readConversation(input.agentId, previous.threadId).activeTurnId
           : null);
       if (hasPendingWork || activeTurn) {
-        throw new Error("Wait for the active turn and queue to finish before changing provider.");
+        throw new Error(sourceText("error.agent.waitBeforeProviderChange"));
       }
       await this.ensureProvider(requestedProvider);
     }
@@ -1201,7 +1203,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async resolveWorkspaceFile(agentId: string, inputPath: string): Promise<ResolvedSharedFile> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(`Unknown agent: ${agentId}`);
+    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
     return resolveWorkspaceFile(agent, inputPath);
   }
 
@@ -1283,6 +1285,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** See `CustomEndpoints.remove`: the exclusion, the agents that were on it, and the file write. */
   removeCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
     return this.#endpoints.remove(providerId, persist);
+  }
+
+  /**
+   * True while the CLI runs a turn for this agent. A channel turn runs on a thread of its own, so the
+   * agent's own conversation holds no turn id while the CLI works. `workingSnapshot` reads the
+   * execution threads as well.
+   *
+   * A compaction is a provider turn as well, and it holds no active turn id: its `turn/started`
+   * belongs to the compaction, not to the agent, so `claimTurn` takes it away. Only its own guard
+   * reports the turn the CLI is running.
+   */
+  #runsTurn(agentId: string): boolean {
+    return this.#conversation.workingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId);
   }
 
   /** Whether this provider reports a CLI that is installed, current, and signed in. */
@@ -1419,7 +1434,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async sendMessage(input: SendMessageInput): Promise<QueuedMessageReceipt> {
     const validateRecipient = this.#mailbox.prepareDelivery([input.agentId]);
-    if (this.#duplication.isPending(input.agentId)) throw new Error(`Unknown agent: ${input.agentId}`);
+    if (this.#duplication.isPending(input.agentId))
+      throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
     const agent = await this.#store.getOrCreate(input.agentId);
     await this.ensureProvider(providerForAgent(agent));
     validateRecipient();
@@ -1432,7 +1448,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
-    if (!delivery) throw new Error("Unable to create queued message.");
+    if (!delivery) throw new Error(sourceText("error.agent.queuedMessageCreateFailed"));
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     this.#mailboxSync.syncMailboxMessages(snapshot);
     await this.#store.updatePreview(
@@ -1458,7 +1474,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
     const current = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     if (!current.messages.some((message) => message.id === input.messageId)) {
-      throw new Error("The message is no longer available.");
+      throw new Error(sourceText("error.agent.messageUnavailable"));
     }
     await this.#mailbox.setReaction(agent.id, input.messageId, { kind: "user" }, input.emoji);
     this.#mailboxSync.syncMailboxMessages(current);
@@ -1467,7 +1483,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
     const agent = await this.#store.getOrCreate(agentId);
-    const client = this.#providers.requireReadyClient(providerForAgent(agent));
+    const client = this.#providers.requireReadyClientForAgent(agent);
     const snapshot = [...this.#conversation.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];

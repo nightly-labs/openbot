@@ -14,7 +14,7 @@ packages/
   ui/                Shared SolidJS controls and primitive styles for desktop, web, and Storybook
   brand/             Shared logos, avatars, and design tokens
   contracts/         Process and network boundary types, limits, and pure validation
-  i18n/              Message catalogs and the translate function for desktop and shared UI
+  i18n/              Message catalogs, translate and format functions for desktop, shared UI and mobile
   logging/           ts-log Logger interface plus the redacting console/file implementation
   team-client/       Shared team connection, recovery, and WebRTC framing code
   user-errors/       Shared user-facing error messages for desktop and mobile
@@ -91,11 +91,12 @@ calls to the agent settings panel, which shows only Skills and Tables in the bro
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
 route. `web-marketplace.ts` gives `SkillsMarketplaceModal` its calls: the public catalog routes of
 the account service that serves `/app` (`@openbot/team-client/marketplace-catalog`), and installs on
-the host over `skills-admin-v1`, `agent-install-v1`, and `mcp-servers-v1`. Try skill and a plugin
+the host over `skills-admin-v1`, `agent-install-v1`, `agent-update-v1`, and `mcp-servers-v1`. Try skill and a plugin
 prompt add a line to the agent's draft, as on desktop. A shared agent page also links
 `/app?agent=<id>`: `WebApp` reads the id once, removes the query, and keeps it through sign-in;
 `AgentTemplateInstall` then shows the preview, and the host adds the agent over `agent-install-v1`.
-A browser publishes nothing and updates no installed agent; those stay on the desktop.
+A browser publishes nothing; publishing stays on the desktop. An agent that the host added from a
+listing gets Update when the host serves `agent-update-v1`; the host downloads the current version.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
 the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
 sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The
@@ -1013,6 +1014,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `agentAdmin` |
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
+| `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 

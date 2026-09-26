@@ -3,7 +3,7 @@ import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot
 import { normalizeAccountName, validateProfileName } from "@openbot/contracts/validation";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { normalizeAvatarFile } from "../../../avatar-image";
-import { errorMessage } from "../../../error-message";
+import { currentText } from "../../../text";
 
 interface ProfileStoreProps {
   open: boolean;
@@ -73,7 +73,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     } catch {
       if (revision !== sessionsRevision) return;
       setPanels((state) => {
-        state.sessions.error = "Could not load account sessions. Please try again.";
+        state.sessions.error = currentText().t("settings.profile.sessions.loadFailed");
       });
     } finally {
       if (revision === sessionsRevision)
@@ -97,7 +97,7 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     } catch {
       if (revision !== sessionsRevision) return;
       setPanels((state) => {
-        state.sessions.error = "Could not disconnect this session. Please try again.";
+        state.sessions.error = currentText().t("settings.profile.sessions.disconnectFailed");
       });
     } finally {
       setPanels((state) => {
@@ -137,15 +137,16 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
   const nameValidation = createMemo(() => validateProfileName(panels.profile.name));
   const normalizedName = () => nameValidation().name;
   const nameError = () => {
+    const { t } = currentText();
     switch (nameValidation().error) {
       case "unsafe":
-        return "Remove line breaks and hidden or control characters.";
+        return t("settings.profile.name.unsafe");
       case "required":
-        return "Enter a display name.";
+        return t("settings.profile.name.required");
       case "too-short":
-        return `Use at least ${INPUT_LIMITS.profileNameMin} characters.`;
+        return t("settings.profile.name.tooShort", { limit: INPUT_LIMITS.profileNameMin });
       case "too-long":
-        return `Use no more than ${INPUT_LIMITS.profileName} characters.`;
+        return t("settings.profile.name.tooLong", { limit: INPUT_LIMITS.profileName });
       case null:
         return null;
     }
@@ -163,7 +164,8 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       await props.onUpdateAccountAvatar(image);
     } catch (error) {
       setPanels((state) => {
-        state.avatar.error = errorMessage(error, "Could not update your profile photo.");
+        const text = currentText();
+        state.avatar.error = text.errorMessage(error, text.t("settings.profile.photo.updateFailed"));
       });
     } finally {
       setPanels((state) => {
@@ -220,7 +222,8 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       });
     } catch (error) {
       setPanels((state) => {
-        state.profile.saveError = errorMessage(error, "Could not update your display name.");
+        const text = currentText();
+        state.profile.saveError = text.errorMessage(error, text.t("settings.profile.name.saveFailed"));
       });
       queueMicrotask(() => nameInput?.focus({ preventScroll: true }));
     } finally {
@@ -241,7 +244,8 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
       await props.onUpdateAccountAvatar(image);
     } catch (error) {
       setPanels((state) => {
-        state.avatar.error = errorMessage(error, "Could not process your profile photo.");
+        const text = currentText();
+        state.avatar.error = text.errorMessage(error, text.t("settings.profile.photo.processFailed"));
       });
     } finally {
       setPanels((state) => {

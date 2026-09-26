@@ -1,7 +1,9 @@
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agent-providers";
+import type { AppFormat } from "@openbot/i18n";
 import { Button, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
+import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 
 /**
@@ -25,6 +27,7 @@ export function ComposerNotice(props: {
   conversationKey?: string | null;
   onDismiss?: () => void;
 }) {
+  const { t } = useText();
   return (
     <Show
       when={props.onDismiss}
@@ -57,7 +60,7 @@ export function ComposerNotice(props: {
             type="button"
             size="sm"
             class="composer-notice-dismiss"
-            aria-label="Dismiss error"
+            aria-label={t("composer.notice.dismiss")}
             onClick={() => dismiss()()}
           >
             <CloseIcon />
@@ -97,6 +100,7 @@ export function ComposerSignInNotice(props: {
   onSignIn: (provider: AgentProviderId) => void | Promise<void>;
   signingIn?: boolean;
 }) {
+  const { t } = useText();
   const providerName = () => agentProviderName(props.provider);
   /**
    * Opening the sign-in guide is a round trip to the main process, and the provider only reports
@@ -117,19 +121,19 @@ export function ComposerSignInNotice(props: {
   };
   return (
     <ComposerNotice
-      title="Sign in required"
-      body={`Sign in to ${providerName()} to send messages.`}
+      title={t("composer.signIn.title")}
+      body={t("composer.signIn.body", { provider: providerName() })}
       action={
         <Button
           variant="outline"
           size="sm"
           type="button"
           loading={busy()}
-          loadingLabel="Signing in…"
-          aria-label={`Sign in to ${providerName()}`}
+          loadingLabel={t("composer.signIn.pending")}
+          aria-label={t("composer.signIn.label", { provider: providerName() })}
           onClick={() => void signIn()}
         >
-          Sign in
+          {t("composer.signIn.action")}
         </Button>
       }
     />
@@ -137,16 +141,16 @@ export function ComposerSignInNotice(props: {
 }
 
 /** The reset moment, in the reader's own locale. A window with no reported reset gets no sentence. */
-function formatUsageReset(resetsAt: number | null | undefined): string | null {
+function formatUsageReset(resetsAt: number | null | undefined, format: AppFormat): string | null {
   if (resetsAt === null || resetsAt === undefined) return null;
   const date = new Date(resetsAt * 1_000);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
+  return format.date(date, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  });
 }
 
 /**
@@ -157,13 +161,14 @@ function formatUsageReset(resetsAt: number | null | undefined): string | null {
  * says when the limit resets instead, which is the one fact the user needs to plan around it.
  */
 export function ComposerUsageLimitNotice(props: { provider: AgentProviderId; resetsAt?: number | null }) {
-  const resetAt = () => formatUsageReset(props.resetsAt);
+  const { t, format } = useText();
+  const resetAt = () => formatUsageReset(props.resetsAt, format);
   const body = () => {
-    const providerName = agentProviderName(props.provider);
+    const provider = agentProviderName(props.provider);
     const reset = resetAt();
     return reset
-      ? `You used all of your ${providerName} limit. It resets ${reset}.`
-      : `You used all of your ${providerName} limit. Select a different model to continue.`;
+      ? t("composer.usageLimit.resets", { provider, reset })
+      : t("composer.usageLimit.selectModel", { provider });
   };
-  return <ComposerNotice tone="danger" title="Usage limit reached" body={body()} />;
+  return <ComposerNotice tone="danger" title={t("composer.usageLimit.title")} body={body()} />;
 }

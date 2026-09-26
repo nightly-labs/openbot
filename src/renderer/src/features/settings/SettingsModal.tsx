@@ -280,11 +280,11 @@ export function SettingsModal(props: SettingsModalProps) {
                     size="sm"
                     variant="default"
                     loading={profile.state.profile.busy}
-                    loadingLabel={i18n.t("settings.save.saving")}
+                    loadingLabel={i18n.t("common.saving")}
                     disabled={profile.state.profile.busy}
                     onClick={() => void profile.saveName()}
                   >
-                    {i18n.t("settings.save.save")}
+                    {i18n.t("common.save")}
                   </Button>
                 </div>
               </section>

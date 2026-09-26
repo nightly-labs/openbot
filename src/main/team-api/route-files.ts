@@ -15,6 +15,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents, TeamApiMailbox } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -38,7 +39,7 @@ export async function routeFiles(
     const name = url.searchParams.get("name")?.trim();
     const mimeType = url.searchParams.get("mime") ?? "application/octet-stream";
     if (!name || basename(name) !== name || name.length > INPUT_LIMITS.attachmentName) {
-      throw new HttpError(400, "A safe attachment name is required.");
+      throw new HttpError(400, sourceText("error.team.attachmentNameRequired"));
     }
     if (mimeType.length > INPUT_LIMITS.mimeType) {
       throw new HttpError(400, "The attachment MIME type is too long.");
@@ -57,7 +58,7 @@ export async function routeFiles(
     }
     if (method === "GET") {
       const attachment = await mailbox.resolveAttachment(attachmentId);
-      if (!attachment) throw new HttpError(404, "Attachment not found.");
+      if (!attachment) throw new HttpError(404, sourceText("error.team.attachmentNotFound"));
       const bytes = await readFile(attachment.path);
       response.writeHead(200, {
         "Content-Type": attachment.mimeType || "application/octet-stream",
@@ -75,7 +76,7 @@ export async function routeFiles(
     }
     const sharedFile = await agents.resolveSharedFile(sharedPath);
     if (sharedFile.size > ATTACHMENT_LIMITS.fileBytes) {
-      throw new HttpError(413, "The shared file exceeds the 100 MB limit.");
+      throw new HttpError(413, sourceText("error.team.sharedFileTooLarge"));
     }
     const bytes = await readFile(sharedFile.path);
     response.writeHead(200, {
@@ -99,7 +100,7 @@ export async function routeFiles(
     }
     const workspaceFile = await agents.resolveWorkspaceFile(agentId, workspacePath);
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {
-      throw new HttpError(413, "The workspace file exceeds the 100 MB limit.");
+      throw new HttpError(413, sourceText("error.team.workspaceFileTooLarge"));
     }
     const bytes = await readFile(workspaceFile.path);
     response.writeHead(200, {

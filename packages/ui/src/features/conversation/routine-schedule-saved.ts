@@ -1,9 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { RoutineSchedule } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
+import { currentText } from "../../text";
 import {
   ROUTINE_DRAFT_KINDS,
   ROUTINE_EVERY_DAY,
-  ROUTINE_EVERY_HOURS_OPTIONS,
+  ROUTINE_EVERY_HOURS,
   ROUTINE_WORKDAYS,
   type RoutineClock,
   type RoutineScheduleDraft,
@@ -25,21 +27,21 @@ import { routineTimeMinutes } from "./routine-schedule-ui";
 export const ROUTINE_SAVED_DRAFT_KINDS = ROUTINE_DRAFT_KINDS.filter((option) => option.value !== "once");
 
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const EVERY_HOURS = new Set(ROUTINE_EVERY_HOURS_OPTIONS.map((option) => Number(option.value)));
+const EVERY_HOURS = new Set(ROUTINE_EVERY_HOURS);
 
 /** Why the draft cannot be saved, or `null`. A save of such a draft would change when it runs. */
-export function routineDraftProblem(draft: RoutineScheduleDraft): string | null {
+export function routineDraftProblem(draft: RoutineScheduleDraft, t: AppTranslate = currentText().t): string | null {
   switch (draft.kind) {
     case "once":
-      return "A one-time routine cannot be saved yet.";
+      return t("routine.problem.once");
     case "hourly":
-      return routineRunsPerDay(draft.window, draft.everyHours) === 0 ? "End time must be after start time." : null;
+      return routineRunsPerDay(draft.window, draft.everyHours) === 0 ? t("routine.problem.endBeforeStart") : null;
     case "yearly":
-      return draft.day > routineYearlyDaysInMonth(draft.month) ? "Choose a date that exists." : null;
+      return draft.day > routineYearlyDaysInMonth(draft.month) ? t("routine.problem.invalidDate") : null;
     case "custom": {
       const expression = draft.expression.trim();
-      if (!expression) return "Enter a cron expression.";
-      return expression.length > INPUT_LIMITS.routineCron ? "The cron expression is too long." : null;
+      if (!expression) return t("routine.problem.cronRequired");
+      return expression.length > INPUT_LIMITS.routineCron ? t("routine.problem.cronTooLong") : null;
     }
     default:
       return null;

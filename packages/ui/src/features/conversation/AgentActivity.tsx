@@ -1,6 +1,12 @@
+import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
+/**
+ * The English source of each label. A label is an identifier here: render it with
+ * `t(agentActivityLabelKey(label))`.
+ */
 export const AGENT_ACTIVITY_LABELS = [
   "Working on it…",
   "Thinking it through…",
@@ -18,6 +24,24 @@ const FACTUAL_ACTIVITY_LABELS = AGENT_ACTIVITY_LABELS.slice(0, 7);
 const PLAYFUL_ACTIVITY_LABELS = AGENT_ACTIVITY_LABELS.slice(7);
 
 export type AgentActivityLabel = (typeof AGENT_ACTIVITY_LABELS)[number];
+
+const AGENT_ACTIVITY_LABEL_KEYS = {
+  "Working on it…": "chat.activity.workingOnIt",
+  "Thinking it through…": "chat.activity.thinking",
+  "Connecting the dots…": "chat.activity.connectingDots",
+  "Checking the details…": "chat.activity.checkingDetails",
+  "Putting the answer together…": "chat.activity.puttingTogether",
+  "Making sense of it…": "chat.activity.makingSense",
+  "One step at a time…": "chat.activity.oneStep",
+  "Tiny gears are turning…": "chat.activity.tinyGears",
+  "Consulting the inner council…": "chat.activity.innerCouncil",
+  "Cooking up something useful…": "chat.activity.cookingUp",
+} as const satisfies Record<AgentActivityLabel, AppTextKey>;
+
+/** The catalog key that renders `label` in the interface language. */
+export function agentActivityLabelKey(label: AgentActivityLabel): AppTextKey {
+  return AGENT_ACTIVITY_LABEL_KEYS[label];
+}
 
 /**
  * The line the indicator shows while an agent works.
@@ -40,7 +64,8 @@ export function AgentActivityIndicator(props: {
   label: AgentActivityLabel;
   phase?: "active" | "exiting";
 }) {
-  const label = () => props.detail ?? props.label;
+  const { t } = useText();
+  const label = () => props.detail ?? t(agentActivityLabelKey(props.label));
   return (
     <div class="agent-activity-entry" data-state={props.phase ?? "active"}>
       <span
@@ -48,9 +73,12 @@ export function AgentActivityIndicator(props: {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        aria-label={`${props.agent?.name ?? "Agent"} is working: ${label()}`}
+        aria-label={t("chat.activity.status", {
+          name: props.agent?.name ?? t("chat.activity.agentFallback"),
+          label: label(),
+        })}
       />
-      <section class="agent-activity-content" aria-label="Current activity">
+      <section class="agent-activity-content" aria-label={t("chat.activity.current")}>
         <AgentAvatar agent={props.agent} mood="working" class="agent-activity-avatar" />
         <span class="agent-activity-label">{label()}</span>
       </section>

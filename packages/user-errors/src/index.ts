@@ -1,3 +1,9 @@
+import {
+  localizeSourceText,
+  type SourceMessages,
+  sourceTranslateFor,
+  type TranslatedLocale,
+} from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 
 /**
@@ -21,20 +27,20 @@ export type UserErrorKind =
   | "service"
   | "unknown";
 
-const USER_ERROR_COPY: Record<Exclude<UserErrorKind, "unknown">, string> = {
-  network: "Could not connect. Check your connection and try again.",
-  timeout: "The request took too long. Check whether the action completed before you try again.",
-  storage: "There is not enough storage space. Free some space on the computer running OpenBot, then try again.",
-  "file-permission":
-    "OpenBot does not have permission to complete this action. Check the file or folder permissions, then try again.",
-  "not-found": "A required file or folder could not be found. Restore it or choose another one, then try again.",
-  "read-only": "This folder is read-only. Choose a folder you can write to, then try again.",
-  conflict: "An item with this name already exists. Choose a different name, then try again.",
-  auth: "Authentication failed. Check your account or server connection, then try again.",
-  permission: "You do not have permission to complete this action. Ask the owner for access.",
-  "rate-limit": "Too many requests. Wait a moment, then try again.",
-  service: "The service is unavailable. Wait a moment, then try again.",
-};
+/** The catalog key for each kind's sentence. The text lives in `@openbot/i18n` (`error.kind.*`). */
+const USER_ERROR_COPY = {
+  network: "error.kind.network",
+  timeout: "error.kind.timeout",
+  storage: "error.kind.storage",
+  "file-permission": "error.kind.filePermission",
+  "not-found": "error.kind.notFound",
+  "read-only": "error.kind.readOnly",
+  conflict: "error.kind.conflict",
+  auth: "error.kind.auth",
+  permission: "error.kind.permission",
+  "rate-limit": "error.kind.rateLimit",
+  service: "error.kind.service",
+} as const satisfies Record<Exclude<UserErrorKind, "unknown">, keyof SourceMessages>;
 
 const NETWORK_CODES = [
   "ECONNREFUSED",
@@ -67,9 +73,17 @@ const AUTH_SIGNALS =
 const TECHNICAL_OUTPUT =
   /(?:\bSQLITE_\w+|\bERR_\w+|^E[A-Z_]+:|^Command failed|^spawn |\n\s*at |\[object Object\]|^\s*[<{[]|\/(?:Users|home|tmp|private|var|etc|usr)\/|[A-Za-z]:\\)/u;
 
+/**
+ * What Electron and the error classes put in front of a message: `Error invoking remote method
+ * 'x': RemoteRequestError: …`. A built-in `TypeError:` and the like stays, because it marks runtime
+ * output that is never shown.
+ */
+const MESSAGE_PREFIX =
+  /^(?:(?:Error invoking remote method '[^']+':|(?!(?:Type|Syntax|Reference|Range)Error:)(?:[A-Z]\w*)?Error:)\s*)+/u;
+
 function normalizeMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
-  return raw.trim().replace(/^(?:(?:Error invoking remote method '[^']+':|Error:)\s*)+/u, "");
+  return raw.trim().replace(MESSAGE_PREFIX, "");
 }
 
 function errnoCode(message: string): string | undefined {
@@ -106,10 +120,16 @@ export function classifyUserError(error: unknown): UserErrorKind {
   return "unknown";
 }
 
-/** Format errors for display only. Keep the original error for logs and recovery decisions. */
-export function userErrorMessage(error: unknown, fallback: string): string {
+/**
+ * Format errors for display only. Keep the original error for logs and recovery decisions.
+ *
+ * `fallback` is already in the reader's language. A product message the sender wrote with
+ * `sourceText` is translated into `locale`; any other message is shown as it is. Redaction runs on
+ * the final text, so a secret inside a translated placeholder is still removed.
+ */
+export function userErrorMessage(error: unknown, fallback: string, locale: TranslatedLocale = "en"): string {
   const kind = classifyUserError(error);
-  if (kind !== "unknown") return USER_ERROR_COPY[kind];
+  if (kind !== "unknown") return sourceTranslateFor(locale)(USER_ERROR_COPY[kind]);
 
   const message = normalizeMessage(error);
   // Preserve useful product validation messages, but do not display runtime output or paths.
@@ -125,5 +145,5 @@ export function userErrorMessage(error: unknown, fallback: string): string {
   ) {
     return fallback;
   }
-  return redactText(message);
+  return redactText(localizeSourceText(message, locale));
 }

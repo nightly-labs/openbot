@@ -16,6 +16,7 @@ import {
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 
@@ -71,7 +72,7 @@ export class ChannelStore {
         .prepare("SELECT channel_json FROM projection_channels WHERE channel_id = ?")
         .get(channelId),
     );
-    if (!row) throw new Error("Channel not found.");
+    if (!row) throw new Error(sourceText("error.backend.channelNotFound"));
     return decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
   }
 
@@ -431,7 +432,7 @@ export class ChannelStore {
 
   /** Permanently removes a channel and its execution threads from every local projection. */
   delete(channelId: string, operationId: string = randomUUID()): void {
-    if (!this.exists(channelId)) throw new Error("Channel not found.");
+    if (!this.exists(channelId)) throw new Error(sourceText("error.backend.channelNotFound"));
     const threadIds = this.contextThreads(channelId);
     this.database.dispatch(
       `channel-delete:${operationId}`,

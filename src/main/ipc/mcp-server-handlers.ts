@@ -17,6 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { TestMcpServerOptions } from "../../backend/agent-service";
 import { MCP_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
 import { type McpToolRuntimes, needsManagedRuntime } from "../../backend/mcp-provider-shapes";
@@ -120,7 +121,7 @@ export function mcpServerIpcHandlers({
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
     if (!remoteServers.supportsCapability(serverId, MCP_SERVERS_CAPABILITY))
-      throw new Error("MCP servers are not supported by this server.");
+      throw new Error(sourceText("error.mcp.unsupported"));
   }
 
   // The shared contract decoder, as the channel-routine handlers do: it already bounds every field

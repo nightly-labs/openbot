@@ -36,6 +36,7 @@ import {
   type TeamProtocolSupportV1,
   teamProtocolUpdateDirection,
 } from "@openbot/contracts/team-protocol/v1";
+import { sourceText } from "@openbot/i18n/source";
 import { decodeRemoteDesktopCapabilities } from "./remote-device-decoding";
 import type { ResponseDecoder } from "./remote-host-decoding";
 import {
@@ -321,7 +322,7 @@ export class RemoteServerClient {
       // with nowhere to put an error, so recording it here is the only thing that stops the app
       // treating a host talking nonsense as healthy.
       const value = await this.#hostRequest(serverId, TEAM_API_ROUTES.compatibility);
-      host = decodeOrProtocolError(decodeTeamProtocolSupportV1, value, INVALID_COMPATIBILITY);
+      host = decodeOrProtocolError(decodeTeamProtocolSupportV1, value, sourceText("error.remote.invalidCompatibility"));
     } catch (error) {
       this.#connections.reportError(serverId, error);
       throw error;
@@ -343,23 +344,19 @@ export class RemoteServerClient {
       host = await requestJson(apiUrl, TEAM_API_ROUTES.compatibility, decodeTeamProtocolSupportV1);
     } catch (error) {
       if (error instanceof RemoteRequestError && error.status === 404) {
-        throw new RemoteProtocolError("host_update_required", "Update OpenBot on the host before connecting.");
+        throw new RemoteProtocolError("host_update_required", sourceText("error.team.hostUpdateRequired"));
       }
       if (error instanceof SyntaxError || (error instanceof RemoteProtocolError && error.code === "protocol_error")) {
-        throw new RemoteProtocolError("protocol_error", INVALID_COMPATIBILITY);
+        throw new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidCompatibility"));
       }
       throw error;
     }
     const negotiatedProtocol = highestCommonTeamProtocol(LOCAL_TEAM_PROTOCOL, host.protocol);
     if (negotiatedProtocol === null) {
       if (teamProtocolUpdateDirection(LOCAL_TEAM_PROTOCOL, host.protocol) === "client_update_required") {
-        throw new RemoteProtocolError(
-          "client_update_required",
-          "Update this OpenBot app before connecting to the host.",
-          host,
-        );
+        throw new RemoteProtocolError("client_update_required", sourceText("error.remote.appUpdateRequired"), host);
       }
-      throw new RemoteProtocolError("host_update_required", "Update OpenBot on the host before connecting.", host);
+      throw new RemoteProtocolError("host_update_required", sourceText("error.team.hostUpdateRequired"), host);
     }
     return negotiatedCompatibility(this.#appVersion, host, negotiatedProtocol);
   }
@@ -393,7 +390,7 @@ export class RemoteServerClient {
       proof.fingerprint === expectedFingerprint &&
       fingerprint(proof.publicKey) === expectedFingerprint &&
       verify(null, Buffer.from(challenge), proof.publicKey, Buffer.from(proof.signature, "base64url"));
-    if (!valid) throw new Error("The server identity could not be verified.");
+    if (!valid) throw new Error(sourceText("error.remote.identityNotVerified"));
     return {
       publicKey: proof.publicKey,
       serverName: proof.serverName,
@@ -458,7 +455,7 @@ export class RemoteServerClient {
     const value = await this.#hostRequest(serverId, TEAM_API_ROUTES.compatibility);
     return webRtcCompatibility(
       this.#appVersion,
-      decodeOrProtocolError(decodeTeamProtocolSupportV1, value, INVALID_COMPATIBILITY),
+      decodeOrProtocolError(decodeTeamProtocolSupportV1, value, sourceText("error.remote.invalidCompatibility")),
     );
   }
 
@@ -492,7 +489,7 @@ export class RemoteServerClient {
   }
 
   #requireTransport(): RemoteHostRequestTransport {
-    if (!this.#transport) throw new Error("The WebRTC transport is unavailable.");
+    if (!this.#transport) throw new Error(sourceText("error.remote.webRtcUnavailable"));
     return this.#transport;
   }
 }
@@ -500,7 +497,7 @@ export class RemoteServerClient {
 function decodeOrProtocolError<T>(
   decoder: ResponseDecoder<T>,
   value: unknown,
-  message = "The host returned data that this app could not safely use.",
+  message = sourceText("error.remote.unsafeData"),
 ): T {
   try {
     return decoder(value);
@@ -508,8 +505,6 @@ function decodeOrProtocolError<T>(
     throw new RemoteProtocolError("protocol_error", message, null, { cause: error });
   }
 }
-
-const INVALID_COMPATIBILITY = "The host returned invalid compatibility information.";
 
 /** A transport failure carries a status and a code; everything else is rethrown untouched. */
 function rethrowAsRemoteRequestError(error: unknown): never {

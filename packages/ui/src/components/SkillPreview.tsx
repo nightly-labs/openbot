@@ -1,4 +1,5 @@
 import type { MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import { ArrowRight, IconButton, Puzzle } from "@openbot/ui";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
@@ -6,9 +7,13 @@ import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { SkillGradient } from "@openbot/ui/skill-gradient";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
+import { currentText, useText } from "../text";
 
-export function skillExamplePrompt(skill: Pick<MarketplaceSkillDetail, "examplePrompt">): string {
-  return skill.examplePrompt?.trim() || "Help me use this skill.";
+export function skillExamplePrompt(
+  skill: Pick<MarketplaceSkillDetail, "examplePrompt">,
+  t: AppTranslate = currentText().t,
+): string {
+  return skill.examplePrompt?.trim() || t("skill.preview.examplePrompt");
 }
 
 function skillInstructions(skill: MarketplaceSkillDetail): string {
@@ -27,6 +32,7 @@ export function SkillPreview(props: {
   /** What the page offers for this skill, on the name's line. */
   action?: JSX.Element;
 }) {
+  const { t } = useText();
   const [linkError, setLinkError] = createSignal<string | null>(null);
   const [iconTint, setIconTint] = createSignal<{ url: string; color: string } | null>(null);
   const [failedIcon, setFailedIcon] = createSignal<string | null>(null);
@@ -64,10 +70,10 @@ export function SkillPreview(props: {
   };
   const openLink = (url: string) => {
     const safe = safeBrowserUrl(url);
-    if (safe) void props.onOpenUrl(safe).catch(() => setLinkError("Could not open the link."));
+    if (safe) void props.onOpenUrl(safe).catch(() => setLinkError(t("skill.preview.linkFailed")));
   };
   return (
-    <section class="skill-preview t-stagger is-shown" aria-label={`${props.skill.name} preview`}>
+    <section class="skill-preview t-stagger is-shown" aria-label={t("skill.preview.label", { name: props.skill.name })}>
       <header class="skill-preview-heading t-stagger-line t-stagger-line--1">
         <span class="agent-skill-icon" aria-hidden="true">
           <Show when={iconUrl()} fallback={<Puzzle />} keyed>
@@ -83,7 +89,9 @@ export function SkillPreview(props: {
         </span>
         <div class="skill-preview-name">
           <h2>{props.skill.name}</h2>
-          <Show when={props.creatorName}>{(name) => <p class="skill-preview-creator">By {name()}</p>}</Show>
+          <Show when={props.creatorName}>
+            {(name) => <p class="skill-preview-creator">{t("skill.preview.creator", { name: name() })}</p>}
+          </Show>
         </div>
         <Show when={props.action}>{(action) => <div class="skill-preview-action">{action()}</div>}</Show>
         <p class="skill-preview-summary">{props.skill.description}</p>
@@ -105,10 +113,10 @@ export function SkillPreview(props: {
                 </Show>
               }
             />{" "}
-            {skillExamplePrompt(props.skill)}
+            {skillExamplePrompt(props.skill, t)}
           </p>
           <IconButton
-            label="Try skill"
+            label={t("skill.preview.try")}
             size="icon-lg"
             variant="ghost"
             disabled={!props.onTry}

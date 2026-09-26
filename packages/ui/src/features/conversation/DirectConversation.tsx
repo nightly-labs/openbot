@@ -11,7 +11,6 @@ import {
   Textarea,
 } from "@openbot/ui";
 import { TypingDots } from "@openbot/ui/components/TypingDots";
-import { errorMessage } from "@openbot/ui/error-message";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import { ScrollToLatestButton, scrollToLatestMessage } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -21,6 +20,7 @@ import {
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
 import { TeamPersonAvatar, teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
+import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { calculateChatScrollMargin, chatHistoryBoundaryReached, createChatVirtualizer } from "./createChatVirtualizer";
 import { anchorNewMessages, type NewMessageTally, tallyNewMessages } from "./new-message-tally";
@@ -43,6 +43,7 @@ interface DirectConversationProps {
 }
 
 export function DirectConversation(props: DirectConversationProps) {
+  const { t, format, errorMessage } = useText();
   const [text, setText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -202,7 +203,7 @@ export function DirectConversation(props: DirectConversationProps) {
       setText("");
       if (result.readError) setError(result.readError);
     } catch (cause) {
-      setError(errorMessage(cause, "The message was not sent."));
+      setError(errorMessage(cause, t("conversation.direct.sendFailed")));
     } finally {
       setSending(false);
     }
@@ -215,7 +216,7 @@ export function DirectConversation(props: DirectConversationProps) {
     try {
       await props.onMarkRead();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not mark messages as read."));
+      setError(errorMessage(cause, t("conversation.direct.markReadFailed")));
     } finally {
       setMarkingRead(false);
     }
@@ -250,7 +251,10 @@ export function DirectConversation(props: DirectConversationProps) {
   }
 
   return (
-    <main class="direct-conversation" aria-label={`Direct conversation with ${teamMemberName(props.member)}`}>
+    <main
+      class="direct-conversation"
+      aria-label={t("conversation.direct.label", { name: teamMemberName(props.member) })}
+    >
       <header class="window-drag direct-conversation-header">
         <div class="direct-conversation-person no-drag">
           <TeamPersonAvatar member={props.member} />
@@ -258,12 +262,12 @@ export function DirectConversation(props: DirectConversationProps) {
             <h1>{teamMemberName(props.member)}</h1>
             <span class={props.member.online ? "online" : undefined}>
               <i aria-hidden="true" />
-              {props.member.online ? "Online" : "Offline"}
+              {props.member.online ? t("conversation.direct.online") : t("conversation.direct.offline")}
             </span>
           </div>
         </div>
         <span class="direct-private-label no-drag">
-          <LockIcon /> Private
+          <LockIcon /> {t("conversation.direct.private")}
         </span>
       </header>
 
@@ -297,12 +301,15 @@ export function DirectConversation(props: DirectConversationProps) {
             onDismiss={clearNewMessages}
           />
         </Show>
-        <Show when={!props.loading} fallback={<div class="direct-conversation-state">Loading messages…</div>}>
+        <Show
+          when={!props.loading}
+          fallback={<div class="direct-conversation-state">{t("conversation.direct.loading")}</div>}
+        >
           <Show
             when={!props.loadError}
             fallback={
               <div class="direct-conversation-state" role="alert">
-                <strong>The messages could not load.</strong>
+                <strong>{t("conversation.direct.loadFailed")}</strong>
                 <span>{props.loadError}</span>
               </div>
             }
@@ -312,17 +319,17 @@ export function DirectConversation(props: DirectConversationProps) {
               fallback={
                 <div class="direct-conversation-empty">
                   <TeamPersonAvatar member={props.member} large />
-                  <h2>Message {teamMemberName(props.member)}</h2>
-                  <p>This is a private conversation between the two of you.</p>
+                  <h2>{t("conversation.direct.emptyTitle", { name: teamMemberName(props.member) })}</h2>
+                  <p>{t("conversation.direct.emptyBody")}</p>
                 </div>
               }
             >
               <Show when={props.loadingOlder || props.olderError}>
                 <div class="conversation-history-status" role={props.olderError ? "alert" : "status"}>
-                  <Show when={props.olderError} fallback="Loading older messages…">
+                  <Show when={props.olderError} fallback={t("conversation.direct.loadingOlder")}>
                     <span>{props.olderError}</span>
                     <Button type="button" variant="ghost" size="xs" onClick={() => props.onLoadOlder?.()}>
-                      Retry
+                      {t("common.retry")}
                     </Button>
                   </Show>
                 </div>
@@ -372,7 +379,10 @@ export function DirectConversation(props: DirectConversationProps) {
                           align={own() ? "end" : "start"}
                           class={["direct-message", { own: own() }]}
                           data-author={own() ? "user" : "member"}
-                          aria-label={`${own() ? "You" : teamMemberName(props.member)} at ${messageTime(message.createdAt)}`}
+                          aria-label={t("conversation.direct.messageLabel", {
+                            name: own() ? t("conversation.direct.you") : teamMemberName(props.member),
+                            time: messageTime(message.createdAt, format),
+                          })}
                         >
                           <MessageContent>
                             <Bubble
@@ -383,7 +393,7 @@ export function DirectConversation(props: DirectConversationProps) {
                               <BubbleContent>{message.text}</BubbleContent>
                             </Bubble>
                             <MessageFooter>
-                              <time datetime={message.createdAt}>{messageTime(message.createdAt)}</time>
+                              <time datetime={message.createdAt}>{messageTime(message.createdAt, format)}</time>
                             </MessageFooter>
                           </MessageContent>
                         </Message>
@@ -401,7 +411,7 @@ export function DirectConversation(props: DirectConversationProps) {
         <Show when={props.typing}>
           <div class="direct-typing-indicator" role="status" aria-live="polite">
             <TypingDots class="team-typing-dots" />
-            {teamMemberName(props.member)} is typing
+            {t("conversation.direct.typing", { name: teamMemberName(props.member) })}
           </div>
         </Show>
         <Show when={error()}>{(message) => <p class="direct-message-error">{message()}</p>}</Show>
@@ -410,8 +420,8 @@ export function DirectConversation(props: DirectConversationProps) {
             value={text()}
             rows="1"
             maxlength={INPUT_LIMITS.directMessageText}
-            aria-label={`Message ${teamMemberName(props.member)}`}
-            placeholder={`Message ${teamMemberName(props.member)}`}
+            aria-label={t("conversation.direct.input", { name: teamMemberName(props.member) })}
+            placeholder={t("conversation.direct.input", { name: teamMemberName(props.member) })}
             disabled={sending()}
             onValueChange={updateText}
             onKeyDown={(event) => {
@@ -423,7 +433,7 @@ export function DirectConversation(props: DirectConversationProps) {
           <Button
             variant="default"
             type="button"
-            aria-label="Send direct message"
+            aria-label={t("conversation.direct.send")}
             disabled={!text().trim() || sending()}
             onClick={() => void send()}
           >
@@ -435,8 +445,8 @@ export function DirectConversation(props: DirectConversationProps) {
   );
 }
 
-function messageTime(value: string): string {
-  return formatChatTimestamp(new Date(value));
+function messageTime(value: string, format: TextValue["format"]): string {
+  return formatChatTimestamp(new Date(value), format);
 }
 
 function LockIcon() {

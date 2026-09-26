@@ -1,11 +1,12 @@
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
+import { currentText } from "@/shared/lib/text";
 import type { ChatAttachment } from "../components/use-chat-attachments";
 import type { StoredQueueAttachment } from "./queue-edit-draft";
 
 function directory(editId: string): string {
   if (!/^[a-zA-Z0-9_-]+$/u.test(editId)) throw new Error("Invalid queue edit identity.");
-  if (!FileSystem.documentDirectory) throw new Error("Attachment storage is unavailable.");
+  if (!FileSystem.documentDirectory) throw new Error(currentText().t("mobile.chat.queue.storageUnavailable"));
   return `${FileSystem.documentDirectory}queue-edit-attachments/${encodeURIComponent(editId)}/`;
 }
 

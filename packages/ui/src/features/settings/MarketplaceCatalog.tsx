@@ -1,15 +1,52 @@
-import {
-  type MarketplaceSkillQuery,
-  SKILL_CATEGORIES,
-  SKILL_CATEGORY_LABELS,
-  type SkillCategory,
-} from "@openbot/contracts/ipc";
+import { type MarketplaceSkillQuery, SKILL_CATEGORIES, type SkillCategory } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, Skeleton, UserAvatar } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, For, onCleanup, onSettled, Show } from "solid-js";
-import { errorMessage } from "../../error-message";
+import { currentText, useText } from "../../text";
 
-export const CATEGORY_LABELS: Record<SkillCategory, string> = SKILL_CATEGORY_LABELS;
+export const CATEGORY_LABELS = {
+  coding: "marketplace.category.coding",
+  design: "marketplace.category.design",
+  "data-analytics": "marketplace.category.dataAnalytics",
+  documents: "marketplace.category.documents",
+  productivity: "marketplace.category.productivity",
+  research: "marketplace.category.research",
+  automation: "marketplace.category.automation",
+  other: "marketplace.category.other",
+} as const satisfies Record<SkillCategory, AppTextKey>;
+
+type CatalogKind = "skills" | "agents" | "plugins";
+
+const DISCOVER_LABEL = {
+  skills: "marketplace.discover.skills",
+  agents: "marketplace.discover.agents",
+  plugins: "marketplace.discover.plugins",
+} as const satisfies Record<CatalogKind, AppTextKey>;
+
+const ALL_LABEL = {
+  skills: "marketplace.all.skills",
+  agents: "marketplace.all.agents",
+  plugins: "marketplace.all.plugins",
+} as const satisfies Record<CatalogKind, AppTextKey>;
+
+const LOADING_LABEL = {
+  skills: "marketplace.loading.skills",
+  agents: "marketplace.loading.agents",
+  plugins: "marketplace.loading.plugins",
+} as const satisfies Record<CatalogKind, AppTextKey>;
+
+const NO_MATCH_LABEL = {
+  skills: "marketplace.noMatch.skills",
+  agents: "marketplace.noMatch.agents",
+  plugins: "marketplace.noMatch.plugins",
+} as const satisfies Record<CatalogKind, AppTextKey>;
+
+const VIEW_ALL_LABEL = {
+  skills: "marketplace.viewAllCategory.skills",
+  agents: "marketplace.viewAllCategory.agents",
+  plugins: "marketplace.viewAllCategory.plugins",
+} as const;
 
 /** The rows each category shows on the overview; a category with more offers its own page. */
 const HOME_ROWS_PER_CATEGORY = 6;
@@ -112,7 +149,7 @@ export function MarketplaceIdentity(props: { item: CatalogItem; children: JSX.El
 }
 
 export function MarketplaceCatalog<T extends CatalogItem>(props: {
-  kind: "skills" | "agents" | "plugins";
+  kind: CatalogKind;
   /** The search text, held by the dialog chrome that shows the field next to the kind switch. */
   query: string;
   refreshVersion: number;
@@ -122,6 +159,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   icon: (item: T) => JSX.Element;
   onOpen: (item: T) => void | Promise<void>;
 }) {
+  const { t } = useText();
   const [state, setState] = createStore<{
     query: string;
     /** The trimmed query `items` came back for, so a newer keystroke knows it must filter them itself. */
@@ -197,7 +235,8 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
     } catch (error) {
       if (version === requestVersion)
         setState((s) => {
-          s.error = errorMessage(error, "Could not load the marketplace.");
+          const text = currentText();
+          s.error = text.errorMessage(error, text.t("marketplace.loadFailed"));
         });
     } finally {
       if (version === requestVersion)
@@ -275,14 +314,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
               <Button
                 class="skills-marketplace-card-hitarea"
                 variant="ghost"
-                aria-label={`View ${item.name} details`}
+                aria-label={t("marketplace.card.viewDetails", { name: item.name })}
                 onClick={() => void props.onOpen(item)}
               />
               {props.icon(item)}
               <div class="skills-marketplace-card-copy">
                 <div>
                   <h3>{item.name}</h3>
-                  <span>by {item.creatorName}</span>
+                  <span>{t("marketplace.card.byCreator", { creator: item.creatorName })}</span>
                 </div>
                 <p>{item.description}</p>
               </div>
@@ -323,7 +362,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
   return (
     <section
       class="marketplace-catalog"
-      aria-label={`Discover ${props.kind}`}
+      aria-label={t(DISCOVER_LABEL[props.kind])}
       data-search={state.query.trim() ? "" : undefined}
       data-pending={searchPending() ? "" : undefined}
     >
@@ -332,9 +371,9 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
           <Show when={state.category} keyed>
             {(category) => (
               <div class="skills-marketplace-section-title">
-                <h2>{CATEGORY_LABELS[category]}</h2>
+                <h2>{t(CATEGORY_LABELS[category])}</h2>
                 <Button variant="ghost" size="sm" onClick={() => selectCategory(null)}>
-                  All {props.kind}
+                  {t(ALL_LABEL[props.kind])}
                 </Button>
               </div>
             )}
@@ -344,7 +383,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
               <div role="alert" class="skills-marketplace-state">
                 {message()}
                 <Button variant="ghost" onClick={() => void load()}>
-                  Retry
+                  {t("common.retry")}
                 </Button>
               </div>
             )}
@@ -352,7 +391,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
           <Show
             when={!state.loading}
             fallback={
-              <div role="status" aria-label={`Loading ${props.kind}`} class="marketplace-catalog-skeleton">
+              <div role="status" aria-label={t(LOADING_LABEL[props.kind])} class="marketplace-catalog-skeleton">
                 <For each={[0, 1, 2, 3, 4, 5]}>
                   {() => (
                     <div class="marketplace-row-skeleton" aria-hidden="true">
@@ -371,14 +410,14 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
             them waits for the answer rather than saying at once that nothing matches. */}
             <Show
               when={items().length || state.error || searchPending()}
-              fallback={<div class="skills-marketplace-state">No {props.kind} match this search.</div>}
+              fallback={<div class="skills-marketplace-state">{t(NO_MATCH_LABEL[props.kind])}</div>}
             >
               <Show
                 when={overview()}
                 fallback={
                   <section class="skills-marketplace-category-section">
                     <Show when={!state.category}>
-                      <h2>Search results</h2>
+                      <h2>{t("marketplace.searchResults")}</h2>
                     </Show>
                     {rows(items)}
                   </section>
@@ -389,15 +428,15 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
                     <Show when={items().filter((item) => (item.category ?? "other") === category).length}>
                       <section class="skills-marketplace-category-section">
                         <div class="skills-marketplace-section-title">
-                          <h2>{CATEGORY_LABELS[category]}</h2>
+                          <h2>{t(CATEGORY_LABELS[category])}</h2>
                           <Show when={state.moreCategories.includes(category)}>
                             <Button
                               variant="ghost"
                               size="sm"
-                              aria-label={`View all ${CATEGORY_LABELS[category]} ${props.kind}`}
+                              aria-label={t(VIEW_ALL_LABEL[props.kind], { category: t(CATEGORY_LABELS[category]) })}
                               onClick={() => selectCategory(category)}
                             >
-                              View all
+                              {t("marketplace.viewAll")}
                             </Button>
                           </Show>
                         </div>
@@ -418,7 +457,7 @@ export function MarketplaceCatalog<T extends CatalogItem>(props: {
                 loading={state.loadingMore}
                 onClick={() => void load(state.category, state.query, state.nextCursor ?? undefined)}
               >
-                Load more
+                {t("marketplace.loadMore")}
               </Button>
             </Show>
           </Show>

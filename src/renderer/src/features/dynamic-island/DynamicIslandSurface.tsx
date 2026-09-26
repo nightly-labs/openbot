@@ -2,6 +2,7 @@ import type { DynamicIslandAction, DynamicIslandPreference, DynamicIslandPresent
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } from "@openbot/contracts/ipc";
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
+import { useText } from "@openbot/ui/text";
 import { createSignal, onSettled, Show } from "solid-js";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
@@ -13,6 +14,7 @@ const DEFAULT_NOTCH_SIZE: DynamicIslandNotchSize = {
 };
 
 export function DynamicIslandSurface() {
+  const { t } = useText();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
   const notchWidth = readPositivePixelValue(query.get("notch-width"), DEFAULT_NOTCH_WIDTH);
@@ -165,11 +167,11 @@ export function DynamicIslandSurface() {
     };
   });
   return (
-    <main class="dynamic-island-surface" aria-label="OpenBot MacBook notch">
+    <main class="dynamic-island-surface" aria-label={t("island.surface.label")}>
       <Show when={presentation().mode !== "idle" || preference().idleVisible}>
         <fieldset
           class="dynamic-island-surface-anchor"
-          aria-label="Dynamic Island interaction area"
+          aria-label={t("island.surface.interactionArea")}
           onMouseOver={enterInteraction}
           onMouseOut={leaveInteraction}
           onFocus={beginFocusInteraction}

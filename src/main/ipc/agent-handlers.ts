@@ -26,6 +26,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
@@ -161,7 +162,7 @@ export function agentIpcHandlers({
         local: (channelId) => service.deleteChannel(channelId),
         remote: async (channelId, serverId) => {
           if (!remoteServers.supportsCapability(serverId, CHANNEL_DELETE_CAPABILITY))
-            throw new Error("Channel deletion is not supported by this server.");
+            throw new Error(sourceText("error.backend.channelDeleteUnsupported"));
           await remoteServers.request(serverId, CHANNEL_ROUTES.delete, decodeVoid, {
             method: "POST",
             body: { channelId },
@@ -215,10 +216,10 @@ export function agentIpcHandlers({
         remote: (input, serverId) => {
           // The Team API does not carry access, and a team member must not be able to widen it.
           if (input.access !== undefined) {
-            throw new Error("Agent access can only be changed on the computer that runs the agent.");
+            throw new Error(sourceText("error.agent.accessLocalOnly"));
           }
           if (input.computerUse !== undefined) {
-            throw new Error("Computer Use can only be changed on the computer that runs the agent.");
+            throw new Error(sourceText("error.agent.computerUseLocalOnly"));
           }
           return remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
             method: "PATCH",
@@ -401,10 +402,7 @@ async function duplicateAgentLocally(
     ]);
     const rollbackErrors = rollbackResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
     if (rollbackErrors.length > 0) {
-      throw new AggregateError(
-        [error, ...rollbackErrors],
-        "Agent duplication failed and the incomplete copy could not be removed.",
-      );
+      throw new AggregateError([error, ...rollbackErrors], sourceText("error.agent.duplicateCleanupFailed"));
     }
     throw error;
   }

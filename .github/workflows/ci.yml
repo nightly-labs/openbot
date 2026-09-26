@@ -94,6 +94,9 @@ jobs:
       - name: Check ratcheted lint rules
         run: bun run lint:ratchet
 
+      - name: Check translation catalogs
+        run: bun run i18n:check
+
       - name: Check ratcheted TypeScript options
         run: bun run types:ratchet
 
