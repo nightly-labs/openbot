@@ -333,6 +333,7 @@ describe.sequential("AgentService: queue", () => {
         },
         { id: "grok", state: "not-installed", version: null },
         { id: "opencode", state: "not-installed", version: null },
+        { id: "antigravity", state: "not-installed", version: null },
       ],
     });
     await expect(
@@ -403,6 +404,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "claude", state: "error", message: expect.stringContaining("included Claude runtime") },
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
+          { id: "antigravity", state: "not-installed" },
         ],
       });
 
@@ -414,6 +416,7 @@ describe.sequential("AgentService: queue", () => {
           { id: "claude", state: "error", message: expect.stringContaining("included Claude runtime") },
           { id: "grok", state: "not-installed" },
           { id: "opencode", state: "not-installed" },
+          { id: "antigravity", state: "not-installed" },
         ],
       });
       const codexClient = clients.get("codex");

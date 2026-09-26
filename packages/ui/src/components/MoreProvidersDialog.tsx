@@ -4,7 +4,7 @@ import { Button, Dialog, IconButton, Input, SlidersHorizontal, X } from "@openbo
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../text";
 
-export interface MoreProvidersEntry {
+interface MoreProvidersEntry {
   id: AgentProviderId;
   name: string;
   description?: string | null;

@@ -20,7 +20,7 @@ export interface OnboardingProviderRows {
  * only the sign-in is missing. A download in progress does not count: the user started it from a
  * row, so that row is in `kept` already.
  */
-export function userHasProvider(option: ProviderPickerOption): boolean {
+function userHasProvider(option: ProviderPickerOption): boolean {
   return option.state === "available" || option.state === "sign-in-required" || option.state === "outdated";
 }
 

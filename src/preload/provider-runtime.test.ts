@@ -5,7 +5,13 @@ const runtime = { phase: "ready", progress: null, message: null, version: "1.0.0
 function snapshot(availableVersion?: string | number | null) {
   return {
     revision: 1,
-    providers: { codex: runtime, claude: { ...runtime, availableVersion }, grok: runtime, opencode: runtime },
+    providers: {
+      codex: runtime,
+      claude: { ...runtime, availableVersion },
+      grok: runtime,
+      opencode: runtime,
+      antigravity: runtime,
+    },
     // The tool runtimes travel beside the provider CLIs and are decoded the same way. Main and
     // preload are one build, so a snapshot without them is a main process this one cannot trust.
     toolRuntimes: { bun: runtime },
