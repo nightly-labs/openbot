@@ -4,7 +4,7 @@ import type { AppFormat, AppMessages, AppTextKey } from "@openbot/i18n";
 import { Button, ConfirmDialog, Dialog, IconButton, Plus, Textarea, Trash2, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import type { MemoriesPort } from "./memories-port";
 
@@ -67,7 +67,7 @@ export function AgentMemoriesModal(props: AgentMemoriesModalProps) {
       setAddOpen(false);
       setNewText("");
       setClearConfirmation(false);
-      void loadMemories();
+      void untrack(() => loadMemories());
     },
   );
 

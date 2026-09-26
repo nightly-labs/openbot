@@ -77,7 +77,7 @@ import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { truncateMiddle } from "@openbot/ui/utils";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot, untrack } from "solid-js";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
 import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
@@ -412,7 +412,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     (visible) => {
       if (visible === mcpSectionVisible) return;
       mcpSectionVisible = visible;
-      if (visible) props.onMcpSectionShown?.();
+      if (visible) untrack(() => props.onMcpSectionShown?.());
     },
   );
 

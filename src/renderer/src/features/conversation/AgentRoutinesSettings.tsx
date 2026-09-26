@@ -18,7 +18,7 @@ import {
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
 import { type RoutineText, routineScheduleSummary } from "@openbot/ui/features/conversation/routine-schedule-ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
 import type { RoutinesPort } from "./routines-port";
 
@@ -126,7 +126,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       closeEditor();
       setLoading(true);
       setRoutinesLoaded(false);
-      void loadRoutines();
+      void untrack(loadRoutines);
     },
   );
 
