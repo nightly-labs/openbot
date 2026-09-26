@@ -80,6 +80,14 @@ requests use a closed list of `/api/browser/*` operations. They cannot carry cha
 Browser tickets and session termination require the same account-session hash that created the
 remote session. Existing bearer-token endpoints retain their behavior.
 
+An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
+desktop port as the default and take injected calls: `web-server-settings.ts` gives
+`ServerSettingsModal` the host identity, MCP, and storage routes through
+`@openbot/team-client/team-admin-requests`, and member and invitation calls through the closed
+`/api/browser/*` list. The Worker applies the same `RemoteControlPlane` role checks as the bearer
+routes. A member or role change revokes every session on the host; the browser reconnects once when
+the directory still lists the host.
+
 Browser sign-in, account reads, and connection tickets are always available. No host or D1
 migration is needed. See [web client delivery](web-client.md) for the seven review scopes, local
 commands, and release checks.

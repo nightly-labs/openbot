@@ -9,7 +9,9 @@ The optional browser client at `/app` connects to the computer that runs OpenBot
 and attachment data travel through the existing encrypted host connection, not through the
 account Worker. The browser keeps chat pages, drafts, search results, and file previews in memory;
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
-their browser. The host must stay online.
+their browser. The host must stay online. An owner or admin can manage members and invitations from
+the browser; these requests go to the account Worker, as they do from the desktop app. Host settings,
+such as MCP servers, travel through the encrypted host connection.
 
 Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.
 Browser JavaScript cannot read the account credential. Trusted host public keys are stored in

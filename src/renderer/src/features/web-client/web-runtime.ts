@@ -26,6 +26,8 @@ import type {
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  TeamInviteSummary,
+  TeamMemberSummary,
   TeamRealtimeEvent,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -38,6 +40,7 @@ import {
   isConversationSnapshot,
   isQueuedMessageReceipt,
   isSidebarLayoutSnapshot,
+  isTeamPresenceSnapshot,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -50,7 +53,12 @@ import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
-import { RemoteTeamDirectoryClient, type RemoteTeamHost } from "@openbot/team-client/remote-directory";
+import {
+  RemoteTeamDirectoryClient,
+  type RemoteTeamHost,
+  type RemoteTeamInvite,
+  type RemoteTeamMember,
+} from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
   MOBILE_ATTACHMENT_BYTES,
@@ -63,12 +71,25 @@ import {
   interruptAgentTurn,
   respondToBrowserSecret,
   respondToBrowserTakeover,
+  type TeamApiRequest,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import type { ServerAdminPort } from "../servers/servers-port";
 import { acquireWebHostLock } from "./web-host-lock";
 
+/**
+ * The host controls of the connected host. The host answers the Team API routes, and the account
+ * service answers the member and invitation routes; both refuse a `member`, so the UI gate is not
+ * the only one.
+ */
+export interface WebAdminRuntime {
+  request: TeamApiRequest;
+  team: ServerAdminPort;
+}
+
 export interface WebWorkspaceRuntime {
+  admin?: WebAdminRuntime;
   browser: BrowserViewRuntime;
   browserTabs(): Promise<BrowserTab[]>;
   browserPreview?: (tabId: string) => Promise<BrowserPreview>;
@@ -125,6 +146,8 @@ export function createWebWorkspaceRuntime(
     apiUrl: window.location.origin,
     authentication: { kind: "browser" },
     fetch: accountFetch,
+    // `bun run dev:api` serves this page and the account service from `http://localhost:<port>`.
+    inviteLinks: { allowLocalDevelopmentApiUrl: import.meta.env.DEV },
     hostKeys: {
       get: async (id) => localStorage.getItem(`openbot.web.host-key:${accountId}:${id}`),
       set: async (id, key) => localStorage.setItem(`openbot.web.host-key:${accountId}:${id}`, key),
@@ -155,7 +178,7 @@ export function createWebWorkspaceRuntime(
   let generation = 0;
   let uploadGeneration = 0;
   let capabilities: string[] = [];
-  let connectedHostRole: RemoteTeamHost["role"] | null = null;
+  let connectedHost: RemoteTeamHost | null = null;
   const duplicateOperationIds = new Map<string, string>();
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
@@ -210,7 +233,10 @@ export function createWebWorkspaceRuntime(
     const result = await peer.execute({ id: crypto.randomUUID(), type: "request", method, path, body, upload });
     if (disposed || generation !== current) throw new Error("The selected host changed.");
     if (!result.ok || (result.status ?? 500) >= 400)
-      throw new Error("The host could not complete this request. Refresh before trying again.");
+      throw new Error(
+        hostRefusal(result.status, result.body) ??
+          "The host could not complete this request. Refresh before trying again.",
+      );
     return result.body;
   }
   // The shared Team API requests decode their own responses. A declaration, like `request`, so the
@@ -224,6 +250,59 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     return decode(await request(method, path, body, upload));
   }
+  function requireHost(): RemoteTeamHost {
+    if (!connectedHost) throw new Error("The host is not connected.");
+    return connectedHost;
+  }
+  async function listMembers(): Promise<TeamMemberSummary[]> {
+    return (await directory.listMembers(requireHost().hostId)).map(toTeamMember);
+  }
+  const admin: WebAdminRuntime = {
+    request: teamApi,
+    team: {
+      async getPresence() {
+        const value = await request("GET", TEAM_API_ROUTES.team.presence);
+        if (!isTeamPresenceSnapshot(value)) throw new Error("The host returned invalid presence.");
+        return value;
+      },
+      listMembers,
+      async listInvites() {
+        return (await directory.listInvites(requireHost().hostId))
+          .filter((invite) => invite.revokedAt === null)
+          .map(toTeamInvite);
+      },
+      async createInvite(input) {
+        const host = requireHost();
+        const invite = input.email
+          ? await directory.sendInviteEmail(host, { role: input.role, email: input.email })
+          : await directory.createInvite(host, input);
+        return {
+          id: invite.inviteId,
+          role: input.role,
+          expiresAt: new Date(invite.expiresAt).toISOString(),
+          usedAt: null,
+          email: input.email ?? null,
+          permanent: input.permanent ?? false,
+          useCount: 0,
+          inviteUrl: invite.inviteUrl,
+        };
+      },
+      // The account service returns nothing useful, so the member is read back. The read before the
+      // change refuses an owner, as the desktop does.
+      async updateMember(input) {
+        const hostId = requireHost().hostId;
+        const current = (await listMembers()).find((member) => member.id === input.memberId);
+        if (!current || current.role === "owner") throw new Error("The member does not exist.");
+        if (input.disabled) await directory.leaveHost(hostId, input.memberId);
+        else await directory.updateMember(hostId, input.memberId, input.role ?? current.role, input.disabled === false);
+        const updated = (await listMembers()).find((member) => member.id === input.memberId);
+        if (!updated) throw new Error("The member does not exist.");
+        return updated;
+      },
+      removeMember: (memberId) => directory.leaveHost(requireHost().hostId, memberId),
+      revokeInvite: (inviteId) => directory.revokeInvite(inviteId),
+    },
+  };
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -247,6 +326,7 @@ export function createWebWorkspaceRuntime(
     for (const listener of viewListeners) listener(event);
   };
   return {
+    admin,
     browser: {
       async startLiveView(tabId) {
         const currentGeneration = ++liveViewGeneration;
@@ -348,7 +428,7 @@ export function createWebWorkspaceRuntime(
           lockedHostId = host.hostId;
         }
         const current = ++generation;
-        connectedHostRole = host.role;
+        connectedHost = host;
         // Pin after directory validation and before connecting. Never silently replace a saved identity.
         const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
         const pinned = localStorage.getItem(key);
@@ -370,7 +450,7 @@ export function createWebWorkspaceRuntime(
         return capabilities;
       } catch (error) {
         capabilities = [];
-        connectedHostRole = null;
+        connectedHost = null;
         try {
           await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
         } finally {
@@ -396,7 +476,7 @@ export function createWebWorkspaceRuntime(
         releaseHostLock?.();
         releaseHostLock = null;
         lockedHostId = null;
-        connectedHostRole = null;
+        connectedHost = null;
       }
     },
     async listAgents() {
@@ -525,7 +605,7 @@ export function createWebWorkspaceRuntime(
       await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...input });
     },
     async deleteAgent(agentId) {
-      if (connectedHostRole === "member") throw new Error("Members cannot delete agents.");
+      if (connectedHost?.role === "member") throw new Error("Members cannot delete agents.");
       await deleteAgent(teamApi, agentId);
     },
     async search(agentId, query, cursor) {
@@ -552,7 +632,7 @@ export function createWebWorkspaceRuntime(
       viewListeners.clear();
       disposed = true;
       generation += 1;
-      connectedHostRole = null;
+      connectedHost = null;
       duplicateOperationIds.clear();
       try {
         await peer.dispose();
@@ -561,6 +641,39 @@ export function createWebWorkspaceRuntime(
         releaseHostLock = null;
       }
     },
+  };
+}
+
+/** The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. */
+function hostRefusal(status: number | undefined, body: unknown): string | null {
+  if (status === undefined || status < 400 || status >= 500) return null;
+  if (!isDynamicRecord(body) || !isString(body.error) || !body.error.trim()) return null;
+  const text = body.error.trim();
+  return text.length > 300 ? `${text.slice(0, 299)}…` : text;
+}
+
+function toTeamMember(member: RemoteTeamMember): TeamMemberSummary {
+  return {
+    id: member.membershipId,
+    username: member.email,
+    email: member.email,
+    name: member.name,
+    avatarUrl: member.avatarUrl ?? null,
+    role: member.role,
+    createdAt: new Date(member.createdAt ?? 0).toISOString(),
+    disabled: member.status !== "active",
+  };
+}
+
+function toTeamInvite(invite: RemoteTeamInvite): TeamInviteSummary {
+  return {
+    id: invite.inviteId,
+    role: invite.role,
+    expiresAt: new Date(invite.expiresAt).toISOString(),
+    usedAt: invite.usedAt === null ? null : new Date(invite.usedAt).toISOString(),
+    email: invite.email,
+    permanent: invite.permanent,
+    useCount: invite.useCount,
   };
 }
 
