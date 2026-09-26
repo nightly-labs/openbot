@@ -1,7 +1,10 @@
+import {
+  LANDING_PREVIEW_READY_MESSAGE,
+  LANDING_PREVIEW_START_MESSAGE,
+} from "@openbot/contracts/landing-preview-messages";
 import type { JSX } from "@solidjs/web";
 import { onCleanup, onSettled } from "solid-js";
 import { App } from "../App";
-import { LANDING_PREVIEW_READY_MESSAGE, LANDING_PREVIEW_START_MESSAGE } from "./landing-demo-messages";
 import { LANDING_PREVIEW_OPTIONS } from "./landing-fixtures";
 import { createMockOpenBot, type MockOpenBotControls, type MockOpenBotOptions } from "./mock-openbot";
 
