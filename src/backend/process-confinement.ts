@@ -91,9 +91,10 @@ const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 
 /**
- * The project settings of the providers whose sandbox follows settings, in each root. Claude loads
- * `.claude/settings*.json` in a Workspace only session, and they can widen its sandbox. Codex keeps
- * `.codex` read-only in its own sandbox for the same reason. An agent that moves to one of them later
+ * The project settings of the providers whose sandbox follows settings, in each root. A Workspace
+ * only Claude session ignores `.claude/settings*.json`, but a Full access session or Claude in a
+ * terminal loads them and runs their hooks. Codex keeps `.codex` read-only in its own sandbox for the
+ * same reason. An agent that moves to one of them later
  * must not find settings that it wrote here. The whole folder is denied, because a folder renamed to
  * `.claude` would bring a settings file past a rule for the file alone.
  */
