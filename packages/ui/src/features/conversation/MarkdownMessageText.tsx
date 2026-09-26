@@ -208,7 +208,7 @@ function MarkdownBlocks(props: {
   linkDefinitions?: string;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }) {
   const tokens = createMemo(() => props.tokens);
   const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
@@ -247,7 +247,7 @@ function MarkdownBlock(props: {
   token: Token;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }) {
   const token = props.token;
   switch (token.type) {
@@ -352,7 +352,7 @@ function MarkdownList(props: {
   token: Tokens.List;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }) {
   const items = createMemo(() => props.token.items);
   const tailAfter = createTailOffsets(items, () =>
@@ -447,7 +447,7 @@ function MarkdownInline(props: {
   tokens: Token[];
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }) {
   const tokens = createMemo(() => repairEscapedLocalFileLinkTokens(props.tokens));
   const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
@@ -634,7 +634,7 @@ function RichText(props: {
   body: string;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }) {
   return (
     <RichMessageText

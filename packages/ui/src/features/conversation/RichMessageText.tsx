@@ -32,7 +32,7 @@ export interface RichMessageTextProps {
   onOpenWorkspaceFile?: (path: string) => void;
   showCitationFooter?: boolean;
   /** The characters of a streaming body after this text. It fades the words revealed last. */
-  streamingTailAfter?: number;
+  streamingTailAfter?: number | undefined;
 }
 
 export function RichMessageText(props: RichMessageTextProps) {
