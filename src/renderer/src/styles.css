@@ -20,8 +20,12 @@
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
 @import "@openbot/ui/features/conversation/conversation.css";
+@import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";
+@import "@openbot/ui/features/channels/channel-activity.css";
+@import "@openbot/ui/features/usage/agent-usage-report.css";
 @import "./features/usage/usage.css";
+@import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";
 @import "@openbot/ui/features/import/agent-import.css";
 @import "./features/settings/settings-modal.css";
@@ -32,6 +36,7 @@
 @import "./features/servers/server-settings-modal.css";
 @import "./features/servers/server-mcp.css";
 @import "./features/settings/skills-marketplace.css";
+@import "@openbot/ui/features/settings/marketplace-plugin-detail.css";
 @import "./features/settings/mcp-connect-dialog.css";
 @import "./features/provider-updates/provider-updates.css";
 @import "@openbot/ui/features/custom-providers/custom-providers.css";
