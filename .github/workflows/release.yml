@@ -247,11 +247,26 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
+        # On a hosted macOS runner, `hdiutil create` can fail with "Device not configured" or
+        # "Resource busy" when nothing is wrong with the app; v0.21.1 failed this way. Only that
+        # error gets another attempt. Each attempt signs and notarizes again, about 6 minutes.
+        shell: bash
         run: |
           bun run voice:prepare-runtime
           bun run build
-          bun x electron-builder --mac --arm64 --publish never \
-            --config.mac.provisioningProfile="$OPENBOT_PROVISIONING_PROFILE"
+          log="$RUNNER_TEMP/electron-builder-mac.log"
+          for attempt in 1 2 3; do
+            if bun x electron-builder --mac --arm64 --publish never \
+              --config.mac.provisioningProfile="$OPENBOT_PROVISIONING_PROFILE" 2>&1 | tee "$log"; then
+              exit 0
+            fi
+            if ! grep -Eq 'hdiutil: create failed - (Device not configured|Resource busy)' "$log"; then
+              exit 1
+            fi
+            echo "::warning::hdiutil could not create the DMG (attempt $attempt of 3)."
+            hdiutil info || true
+          done
+          exit 1
 
       - name: Verify packaged application metadata and launch
         run: bun run verify:package
