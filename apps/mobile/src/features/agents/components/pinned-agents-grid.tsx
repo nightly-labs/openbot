@@ -18,6 +18,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
@@ -55,6 +56,7 @@ export function PinnedAgentsGrid({ agents, children }: PropsWithChildren<{ agent
 }
 
 function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
+  const { t } = useText();
   const [background, accent] = useThemeColor(["background", "accent"]);
   const agentContextMenu = useAgentContextMenu(agent);
   const agentChatPreview = useAgentChatPreview(agent);
@@ -65,7 +67,11 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
       <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
         <Link.Trigger>
           <ChatLinkPressable
-            accessibilityLabel={`Open pinned chat with ${agent.name}${agent.title.trim() ? `, ${agent.title.trim()}` : ""}`}
+            accessibilityLabel={
+              agent.title.trim()
+                ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
+                : t("mobile.agent.list.openPinned", { name: agent.name })
+            }
             accessibilityRole="button"
             className="w-full items-center gap-2 px-1"
             onPressIn={agentChatPreview.onPressIn}

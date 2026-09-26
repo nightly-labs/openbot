@@ -74,6 +74,8 @@ export interface MainWindowContext {
   isQuitting: () => boolean;
   /** A function, not a value: nothing exists yet when the first window is created. */
   getServices: () => MainWindowApplicationServices | null;
+  /** A function, not a value: the saved language is read after the first window opens. */
+  getTranslate: () => AppTranslate;
   forwardAgentEvent: (serverId: string, event: AgentEvent) => void;
   /** The renderer is about to be replaced, so a queued invitation has nobody to receive it. */
   onRendererLoadStarted: () => void;
@@ -100,6 +102,7 @@ export function createMainWindowController({
   developmentTestClientEnabled,
   isQuitting,
   getServices,
+  getTranslate,
   forwardAgentEvent,
   onRendererLoadStarted,
   onMainWindowCreated,
@@ -129,7 +132,10 @@ export function createMainWindowController({
       minHeight: 640,
       show: false,
       backgroundColor: "#0b0d0e",
-      title: developmentProfile === "test-client" ? "OpenBot Local Client" : "OpenBot Local Host",
+      title:
+        developmentProfile === "test-client"
+          ? getTranslate()("window.localClientTitle")
+          : getTranslate()("window.localHostTitle"),
       icon: appIconPath,
       // The dots are drawn over the renderer, so this position is a layout value, not a chrome
       // detail. macOS spaces the three 13px dots 23px apart, so the group is 59px wide: x 12 leaves
@@ -238,7 +244,7 @@ export function createMainWindowController({
           if (item === "separator") return { type: "separator" } as const;
           if (item === "copy-link")
             return {
-              label: "Copy Link",
+              label: getTranslate()("menu.copyLink"),
               click: () => clipboard.writeText(params.linkURL),
             };
           if (item === "copy") return { role: "copy" } as const;
@@ -408,7 +414,7 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
  * sandboxed, context-isolated, no window may be opened from it, and no navigation away from the
  * renderer's own origin.
  */
-export function createComputerUsePermissionHelpWindow(): BrowserWindow {
+export function createComputerUsePermissionHelpWindow(translate: AppTranslate): BrowserWindow {
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const width = 340;
   // The card the user drags out of it, the two steps, and nothing else: a window taller than its
@@ -427,7 +433,7 @@ export function createComputerUsePermissionHelpWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     backgroundColor: "#0b0d0e",
-    title: "Turn on Computer Use",
+    title: translate("window.computerUsePermissionTitle"),
     ...(process.platform === "darwin"
       ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 12, y: 13 } }
       : {}),

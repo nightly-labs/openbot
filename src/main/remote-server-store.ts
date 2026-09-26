@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import {
   emptyStoredRemoteServers,
@@ -102,7 +103,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
     // empty default here would hand a file the newer build still reads to the next `persist()` to
     // overwrite, which is how a downgrade loses every joined server. The message quotes nothing from
     // the file; `encryptedToken` is in there.
-    if (!stored) throw new Error("The remote server list is not in a format this version can read.");
+    if (!stored) throw new Error(sourceText("error.remote.serverListUnreadable"));
     this.#state = stored;
   }
 
@@ -148,7 +149,7 @@ export class RemoteServerStore implements RemoteServerDirectory {
 
   require(serverId: string): StoredRemoteServerView {
     const server = this.find(serverId);
-    if (!server) throw new Error("Remote server not found.");
+    if (!server) throw new Error(sourceText("error.remote.serverNotFound"));
     return server;
   }
 
@@ -344,7 +345,8 @@ export class RemoteServerStore implements RemoteServerDirectory {
     change: (state: StoredRemoteServers) => Pick<StoredRemoteServers, "mutedServerIds" | "serverNotifications">,
   ): Promise<void> {
     const operation = this.#writeChain.then(async () => {
-      if (serverId !== LOCAL_SERVER_ID && !this.has(serverId)) throw new Error("Remote server not found.");
+      if (serverId !== LOCAL_SERVER_ID && !this.has(serverId))
+        throw new Error(sourceText("error.remote.serverNotFound"));
       const next = change(this.#state);
       await this.#writeSnapshot({ ...structuredClone(this.#state), ...next });
       this.#state.mutedServerIds = next.mutedServerIds;

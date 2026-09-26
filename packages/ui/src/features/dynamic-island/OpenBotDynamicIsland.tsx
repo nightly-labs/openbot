@@ -9,6 +9,7 @@ import type {
   DynamicIslandTakeoverItem,
 } from "@openbot/contracts/ipc";
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, dynamicIslandCompactHeight } from "@openbot/contracts/ipc";
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
   Button,
@@ -26,6 +27,7 @@ import {
   OctagonX,
   Spinner,
 } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { Dynamic, type JSX } from "@solidjs/web";
 import {
@@ -128,10 +130,10 @@ type StatusMode = Extract<
 >;
 
 interface OpenBotIslandModeConfig {
-  label: string;
+  label: AppTextKey;
   ariaLive?: "polite";
   badge?: {
-    label: string;
+    label: AppTextKey;
     variant: "success-light" | "info-light" | "warning-light" | "destructive-light";
     icon: () => JSX.Element;
     className: string;
@@ -155,12 +157,12 @@ const STATUS_SHARED_TRAILING: SharedLeadingMotion = {
 
 const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], OpenBotIslandModeConfig> = {
   idle: {
-    label: "Open OpenBot",
+    label: "island.label.idle",
   },
   working: {
-    label: "OpenBot working status",
+    label: "island.label.working",
     badge: {
-      label: "Working",
+      label: "island.badge.working",
       variant: "success-light",
       icon: () => (
         <Spinner
@@ -175,9 +177,9 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   message: {
-    label: "OpenBot chat update",
+    label: "island.label.message",
     badge: {
-      label: "Message",
+      label: "island.badge.message",
       variant: "info-light",
       icon: () => (
         <MessageCircle data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -186,9 +188,9 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   question: {
-    label: "OpenBot question from AI",
+    label: "island.label.question",
     badge: {
-      label: "Questions",
+      label: "island.badge.question",
       variant: "info-light",
       icon: () => (
         <MessageCircleQuestionMark
@@ -201,10 +203,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   approval: {
-    label: "OpenBot approval request",
+    label: "island.label.approval",
     ariaLive: "polite",
     badge: {
-      label: "Approval",
+      label: "island.badge.approval",
       variant: "warning-light",
       icon: () => (
         <Check data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -213,10 +215,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   takeover: {
-    label: "OpenBot browser takeover",
+    label: "island.label.takeover",
     ariaLive: "polite",
     badge: {
-      label: "Take over",
+      label: "island.badge.takeover",
       variant: "warning-light",
       icon: () => (
         <Monitor data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -225,10 +227,10 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
     },
   },
   failed: {
-    label: "OpenBot task failed",
+    label: "island.label.failed",
     ariaLive: "polite",
     badge: {
-      label: "Failed",
+      label: "island.badge.failed",
       variant: "destructive-light",
       icon: () => (
         <OctagonX data-icon="inline-start" class="dynamic-island-surface-status-badge-icon" aria-hidden="true" />
@@ -239,6 +241,7 @@ const OPENBOT_ISLAND_MODE_CONFIG: Record<DynamicIslandPresentation["mode"], Open
 };
 
 function compactStatusGeometry(
+  t: AppTranslate,
   presentation: DynamicIslandPresentation,
   physicalNotchWidth = STATUS_COMPACT_NOTCH_WIDTH,
 ): StatusCompactGeometry | undefined {
@@ -252,7 +255,7 @@ function compactStatusGeometry(
 
   const badge = OPENBOT_ISLAND_MODE_CONFIG[mode].badge;
   if (!badge) return undefined;
-  const badgeWidth = Math.ceil(measureCompactText(badge.label, 600) + STATUS_COMPACT_BADGE_CHROME_WIDTH);
+  const badgeWidth = Math.ceil(measureCompactText(t(badge.label), 600) + STATUS_COMPACT_BADGE_CHROME_WIDTH);
   const measuredNameWidth = agent ? measureCompactText(agent.name, 600) : 0;
   const notchNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.notch, Math.ceil(measuredNameWidth));
   const islandNameWidth = Math.min(STATUS_COMPACT_NAME_MAX_WIDTH.island, Math.ceil(measuredNameWidth));
@@ -334,6 +337,7 @@ function measureCompactText(text: string, weight: number): number {
 }
 
 export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Element {
+  const { t } = useText();
   const initialPresentation = untrack(() => props.presentation);
   const [visiblePresentation, setVisiblePresentation] = createSignal(initialPresentation);
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[visiblePresentation().mode];
@@ -351,7 +355,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   // The shared motion below is placed from these widths, so the size is applied here rather than
   // in the island primitive: the avatar and badge then land on the resized ears.
   const compactGeometry = createMemo(() => {
-    const geometry = compactStatusGeometry(compactLayoutPresentation(), props.notchSize?.width);
+    const geometry = compactStatusGeometry(t, compactLayoutPresentation(), props.notchSize?.width);
     const percent = widthPercent();
     if (!geometry || percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return geometry;
     return {
@@ -502,7 +506,11 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       data-mode-transitioning={modeTransitioning() ? "true" : undefined}
     >
       <DynamicIsland
-        label={`${config().label}${props.displayMode === "island" ? " on external display" : ""}`}
+        label={
+          props.displayMode === "island"
+            ? t("island.label.externalDisplay", { label: t(config().label) })
+            : t(config().label)
+        }
         ariaLive={config().ariaLive}
         state={props.state}
         displayMode={props.displayMode}
@@ -707,6 +715,7 @@ function CompactAgentName(props: { name: string; displayMode?: "notch" | "island
 }
 
 function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
+  const { t } = useText();
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[props.mode].badge;
   return (
     <Show when={config()}>
@@ -719,7 +728,7 @@ function CompactStatusBadge(props: { mode: StatusMode }): JSX.Element {
           aria-hidden="true"
         >
           {badge().icon()}
-          <span class="dynamic-island-surface-status-badge-label">{badge().label}</span>
+          <span class="dynamic-island-surface-status-badge-label">{t(badge().label)}</span>
         </Badge>
       )}
     </Show>
@@ -772,6 +781,7 @@ function ExpandedContent(props: {
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
+  const { t } = useText();
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
   const unreadCount = () => (props.presentation.mode === "message" ? props.presentation.unreadCount : 0);
   return (
@@ -815,13 +825,15 @@ function ExpandedContent(props: {
             <IslandContentSwap contentKey={message().messageId} block>
               <DynamicIslandIdentity
                 name={message().agent.name}
-                status="replied"
+                status={t("island.status.replied")}
                 description={message().text}
-                trailing={<time datetime={message().createdAt}>now</time>}
+                trailing={<time datetime={message().createdAt}>{t("chat.day.now")}</time>}
               />
             </IslandContentSwap>
             <footer class="dynamic-island-message-first-footer" data-island-motion-content>
-              <span class="dynamic-island-message-first-unread">{unreadCount()} unread</span>
+              <span class="dynamic-island-message-first-unread">
+                {t("island.message.unread", { count: unreadCount() })}
+              </span>
               <Button
                 size="sm"
                 onClick={() =>
@@ -833,7 +845,7 @@ function ExpandedContent(props: {
                   })
                 }
               >
-                <MessageCircle aria-hidden="true" /> Open chat
+                <MessageCircle aria-hidden="true" /> {t("island.action.openChat")}
               </Button>
             </footer>
           </article>
@@ -876,12 +888,13 @@ function FailureContent(props: {
   serverId: string;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
+  const { t } = useText();
   return (
     <NotificationContent
       contentKey={`${props.item.turnId}:${props.item.detail ?? ""}`}
       name={props.item.agent.name}
-      status="failed"
-      description={props.item.detail ?? "The task stopped before it could finish."}
+      status={t("island.status.failed")}
+      description={props.item.detail ?? t("island.failure.fallback")}
       action={
         <Button
           size="sm"
@@ -894,7 +907,7 @@ function FailureContent(props: {
             })
           }
         >
-          <ExternalLink aria-hidden="true" /> Open details
+          <ExternalLink aria-hidden="true" /> {t("island.action.openDetails")}
         </Button>
       }
     />
@@ -906,12 +919,13 @@ function TakeoverContent(props: {
   serverId: string;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
+  const { t } = useText();
   return (
     <NotificationContent
       contentKey={`${props.item.requestId}:${props.item.detail ?? ""}`}
       name={props.item.agent.name}
-      status="needs you"
-      description={props.item.detail ?? "Complete the browser step so the agent can continue."}
+      status={t("island.status.needsYou")}
+      description={props.item.detail ?? t("island.takeover.fallback")}
       action={
         <Button
           size="sm"
@@ -924,7 +938,7 @@ function TakeoverContent(props: {
             })
           }
         >
-          <Monitor aria-hidden="true" /> Take over
+          <Monitor aria-hidden="true" /> {t("island.action.takeOver")}
         </Button>
       }
     />
@@ -957,6 +971,7 @@ export function ApprovalContent(props: {
   allowDesktopReview?: boolean;
   onAction: (action: DynamicIslandAction) => void | Promise<void>;
 }): JSX.Element {
+  const { t, sourceText } = useText();
   const openInOpenBot = () =>
     props.onAction({
       type: "review-attention",
@@ -977,15 +992,15 @@ export function ApprovalContent(props: {
     <div class="dynamic-island-surface-panel dynamic-island-surface-attention-panel">
       <DynamicIslandIdentity
         name={props.item.agent.name}
-        status="needs approval"
-        description={props.item.approval.reason ?? props.item.detail ?? "Review the requested action before it runs."}
+        status={t("island.status.needsApproval")}
+        description={sourceText(props.item.approval.reason ?? props.item.detail ?? t("island.approval.fallback"))}
       />
       <IslandContentSwap contentKey={`${props.item.requestId}:${props.item.detail ?? ""}`} block>
         <div class="dynamic-island-surface-request-copy" data-island-motion-content>
           <ApprovalContext item={props.item} />
           <Show when={props.remainingCount > 0}>
             <small class="dynamic-island-surface-more">
-              +{props.remainingCount} more {props.remainingCount === 1 ? "request" : "requests"}
+              {t("island.moreRequests", { count: props.remainingCount })}
             </small>
           </Show>
         </div>
@@ -993,18 +1008,18 @@ export function ApprovalContent(props: {
       <div class="dynamic-island-surface-actions" data-island-motion-content>
         <Show when={props.allowDesktopReview !== false}>
           <Button size="sm" variant="ghost" onClick={openInOpenBot}>
-            Review in OpenBot
+            {t("island.action.reviewInOpenBot")}
           </Button>
         </Show>
         <Show when={props.allowDesktopReview === false && props.item.truncated}>
-          <p>Open this request in the desktop app to see all details before approval.</p>
+          <p>{t("island.approval.openOnDesktop")}</p>
         </Show>
         <Button size="sm" variant="ghost" onClick={() => respond("decline")}>
-          Decline
+          {t("island.action.decline")}
         </Button>
         <Show when={!props.item.truncated}>
           <Button size="sm" onClick={() => respond("accept")}>
-            Approve
+            {t("island.action.approve")}
           </Button>
         </Show>
       </div>
@@ -1020,6 +1035,7 @@ function QuestionContent(props: {
   onHaptic?: () => void;
   onClose: () => void;
 }): JSX.Element {
+  const { t } = useText();
   const [questionIndex, setQuestionIndex] = createSignal(0);
   const [answers, setAnswers] = createSignal<Record<string, string[]>>({});
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
@@ -1132,7 +1148,7 @@ function QuestionContent(props: {
     <div class="dynamic-island-surface-panel dynamic-island-surface-question-panel">
       <DynamicIslandIdentity
         name={props.item.agent.name}
-        status="asks"
+        status={t("island.status.asks")}
         description={questionText()}
         descriptionRef={(element) => {
           questionPrompt = element;
@@ -1146,13 +1162,13 @@ function QuestionContent(props: {
       <div data-island-motion-content>
         <div ref={questionStep} class="dynamic-island-surface-question-step">
           <Show when={directAnswerAvailable()}>
-            <ul class="dynamic-island-surface-question-options" aria-label="Suggested answers">
+            <ul class="dynamic-island-surface-question-options" aria-label={t("island.question.suggestedAnswers")}>
               <For each={currentQuestion()?.options ?? []}>
                 {(option, index) => (
                   <li>
                     <Button
                       variant="ghost"
-                      aria-label={`${option.label}. ${option.description}`}
+                      aria-label={t("island.question.option", { label: option.label, description: option.description })}
                       onClick={() => answerWith(option.label)}
                     >
                       <span class="dynamic-island-surface-question-option-index" aria-hidden="true">
@@ -1172,15 +1188,13 @@ function QuestionContent(props: {
       </div>
       <div class="dynamic-island-surface-actions dynamic-island-surface-question-actions" data-island-motion-content>
         <Show when={props.remainingCount > 0}>
-          <small class="dynamic-island-surface-more">
-            +{props.remainingCount} more {props.remainingCount === 1 ? "request" : "requests"}
-          </small>
+          <small class="dynamic-island-surface-more">{t("island.moreRequests", { count: props.remainingCount })}</small>
         </Show>
         <Button size="sm" variant="ghost" onClick={props.onClose}>
-          Later
+          {t("island.action.later")}
         </Button>
         <Button size="sm" onClick={openInOpenBot}>
-          Answer in OpenBot
+          {t("island.action.answerInOpenBot")}
         </Button>
       </div>
     </div>
@@ -1188,6 +1202,7 @@ function QuestionContent(props: {
 }
 
 function QuestionProgress(props: { current: number; total: number }): JSX.Element {
+  const { t } = useText();
   let stack: HTMLSpanElement | undefined;
   let currentDigit: HTMLSpanElement | undefined;
   let outgoingDigit: HTMLSpanElement | undefined;
@@ -1274,9 +1289,7 @@ function QuestionProgress(props: { current: number; total: number }): JSX.Elemen
 
   return (
     <span class="dynamic-island-surface-question-progress">
-      <span class="sr-only">
-        Question {props.current} of {props.total}
-      </span>
+      <span class="sr-only">{t("app.questionnaire.step", { current: props.current, total: props.total })}</span>
       <span ref={stack} class="dynamic-island-surface-question-progress-stack" aria-hidden="true">
         <span ref={currentDigit} class="dynamic-island-surface-question-progress-digit">
           {props.current}
@@ -1336,6 +1349,7 @@ function nextAnimationFrame(): Promise<void> {
 }
 
 function ApprovalContext(props: { item: DynamicIslandApprovalItem }): JSX.Element {
+  const { t } = useText();
   const approval = () => props.item.approval;
   return (
     <>
@@ -1343,7 +1357,7 @@ function ApprovalContext(props: { item: DynamicIslandApprovalItem }): JSX.Elemen
         {(command) => (
           <div class="dynamic-island-surface-command">
             <div class="dynamic-island-surface-command-meta">
-              <small>Command</small>
+              <small>{t("island.approval.command")}</small>
               <Show when={approval().cwd}>{(cwd) => <span>{cwd()}</span>}</Show>
             </div>
             <code title={command()}>{command()}</code>
@@ -1352,15 +1366,15 @@ function ApprovalContext(props: { item: DynamicIslandApprovalItem }): JSX.Elemen
       </Show>
       <Show when={approval().kind === "file-change"}>
         <div class="dynamic-island-surface-context-line">
-          <small>Files</small>
-          <span>{approval().grantRoot ?? "Agent workspace"}</span>
+          <small>{t("island.approval.files")}</small>
+          <span>{approval().grantRoot ?? t("island.approval.workspace")}</span>
         </div>
       </Show>
       <Show when={approval().kind === "permissions" && approval().permissions}>
         {(permissions) => (
           <div class="dynamic-island-surface-context-line">
-            <small>Access</small>
-            <span>{permissionSummary(permissions())}</span>
+            <small>{t("island.approval.access")}</small>
+            <span>{permissionSummary(permissions(), t)}</span>
           </div>
         )}
       </Show>
@@ -1427,11 +1441,14 @@ function statusMode(mode: DynamicIslandPresentation["mode"]): StatusMode | undef
   return mode === "idle" ? undefined : mode;
 }
 
-function permissionSummary(permissions: NonNullable<DynamicIslandApprovalItem["approval"]["permissions"]>) {
+function permissionSummary(
+  permissions: NonNullable<DynamicIslandApprovalItem["approval"]["permissions"]>,
+  t: AppTranslate,
+) {
   const parts = [
-    permissions.fileSystem.read.length > 0 ? "read files" : null,
-    permissions.fileSystem.write.length > 0 ? "write files" : null,
-    permissions.network ? "use network" : null,
+    permissions.fileSystem.read.length > 0 ? t("island.permission.readFiles") : null,
+    permissions.fileSystem.write.length > 0 ? t("island.permission.writeFiles") : null,
+    permissions.network ? t("island.permission.network") : null,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "Limited agent access";
+  return parts.length > 0 ? parts.join(", ") : t("island.permission.limited");
 }

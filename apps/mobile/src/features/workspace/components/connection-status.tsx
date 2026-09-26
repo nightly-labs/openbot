@@ -7,12 +7,16 @@ import { AnimatedCounter } from "@/features/workspace/components/connection-coun
 import { ConnectionStatusReveal } from "@/features/workspace/components/connection-status-reveal";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { useText } from "@/shared/lib/text";
 
 function ConnectionStatusText({ server }: { server: MobileServer }) {
+  const { t, sourceText } = useText();
   const recovery = server.recoveryStatus;
   const reconnecting = recovery && recovery.phase !== "online" && recovery.phase !== "suspended";
-  const title = reconnecting ? "Reconnecting" : serverStatusLabel(server);
-  const detail = reconnecting ? `Attempt ${recovery.attempt}/${REMOTE_RETRY_LIMIT}` : server.connectionMessage;
+  const title = reconnecting ? t("mobile.workspace.status.reconnecting") : serverStatusLabel(server, t);
+  const detail = reconnecting
+    ? t("mobile.workspace.status.attempt", { attempt: recovery.attempt, limit: REMOTE_RETRY_LIMIT })
+    : server.connectionMessage && sourceText(server.connectionMessage);
   const remainingSeconds = reconnecting ? recovery.remainingSeconds : null;
 
   return (
@@ -21,7 +25,9 @@ function ConnectionStatusText({ server }: { server: MobileServer }) {
       accessibilityLabel={[
         title,
         detail,
-        remainingSeconds !== null && remainingSeconds > 0 ? `Retry in ${remainingSeconds} seconds` : null,
+        remainingSeconds !== null && remainingSeconds > 0
+          ? t("mobile.workspace.status.retryIn", { seconds: remainingSeconds })
+          : null,
       ]
         .filter(Boolean)
         .join(". ")}

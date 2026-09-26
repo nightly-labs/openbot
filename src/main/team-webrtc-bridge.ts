@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
+import { sourceText } from "@openbot/i18n/source";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
 
@@ -108,7 +109,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     let ready: Promise<void>;
     ready = this.#start().catch((error) => {
       if (this.#ready === ready) {
-        this.#reset("The Team WebRTC bridge failed to start.");
+        this.#reset(sourceText("error.remote.bridgeStartFailed"));
         this.#ready = null;
       }
       throw error;
@@ -147,7 +148,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
 
   async stop(): Promise<void> {
     if (this.#port) await this.#command({ type: "close", peerId: "all" }).catch(() => undefined);
-    this.#reset("The Team WebRTC bridge stopped.");
+    this.#reset(sourceText("error.remote.bridgeStopped"));
     this.#ready = null;
   }
 
@@ -185,7 +186,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     port1.on("message", (event) => this.#handleMessage(bridgeMessageSchema.parse(event.data)));
     port1.start();
     const rendererReady = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("The Team WebRTC bridge did not start.")), 10_000);
+      const timer = setTimeout(() => reject(new Error(sourceText("error.remote.bridgeDidNotStart"))), 10_000);
       const ready = (message: BridgeMessage) => {
         if (message.type !== "bridge-ready") return;
         clearTimeout(timer);
@@ -201,13 +202,13 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
 
   #command(command: BridgeCommand): Promise<void> {
     const port = this.#port;
-    if (!port) return Promise.reject(new Error("The Team WebRTC bridge is not ready."));
+    if (!port) return Promise.reject(new Error(sourceText("error.remote.bridgeNotReady")));
     const commandId = crypto.randomUUID();
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
         () => {
           this.#pending.delete(commandId);
-          reject(new Error(`The Team WebRTC ${command.type} command timed out.`));
+          reject(new Error(sourceText("error.remote.bridgeCommandTimeout", { command: command.type })));
         },
         command.type === "send" ? SEND_COMMAND_TIMEOUT_MS : COMMAND_TIMEOUT_MS,
       );
@@ -223,7 +224,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       clearTimeout(pending.timer);
       this.#pending.delete(message.commandId);
       if (message.type === "command-complete") pending.resolve();
-      else pending.reject(new Error(message.message ?? "The Team WebRTC command failed."));
+      else pending.reject(new Error(message.message ?? sourceText("error.remote.bridgeCommandFailed")));
       return;
     }
     if (!message.peerId) return;
@@ -262,6 +263,11 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     } else if (message.type === "data" && message.channel && message.data !== undefined)
       this.emit("data", message.peerId, message.channel, message.data);
     else if (message.type === "peer-error")
-      this.emit("error", message.peerId, message.code ?? "webrtc_error", message.message ?? "WebRTC failed.");
+      this.emit(
+        "error",
+        message.peerId,
+        message.code ?? "webrtc_error",
+        message.message ?? sourceText("error.remote.webRtcFailed"),
+      );
   }
 }

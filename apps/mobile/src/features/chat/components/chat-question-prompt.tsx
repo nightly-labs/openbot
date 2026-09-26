@@ -6,6 +6,7 @@ import { Check, ChevronLeft, ChevronRight, Send, X } from "lucide-react-native";
 import { TextInput, View } from "react-native";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { useText } from "@/shared/lib/text";
 
 export function ChatQuestionPrompt({
   prompt,
@@ -18,13 +19,14 @@ export function ChatQuestionPrompt({
   canSend: boolean;
   onActivate?: () => void;
 }) {
+  const { t } = useText();
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
         <Typography>{prompt.questions[0]?.question}</Typography>
         <Button variant="ghost" onPress={onActivate}>
-          <Button.Label>Answer form</Button.Label>
+          <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
         </Button>
       </View>
     );
@@ -41,10 +43,10 @@ export function ChatQuestionPrompt({
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
             {resolution.status === "answered"
-              ? "Answers sent"
+              ? t("mobile.chat.question.answersSent")
               : resolution.status === "cancelled"
-                ? "Form cancelled"
-                : "Form expired"}
+                ? t("mobile.chat.question.formCancelled")
+                : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
         {resolution.status === "answered"
@@ -53,7 +55,7 @@ export function ChatQuestionPrompt({
                 <Typography type="body-sm" className="text-text-secondary">
                   {item.question}
                 </Typography>
-                <Typography>{promptAnswerLabel(item, resolution)}</Typography>
+                <Typography>{promptAnswerLabel(item, resolution, t)}</Typography>
               </View>
             ))
           : null}
@@ -68,7 +70,7 @@ export function ChatQuestionPrompt({
     <View
       className="w-full max-w-[88%] self-start gap-1 rounded-[30px] bg-control/60 px-4 py-3"
       style={{ borderCurve: "circular" }}
-      accessibilityLabel="Question form"
+      accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">
         <Typography weight="medium" className="min-w-0 flex-1">
@@ -78,7 +80,7 @@ export function ChatQuestionPrompt({
           variant="ghost"
           size="sm"
           isIconOnly
-          accessibilityLabel="Cancel form"
+          accessibilityLabel={t("mobile.chat.question.cancelForm")}
           isDisabled={disabled}
           onPress={() => void submit({})}
         >
@@ -88,13 +90,13 @@ export function ChatQuestionPrompt({
       {prompt.questions.length > 1 ? (
         <View className="flex-row items-center justify-between">
           <Typography type="body-xs" className="flex-1 text-text-secondary">
-            {index + 1} of {prompt.questions.length}
+            {t("mobile.chat.question.position", { current: index + 1, total: prompt.questions.length })}
           </Typography>
           <Button
             variant="ghost"
             size="sm"
             isIconOnly
-            accessibilityLabel="Previous question"
+            accessibilityLabel={t("mobile.chat.question.previous")}
             isDisabled={disabled || index === 0}
             onPress={() => setIndex(index - 1)}
           >
@@ -104,7 +106,7 @@ export function ChatQuestionPrompt({
             variant="ghost"
             size="sm"
             isIconOnly
-            accessibilityLabel="Next question"
+            accessibilityLabel={t("mobile.chat.question.next")}
             isDisabled={disabled || index === prompt.questions.length - 1}
             onPress={() => setIndex(index + 1)}
           >
@@ -145,22 +147,26 @@ export function ChatQuestionPrompt({
       </View>
       <View className="flex-row items-center justify-between gap-2">
         <Typography type="body-xs" className="flex-1 text-text-secondary">
-          Or type your answer
+          {t("mobile.chat.question.orTypeAnswer")}
         </Typography>
         <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => answer([])}>
           <Typography type="body-xs" className="text-text-secondary">
-            Skip
+            {t("mobile.chat.question.skip")}
           </Typography>
         </Button>
       </View>
       <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
         <TextInput
-          accessibilityLabel={`Custom answer for: ${question.question}`}
+          accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
           autoCapitalize={question.isSecret ? "none" : "sentences"}
           autoCorrect={!question.isSecret}
           editable={!disabled}
           maxLength={INPUT_LIMITS.promptAnswerText}
-          placeholder={question.isSecret ? "Enter a private answer" : "Type your answer"}
+          placeholder={
+            question.isSecret
+              ? t("mobile.chat.question.privatePlaceholder")
+              : t("mobile.chat.question.answerPlaceholder")
+          }
           placeholderTextColor={muted}
           secureTextEntry={question.isSecret}
           selectionColor={foreground}
@@ -176,7 +182,7 @@ export function ChatQuestionPrompt({
           variant="ghost"
           size="sm"
           isIconOnly
-          accessibilityLabel="Send custom answer"
+          accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
           isDisabled={disabled || !controller.draft.trim()}
           onPress={() => answer([controller.draft.trim()])}
         >
@@ -185,21 +191,21 @@ export function ChatQuestionPrompt({
       </View>
       {pending ? (
         <Typography type="body-xs" accessibilityLiveRegion="polite">
-          Sending answers…
+          {t("mobile.chat.question.sending")}
         </Typography>
       ) : null}
       {!canSend ? (
         <Typography type="body-xs" className="text-text-secondary">
-          Reconnect to answer this form.
+          {t("mobile.chat.question.reconnect")}
         </Typography>
       ) : null}
       {failedAnswers ? (
         <View className="flex-row items-center gap-2">
           <Typography type="body-xs" className="flex-1" accessibilityRole="alert">
-            Couldn’t send your answers. Please try again.
+            {t("mobile.chat.question.sendFailed")}
           </Typography>
           <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => void submit(failedAnswers)}>
-            <Button.Label>Retry</Button.Label>
+            <Button.Label>{t("common.retry")}</Button.Label>
           </Button>
         </View>
       ) : null}

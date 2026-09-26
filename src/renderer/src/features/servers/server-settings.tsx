@@ -7,7 +7,7 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
@@ -83,7 +83,7 @@ const ServerSettings = createSimpleContext({
       setServerSettingsError(null);
       try {
         let server = servers().find((item) => item.id === serverId);
-        if (!server) throw new Error("This server is not available.");
+        if (!server) throw new Error(currentText().t("server.settings.unavailable"));
         let identityError: string | null = null;
         if (server.kind === "remote") {
           try {
@@ -91,7 +91,8 @@ const ServerSettings = createSimpleContext({
             setServers((current) => current.map((item) => (item.id === serverId ? refreshed : item)));
             server = refreshed;
           } catch (error) {
-            identityError = errorMessage(error, "The server identity could not refresh.");
+            const text = currentText();
+            identityError = text.errorMessage(error, text.t("server.settings.identityRefreshFailed"));
           }
         }
         const canManage = server.kind === "local" ? hostStatus().configured : serverRoleCanAdminister(server);
@@ -115,7 +116,8 @@ const ServerSettings = createSimpleContext({
         if (identityError) setServerSettingsError(identityError);
       } catch (error) {
         if (request === serverSettingsRequest && serverSettingsTargetId() === serverId) {
-          setServerSettingsError(errorMessage(error, "The server settings could not load."));
+          const text = currentText();
+          setServerSettingsError(text.errorMessage(error, text.t("server.settings.loadFailed")));
         }
       } finally {
         if (request === serverSettingsRequest) setServerSettingsLoading(false);
@@ -139,7 +141,7 @@ const ServerSettings = createSimpleContext({
     async function saveServerIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
       const server = serverSettingsTarget();
       if (!serverCanAdminister(server, "host-admin-v1"))
-        throw new Error("The name and logo of this server can only change on the computer that runs it.");
+        throw new Error(currentText().t("server.settings.identityLocalOnly"));
       const analytics = desktopAnalytics.scope();
       const serverKind = server.kind;
       let operationSucceeded = false;
@@ -185,7 +187,7 @@ const ServerSettings = createSimpleContext({
 
     async function setServerPublished(published: boolean): Promise<void> {
       const server = serverSettingsTarget();
-      if (server?.kind !== "local") throw new Error("Only the local server can change publication.");
+      if (server?.kind !== "local") throw new Error(currentText().t("server.settings.publicationLocalOnly"));
       const analytics = desktopAnalytics.scope();
       const action = published ? ("published" as const) : ("unpublished" as const);
       let operationSucceeded = false;
@@ -216,7 +218,7 @@ const ServerSettings = createSimpleContext({
       permanent?: boolean;
     }): Promise<InviteSummary> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
@@ -248,7 +250,7 @@ const ServerSettings = createSimpleContext({
 
     async function updateServerMember(input: UpdateTeamMemberInput): Promise<void> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
@@ -271,7 +273,7 @@ const ServerSettings = createSimpleContext({
 
     async function removeServerMember(memberId: string): Promise<void> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
@@ -294,7 +296,7 @@ const ServerSettings = createSimpleContext({
 
     async function revokeServerInvite(inviteId: string): Promise<void> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {
@@ -336,7 +338,10 @@ const ServerSettings = createSimpleContext({
         // Reported in the panel rather than thrown: the callers ask for this list on a section
         // change, where nothing is waiting for the promise and an unreported failure would leave
         // the panel saying the server has no MCP servers at all.
-        if (current()) setServerSettingsMcpError(errorMessage(error, "The MCP servers could not load."));
+        if (current()) {
+          const text = currentText();
+          setServerSettingsMcpError(text.errorMessage(error, text.t("mcp.server.loadFailed")));
+        }
       }
     }
 
@@ -347,7 +352,7 @@ const ServerSettings = createSimpleContext({
      */
     async function testMcpServer(config: McpServerConfig): Promise<McpTestResult> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       const result = await serversPort().agent.testMcpServer({ config }, server.id);
       analytics.track("team_action", {
@@ -388,7 +393,7 @@ const ServerSettings = createSimpleContext({
       mutate: (serverId: string) => Promise<McpServerConfig[]>,
     ): Promise<void> {
       const server = serverSettingsTarget();
-      if (!server) throw new Error("This server is not available.");
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       const analytics = desktopAnalytics.scope();
       let operationSucceeded = false;
       try {

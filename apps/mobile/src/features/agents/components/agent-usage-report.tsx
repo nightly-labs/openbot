@@ -3,21 +3,27 @@ import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useText } from "@/shared/lib/text";
 
 // A usage row names the provider the record carried, which is not always one OpenBot knows:
 // an unrecognised string is shown as it was stored rather than guessed at.
 const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
-const number = (value: number | null) => (value === null ? "Unavailable" : value.toLocaleString());
-const money = (value: number | null) => (value === null ? "Unavailable" : `$${value.toFixed(4)}`);
-const date = (value: string, includeYear = false) =>
-  new Date(`${value}T12:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: includeYear ? "numeric" : undefined,
-    timeZone: "UTC",
-  });
 
 export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
+  const { t, format } = useText();
+  const number = (value: number | null) =>
+    value === null ? t("mobile.agent.runtime.unavailable") : format.number(value);
+  const money = (value: number | null) =>
+    value === null
+      ? t("mobile.agent.runtime.unavailable")
+      : format.currencyUsd(value, { minimumFractionDigits: 4, maximumFractionDigits: 4, useGrouping: false });
+  const date = (value: string, includeYear = false) =>
+    format.date(new Date(`${value}T12:00:00Z`), {
+      month: "short",
+      day: "numeric",
+      year: includeYear ? "numeric" : undefined,
+      timeZone: "UTC",
+    });
   const [metric, setMetric] = useState<"processedTokens" | "estimatedCostUsd">("processedTokens");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const selected = result.daily.find((day) => day.date === selectedDate);
@@ -32,18 +38,18 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
       <View className="flex-row gap-3">
         <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
           <Typography type="body-xs" className="text-grouped-secondary">
-            Processed tokens
+            {t("mobile.agent.usage.processedTokens")}
           </Typography>
           <Typography className="text-2xl font-semibold">{number(totals.processedTokens)}</Typography>
         </View>
         <View className="flex-1 gap-1 rounded-grouped bg-grouped p-4">
           <Typography type="body-xs" className="text-grouped-secondary">
-            Estimated cost
+            {t("mobile.agent.usage.estimatedCost")}
           </Typography>
           <Typography className="text-2xl font-semibold">{money(totals.estimatedCostUsd)}</Typography>
         </View>
       </View>
-      <SettingsSection title="Daily usage">
+      <SettingsSection title={t("mobile.agent.usage.daily")}>
         <View className="gap-4 p-4">
           <View className="flex-row gap-2">
             {(["processedTokens", "estimatedCostUsd"] as const).map((value) => (
@@ -54,14 +60,16 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
                 accessibilityState={{ selected: metric === value }}
                 onPress={() => setMetric(value)}
               >
-                <Button.Label>{value === "processedTokens" ? "Tokens" : "Cost"}</Button.Label>
+                <Button.Label>
+                  {t(value === "processedTokens" ? "mobile.agent.usage.tokens" : "mobile.agent.usage.cost")}
+                </Button.Label>
               </Button>
             ))}
           </View>
           {max > 0 ? (
             <>
               <Typography type="body-xs" className="text-grouped-secondary">
-                Peak {metric === "processedTokens" ? number(max) : money(max)}
+                {t("mobile.agent.usage.peak", { value: metric === "processedTokens" ? number(max) : money(max) })}
               </Typography>
               <View className={result.daily.length > 90 ? "h-32 flex-row items-end" : "h-32 flex-row items-end gap-px"}>
                 {result.daily.map((day) => (
@@ -69,7 +77,7 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
                     key={day.date}
                     className="h-full flex-1 justify-end"
                     accessibilityRole="button"
-                    accessibilityLabel={`${day.date}: ${metric === "processedTokens" ? `${number(day[metric])} tokens` : money(day[metric])}`}
+                    accessibilityLabel={`${day.date}: ${metric === "processedTokens" ? t("mobile.agent.usage.tokenCount", { tokens: number(day[metric]) }) : money(day[metric])}`}
                     accessibilityState={{ selected: selectedDate === day.date }}
                     onPress={() => setSelectedDate(day.date)}
                   >
@@ -94,55 +102,59 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
             </>
           ) : (
             <Typography.Paragraph className="text-grouped-secondary">
-              {metric === "estimatedCostUsd"
-                ? "No daily cost estimates available in this range."
-                : "No daily token usage recorded in this range."}
+              {t(metric === "estimatedCostUsd" ? "mobile.agent.usage.noDailyCost" : "mobile.agent.usage.noDailyTokens")}
             </Typography.Paragraph>
           )}
           <Typography type="body-xs" className="text-grouped-secondary">
             {selected
-              ? `${date(selected.date)} · ${number(selected.processedTokens)} tokens · ${money(selected.estimatedCostUsd)} · ${number(selected.sessions)} sessions`
-              : max > 0
-                ? "Select a day to see its totals."
-                : "Try a different date range to see earlier activity."}
+              ? t("mobile.agent.usage.selectedDay", {
+                  date: date(selected.date),
+                  tokens: number(selected.processedTokens),
+                  cost: money(selected.estimatedCostUsd),
+                  sessions: number(selected.sessions),
+                })
+              : t(max > 0 ? "mobile.agent.usage.selectDay" : "mobile.agent.usage.tryOtherRange")}
           </Typography>
         </View>
       </SettingsSection>
-      <SettingsSection title="Activity">
+      <SettingsSection title={t("mobile.agent.usage.activity")}>
         {(
           [
-            ["Sessions", totals.sessions],
-            ["User messages", totals.userMessages],
-            ["Assistant messages", totals.assistantMessages],
+            ["mobile.agent.usage.sessions", totals.sessions],
+            ["mobile.agent.usage.userMessages", totals.userMessages],
+            ["mobile.agent.usage.assistantMessages", totals.assistantMessages],
           ] as const
         ).map(([label, value]) => (
-          <SettingsRow key={label} trailing={<Typography>{value.toLocaleString()}</Typography>}>
-            <Typography>{label}</Typography>
+          <SettingsRow key={label} trailing={<Typography>{format.number(value)}</Typography>}>
+            <Typography>{t(label)}</Typography>
           </SettingsRow>
         ))}
       </SettingsSection>
-      <SettingsSection title="Token breakdown">
+      <SettingsSection title={t("mobile.agent.usage.tokenBreakdown")}>
         {(
           [
-            ["Uncached input", totals.uncachedInput],
-            ["Cached input", totals.cachedInput],
-            ["Cache creation", totals.cacheCreation],
-            ["Output", totals.output],
+            ["mobile.agent.usage.uncachedInput", totals.uncachedInput],
+            ["mobile.agent.usage.cachedInput", totals.cachedInput],
+            ["mobile.agent.usage.cacheCreation", totals.cacheCreation],
+            ["mobile.agent.usage.output", totals.output],
           ] as const
         ).map(([label, value]) => (
           <SettingsRow key={label} trailing={<Typography>{number(value)}</Typography>}>
-            <Typography>{label}</Typography>
+            <Typography>{t(label)}</Typography>
           </SettingsRow>
         ))}
       </SettingsSection>
-      <SettingsSection title="Models">
+      <SettingsSection title={t("mobile.agent.usage.models")}>
         {result.models.length ? (
           result.models.map((model) => (
             <View key={`${model.provider}:${model.model}`} className="gap-2 p-4">
-              <Typography>{model.model || "Unknown model"}</Typography>
+              <Typography>{model.model || t("mobile.agent.usage.unknownModel")}</Typography>
               <Typography type="body-xs" className="text-grouped-secondary">
-                {providerName(model.provider)} · {number(model.processedTokens)} tokens ·{" "}
-                {money(model.estimatedCostUsd)}
+                {t("mobile.agent.usage.modelLine", {
+                  provider: providerName(model.provider),
+                  tokens: number(model.processedTokens),
+                  cost: money(model.estimatedCostUsd),
+                })}
               </Typography>
               <View className="h-1 overflow-hidden rounded-full bg-grouped-border">
                 <View
@@ -151,14 +163,16 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
                 />
               </View>
               <Typography type="body-xs" className="text-grouped-secondary">
-                {(model.share * 100).toFixed(1)}% of known tokens
+                {t("mobile.agent.usage.share", {
+                  percent: format.percent(model.share, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                })}
               </Typography>
             </View>
           ))
         ) : (
           <SettingsRow>
             <Typography.Paragraph className="text-grouped-secondary">
-              No model usage recorded in this range.
+              {t("mobile.agent.usage.noModels")}
             </Typography.Paragraph>
           </SettingsRow>
         )}
@@ -166,16 +180,30 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
       <View className="gap-2 px-1">
         {partial ? (
           <Typography type="body-xs" className="text-grouped-secondary">
-            Partial data: {totals.missingUsageTurns} turns without usage, {totals.incompleteRecords} incomplete records,{" "}
-            {totals.unpricedRecords} records without a cost estimate.
+            {t("mobile.agent.usage.partial", {
+              missingUsage: totals.missingUsageTurns,
+              incomplete: totals.incompleteRecords,
+              unpriced: totals.unpricedRecords,
+            })}
           </Typography>
         ) : null}
         <Typography type="body-xs" className="text-grouped-secondary">
-          API-equivalent cost in USD. This estimate excludes subscription charges, tools, and media fees.
+          {t("mobile.agent.usage.costNote")}
         </Typography>
         <Typography type="body-xs" className="text-grouped-secondary">
-          Collection started {new Date(result.collectionStartedAt).toLocaleDateString()}. Updated{" "}
-          {result.updatedAt ? new Date(result.updatedAt).toLocaleString() : "never"}.
+          {t("mobile.agent.usage.collection", {
+            started: format.date(new Date(result.collectionStartedAt)),
+            updated: result.updatedAt
+              ? format.date(new Date(result.updatedAt), {
+                  year: "numeric",
+                  month: "numeric",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "numeric",
+                  second: "numeric",
+                })
+              : t("mobile.agent.usage.never"),
+          })}
         </Typography>
       </View>
     </View>

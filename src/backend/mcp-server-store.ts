@@ -9,6 +9,7 @@ import {
   normalizeMcpConfig,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database/database-rows";
 import { registerMcpSecretValues } from "./mcp-redaction";
 import type { OpenBotDatabase } from "./openbot-database";
@@ -87,12 +88,12 @@ export class McpServerStore {
     db.exec("BEGIN IMMEDIATE");
     try {
       const existing = normalized.id ? this.get(normalized.id) : null;
-      if (normalized.id && !existing) throw new McpServerError("This MCP server no longer exists.");
+      if (normalized.id && !existing) throw new McpServerError(sourceText("error.backend.mcpServerGone"));
       if (!existing && this.count() >= INPUT_LIMITS.mcpServers)
-        throw new McpServerError(`OpenBot keeps up to ${INPUT_LIMITS.mcpServers} MCP servers.`);
+        throw new McpServerError(sourceText("error.backend.mcpServerLimit", { limit: INPUT_LIMITS.mcpServers }));
       // Reported here rather than left to the unique index, so the user reads a sentence.
       if (this.nameTaken(normalized.name, existing?.id ?? null))
-        throw new McpServerError(`An MCP server named ${normalized.name} already exists.`);
+        throw new McpServerError(sourceText("error.backend.mcpServerNameTaken", { name: normalized.name }));
 
       // A draft carries an empty id, which is not nullish - `??` would store the empty string.
       const stored: McpServerConfig = { ...normalized, id: existing?.id || createMcpServerId() };

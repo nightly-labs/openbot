@@ -1,11 +1,13 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { AttachmentSummary, InstalledSkill } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Blocks, Button, Puzzle } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import type { AgentProfile, MessageCitation } from "../../data";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
@@ -35,7 +37,14 @@ export interface RichMessageTextProps {
   streamingTailAfter?: number | undefined;
 }
 
+const UNAVAILABLE_TAG_LABELS = {
+  agent: "chat.tag.unavailableAgent",
+  skill: "chat.tag.unavailableSkill",
+  mcp: "chat.tag.unavailableMcp",
+} as const satisfies Record<ChatTagKind, AppTextKey>;
+
 export function RichMessageText(props: RichMessageTextProps) {
+  const { t } = useText();
   const citationsByNumber = createMemo(
     () => new Map((props.citations ?? []).map((citation) => [citation.number, citation])),
   );
@@ -98,7 +107,7 @@ export function RichMessageText(props: RichMessageTextProps) {
                 type="button"
                 class="message-file-reference"
                 data-file-tone={attachmentReferenceTone(name)}
-                aria-label={`${attachment ? "Open attached file" : "Open shared file"} ${name}`}
+                aria-label={attachment ? t("chat.file.openAttached", { name }) : t("chat.file.openShared", { name })}
                 aria-describedby={tooltipId}
                 onPointerEnter={(event) => openTooltip(event.currentTarget, name, true)}
                 onMouseEnter={(event) => openTooltip(event.currentTarget, name, true)}
@@ -146,7 +155,7 @@ export function RichMessageText(props: RichMessageTextProps) {
           if (part.unavailableKind) {
             return (
               <span class="message-tag-unavailable">
-                <span class="sr-only">Unavailable {part.unavailableKind} </span>
+                <span class="sr-only">{t(UNAVAILABLE_TAG_LABELS[part.unavailableKind])} </span>
                 {part.text}
               </span>
             );
@@ -157,7 +166,7 @@ export function RichMessageText(props: RichMessageTextProps) {
                 <a
                   class="message-citation-mark"
                   href={part.citation.url}
-                  aria-label={`Open citation ${part.citation.number}: ${part.citation.label}`}
+                  aria-label={t("chat.citation.open", { number: part.citation.number, label: part.citation.label })}
                   aria-describedby={tooltipId}
                   onPointerEnter={(event) => openTooltip(event.currentTarget, part.citation?.label ?? "")}
                   onMouseEnter={(event) => openTooltip(event.currentTarget, part.citation?.label ?? "")}
@@ -191,7 +200,7 @@ export function RichMessageText(props: RichMessageTextProps) {
               <a
                 class="message-citation-ref"
                 href={citation.url}
-                aria-label={`Open source ${citation.number}: ${citation.label}`}
+                aria-label={t("chat.citation.openSource", { number: citation.number, label: citation.label })}
                 onClick={(event) => {
                   event.preventDefault();
                   props.onOpenLink(citation.url);

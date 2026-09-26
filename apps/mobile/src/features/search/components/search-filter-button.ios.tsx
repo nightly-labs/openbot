@@ -15,10 +15,14 @@ import { useThemeColor } from "heroui-native/hooks";
 
 import type { MobileSearchFilterButtonProps } from "@/features/search/components/search-filter-button.types";
 import { MOBILE_SEARCH_FILTERS } from "@/features/search/model/mobile-search";
+import { useText } from "@/shared/lib/text";
 
 export function MobileSearchFilterButton({ category, onCategoryChange }: MobileSearchFilterButtonProps) {
+  const { t } = useText();
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
-  const activeFilterLabel = MOBILE_SEARCH_FILTERS.find((filter) => filter.id === category)?.label ?? "All";
+  const activeFilterLabel = t(
+    MOBILE_SEARCH_FILTERS.find((filter) => filter.id === category)?.label ?? "mobile.search.filter.all",
+  );
   const liquidGlassAvailable = isLiquidGlassAvailable();
 
   return (
@@ -42,7 +46,7 @@ export function MobileSearchFilterButton({ category, onCategoryChange }: MobileS
               ]
             : [buttonBorderShape("roundedRectangle", 18)]),
           tint(String(foreground)),
-          accessibilityLabel(`Filter results, ${activeFilterLabel}`),
+          accessibilityLabel(t("mobile.search.filterResults", { filter: activeFilterLabel })),
         ]}
         testID="search-filter-menu"
       >
@@ -50,7 +54,7 @@ export function MobileSearchFilterButton({ category, onCategoryChange }: MobileS
           <Toggle
             isOn={filter.id === category}
             key={filter.id}
-            label={filter.label}
+            label={t(filter.label)}
             onIsOnChange={() => onCategoryChange(filter.id)}
           />
         ))}

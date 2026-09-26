@@ -1,6 +1,7 @@
 import { type ApprovalAutomationPreference, agentAutoApprovalEnabled } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { usePlatform } from "../../platform";
@@ -131,11 +132,8 @@ const Settings = createSimpleContext({
           })
           .catch(() => {
             setGeneralSettings((current) => ({ ...current, turboMode: previous.turboMode }));
-            toast.error(
-              previous.turboMode
-                ? "Could not turn off Turbo mode. It is still active. Try again."
-                : "Could not turn on Turbo mode. Try again.",
-            );
+            const { t } = currentText();
+            toast.error(previous.turboMode ? t("settings.turbo.turnOffFailed") : t("settings.turbo.turnOnFailed"));
           })
           .finally(() => setTurboModePending(false));
       }

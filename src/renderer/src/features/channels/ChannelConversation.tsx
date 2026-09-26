@@ -40,6 +40,7 @@ import {
   UnreadMessagesDivider,
   unreadMessagesDividerIsVisible,
 } from "@openbot/ui/features/conversation/UnreadMessages";
+import { useText } from "@openbot/ui/text";
 import {
   createEffect,
   createMemo,
@@ -76,6 +77,7 @@ const ChannelFilePreviewPanel = lazy(() => import("../conversation/FilePreviewPa
 
 export function ChannelConversation() {
   const channels = useChannels();
+  const { t, format, sourceText } = useText();
   const { selectAgent } = useNavigation();
   const { centralAuth } = useAuth();
   const { currentTeamMember } = usePresence();
@@ -231,7 +233,7 @@ export function ChannelConversation() {
   let scrolledChannel: string | undefined;
   const timeline = createMemo(() => {
     const page = channels.state.page;
-    return page ? channelTimelineEntries(page, agentList(), isOwnMessage) : [];
+    return page ? channelTimelineEntries(page, agentList(), isOwnMessage, { t, format }) : [];
   });
   const unreadCount = createMemo(
     () => channels.state.channels.find((channel) => channel.id === channels.state.selectedId)?.unreadCount ?? 0,
@@ -271,7 +273,7 @@ export function ChannelConversation() {
     return [...ids].map((id) => {
       const agent = agentList().find((candidate) => candidate.id === id);
       const authored = page.messages.find((entry) => entry.author.id === id);
-      return { id, name: agent?.name ?? authored?.author.name ?? "Agent", agent };
+      return { id, name: agent?.name ?? authored?.author.name ?? t("chat.activity.agentFallback"), agent };
     });
   });
   const messageVirtualizer = createChatVirtualizer<HTMLElement, HTMLElement>({
@@ -369,7 +371,7 @@ export function ChannelConversation() {
     try {
       await writeClipboardText(text);
     } catch {
-      setCopyError("Could not copy the message.");
+      setCopyError(t("chat.actions.copyFailed"));
       return;
     }
     setCopiedMessageId(message.id);
@@ -413,7 +415,8 @@ export function ChannelConversation() {
     if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame);
     if (unreadVisibilityFrame !== undefined) cancelAnimationFrame(unreadVisibilityFrame);
   });
-  const name = (id: string | null) => agentList().find((agent) => agent.id === id)?.name ?? "Unassigned";
+  const name = (id: string | null) =>
+    agentList().find((agent) => agent.id === id)?.name ?? t("sidebar.section.unassigned");
   /**
    * The work that waits for the reader: one entry for each stopped run, not for each stopped task.
    *
@@ -470,12 +473,12 @@ export function ChannelConversation() {
     <main
       ref={(element) => (conversationPanel = element)}
       class="conversation-panel"
-      aria-label="Channel conversation"
+      aria-label={t("channel.conversation.label")}
       style={`--settings-panel-width: ${panelWidth()}px`}
     >
       <Show when={channels.state.error}>
         <p role="alert">
-          {channels.state.error}
+          {sourceText(channels.state.error ?? "")}
           <Button
             variant="ghost"
             onClick={() =>
@@ -484,13 +487,13 @@ export function ChannelConversation() {
               })
             }
           >
-            Retry
+            {t("common.retry")}
           </Button>
         </p>
       </Show>
       <Show when={copyError()}>{(message) => <p role="alert">{message()}</p>}</Show>
 
-      <Show when={channels.state.page} fallback={<p>Loading channel…</p>}>
+      <Show when={channels.state.page} fallback={<p>{t("channel.conversation.loading")}</p>}>
         {(page) => (
           <>
             <header class="window-drag conversation-header">
@@ -499,7 +502,7 @@ export function ChannelConversation() {
                   variant="ghost"
                   size="sm"
                   class="conversation-title channel-title no-drag"
-                  aria-label="Channel settings"
+                  aria-label={t("channel.settings.title")}
                   onClick={openSettings}
                   disabled={page().channel.archived}
                 >
@@ -515,7 +518,7 @@ export function ChannelConversation() {
             </header>
             <section
               class="conversation-scroll"
-              aria-label="Shared messages"
+              aria-label={t("channel.conversation.messages")}
               aria-live="polite"
               ref={(element) => {
                 messageList = element;
@@ -545,7 +548,7 @@ export function ChannelConversation() {
               </Show>
               <Show when={page().olderCursor}>
                 <Button variant="ghost" onClick={() => void channels.loadOlder()}>
-                  Load earlier messages
+                  {t("channel.conversation.loadOlder")}
                 </Button>
               </Show>
               <Show when={!page().messages.length}>
@@ -785,11 +788,11 @@ export function ChannelConversation() {
                 }}
               </For>
               <Show when={!page().channel.archived && !page().channel.members.length}>
-                <p>Add agents in channel settings to start work.</p>
+                <p>{t("channel.conversation.noMembers")}</p>
               </Show>
             </section>
             <Show when={page().channel.archived}>
-              <p class="channel-preview-notice">Deleted channel. Preview only.</p>
+              <p class="channel-preview-notice">{t("channel.conversation.archivedNotice")}</p>
             </Show>
             <Show when={!page().channel.archived}>
               <div class="composer-wrap">
@@ -825,7 +828,7 @@ export function ChannelConversation() {
                         })
                       }
                     >
-                      Cancel reply
+                      {t("channel.composer.cancelReply")}
                     </Button>
                   </Show>
                   <Show when={composer.attachments.length}>
@@ -840,7 +843,7 @@ export function ChannelConversation() {
                               type="button"
                               variant="ghost"
                               size="xs"
-                              aria-label={`Remove ${attachment.name}`}
+                              aria-label={t("channel.composer.removeAttachment", { name: attachment.name })}
                               onClick={() =>
                                 setComposer((state) => {
                                   state.attachments = state.attachments.filter((item) => item.id !== attachment.id);
@@ -861,8 +864,8 @@ export function ChannelConversation() {
                         page().channel.members.some((member) => member.agentId === agent.id),
                       )}
                       attachments={composer.attachments}
-                      ariaLabel="Message to channel"
-                      placeholder={`Message ${page().channel.name}`}
+                      ariaLabel={t("channel.composer.label")}
+                      placeholder={t("channel.composer.placeholder", { name: page().channel.name })}
                       value={composer.text}
                       disabled={channels.state.pending}
                       onSubmit={submit}
@@ -878,7 +881,7 @@ export function ChannelConversation() {
                       type="button"
                       variant="ghost"
                       class="composer-button"
-                      aria-label="Attach files"
+                      aria-label={t("channel.composer.attach")}
                       onClick={() =>
                         void channels.perform(async () => {
                           const selectedId = channels.state.selectedId;
@@ -897,7 +900,7 @@ export function ChannelConversation() {
                         type="submit"
                         variant="ghost"
                         class="voice-button"
-                        aria-label="Send message"
+                        aria-label={t("channel.composer.send")}
                         disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
                       >
                         <ArrowUp aria-hidden="true" />
@@ -936,7 +939,7 @@ export function ChannelConversation() {
               <SettingsPanel
                 onResizeEnd={saveSettingsPanelWidth}
                 id="channel-side-panel"
-                label="Channel panel"
+                label={t("channel.panel.label")}
                 width={panelWidth()}
                 maxWidth={() => settingsPanelMaxWidth(conversationPanel)}
                 onResize={setPanelWidth}
@@ -948,9 +951,9 @@ export function ChannelConversation() {
                   fallback={
                     <>
                       <SettingsPanelHeader
-                        title="Channel settings"
+                        title={t("channel.settings.title")}
                         onClose={closePanel}
-                        closeLabel="Close channel panel"
+                        closeLabel={t("channel.panel.close")}
                       />
                       <SettingsPanelContent>
                         <ChannelEditor

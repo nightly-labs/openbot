@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
 import {
   parseCreateChannelMemory,
@@ -57,7 +58,7 @@ export async function routeChannels(
   const settings = method === "POST" && isChannelSettingsRoute(url.pathname);
   if (!list && !read && !command && !remove && !settings) return "unmatched";
   if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
-    throw new HttpError(400, "Channel chats are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
   if (list) return json(200, channels.store.list(member.id));
   if (read) {
     const input = parseChannelRead(channelRequest(url.pathname, await readJson(request)));
@@ -65,8 +66,8 @@ export async function routeChannels(
   }
   if (remove) {
     if (!capabilities.has(CHANNEL_DELETE_CAPABILITY))
-      throw new HttpError(400, "Channel deletion is not supported by this connection.");
-    if (member.role === "member") throw new HttpError(403, "Members cannot delete channels.");
+      throw new HttpError(400, sourceText("error.team.channelDeleteUnsupported"));
+    if (member.role === "member") throw new HttpError(403, sourceText("error.team.membersCannotDeleteChannels"));
     const body = await readJson(request);
     await channels.deleteChannel(channelId(body));
     return empty(204);
@@ -74,7 +75,7 @@ export async function routeChannels(
   if (settings) return routeChannelSettings(context, agents);
   const input = parseChannelCommand(channelRequest(url.pathname, await readJson(request)));
   if (input.type === "archive" && member.role === "member")
-    throw new HttpError(403, "Members cannot archive channels.");
+    throw new HttpError(403, sourceText("error.team.membersCannotArchiveChannels"));
   return json(200, await channels.command(input, { id: member.id, name: member.name ?? "Team member" }));
 }
 

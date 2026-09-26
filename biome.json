@@ -275,6 +275,24 @@
       "plugins": ["./tools/ui-foundation/no-story-play.grit"]
     },
     {
+      "includes": [
+        "src/renderer/src/**/*.ts",
+        "src/renderer/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx",
+        "apps/mobile/src/**/*.ts",
+        "apps/mobile/src/**/*.tsx",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/*.stories.tsx",
+        "!src/renderer/src/preview/**",
+        "!src/renderer/src/app-test-harness.ts",
+        "!src/renderer/src/setupTests.ts",
+        "!apps/mobile/src/test-setup.ts"
+      ],
+      "plugins": ["./tools/ui-foundation/no-hardcoded-ui-text.grit"]
+    },
+    {
       "includes": ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
       "plugins": ["./tools/ui-foundation/no-desktop-preload.grit"],
       "linter": {

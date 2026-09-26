@@ -4,6 +4,7 @@ import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 
 const PANEL_MIN = 220;
@@ -35,6 +36,7 @@ interface FilePreviewPanelProps {
 }
 
 export default function FilePreviewPanel(props: FilePreviewPanelProps) {
+  const { t, format } = useText();
   const defaultPanelWidth = () => Math.round(Math.min(PANEL_MAX, Math.max(PANEL_MIN, props.defaultWidth())));
   const [panelWidth, setPanelWidth] = createSignal(props.readWidth(defaultPanelWidth(), PANEL_MIN, PANEL_MAX));
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
@@ -97,11 +99,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       id="file-preview-panel"
       class="browser-panel file-preview-panel t-panel-slide"
       data-open={revealed() ? "true" : "false"}
-      aria-label="File preview"
+      aria-label={t("preview.panel.label")}
     >
       <PanelResizer
         class="right-panel-resizer"
-        label="Resize file preview"
+        label={t("preview.panel.resize")}
         controls="file-preview-panel"
         direction="right"
         value={panelWidth()}
@@ -124,7 +126,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             variant="ghost"
             type="button"
             class="browser-toolbar-button"
-            aria-label="Open file externally"
+            aria-label={t("preview.panel.openExternally")}
             onClick={props.onOpenExternally}
           >
             <ExternalLink class="browser-toolbar-icon" />
@@ -136,7 +138,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
               variant="ghost"
               type="button"
               class="browser-toolbar-button"
-              aria-label="Download file"
+              aria-label={t("preview.panel.download")}
               onClick={() => download()()}
             >
               <Download class="browser-toolbar-icon" />
@@ -149,7 +151,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
               variant="ghost"
               type="button"
               class="browser-toolbar-button"
-              aria-label="Show file in Finder"
+              aria-label={t("preview.panel.reveal")}
               onClick={() => reveal()()}
             >
               <FolderOpen class="browser-toolbar-icon" />
@@ -160,7 +162,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           variant="ghost"
           type="button"
           class="browser-toolbar-button"
-          aria-label="Close file preview"
+          aria-label={t("preview.panel.close")}
           onClick={props.onClose}
         >
           <X class="browser-toolbar-icon" />
@@ -185,7 +187,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={props.preview.previewKind === "text"}>
           <pre class="file-preview-text">{text().value}</pre>
           <Show when={text().truncated}>
-            <p class="file-preview-truncated">Preview truncated after 1,000,000 characters.</p>
+            <p class="file-preview-truncated">{t("preview.truncated", { limit: format.number(TEXT_LIMIT) })}</p>
           </Show>
         </Show>
         <Show when={props.preview.previewKind === "image" && previewUrl()}>
@@ -214,11 +216,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={props.preview.previewKind === "none"}>
           <div class="file-preview-unsupported">
             <File />
-            <strong>Preview unavailable</strong>
+            <strong>{t("preview.unsupported.title")}</strong>
             <Show when={props.allowExternalOpen !== false}>
-              <span>This file type can be opened in its default application.</span>
+              <span>{t("preview.unsupported.description")}</span>
               <Button variant="outline" type="button" onClick={props.onOpenExternally}>
-                Open externally
+                {t("preview.unsupported.openExternally")}
               </Button>
             </Show>
           </div>

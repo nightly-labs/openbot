@@ -12,6 +12,7 @@ import type { ChannelMessage, ChannelPage } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEvent, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { currentText } from "@openbot/ui/text";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
 import { withinGroupingWindow } from "../conversation/chat-grouping";
 
@@ -48,12 +49,18 @@ function channelRoutingMarker(entry: ChannelMessage): ChatActionMarkerModel | nu
 function toAgentMessage(entry: ChannelMessage, own: boolean, options: DayMarkerOptions): AgentMessage {
   const message = entry.message;
   const actionMarker = channelRoutingMarker(entry);
+  const time = { hour: "numeric", minute: "2-digit" } as const;
+  const createdAt = new Date(message.createdAt);
   return {
     id: entry.id,
     author: own ? "you" : "agent",
     ...(actionMarker ? { kind: "action-marker" as const, actionMarker } : {}),
     body: message.text,
-    time: new Date(message.createdAt).toLocaleTimeString(options.locale, { hour: "numeric", minute: "2-digit" }),
+    // Intl throws on an invalid date, where `toLocaleTimeString` returns text.
+    time:
+      options.format && !Number.isNaN(createdAt.getTime())
+        ? options.format.date(createdAt, time)
+        : createdAt.toLocaleTimeString(options.locale, time),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
     status: message.status,
@@ -106,6 +113,7 @@ export function channelTimelineEntries(
   options: DayMarkerOptions = {},
 ): ChannelTimelineEntry[] {
   const entries: ChannelTimelineEntry[] = [];
+  const t = options.t ?? currentText().t;
   let previous: ChannelTimelineEntry | undefined;
   // A run of one author is broken by an activity row the same way a reply from someone else breaks
   // it: the marker draws no name, so the message under it has to show its own again.
@@ -115,7 +123,7 @@ export function channelTimelineEntries(
     const own = source.author.kind === "member" && isOwnMessage(source.author.id);
     const agent = agents.find((candidate) => candidate.id === source.author.id);
     const author: ChatMessageAuthor = own
-      ? { kind: "you", name: "You" }
+      ? { kind: "you", name: t("chat.message.you") }
       : { kind: "agent", name: source.author.name, agent, avatarSeed: agent ? undefined : source.author.id };
     const dayMarker = dayMarkerLabel(previous?.message.createdAt, source.message.createdAt, options);
     const marker = channelRoutingMarker(source);

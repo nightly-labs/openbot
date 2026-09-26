@@ -1,6 +1,7 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
@@ -13,6 +14,7 @@ import {
 import * as Crypto from "expo-crypto";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { currentText } from "@/shared/lib/text";
 
 import RemoteTeamBridge from "./remote-team-bridge.dom";
 
@@ -82,11 +84,11 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
       () => ({
         connect: async (hostId, hostPublicKey) => {
           const result = await enqueue({ type: "connect", hostId, hostPublicKey });
-          if (!result.ok) throw new Error(result.error ?? "The server connection failed.");
+          if (!result.ok) throw new Error(result.error ?? currentText().t("mobile.workspace.error.connectFailed"));
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
-          if (!result.ok) throw new Error(result.error ?? "The server did not disconnect cleanly.");
+          if (!result.ok) throw new Error(result.error ?? currentText().t("mobile.workspace.error.disconnectFailed"));
         },
         request: async <T,>(
           method: string,
@@ -97,10 +99,11 @@ export const RemoteTeamTransport = forwardRef<RemoteTeamTransportRef, RemoteTeam
           onUploadProgress?: (fraction: number) => void,
         ): Promise<T> => {
           const result = await enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
-          if (!result.ok) throw new Error(result.error ?? "The server request failed.");
+          if (!result.ok) throw new Error(result.error ?? sourceText("error.remote.serverRequestFailed"));
           if (result.status === 409 && isQueueEditRoute(method, path))
-            throw new QueueEditRejectedError("The host did not accept this edit.");
-          if (result.status !== undefined && result.status >= 400) throw new Error("The server request failed.");
+            throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
+          if (result.status !== undefined && result.status >= 400)
+            throw new Error(sourceText("error.remote.serverRequestFailed"));
           return decode(result.body);
         },
       }),

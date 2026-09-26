@@ -17,6 +17,7 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -50,12 +51,13 @@ export function storageIpcHandlers({
   mailbox,
   remoteServers,
   getMainWindow,
+  translate,
   agents,
   openPath,
 }: StorageIpcDependencies): Pick<IpcGroupHandlers, "storage"> {
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<void> {
     if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY))
-      throw new Error("Storage is not supported by this server.");
+      throw new Error(sourceText("error.storage.unsupported"));
     return remoteServers.request(serverId, path, decodeStorageChange, { method: "POST", body });
   }
 
@@ -83,7 +85,7 @@ export function storageIpcHandlers({
       // A stored file is a sent or generated attachment, so the chat's open path serves it.
       openFile: payloadHandler(agentRequest(parseOpenStoredFileInput), (scoped) => {
         const parsed = scoped.payload;
-        return openAttachmentForServer({ mailbox, remoteServers, getMainWindow }, scoped.serverId, {
+        return openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, {
           attachmentId: parsed.fileId,
           action: parsed.action,
         });
@@ -91,7 +93,7 @@ export function storageIpcHandlers({
       // Local only: a remote host's workspace is a path on another computer.
       openLocation: payloadHandler(parseOpenStorageLocationInput, async ({ agentId }) => {
         const agent = agents().find((candidate) => candidate.id === agentId);
-        if (!agent) throw new Error("The agent does not exist.");
+        if (!agent) throw new Error(sourceText("error.storage.agentMissing"));
         const error = await openPath(agent.workspacePath);
         if (error) throw new Error(error);
       }),

@@ -14,6 +14,7 @@ import type {
   RemoteDesktopTestStatus,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type * as Ws from "ws";
 import { z } from "zod";
 import { recordRestartActivity } from "../backend/restart-activity";
@@ -183,15 +184,15 @@ export class RemoteScreenGateway {
     if (this.#options.platform !== "darwin" || !this.#options.runtimePaths) {
       result.message =
         this.#options.platform !== "darwin"
-          ? "Permission setup is available on macOS."
-          : "Install the remote desktop host component, then check again.";
+          ? sourceText("status.remote.setupMacOnly")
+          : sourceText("status.remote.setupInstallHost");
       return result;
     }
     try {
       await this.#ensureRuntime();
       result.service = "allowed";
       if (!this.#runtime?.checkSetup) {
-        result.message = "Update the remote desktop runtime to check macOS permissions.";
+        result.message = sourceText("status.remote.setupUpdateRuntime");
         return result;
       }
       try {
@@ -205,13 +206,12 @@ export class RemoteScreenGateway {
           result.displays =
             unavailable ? "unavailable" : "failed";
         result.message = unavailable
-          ? "Update the remote desktop runtime to check macOS permissions."
-          : "Sunshine could not complete the permission check. Check the host session, then try again.";
+          ? sourceText("status.remote.setupUpdateRuntime")
+          : sourceText("status.remote.setupCheckFailed");
       }
     } catch {
       result.service = "failed";
-      result.message =
-        "The remote desktop service could not start. Check that this macOS user has an active GUI session.";
+      result.message = sourceText("status.remote.setupServiceFailed");
     } finally {
       result.activeSessions = this.#sessions.size;
       if (this.#sessions.size === 0 && this.#startingSessions === 0) await this.#stopRuntime();
@@ -226,16 +226,12 @@ export class RemoteScreenGateway {
   ): Promise<RemoteDesktopTestStatus> {
     const session = this.#sessions.get(sessionId);
     if (!session || session.memberId !== memberId)
-      throw new RemoteScreenError(404, "session_expired", "Remote control session not found.");
+      throw new RemoteScreenError(404, "session_expired", sourceText("error.remote.controlSessionNotFound"));
     if (this.#options.platform !== "darwin" || !this.#runtime?.test)
-      throw new RemoteScreenError(503, "host_unavailable", "Update the macOS remote desktop runtime to run this test.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.testRuntimeUpdate"));
     if (action === "start") {
       if (this.#sessions.size !== 1 || this.#startingSessions > 0 || this.#displaySwitching || this.#testSessionId)
-        throw new RemoteScreenError(
-          409,
-          "session_capacity_reached",
-          "End other remote desktop sessions before you start a test.",
-        );
+        throw new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testOtherSessions"));
       this.#testSessionId = sessionId;
       try {
         const permissions = await this.#runtime.checkSetup?.();
@@ -246,20 +242,17 @@ export class RemoteScreenGateway {
           permissions.displays !== "allowed" ||
           permissions.restartRequired
         ) {
-          throw new RemoteScreenError(
-            503,
-            "host_permissions_required",
-            "Check permissions and the GUI session on the host before starting the test.",
-          );
+          throw new RemoteScreenError(503, "host_permissions_required", sourceText("error.remote.testPermissions"));
         }
         const status = await this.#runtime?.test?.("start");
-        if (!status) throw new RemoteScreenError(404, "session_expired", "Remote control session ended.");
+        if (!status)
+          throw new RemoteScreenError(404, "session_expired", sourceText("error.remote.controlSessionEnded"));
         if (!status.active)
-          throw new RemoteScreenError(503, "host_unavailable", "The host could not open the test panel.");
+          throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.testPanelFailed"));
         if (!this.#sessions.has(sessionId)) {
           await this.#runtime?.test?.("stop");
           this.#testSessionId = null;
-          throw new RemoteScreenError(404, "session_expired", "Remote control session ended.");
+          throw new RemoteScreenError(404, "session_expired", sourceText("error.remote.controlSessionEnded"));
         }
         return status;
       } catch (error) {
@@ -329,7 +322,8 @@ export class RemoteScreenGateway {
         server.listen(0, "127.0.0.1", resolve);
       });
       const address = server.address();
-      if (!address || typeof address === "string") throw new Error("The local test listener is unavailable.");
+      if (!address || typeof address === "string")
+        throw new Error(sourceText("error.remote.localTestListenerUnavailable"));
       const session = await this.createSession({
         serverId: "local",
         memberId: "local-setup",
@@ -346,7 +340,7 @@ export class RemoteScreenGateway {
   }
 
   testLocalSession(sessionId: string, action: "start" | "status" | "stop") {
-    if (!this.#localTestServers.has(sessionId)) throw new Error("Local test session not found.");
+    if (!this.#localTestServers.has(sessionId)) throw new Error(sourceText("error.remote.localTestNotFound"));
     return this.test(sessionId, "local-setup", action);
   }
 
@@ -380,31 +374,19 @@ export class RemoteScreenGateway {
   }): Promise<RemoteDesktopSession> {
     this.#pruneExpiredGrants();
     if (this.#sessions.size >= REMOTE_DESKTOP_MAX_SESSIONS) {
-      throw new RemoteScreenError(429, "session_capacity_reached", "The host already has four active sessions.");
+      throw new RemoteScreenError(429, "session_capacity_reached", sourceText("error.remote.sessionCapacity"));
     }
     if (this.#options.platform === "linux") {
-      throw new RemoteScreenError(503, "host_unavailable", "Remote desktop hosting is not supported on Linux.");
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.linuxUnsupported"));
     }
     if (!this.#options.runtimePaths) {
-      throw new RemoteScreenError(
-        503,
-        "host_unavailable",
-        "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on an Apple silicon Mac or Windows x64 host, then restart OpenBot.",
-      );
+      throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing"));
     }
     if (this.#testSessionId)
-      throw new RemoteScreenError(
-        409,
-        "session_capacity_reached",
-        "A remote desktop test is active. Try again when it ends.",
-      );
+      throw new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive"));
     await this.#ensureRuntime();
     if (this.#testSessionId)
-      throw new RemoteScreenError(
-        409,
-        "session_capacity_reached",
-        "A remote desktop test is active. Try again when it ends.",
-      );
+      throw new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive"));
     // The runtime starts and answers either way, so this is the only place the refusal can become a
     // failure the member sees. Without it the session is created, the stream never starts, and the
     // viewer sits at "connecting" until the member gives up.
@@ -412,24 +394,20 @@ export class RemoteScreenGateway {
       // The createSession lease releases an idle runtime after pending creates settle, so a new
       // grant is read by the next process without stopping an existing member's session.
       this.#reportScreenRecordingDenied(true);
-      throw new RemoteScreenError(
-        503,
-        "host_permissions_required",
-        "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
-      );
+      throw new RemoteScreenError(503, "host_permissions_required", sourceText("error.remote.screenRecordingDenied"));
     }
     this.#reportScreenRecordingDenied(false);
     const id = randomUUID();
     const usedStreamerSlots = new Set([...this.#sessions.values()].map((session) => session.streamerSlot));
     const streamerSlot = [1, 2, 3, 4].find((slot) => !usedStreamerSlots.has(slot));
     if (!streamerSlot) {
-      throw new RemoteScreenError(429, "session_capacity_reached", "The host already has four active sessions.");
+      throw new RemoteScreenError(429, "session_capacity_reached", sourceText("error.remote.sessionCapacity"));
     }
     const viewerGrant = randomBytes(32).toString("base64url");
     const now = this.#options.now();
     const teamSessionExpiresAt = Date.parse(input.teamSessionExpiresAt);
     if (!Number.isFinite(teamSessionExpiresAt) || teamSessionExpiresAt <= now) {
-      throw new RemoteScreenError(401, "session_expired", "The team session has expired.");
+      throw new RemoteScreenError(401, "session_expired", sourceText("error.remote.teamSessionExpired"));
     }
     const createdAt = new Date(now).toISOString();
     const snapshot: RemoteDesktopSession = {
@@ -442,7 +420,7 @@ export class RemoteScreenGateway {
       phase: "connecting",
       transport: "unknown",
       errorCode: null,
-      message: "Connecting through Sunshine…",
+      message: sourceText("status.remote.connectingSunshine"),
       createdAt,
       grantExpiresAt: new Date(now + GRANT_TTL_MS).toISOString(),
     };
@@ -473,22 +451,18 @@ export class RemoteScreenGateway {
 
   async selectDisplay(displayId: string): Promise<void> {
     if (this.#testSessionId)
-      throw new RemoteScreenError(
-        409,
-        "connection_failed",
-        "Finish the remote desktop test before switching displays.",
-      );
+      throw new RemoteScreenError(409, "connection_failed", sourceText("error.remote.finishTestBeforeSwitch"));
     if (!this.#availableDisplays().some((display) => display.id === displayId)) {
-      throw new RemoteScreenError(400, "host_unavailable", "Remote display not found.");
+      throw new RemoteScreenError(400, "host_unavailable", sourceText("error.remote.displayNotFound"));
     }
     if (this.#displaySwitching)
-      throw new RemoteScreenError(409, "connection_failed", "A display switch is in progress.");
+      throw new RemoteScreenError(409, "connection_failed", sourceText("error.remote.displaySwitchInProgress"));
     if (displayId === this.#selectedDisplayId) return;
     this.#displaySwitching = true;
     try {
       for (const session of this.#sessions.values()) {
         session.snapshot.phase = "connecting";
-        session.snapshot.message = "Switching the shared monitor…";
+        session.snapshot.message = sourceText("status.remote.switchingMonitor");
       }
       await this.#runtime?.selectDisplay(displayId);
       this.#selectedDisplayId = displayId;
@@ -529,10 +503,10 @@ export class RemoteScreenGateway {
       session.snapshot.message =
         update.message ??
         (update.state === "connected"
-          ? "Remote control connected."
+          ? sourceText("status.remote.controlConnected")
           : update.state === "connecting"
-            ? "Connecting through Sunshine…"
-            : "Remote control failed.");
+            ? sourceText("status.remote.connectingSunshine")
+            : sourceText("status.remote.controlFailed"));
       if (update.transport && update.transport !== session.snapshot.transport) {
         session.snapshot.transport = update.transport;
         this.#audit(session, "transport");
@@ -617,7 +591,7 @@ export class RemoteScreenGateway {
           pendingClientBytes = 0;
           recordRestartActivity();
           session.snapshot.phase = "connected";
-          session.snapshot.message = "Remote control connected.";
+          session.snapshot.message = sourceText("status.remote.controlConnected");
           this.#audit(session, "started");
         });
       });
@@ -784,7 +758,7 @@ export class RemoteScreenGateway {
     if (this.#runtimeStopping) await this.#runtimeStopping;
     if (this.#runtimeState) return this.#runtimeState;
     const paths = this.#options.runtimePaths;
-    if (!paths || this.#options.platform === "linux") throw new Error("Remote desktop runtime is not available.");
+    if (!paths || this.#options.platform === "linux") throw new Error(sourceText("error.remote.runtimeUnavailable"));
     this.#runtime ??= this.#options.createRuntime({
       paths,
       stateDirectory: this.#options.runtimeStateDirectory,

@@ -1,7 +1,10 @@
 import { createRemoteConnectionRecovery, REMOTE_RETRY_INTERVAL_MS } from "@openbot/team-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { textFor } from "../../../shared/lib/text-value";
 import { applyServerFailure, applyServerRecovery, serverKind, serverStatusLabel } from "./server-status";
 import type { MobileServer } from "./workspace-types";
+
+const { t } = textFor("en");
 
 const server: MobileServer = {
   id: "desktop",
@@ -39,14 +42,14 @@ describe("mobile server availability", () => {
       const protocolMessage = current.connectionMessage;
       connection.reject(new Error("The server disconnected."));
       await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
-      expect(serverStatusLabel(current)).toBe("Connection error");
+      expect(serverStatusLabel(current, t)).toBe("Connection error");
       expect(current.connectionMessage).toBe(protocolMessage);
 
       connection = Promise.withResolvers<void>();
       controller.refresh();
-      expect(serverStatusLabel(current)).toBe("Offline");
+      expect(serverStatusLabel(current, t)).toBe("Offline");
       connection.resolve();
-      await vi.waitFor(() => expect(serverStatusLabel(current)).toBe("Online"));
+      await vi.waitFor(() => expect(serverStatusLabel(current, t)).toBe("Online"));
       expect(current.connectionMessage).toBeNull();
     } finally {
       controller.dispose();
@@ -65,7 +68,7 @@ describe("mobile server availability", () => {
       },
     );
     controller.setActive(true);
-    expect(serverStatusLabel(current)).toBe("Connecting…");
+    expect(serverStatusLabel(current, t)).toBe("Connecting…");
     connection.resolve();
     await vi.advanceTimersByTimeAsync(0);
     expect(current.state).toBe("online");
@@ -80,14 +83,14 @@ describe("mobile server availability", () => {
     expect(current.state).toBe("offline");
     await vi.advanceTimersByTimeAsync(1);
     expect(current.state).toBe("connecting");
-    expect(serverStatusLabel(current)).toBe("Offline");
+    expect(serverStatusLabel(current, t)).toBe("Offline");
     connection.resolve();
     await vi.advanceTimersByTimeAsync(0);
-    expect(serverStatusLabel(current)).toBe("Online");
+    expect(serverStatusLabel(current, t)).toBe("Online");
     controller.suspend();
     expect(current.state).toBe("error");
     controller.refresh();
-    expect(serverStatusLabel(current)).toBe("Offline");
+    expect(serverStatusLabel(current, t)).toBe("Offline");
     await vi.advanceTimersByTimeAsync(0);
     expect(current.state).toBe("online");
     controller.dispose();

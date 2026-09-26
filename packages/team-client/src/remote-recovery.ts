@@ -1,4 +1,5 @@
 import type { ConversationSnapshot } from "@openbot/contracts/ipc";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 
 export const REMOTE_RETRY_INTERVAL_MS = 10_000;
 export const REMOTE_RETRY_LIMIT = 5;
@@ -18,70 +19,91 @@ export type RemoteConnectionStage =
   | "reads"
   | "conversations";
 
-const CONNECTION_STAGES: Record<RemoteConnectionStage, string> = {
-  preferences: "Loading local chat preferences",
-  connection: "Connecting to the desktop",
-  compatibility: "Checking desktop compatibility",
-  agents: "Loading agents",
-  reads: "Loading read status",
-  conversations: "Loading conversations",
-};
+const CONNECTION_STAGES = {
+  preferences: "status.remote.stagePreferences",
+  connection: "status.remote.stageConnection",
+  compatibility: "status.remote.stageCompatibility",
+  agents: "status.remote.stageAgents",
+  reads: "status.remote.stageReads",
+  conversations: "status.remote.stageConversations",
+} as const satisfies Record<RemoteConnectionStage, keyof SourceMessages>;
 
 // Only fixed protocol messages may appear in diagnostics. Arbitrary server or
 // decoder errors can contain request bodies, credentials, or conversation text.
-const SAFE_CONNECTION_ERRORS = new Set([
-  "The app is in the background.",
-  "The connection was replaced.",
-  "The selected server is offline.",
-  "The server disconnected.",
-  "The desktop went offline.",
-  "The desktop did not connect.",
-  "The desktop connection needs to be restored.",
-  "The host already has an active remote session.",
-  "Too many active remote connections.",
-  "The server request failed.",
-  "The remote session is not active.",
-  "The account session has ended.",
-  "The host is offline.",
-  "The remote session ended.",
-  "Remote ticket is invalid or expired.",
-  "The desktop identity could not be verified.",
-  "The host sent data before authentication.",
-  "The host event stream has a gap.",
-  "The host returned a malformed event.",
-  "Signal returned an invalid message.",
-  "The saved chat preferences could not be read.",
-  "The desktop request timed out.",
-  "The remote session is invalid.",
-  "The connection ticket is invalid.",
-  "The WebRTC channel is not open.",
-  "Signal is offline.",
-  "Update OpenBot Mobile or the desktop app before connecting.",
-]);
+const SAFE_CONNECTION_ERRORS = new Set(
+  (
+    [
+      "error.remote.appInBackground",
+      "error.remote.connectionReplaced",
+      "error.remote.selectedServerOffline",
+      "error.remote.serverDisconnected",
+      "error.remote.desktopOffline",
+      "error.remote.desktopDidNotConnect",
+      "error.remote.desktopRestoreNeeded",
+      "error.remote.hostSessionActive",
+      "error.remote.tooManyConnections",
+      "error.remote.serverRequestFailed",
+      "error.remote.sessionNotActive",
+      "error.remote.accountSessionEnded",
+      "error.remote.hostOffline",
+      "error.remote.sessionEnded",
+      "error.remote.ticketInvalidOrExpired",
+      "error.remote.desktopIdentityNotVerified",
+      "error.remote.dataBeforeAuth",
+      "error.remote.eventStreamGap",
+      "error.remote.malformedEvent",
+      "error.remote.signalInvalidMessage",
+      "error.remote.preferencesUnreadable",
+      "error.remote.desktopRequestTimeout",
+      "error.remote.sessionInvalid",
+      "error.remote.ticketInvalid",
+      "error.remote.channelNotOpen",
+      "error.remote.signalOffline",
+      "error.remote.mobileUpdateRequired",
+    ] as const satisfies readonly (keyof SourceMessages)[]
+  ).map((key) => sourceText(key)),
+);
 
 export function remoteConnectionFailure(stage: RemoteConnectionStage, error: unknown): string {
   const reason =
     error instanceof Error && SAFE_CONNECTION_ERRORS.has(error.message)
       ? error.message
-      : "Could not complete this connection step.";
-  return `${CONNECTION_STAGES[stage]}: ${reason}`;
+      : sourceText("error.remote.connectionStepFailed");
+  return sourceText(CONNECTION_STAGES[stage], { reason });
 }
 
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {
   if (status.phase === "online") return null;
-  const detail = failure ? `\n${failure}` : "";
+  const detail = failure || null;
   // No countdown, because nothing is scheduled. Retrying is what this phase exists to stop.
-  if (status.phase === "suspended") return `Update OpenBot Mobile or the desktop app before connecting.${detail}`;
+  if (status.phase === "suspended") {
+    return detail
+      ? sourceText("status.remote.suspendedDetail", { detail })
+      : sourceText("error.remote.mobileUpdateRequired");
+  }
   if (status.phase === "cooldown") {
     const minutes = Math.floor(status.remainingSeconds / 60);
     const seconds = String(status.remainingSeconds % 60).padStart(2, "0");
-    return `Connection failed after ${REMOTE_RETRY_LIMIT} attempts. Retrying in ${minutes}:${seconds}.${detail}`;
+    const params = { limit: REMOTE_RETRY_LIMIT, minutes, seconds };
+    return detail
+      ? sourceText("status.remote.cooldownDetail", { ...params, detail })
+      : sourceText("status.remote.cooldown", params);
+  }
+  const count = status.remainingSeconds;
+  if (status.phase === "waiting" && status.attempt === 0) {
+    return detail
+      ? sourceText("status.remote.connectionLostDetail", { count, detail })
+      : sourceText("status.remote.connectionLost", { count });
   }
   if (status.phase === "waiting") {
-    const reason = status.attempt === 0 ? "Connection lost." : "Connection attempt failed.";
-    return `${reason} Retrying in ${status.remainingSeconds}s.${detail}`;
+    return detail
+      ? sourceText("status.remote.attemptFailedDetail", { count, detail })
+      : sourceText("status.remote.attemptFailed", { count });
   }
-  return `Reconnecting ${status.attempt}/${REMOTE_RETRY_LIMIT}${detail}`;
+  // The limit is the {count} value: only a number placeholder at the end keeps this text apart from its detail form.
+  return detail
+    ? sourceText("status.remote.reconnectingDetail", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT, detail })
+    : sourceText("status.remote.reconnecting", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT });
 }
 
 /** One recovery attempt at a time. Background time never starts network work. */
@@ -151,7 +173,7 @@ export function createRemoteConnectionRecovery(
     try {
       await connect();
     } catch (error) {
-      if (error instanceof Error && error.message === "The app is in the background.") {
+      if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
         interrupted = true;
         retryRequested = false;
         retryAt = null;

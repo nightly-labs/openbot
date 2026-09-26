@@ -6,12 +6,15 @@ import {
 import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { desktopAnalytics } from "../../../analytics";
 import { writeClipboardText } from "../../../clipboard";
 import type { StoredQueueEdit } from "../composer-draft";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
+
+// Each member reads the interface language when it is called.
+const { t, errorMessage } = currentText();
 
 export interface MessageActionsDeps {
   props: ConversationProps;
@@ -58,7 +61,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         result: "failed",
         failure_code: "reaction_failed",
       });
-      deps.setComposerError(errorMessage(error, "Could not update the reaction. Try again."), target);
+      deps.setComposerError(errorMessage(error, t("chat.actions.reactionFailed")), target);
     }
   }
 
@@ -87,7 +90,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
         if (deps.copiedMessageId() === message.id) deps.setCopiedMessageId(null);
       }, 1_400);
     } catch (error) {
-      deps.setComposerError(errorMessage(error, "Could not copy the message."), target);
+      deps.setComposerError(errorMessage(error, t("chat.actions.copyFailed")), target);
     }
   }
 

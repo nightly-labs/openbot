@@ -1,6 +1,7 @@
 import type { InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { Button, Switch } from "@openbot/ui";
 import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { SkillPreview } from "../../components/SkillPreview";
 import { skillsPort } from "../../skills-port";
@@ -13,6 +14,7 @@ export function LocalSkillsLibrary(props: {
   onInstalled: () => Promise<void>;
   onTry?: (skill: MarketplaceSkillDetail) => void;
 }) {
+  const { t, errorMessage } = useText();
   const [reload, setReload] = createSignal(0);
   let active = true;
   onSettled(() => () => {
@@ -49,8 +51,7 @@ export function LocalSkillsLibrary(props: {
               }));
           },
           () => {
-            if (!disposed)
-              setState((current) => ({ ...current, error: "Could not load local skills.", loading: false }));
+            if (!disposed) setState((current) => ({ ...current, error: t("skill.local.loadFailed"), loading: false }));
           },
         );
       return () => {
@@ -75,7 +76,7 @@ export function LocalSkillsLibrary(props: {
       if (active && props.agentId === agentId)
         setState((current) => ({
           ...current,
-          error: error instanceof Error ? error.message : "Could not change the skill state.",
+          error: errorMessage(error, t("skill.local.toggleFailed")),
         }));
     } finally {
       if (active && props.agentId === agentId) setState((current) => ({ ...current, busy: false }));
@@ -91,7 +92,7 @@ export function LocalSkillsLibrary(props: {
     } catch (error) {
       setState((current) => ({
         ...current,
-        error: error instanceof Error ? error.message : "Could not add the local skill.",
+        error: errorMessage(error, t("skill.local.addFailed")),
       }));
     } finally {
       setState((current) => ({ ...current, busy: false }));
@@ -107,7 +108,7 @@ export function LocalSkillsLibrary(props: {
       await props.onInstalled();
       if (active && props.agentId === agentId && state.selected?.id === skill.id) props.onTry?.(skill);
     } catch {
-      setState((current) => ({ ...current, error: "Could not enable the skill." }));
+      setState((current) => ({ ...current, error: t("skill.enableFailed") }));
     } finally {
       setState((current) => ({ ...current, busy: false }));
     }
@@ -118,7 +119,7 @@ export function LocalSkillsLibrary(props: {
         <div class="skill-preview-toolbar">
           <Show when={state.selected}>
             <Button variant="ghost" onClick={() => setState((current) => ({ ...current, selected: null, error: "" }))}>
-              Back to local skills
+              {t("skill.local.back")}
             </Button>
           </Show>
           <Show when={state.selected}>
@@ -131,12 +132,12 @@ export function LocalSkillsLibrary(props: {
                 onClick={() => void install(skill())}
               >
                 {installed()?.state === "needs-repair"
-                  ? "Repair"
+                  ? t("skill.repair")
                   : installed()?.installedVersion === skill().version
-                    ? "Added"
+                    ? t("skill.local.added")
                     : installed()
-                      ? "Update"
-                      : "Add skill"}
+                      ? t("skill.update")
+                      : t("skill.local.add")}
               </Button>
             )}
           </Show>
@@ -148,7 +149,7 @@ export function LocalSkillsLibrary(props: {
         </p>
         <Show when={!state.selected}>
           <Button variant="ghost" onClick={() => setReload((value) => value + 1)}>
-            Retry
+            {t("common.retry")}
           </Button>
         </Show>
       </Show>
@@ -156,7 +157,7 @@ export function LocalSkillsLibrary(props: {
         when={!state.loading}
         fallback={
           <p role="status" class="agent-memory-state">
-            Loading local skills…
+            {t("skill.local.loading")}
           </p>
         }
       >
@@ -165,7 +166,7 @@ export function LocalSkillsLibrary(props: {
           fallback={
             <>
               <Show when={state.skills.length === 0 && !state.error}>
-                <p class="agent-memory-state">No local skills yet.</p>
+                <p class="agent-memory-state">{t("skill.local.empty")}</p>
               </Show>
               <For each={state.skills}>
                 {(skill) => (
@@ -202,15 +203,15 @@ export function LocalSkillsLibrary(props: {
                         size="sm"
                         variant="ghost"
                         class="agent-skill-update"
-                        aria-label={`Update ${skill.name}`}
+                        aria-label={t("skill.updateName", { name: skill.name })}
                         disabled={state.busy || props.disabled}
                         onClick={() => void install(skill)}
                       >
-                        Update
+                        {t("skill.update")}
                       </Button>
                     </Show>
                     <Switch
-                      aria-label={`Enable ${skill.name}`}
+                      aria-label={t("skill.enableName", { name: skill.name })}
                       checked={props.installed.some((item) => item.skillId === skill.id && item.enabled !== false)}
                       disabled={state.busy || props.disabled}
                       onChange={(enabled) => void toggleSkill(skill, enabled)}
@@ -234,12 +235,12 @@ export function LocalSkillsLibrary(props: {
               }
               unavailableReason={
                 !installed()
-                  ? "Add this skill to try it."
+                  ? t("skill.unavailable.add")
                   : installed()?.installedVersion !== skill().version
-                    ? "Update this skill to try this revision."
+                    ? t("skill.unavailable.updateRevision")
                     : installed()?.state === "needs-repair"
-                      ? "Repair this skill to try it."
-                      : "The agent composer is unavailable."
+                      ? t("skill.unavailable.repair")
+                      : t("skill.unavailable.composer")
               }
             />
           )}

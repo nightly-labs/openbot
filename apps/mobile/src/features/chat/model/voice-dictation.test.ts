@@ -1,3 +1,4 @@
+import { mobileTranslateFor } from "@openbot/i18n/mobile";
 import { describe, expect, it } from "vitest";
 import {
   applyDictationResult,
@@ -10,6 +11,8 @@ import {
   retriesWithSystemService,
   spokenText,
 } from "./voice-dictation";
+
+const t = mobileTranslateFor("en");
 
 const idle: ComposerControlsInput = {
   disabled: false,
@@ -97,7 +100,7 @@ describe("recognition locale", () => {
   });
 
   it("lists each language once, by name, and keeps a stored one the recognizer no longer lists", () => {
-    const options = dictationLanguageOptions(["pl-PL", "en-US", "en_US"], "de-DE");
+    const options = dictationLanguageOptions(["pl-PL", "en-US", "en_US"], "de-DE", t);
     expect(options.map((option) => option.value).sort()).toEqual(["de-DE", "en-US", "pl-PL"]);
     expect(options.map((option) => option.label)).toEqual([
       "English (United States)",
@@ -105,9 +108,9 @@ describe("recognition locale", () => {
       "Polish (Poland)",
     ]);
     expect(
-      dictationLanguageOptions(["zh-Hans-CN", "yue-CN", "es-419", "xx-YY"], null).map((option) => option.label),
+      dictationLanguageOptions(["zh-Hans-CN", "yue-CN", "es-419", "xx-YY"], null, t).map((option) => option.label),
     ).toEqual(["Cantonese (China mainland)", "Chinese (China mainland)", "Spanish (Latin America)", "xx-YY"]);
-    expect(dictationLanguageOptions(["pl-PL"], null).map((option) => option.value)).toEqual(["pl-PL"]);
+    expect(dictationLanguageOptions(["pl-PL"], null, t).map((option) => option.value)).toEqual(["pl-PL"]);
   });
 });
 

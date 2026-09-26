@@ -1,12 +1,13 @@
 import type { MenuAction } from "@expo/ui/community/menu";
 import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
-import { userErrorMessage } from "@openbot/user-errors";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { currentText, useText } from "@/shared/lib/text";
 
 export function useChatSectionMenu(serverId: string, chatId: string) {
+  const { t } = useText();
   const { sidebarByServer, servers, mutateSidebarLayout } = useMobileWorkspace();
   const layout = sidebarByServer[serverId]?.layout;
   const pending = useRef(false);
@@ -14,7 +15,7 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
   const disabled = saving || !servers.some((server) => server.id === serverId && server.state === "online");
   const names = new Map(layout?.sections.map((section) => [section.id, section.name]));
   const sections = (layout?.order ?? []).flatMap((id) => {
-    const name = id === SIDEBAR_UNASSIGNED_SECTION_ID ? "Agents" : names.get(id);
+    const name = id === SIDEBAR_UNASSIGNED_SECTION_ID ? t("mobile.agent.section.unassigned") : names.get(id);
     return name ? [{ id, name }] : [];
   });
   const assigned = layout?.agentAssignments[chatId] ?? SIDEBAR_UNASSIGNED_SECTION_ID;
@@ -29,7 +30,11 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
         sectionId: sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : sectionId,
       });
     } catch (error) {
-      Alert.alert("Could not move chat", userErrorMessage(error, "Please try again."));
+      const text = currentText();
+      Alert.alert(
+        text.t("mobile.agent.section.moveFailed"),
+        text.errorMessage(error, text.t("mobile.agent.section.tryAgain")),
+      );
     } finally {
       pending.current = false;
       setSaving(false);
@@ -39,7 +44,7 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
     ? [
         {
           id: "sections",
-          title: "Move to section",
+          title: t("mobile.agent.section.moveTo"),
           attributes: { disabled },
           subactions: sections.map((section) => ({
             id: `section:${section.id}`,
@@ -56,7 +61,7 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
       if (id.startsWith("section:")) void assign(id.slice("section:".length));
     },
     menu: layout ? (
-      <Link.Menu icon="folder" title="Move to section">
+      <Link.Menu icon="folder" title={t("mobile.agent.section.moveTo")}>
         {sections.map((section) => (
           <Link.MenuAction
             key={section.id}

@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { extname, posix, resolve, win32 } from "node:path";
 import { promisify } from "node:util";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 144, 1] as const;
@@ -68,7 +69,7 @@ export async function resolveCodexCli(
       const stdout = await readCliVersion(candidate.executable);
       const version = parseCodexVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_CODEX_VERSION)) {
-        throw new CodexCliError(`Codex CLI ${version} is too old. OpenBot requires 0.144.1 or newer.`, "outdated");
+        throw new CodexCliError(sourceText("error.provider.codexOutdated", { version }), "outdated");
       }
 
       return { executable: candidate.executable, version, source: candidate.source };
@@ -76,7 +77,7 @@ export async function resolveCodexCli(
       failures.push(
         error instanceof CodexCliError
           ? error
-          : new CodexCliError("Codex CLI was found but could not be started.", "invalid"),
+          : new CodexCliError(sourceText("error.provider.codexNotStarted"), "invalid"),
       );
     }
   }
@@ -84,13 +85,10 @@ export async function resolveCodexCli(
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
   if (failures.length > 0) {
-    throw new CodexCliError(
-      "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
-      "invalid",
-    );
+    throw new CodexCliError(sourceText("error.provider.codexNotStartedHint"), "invalid");
   }
 
-  throw new CodexCliError("ChatGPT is not downloaded. Download it in OpenBot to continue.", "missing");
+  throw new CodexCliError(sourceText("error.provider.codexMissing"), "missing");
 }
 
 export function bundledCodexExecutable(
@@ -115,14 +113,14 @@ export async function resolveClaudeCli(
       const stdout = await readCliVersion(candidate.executable);
       const version = parseClaudeVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_CLAUDE_VERSION)) {
-        throw new CodexCliError(`Claude Code ${version} is too old. OpenBot requires 2.1.232 or newer.`, "outdated");
+        throw new CodexCliError(sourceText("error.provider.claudeOutdated", { version }), "outdated");
       }
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
       failures.push(
         error instanceof CodexCliError
           ? error
-          : new CodexCliError("Claude CLI was found but could not be started.", "invalid"),
+          : new CodexCliError(sourceText("error.provider.claudeNotStarted"), "invalid"),
       );
     }
   }
@@ -130,13 +128,10 @@ export async function resolveClaudeCli(
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
   if (failures.length > 0) {
-    throw new CodexCliError(
-      "Claude CLI was found but could not be started. Run `claude --version` in a new terminal.",
-      "invalid",
-    );
+    throw new CodexCliError(sourceText("error.provider.claudeNotStartedHint"), "invalid");
   }
 
-  throw new CodexCliError("Claude is not downloaded. Download it in OpenBot to continue.", "missing");
+  throw new CodexCliError(sourceText("error.provider.claudeMissing"), "missing");
 }
 
 export function bundledClaudeExecutable(
@@ -161,14 +156,14 @@ export async function resolveGrokCli(
       const stdout = await readCliVersion(candidate.executable);
       const version = parseGrokVersion(stdout);
       if (!isMinimumVersion(version, MINIMUM_GROK_VERSION)) {
-        throw new CodexCliError(`Grok CLI ${version} is too old. OpenBot requires 1.0.5 or newer.`, "outdated");
+        throw new CodexCliError(sourceText("error.provider.grokOutdated", { version }), "outdated");
       }
       return { executable: candidate.executable, version, source: candidate.source };
     } catch (error) {
       failures.push(
         error instanceof CodexCliError
           ? error
-          : new CodexCliError("Grok CLI was found but could not be started.", "invalid"),
+          : new CodexCliError(sourceText("error.provider.grokNotStarted"), "invalid"),
       );
     }
   }
@@ -176,13 +171,10 @@ export async function resolveGrokCli(
   const outdated = failures.find((failure) => failure.code === "outdated");
   if (outdated) throw outdated;
   if (failures.length > 0) {
-    throw new CodexCliError(
-      "Grok CLI was found but could not be started. Run `grok --version` in a new terminal.",
-      "invalid",
-    );
+    throw new CodexCliError(sourceText("error.provider.grokNotStartedHint"), "invalid");
   }
 
-  throw new CodexCliError("Grok is not downloaded. Download it in OpenBot to continue.", "missing");
+  throw new CodexCliError(sourceText("error.provider.grokMissing"), "missing");
 }
 
 /**
@@ -210,9 +202,7 @@ export async function resolveOpencodeCli(
     }
   }
   throw new CodexCliError(
-    found
-      ? "OpenCode could not start. Run `opencode --version` in a terminal."
-      : "OpenCode is not downloaded. Download it in OpenBot to continue.",
+    found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
     found ? "invalid" : "missing",
   );
 }
@@ -260,26 +250,26 @@ function bundledProviderExecutable(
 
 export function parseCodexVersion(output: string): string {
   const match = output.match(/(?:codex-cli\s+)?(\d+)\.(\d+)\.(\d+)/i);
-  if (!match) throw new CodexCliError("Unable to read the Codex CLI version.", "invalid");
+  if (!match) throw new CodexCliError(sourceText("error.provider.codexVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
 export function parseClaudeVersion(output: string): string {
   const match = output.match(/(\d+)\.(\d+)\.(\d+)(?:\s+\(Claude Code\))?/i);
-  if (!match) throw new CodexCliError("Unable to read the Claude CLI version.", "invalid");
+  if (!match) throw new CodexCliError(sourceText("error.provider.claudeVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
 export function parseGrokVersion(output: string): string {
   const match = output.match(/(?:grok(?:-cli)?\s+)?v?(\d+)\.(\d+)\.(\d+)/i);
-  if (!match) throw new CodexCliError("Unable to read the Grok CLI version.", "invalid");
+  if (!match) throw new CodexCliError(sourceText("error.provider.grokVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
 /** OpenCode prints a bare `1.18.30`, and `verifyInstalledRuntime` compares that exactly. */
 export function parseOpencodeVersion(output: string): string {
   const match = output.trim().match(/^(?:opencode\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
-  if (!match) throw new CodexCliError("Unable to read the OpenCode CLI version.", "invalid");
+  if (!match) throw new CodexCliError(sourceText("error.provider.opencodeVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
@@ -289,7 +279,7 @@ export function parseOpencodeVersion(output: string): string {
  */
 export function parseBunVersion(output: string): string {
   const match = output.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/);
-  if (!match) throw new CodexCliError("Unable to read the Bun runtime version.", "invalid");
+  if (!match) throw new CodexCliError(sourceText("error.provider.bunVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 

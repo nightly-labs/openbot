@@ -1,17 +1,21 @@
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { type RemoteRecoveryStatus, remoteRecoveryMessage } from "@openbot/team-client";
 import type { MobileServer, MobileServerState } from "./workspace-types";
 
-const LABELS: Record<MobileServerState, string> = {
-  unknown: "Not connected",
-  connecting: "Connecting…",
-  online: "Online",
-  offline: "Offline",
-  error: "Connection error",
-};
+const LABELS = {
+  unknown: "mobile.workspace.status.notConnected",
+  connecting: "common.connecting",
+  online: "mobile.workspace.status.online",
+  offline: "mobile.workspace.status.offline",
+  error: "mobile.workspace.status.error",
+} as const satisfies Record<MobileServerState, MobileTextKey>;
 
-export function serverStatusLabel(server: Pick<MobileServer, "state" | "initialConnectionPending">): string {
-  if (server.state === "connecting" && !server.initialConnectionPending) return LABELS.offline;
-  return LABELS[server.state];
+export function serverStatusLabel(
+  server: Pick<MobileServer, "state" | "initialConnectionPending">,
+  t: MobileTranslate,
+): string {
+  if (server.state === "connecting" && !server.initialConnectionPending) return t(LABELS.offline);
+  return t(LABELS[server.state]);
 }
 
 export function applyServerFailure(server: MobileServer, connectionMessage: string | null): MobileServer {

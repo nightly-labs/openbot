@@ -1,4 +1,6 @@
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, Globe2, MessageCircle } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { Dynamic } from "@solidjs/web";
 import { For } from "solid-js";
 
@@ -11,17 +13,18 @@ interface WebMobileNavigationProps {
 
 const PANES: ReadonlyArray<{
   id: WebMobilePane;
-  label: string;
+  label: AppTextKey;
   Icon: typeof MessageCircle;
 }> = [
-  { id: "conversation", label: "Chat", Icon: MessageCircle },
-  { id: "workspace", label: "Workspace", Icon: Globe2 },
+  { id: "conversation", label: "webClient.pane.chat", Icon: MessageCircle },
+  { id: "workspace", label: "webClient.pane.workspace", Icon: Globe2 },
 ];
 
 /** The small-screen switch for the existing workspace and conversation surfaces. */
 export function WebMobileNavigation(props: WebMobileNavigationProps) {
+  const { t } = useText();
   return (
-    <nav class="web-mobile-navigation" aria-label="Workspace navigation">
+    <nav class="web-mobile-navigation" aria-label={t("webClient.pane.navigation")}>
       <div class="web-mobile-navigation-list">
         <For each={PANES}>
           {(pane) => (
@@ -34,7 +37,7 @@ export function WebMobileNavigation(props: WebMobileNavigationProps) {
               onClick={() => props.onChange(pane.id)}
             >
               <Dynamic component={pane.Icon} aria-hidden="true" />
-              <span>{pane.label}</span>
+              <span>{t(pane.label)}</span>
             </Button>
           )}
         </For>

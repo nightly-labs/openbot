@@ -10,6 +10,7 @@ import {
   type SidebarLayoutAction,
   type TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import type {
   ChatDropTarget,
@@ -57,6 +58,7 @@ export function createSidebarLayoutActions(deps: {
     visiblePinnedKeys,
     visibleSectionIds,
   } = deps;
+  const { t } = currentText();
 
   function moveSection(sectionId: string, direction: "up" | "down"): void {
     const visibleOrder = visibleSectionIds();
@@ -94,7 +96,13 @@ export function createSidebarLayoutActions(deps: {
     props.onReorderPeople(memberIds);
     const position = memberIds.indexOf(sourceMemberId) + 1;
     const member = personById().get(sourceMemberId);
-    announce(`Moved ${member ? teamMemberName(member) : "person"} to position ${position} of ${memberIds.length}.`);
+    announce(
+      t("sidebar.announce.movedToPosition", {
+        name: member ? teamMemberName(member) : t("sidebar.announce.personFallback"),
+        position,
+        total: memberIds.length,
+      }),
+    );
   }
 
   function movePersonByKeyboard(memberId: string, direction: -1 | 1): void {
@@ -113,7 +121,11 @@ export function createSidebarLayoutActions(deps: {
     if (!action) return;
     void props
       .onMutateLayout(action)
-      .then(() => announce(`Moved ${chatName(chatId)} in ${sectionLabel(target.sectionId)}.`), announceError);
+      .then(
+        () =>
+          announce(t("sidebar.announce.movedIn", { name: chatName(chatId), section: sectionLabel(target.sectionId) })),
+        announceError,
+      );
   }
 
   function reorderDraggedSection(sourceSectionId: string, target: SectionDropTarget): void {
@@ -131,22 +143,24 @@ export function createSidebarLayoutActions(deps: {
     const visibleOrder = visibleSectionIds().filter((sectionId) => sectionId !== sourceSectionId);
     const visibleTargetIndex = visibleOrder.indexOf(target.sectionId);
     const visibleInsertionIndex = visibleTargetIndex + (target.placement === "after" ? 1 : 0);
-    void props
-      .onMutateLayout({ type: "move", sectionId: sourceSectionId, direction, steps })
-      .then(
-        () =>
-          announce(
-            `Moved ${sectionLabel(sourceSectionId)} to position ${visibleInsertionIndex + 1} of ${visibleOrder.length + 1}.`,
-          ),
-        announceError,
-      );
+    void props.onMutateLayout({ type: "move", sectionId: sourceSectionId, direction, steps }).then(
+      () =>
+        announce(
+          t("sidebar.announce.movedToPosition", {
+            name: sectionLabel(sourceSectionId),
+            position: visibleInsertionIndex + 1,
+            total: visibleOrder.length + 1,
+          }),
+        ),
+      announceError,
+    );
   }
 
   function pinDraggedSidebarItem(): boolean {
     const item = draggedSidebarItem();
     if (!item || !canPinDraggedSidebarItem()) return false;
     props.onPin(item);
-    announce(`Pinned ${chatName(item.id)}.`);
+    announce(t("sidebar.announce.pinned", { name: chatName(item.id) }));
     return true;
   }
 
@@ -181,7 +195,7 @@ export function createSidebarLayoutActions(deps: {
     target: SidebarDropTarget | null,
   ) {
     if (target && target.kind !== "pinned" && !layoutMutable()) {
-      announce("This host does not support sidebar layout changes.");
+      announce(t("sidebar.section.layoutUnsupported"));
       return;
     }
     let action: SidebarLayoutAction | null = null;
@@ -198,7 +212,7 @@ export function createSidebarLayoutActions(deps: {
     try {
       if (action) await props.onMutateLayout(action);
       props.onUnpin(ref);
-      announce(`Moved ${chatName(source.id)} to ${sectionLabel(sectionId)}.`);
+      announce(t("sidebar.announce.movedTo", { name: chatName(source.id), section: sectionLabel(sectionId) }));
     } catch (error) {
       announceError(error);
     }
@@ -225,7 +239,13 @@ export function createSidebarLayoutActions(deps: {
       else if (target?.kind === "section") {
         void props
           .onMutateLayout(appendChatAction(source.id, target.sectionId))
-          .then(() => announce(`Moved ${chatName(source.id)} to ${sectionLabel(target.sectionId)}.`), announceError);
+          .then(
+            () =>
+              announce(
+                t("sidebar.announce.movedTo", { name: chatName(source.id), section: sectionLabel(target.sectionId) }),
+              ),
+            announceError,
+          );
       }
       return;
     }
@@ -249,7 +269,7 @@ export function createSidebarLayoutActions(deps: {
     items.splice(targetIndex, 0, source);
     props.onReorderPinned(items);
     const position = visiblePinnedKeys().indexOf(targetKey) + 1;
-    announce(`Moved pinned chat to position ${position} of ${visiblePinnedKeys().length}.`);
+    announce(t("sidebar.announce.movedPinned", { position, total: visiblePinnedKeys().length }));
   }
 
   function movePinnedItem(key: string, direction: -1 | 1): void {

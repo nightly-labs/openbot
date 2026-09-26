@@ -5,6 +5,7 @@ import {
   isAgentTemplateCardPng,
   type PublishAgentTemplateInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentTemplateService } from "../agent-template-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { isObject, requireString, stringPayload } from "./validation";
@@ -48,6 +49,6 @@ function parsePublishAgentTemplate(input: unknown): PublishAgentTemplateInput {
   if (!isObject(input)) throw new Error("Invalid agent publication.");
   const card = input.card;
   if (card !== null && !(card instanceof Uint8Array && isAgentTemplateCardPng(card)))
-    throw new Error("The share card is invalid.");
+    throw new Error(sourceText("error.marketplace.shareCardInvalid"));
   return { agentId: requireString(input.agentId, "agentId"), card };
 }

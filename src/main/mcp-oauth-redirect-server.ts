@@ -21,6 +21,8 @@
 
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
+import type { AppTextKey } from "@openbot/i18n";
+import type { LanguageService } from "./language-service";
 
 /** The one path this listener answers. Everything else is a 404, including `/`. */
 const REDIRECT_PATH = "/mcp-auth";
@@ -41,6 +43,8 @@ export interface McpOAuthRedirectServerOptions {
    * refused here exactly as the deep link refuses it.
    */
   deliver: (state: string, code: string) => boolean;
+  /** Read on each request, so the page uses the language that is set at that time. */
+  language: Pick<LanguageService, "locale" | "translate">;
 }
 
 /**
@@ -52,6 +56,7 @@ export interface McpOAuthRedirectServerOptions {
  */
 export async function startMcpOAuthRedirectServer({
   deliver,
+  language,
 }: McpOAuthRedirectServerOptions): Promise<McpOAuthRedirectServer> {
   // A browser keeps its connection open after the page is served, and `server.close` waits for
   // every one of them - so shutdown would sit on a socket nobody is using. They are ended by hand.
@@ -65,7 +70,7 @@ export async function startMcpOAuthRedirectServer({
         // it, and nothing here is worth a second read anyway.
         "cache-control": "no-store",
       })
-      .end(answer.body);
+      .end(page(language.locale, language.translate(answer.message)));
   });
   server.on("connection", (socket) => {
     sockets.add(socket);
@@ -103,7 +108,8 @@ function listen(server: Server): Promise<number> {
 
 interface Answer {
   status: number;
-  body: string;
+  /** The catalog key of the page text. */
+  message: Extract<AppTextKey, `error.mcp.redirect${string}`>;
 }
 
 /**
@@ -120,27 +126,27 @@ function respondTo(
   // request here believing it is talking to that site. It cannot read the answer, but it can
   // deliver a grant of its own choosing. The `Host` header is what the browser thinks it reached,
   // so a request naming anything but the loopback address is not from a redirect this sent.
-  if (!isLoopbackHost(host)) return { status: 403, body: page("This address is not reachable by name.") };
-  if (method !== "GET" && method !== "HEAD") return { status: 405, body: page("This address answers GET only.") };
+  if (!isLoopbackHost(host)) return { status: 403, message: "error.mcp.redirectByName" };
+  if (method !== "GET" && method !== "HEAD") return { status: 405, message: "error.mcp.redirectGetOnly" };
   let url: URL;
   try {
     url = new URL(target ?? "/", "http://127.0.0.1");
   } catch {
-    return { status: 404, body: page("This address is not part of a sign-in.") };
+    return { status: 404, message: "error.mcp.redirectNotSignIn" };
   }
-  if (url.pathname !== REDIRECT_PATH) return { status: 404, body: page("This address is not part of a sign-in.") };
+  if (url.pathname !== REDIRECT_PATH) return { status: 404, message: "error.mcp.redirectNotSignIn" };
 
   // An authorization server states a refusal here instead of sending a code. The sign-in itself
   // ends on its own deadline, with the words the dialog already has; this page exists so the
   // person reading the browser is not left on a blank one.
   const failure = url.searchParams.get("error");
-  if (failure) return { status: 400, body: page("The sign-in was refused. Go back to OpenBot and try again.") };
+  if (failure) return { status: 400, message: "error.mcp.redirectRefused" };
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (!code || !state) return { status: 400, body: page("This address is not part of a sign-in.") };
-  if (!deliver(state, code)) return { status: 400, body: page("No sign-in is waiting for this. It may have ended.") };
-  return { status: 200, body: page("OpenBot is signed in. You can close this window.") };
+  if (!code || !state) return { status: 400, message: "error.mcp.redirectNotSignIn" };
+  if (!deliver(state, code)) return { status: 400, message: "error.mcp.redirectNoSignIn" };
+  return { status: 200, message: "error.mcp.redirectSignedIn" };
 }
 
 function isLoopbackHost(host: string | undefined): boolean {
@@ -153,9 +159,9 @@ function isLoopbackHost(host: string | undefined): boolean {
 }
 
 /**
- * The whole page. The text is fixed at every call site above, so nothing user-supplied and nothing
- * from the authorization server reaches the markup.
+ * The whole page. The text is a fixed catalog message for a key above, so nothing user-supplied and
+ * nothing from the authorization server reaches the markup.
  */
-function page(message: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>OpenBot</title></head><body style="font-family:system-ui;padding:2rem"><p>${message}</p></body></html>`;
+function page(locale: string, message: string): string {
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>OpenBot</title></head><body style="font-family:system-ui;padding:2rem"><p>${message}</p></body></html>`;
 }

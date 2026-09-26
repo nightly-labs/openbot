@@ -5,8 +5,10 @@ import { Copy, Reply, TextSelect } from "lucide-react-native";
 import { useCopyMessage } from "@/features/chat/components/use-copy-message";
 import { useMessageActions } from "@/features/chat/context/message-actions-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useText } from "@/shared/lib/text";
 
 export default function MessageActionsScreen() {
+  const { t } = useText();
   const { selected } = useMessageActions();
   const foreground = useThemeColor("foreground");
   const { copy } = useCopyMessage(selected?.message.body ?? "");
@@ -23,7 +25,7 @@ export default function MessageActionsScreen() {
             router.back();
           }}
         >
-          <Typography>Reply</Typography>
+          <Typography>{t("mobile.app.messageActions.reply")}</Typography>
         </SettingsRow>
         <SettingsRow
           leading={<Copy color={foreground} size={22} />}
@@ -32,13 +34,13 @@ export default function MessageActionsScreen() {
             if (await copy()) router.back();
           }}
         >
-          <Typography>Copy</Typography>
+          <Typography>{t("common.copy")}</Typography>
         </SettingsRow>
         <SettingsRow
           leading={<TextSelect color={foreground} size={22} />}
           onPress={() => router.push("/message-actions/select-text")}
         >
-          <Typography>Select Text</Typography>
+          <Typography>{t("mobile.app.messageActions.selectText")}</Typography>
         </SettingsRow>
       </SettingsSection>
     </SettingsContent>

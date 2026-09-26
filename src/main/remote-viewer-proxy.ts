@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type * as Ws from "ws";
 import { LifecycleGate } from "./lifecycle-gate";
 import {
@@ -105,8 +106,7 @@ export class RemoteViewerProxy {
       server.once("error", reject);
       server.listen(0, "127.0.0.1", () => {
         const address = server.address();
-        if (!address || isString(address))
-          return reject(new Error("The local remote viewer proxy did not get a port."));
+        if (!address || isString(address)) return reject(new Error(sourceText("error.remote.viewerProxyNoPort")));
         this.#server = server;
         this.#port = address.port;
         resolve(address.port);

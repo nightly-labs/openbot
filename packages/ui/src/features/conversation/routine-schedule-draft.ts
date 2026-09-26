@@ -1,8 +1,12 @@
+import type { AppMessages, AppTextKey } from "@openbot/i18n";
+import { currentText } from "../../text";
 import {
   formatRoutineClock,
-  ROUTINE_WEEKDAYS,
   type RoutineSelectOption,
+  type RoutineText,
+  routineClockText,
   routineTimeMinutes,
+  routineWeekdayText,
 } from "./routine-schedule-ui";
 
 /*
@@ -35,43 +39,41 @@ export type RoutineScheduleDraft =
 
 export type RoutineDraftKind = RoutineScheduleDraft["kind"];
 
-export const ROUTINE_DRAFT_KINDS: { value: RoutineDraftKind; label: string }[] = [
-  { value: "once", label: "Once" },
-  { value: "hourly", label: "Hourly" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "yearly", label: "Yearly" },
-  { value: "custom", label: "Custom" },
+/** A frequency the menu offers. `label` is the key of its name. */
+export interface RoutineDraftKindOption {
+  value: RoutineDraftKind;
+  label: AppTextKey;
+}
+
+export const ROUTINE_DRAFT_KINDS: RoutineDraftKindOption[] = [
+  { value: "once", label: "routine.kind.once" },
+  { value: "hourly", label: "routine.kind.hourly" },
+  { value: "daily", label: "routine.kind.daily" },
+  { value: "weekly", label: "routine.kind.weekly" },
+  { value: "monthly", label: "routine.kind.monthly" },
+  { value: "yearly", label: "routine.kind.yearly" },
+  { value: "custom", label: "routine.kind.custom" },
 ];
 
 export const ROUTINE_EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 export const ROUTINE_WORKDAYS = [1, 2, 3, 4, 5];
 
-const ROUTINE_MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+export function routineMonthDayOptions(text: RoutineText = currentText()): RoutineSelectOption[] {
+  return Array.from({ length: 31 }, (_, index) => ({
+    value: String(index + 1),
+    label: text.t("routine.monthDay.option", { day: index + 1 }),
+  }));
+}
 
-export const ROUTINE_MONTH_DAY_OPTIONS: RoutineSelectOption[] = Array.from({ length: 31 }, (_, index) => ({
-  value: String(index + 1),
-  label: `Day ${index + 1}`,
-}));
+/** The steps an hourly run can repeat at. */
+export const ROUTINE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12];
 
-export const ROUTINE_EVERY_HOURS_OPTIONS: RoutineSelectOption[] = [1, 2, 3, 4, 6, 8, 12].map((hours) => ({
-  value: String(hours),
-  label: hours === 1 ? "every hour" : `every ${hours} hours`,
-}));
+export function routineEveryHoursOptions(text: RoutineText = currentText()): RoutineSelectOption[] {
+  return ROUTINE_EVERY_HOURS.map((hours) => ({
+    value: String(hours),
+    label: text.t("routine.everyHours.option", { count: hours }),
+  }));
+}
 
 const DEFAULT_TIME = "09:00";
 const DEFAULT_WINDOW = { start: "09:00", end: "18:00" };
@@ -187,25 +189,42 @@ function sameDays(days: number[], expected: number[]): boolean {
   return days.length === expected.length && expected.every((day) => days.includes(day));
 }
 
-export function routineDaySetLabel(days: number[]): string {
-  if (sameDays(days, ROUTINE_EVERY_DAY)) return "Every day";
-  if (sameDays(days, ROUTINE_WORKDAYS)) return "Weekdays";
-  if (sameDays(days, [0, 6])) return "Weekends";
+type RoutineNamedDaySet = "everyDay" | "weekdays" | "weekends";
+
+function routineNamedDaySet(days: number[]): RoutineNamedDaySet | null {
+  if (sameDays(days, ROUTINE_EVERY_DAY)) return "everyDay";
+  if (sameDays(days, ROUTINE_WORKDAYS)) return "weekdays";
+  if (sameDays(days, [0, 6])) return "weekends";
+  return null;
+}
+
+const NAMED_DAY_SET_LABEL = {
+  everyDay: "routine.days.everyDay",
+  weekdays: "routine.days.weekdays",
+  weekends: "routine.days.weekends",
+} as const satisfies Record<RoutineNamedDaySet, AppTextKey>;
+
+export function routineDaySetLabel(days: number[], text: RoutineText = currentText()): string {
+  const named = routineNamedDaySet(days);
+  if (named) return text.t(NAMED_DAY_SET_LABEL[named]);
   // Three or more days in a row read as a range, so six days stay short: "Mon–Sat".
   return routineDayRuns(days)
     .map((run) => {
       const first = run[0] ?? 0;
       const last = run.at(-1) ?? first;
-      if (run.length < 3) return run.map(routineWeekdayShort).join(", ");
-      return `${routineWeekdayShort(first)}–${routineWeekdayShort(last)}`;
+      if (run.length < 3) return run.map((day) => routineWeekdayShort(day, text)).join(", ");
+      return text.t("routine.days.range", {
+        first: routineWeekdayShort(first, text),
+        last: routineWeekdayShort(last, text),
+      });
     })
     .join(", ");
 }
 
 /** The days chip: the day set, or a count when the list is too long for one row. */
-export function routineDayChipLabel(days: number[]): string {
-  const label = routineDaySetLabel(days);
-  return label.length > 13 ? `${new Set(days).size} days` : label;
+export function routineDayChipLabel(days: number[], text: RoutineText = currentText()): string {
+  const label = routineDaySetLabel(days, text);
+  return label.length > 13 ? text.t("routine.days.count", { count: new Set(days).size }) : label;
 }
 
 /**
@@ -228,40 +247,58 @@ function routineDayRuns(days: number[]): number[][] {
   return runs;
 }
 
-export function routineWeekdayName(day: number): string {
-  return ROUTINE_WEEKDAYS[day] ?? "Sunday";
+export function routineWeekdayName(day: number, text: RoutineText = currentText()): string {
+  return routineWeekdayText(day, "long", text);
 }
 
-export function routineWeekdayShort(day: number): string {
-  return routineWeekdayName(day).slice(0, 3);
+export function routineWeekdayShort(day: number, text: RoutineText = currentText()): string {
+  return routineWeekdayText(day, "short", text);
 }
 
-export function routineWeekdayInitial(day: number): string {
-  return routineWeekdayName(day).slice(0, 1);
+export function routineWeekdayInitial(day: number, text: RoutineText = currentText()): string {
+  return routineWeekdayText(day, "narrow", text);
 }
 
 /**
  * The hours chip: "All day", "All day at :30" for runs past the hour, "9 AM–6 PM", or
  * "10:30–11:30 AM" when both ends share a half of the day. The step is on the frequency chip.
  */
-export function routineHoursLabel(window: RoutineHoursWindow, minute = 0): string {
-  if (!window) return minute > 0 ? `All day at :${String(minute).padStart(2, "0")}` : "All day";
-  const start = formatRoutineClockShort(window.start);
-  const end = formatRoutineClockShort(window.end);
-  const meridiem = splitClock(window.start).meridiem;
-  const sameHalf = meridiem === splitClock(window.end).meridiem;
-  return `${sameHalf ? start.slice(0, -` ${meridiem}`.length) : start}–${end}`;
+export function routineHoursLabel(window: RoutineHoursWindow, minute = 0, text: RoutineText = currentText()): string {
+  const { t } = text;
+  if (!window) {
+    return minute > 0
+      ? t("routine.hours.allDayAt", { minute: String(minute).padStart(2, "0") })
+      : t("routine.hours.allDay");
+  }
+  const start = splitClock(window.start);
+  const end = splitClock(window.end);
+  if (start.meridiem === end.meridiem) {
+    return t("routine.hours.windowSameHalf", {
+      start: shortClockDigits(start),
+      end: shortClockDigits(end),
+      meridiem: start.meridiem === "PM" ? t("routine.clock.pm") : t("routine.clock.am"),
+    });
+  }
+  return t("routine.hours.window", {
+    start: formatRoutineClockShort(window.start, text),
+    end: formatRoutineClockShort(window.end, text),
+  });
 }
 
 /** The frequency chip of an hourly run: "Hourly", or "Every 2h" with a longer step. */
-export function routineHourlyLabel(everyHours: number): string {
-  return everyHours <= 1 ? "Hourly" : `Every ${everyHours}h`;
+export function routineHourlyLabel(everyHours: number, text: RoutineText = currentText()): string {
+  return everyHours <= 1 ? text.t("routine.kind.hourly") : text.t("routine.hours.everyShort", { hours: everyHours });
+}
+
+/** "9" on the hour and "9:30" otherwise. */
+function shortClockDigits(parts: RoutineClockParts): string {
+  return parts.minute === 0 ? String(parts.hour) : `${parts.hour}:${String(parts.minute).padStart(2, "0")}`;
 }
 
 /** "9 AM" on the hour and "9:30 AM" otherwise, for labels that must stay short. */
-export function formatRoutineClockShort(value: RoutineClock): string {
-  const { hour, minute, meridiem } = splitClock(value);
-  return minute === 0 ? `${hour} ${meridiem}` : `${hour}:${String(minute).padStart(2, "0")} ${meridiem}`;
+export function formatRoutineClockShort(value: RoutineClock, text: RoutineText = currentText()): string {
+  const parts = splitClock(value);
+  return routineClockText(shortClockDigits(parts), parts.meridiem === "PM", text);
 }
 
 /** How many runs one day gets. The window is inclusive at both ends, so 9:00 to 18:00 hourly is 10. */
@@ -273,10 +310,14 @@ export function routineRunsPerDay(window: RoutineHoursWindow, everyHours: number
   return Math.floor((end - start) / step) + 1;
 }
 
-export function routineRunsPerDayLabel(window: RoutineHoursWindow, everyHours: number): string {
+export function routineRunsPerDayLabel(
+  window: RoutineHoursWindow,
+  everyHours: number,
+  text: RoutineText = currentText(),
+): string {
   const runs = routineRunsPerDay(window, everyHours);
-  if (runs === 0) return "End time must be after start time";
-  return runs === 1 ? "Once a day" : `${runs} times a day`;
+  if (runs === 0) return text.t("routine.hours.endBeforeStart");
+  return text.t("routine.hours.runsPerDay", { count: runs });
 }
 
 /** A local calendar date as "YYYY-MM-DD". */
@@ -289,16 +330,17 @@ export function parseRoutineDateKey(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
-export function formatRoutineDate(value: string): string {
-  const date = parseRoutineDateKey(value);
-  return `${routineWeekdayShort(date.getDay())}, ${routineMonthShort(date.getMonth() + 1)} ${date.getDate()}`;
+/** "Thu, Sep 24". */
+export function formatRoutineDate(value: string, text: RoutineText = currentText()): string {
+  return text.format.date(parseRoutineDateKey(value), { weekday: "short", month: "short", day: "numeric" });
 }
 
 /** The date chip: "Sep 24", with the year only when it is not the current one. */
-export function routineDateChipLabel(value: string, today: Date): string {
+export function routineDateChipLabel(value: string, today: Date, text: RoutineText = currentText()): string {
   const date = parseRoutineDateKey(value);
-  const label = `${routineMonthShort(date.getMonth() + 1)} ${date.getDate()}`;
-  return date.getFullYear() === today.getFullYear() ? label : `${label}, ${date.getFullYear()}`;
+  return date.getFullYear() === today.getFullYear()
+    ? text.format.date(date, { month: "short", day: "numeric" })
+    : text.format.date(date, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /**
@@ -324,42 +366,78 @@ export function routineYearlyCalendarDate(month: number, day: number): Date {
   return new Date(YEARLY_CALENDAR_YEAR, month, day);
 }
 
-export function routineMonthName(month: number): string {
-  return ROUTINE_MONTHS[month - 1] ?? "January";
+function monthDate(month: number): Date {
+  return new Date(YEARLY_CALENDAR_YEAR, month >= 1 && month <= 12 ? month - 1 : 0, 1);
 }
 
-export function routineMonthShort(month: number): string {
-  return routineMonthName(month).slice(0, 3);
+export function routineMonthName(month: number, text: RoutineText = currentText()): string {
+  return text.format.date(monthDate(month), { month: "long" });
 }
 
-const NAMED_DAY_SETS = new Set(["Every day", "Weekdays", "Weekends"]);
+export function routineMonthShort(month: number, text: RoutineText = currentText()): string {
+  return text.format.date(monthDate(month), { month: "short" });
+}
 
-export function routineDraftSummary(draft: RoutineScheduleDraft): string {
+const HOURLY_DAYS_SUMMARY = {
+  everyDay: "routine.draftSummary.hourlyEveryDay",
+  weekdays: "routine.draftSummary.hourlyWeekdays",
+  weekends: "routine.draftSummary.hourlyWeekends",
+} as const satisfies Record<RoutineNamedDaySet, keyof AppMessages>;
+
+const DAILY_SUMMARY = {
+  everyDay: "routine.summary.daily",
+  weekdays: "routine.summary.weekdays",
+  weekends: "routine.draftSummary.dailyWeekends",
+} as const satisfies Record<RoutineNamedDaySet, keyof AppMessages>;
+
+export function routineDraftSummary(draft: RoutineScheduleDraft, text: RoutineText = currentText()): string {
+  const { t } = text;
   switch (draft.kind) {
     case "once":
-      return `Once on ${formatRoutineDate(draft.date)} at ${formatRoutineClock(draft.time)}`;
+      return t("routine.draftSummary.once", {
+        date: formatRoutineDate(draft.date, text),
+        time: formatRoutineClock(draft.time, text),
+      });
     case "hourly": {
       const minute = routineHourlyMinute(draft);
-      const at = !draft.window && minute > 0 ? ` at :${String(minute).padStart(2, "0")}` : "";
-      const every = `${draft.everyHours === 1 ? "Every hour" : `Every ${draft.everyHours} hours`}${at}`;
-      const days = routineDaySetLabel(draft.days);
-      const window = draft.window
-        ? `, between ${formatRoutineClock(draft.window.start)} – ${formatRoutineClock(draft.window.end)}`
-        : "";
-      return `${every}, ${NAMED_DAY_SETS.has(days) ? days.toLowerCase() : `on ${days}`}${window}`;
+      const everyHours = t("routine.draftSummary.everyHours", { count: draft.everyHours });
+      const every =
+        !draft.window && minute > 0
+          ? t("routine.draftSummary.atMinute", { every: everyHours, minute: String(minute).padStart(2, "0") })
+          : everyHours;
+      const named = routineNamedDaySet(draft.days);
+      const days = named
+        ? t(HOURLY_DAYS_SUMMARY[named], { every })
+        : t("routine.draftSummary.hourlyOnDays", { every, days: routineDaySetLabel(draft.days, text) });
+      if (!draft.window) return days;
+      return t("routine.draftSummary.between", {
+        schedule: days,
+        start: formatRoutineClock(draft.window.start, text),
+        end: formatRoutineClock(draft.window.end, text),
+      });
     }
     case "daily": {
-      const days = routineDaySetLabel(draft.days);
-      return `${NAMED_DAY_SETS.has(days) ? days : `On ${days}`} at ${formatRoutineClock(draft.time)}`;
+      const time = formatRoutineClock(draft.time, text);
+      const named = routineNamedDaySet(draft.days);
+      return named
+        ? t(DAILY_SUMMARY[named], { time })
+        : t("routine.draftSummary.dailyOnDays", { days: routineDaySetLabel(draft.days, text), time });
     }
     case "weekly":
-      return `Every ${routineWeekdayName(draft.weekday)} at ${formatRoutineClock(draft.time)}`;
+      return t("routine.draftSummary.weekly", {
+        weekday: routineWeekdayName(draft.weekday, text),
+        time: formatRoutineClock(draft.time, text),
+      });
     case "monthly":
-      return `Day ${draft.day} of every month at ${formatRoutineClock(draft.time)}`;
+      return t("routine.draftSummary.monthly", { day: draft.day, time: formatRoutineClock(draft.time, text) });
     case "yearly":
-      return `Every year on ${routineMonthName(draft.month)} ${draft.day} at ${formatRoutineClock(draft.time)}`;
+      return t("routine.draftSummary.yearly", {
+        month: routineMonthName(draft.month, text),
+        day: draft.day,
+        time: formatRoutineClock(draft.time, text),
+      });
     case "custom":
-      return `Custom schedule ${draft.expression}`;
+      return t("routine.draftSummary.custom", { expression: draft.expression });
   }
 }
 

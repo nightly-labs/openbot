@@ -12,6 +12,7 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
 import { appPort } from "../../app-port";
 import type { SettingsHostedSitesStore } from "./stores/hosted-sites-store";
@@ -21,24 +22,24 @@ interface SettingsHostedSitesTabProps {
   available: boolean;
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
-}
-
 export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
+  const { t, format } = useText();
+  const formatDate = (value: string) => format.date(new Date(value), { dateStyle: "medium" });
   return (
-    <SettingsSection title="Your sites">
-      <Show when={props.available} fallback={<Text tone="muted">Site hosting is unavailable.</Text>}>
+    <SettingsSection title={t("settings.hostedSites.title")}>
+      <Show when={props.available} fallback={<Text tone="muted">{t("settings.hostedSites.unavailable")}</Text>}>
         <div class="hosted-sites-overview">
-          <span class="settings-modal-row-title">{props.store.state.sites.length} of 10 sites</span>
+          <span class="settings-modal-row-title">
+            {t("settings.hostedSites.usage", { used: props.store.state.sites.length })}
+          </span>
           <Text tone="muted" variant="caption">
-            Sites expire 30 days after publication. Ask an agent to publish or update a site.
+            {t("settings.hostedSites.expiryNote")}
           </Text>
         </div>
         <Show when={props.store.state.error}>{(message) => <p class="settings-modal-error">{message()}</p>}</Show>
         <Show
           when={props.store.state.sites.length > 0}
-          fallback={<Text tone="muted">You do not have a hosted site yet. Ask an agent to publish one.</Text>}
+          fallback={<Text tone="muted">{t("settings.hostedSites.empty")}</Text>}
         >
           <ItemGroup class="settings-modal-card hosted-sites-list" surface="subtle">
             <For each={props.store.state.sites}>
@@ -60,33 +61,35 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                       when={site.status === "blocked"}
                       fallback={
                         <Text tone="muted" variant="caption">
-                          {site.expiresAt ? `Expires ${formatDate(site.expiresAt)}` : "Expiry unavailable"}
+                          {site.expiresAt
+                            ? t("settings.hostedSites.expires", { date: formatDate(site.expiresAt) })
+                            : t("settings.hostedSites.expiryUnavailable")}
                         </Text>
                       }
                     >
-                      <Badge tone="neutral">Blocked</Badge>
+                      <Badge tone="neutral">{t("settings.hostedSites.blocked")}</Badge>
                     </Show>
                   </ItemContent>
                   <ItemActions class="hosted-sites-actions">
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-label={`Open ${site.hostname}`}
+                      aria-label={t("settings.hostedSites.openLabel", { hostname: site.hostname })}
                       disabled={site.status !== "active"}
                       onClick={() => void appPort().openUrl(site.url)}
                     >
                       <ExternalLink size={14} aria-hidden="true" />
-                      Open
+                      {t("common.open")}
                     </Button>
                     <Button
                       variant="destructive-ghost"
                       size="sm"
-                      aria-label={`Delete ${site.hostname}`}
+                      aria-label={t("settings.hostedSites.deleteLabel", { hostname: site.hostname })}
                       disabled={props.store.state.busy}
                       onClick={() => props.store.requestDelete(site)}
                     >
                       <Trash2 size={14} aria-hidden="true" />
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </ItemActions>
                 </Item>
@@ -96,10 +99,10 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
         </Show>
         <ConfirmDialog
           open={props.store.state.pendingDelete !== null}
-          title={`Delete ${props.store.state.pendingDelete?.hostname ?? ""}?`}
-          description="This address will immediately return 410 Gone."
-          confirmLabel="Delete"
-          pendingLabel="Deleting…"
+          title={t("settings.hostedSites.deleteTitle", { hostname: props.store.state.pendingDelete?.hostname ?? "" })}
+          description={t("settings.hostedSites.deleteDescription")}
+          confirmLabel={t("common.delete")}
+          pendingLabel={t("settings.hostedSites.deleting")}
           pending={props.store.state.busy}
           error={props.store.state.deleteError ?? undefined}
           onCancel={props.store.cancelDelete}

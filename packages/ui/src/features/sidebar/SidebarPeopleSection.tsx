@@ -6,6 +6,7 @@
 
 import { Badge, Button } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 import { sidebarMessageTime } from "./sidebar-filtering";
@@ -24,18 +25,20 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
     startPersonDragging,
     stopSidebarDragging,
   } = useSidebarScope();
+  const { t, format } = useText();
+  const presence = (online: boolean) => (online ? t("sidebar.people.online") : t("sidebar.people.offline"));
   const sectionId = () => sectionProps.sectionId;
   return (
     <Show when={props.showPeople !== false && filteredPeople().length > 0}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}
-        aria-label="People"
+        aria-label={t("sidebar.section.people")}
         data-section-id={sectionId()}
         onFocusIn={() => props.onPreloadDirectConversation?.()}
         onPointerEnter={() => props.onPreloadDirectConversation?.()}
       >
-        <SidebarSectionHeader sectionId={sectionId()} name="People" />
+        <SidebarSectionHeader sectionId={sectionId()} name={t("sidebar.section.people")} />
         <div
           class="sidebar-section-collapse"
           data-collapsed={sectionIsCollapsed(sectionId()) ? "" : undefined}
@@ -62,7 +65,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                       variant="ghost"
                       type="button"
                       class={["agent-row person-row", { "agent-row-active": props.activeDirectMemberId === member.id }]}
-                      aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? (member.online ? "Online now" : "Offline")}`}
+                      aria-label={`${teamMemberName(member)}. ${thread()?.lastMessage.text ?? presence(member.online)}`}
                       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                       aria-pressed={props.activeDirectMemberId === member.id ? "true" : "false"}
                       onClick={(event: MouseEvent) => {
@@ -92,14 +95,12 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                       <span class="agent-row-copy">
                         <span class="agent-row-heading">
                           <strong>{teamMemberName(member)}</strong>
-                          <span>{thread() ? sidebarMessageTime(thread()?.updatedAt ?? "") : ""}</span>
+                          <span>{thread() ? sidebarMessageTime(thread()?.updatedAt ?? "", format) : ""}</span>
                         </span>
-                        <span class="agent-row-preview">
-                          {thread()?.lastMessage.text ?? (member.online ? "Online now" : "Offline")}
-                        </span>
+                        <span class="agent-row-preview">{thread()?.lastMessage.text ?? presence(member.online)}</span>
                       </span>
                       <Show when={(thread()?.unreadCount ?? 0) > 0}>
-                        <span class="sr-only">{thread()?.unreadCount} unread direct messages</span>
+                        <span class="sr-only">{t("sidebar.people.unread", { count: thread()?.unreadCount ?? 0 })}</span>
                       </Show>
                     </Button>
                   </div>

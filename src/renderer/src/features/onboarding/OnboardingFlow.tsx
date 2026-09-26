@@ -11,16 +11,16 @@ import {
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { ArrowUp, Button, Plus, toast } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
-import { freeModelsReady, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
-import { errorMessage } from "@openbot/ui/error-message";
+import { freeModelsReady, ProviderPicker, type ProviderPickerOption } from "@openbot/ui/components/ProviderPicker";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -75,6 +75,15 @@ const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string 
 );
 
 /**
+ * The provider registry carries its onboarding line in English. A line that has no key here, such
+ * as one a newer registry adds, shows as it is.
+ */
+const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
+  "Included with OpenBot": "onboarding.provider.included",
+  "Free models, no account needed": "onboarding.provider.freeModels",
+};
+
+/**
  * Whether setup can continue with this provider. A signed-in provider can; so can a downloaded
  * provider that runs free models, because it has no sign-in to wait for.
  */
@@ -100,6 +109,7 @@ type OnboardingAvatarVariants = {
 };
 
 export function OnboardingFlow(props: OnboardingFlowProps) {
+  const { t, errorMessage } = useText();
   const [step, setStep] = createSignal<OnboardingStep>("meet");
   const [direction, setDirection] = createSignal<StepDirection>("forward");
   /**
@@ -140,8 +150,10 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     PROVIDERS.map((provider) => {
       const status = props.agentStatus.providers?.find((candidate) => candidate.id === provider.id);
       const runtime = props.providerRuntimeStatuses?.[provider.id];
+      const descriptionKey = PROVIDER_DESCRIPTION_KEYS[provider.description];
       return {
         ...provider,
+        description: descriptionKey ? t(descriptionKey) : provider.description,
         state: status?.state ?? fallbackProviderState(props.agentStatus),
         message: status?.message,
         email: status?.email,
@@ -151,7 +163,10 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
         freeModels: provider.id === "opencode",
         // For a user with no account anywhere, this row is the way forward, and among four rows it
         // reads like any other; the note points it out.
-        callout: provider.id === "opencode" ? { title: "Try it free", detail: "No sign-in needed" } : null,
+        callout:
+          provider.id === "opencode"
+            ? { title: t("onboarding.provider.tryFree"), detail: t("onboarding.provider.noSignIn") }
+            : null,
         runtimeStatus:
           runtime?.phase === "not-downloaded" && (status?.state === "available" || status?.state === "sign-in-required")
             ? { ...runtime, phase: "ready", version: status.version }
@@ -235,21 +250,22 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const nextBlockedReason = createMemo(() => {
     if (selectedProviderConnected()) return "";
     const option = providerOptions().find((candidate) => candidate.id === selectedProvider());
-    if (!option) return "Select a provider to continue.";
+    if (!option) return t("onboarding.next.selectProvider");
+    const provider = option.name;
     switch (option.runtimeStatus?.phase) {
       case "downloading":
-        return `${option.name} is still downloading.`;
+        return t("onboarding.next.downloading", { provider });
       case "finishing":
-        return `${option.name} is still being set up.`;
+        return t("onboarding.next.finishing", { provider });
       case "download-error":
-        return `${option.name} could not be downloaded. Retry the download to continue.`;
+        return t("onboarding.next.downloadError", { provider });
       case "not-downloaded":
-        return `Download ${option.name} to continue.`;
+        return t("onboarding.next.notDownloaded", { provider });
       default:
         break;
     }
-    if (option.connectionState === "connecting") return `${option.name} is connecting.`;
-    return `Connect ${option.name} to continue.`;
+    if (option.connectionState === "connecting") return t("onboarding.next.connecting", { provider });
+    return t("onboarding.next.connect", { provider });
   });
 
   createEffect(
@@ -330,9 +346,12 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     try {
       await action(provider);
     } catch {
-      const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
+      const providerName =
+        PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? t("onboarding.provider.fallbackName");
       setError(
-        `OpenBot could not open the ${kind === "install" ? "installation" : "sign-in"} guide for ${providerName}.`,
+        kind === "install"
+          ? t("onboarding.error.installGuide", { provider: providerName })
+          : t("onboarding.error.signInGuide", { provider: providerName }),
       );
     }
   }
@@ -360,8 +379,9 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       await props.onConnectProvider(provider);
     } catch {
       providersAwaitingFocusRefresh.delete(provider);
-      const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not connect ${providerName}. Try again.`);
+      const providerName =
+        PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? t("onboarding.provider.fallbackName");
+      setError(t("onboarding.error.connect", { provider: providerName }));
     }
   }
 
@@ -373,8 +393,9 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     try {
       await props.onDownloadProvider(provider);
     } catch {
-      const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not download ${providerName}. Try again.`);
+      const providerName =
+        PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? t("onboarding.provider.fallbackName");
+      setError(t("onboarding.error.download", { provider: providerName }));
     }
   }
 
@@ -384,8 +405,9 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     try {
       await props.onCancelProviderDownload(provider);
     } catch {
-      const providerName = PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? "provider";
-      setError(`OpenBot could not cancel the ${providerName} download. Try again.`);
+      const providerName =
+        PROVIDERS.find((candidate) => candidate.id === provider)?.name ?? t("onboarding.provider.fallbackName");
+      setError(t("onboarding.error.cancelDownload", { provider: providerName }));
     }
   }
 
@@ -401,7 +423,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
     try {
       await props.onRefreshProviders();
     } catch {
-      setError("OpenBot could not refresh your local AI providers. Try again.");
+      setError(t("onboarding.error.refresh"));
     }
   }
 
@@ -430,7 +452,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       toast.info(nextBlockedReason());
       return;
     }
-    toast.info(`Connecting ${option.name}. Finish the sign-in if a browser window opens.`);
+    toast.info(t("onboarding.toast.connecting", { provider: option.name }));
     void connectProvider(option.id);
   }
 
@@ -476,7 +498,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       // A built-in provider keeps its own default model, so only the custom row sends one.
       await props.onSave(provider, customSelected() ? (customModel() ?? firstSavedCustomModel()) : null);
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not finish setup."));
+      setError(errorMessage(cause, t("onboarding.error.finish")));
       setSaving(false);
     }
   }
@@ -491,7 +513,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
       ref={(element) => setScreenElement(element)}
     >
       <div class="onboarding-shell">
-        <nav class="onboarding-progress" aria-label={`Onboarding step ${stepNumber()} of 3`}>
+        <nav class="onboarding-progress" aria-label={t("onboarding.progress", { step: stepNumber(), total: 3 })}>
           <For each={[1, 2, 3]}>
             {(item) => <span class={item === stepNumber() ? "is-active" : item < stepNumber() ? "is-complete" : ""} />}
           </For>
@@ -511,13 +533,13 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                     class="onboarding-avatar-hero"
                   />
                 </div>
-                <h1 id="onboarding-title">Meet OpenBot</h1>
-                <p class="onboarding-description">A team that works with you.</p>
+                <h1 id="onboarding-title">{t("onboarding.meet.title")}</h1>
+                <p class="onboarding-description">{t("onboarding.meet.description")}</p>
 
-                <section class="composer onboarding-composer" data-compact aria-label="Example task handoff">
+                <section class="composer onboarding-composer" data-compact aria-label={t("onboarding.meet.example")}>
                   <div class="composer-input-label">
                     <div class="composer-editor-root">
-                      <span class="composer-editor-placeholder">Hand off any task to your team</span>
+                      <span class="composer-editor-placeholder">{t("onboarding.meet.placeholder")}</span>
                     </div>
                   </div>
                   <div class="composer-toolbar">
@@ -526,7 +548,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       variant="ghost"
                       size="xs"
                       class="composer-button"
-                      aria-label="Add to prompt"
+                      aria-label={t("onboarding.meet.addToPrompt")}
                       disabled
                     >
                       <Plus aria-hidden="true" />
@@ -537,7 +559,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         variant="ghost"
                         size="xs"
                         class="voice-button"
-                        aria-label="Send message"
+                        aria-label={t("onboarding.meet.sendMessage")}
                         disabled
                       >
                         <ArrowUp aria-hidden="true" />
@@ -550,14 +572,14 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                   <ProviderPicker
                     value={selectedProvider()}
                     options={providerOptions()}
-                    ariaLabel="Default provider"
-                    label="Choose your AI provider"
+                    ariaLabel={t("onboarding.provider.defaultLabel")}
+                    label={t("onboarding.provider.label")}
                     hint={
                       lazyProviderMode()
-                        ? "Download, connect, and select a provider to continue."
+                        ? t("onboarding.provider.hintDownload")
                         : showsProviderSetup()
-                          ? "Connect and select a provider to continue. Use Refresh after external account changes."
-                          : "You can change this for each agent later."
+                          ? t("onboarding.provider.hintConnect")
+                          : t("onboarding.provider.hintChange")
                     }
                     allowUnavailableSelection
                     focusFirst
@@ -633,7 +655,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
             <Match when={step() === "computer"}>
               <section class="onboarding-panel onboarding-panel-computer" aria-labelledby="onboarding-title">
-                <h1 id="onboarding-title">OpenBot might control your computer</h1>
+                <h1 id="onboarding-title">{t("onboarding.computer.title")}</h1>
 
                 <div class="onboarding-computer-visual" aria-hidden="true">
                   <svg viewBox="0 0 400 240" role="presentation">
@@ -709,10 +731,10 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
 
             <Match when={step() === "jobs"}>
               <section class="onboarding-panel onboarding-panel-jobs" aria-labelledby="onboarding-title">
-                <h1 id="onboarding-title">Give each agent a job</h1>
-                <p class="onboarding-description">Start with focused agents, then build the team around your work.</p>
+                <h1 id="onboarding-title">{t("onboarding.jobs.title")}</h1>
+                <p class="onboarding-description">{t("onboarding.jobs.description")}</p>
 
-                <section class="onboarding-job-orbit" aria-label="Example agent jobs">
+                <section class="onboarding-job-orbit" aria-label={t("onboarding.jobs.example")}>
                   <article class="onboarding-job-card onboarding-job-card-top">
                     <AgentAvatar
                       seed={avatarVariants.inbox.seed}
@@ -722,7 +744,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.inbox.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Inbox Triage</span>
+                    <span>{t("onboarding.jobs.inbox")}</span>
                   </article>
                   <article class="onboarding-job-card onboarding-job-card-left">
                     <AgentAvatar
@@ -733,7 +755,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.weekly.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Weekly Planning</span>
+                    <span>{t("onboarding.jobs.weekly")}</span>
                   </article>
                   <article class="onboarding-job-card onboarding-job-card-right">
                     <AgentAvatar
@@ -744,7 +766,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                       animationOffset={avatarVariants.research.animationOffset}
                       class="onboarding-job-avatar"
                     />
-                    <span>Research Digest</span>
+                    <span>{t("onboarding.jobs.research")}</span>
                   </article>
                 </section>
               </section>
@@ -761,7 +783,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
         <div class="onboarding-actions">
           <Show when={step() !== "meet"}>
             <Button type="button" variant="outline" class="onboarding-back" disabled={saving()} onClick={previousStep}>
-              Back
+              {t("common.back")}
             </Button>
           </Show>
           <Button
@@ -771,10 +793,14 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
             disabled={saving()}
             aria-describedby={nextBlockedReason() ? nextReasonId : undefined}
             loading={saving()}
-            loadingLabel="Opening OpenBot…"
+            loadingLabel={t("onboarding.opening")}
             onClick={nextStep}
           >
-            {!selectedProviderConnected() ? "Connect" : step() === "jobs" ? "Open OpenBot" : "Next"}
+            {!selectedProviderConnected()
+              ? t("onboarding.action.connect")
+              : step() === "jobs"
+                ? t("onboarding.action.open")
+                : t("onboarding.action.next")}
           </Button>
           {/* Named by the button above, so the reason is read out with it rather than hunted for. */}
           <Show when={nextBlockedReason()}>

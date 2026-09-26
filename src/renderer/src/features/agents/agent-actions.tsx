@@ -1,7 +1,7 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { toast } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { currentText } from "@openbot/ui/text";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
@@ -92,7 +92,8 @@ const AgentActions = createSimpleContext({
         analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
       } catch (error) {
         analytics.track("agent_action", { action: "create", result: "failed", failure_code: "create_failed" });
-        setAgentSetupError(errorMessage(error, "The agent could not be created."));
+        const { t, errorMessage } = currentText();
+        setAgentSetupError(errorMessage(error, t("agent.error.createFailed")));
       } finally {
         setCreatingAgent(false);
       }
@@ -125,8 +126,9 @@ const AgentActions = createSimpleContext({
           failure_code: "duplicate_failed",
           ...(properties ?? {}),
         });
-        toast.error("Could not duplicate agent", {
-          description: errorMessage(error, "Could not duplicate this agent. Try again."),
+        const { t, errorMessage } = currentText();
+        toast.error(t("agent.error.duplicateTitle"), {
+          description: errorMessage(error, t("agent.error.duplicateFailed")),
         });
         throw error;
       } finally {
@@ -176,7 +178,7 @@ const AgentActions = createSimpleContext({
             failure_code: "uninstall_failed",
           });
         }
-        appendUiError(agentId, error, "Delete failed", serverId);
+        appendUiError(agentId, error, currentText().t("agent.error.deleteFailed"), serverId);
         throw error;
       }
     }

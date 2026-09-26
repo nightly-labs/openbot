@@ -2,6 +2,7 @@ import { lstat, readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { SKILL_DESCRIPTION_MAX_LENGTH, type SkillPackagePreview } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { unzipSync, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 
@@ -14,20 +15,21 @@ export async function archiveDirectory(root: string): Promise<Uint8Array> {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".DS_Store") continue;
       const path = join(directory, entry.name);
-      if (entry.isSymbolicLink()) throw new Error("Skill packages cannot contain symbolic links.");
+      if (entry.isSymbolicLink()) throw new Error(sourceText("error.skill.symlinks"));
       if (entry.isDirectory()) await visit(path);
       else if (entry.isFile()) {
         const name = relative(root, path).replaceAll("\\", "/");
         expandedSize += (await lstat(path)).size;
-        if (expandedSize > MAX_BYTES) throw new Error("The expanded skill must be under 10 MB.");
+        if (expandedSize > MAX_BYTES) throw new Error(sourceText("error.skill.expandedTooLarge"));
         files[name] = new Uint8Array(await readFile(path));
-        if (Object.keys(files).length > MAX_FILES) throw new Error(`A skill can contain at most ${MAX_FILES} files.`);
-      } else throw new Error("Skill packages can contain only regular files and folders.");
+        if (Object.keys(files).length > MAX_FILES)
+          throw new Error(sourceText("error.skill.tooManyFiles", { limit: MAX_FILES }));
+      } else throw new Error(sourceText("error.skill.irregularEntry"));
     }
   }
   await visit(root);
   const bytes = zipSync(files, { level: 6 });
-  if (bytes.byteLength > MAX_BYTES) throw new Error("The skill package must be under 10 MB.");
+  if (bytes.byteLength > MAX_BYTES) throw new Error(sourceText("error.skill.packageTooLarge"));
   return bytes;
 }
 
@@ -39,21 +41,21 @@ export function inspectSkillMarkdown(markdown: string): Omit<SkillPackagePreview
 export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "draftId" | "size"> {
   const files = normalizedFiles(bytes);
   const skillFile = files["SKILL.md"];
-  if (!skillFile) throw new Error("The skill package must contain SKILL.md at its root.");
+  if (!skillFile) throw new Error(sourceText("error.skill.missingSkillFile"));
   const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
   const match = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u);
-  if (!match) throw new Error("SKILL.md must begin with YAML frontmatter.");
+  if (!match) throw new Error(sourceText("error.skill.frontmatterMissing"));
   const metadata = parseYaml(match[1] ?? "");
-  if (!isDynamicRecord(metadata)) throw new Error("SKILL.md metadata is invalid.");
+  if (!isDynamicRecord(metadata)) throw new Error(sourceText("error.skill.metadataInvalid"));
   const name = isString(metadata.name) ? metadata.name.trim() : "";
   const description = isString(metadata.description) ? metadata.description.trim() : "";
   if (!name || name.length > 80 || !description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
-    throw new Error("SKILL.md needs a valid name and description.");
+    throw new Error(sourceText("error.skill.nameAndDescriptionRequired"));
   return { name, description, slug: slugify(name), files: Object.keys(files).sort() };
 }
 
 export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
-  if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new Error("The skill package must be under 10 MB.");
+  if (!bytes.byteLength || bytes.byteLength > MAX_BYTES) throw new Error(sourceText("error.skill.packageTooLarge"));
   let raw: Record<string, Uint8Array>;
   try {
     let expandedSize = 0;
@@ -67,20 +69,19 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
       },
     });
   } catch {
-    throw new Error("The selected ZIP is invalid.");
+    throw new Error(sourceText("error.skill.zipInvalid"));
   }
   const entries = Object.entries(raw).filter(([name]) => !name.endsWith("/"));
-  if (!entries.length || entries.length > MAX_FILES)
-    throw new Error("The skill package has an invalid number of files.");
+  if (!entries.length || entries.length > MAX_FILES) throw new Error(sourceText("error.skill.fileCountInvalid"));
   const roots = new Set(entries.map(([name]) => name.replaceAll("\\", "/").split("/")[0]));
   const wrapper = roots.size === 1 && entries.every(([name]) => name.includes("/")) ? [...roots][0] : null;
   const result: Record<string, Uint8Array> = {};
   let size = 0;
   for (const [rawName, data] of entries) {
     const name = (wrapper ? rawName.slice((wrapper?.length ?? 0) + 1) : rawName).replaceAll("\\", "/");
-    if (isUnsafeArchivePath(name)) throw new Error(`The skill package contains an unsafe file: ${name}`);
+    if (isUnsafeArchivePath(name)) throw new Error(sourceText("error.skill.unsafeFile", { name }));
     size += data.byteLength;
-    if (size > MAX_BYTES) throw new Error("The expanded skill must be under 10 MB.");
+    if (size > MAX_BYTES) throw new Error(sourceText("error.skill.expandedTooLarge"));
     result[name] = data;
   }
   return result;
@@ -109,6 +110,6 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-|-$/gu, "")
     .slice(0, 64);
-  if (!value) throw new Error("The skill name cannot form a valid slug.");
+  if (!value) throw new Error(sourceText("error.skill.slugInvalid"));
   return value;
 }

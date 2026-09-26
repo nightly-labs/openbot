@@ -4,6 +4,7 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import type { SetProviderApiKeyInput } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { shell } from "electron";
 import type { AgentService } from "../../backend/agent-service";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -73,10 +74,10 @@ export function providerIpcHandlers({
  * secret enters the main process, and each rule here decides what `safeStorage` is asked to keep.
  */
 export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput {
-  if (!isDynamicRecord(value)) throw new Error("A provider key is required.");
+  if (!isDynamicRecord(value)) throw new Error(sourceText("error.provider.keyRequired"));
   const provider = parseProviderId(value.provider);
-  if (!isString(value.key) || !value.key.trim()) throw new Error("A provider key is required.");
-  if (value.key.length > MAX_API_KEY_LENGTH) throw new Error("The provider key is too long.");
+  if (!isString(value.key) || !value.key.trim()) throw new Error(sourceText("error.provider.keyRequired"));
+  if (value.key.length > MAX_API_KEY_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
   return { provider, key: value.key.trim() };
 }
 

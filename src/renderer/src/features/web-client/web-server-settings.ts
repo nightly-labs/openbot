@@ -17,7 +17,7 @@ import {
   testMcpServer as testMcpServerRequest,
   updateHostIdentity,
 } from "@openbot/team-client/team-admin-requests";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { serverCanAdminister, serverRoleCanAdminister } from "../servers/server-capabilities";
 import type { WebAdminRuntime } from "./web-runtime";
@@ -63,7 +63,8 @@ export function createWebServerSettings(options: {
   function requireAdmin(): { server: ServerSummary; admin: WebAdminRuntime } {
     const server = options.server();
     const admin = options.admin();
-    if (!server || !admin || server.state !== "online") throw new Error("Connect to this server first.");
+    if (!server || !admin || server.state !== "online")
+      throw new Error(currentText().t("webClient.error.connectServerFirst"));
     return { server, admin };
   }
 
@@ -121,7 +122,7 @@ export function createWebServerSettings(options: {
     } catch (error) {
       if (current === request)
         setState((draft) => {
-          draft.error = errorMessage(error, "The server settings could not load.");
+          draft.error = currentText().errorMessage(error, currentText().t("server.settings.loadFailed"));
         });
     } finally {
       if (current === request)
@@ -156,7 +157,7 @@ export function createWebServerSettings(options: {
   async function saveIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
     const { server, admin } = requireAdmin();
     if (!serverCanAdminister(server, "host-admin-v1"))
-      throw new Error("The name and logo of this server can only change on the computer that runs it.");
+      throw new Error(currentText().t("server.settings.identityLocalOnly"));
     await updateHostIdentity(admin.request, input);
     await options.refreshHosts();
     await refresh();
@@ -181,7 +182,7 @@ export function createWebServerSettings(options: {
       // Shown in the panel: nothing waits for this promise when a section opens.
       if (current === mcpRequest)
         setState((draft) => {
-          draft.mcpError = errorMessage(error, "The MCP servers could not load.");
+          draft.mcpError = currentText().errorMessage(error, currentText().t("mcp.server.loadFailed"));
         });
     }
   }

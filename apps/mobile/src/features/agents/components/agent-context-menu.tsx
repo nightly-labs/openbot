@@ -1,4 +1,3 @@
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import * as Clipboard from "expo-clipboard";
 import { Link, router } from "expo-router";
 import { useRef } from "react";
@@ -9,6 +8,7 @@ import { useAgentUnread } from "@/features/workspace/components/use-live-workspa
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
+import { currentText, useText } from "@/shared/lib/text";
 
 export function useAgentContextMenu(agent: MobileAgent) {
   const { deleteAgent, duplicateAgent, hideAgent, markAgentRead, markAgentUnread, pinnedAgentIds, pinnedChannelIds } =
@@ -18,6 +18,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
   const isPinned = pinnedAgentIds.includes(agent.id);
   const isUnread = useAgentUnread(agent.id);
   const actionPending = useRef(false);
+  const { t } = useText();
 
   async function runAgentAction(action: "delete" | "duplicate"): Promise<void> {
     if (actionPending.current) return;
@@ -27,9 +28,10 @@ export function useAgentContextMenu(agent: MobileAgent) {
       else await duplicateAgent(agent.id);
       void haptics.notification();
     } catch (error) {
+      const text = currentText();
       Alert.alert(
-        action === "delete" ? "Could not delete agent" : "Could not duplicate agent",
-        errorMessage(error, "The server could not complete this action. Please try again."),
+        text.t(action === "delete" ? "mobile.agent.menu.deleteFailed" : "mobile.agent.menu.duplicateFailed"),
+        text.errorMessage(error, text.t("mobile.agent.menu.actionFailed")),
       );
     } finally {
       actionPending.current = false;
@@ -45,10 +47,10 @@ export function useAgentContextMenu(agent: MobileAgent) {
   };
 
   const handleDelete = () => {
-    Alert.alert(`Delete ${agent.name}?`, "This removes the agent from this server.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("mobile.agent.menu.deleteTitle", { name: agent.name }), t("mobile.agent.menu.deleteBody"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("common.delete"),
         style: "destructive",
         onPress: () => {
           void runAgentAction("delete");
@@ -71,7 +73,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
   return (
     <Link.Menu>
       <Link.MenuAction icon={isUnread ? "envelope.open" : "envelope.badge"} onPress={handleRead}>
-        {isUnread ? "Mark read" : "Mark unread"}
+        {t(isUnread ? "mobile.agent.menu.markRead" : "mobile.agent.menu.markUnread")}
       </Link.MenuAction>
       <Link.MenuAction
         icon={isPinned ? "pin.slash" : "pin"}
@@ -79,18 +81,18 @@ export function useAgentContextMenu(agent: MobileAgent) {
         onPress={handlePin}
         disabled={!canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id)}
       >
-        {isPinned ? "Unpin" : "Pin"}
+        {t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin")}
       </Link.MenuAction>
       <Link.MenuAction icon="eye.slash" onPress={handleHide}>
-        Hide
+        {t("mobile.agent.menu.hide")}
       </Link.MenuAction>
       {sectionMenu.menu}
       <Link.MenuAction icon="info.circle" onPress={handleInfo}>
-        Info
+        {t("mobile.agent.menu.info")}
       </Link.MenuAction>
-      <Link.Menu icon="ellipsis" title="More">
+      <Link.Menu icon="ellipsis" title={t("mobile.agent.menu.more")}>
         <Link.MenuAction icon="doc.on.doc" onPress={handleCopyId}>
-          Copy ID
+          {t("mobile.agent.menu.copyId")}
         </Link.MenuAction>
         <Link.MenuAction
           icon="plus.square.on.square"
@@ -98,10 +100,10 @@ export function useAgentContextMenu(agent: MobileAgent) {
             void runAgentAction("duplicate");
           }}
         >
-          Duplicate
+          {t("mobile.agent.menu.duplicate")}
         </Link.MenuAction>
         <Link.MenuAction destructive icon="trash" onPress={handleDelete}>
-          Delete
+          {t("common.delete")}
         </Link.MenuAction>
       </Link.Menu>
     </Link.Menu>

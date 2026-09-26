@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentSummary } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
@@ -86,11 +87,11 @@ export class AgentRemoval {
   }
 
   async delete(agentId: string): Promise<void> {
-    if (this.#deleting.has(agentId)) throw new Error("Agent deletion is already in progress.");
+    if (this.#deleting.has(agentId)) throw new Error(sourceText("error.agent.deletionBusy"));
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const hasPendingWork = this.#mailbox.hasUnfinishedDelivery(agentId);
     if (hasPendingWork || this.#conversation.workingSnapshot(agentId)?.activeTurnId) {
-      throw new Error("Stop the agent and cancel its queued messages before deleting it.");
+      throw new Error(sourceText("error.agent.stopBeforeDelete"));
     }
 
     const { wasPending, release } = this.#duplication.releaseForDelete(agentId);
@@ -115,7 +116,7 @@ export class AgentRemoval {
     try {
       await this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentData(agent));
     } catch {
-      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
+      throw new Error(sourceText("error.agent.deleteIncomplete"));
     }
   }
 
@@ -134,7 +135,7 @@ export class AgentRemoval {
     } catch {
       // File-system errors can contain private paths. Log only the failed stage.
       this.#logger.warn("Agent deletion failed.", { stage });
-      throw new Error("The agent data could not be removed completely. Retry deleting the agent.");
+      throw new Error(sourceText("error.agent.deleteIncomplete"));
     }
     await this.#closeBrowserTabs(agent);
     this.#conversation.forgetAgent(agent.id);

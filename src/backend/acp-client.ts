@@ -19,6 +19,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
@@ -522,7 +523,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       await this.options.authenticate?.(connection, this.#initialization);
       this.#models = await this.#discoverModels();
       if (this.#models.length === 0) {
-        throw new Error("ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.");
+        throw new Error(sourceText("error.provider.acpNoModels"));
       }
       this.#signedIn = true;
     } catch (error) {
@@ -902,7 +903,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const model = thread.currentModelId;
     if (!model || !this.options.servesModel) return;
     if (!this.options.servesModel(model)) {
-      throw new Error("The endpoint this agent used was removed. Choose another model for it.");
+      throw new Error(sourceText("error.agent.endpointRemoved"));
     }
   }
 

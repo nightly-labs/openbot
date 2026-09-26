@@ -16,8 +16,10 @@ import {
 } from "@/features/search/model/mobile-search";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { useText } from "@/shared/lib/text";
 
 export function SearchAgentsScreen() {
+  const { t } = useText();
   const { activeAgents } = useMobileWorkspace();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<MobileSearchCategory>("all");
@@ -84,10 +86,10 @@ export function SearchAgentsScreen() {
       ) : (
         <View className="items-center px-8 py-12">
           <Typography.Paragraph align="center" weight="semibold">
-            No matching results
+            {t("mobile.search.emptyTitle")}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" align="center" className="mt-1 text-text-secondary">
-            Try a different search or choose another filter.
+            {t("mobile.search.emptyBody")}
           </Typography.Paragraph>
         </View>
       )}

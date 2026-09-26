@@ -4,6 +4,7 @@ import { type BrowserDisplayState, LOCAL_SERVER_ID } from "@openbot/contracts/ip
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewInputValue } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { sourceText } from "@openbot/i18n/source";
 import type { BrowserHost } from "../../backend/browser-host";
 import type { BrowserPictureInPicture } from "../browser-picture-in-picture";
 import type { BrowserViewClient } from "../browser-view-client";
@@ -90,7 +91,7 @@ export function browserIpcHandlers({
             // An older host has no route that moves an existing tab to an address. The renderer
             // opens a new tab for it instead, so this stays the error that tells it to.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
-              throw new Error("This remote host does not support address-bar navigation in an existing tab.");
+              throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
             return remoteServers.request(serverId, TEAM_API_ROUTES.browser.load, decodeVoid, {
               method: "POST",

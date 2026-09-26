@@ -14,6 +14,7 @@ import {
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { RemoteServerManager } from "./remote-server-manager";
 
 export interface BrowserViewClientOptions {
@@ -44,9 +45,9 @@ export class BrowserViewClient {
   async start(tabId: string): Promise<void> {
     return this.#queue(async () => {
       const serverId = this.#options.servers.activeServerId;
-      if (!serverId) throw new Error("A live browser view is only for a remote host.");
+      if (!serverId) throw new Error(sourceText("error.backend.browserViewRemoteOnly"));
       if (!this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY)) {
-        throw new Error("This remote host does not support a live browser view.");
+        throw new Error(sourceText("error.backend.browserViewUnsupported"));
       }
       await this.#closeView();
       const stream = await this.#options.servers.openBrowserViewStream(serverId, tabId);

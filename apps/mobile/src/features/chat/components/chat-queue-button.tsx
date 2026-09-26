@@ -5,6 +5,7 @@ import { ChevronUp, Clock, TriangleAlert } from "lucide-react-native";
 import { memo } from "react";
 import { View, type ViewStyle } from "react-native";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import type { QueuedUpload } from "../context/queued-messages-context";
 import { queueRowsWithHeldEdit } from "../model/queue-edit-draft";
 import { ChatGlassButton } from "./chat-glass-icon-button";
@@ -23,6 +24,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
   liquidGlassAvailable,
   fallbackBackground,
 }: ChatQueueButtonProps) {
+  const { t } = useText();
   const muted = useThemeColor("muted");
   // The sheet keeps a held edit in its rows when the host hides it. Count it here as
   // well, so a saved edit with a lost response stays reachable after a restart.
@@ -36,9 +38,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
     <View className="mb-2 items-center">
       <ChatGlassButton
         accessibilityLabel={
-          failed
-            ? "The queued messages did not load. Show queued messages"
-            : `${count} queued message${count === 1 ? "" : "s"}. Show queued messages`
+          failed ? t("mobile.chat.queue.buttonFailed") : t("mobile.chat.queue.buttonLabel", { count })
         }
         className="h-11 flex-row items-center gap-2 px-4"
         fallbackBackground={fallbackBackground}
@@ -55,7 +55,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
           <Clock color={String(muted)} size={16} strokeWidth={2} />
         )}
         <Typography.Paragraph type="body-sm" weight="semibold">
-          {failed ? "Queue unavailable" : `${count} queued`}
+          {failed ? t("mobile.chat.queue.unavailable") : t("mobile.chat.queue.count", { count })}
         </Typography.Paragraph>
         <ChevronUp color={String(muted)} size={16} strokeWidth={2} />
       </ChatGlassButton>

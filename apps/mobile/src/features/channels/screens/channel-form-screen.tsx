@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AvatarHue, type ChannelDraft, type ChannelSummary, isChannelDraft } from "@openbot/contracts/ipc";
-import { userErrorMessage } from "@openbot/user-errors";
 import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -14,6 +13,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { currentText, useText } from "@/shared/lib/text";
 import { toggleChannelMember } from "../model/channel-draft";
 import type { MobileChannelStore } from "../model/channel-store";
 
@@ -56,6 +56,7 @@ const MemberChoice = memo(function MemberChoice({
 });
 
 export function ChannelFormScreen({ create = false }: { create?: boolean }) {
+  const { t } = useText();
   const params = useLocalSearchParams<{ serverId?: string; channelId?: string }>();
   const workspace = useMobileWorkspace();
   const [serverId] = useState(params.serverId ?? workspace.activeServer.id);
@@ -72,7 +73,7 @@ export function ChannelFormScreen({ create = false }: { create?: boolean }) {
     return (
       <SheetScrollView>
         <Typography.Paragraph>
-          {state.loading ? "Loading channel…" : "This channel is no longer available."}
+          {t(state.loading ? "mobile.channel.form.loading" : "mobile.channel.form.gone")}
         </Typography.Paragraph>
       </SheetScrollView>
     );
@@ -104,6 +105,7 @@ function ChannelForm({
   available: boolean;
   store: MobileChannelStore;
 }) {
+  const { t, errorMessage } = useText();
   const { agents, servers } = useMobileWorkspace();
   const canManage = servers.find((server) => server.id === serverId)?.role !== "member";
   const navigation = useNavigation();
@@ -134,9 +136,14 @@ function ChannelForm({
   const disabled = saving || !available || finished || Boolean(channel?.archived);
   usePreventRemove(!finished && (dirty || saving), ({ data }) => {
     if (lock.current) return;
-    Alert.alert("Discard changes?", "Your changes have not been saved.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => navigation.dispatch(data.action) },
+    const text = currentText();
+    Alert.alert(text.t("mobile.channel.discard.title"), text.t("mobile.channel.discard.body"), [
+      { text: text.t("mobile.channel.discard.keepEditing"), style: "cancel" },
+      {
+        text: text.t("mobile.channel.discard.discard"),
+        style: "destructive",
+        onPress: () => navigation.dispatch(data.action),
+      },
     ]);
   });
   useEffect(() => {
@@ -155,7 +162,7 @@ function ChannelForm({
       setEdits({});
       if (close) setFinished(true);
     } catch (cause) {
-      setError(userErrorMessage(cause, "Could not save this channel. Try again."));
+      setError(errorMessage(cause, t("mobile.channel.form.saveFailed")));
     } finally {
       lock.current = false;
       setSaving(false);
@@ -195,8 +202,13 @@ function ChannelForm({
     >
       {create ? (
         <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button icon="xmark" accessibilityLabel="Close" disabled={saving} onPress={() => router.back()}>
-            Close
+          <Stack.Toolbar.Button
+            icon="xmark"
+            accessibilityLabel={t("common.close")}
+            disabled={saving}
+            onPress={() => router.back()}
+          >
+            {t("common.close")}
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       ) : null}
@@ -204,12 +216,12 @@ function ChannelForm({
         dirty={dirty}
         canSave={valid && !disabled}
         pending={saving}
-        label={create ? "Create channel" : "Save channel"}
+        label={t(create ? "mobile.channel.form.create" : "mobile.channel.form.save")}
         onSave={save}
       />
       <SheetFormField
-        label="Name"
-        placeholder="Launch hub"
+        label={t("mobile.channel.form.name")}
+        placeholder={t("mobile.channel.form.namePlaceholder")}
         appearance="soft"
         value={draft.name}
         onChangeText={(name) => setEdits((current) => ({ ...current, name }))}
@@ -219,18 +231,18 @@ function ChannelForm({
       {!create ? (
         <>
           <SheetFormField
-            label="Title"
+            label={t("mobile.channel.form.title")}
             appearance="soft"
-            placeholder="Describe what this channel does"
+            placeholder={t("mobile.channel.form.titlePlaceholder")}
             value={draft.title}
             onChangeText={(title) => setEdits((current) => ({ ...current, title }))}
             editable={!disabled}
             maxLength={INPUT_LIMITS.agentTitle}
           />
           <SheetFormField
-            label="Instructions"
+            label={t("mobile.channel.form.instructions")}
             appearance="soft"
-            placeholder="What will this channel work on?"
+            placeholder={t("mobile.channel.form.instructionsPlaceholder")}
             multiline
             value={draft.instructions}
             onChangeText={(instructions) => setEdits((current) => ({ ...current, instructions }))}
@@ -239,7 +251,7 @@ function ChannelForm({
           />
         </>
       ) : null}
-      <SettingsSection title="Agents">
+      <SettingsSection title={t("mobile.channel.form.agents")}>
         {choices.map((agent) => (
           <MemberChoice
             key={agent.id}
@@ -255,7 +267,7 @@ function ChannelForm({
         ))}
         {!choices.length ? (
           <SettingsRow>
-            <Typography.Paragraph>No agents on this server.</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.channel.form.noAgents")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
         {draft.members
@@ -267,12 +279,12 @@ function ChannelForm({
               onPress={() => toggle(member.agentId)}
               disclosure={false}
             >
-              <Typography.Paragraph>Remove unavailable agent</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.channel.form.removeUnavailable")}</Typography.Paragraph>
             </SettingsRow>
           ))}
       </SettingsSection>
       {draft.members.length > 0 ? (
-        <SettingsSection title="Lead agent">
+        <SettingsSection title={t("mobile.channel.form.lead")}>
           {choices
             .filter((agent) => selectedIds.has(agent.id))
             .map((agent) => (
@@ -296,7 +308,7 @@ function ChannelForm({
               router.push({ pathname: "/channel-info/[channelId]/memories", params: { channelId, serverId } })
             }
           >
-            <Typography.Paragraph>Memories</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.channel.form.memories")}</Typography.Paragraph>
           </SettingsRow>
           <SettingsRow
             disabled={saving}
@@ -304,7 +316,7 @@ function ChannelForm({
               router.push({ pathname: "/channel-info/[channelId]/routines", params: { channelId, serverId } })
             }
           >
-            <Typography.Paragraph>Routines</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.channel.form.routines")}</Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : null}
@@ -314,37 +326,33 @@ function ChannelForm({
             <SettingsRow
               disabled={disabled || dirty}
               disclosure={false}
-              onPress={() =>
-                Alert.alert(
-                  "Delete channel?",
-                  "This stops the channel. Its history stays in Deleted channels for preview only. You cannot restore it. Agents are kept.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: () =>
-                        void run(
-                          () =>
-                            store.command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId }),
-                          true,
-                        ),
-                    },
-                  ],
-                )
-              }
+              onPress={() => {
+                const text = currentText();
+                Alert.alert(text.t("mobile.channel.form.deleteTitle"), text.t("mobile.channel.form.deleteBody"), [
+                  { text: text.t("common.cancel"), style: "cancel" },
+                  {
+                    text: text.t("common.delete"),
+                    style: "destructive",
+                    onPress: () =>
+                      void run(
+                        () => store.command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId }),
+                        true,
+                      ),
+                  },
+                ]);
+              }}
             >
-              <Typography.Paragraph className="text-danger-text">Delete channel</Typography.Paragraph>
+              <Typography.Paragraph className="text-danger-text">
+                {t("mobile.channel.form.delete")}
+              </Typography.Paragraph>
             </SettingsRow>
           ) : null}
         </SettingsSection>
       ) : null}
-      {!available ? (
-        <Typography.Paragraph>Connect to a desktop server that supports channels to make changes.</Typography.Paragraph>
-      ) : null}
+      {!available ? <Typography.Paragraph>{t("mobile.channel.form.unavailable")}</Typography.Paragraph> : null}
       {dirty && !valid ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          Enter a valid channel name.
+          {t("mobile.channel.form.invalidName")}
         </Typography.Paragraph>
       ) : null}
       {error ? (

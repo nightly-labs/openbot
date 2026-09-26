@@ -12,6 +12,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { BlurReveal } from "@/shared/components/blur-reveal";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { useText } from "@/shared/lib/text";
 import type { ChatTarget } from "../model/chat-target";
 
 interface ChatHeaderProps {
@@ -36,6 +37,7 @@ export function ChatHeader({
   readOnly = false,
 }: ChatHeaderProps) {
   const warning = useThemeColor("warning");
+  const { t } = useText();
   const { servers } = useMobileWorkspace();
   const disconnected = !servers.some((server) => server.id === target.serverId && server.state === "online");
   const members = useMemo(
@@ -52,7 +54,7 @@ export function ChatHeader({
         style={{ top: topInset + 8 }}
       >
         <ChatGlassIconButton
-          accessibilityLabel="Back"
+          accessibilityLabel={t("common.back")}
           fallbackBackground={fallbackBackground}
           liquidGlassAvailable={liquidGlassAvailable}
           onPress={onBack}
@@ -77,7 +79,7 @@ export function ChatHeader({
           <Pressable
             className="min-w-0 shrink flex-row items-center gap-2 self-stretch px-3"
             accessibilityRole="button"
-            accessibilityLabel={readOnly ? target.name : `Info for ${target.name}`}
+            accessibilityLabel={readOnly ? target.name : t("mobile.chat.header.info", { name: target.name })}
             disabled={readOnly}
             hitSlop={8}
             onPress={() =>
@@ -134,7 +136,7 @@ export function ChatHeader({
             >
               {(actionTarget) => (
                 <ChatGlassIconButton
-                  accessibilityLabel="Actions needed"
+                  accessibilityLabel={t("mobile.chat.header.actionsNeeded")}
                   fallbackBackground={fallbackBackground}
                   liquidGlassAvailable={liquidGlassAvailable}
                   onPress={() =>

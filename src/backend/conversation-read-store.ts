@@ -7,6 +7,7 @@ import {
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 
 export interface ConversationMarkerExclusions {
@@ -103,7 +104,7 @@ export class ConversationReadStore {
       ? snapshot.messages.findIndex((message) => message.id === throughMessageId)
       : -1;
     if (throughMessageId && requestedIndex < 0) {
-      throw new Error("The read boundary is no longer available.");
+      throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
     }
     const stored = this.#storedCursor(snapshot.threadId, memberId);
     const storedIndex = stored ? snapshot.messages.findIndex((message) => message.id === stored) : -1;

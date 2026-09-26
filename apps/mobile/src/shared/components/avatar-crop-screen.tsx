@@ -15,6 +15,7 @@ import {
   finishAvatarCrop,
 } from "@/shared/lib/avatar-crop-request";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 const MARGIN = 16;
 const MAX_SCALE = 5;
@@ -22,6 +23,7 @@ const SETTLE_SPRING = { damping: 34, stiffness: 320, mass: 1 } as const;
 
 /** Move and scale a picked photo inside a circle, as the avatar will show it. */
 export function AvatarCropScreen() {
+  const { t } = useText();
   const [request] = useState(currentAvatarCropRequest);
   const readCrop = useRef<(() => AvatarCrop) | null>(null);
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
@@ -48,7 +50,7 @@ export function AvatarCropScreen() {
         dirty
         canSave={Boolean(request && side > 0)}
         pending={false}
-        label="Choose"
+        label={t("mobile.shared.crop.choose")}
         onSave={() => {
           const crop = readCrop.current?.();
           if (!request || !crop) return;
@@ -86,6 +88,7 @@ function CropArea({
   extent: number;
   readCrop: { current: (() => AvatarCrop) | null };
 }) {
+  const { t } = useText();
   // At scale 1 the photo just covers the circle's square.
   const base = side / Math.max(Math.min(source.width, source.height), 1);
   const shown = { width: source.width * base, height: source.height * base };
@@ -183,8 +186,8 @@ function CropArea({
         collapsable={false}
         accessible
         accessibilityRole="image"
-        accessibilityLabel="Photo crop"
-        accessibilityHint="Drag to move the photo. Pinch to scale it."
+        accessibilityLabel={t("mobile.shared.crop.label")}
+        accessibilityHint={t("mobile.shared.crop.hint")}
       >
         <Animated.View
           style={[

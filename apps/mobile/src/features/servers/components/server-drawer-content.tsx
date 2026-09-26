@@ -1,10 +1,10 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
+import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { Href } from "expo-router";
 import { Typography } from "heroui-native";
 import { Check, Plus, Settings } from "lucide-react-native";
 import { type ReactNode, useEffect, useState } from "react";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
-
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import type { MobileServer } from "@/features/workspace/context/mobile-workspace-context";
@@ -12,6 +12,7 @@ import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { useText } from "@/shared/lib/text";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
 import { SERVER_ROW_HEIGHT, SortableServerList } from "./sortable-server-list";
@@ -32,10 +33,14 @@ interface ServerDrawerContentProps {
 }
 
 /** Local or Remote, with the connection state only when it needs attention. The dot shows online or offline. */
-function serverDetail(server: MobileServer): string {
-  const label = server.kind === "local" ? "Local" : "Remote";
+function serverDetail(server: MobileServer, t: MobileTranslate): string {
+  const label = serverKindLabel(server, t);
   const pending = server.state === "connecting" && server.initialConnectionPending;
-  return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server)}` : label;
+  return pending || server.state === "error" ? `${label} · ${serverStatusLabel(server, t)}` : label;
+}
+
+function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
+  return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
 }
 
 export function ServerDrawerContent({
@@ -52,6 +57,7 @@ export function ServerDrawerContent({
   onReorder,
   onSelectServer,
 }: ServerDrawerContentProps) {
+  const { t } = useText();
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
@@ -60,8 +66,9 @@ export function ServerDrawerContent({
   const localServers = servers.filter((server) => server.kind === "local");
   const remoteIds = servers.filter((server) => server.kind !== "local").map((server) => server.id);
   const canReorder = remoteIds.length > 1;
-  const menuActions: MenuAction[] = [{ id: "options", title: "Options", image: "gearshape" }];
-  if (canReorder) menuActions.push({ id: "reorder", title: "Edit order", image: "arrow.up.arrow.down" });
+  const menuActions: MenuAction[] = [{ id: "options", title: t("mobile.server.drawer.options"), image: "gearshape" }];
+  if (canReorder)
+    menuActions.push({ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" });
 
   // A drag cut short by leaving edit mode never reports its end, so leaving also releases the scroll lock.
   const stopEditing = () => {
@@ -85,18 +92,20 @@ export function ServerDrawerContent({
   function renderRow(serverItem: MobileServer) {
     const selected = serverItem.id === activeServerId;
     const remoteIndex = remoteIds.indexOf(serverItem.id);
-    const serverLabel = serverItem.kind === "local" ? "Local" : "Remote";
+    const serverLabel = serverKindLabel(serverItem, t);
     const accessibilityActions = [
-      ...(editing ? [] : [{ name: "options", label: "Server options" }]),
-      ...(remoteIndex > 0 ? [{ name: "moveUp", label: "Move up" }] : []),
-      ...(remoteIndex >= 0 && remoteIndex < remoteIds.length - 1 ? [{ name: "moveDown", label: "Move down" }] : []),
+      ...(editing ? [] : [{ name: "options", label: t("mobile.server.drawer.serverOptions") }]),
+      ...(remoteIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
+      ...(remoteIndex >= 0 && remoteIndex < remoteIds.length - 1
+        ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }]
+        : []),
     ];
     return (
       <Pressable
         key={serverItem.id}
         accessibilityRole="button"
         accessibilityState={{ selected }}
-        accessibilityLabel={`${serverItem.name}, ${serverLabel}, ${serverStatusLabel(serverItem)}`}
+        accessibilityLabel={`${serverItem.name}, ${serverLabel}, ${serverStatusLabel(serverItem, t)}`}
         accessibilityActions={accessibilityActions}
         onAccessibilityAction={(event) => {
           const action = event.nativeEvent.actionName;
@@ -122,7 +131,7 @@ export function ServerDrawerContent({
             className={serverItem.state === "error" ? "text-danger-text" : "text-text-secondary"}
             numberOfLines={1}
           >
-            {serverDetail(serverItem)}
+            {serverDetail(serverItem, t)}
           </Typography.Paragraph>
         </View>
       </Pressable>
@@ -186,7 +195,7 @@ export function ServerDrawerContent({
         )}
         {editing && localServers.length ? (
           <Typography.Paragraph type="body-xs" className="px-3 pt-3 text-text-secondary">
-            The local server stays first. The order is saved on this device.
+            {t("mobile.server.drawer.orderHint")}
           </Typography.Paragraph>
         ) : null}
       </ScrollView>
@@ -201,11 +210,11 @@ export function ServerDrawerContent({
         style={{ left: -sideInset, paddingLeft: sideInset + 12, top: Math.max(topInset, 16) }}
       >
         <Typography.Heading type="h1" weight="bold">
-          Servers
+          {t("mobile.server.drawer.title")}
         </Typography.Heading>
         {editing ? (
           <ServerDrawerIconButton
-            accessibilityLabel="Done editing order"
+            accessibilityLabel={t("mobile.server.drawer.doneEditing")}
             color={mutedColor}
             fallbackVariant="filled"
             systemName="checkmark"
@@ -215,7 +224,7 @@ export function ServerDrawerContent({
           </ServerDrawerIconButton>
         ) : (
           <ServerDrawerIconButton
-            accessibilityLabel="Join a server"
+            accessibilityLabel={t("mobile.server.drawer.join")}
             color={mutedColor}
             fallbackVariant="filled"
             systemName="plus"
@@ -239,7 +248,7 @@ export function ServerDrawerContent({
           </View>
         </View>
         <ServerDrawerIconButton
-          accessibilityLabel="Settings"
+          accessibilityLabel={t("mobile.server.drawer.settings")}
           color={mutedColor}
           systemName="gearshape"
           onPress={() => onNavigate("/settings")}

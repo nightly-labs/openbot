@@ -6,19 +6,23 @@ import { useMemo } from "react";
 
 import type { MobileSearchFilterButtonProps } from "@/features/search/components/search-filter-button.types";
 import { MOBILE_SEARCH_FILTERS } from "@/features/search/model/mobile-search";
+import { useText } from "@/shared/lib/text";
 
 export function MobileSearchFilterButton({ category, onCategoryChange }: MobileSearchFilterButtonProps) {
+  const { t } = useText();
   const [foreground, muted, fieldBackground] = useThemeColor(["foreground", "muted", "default"]);
   const liquidGlassAvailable = isLiquidGlassAvailable();
-  const activeFilterLabel = MOBILE_SEARCH_FILTERS.find((filter) => filter.id === category)?.label ?? "All";
+  const activeFilterLabel = t(
+    MOBILE_SEARCH_FILTERS.find((filter) => filter.id === category)?.label ?? "mobile.search.filter.all",
+  );
   const actions = useMemo<MenuAction[]>(
     () =>
       MOBILE_SEARCH_FILTERS.map((filter) => ({
         id: filter.id,
         state: filter.id === category ? "on" : "off",
-        title: filter.label,
+        title: t(filter.label),
       })),
-    [category],
+    [category, t],
   );
 
   return (
@@ -32,7 +36,7 @@ export function MobileSearchFilterButton({ category, onCategoryChange }: MobileS
       testID="search-filter-menu"
     >
       <GlassView
-        accessibilityLabel={`Filter results, ${activeFilterLabel}`}
+        accessibilityLabel={t("mobile.search.filterResults", { filter: activeFilterLabel })}
         accessibilityRole="button"
         accessible
         glassEffectStyle={liquidGlassAvailable ? "regular" : "none"}

@@ -1,4 +1,5 @@
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "./acp-client";
 import type { AgentClient } from "./agent-client";
 import { CodexAppServerClient } from "./app-server-client";
@@ -164,7 +165,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
     validateAccount: (account) => {
       if (account.type !== "chatgpt") {
-        throw new Error("Codex requires a ChatGPT subscription login. Run `codex login`.");
+        throw new Error(sourceText("error.provider.codexLoginRequired"));
       }
     },
   },

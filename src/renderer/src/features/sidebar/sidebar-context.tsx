@@ -5,6 +5,7 @@ import {
   type SidebarPinnedItem,
   sidebarPinnedItemKey,
 } from "@openbot/ui/features/sidebar/sidebar-pins";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
@@ -64,7 +65,7 @@ const Sidebar = createSimpleContext({
 
     async function mutateSidebarLayout(action: SidebarLayoutAction): Promise<void> {
       if (!activeServerSupportsCapability("sidebar-layout")) {
-        throw new Error("This host does not support sidebar layout changes.");
+        throw new Error(currentText().t("sidebar.section.layoutUnsupported"));
       }
       const layout = await sidebarPort().agent.mutateSidebarLayout(action);
       setSidebarLayout(layout);

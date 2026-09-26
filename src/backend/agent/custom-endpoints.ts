@@ -1,5 +1,6 @@
 import type { AgentModelOption, AgentSummary, UpdateAgentInput } from "@openbot/contracts/ipc";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
@@ -245,7 +246,7 @@ export class CustomEndpoints {
     // would trap the user on an endpoint that may be the reason no model is listed.
     if (!fallback) return;
     if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
-      throw new Error("Wait for the active turn and queue to finish before you remove this endpoint.");
+      throw new Error(sourceText("error.provider.endpointRemoveBusy"));
     }
     for (const agent of affected) {
       // Not the public `updateAgent`: this already runs inside the chain that one takes.

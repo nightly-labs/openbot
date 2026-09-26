@@ -7,12 +7,14 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import { createSignal } from "solid-js";
+import { useText } from "../../text";
 
 export function AgentSelect(props: {
   agents: Array<{ id: string; name: string }>;
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useText();
   const selected = () => props.agents.find((agent) => agent.id === props.value) ?? null;
   /* The list belongs to the dialog, as in the settings modal: outside it the dialog hides it from
      assistive technology. */
@@ -30,7 +32,7 @@ export function AgentSelect(props: {
       class="skills-agent-select"
       /* Kobalte prints the children of the value only once one is chosen, so the empty state is
          named here instead; without it the control reads as a blank pill. */
-      placeholder={props.agents.length ? "Choose an agent" : "No local agents"}
+      placeholder={props.agents.length ? t("settings.agentSelect.placeholder") : t("settings.agentSelect.empty")}
       options={props.agents}
       value={selected()}
       optionValue="id"
@@ -42,7 +44,7 @@ export function AgentSelect(props: {
       itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
     >
       {/* The control sits beside the install button, which says what the target is for. */}
-      <SelectTrigger size="sm" aria-label="Install to">
+      <SelectTrigger size="sm" aria-label={t("settings.agentSelect.label")}>
         <SelectValue<{ id: string; name: string }>>{(state) => state.selectedOption()?.name}</SelectValue>
       </SelectTrigger>
       <SelectContent mount={mount()} />

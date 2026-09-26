@@ -18,6 +18,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { sourceText } from "@openbot/i18n/source";
 import type { RemoteInviteRecord, RemoteMemberRecord } from "./central-auth-manager";
 import { decodeVoid } from "./remote-host-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
@@ -92,12 +93,12 @@ export class RemoteTeamDirectory {
       return (async () => {
         const members = await this.listMembers(serverId);
         const current = members.find((member) => member.id === input.memberId);
-        if (!current || current.role === "owner") throw new Error("The remote member does not exist.");
+        if (!current || current.role === "owner") throw new Error(sourceText("error.host.memberNotFound"));
         if (input.disabled) await transport.removeMember(serverId, input.memberId);
         else
           await transport.updateMember(serverId, input.memberId, input.role ?? current.role, input.disabled === false);
         const updated = (await this.listMembers(serverId)).find((member) => member.id === input.memberId);
-        if (!updated) throw new Error("The remote member does not exist.");
+        if (!updated) throw new Error(sourceText("error.host.memberNotFound"));
         return updated;
       })();
     }
@@ -148,7 +149,7 @@ export class RemoteTeamDirectory {
     if (transport) {
       // The invitation URL carries the host fingerprint, so a host nobody has connected to yet has
       // nothing to put in it and the invitation would be unverifiable.
-      if (!server.fingerprint) throw new Error("The host must connect once before it can create invitations.");
+      if (!server.fingerprint) throw new Error(sourceText("error.remote.inviteNeedsConnection"));
       const invite = await transport.createInvite(serverId, input);
       const result: InviteSummary = {
         id: invite.inviteId,
@@ -184,7 +185,7 @@ export class RemoteTeamDirectory {
     }
     // The frozen Team API projections strip `permanent` on this transport, so the request
     // would silently mint single-use. Fail loudly instead of handing back the wrong kind.
-    if (input.permanent) throw new Error("This server connection does not support permanent invitation links.");
+    if (input.permanent) throw new Error(sourceText("error.remote.permanentInviteUnsupported"));
     return this.#request(serverId, TEAM_API_ROUTES.team.invites, decodeInviteSummary, { method: "POST", body: input });
   }
 

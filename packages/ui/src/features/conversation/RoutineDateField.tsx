@@ -1,5 +1,6 @@
 import { Button, ChevronLeft, ChevronRight, IconButton, Popover } from "@openbot/ui";
 import { createMemo, createSignal, For, flush, Show } from "solid-js";
+import { useText } from "../../text";
 import { createStableChipAnchor } from "./routine-popover-anchor";
 import {
   formatRoutineDate,
@@ -9,9 +10,7 @@ import {
   routineDateChipLabel,
   routineDateKey,
   routineMonthName,
-  routineMonthShort,
   routineWeekdayInitial,
-  routineWeekdayName,
   routineYearlyCalendarDate,
 } from "./routine-schedule-draft";
 
@@ -29,13 +28,14 @@ interface RoutineDateFieldProps {
 
 /** A chip that opens a one-month calendar, for a routine that runs once or each year. */
 export function RoutineDateField(props: RoutineDateFieldProps) {
+  const text = useText();
   const [open, setOpen] = createSignal(false);
   const anchor = createStableChipAnchor(() => props.onClose?.());
   const date = () => parseRoutineDateKey(props.value);
   const label = () =>
     props.yearly
-      ? `${routineMonthShort(date().getMonth() + 1)} ${date().getDate()}`
-      : routineDateChipLabel(props.value, props.today);
+      ? text.format.date(date(), { month: "short", day: "numeric" })
+      : routineDateChipLabel(props.value, props.today, text);
   return (
     <Popover.Root
       modal
@@ -50,7 +50,9 @@ export function RoutineDateField(props: RoutineDateFieldProps) {
     >
       <Popover.Trigger
         class="routine-chip routine-chip-flexible"
-        aria-label={`Date: ${props.yearly ? label() : formatRoutineDate(props.value)}`}
+        aria-label={text.t("routine.date.chipLabel", {
+          date: props.yearly ? label() : formatRoutineDate(props.value, text),
+        })}
         title={label()}
         disabled={props.disabled}
       >
@@ -61,7 +63,7 @@ export function RoutineDateField(props: RoutineDateFieldProps) {
           ref={anchor.setContent}
           class="ui-popover-menu-surface routine-popover routine-calendar-popover"
         >
-          <Popover.Title class="sr-only">Choose date</Popover.Title>
+          <Popover.Title class="sr-only">{text.t("routine.date.choose")}</Popover.Title>
           <RoutineCalendar
             value={props.value}
             today={props.today}
@@ -81,6 +83,7 @@ export function RoutineDateField(props: RoutineDateFieldProps) {
 const NAVIGATION_STEPS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
 
 function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; onSelect: (value: string) => void }) {
+  const text = useText();
   const todayKey = () => routineDateKey(props.today);
   const [month, setMonth] = createSignal(() => monthStart(parseRoutineDateKey(props.value)));
   const [focusKey, setFocusKey] = createSignal(() => props.value);
@@ -102,8 +105,8 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
   const canGoBack = () => props.yearly || month() > monthStart(props.today);
   const title = () =>
     props.yearly
-      ? routineMonthName(month().getMonth() + 1)
-      : `${routineMonthName(month().getMonth() + 1)} ${month().getFullYear()}`;
+      ? routineMonthName(month().getMonth() + 1, text)
+      : text.format.date(month(), { month: "long", year: "numeric" });
 
   // A yearly calendar pages from December back to January.
   const inCalendar = (date: Date) =>
@@ -134,7 +137,7 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
     <div class="routine-calendar">
       <div class="routine-calendar-header">
         <IconButton
-          label="Previous month"
+          label={text.t("routine.date.previousMonth")}
           variant="ghost"
           size="icon-xs"
           disabled={!canGoBack()}
@@ -145,13 +148,18 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
         <span class="routine-calendar-title" aria-live="polite">
           {title()}
         </span>
-        <IconButton label="Next month" variant="ghost" size="icon-xs" onClick={() => showMonth(1)}>
+        <IconButton
+          label={text.t("routine.date.nextMonth")}
+          variant="ghost"
+          size="icon-xs"
+          onClick={() => showMonth(1)}
+        >
           <ChevronRight aria-hidden="true" />
         </IconButton>
       </div>
       <Show when={!props.yearly}>
         <div class="routine-calendar-weekdays" aria-hidden="true">
-          <For each={ROUTINE_EVERY_DAY}>{(day) => <span>{routineWeekdayInitial(day)}</span>}</For>
+          <For each={ROUTINE_EVERY_DAY}>{(day) => <span>{routineWeekdayInitial(day, text)}</span>}</For>
         </div>
       </Show>
       <fieldset ref={(element) => (grid = element)} class="routine-calendar-days" aria-label={title()}>
@@ -169,8 +177,8 @@ function RoutineCalendar(props: { value: string; today: Date; yearly?: boolean; 
                 disabled={isPast(key)}
                 aria-label={
                   props.yearly
-                    ? `${routineMonthName(date.getMonth() + 1)} ${date.getDate()}`
-                    : `${routineWeekdayName(date.getDay())}, ${routineMonthName(date.getMonth() + 1)} ${date.getDate()}, ${date.getFullYear()}`
+                    ? text.format.date(date, { month: "long", day: "numeric" })
+                    : text.format.date(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
                 }
                 aria-pressed={key === props.value ? "true" : "false"}
                 aria-current={!props.yearly && key === todayKey() ? "date" : undefined}

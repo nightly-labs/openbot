@@ -1,5 +1,8 @@
 import type { AgentProviderId, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText, type TextValue } from "../../text";
+
+/** The part of the interface text that the presenters read. */
+type UpdateText = Pick<TextValue, "t" | "errorMessage">;
 
 /**
  * A managed provider CLI, and the newer version main says exists for it.
@@ -36,7 +39,7 @@ export interface ProviderUpdatePresentation {
    * left the runtime half replaced would be the more alarming outcome. The close control is still
    * there, and closing the notification stops nothing.
    */
-  actionLabel: "Update" | "Retry" | undefined;
+  actionLabel: string | undefined;
   title: string;
   detail: string;
   /**
@@ -56,21 +59,25 @@ export function providerUpdateAvailable(runtime: ProviderRuntimeStatus, availabl
   );
 }
 
-export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePresentation {
+export function presentProviderUpdate(
+  update: ProviderUpdate,
+  text: UpdateText = currentText(),
+): ProviderUpdatePresentation {
+  const { t } = text;
   const { name, runtime, availableVersion } = update;
   const updatable = providerUpdateAvailable(runtime, availableVersion);
   const busy = update.checking === true || runtime.phase === "downloading" || runtime.phase === "finishing";
   const failed = runtime.phase === "download-error";
 
   let actionLabel: ProviderUpdatePresentation["actionLabel"];
-  if (updatable) actionLabel = "Update";
-  else if (failed) actionLabel = "Retry";
+  if (updatable) actionLabel = t("update.provider.update");
+  else if (failed) actionLabel = t("common.retry");
 
-  let title = `${name} is up to date`;
-  if (update.checking) title = `Checking for ${name} updates`;
-  else if (updatable) title = `${name} update available`;
-  else if (busy) title = `Updating ${name}`;
-  else if (failed) title = `${name} update failed`;
+  let title = t("update.provider.upToDate", { name });
+  if (update.checking) title = t("update.provider.checking", { name });
+  else if (updatable) title = t("update.provider.available", { name });
+  else if (busy) title = t("update.provider.updating", { name });
+  else if (failed) title = t("update.provider.failed", { name });
 
   return {
     updatable,
@@ -78,7 +85,7 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
     failed,
     actionLabel,
     title,
-    detail: updateDetail(update, updatable),
+    detail: updateDetail(update, updatable, text),
     progress: !update.checking && runtime.phase === "downloading" ? clampProgress(runtime.progress) : null,
   };
 }
@@ -92,25 +99,28 @@ export function presentProviderUpdate(update: ProviderUpdate): ProviderUpdatePre
  * offered: the row has the badge and the Update button to say an update exists, and the version
  * the user would get is in the notification, which has the width for both.
  */
-export function providerVersionLabel(runtime: ProviderRuntimeStatus): string | null {
-  return runtime.version ? formatVersion(runtime.version) : null;
+export function providerVersionLabel(
+  runtime: ProviderRuntimeStatus,
+  text: Pick<TextValue, "t"> = currentText(),
+): string | null {
+  return runtime.version ? formatVersion(runtime.version, text) : null;
 }
 
-function versionTransition(version: string | null, availableVersion: string | null): string {
-  return `${formatVersion(version)} → ${formatVersion(availableVersion)}`;
+function versionTransition(version: string | null, availableVersion: string | null, text: UpdateText): string {
+  return `${formatVersion(version, text)} → ${formatVersion(availableVersion, text)}`;
 }
 
-function updateDetail(update: ProviderUpdate, updatable: boolean): string {
+function updateDetail(update: ProviderUpdate, updatable: boolean, text: UpdateText): string {
   const { runtime, availableVersion } = update;
-  if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion);
-  if (runtime.phase === "finishing") return "Setting up";
+  if (updatable || runtime.phase === "downloading") return versionTransition(runtime.version, availableVersion, text);
+  if (runtime.phase === "finishing") return text.t("update.provider.settingUp");
   if (runtime.phase === "download-error")
-    return errorMessage(runtime.message, "The update was interrupted. Try again.");
-  return formatVersion(runtime.version ?? availableVersion);
+    return text.errorMessage(runtime.message, text.t("update.provider.interrupted"));
+  return formatVersion(runtime.version ?? availableVersion, text);
 }
 
-function formatVersion(version: string | null): string {
-  if (!version) return "unknown version";
+function formatVersion(version: string | null, text: Pick<TextValue, "t">): string {
+  if (!version) return text.t("update.provider.unknownVersion");
   return version.startsWith("v") ? version : `v${version}`;
 }
 

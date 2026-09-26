@@ -1,7 +1,7 @@
 import type { AppInfo, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateActivePhase } from "@openbot/contracts/ipc";
 import { createMemo, createSignal } from "solid-js";
-import { errorMessage } from "../../../error-message";
+import { currentText } from "../../../text";
 import { presentUpdateStatus } from "../../updates/update-status";
 
 interface UpdatesStoreProps {
@@ -18,57 +18,65 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
   const [error, setError] = createSignal<string | null>(null);
 
   const presentation = createMemo(() => presentUpdateStatus(props.updateStatus));
-  const installedVersion = () => props.updateStatus.currentVersion || props.appInfo?.version || "Unknown";
+  const installedVersion = () =>
+    props.updateStatus.currentVersion || props.appInfo?.version || currentText().t("settings.updates.versionUnknown");
   const targetUpdate = () =>
     props.updateStatus.availableVersion
       ? `OpenBot v${props.updateStatus.availableVersion}`
-      : "The latest OpenBot update";
+      : currentText().t("settings.updates.target.latest");
   /**
    * Host phases arrive mapped onto the shared update phases, so the managed wording says what the
    * host is doing rather than asking a tenant to restart an application the host replaces.
    */
   const hostMessage = () => {
+    const { t, errorMessage } = currentText();
     switch (props.updateStatus.phase) {
       case "idle":
       case "up-to-date":
-        return "Up to date. OpenBot Host Manager keeps this Mac current.";
+        return t("settings.updates.host.upToDate");
       case "ready":
-        return `${targetUpdate()} is downloaded. Waiting for the other users of this Mac to be idle.`;
+        return t("settings.updates.host.ready", { target: targetUpdate() });
       case "installing":
-        return `Installing ${targetUpdate()}…`;
+        return t("settings.updates.host.installing", { target: targetUpdate() });
       case "error":
-        return errorMessage(props.updateStatus.message, "The host update failed. Contact the host administrator.");
+        return errorMessage(props.updateStatus.message, t("settings.updates.host.failed"));
       default:
         return null;
     }
   };
   const message = () => {
     if (error()) return error();
+    const { t, format, errorMessage, sourceText } = currentText();
     if (presentation().managed) {
       const managedMessage = hostMessage();
       if (managedMessage) return managedMessage;
     }
     switch (props.updateStatus.phase) {
       case "idle":
-        return "Check for updates to find the latest Stable release.";
+        return t("settings.updates.status.idle");
       case "checking":
-        return "Checking the Stable track for updates…";
+        return t("settings.updates.status.checking");
       case "available":
-        return `${targetUpdate()} is available to download.`;
+        return t("settings.updates.status.available", { target: targetUpdate() });
       case "downloading":
-        return `Downloading ${targetUpdate()}${
-          props.updateStatus.progress === null ? "…" : ` · ${Math.round(props.updateStatus.progress)}%`
-        }`;
+        return props.updateStatus.progress === null
+          ? t("settings.updates.status.downloading", { target: targetUpdate() })
+          : t("settings.updates.status.downloadingProgress", {
+              target: targetUpdate(),
+              progress: format.percent(Math.round(props.updateStatus.progress) / 100),
+            });
       case "ready":
-        return `${targetUpdate()} is ready. Restart to apply.`;
+        return t("settings.updates.status.ready", { target: targetUpdate() });
       case "installing":
-        return `Restarting to apply ${targetUpdate()}…`;
+        return t("settings.updates.status.installing", { target: targetUpdate() });
       case "up-to-date":
-        return "OpenBot is up to date on the Stable track.";
+        return t("settings.updates.status.upToDate");
       case "error":
-        return errorMessage(props.updateStatus.message, "OpenBot could not check for updates. Try again.");
+        return errorMessage(props.updateStatus.message, t("settings.updates.status.checkFailed"));
       case "unsupported":
-        return props.updateStatus.message ?? "Updates are unavailable in this build.";
+        return props.updateStatus.message !== null
+          ? sourceText(props.updateStatus.message)
+          : t("settings.updates.status.unsupported");
     }
   };
   const messageClass = () => {
@@ -85,7 +93,8 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     try {
       await props.onUpdateAction();
     } catch (failure) {
-      setError(errorMessage(failure, "Could not update OpenBot."));
+      const text = currentText();
+      setError(text.errorMessage(failure, text.t("settings.updates.actionFailed")));
     }
   }
 

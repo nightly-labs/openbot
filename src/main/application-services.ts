@@ -42,6 +42,7 @@ import type {
   VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import { IPC_ENDPOINTS, isManagedToolRuntime, isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
@@ -313,7 +314,7 @@ export async function createApplicationServices({
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
     performCriticalAction: async (action) => {
-      if (!criticalActionTargets) throw new Error("OpenBot is not ready.");
+      if (!criticalActionTargets) throw new Error(sourceText("error.app.notReady"));
       const { agents, remoteServers } = criticalActionTargets;
       await performDynamicIslandCriticalAction(action, agents, remoteServers, decodeVoid);
     },
@@ -330,7 +331,7 @@ export async function createApplicationServices({
     canPersist: () => safeStorage.isEncryptionAvailable(),
     encrypt: (value) => {
       if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error("macOS secure storage is unavailable.");
+        throw new Error(sourceText("error.app.macSecureStorageUnavailable"));
       }
       return safeStorage.encryptString(value);
     },
@@ -499,7 +500,7 @@ export async function createApplicationServices({
     cipher: {
       canPersist: () => safeStorage.isEncryptionAvailable(),
       encrypt: (value) => {
-        if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+        if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
         return safeStorage.encryptString(value);
       },
       decrypt: (value) => safeStorage.decryptString(value),
@@ -515,7 +516,7 @@ export async function createApplicationServices({
    */
   const providerCredentials = new ProviderCredentialStore(join(app.getPath("userData"), PROVIDER_CREDENTIAL_FILE), {
     encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
       return safeStorage.encryptString(value);
     },
     decrypt: (value) => safeStorage.decryptString(value),
@@ -536,7 +537,7 @@ export async function createApplicationServices({
    */
   const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), {
     encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
       return safeStorage.encryptString(value);
     },
     decrypt: (value) => safeStorage.decryptString(value),
@@ -560,6 +561,7 @@ export async function createApplicationServices({
   // held rather than closed over, so that request is refused instead of raising in the listener.
   let mcpOAuthAuthority: McpOAuth | null = null;
   const mcpOAuthRedirect = await startMcpOAuthRedirectServer({
+    language,
     deliver: (state, code) => {
       if (!mcpOAuthAuthority?.receiveAuthorizationCode(state, code)) return false;
       const current = windows.getMainWindow();
@@ -664,7 +666,7 @@ export async function createApplicationServices({
     await computerUseReads.close();
   });
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
-    createWindow: createComputerUsePermissionHelpWindow,
+    createWindow: () => createComputerUsePermissionHelpWindow(language.translate),
     loadWindow: loadComputerUsePermissionHelpRenderer,
     // The bundle that owns this process, which is the one macOS attributes every click and capture
     // to. In a development build that is Electron itself, and the window says so.
@@ -943,7 +945,7 @@ export async function createApplicationServices({
     },
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error("System secret storage is unavailable.");
+      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
       return loadOrCreateRemoteDesktopCredentials(join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE), {
         encrypt: (value) => safeStorage.encryptString(value),
         decrypt: (value) => safeStorage.decryptString(value),
@@ -962,9 +964,9 @@ export async function createApplicationServices({
     getRemoteDesktopIceServers: () => {
       if (developmentRemoteRole === "host") return Promise.resolve([]);
       const identity = teamStore.getIdentity();
-      if (!identity) throw new Error("The remote host identity is unavailable.");
+      if (!identity) throw new Error(sourceText("error.app.remoteIdentityUnavailable"));
       const iceServers = teamWebRtcBridge.getIceServers(identity.serverId);
-      if (iceServers.length === 0) throw new Error("Remote Signal has not supplied ICE servers yet.");
+      if (iceServers.length === 0) throw new Error(sourceText("error.app.iceServersMissing"));
       return Promise.resolve(iceServers);
     },
   });
@@ -1022,7 +1024,7 @@ export async function createApplicationServices({
     {
       encrypt: (value) => {
         if (!safeStorage.isEncryptionAvailable()) {
-          throw new Error("macOS secure storage is unavailable.");
+          throw new Error(sourceText("error.app.macSecureStorageUnavailable"));
         }
         return safeStorage.encryptString(value);
       },
@@ -1099,7 +1101,7 @@ export async function createApplicationServices({
         ? host.closeLocalRemoteDesktopTestSession(sessionId)
         : remoteServers.closeRemoteDesktopSession(serverId, sessionId),
     selectRemoteDesktopDisplay: (serverId, displayId) => {
-      if (serverId === "local") return Promise.reject(new Error("Finish the local test before switching displays."));
+      if (serverId === "local") return Promise.reject(new Error(sourceText("error.app.finishLocalTest")));
       return remoteServers.selectRemoteDesktopDisplay(serverId, displayId);
     },
   });

@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_STATUS } from "../../app-defaults";
@@ -195,7 +196,7 @@ const Agents = createSimpleContext({
           failure_code: "update_failed",
           ...(properties ?? {}),
         });
-        appendUiError(agentId, error, "Settings failed", serverId);
+        appendUiError(agentId, error, currentText().t("agent.error.settingsFailed"), serverId);
         throw error;
       }
     }
@@ -227,7 +228,7 @@ const Agents = createSimpleContext({
           failure_code: "avatar_update_failed",
           ...(properties ?? {}),
         });
-        appendUiError(agentId, error, "Avatar update failed", serverId);
+        appendUiError(agentId, error, currentText().t("agent.error.avatarFailed"), serverId);
         throw error;
       }
     }

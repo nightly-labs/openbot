@@ -4,6 +4,7 @@ import {
   type ChannelTask,
   channelRoutingConversationEvent,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { ChannelMemoryStore } from "./channel-memory-store";
 import type { ChannelStore } from "./channel-store";
 
@@ -66,7 +67,7 @@ export class ChannelHistory {
     let recent = messages.filter((message) => message.sequence > summary.throughSequence);
     // Reserve half the handoff ceiling for instructions, requested sources, and provider overhead.
     while (render(recent).length > characterBudget / 2 && recent.length > 1) {
-      if (!lead) throw new Error("Choose a channel lead to prepare the shared history.");
+      if (!lead) throw new Error(sourceText("error.backend.channelHistoryLeadRequired"));
       const old: ChannelMessage[] = [];
       let size = 0;
       for (const message of recent.slice(0, -1)) {
@@ -82,7 +83,7 @@ export class ChannelHistory {
       // and no shorter request can remove it from the stored history.
       const oversized = old.length ? null : recent[0];
       if (oversized?.message.status === "streaming")
-        throw new Error("A shared message is still arriving. Resume when it is complete.");
+        throw new Error(sourceText("error.backend.channelHistoryArriving"));
       if (oversized) old.push(oversized);
       const inputs = oversized ? parts(render([oversized]), Math.floor(characterBudget / 2)) : [render(old)];
       let text = summary.text;
@@ -96,7 +97,7 @@ export class ChannelHistory {
           ].join("\n"),
         );
         if (!text.trim() || text.length > SUMMARY_CHARACTERS)
-          throw new Error("The history summary is invalid. Resume to try again.");
+          throw new Error(sourceText("error.backend.channelHistoryInvalid"));
       }
       // Another task can update the summary while this isolated model runs.
       const current = this.store.summary(channel.id);
@@ -152,8 +153,7 @@ export class ChannelHistory {
       `Recent shared messages:\n${render(recent)}`,
       `Current assignment:\n${task.instruction}\nExpected result: ${task.expectedResult}`,
     ].join("\n\n");
-    if (text.length > characterBudget)
-      throw new Error("This assignment exceeds the shared context limit. Send a shorter request or reassign it.");
+    if (text.length > characterBudget) throw new Error(sourceText("error.backend.channelContextTooLong"));
     return { text, throughSequence: messages.at(-1)?.sequence ?? 0, summaryVersion: summary.version };
   }
 }

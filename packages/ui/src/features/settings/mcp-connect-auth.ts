@@ -15,6 +15,7 @@
  */
 
 import type { McpKeyValue, McpServerConfig } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 
 /** One credential the user pastes. */
 export interface McpAuthField {
@@ -86,11 +87,12 @@ export function mcpFlowError(
   config: McpServerConfig,
   flow: McpConnectFlow | null | undefined,
   values: McpAuthValues,
+  t: AppTranslate,
 ): string | null {
   for (const field of mcpFlowFields(flow)) {
     const value = (values[field.id] ?? "").trim();
     if (field.url && value && !isListingUrl(value, config.url)) {
-      return `Enter an https link from ${new URL(config.url).hostname}.`;
+      return t("mcp.connect.httpsLinkRequired", { hostname: new URL(config.url).hostname });
     }
   }
   return null;

@@ -64,6 +64,7 @@ import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-ta
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiRequest } from "./team-api-requests";
 
 // The route codec has already checked the empty reply.
@@ -131,7 +132,7 @@ export async function installMarketplaceAgent(
   request: TeamApiRequest,
   input: InstallMarketplaceAgentInput,
 ): Promise<AddedAgent> {
-  if (input.agentId !== undefined) throw new Error("An agent on a joined server cannot be updated from here.");
+  if (input.agentId !== undefined) throw new Error(sourceText("error.agent.joinedServerUpdate"));
   const { listingId, timezone, receiptId } = input;
   return request("POST", AGENT_INSTALL_ROUTES.marketplace, decodeHostAddedAgent, { listingId, timezone, receiptId });
 }

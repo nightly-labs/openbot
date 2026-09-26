@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AgentDeliveryMarkerStatus, AgentMessage, AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
+import { currentText } from "@openbot/ui/text";
 import { cleanAgentMessageText } from "./features/agents/agent-message-text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
@@ -29,7 +30,7 @@ export function toAgentProfile(stored: AgentSummary): AgentProfile {
     avatarUrl: stored.avatarUrl,
     marketplaceSource: stored.marketplaceSource,
     updatedAt: stored.updatedAt,
-    time: stored.updatedAt ? formatTime(stored.updatedAt) : "now",
+    time: stored.updatedAt ? formatTime(stored.updatedAt) : currentText().t("chat.day.now"),
     preview: cleanPreview(stored.preview),
   };
 }
@@ -263,7 +264,7 @@ function chatActionMarker(
     };
   }
   if (isRoutineEventItem(message)) {
-    return { kind: "unavailable", label: "Action unavailable", timestamp: message.createdAt };
+    return { kind: "unavailable", label: currentText().t("app.action.unavailable"), timestamp: message.createdAt };
   }
   return null;
 }
@@ -317,20 +318,19 @@ function cleanPreview(preview: string): string {
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  return cleaned || "No messages yet";
+  return cleaned || currentText().t("app.agent.noMessages");
 }
 
 function formatTime(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "now";
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  const { t, format } = currentText();
+  if (Number.isNaN(date.getTime())) return t("chat.day.now");
+  return format.date(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatMessageTime(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "now";
-  return formatChatTimestamp(date);
+  const { t, format } = currentText();
+  if (Number.isNaN(date.getTime())) return t("chat.day.now");
+  return formatChatTimestamp(date, format);
 }

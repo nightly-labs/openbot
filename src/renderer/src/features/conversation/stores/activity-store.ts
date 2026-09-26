@@ -5,6 +5,7 @@ import {
   agentActivityExitDuration,
   agentActivityShowDelay,
 } from "@openbot/ui/features/conversation/activity-timing";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import type { ConversationProps } from "../conversation-types";
 
@@ -74,7 +75,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   });
   const activeActivityDetail = createMemo(() => {
     const hold = heldByOwnChannelWork();
-    if (hold) return `Working in ${hold.channelName}`;
+    if (hold) return currentText().t("chat.activity.workingIn", { channel: hold.channelName });
     return latestActiveCommentary() ?? (deps.props.activityDetail?.trim() || null);
   });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));

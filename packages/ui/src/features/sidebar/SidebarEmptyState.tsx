@@ -6,17 +6,23 @@
 
 import { Button } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarEmptyState() {
   const { props, query } = useSidebarScope();
+  const { t } = useText();
   return (
     <Show
       when={!query().trim() && props.emptyAction}
       fallback={
         <p class="empty-search">
-          {query().trim() ? "No matches" : props.agents.length ? "No matches" : "No agents yet"}
+          {query().trim()
+            ? t("sidebar.empty.noMatches")
+            : props.agents.length
+              ? t("sidebar.empty.noMatches")
+              : t("sidebar.empty.noAgents")}
         </p>
       }
     >

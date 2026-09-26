@@ -1,4 +1,6 @@
+import { type AppFormat, createFormat } from "@openbot/i18n";
 import { Button } from "@openbot/ui";
+import { useText } from "@openbot/ui/text";
 import { strFromU8, unzipSync } from "fflate";
 import { createMemo, createSignal, For, Show } from "solid-js";
 
@@ -142,7 +144,7 @@ function formatExcelTime(value: number, format: string): string {
   return `${String(displayedHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}${/[s]/iu.test(format) ? `:${String(seconds).padStart(2, "0")}` : ""}${suffix}`;
 }
 
-function formatExcelNumber(value: string, format: string, date1904: boolean): string {
+function formatExcelNumber(value: string, format: string, date1904: boolean, numbers: AppFormat): string {
   const number = Number(value);
   if (!Number.isFinite(number) || format === "General" || format === "@") return value;
   if (!isSupportedNumberFormat(format)) return value;
@@ -156,13 +158,13 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   if (hasPercentScaling) {
     const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
     const maximumFractionDigits = decimals.length;
-    return `${(number * 100).toLocaleString("en-US", { minimumFractionDigits, maximumFractionDigits })}%${suffix ? ` ${suffix}` : ""}`;
+    return `${numbers.number(number * 100, { minimumFractionDigits, maximumFractionDigits })}%${suffix ? ` ${suffix}` : ""}`;
   }
   const minimumFractionDigits = (decimals.match(/0/gu) ?? []).length;
   const integerFormat = unquotedFormat(format).split(".")[0] ?? "";
   const minimumIntegerDigits = Math.max(1, (integerFormat.match(/0/gu) ?? []).length);
   if (minimumIntegerDigits > 21) return value;
-  const formatted = number.toLocaleString("en-US", {
+  const formatted = numbers.number(number, {
     minimumFractionDigits,
     maximumFractionDigits: decimals.length,
     minimumIntegerDigits,
@@ -172,7 +174,13 @@ function formatExcelNumber(value: string, format: string, date1904: boolean): st
   return /"[^"]*%[^"]*"|\\%/u.test(format) ? `${formatted}%` : formatted;
 }
 
-function cellValue(cell: Element, sharedStrings: string[], numberFormats: string[], date1904: boolean): string {
+function cellValue(
+  cell: Element,
+  sharedStrings: string[],
+  numberFormats: string[],
+  date1904: boolean,
+  numbers: AppFormat,
+): string {
   const type = cell.getAttribute("t");
   if (type === "inlineStr") return cell.getElementsByTagNameNS("*", "is")[0]?.textContent ?? "";
   const valueElement = cell.getElementsByTagNameNS("*", "v")[0];
@@ -183,7 +191,7 @@ function cellValue(cell: Element, sharedStrings: string[], numberFormats: string
   if (type === "str") return value;
   if (type === "b") return value === "1" ? "TRUE" : "FALSE";
   const style = Number(cell.getAttribute("s"));
-  return formatExcelNumber(value, numberFormats[style] ?? "General", date1904);
+  return formatExcelNumber(value, numberFormats[style] ?? "General", date1904, numbers);
 }
 
 function parseSheet(
@@ -192,6 +200,7 @@ function parseSheet(
   numberFormats: string[],
   date1904: boolean,
   name: string,
+  numbers: AppFormat,
 ): ParsedSheet {
   const document = xmlDocument(bytes, "a worksheet");
   const rows: string[][] = [];
@@ -207,7 +216,7 @@ function parseSheet(
         truncated = true;
         continue;
       }
-      row[index] = cellValue(cell, sharedStrings, numberFormats, date1904);
+      row[index] = cellValue(cell, sharedStrings, numberFormats, date1904, numbers);
       maxColumns = Math.max(maxColumns, index + 1);
     }
     row.length = Math.min(maxColumns, MAX_COLUMNS);
@@ -234,7 +243,8 @@ function unzipSpreadsheet(bytes: Uint8Array) {
   });
 }
 
-export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
+/** `numbers` formats cell numbers. The default is English, for a caller outside the app. */
+export function parseSpreadsheet(bytes: Uint8Array, numbers: AppFormat = createFormat("en")): SpreadsheetData {
   const files = unzipSpreadsheet(bytes);
   const workbook = xmlDocument(files["xl/workbook.xml"], "xl/workbook.xml");
   const dateSystem = workbook.getElementsByTagNameNS("*", "workbookPr")[0]?.getAttribute("date1904");
@@ -260,7 +270,14 @@ export function parseSpreadsheet(bytes: Uint8Array): SpreadsheetData {
         sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
       const target = id ? relationshipTargets.get(id) : undefined;
       if (!target || !files[target]) return null;
-      return parseSheet(files[target], sharedStrings, numberFormats, date1904, sheet.getAttribute("name") ?? "Sheet");
+      return parseSheet(
+        files[target],
+        sharedStrings,
+        numberFormats,
+        date1904,
+        sheet.getAttribute("name") ?? "Sheet",
+        numbers,
+      );
     })
     .filter((sheet): sheet is ParsedSheet => sheet !== null);
   if (parsedSheets.length === 0) throw new Error("The workbook contains no readable sheets.");
@@ -278,16 +295,17 @@ export interface SpreadsheetFilePreviewProps {
 }
 
 export function SpreadsheetFilePreview(props: SpreadsheetFilePreviewProps) {
+  const { t, format } = useText();
   const parsed = createMemo(() => {
     if (props.loading || props.error || !props.bytes) return null;
     try {
-      return parseSpreadsheet(props.bytes);
+      return parseSpreadsheet(props.bytes, format);
     } catch {
       return null;
     }
   });
   const parseError = () =>
-    !props.loading && !props.error && props.bytes && !parsed() ? "Could not read this spreadsheet." : null;
+    !props.loading && !props.error && props.bytes && !parsed() ? t("preview.spreadsheet.readFailed") : null;
 
   return (
     <div class={`spreadsheet-file-preview${props.class ? ` ${props.class}` : ""}`}>
@@ -295,7 +313,7 @@ export function SpreadsheetFilePreview(props: SpreadsheetFilePreviewProps) {
         when={parsed()}
         fallback={
           <pre class="file-preview-spreadsheet-status">
-            {props.loading ? "Loading…" : (props.error ?? parseError() ?? "Preview unavailable.")}
+            {props.loading ? t("common.loading") : (props.error ?? parseError() ?? t("preview.unavailable"))}
           </pre>
         }
       >
@@ -344,7 +362,12 @@ export function SpreadsheetFilePreview(props: SpreadsheetFilePreviewProps) {
                 </table>
               </div>
               <Show when={workbook().truncated}>
-                <p class="file-preview-spreadsheet-note">Preview limited to the first 500 rows and 50 columns.</p>
+                <p class="file-preview-spreadsheet-note">
+                  {t("preview.spreadsheet.truncated", {
+                    rows: format.number(MAX_ROWS),
+                    columns: format.number(MAX_COLUMNS),
+                  })}
+                </p>
               </Show>
             </>
           );

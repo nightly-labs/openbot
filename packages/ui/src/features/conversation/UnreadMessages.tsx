@@ -1,4 +1,5 @@
 import { Button } from "@openbot/ui";
+import { useText } from "../../text";
 import { newMessagesLabel, preferredMessageScrollBehavior } from "./MessageNavigation";
 
 export function UnreadMessagesBanner(props: {
@@ -7,14 +8,15 @@ export function UnreadMessagesBanner(props: {
   onJumpToUnread: () => void;
   onMarkRead: () => void;
 }) {
-  const label = () => newMessagesLabel(props.count);
+  const { t } = useText();
+  const label = () => newMessagesLabel(props.count, t);
   return (
     <div class="unread-messages-banner" role="status" aria-label={label()}>
       <Button
         variant="ghost"
         class="unread-messages-jump"
         type="button"
-        aria-label={`Jump to ${label()}`}
+        aria-label={t("chat.newMessages.jump", { count: props.count })}
         onClick={props.onJumpToUnread}
       >
         {label()}
@@ -26,17 +28,20 @@ export function UnreadMessagesBanner(props: {
         disabled={props.busy}
         onClick={props.onMarkRead}
       >
-        <span class="unread-messages-mark-read-label">{props.busy ? "Marking…" : "Mark as read"}</span>
+        <span class="unread-messages-mark-read-label">
+          {props.busy ? t("chat.unread.marking") : t("chat.unread.markRead")}
+        </span>
       </Button>
     </div>
   );
 }
 
 export function UnreadMessagesDivider(props: { elementRef?: (element: HTMLDivElement) => void }) {
+  const { t } = useText();
   return (
     <div class="unread-messages-divider" ref={props.elementRef}>
-      <hr aria-label="New messages" />
-      <span>NEW</span>
+      <hr aria-label={t("chat.unread.dividerLabel")} />
+      <span>{t("chat.unread.dividerBadge")}</span>
       <hr />
     </div>
   );

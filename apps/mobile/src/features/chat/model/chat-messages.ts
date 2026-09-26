@@ -15,6 +15,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
 
@@ -32,7 +33,7 @@ export type ChatMessage =
     }
   | { id: string; kind: "exchange"; exchange: AgentExchangeSummary }
   /** A routine created, changed, deleted, or run by the agent. The label matches the desktop marker. */
-  | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: string; routineName: string }
+  | { id: string; kind: "routine"; event: RoutineMarkerEvent; label: MobileTextKey; routineName: string }
   | { id: string; kind: "question"; turnId: string | undefined; prompt: ConversationQuestionPrompt }
   | {
       id: string;
@@ -100,24 +101,32 @@ const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 
-const ROUTINE_RUN_LABELS: Record<RoutineRunStatus, string> = {
-  queued: "Invoked routine",
-  running: "Running routine",
-  "needs-attention": "Routine needs attention",
-  succeeded: "Completed routine",
-  failed: "Routine failed",
-  interrupted: "Routine interrupted",
-  cancelled: "Cancelled routine",
-};
+const ROUTINE_RUN_LABELS = {
+  queued: "mobile.chat.routine.invoked",
+  running: "mobile.chat.routine.running",
+  "needs-attention": "mobile.chat.routine.needsAttention",
+  succeeded: "mobile.chat.routine.completed",
+  failed: "mobile.chat.routine.failed",
+  interrupted: "mobile.chat.routine.interrupted",
+  cancelled: "mobile.chat.routine.cancelled",
+} as const satisfies Record<RoutineRunStatus, MobileTextKey>;
+
+const ROUTINE_ACTION_LABELS = {
+  created: "mobile.chat.routine.created",
+  updated: "mobile.chat.routine.updated",
+  deleted: "mobile.chat.routine.deleted",
+} as const satisfies Record<RoutineConversationEventAction, MobileTextKey>;
 
 /** The routine marker of a host message. A run has one marker per state; `runId` groups them. */
 function routineMarker(message: ConversationMessage) {
   const lifecycle = routineConversationEvent(message);
   if (lifecycle) {
-    const label = { created: "Created routine", updated: "Updated routine", deleted: "Deleted routine" }[
-      lifecycle.action
-    ];
-    return { runId: null, event: lifecycle.action, label, routineName: lifecycle.routineName };
+    return {
+      runId: null,
+      event: lifecycle.action,
+      label: ROUTINE_ACTION_LABELS[lifecycle.action],
+      routineName: lifecycle.routineName,
+    };
   }
   const run = routineRunConversationEvent(message);
   if (run)

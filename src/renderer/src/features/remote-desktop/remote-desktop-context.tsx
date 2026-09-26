@@ -1,5 +1,5 @@
 import type { RemoteDesktopConnectResult, RemoteDesktopErrorCode, RemoteDesktopSession } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { usePlatform } from "../../platform";
@@ -147,7 +147,8 @@ const RemoteDesktop = createSimpleContext({
         const result = await connectRemoteDesktop(serverId);
         if (result.status === "refused") {
           if (current()) {
-            setRemoteDesktopConnectionError(errorMessage(result.message, "Could not start remote control."));
+            const text = currentText();
+            setRemoteDesktopConnectionError(text.errorMessage(result.message, text.t("remoteDesktop.startFailed")));
             setRemoteDesktopConnectionErrorCode(result.errorCode);
           }
           return undefined;
@@ -160,7 +161,8 @@ const RemoteDesktop = createSimpleContext({
         return result.session;
       } catch (error) {
         if (current()) {
-          setRemoteDesktopConnectionError(errorMessage(error, "Could not start remote control."));
+          const text = currentText();
+          setRemoteDesktopConnectionError(text.errorMessage(error, text.t("remoteDesktop.startFailed")));
           setRemoteDesktopConnectionErrorCode(null);
         }
         return undefined;

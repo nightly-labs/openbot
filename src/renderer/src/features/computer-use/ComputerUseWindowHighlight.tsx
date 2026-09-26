@@ -1,4 +1,5 @@
 import type { ComputerUseCoveredArea } from "@openbot/contracts/ipc";
+import { useText } from "@openbot/ui/text";
 
 export interface ComputerUseWindowHighlightProps {
   /** Which application window the agent is working in, for the screen reader and the label. */
@@ -31,6 +32,7 @@ export interface ComputerUseWindowHighlightProps {
  * component holds no control of its own, so it cannot take a click away from the window under it.
  */
 export function ComputerUseWindowHighlight(props: ComputerUseWindowHighlightProps) {
+  const { t } = useText();
   return (
     <div
       class="computer-use-window-highlight"
@@ -41,7 +43,7 @@ export function ComputerUseWindowHighlight(props: ComputerUseWindowHighlightProp
       // The hue is the only sign a blind user would otherwise miss, and it is not in the window's
       // own tree, so it is announced rather than hidden as decoration.
       role="status"
-      aria-label={`OpenBot is working in ${props.windowTitle}`}
+      aria-label={t("computerUse.highlight.working", { title: props.windowTitle })}
     />
   );
 }

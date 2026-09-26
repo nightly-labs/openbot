@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
-import { translateFor } from "@openbot/i18n";
+import { resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
 import { app, BrowserWindow, dialog, Notification, powerMonitor, protocol, screen, shell } from "electron";
@@ -253,6 +253,7 @@ const windows = createMainWindowController({
   developmentTestClientEnabled,
   isQuitting: () => isQuitting,
   getServices: () => services,
+  getTranslate: () => services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale())),
   forwardAgentEvent,
   onRendererLoadStarted: () => {
     deepLinkReceiverReady = false;
@@ -389,8 +390,8 @@ function registerIpcHandlers({
     ...providerIpcHandlers({ service, providerRuntimes, credentials: providerCredentials }),
     ...voiceIpcHandlers({ voice }),
     ...accountIpcHandlers({ centralAuth, host }),
-    ...skillIpcHandlers({ skills, getMainWindow }),
-    ...hostedSiteIpcHandlers({ hostedSites, getMainWindow }),
+    ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
+    ...hostedSiteIpcHandlers({ hostedSites, getMainWindow, translate: language.translate }),
     ...customProviderIpcHandlers(customProviderChanges),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
@@ -400,6 +401,7 @@ function registerIpcHandlers({
     ...agentImportIpcHandlers({
       agentImport,
       getMainWindow,
+      translate: language.translate,
       exportSkillPath: app.isPackaged
         ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
         : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
@@ -447,12 +449,13 @@ function registerIpcHandlers({
       ensureToolRuntimesReady: () => providerRuntimes.ensureToolRuntimesReady(),
       toolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
     }),
-    ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow }),
+    ...attachmentIpcHandlers({ service, mailbox, remoteServers, getMainWindow, translate: language.translate }),
     ...storageIpcHandlers({
       storage: storageUsage,
       mailbox,
       remoteServers,
       getMainWindow,
+      translate: language.translate,
       agents: () => service.listAgents(),
       openPath: (path) => shell.openPath(path),
     }),
@@ -841,10 +844,9 @@ if (!hasSingleInstanceLock) {
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("OpenBot failed to start:", toLogValue(error));
-      dialog.showErrorBox(
-        "OpenBot couldn’t start",
-        `${message}\n\nYour local data was not reset or overwritten. See the troubleshooting guide for recovery steps.`,
-      );
+      // The services, and with them the saved language, may not exist yet. Then the system language applies.
+      const translate = services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale()));
+      dialog.showErrorBox(translate("startup.failedTitle"), translate("startup.failedBody", { message }));
       app.quit();
     });
 }

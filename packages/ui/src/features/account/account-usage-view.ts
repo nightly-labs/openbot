@@ -8,6 +8,9 @@ import {
   agentProviderName,
   isAgentProvider,
 } from "@openbot/contracts/ipc";
+import { currentText, type TextValue } from "../../text";
+
+type UsageText = Pick<TextValue, "t" | "format">;
 
 export type AccountUsageTone = "neutral" | "warning" | "critical";
 
@@ -37,16 +40,17 @@ export function usageTone(remainingPercent: number | null): AccountUsageTone {
 export function accountUsageProviderRows(
   usage: AccountUsage | null,
   providers?: ReadonlyArray<{ id: string; state: string }>,
+  text: UsageText = currentText(),
 ): AccountUsageProviderRow[] {
   const rows = new Map<AgentProviderId, AccountUsageProviderRow>();
   for (const limit of usage?.limits ?? []) {
     if (!isAgentProvider(limit.id)) continue;
-    rows.set(limit.id, usageRow(limit.id, limit));
+    rows.set(limit.id, usageRow(limit.id, limit, text));
   }
   for (const provider of providers ?? []) {
     if (!isAgentProvider(provider.id) || provider.state !== "available" || rows.has(provider.id)) continue;
     if (provider.id === "opencode") continue;
-    rows.set(provider.id, usageRow(provider.id, null));
+    rows.set(provider.id, usageRow(provider.id, null, text));
   }
   return [...rows.values()].sort(
     (left, right) =>
@@ -54,15 +58,19 @@ export function accountUsageProviderRows(
   );
 }
 
-function usageRow(provider: AgentProviderId, limit: AccountUsageLimit | null): AccountUsageProviderRow {
+function usageRow(
+  provider: AgentProviderId,
+  limit: AccountUsageLimit | null,
+  text: UsageText,
+): AccountUsageProviderRow {
   const window = limit ? mostConstrainedWindow(limit) : null;
   const remainingPercent = window ? usageRemainingPercent(window.usedPercent) : null;
   return {
     provider,
     name: agentProviderName(provider),
     remainingPercent,
-    windowLabel: window ? usageWindowLabel(window.windowDurationMins) : null,
-    resetsAtLabel: window ? formatUsageReset(window.resetsAt) : null,
+    windowLabel: window ? usageWindowLabel(window.windowDurationMins, text) : null,
+    resetsAtLabel: window ? formatUsageReset(window.resetsAt, text) : null,
     tone: usageTone(remainingPercent),
   };
 }
@@ -89,36 +97,38 @@ export function accountUsageSummary(
   return lowest;
 }
 
-export function usageWindowLabel(durationMins: number | null): string {
-  if (durationMins === null) return "Limit";
-  if (nearDuration(durationMins, 10_080)) return "Weekly";
-  if (nearDuration(durationMins, 43_200) || nearDuration(durationMins, 40_320)) return "Monthly";
-  if (nearDuration(durationMins, 1_440)) return "Daily";
-  if (nearDuration(durationMins, 300)) return "5-hour";
+export function usageWindowLabel(durationMins: number | null, text: UsageText = currentText()): string {
+  const { t } = text;
+  if (durationMins === null) return t("account.usage.window.limit");
+  if (nearDuration(durationMins, 10_080)) return t("account.usage.window.weekly");
+  if (nearDuration(durationMins, 43_200) || nearDuration(durationMins, 40_320))
+    return t("account.usage.window.monthly");
+  if (nearDuration(durationMins, 1_440)) return t("account.usage.window.daily");
+  if (nearDuration(durationMins, 300)) return t("account.usage.window.fiveHour");
   if (durationMins >= 60 && durationMins % 60 === 0) {
-    const hours = durationMins / 60;
-    return hours === 1 ? "1-hour" : `${hours}-hour`;
+    return t("account.usage.window.hours", { count: durationMins / 60 });
   }
-  return `${Math.round(durationMins)} min`;
+  return t("account.usage.window.minutes", { minutes: Math.round(durationMins) });
 }
 
-export function formatUsageReset(resetsAt: number | null): string | null {
+export function formatUsageReset(resetsAt: number | null, text: UsageText = currentText()): string | null {
   if (resetsAt === null) return null;
   const date = new Date(resetsAt * 1_000);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
+  return text.format.date(date, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  });
 }
 
-export function accountUsageRowLabel(row: AccountUsageProviderRow): string {
-  if (row.remainingPercent === null) return `${row.name}, unavailable`;
-  const parts = [`${row.name}, ${row.remainingPercent}% left`];
+export function accountUsageRowLabel(row: AccountUsageProviderRow, text: UsageText = currentText()): string {
+  const { t } = text;
+  if (row.remainingPercent === null) return t("account.usage.row.unavailable", { name: row.name });
+  const parts = [t("account.usage.row.left", { name: row.name, percent: row.remainingPercent })];
   if (row.windowLabel) parts.push(row.windowLabel);
-  if (row.resetsAtLabel) parts.push(`resets ${row.resetsAtLabel}`);
+  if (row.resetsAtLabel) parts.push(t("account.usage.row.resets", { time: row.resetsAtLabel }));
   return parts.join(", ");
 }
 

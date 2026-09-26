@@ -5,6 +5,7 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import type { AgentProfile } from "../../data";
+import { useText } from "../../text";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { fileBadge } from "./AttachmentCards";
 import { EditIcon, QueueIcon, SteerIcon, TrashIcon } from "./ConversationIcons";
@@ -30,6 +31,7 @@ interface DragSlot {
 }
 
 export function QueuePanel(props: QueuePanelProps) {
+  const { t } = useText();
   const [deleteHeldId, setDeleteHeldId] = createSignal<string | null>(null);
   const [draggedId, setDraggedId] = createSignal<string | null>(null);
   const [dragOverId, setDragOverId] = createSignal<string | null>(null);
@@ -328,7 +330,7 @@ export function QueuePanel(props: QueuePanelProps) {
     ids[index] = displaced;
     ids[target] = moved;
     props.onReorder(ids);
-    setAnnouncement(`Moved queued message to position ${target + 1} of ${ids.length}.`);
+    setAnnouncement(t("queue.moved", { position: target + 1, total: ids.length }));
   }
 
   function dropDelivery(targetId: string) {
@@ -341,7 +343,7 @@ export function QueuePanel(props: QueuePanelProps) {
     ids.splice(sourceIndex, 1);
     ids.splice(targetIndex, 0, sourceId);
     props.onReorder(ids);
-    setAnnouncement(`Moved queued message to position ${targetIndex + 1} of ${ids.length}.`);
+    setAnnouncement(t("queue.moved", { position: targetIndex + 1, total: ids.length }));
   }
 
   function requestCancel(deliveryId: string) {
@@ -356,12 +358,14 @@ export function QueuePanel(props: QueuePanelProps) {
     const text = expandChatTagReferences(delivery.text.trim(), (reference) =>
       reference.kind === "agent" ? agentNames.get(reference.id) : skillNames.get(reference.id),
     );
-    return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || "Attachment";
+    return text || delivery.attachments.map((attachment) => attachment.name).join(", ") || t("queue.attachment");
   }
 
   function holdText(hold: QueueHold): string {
     const name = (props.agents ?? []).find((agent) => agent.id === hold.agentId)?.name;
-    return `Waiting - ${name ?? "this agent"} is working in ${hold.channelName}`;
+    return name
+      ? t("queue.hold.named", { name, channel: hold.channelName })
+      : t("queue.hold.unnamed", { channel: hold.channelName });
   }
 
   function openActionTooltip(anchor: HTMLElement, content: string) {
@@ -385,7 +389,7 @@ export function QueuePanel(props: QueuePanelProps) {
             "agent-queue-panel-dragging": Boolean(draggedId()),
           },
         ]}
-        aria-label="Message queue"
+        aria-label={t("queue.label")}
         onDragOver={(event) => {
           if (!draggedId()) return;
           event.preventDefault();
@@ -469,7 +473,10 @@ export function QueuePanel(props: QueuePanelProps) {
                       }
                     }}
                     tabindex={delivery.status === "queued" && !removing() ? 0 : -1}
-                    aria-label={`Queued message ${delivery.position ?? ""}${editing ? ", editing" : ""}: ${messagePreview(delivery)}`}
+                    aria-label={t(editing ? "queue.item.labelEditing" : "queue.item.label", {
+                      position: delivery.position ?? "",
+                      preview: messagePreview(delivery),
+                    })}
                   >
                     <span class="agent-queue-icon" aria-hidden="true">
                       <QueueIcon />
@@ -491,7 +498,7 @@ export function QueuePanel(props: QueuePanelProps) {
                     </span>
                     <div class="agent-queue-actions">
                       <Show when={editing}>
-                        <span class="agent-queue-editing-badge">Editing</span>
+                        <span class="agent-queue-editing-badge">{t("queue.item.editing")}</span>
                       </Show>
                       <Button
                         variant="ghost"
@@ -499,12 +506,12 @@ export function QueuePanel(props: QueuePanelProps) {
                         class="agent-queue-steer"
                         disabled={!props.canSteer || !actionable}
                         aria-describedby={actionTooltipId}
-                        aria-label={`Steer queued message ${delivery.position ?? ""}`}
-                        onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Steer message")}
-                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, "Steer message")}
+                        aria-label={t("queue.item.steerLabel", { position: delivery.position ?? "" })}
+                        onPointerEnter={(event) => openActionTooltip(event.currentTarget, t("queue.item.steerTooltip"))}
+                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, t("queue.item.steerTooltip"))}
                         onPointerLeave={(event) => closeActionTooltip(event.currentTarget)}
                         onMouseLeave={(event) => closeActionTooltip(event.currentTarget)}
-                        onFocus={(event) => openActionTooltip(event.currentTarget, "Steer message")}
+                        onFocus={(event) => openActionTooltip(event.currentTarget, t("queue.item.steerTooltip"))}
                         onBlur={(event) => closeActionTooltip(event.currentTarget)}
                         onKeyDown={closeActionTooltipOnEscape}
                         onClick={() => {
@@ -513,7 +520,7 @@ export function QueuePanel(props: QueuePanelProps) {
                         }}
                       >
                         <SteerIcon />
-                        <span>{delivery.status === "starting" ? "Steering" : "Steer"}</span>
+                        <span>{delivery.status === "starting" ? t("queue.item.steering") : t("queue.item.steer")}</span>
                       </Button>
                       <Button
                         variant="destructive-ghost"
@@ -521,12 +528,14 @@ export function QueuePanel(props: QueuePanelProps) {
                         class="agent-queue-icon-button agent-queue-delete"
                         disabled={delivery.status !== "queued"}
                         aria-describedby={actionTooltipId}
-                        aria-label={`Delete queued message ${delivery.position ?? ""}`}
-                        onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Delete message")}
-                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, "Delete message")}
+                        aria-label={t("queue.item.deleteLabel", { position: delivery.position ?? "" })}
+                        onPointerEnter={(event) =>
+                          openActionTooltip(event.currentTarget, t("queue.item.deleteTooltip"))
+                        }
+                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, t("queue.item.deleteTooltip"))}
                         onPointerLeave={(event) => closeActionTooltip(event.currentTarget)}
                         onMouseLeave={(event) => closeActionTooltip(event.currentTarget)}
-                        onFocus={(event) => openActionTooltip(event.currentTarget, "Delete message")}
+                        onFocus={(event) => openActionTooltip(event.currentTarget, t("queue.item.deleteTooltip"))}
                         onBlur={(event) => closeActionTooltip(event.currentTarget)}
                         onKeyDown={closeActionTooltipOnEscape}
                         onClick={() => {
@@ -543,12 +552,12 @@ export function QueuePanel(props: QueuePanelProps) {
                         class="agent-queue-icon-button agent-queue-edit"
                         disabled={!actionable}
                         aria-describedby={actionTooltipId}
-                        aria-label={`Edit queued message ${delivery.position ?? ""}`}
-                        onPointerEnter={(event) => openActionTooltip(event.currentTarget, "Edit message")}
-                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, "Edit message")}
+                        aria-label={t("queue.item.editLabel", { position: delivery.position ?? "" })}
+                        onPointerEnter={(event) => openActionTooltip(event.currentTarget, t("queue.item.editTooltip"))}
+                        onMouseEnter={(event) => openActionTooltip(event.currentTarget, t("queue.item.editTooltip"))}
                         onPointerLeave={(event) => closeActionTooltip(event.currentTarget)}
                         onMouseLeave={(event) => closeActionTooltip(event.currentTarget)}
-                        onFocus={(event) => openActionTooltip(event.currentTarget, "Edit message")}
+                        onFocus={(event) => openActionTooltip(event.currentTarget, t("queue.item.editTooltip"))}
                         onBlur={(event) => closeActionTooltip(event.currentTarget)}
                         onKeyDown={closeActionTooltipOnEscape}
                         onClick={() => {
@@ -577,10 +586,10 @@ export function QueuePanel(props: QueuePanelProps) {
           setDeleteHeldId(null);
           if (id) requestCancel(id);
         }}
-        title="Delete queued message?"
-        description="Another device is editing this message. The agent will not receive it."
-        confirmLabel="Delete"
-        cancelLabel="Keep"
+        title={t("queue.deleteHeld.title")}
+        description={t("queue.deleteHeld.body")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("queue.deleteHeld.keep")}
         initialFocus="cancel"
       />
       <Show when={actionTooltip()}>

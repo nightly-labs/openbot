@@ -1,5 +1,16 @@
 import type { AgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
 import { isCustomProviderModelId, isFreeOpencodeModel } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
+import { currentText } from "../text";
+
+/** The efforts that have a name in the catalog. The other efforts show their id. */
+const EFFORT_LABELS: Partial<Record<string, AppTextKey>> = {
+  low: "provider.effort.low",
+  medium: "provider.effort.medium",
+  high: "provider.effort.high",
+  xhigh: "provider.effort.xhigh",
+  max: "provider.effort.max",
+};
 
 export interface PickerModel {
   id: string;
@@ -21,6 +32,7 @@ function modelTier(model: PickerModel): 0 | 1 {
 
 /** OpenCode exposes reasoning variants as model IDs. Keep those IDs at the selection boundary. */
 export function pickerModels(options: AgentModelOption[]): PickerModel[] {
+  const { t } = currentText();
   const byId = new Map(options.map((model) => [model.id, model]));
   const variants = new Map<string, { id: string; name: string }[]>();
   const variantIds = new Set<string>();
@@ -30,7 +42,8 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
     const [, baseId, effort] = match ?? [];
     const base = baseId === undefined ? undefined : byId.get(baseId);
     if (!base || effort === undefined || model.name !== `${base.name} (${effort})`) continue;
-    const name = effort === "xhigh" ? "Extra high" : effort.charAt(0).toUpperCase() + effort.slice(1);
+    const label = EFFORT_LABELS[effort];
+    const name = label ? t(label) : effort.charAt(0).toUpperCase() + effort.slice(1);
     variants.set(base.id, [...(variants.get(base.id) ?? []), { id: model.id, name }]);
     variantIds.add(model.id);
   }
@@ -45,7 +58,9 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
         service: separator < 0 ? "" : model.name.slice(0, separator),
         // Free-tier label only; shared with catalog order so badge and default agree.
         free: model.provider === "opencode" && isFreeOpencodeModel(model.id, name),
-        variants: variants.has(model.id) ? [{ id: model.id, name: "Default" }, ...(variants.get(model.id) ?? [])] : [],
+        variants: variants.has(model.id)
+          ? [{ id: model.id, name: t("app.modelVariant.default") }, ...(variants.get(model.id) ?? [])]
+          : [],
       };
     });
 }

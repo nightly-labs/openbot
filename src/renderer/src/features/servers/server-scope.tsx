@@ -1,4 +1,4 @@
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
@@ -106,9 +106,10 @@ const ServerScope = createSimpleContext({
           })
           .catch((error) => {
             if (!isCurrent()) return;
+            const text = currentText();
             setAgentStatus((current) => ({
               ...current,
-              message: errorMessage(error, "Could not load agents. Check the server connection and try again."),
+              message: text.errorMessage(error, text.t("server.scope.agentsLoadFailed")),
             }));
           }),
         loadSidebarLayout(server)

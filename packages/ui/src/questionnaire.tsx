@@ -2,6 +2,7 @@ import type { ComponentProps, JSX } from "@solidjs/web";
 import { createContext, omit, useContext } from "solid-js";
 import { Button, type ButtonProps } from "./button";
 import { Input, type InputProps } from "./form";
+import { useText } from "./text";
 import { cx } from "./utils";
 
 interface QuestionnaireContextValue {
@@ -79,15 +80,19 @@ export interface QuestionnaireProgressProps extends Omit<ComponentProps<"div">, 
 
 function QuestionnaireProgress(props: QuestionnaireProgressProps): JSX.Element {
   const context = useQuestionnaireContext("Questionnaire.Progress");
+  const { t } = useText();
   const others = omit(props, "children", "class");
-  const label = () => (context.total ? `Question ${context.current} of ${context.total}` : "No questions");
+  const label = () =>
+    context.total
+      ? t("app.questionnaire.step", { current: context.current, total: context.total })
+      : t("app.questionnaire.empty");
 
   return (
     <div
       data-slot="questionnaire-progress"
       class={cx("ui-questionnaire-progress", props.class)}
       role="progressbar"
-      aria-label="Question progress"
+      aria-label={t("app.questionnaire.progress")}
       aria-live="polite"
       aria-valuemin={context.total ? 1 : undefined}
       aria-valuemax={context.total || undefined}

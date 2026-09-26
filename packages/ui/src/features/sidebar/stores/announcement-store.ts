@@ -1,10 +1,10 @@
-import { errorMessage } from "../../../error-message";
 /**
  * The sidebar's one live region. Every reorder, move, pin and failure the user cannot see happen
  * announces here, so the store is the sink the rest of the sidebar writes to and reads nothing back.
  */
 
 import { createSignal } from "solid-js";
+import { currentText } from "../../../text";
 
 export function createSidebarAnnouncementStore() {
   const [reorderAnnouncement, setReorderAnnouncement] = createSignal("");
@@ -18,7 +18,8 @@ export function createSidebarAnnouncementStore() {
    * cause is unwrapped here rather than at each of the seven call sites that used to spell it out.
    */
   const announceError = (cause: unknown): void => {
-    setReorderAnnouncement(errorMessage(cause, "Could not update the sidebar. Try again."));
+    const text = currentText();
+    setReorderAnnouncement(text.errorMessage(cause, text.t("sidebar.announce.updateFailed")));
   };
 
   return { announce, announceError, reorderAnnouncement };

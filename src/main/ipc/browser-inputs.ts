@@ -6,6 +6,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { isObject, requireString } from "./validation";
 
 export function parseBrowserOpen(value: unknown): BrowserOpenInput {
@@ -31,7 +32,7 @@ export function parseBrowserNavigate(value: unknown): BrowserNavigateInput {
   }
   if (isObject(value) && value.direction === undefined && value.url !== undefined) {
     const url = requireString(value.url, "url", INPUT_LIMITS.browserUrl);
-    if (!/^https?:\/\//i.test(url)) throw new Error("Only HTTP(S) browser URLs are allowed.");
+    if (!/^https?:\/\//i.test(url)) throw new Error(sourceText("error.backend.browserUrlProtocol"));
     return { tabId: requireString(value.tabId, "tabId"), url };
   }
   if (!isObject(value) || (value.direction !== "back" && value.direction !== "forward")) {

@@ -1,6 +1,7 @@
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
+import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
@@ -28,6 +29,7 @@ import { useSidebar } from "./sidebar-context";
  * answers disagree for a frame.
  */
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
+  const { t } = useText();
   const layout = useLayout();
   const channels = useChannels();
   const { activeServer, activeServerSupportsCapability } = useServers();
@@ -139,7 +141,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       emptyAction={
         agentList().length === 0
           ? {
-              label: "Create your first agent",
+              label: t("sidebar.empty.firstAgent"),
               avatarSeed: agentSetupDraft().avatarSeed,
               avatarHue: agentSetupDraft().avatarHue,
               onSelect: () => {

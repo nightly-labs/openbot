@@ -19,6 +19,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { AgentRoutineStore } from "../agent-routine-store";
 import type { AgentStore } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
@@ -191,9 +192,9 @@ export class RoutineScheduler implements RoutineDueSource {
   async delete(input: DeleteRoutineInput, options: RoutineMutationOptions = {}): Promise<void> {
     this.#conversation.requireKnownAgent(input.agentId);
     const routine = this.#routines.get(input.agentId, input.routineId);
-    if (!routine) throw new RoutineInputError("This routine no longer exists.");
+    if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
     if (this.#deletionAgents.has(input.agentId)) {
-      throw new RoutineInputError("Another routine deletion is already in progress for this agent.");
+      throw new RoutineInputError(sourceText("error.backend.routineDeletionBusy"));
     }
     this.#deletionAgents.add(input.agentId);
     try {
@@ -251,11 +252,10 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   async test(input: TestRoutineInput): Promise<RoutineRun> {
-    if (!this.mayDrain(input.agentId))
-      throw new RoutineInputError("Wait until the agent operation finishes before running a routine.");
+    if (!this.mayDrain(input.agentId)) throw new RoutineInputError(sourceText("error.backend.routineWaitForAgent"));
     this.#conversation.requireKnownAgent(input.agentId);
     const routine = this.#routines.get(input.agentId, input.routineId);
-    if (!routine) throw new RoutineInputError("This routine no longer exists.");
+    if (!routine) throw new RoutineInputError(sourceText("error.backend.routineGone"));
     const run = this.#routines.createRun(routine, null, "manual", new Date().toISOString());
     await this.#enqueueRun(run);
     this.stateChanged(input.agentId);
@@ -265,7 +265,7 @@ export class RoutineScheduler implements RoutineDueSource {
   listRuns(input: ListRoutineRunsInput): RoutineRun[] {
     this.#conversation.requireKnownAgent(input.agentId);
     if (!this.#routines.get(input.agentId, input.routineId))
-      throw new RoutineInputError("This routine no longer exists.");
+      throw new RoutineInputError(sourceText("error.backend.routineGone"));
     return this.#routines.listRuns(input.agentId, input.routineId, input.limit);
   }
 
@@ -558,14 +558,14 @@ export class RoutineScheduler implements RoutineDueSource {
       }
       if (delivery.status !== "starting" && delivery.status !== "running") continue;
       if (!delivery.turnId) {
-        throw new Error("This routine run is still starting. Try again after its turn starts.");
+        throw new Error(sourceText("error.backend.routineRunStarting"));
       }
       cancellableRuns.push(run);
       activeTurnIds.add(delivery.turnId);
     }
     if (activeTurnIds.size === 0) return cancellableRuns;
     if (!this.#store.activeProviderSession(agentId)) {
-      throw new Error("OpenBot cannot interrupt the active routine run because its provider session is unavailable.");
+      throw new Error(sourceText("error.backend.routineRunNoSession"));
     }
     for (const turnId of activeTurnIds) await this.#hooks.interrupt(agentId, turnId);
     return cancellableRuns;

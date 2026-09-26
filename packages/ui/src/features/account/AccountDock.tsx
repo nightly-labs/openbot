@@ -26,7 +26,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { TypingDots } from "../../components/TypingDots";
-import { errorMessage } from "../../error-message";
+import { useText } from "../../text";
 import { presentUpdateStatus } from "../updates/update-status";
 import { AccountUpdateIsland } from "./AccountUpdateIsland";
 import { AccountUsageDetails } from "./AccountUsageDetails";
@@ -56,6 +56,8 @@ interface AccountDockProps {
   onOpenSettings: (trigger: HTMLElement) => void;
   onOpenSkills: () => void;
 }
+
+const PRODUCT_NAME = "OpenBot";
 
 const USAGE_REFRESH_TIMEOUT_MS = 12_000;
 /** How old a reading may get while it is on screen before it is fetched again. */
@@ -103,6 +105,8 @@ function AnimatedUsagePercentage(props: { value: number | null }) {
 }
 
 export function AccountDock(props: AccountDockProps) {
+  const text = useText();
+  const { t, errorMessage } = text;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [usageOpen, setUsageOpen] = createSignal(false);
   const [usageTooltipOpen, setUsageTooltipOpen] = createSignal(false);
@@ -127,25 +131,25 @@ export function AccountDock(props: AccountDockProps) {
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );
-  const usageRows = createMemo(() => accountUsageProviderRows(props.accountUsage, props.agentStatus.providers));
+  const usageRows = createMemo(() => accountUsageProviderRows(props.accountUsage, props.agentStatus.providers, text));
   const usageSummary = createMemo(() => accountUsageSummary(usageRows(), props.usageProvider, props.usageModel));
   const usageRemaining = createMemo(() => usageSummary()?.remainingPercent ?? null);
   const usageTone = createMemo(() => usageSummary()?.tone ?? "neutral");
   const usageButtonLabel = createMemo(() => {
     const summary = usageSummary();
-    if (usageLoading() && summary === null) return "Usage is loading";
-    if (summary === null || summary.remainingPercent === null) return "Usage unavailable";
-    return `Usage, ${summary.name} ${summary.remainingPercent}% left`;
+    if (usageLoading() && summary === null) return t("account.dock.usageLoading");
+    if (summary === null || summary.remainingPercent === null) return t("account.dock.usageUnavailable");
+    return t("account.dock.usageLabel", { name: summary.name, percent: summary.remainingPercent });
   });
   const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
   const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageReady || !props.usageTargetKey);
-  const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus));
+  const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus, text));
   const accountMenuError = createMemo(
     () =>
       menuError() ??
       updateError() ??
       (props.updateStatus.phase === "error"
-        ? errorMessage(props.updateStatus.message, "Could not update OpenBot. Try again.")
+        ? errorMessage(props.updateStatus.message, t("account.menu.updateFailedRetry"))
         : null),
   );
 
@@ -249,13 +253,13 @@ export function AccountDock(props: AccountDockProps) {
     usageWatchdog = window.setTimeout(() => {
       if (generation !== usageRequestGeneration) return;
       setUsageLoading(false);
-      setUsageError("Usage is unavailable.");
+      setUsageError(t("account.usage.unavailable"));
     }, USAGE_REFRESH_TIMEOUT_MS);
     try {
       await props.onRefreshUsage();
     } catch (cause) {
       if (generation === usageRequestGeneration && props.usageTargetKey === targetKey) {
-        setUsageError(errorMessage(cause, "Usage is unavailable."));
+        setUsageError(errorMessage(cause, t("account.usage.unavailable")));
       }
     } finally {
       if (usageWatchdog !== undefined) {
@@ -284,7 +288,7 @@ export function AccountDock(props: AccountDockProps) {
     void props
       .onOpenExternal(destination)
       .then(() => setMenuOpen(false))
-      .catch((cause) => setMenuError(errorMessage(cause, "Could not open the link.")));
+      .catch((cause) => setMenuError(errorMessage(cause, t("account.menu.openLinkFailed"))));
   }
 
   async function runUpdateAction(): Promise<void> {
@@ -293,7 +297,7 @@ export function AccountDock(props: AccountDockProps) {
     try {
       await props.onUpdateAction();
     } catch (cause) {
-      setUpdateError(errorMessage(cause, "Could not update OpenBot."));
+      setUpdateError(errorMessage(cause, t("account.menu.updateFailed")));
     }
   }
 
@@ -305,7 +309,7 @@ export function AccountDock(props: AccountDockProps) {
     try {
       await onLogout();
     } catch (cause) {
-      setMenuError(errorMessage(cause, "Could not sign out."));
+      setMenuError(errorMessage(cause, t("account.menu.signOutFailed")));
       setLoggingOut(false);
     }
   }
@@ -325,10 +329,10 @@ export function AccountDock(props: AccountDockProps) {
             refreshActive={usageRefreshActive()}
             refreshDisabled={usageRefreshDisabled()}
             onRefresh={refreshUsageWithFeedback}
-            title={<h2 class="account-usage-popover-title">Usage</h2>}
+            title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
           />
           <div class="account-menu-separator" />
-          <section class="account-menu-group" aria-label="Account">
+          <section class="account-menu-group" aria-label={t("account.menu.account")}>
             <Button
               variant="ghost"
               type="button"
@@ -339,13 +343,13 @@ export function AccountDock(props: AccountDockProps) {
               }}
             >
               <Settings class="account-menu-icon" aria-hidden="true" />
-              <span>Settings</span>
+              <span>{t("account.menu.settings")}</span>
             </Button>
           </section>
           <div class="account-menu-separator" />
         </Show>
         <Show when={!props.remoteClient}>
-          <section class="account-menu-group" aria-label="OpenBot">
+          <section class="account-menu-group" aria-label={PRODUCT_NAME}>
             <Show
               when={props.updateStatus.phase !== "unsupported" && (!hybridLayout() || !updatePresentation().available)}
             >
@@ -376,7 +380,7 @@ export function AccountDock(props: AccountDockProps) {
               }}
             >
               <Puzzle class="account-menu-icon" aria-hidden="true" />
-              <span>Marketplace</span>
+              <span>{t("account.menu.marketplace")}</span>
             </Button>
             <Button
               variant="ghost"
@@ -388,19 +392,19 @@ export function AccountDock(props: AccountDockProps) {
               }}
             >
               <ShieldCheck class="account-menu-icon" aria-hidden="true" />
-              <span>Providers &amp; permissions</span>
+              <span>{t("account.menu.providersPermissions")}</span>
             </Button>
           </section>
 
           <div class="account-menu-separator" />
-          <section class="account-menu-group" aria-label="Help">
+          <section class="account-menu-group" aria-label={t("account.menu.help")}>
             <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("feedback")}>
               <Megaphone class="account-menu-icon" aria-hidden="true" />
-              <span>Send feedback</span>
+              <span>{t("account.menu.sendFeedback")}</span>
             </Button>
             <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("message")}>
               <Mail class="account-menu-icon" aria-hidden="true" />
-              <span>Message</span>
+              <span>{t("account.menu.message")}</span>
             </Button>
           </section>
         </Show>
@@ -414,7 +418,7 @@ export function AccountDock(props: AccountDockProps) {
             disabled={loggingOut()}
           >
             <LogOut class="account-menu-icon" aria-hidden="true" />
-            <span>{loggingOut() ? "Signing out…" : "Sign out"}</span>
+            <span>{loggingOut() ? t("account.menu.signingOut") : t("account.menu.signOut")}</span>
           </Button>
         </Show>
         <Show when={accountMenuError()}>
@@ -451,7 +455,7 @@ export function AccountDock(props: AccountDockProps) {
           as="button"
           type="button"
           class={buttonVariants({ variant: "ghost", class: "account-dock-trigger" })}
-          aria-label="Open account menu"
+          aria-label={t("account.dock.openMenu")}
           aria-expanded={menuOpen() ? "true" : "false"}
         >
           {avatar("account-dock-avatar")}
@@ -461,16 +465,16 @@ export function AccountDock(props: AccountDockProps) {
             <Show when={!props.remoteClient && props.appInfo}>
               {(info) => (
                 <span class="sr-only">
-                  Version {info().version} · {info().platform}
+                  {t("account.dock.version", { version: info().version, platform: info().platform })}
                 </span>
               )}
             </Show>
           </span>
           <Show when={updatePresentation().available}>
             <Badge class="sidebar-update-pill" variant="new">
-              Update
+              {t("account.dock.updateBadge")}
             </Badge>
-            <span class="sr-only">OpenBot update available</span>
+            <span class="sr-only">{t("account.dock.updateAvailable")}</span>
           </Show>
           <ChevronUp class="account-dock-chevron" aria-hidden="true" />
         </Popover.Trigger>
@@ -480,7 +484,7 @@ export function AccountDock(props: AccountDockProps) {
             class="ui-popover-menu-surface account-popover"
             aria-hidden={menuOpen() ? undefined : "true"}
           >
-            <Popover.Title class="sr-only">Account actions</Popover.Title>
+            <Popover.Title class="sr-only">{t("account.dock.actions")}</Popover.Title>
             {accountMenu(true)}
           </Popover.Content>
         </Popover.Portal>
@@ -510,7 +514,7 @@ export function AccountDock(props: AccountDockProps) {
             as="button"
             type="button"
             class={buttonVariants({ variant: "ghost", class: "account-dock-hybrid-identity" })}
-            aria-label="Open account actions"
+            aria-label={t("account.dock.openActions")}
             aria-expanded={menuOpen() ? "true" : "false"}
           >
             <span class="account-dock-avatar-frame">{avatar("account-dock-avatar")}</span>
@@ -520,7 +524,7 @@ export function AccountDock(props: AccountDockProps) {
               <Show when={!props.remoteClient && props.appInfo}>
                 {(info) => (
                   <span class="sr-only">
-                    Version {info().version} · {info().platform}
+                    {t("account.dock.version", { version: info().version, platform: info().platform })}
                   </span>
                 )}
               </Show>
@@ -531,7 +535,7 @@ export function AccountDock(props: AccountDockProps) {
               class="ui-popover-menu-surface account-popover"
               aria-hidden={menuOpen() ? undefined : "true"}
             >
-              <Popover.Title class="sr-only">Account actions</Popover.Title>
+              <Popover.Title class="sr-only">{t("account.dock.actions")}</Popover.Title>
               {accountMenu()}
             </Popover.Content>
           </Popover.Portal>
@@ -595,7 +599,9 @@ export function AccountDock(props: AccountDockProps) {
                       refreshActive={usageRefreshActive()}
                       refreshDisabled={usageRefreshDisabled()}
                       onRefresh={refreshUsageWithFeedback}
-                      title={<Popover.Title class="account-usage-popover-title">Usage</Popover.Title>}
+                      title={
+                        <Popover.Title class="account-usage-popover-title">{t("account.usage.title")}</Popover.Title>
+                      }
                     />
                   </Popover.Content>
                 </Popover.Portal>
@@ -603,7 +609,9 @@ export function AccountDock(props: AccountDockProps) {
             </Tooltip.Trigger>
             <Tooltip.Portal>
               <Tooltip.Content class="ui-tooltip">
-                {usageSummary() ? `${usageSummary()?.name} usage` : "Usage"}
+                {usageSummary()
+                  ? t("account.dock.usageTooltip", { name: usageSummary()?.name ?? "" })
+                  : t("account.usage.title")}
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
@@ -616,7 +624,7 @@ export function AccountDock(props: AccountDockProps) {
                 variant="ghost"
                 type="button"
                 class="account-dock-icon-button"
-                aria-label="Settings"
+                aria-label={t("account.menu.settings")}
                 onClick={() => {
                   setMenuOpen(false);
                   setUsageOpen(false);
@@ -627,7 +635,7 @@ export function AccountDock(props: AccountDockProps) {
               </Button>
             </Tooltip.Trigger>
             <Tooltip.Portal>
-              <Tooltip.Content class="ui-tooltip">Settings</Tooltip.Content>
+              <Tooltip.Content class="ui-tooltip">{t("account.menu.settings")}</Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
         </Show>

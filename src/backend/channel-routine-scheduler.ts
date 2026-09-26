@@ -10,6 +10,7 @@ import type {
   TestChannelRoutineInput,
   UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { recordRestartActivity } from "./restart-activity";
@@ -144,7 +145,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   async test(input: TestChannelRoutineInput): Promise<ChannelRoutineRun> {
     const channelId = this.#requireChannel(input.channelId);
     const routine = this.#routines.get(channelId, input.routineId);
-    if (!routine) throw new Error("This routine no longer exists.");
+    if (!routine) throw new Error(sourceText("error.backend.routineGone"));
     const run = await this.#fire(routine, null, new Date().toISOString());
     this.#changed(channelId);
     return run;
@@ -309,7 +310,7 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
   }
 
   #requireChannel(channelId: string): string {
-    if (!this.#channels.store.exists(channelId)) throw new Error("Channel not found.");
+    if (!this.#channels.store.exists(channelId)) throw new Error(sourceText("error.backend.channelNotFound"));
     return channelId;
   }
 

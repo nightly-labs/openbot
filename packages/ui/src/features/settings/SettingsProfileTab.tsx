@@ -15,6 +15,7 @@ import {
   UserAvatar,
 } from "@openbot/ui";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
 interface SettingsProfileTabProps {
@@ -24,23 +25,38 @@ interface SettingsProfileTabProps {
   canRevokeSession: boolean;
 }
 
+/** `Date.prototype.toLocaleString()` with no options: the date and the time, each field numeric. */
+const SESSION_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+};
+const SESSION_TITLE_SEPARATOR = " · ";
+
 export function SettingsProfileTab(props: SettingsProfileTabProps) {
+  const { t, format } = useText();
+  const sessionTime = (timestamp: number) => format.date(timestamp, SESSION_TIME_FORMAT);
   return (
     <>
-      <SettingsSection title="Identity">
+      <SettingsSection title={t("settings.profile.identity.title")}>
         <Input
           ref={(element) => props.store.registerAvatarInput(element)}
           class="sr-only"
           type="file"
-          aria-label="Upload profile photo"
+          aria-label={t("settings.profile.photo.upload")}
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => void props.store.uploadAvatar(event.currentTarget.files?.[0])}
         />
         <ItemGroup class="settings-modal-card">
           <Item class="settings-identity-name-row">
             <ItemContent>
-              <ItemTitle id="settings-profile-name-label">Display name</ItemTitle>
-              <ItemDescription id="settings-profile-name-description">Visible in shared workspaces.</ItemDescription>
+              <ItemTitle id="settings-profile-name-label">{t("settings.profile.name.title")}</ItemTitle>
+              <ItemDescription id="settings-profile-name-description">
+                {t("settings.profile.name.description")}
+              </ItemDescription>
             </ItemContent>
             <ItemActions
               class="settings-identity-name-control"
@@ -77,9 +93,9 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
           </Item>
           <Item class="settings-identity-image-row">
             <ItemContent>
-              <ItemTitle>Profile photo</ItemTitle>
+              <ItemTitle>{t("settings.profile.photo.title")}</ItemTitle>
               <ItemDescription class={props.store.state.avatar.error ? "settings-modal-error" : undefined}>
-                {props.store.state.avatar.error ?? "Shown with your profile in OpenBot."}
+                {props.store.state.avatar.error ?? t("settings.profile.photo.description")}
               </ItemDescription>
             </ItemContent>
             <ItemActions class="settings-identity-image-control">
@@ -89,14 +105,19 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                   variant="outline"
                   size="icon-lg"
                   class="settings-identity-image-trigger settings-modal-profile-photo-trigger"
-                  aria-label={props.account.avatarUrl ? "Edit profile photo" : "Add profile photo"}
+                  aria-label={
+                    props.account.avatarUrl ? t("settings.profile.photo.edit") : t("settings.profile.photo.add")
+                  }
                   disabled={props.store.state.avatar.busy}
                   onClick={props.store.openAvatarPicker}
                 >
                   <UserAvatar user={props.account} class="settings-modal-avatar" decorative />
                 </Button>
                 <Show when={props.account.avatarUrl && !props.store.state.avatar.busy}>
-                  <ImageRemoveButton label="Remove profile photo" onClick={() => void props.store.updateAvatar(null)} />
+                  <ImageRemoveButton
+                    label={t("settings.profile.photo.remove")}
+                    onClick={() => void props.store.updateAvatar(null)}
+                  />
                 </Show>
               </div>
             </ItemActions>
@@ -104,12 +125,12 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
         </ItemGroup>
       </SettingsSection>
 
-      <SettingsSection title="Account">
+      <SettingsSection title={t("settings.profile.account.title")}>
         <ItemGroup class="settings-modal-card">
           <Item class="settings-modal-account-email-row">
             <ItemContent>
-              <ItemTitle>Email</ItemTitle>
-              <ItemDescription>Used to sign in to OpenBot.</ItemDescription>
+              <ItemTitle>{t("settings.profile.email.title")}</ItemTitle>
+              <ItemDescription>{t("settings.profile.email.description")}</ItemDescription>
             </ItemContent>
             <ItemActions>
               <Text as="span" class="settings-modal-readonly-value" variant="body">
@@ -121,15 +142,17 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
       </SettingsSection>
       <Show when={props.canListSessions}>
         <SettingsSection
-          title="Account sessions"
-          description="Sessions stay signed in until you log out or disconnect them. Disconnecting also ends this account's active remote connections."
+          title={t("settings.profile.sessions.title")}
+          description={t("settings.profile.sessions.description")}
         >
           <Button
             variant="outline"
             disabled={props.store.state.sessions.loading || Boolean(props.store.state.sessions.revokingId)}
             onClick={() => void props.store.refreshSessions()}
           >
-            {props.store.state.sessions.loading ? "Loading sessions…" : "Refresh sessions"}
+            {props.store.state.sessions.loading
+              ? t("settings.profile.sessions.loading")
+              : t("settings.profile.sessions.refresh")}
           </Button>
           <Show when={props.store.state.sessions.error}>
             {(error) => (
@@ -145,23 +168,33 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                   <ItemContent>
                     <ItemTitle>
                       {session.name}
-                      {session.current ? " · This device" : ""}
+                      {session.current ? `${SESSION_TITLE_SEPARATOR}${t("settings.profile.sessions.thisDevice")}` : ""}
                     </ItemTitle>
                     <ItemDescription>
-                      {session.kind === "desktop" ? "Desktop" : "Mobile"} · Signed in{" "}
-                      {new Date(session.connectedAt).toLocaleString()} · Last active{" "}
-                      {new Date(session.lastActiveAt).toLocaleString()}
+                      {t("settings.profile.sessions.details", {
+                        kind:
+                          session.kind === "desktop"
+                            ? t("settings.profile.sessions.kind.desktop")
+                            : t("settings.profile.sessions.kind.mobile"),
+                        signedIn: sessionTime(session.connectedAt),
+                        lastActive: sessionTime(session.lastActiveAt),
+                      })}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions>
-                    <Show when={!session.current} fallback={<Badge>This device</Badge>}>
+                    <Show when={!session.current} fallback={<Badge>{t("settings.profile.sessions.thisDevice")}</Badge>}>
                       <Button
                         variant="outline"
-                        aria-label={`Disconnect ${session.name} session from ${new Date(session.connectedAt).toLocaleString()}`}
+                        aria-label={t("settings.profile.sessions.disconnectLabel", {
+                          name: session.name,
+                          signedIn: sessionTime(session.connectedAt),
+                        })}
                         disabled={Boolean(props.store.state.sessions.revokingId) || !props.canRevokeSession}
                         onClick={() => void props.store.revokeSession(session.sessionId)}
                       >
-                        {props.store.state.sessions.revokingId === session.sessionId ? "Disconnecting…" : "Disconnect"}
+                        {props.store.state.sessions.revokingId === session.sessionId
+                          ? t("settings.disconnect.pending")
+                          : t("settings.disconnect.action")}
                       </Button>
                     </Show>
                   </ItemActions>

@@ -1,10 +1,12 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
 
 export default function ServerSettingsLayout() {
+  const { t } = useText();
   const background = String(useCSSVariable("--openbot-bg-sheet"));
   return (
     <Stack
@@ -19,8 +21,8 @@ export default function ServerSettingsLayout() {
         contentStyle: { backgroundColor: background },
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Server options" }} />
-      <Stack.Screen name="members" options={{ title: "Members" }} />
+      <Stack.Screen name="index" options={{ title: t("mobile.app.route.serverOptions") }} />
+      <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
     </Stack>
   );
 }

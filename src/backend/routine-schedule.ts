@@ -4,6 +4,7 @@ import {
   type RoutineIntervalUnit,
   type RoutineSchedule,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 
 const MINIMUM_INTERVAL_MS = ROUTINE_MINIMUM_INTERVAL_MINUTES * 60_000;
 const MAX_SEARCH_DAYS = 366 * 5;
@@ -36,12 +37,12 @@ interface CronSpec {
 export class RoutineInputError extends Error {}
 
 export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
-  if (!isRoutineSchedule(schedule)) throw new RoutineInputError("The routine schedule is invalid.");
+  if (!isRoutineSchedule(schedule)) throw new RoutineInputError(sourceText("error.backend.routineScheduleInvalid"));
   validateTimezone(timezone);
   if (schedule.kind === "interval") {
     if (intervalMilliseconds(schedule.amount, schedule.unit) < MINIMUM_INTERVAL_MS) {
       throw new RoutineInputError(
-        `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a daily, weekly, or cron schedule.`,
+        sourceText("error.backend.routineIntervalTooShort", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
       );
     }
     return;
@@ -49,7 +50,7 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
   if (schedule.kind === "advanced" && schedule.time.kind === "every") {
     if (intervalMilliseconds(schedule.time.amount, schedule.time.unit) < MINIMUM_INTERVAL_MS) {
       throw new RoutineInputError(
-        `Routine intervals must be at least ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes. Use ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes or more, or a fixed time.`,
+        sourceText("error.backend.routineIntervalTooShortFixed", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
       );
     }
   }
@@ -61,7 +62,7 @@ export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: str
     const next = nextCronOccurrence(spec, timezone, previous);
     if (next.getTime() - previous.getTime() < MINIMUM_INTERVAL_MS) {
       throw new RoutineInputError(
-        `Custom schedules must run no more often than every ${ROUTINE_MINIMUM_INTERVAL_MINUTES} minutes.`,
+        sourceText("error.backend.routineCronTooOften", { minutes: ROUTINE_MINIMUM_INTERVAL_MINUTES }),
       );
     }
     previous = next;
@@ -73,7 +74,7 @@ export function nextRoutineOccurrence(schedule: RoutineSchedule, timezone: strin
   if (schedule.kind === "interval") {
     const duration = intervalMilliseconds(schedule.amount, schedule.unit);
     const anchor = Date.parse(schedule.anchorAt);
-    if (!Number.isFinite(anchor)) throw new RoutineInputError("The routine interval anchor is invalid.");
+    if (!Number.isFinite(anchor)) throw new RoutineInputError(sourceText("error.backend.routineAnchorInvalid"));
     if (after.getTime() < anchor) return new Date(anchor);
     const elapsed = after.getTime() - anchor;
     return new Date(anchor + (Math.floor(elapsed / duration) + 1) * duration);
@@ -205,7 +206,7 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
       }
     }
   }
-  throw new RoutineInputError("The schedule has no occurrence within the next five years.");
+  throw new RoutineInputError(sourceText("error.backend.routineNoOccurrence"));
 }
 
 function zonedDateTimeCandidates(parts: CalendarParts, timezone: string): Date[] {
@@ -257,13 +258,13 @@ function validateTimezone(timezone: string): void {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
   } catch {
-    throw new RoutineInputError("The routine timezone is invalid.");
+    throw new RoutineInputError(sourceText("error.backend.routineTimezoneInvalid"));
   }
 }
 
 function parseCron(expression: string): CronSpec {
   const values = expression.trim().split(/\s+/);
-  if (!hasFiveFields(values)) throw new RoutineInputError("Custom schedules must use five cron fields.");
+  if (!hasFiveFields(values)) throw new RoutineInputError(sourceText("error.backend.routineCronFields"));
   return cronSpec(
     parseCronField(values[0], 0, 59, "minute"),
     parseCronField(values[1], 0, 23, "hour"),
@@ -288,7 +289,8 @@ function parseCronField(
   const result = new Set<number>();
   for (const segment of source.split(",")) {
     const [rangeSource, stepSource] = segment.split("/");
-    if (rangeSource === undefined) throw new RoutineInputError(`The cron ${label} value is invalid.`);
+    if (rangeSource === undefined)
+      throw new RoutineInputError(sourceText("error.backend.routineCronValueInvalid", { field: label }));
     const step = stepSource === undefined ? 1 : Number(stepSource);
     if (!Number.isInteger(step) || step < 1) throw new RoutineInputError(`The cron ${label} step is invalid.`);
     let start: number;
@@ -308,11 +310,12 @@ function parseCronField(
     }
     const allowedMaximum = sundayAlias ? 7 : maximum;
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < minimum || end > allowedMaximum || end < start) {
-      throw new RoutineInputError(`The cron ${label} value is invalid.`);
+      throw new RoutineInputError(sourceText("error.backend.routineCronValueInvalid", { field: label }));
     }
     for (let value = start; value <= end; value += step) result.add(sundayAlias && value === 7 ? 0 : value);
   }
-  if (result.size === 0) throw new RoutineInputError(`The cron ${label} field is empty.`);
+  if (result.size === 0)
+    throw new RoutineInputError(sourceText("error.backend.routineCronFieldEmpty", { field: label }));
   return { values: [...result].sort((left, right) => left - right), wildcard };
 }
 

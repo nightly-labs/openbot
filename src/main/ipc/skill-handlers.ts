@@ -7,6 +7,7 @@ import {
 } from "./local-skill-inputs";
 // The skill marketplace, and the skills installed into a workspace.
 
+import type { AppTranslate } from "@openbot/i18n";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
@@ -22,9 +23,14 @@ import { nullishPayload, stringPayload } from "./validation";
 export interface SkillIpcDependencies {
   skills: SkillMarketplaceService;
   getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
 }
 
-export function skillIpcHandlers({ skills, getMainWindow }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
+export function skillIpcHandlers({
+  skills,
+  getMainWindow,
+  translate,
+}: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
       localList: handler(() => localSkillTools(skills).list()),
@@ -38,9 +44,9 @@ export function skillIpcHandlers({ skills, getMainWindow }: SkillIpcDependencies
       choosePackage: handler(async () => {
         const mainWindow = getMainWindow();
         const options: OpenDialogOptions = {
-          title: "Choose a skill folder or ZIP",
+          title: translate("dialog.chooseSkill"),
           properties: ["openFile", "openDirectory"],
-          filters: [{ name: "Skill packages", extensions: ["zip"] }],
+          filters: [{ name: translate("dialog.filter.skillPackages"), extensions: ["zip"] }],
         };
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)

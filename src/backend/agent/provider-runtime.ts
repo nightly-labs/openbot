@@ -18,6 +18,7 @@ import {
   isReasoningEffort,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
@@ -442,8 +443,7 @@ export class ProviderRuntime implements ProviderPort {
 
   createProfileClient(provider: AgentProvider): AgentClient {
     const cli = this.#cli.get(provider);
-    if (!cli || !this.#clients.has(provider))
-      throw new Error("Connect the selected provider before generating a profile.");
+    if (!cli || !this.#clients.has(provider)) throw new Error(sourceText("error.provider.connectBeforeProfile"));
     if (this.#clientFactory) return this.#clientFactory(provider, cli);
     const driver = requireProviderDriver(provider);
     if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, this.#credentials);
@@ -568,7 +568,7 @@ export class ProviderRuntime implements ProviderPort {
     await start;
     if (this.#clients.has(provider)) return;
     const status = this.#status.providers?.find((candidate) => candidate.id === provider);
-    throw new Error(status?.message ?? `${providerLabel(provider)} CLI is not ready or signed in.`);
+    throw new Error(status?.message ?? sourceText("error.provider.cliNotReady", { provider: providerLabel(provider) }));
   }
 
   refreshProviders(): Promise<AgentStatus> {
@@ -641,7 +641,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   async startProviderCodeLogin(provider: AgentProvider): Promise<ProviderCodeLoginStart> {
     if (!agentProviderDescriptor(provider).codeSignIn) {
-      throw new Error(`${providerLabel(provider)} cannot be signed in with a code.`);
+      throw new Error(sourceText("error.provider.noCodeSignIn", { provider: providerLabel(provider) }));
     }
     const start = this.#providerStarts.get(provider);
     if (start) await start;
@@ -718,9 +718,7 @@ export class ProviderRuntime implements ProviderPort {
     return this.#runProviderConnectionCommand(provider, async () => {
       await this.#providerStarts.get(provider);
       if (this.#hooks.isProviderBusy(provider)) {
-        throw new Error(
-          `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then try again.`,
-        );
+        throw new Error(sourceText("error.provider.cliBusyRetry", { provider: providerLabel(provider) }));
       }
       this.#replacingCli.add(provider);
       recordRestartActivity();
@@ -740,10 +738,10 @@ export class ProviderRuntime implements ProviderPort {
     return this.#runProviderConnectionCommand(provider, async () => {
       await this.#providerStarts.get(provider);
       if ((provider === "codex" && this.#codexLogin) || this.#cliLogins.has(provider)) {
-        throw new Error(`The ${providerLabel(provider)} CLI is signing in. Finish or cancel sign-in, then update.`);
+        throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
       }
       if (this.#hooks.isProviderBusy(provider)) {
-        throw new Error(`The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then update.`);
+        throw new Error(sourceText("error.provider.cliBusyUpdate", { provider: providerLabel(provider) }));
       }
       const previousVersion = this.#cli.get(provider)?.version ?? null;
       const previousExecutable = this.#bundledExecutables[provider];
@@ -757,13 +755,16 @@ export class ProviderRuntime implements ProviderPort {
         this.#bundledExecutables[provider] = executable;
         const cli = await this.#resolveProviderCli(provider);
         if (cli.source !== "managed" || cli.executable !== executable) {
-          throw new Error("OpenBot could not select the installed managed CLI.");
+          throw new Error(sourceText("error.provider.cliSelectFailed"));
         }
         await this.#reloadProviderCli(provider, cli);
       } catch (error) {
         this.#bundledExecutables[provider] = previousExecutable;
         const failure = new Error(
-          `OpenBot could not update the ${providerLabel(provider)} CLI. ${error instanceof Error ? redactText(error.message) : "Try again."}`,
+          sourceText("error.provider.cliUpdateFailed", {
+            provider: providerLabel(provider),
+            reason: error instanceof Error ? redactText(error.message) : sourceText("error.provider.tryAgain"),
+          }),
           { cause: error },
         );
         // A failed download leaves the previous CLI as it was. An installed CLI that does not start
@@ -805,7 +806,7 @@ export class ProviderRuntime implements ProviderPort {
     const provider = providerForAgent(agent);
     if (!this.#confined.has(agent.id) && !this.#confinementFor(agent)) return this.requireReadyClient(provider);
     const client = this.clientForAgent(agent);
-    if (!client) throw new Error(`${providerLabel(provider)} has no process running for this agent.`);
+    if (!client) throw new Error(sourceText("error.provider.noAgentProcess", { provider: providerLabel(provider) }));
     return client;
   }
 
@@ -868,12 +869,12 @@ export class ProviderRuntime implements ProviderPort {
     key: string,
   ): Promise<AgentClient> {
     const cli = this.#cli.get(provider);
-    if (!cli) throw new Error(`${providerLabel(provider)} CLI is not ready or signed in.`);
+    if (!cli) throw new Error(sourceText("error.provider.cliNotReady", { provider: providerLabel(provider) }));
     const disposals = this.#disposals;
     const { client } = await this.#createAuthenticatedProviderClient(provider, cli, confinement);
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       await client.stop().catch(() => undefined);
-      throw new Error(`${providerLabel(provider)} stopped before the agent's process started.`);
+      throw new Error(sourceText("error.provider.stoppedBeforeAgentProcess", { provider: providerLabel(provider) }));
     }
     this.#confined.set(agentId, { client, key, lastUsed: Date.now() });
     logger.info("Started a Workspace only provider process.", { provider, agentId });
@@ -910,7 +911,9 @@ export class ProviderRuntime implements ProviderPort {
   requireReadyClient(provider: AgentProvider): AgentClient {
     const client = this.clientFor(provider);
     if (!client || this.#status.phase !== "ready") {
-      throw new Error(this.#status.message ?? `${providerLabel(provider)} CLI is not ready or signed in.`);
+      throw new Error(
+        this.#status.message ?? sourceText("error.provider.cliNotReady", { provider: providerLabel(provider) }),
+      );
     }
     return client;
   }
@@ -1163,7 +1166,7 @@ export class ProviderRuntime implements ProviderPort {
       if (!account.account) {
         throw new Error(
           this.#customProviderSignInMessage(provider) ??
-            `${providerLabel(provider)} did not return an authenticated account.`,
+            sourceText("error.provider.noAuthenticatedAccount", { provider: providerLabel(provider) }),
         );
       }
       driver.validateAccount(account.account);
@@ -1336,7 +1339,7 @@ export class ProviderRuntime implements ProviderPort {
       await this.#connect("starting", [provider], { preserveCheckErrors: true, notifyReady: false });
       const status = this.status().providers?.find((row) => row.id === provider);
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
-        throw new Error(status?.message ?? "OpenBot could not activate the managed CLI.");
+        throw new Error(status?.message ?? sourceText("error.provider.cliActivateFailed"));
       }
       return;
     }
@@ -1357,9 +1360,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   async #reprobeProvider(provider: AgentProvider): Promise<AgentStatus> {
     if (this.#hooks.isProviderBusy(provider)) {
-      throw new Error(
-        `The ${providerLabel(provider)} CLI is working on a turn. Wait for it to finish, then reconnect.`,
-      );
+      throw new Error(sourceText("error.provider.cliBusyReconnect", { provider: providerLabel(provider) }));
     }
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
@@ -1531,7 +1532,7 @@ export class ProviderRuntime implements ProviderPort {
         await openExternal(login.authUrl);
       } catch {
         await this.#cancelCodexLogin("OpenBot could not open the ChatGPT connection page.");
-        throw new Error("OpenBot could not open the ChatGPT connection page.");
+        throw new Error(sourceText("error.provider.chatgptPageFailed"));
       }
     });
     return this.status();
@@ -1578,7 +1579,7 @@ export class ProviderRuntime implements ProviderPort {
     try {
       const account = await pending.client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
       if (account.account?.type !== "chatgpt") {
-        throw new Error("ChatGPT did not return an authenticated account.");
+        throw new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" }));
       }
       if (this.#codexLogin !== pending) return;
       await this.#activateProviderClient("codex", pending.client, pending.cli, account.account, {
@@ -1752,7 +1753,7 @@ export class ProviderRuntime implements ProviderPort {
       : this.#clients.has("codex")
         ? "codex"
         : this.#clients.keys().next().value;
-    if (!primaryProvider) throw new Error("No agent provider is ready.");
+    if (!primaryProvider) throw new Error(sourceText("error.provider.noneReady"));
     const primaryAccount = this.#accounts.get(primaryProvider);
     for (const provider of activated) this.#restartAttempts.delete(provider);
     this.#setStatus({
