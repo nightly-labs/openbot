@@ -52,7 +52,7 @@ function openWebDestination(destination: ExternalDestination): Promise<void> {
  * The desktop `providerAdmin` group, answered over the Team API of the connected host. The calls are
  * async so a refused server is a rejected promise, as a failed IPC call is.
  */
-export function webProviderAdmin(request: (serverId?: string) => TeamApiRequest): ProviderAdminDesktopApi {
+function webProviderAdmin(request: (serverId?: string) => TeamApiRequest): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider),
     cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider),

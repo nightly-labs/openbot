@@ -10,7 +10,7 @@ import { createEffect, createSignal, flush, onCleanup } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 
 /** The computer that runs the providers: it issues the code, and a cancel goes to the same one. */
-export interface ProviderCodeLoginTarget {
+interface ProviderCodeLoginTarget {
   start: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
   cancel: (provider: AgentProviderId) => Promise<AgentStatus>;
 }
