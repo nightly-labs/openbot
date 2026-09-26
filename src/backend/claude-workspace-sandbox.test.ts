@@ -6,13 +6,17 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { claudeWriteOutsideRoots } from "./claude-workspace-sandbox";
 
+// The temporary folders are writable, so the test folder is in the checkout.
+const TEST_PARENT = join(process.cwd(), ".openbot-build", "claude-sandbox-test");
+
 let root: string;
 let workspace: string;
 let shared: string;
 let outside: string;
 
 beforeEach(async () => {
-  root = await realpath(await mkdtemp(join(tmpdir(), "openbot-claude-sandbox-")));
+  await mkdir(TEST_PARENT, { recursive: true });
+  root = await realpath(await mkdtemp(join(TEST_PARENT, "run-")));
   workspace = join(root, "workspace");
   shared = join(root, "shared");
   outside = join(root, "outside");
@@ -28,10 +32,11 @@ function outsideRoots(toolName: string, input: unknown): Promise<string | null> 
 }
 
 describe("claudeWriteOutsideRoots", () => {
-  it("lets a file tool write a new file in the workspace and the shared folder", async () => {
+  it("lets a file tool write a new file in the workspace, the shared folder and a temporary folder", async () => {
     await expect(outsideRoots("Write", { file_path: join(workspace, "new/dir/a.txt") })).resolves.toBeNull();
     await expect(outsideRoots("Edit", { file_path: "relative.txt" })).resolves.toBeNull();
     await expect(outsideRoots("NotebookEdit", { notebook_path: join(shared, "a.ipynb") })).resolves.toBeNull();
+    await expect(outsideRoots("Write", { file_path: join(tmpdir(), "openbot-a.txt") })).resolves.toBeNull();
   });
 
   it("asks for a write outside, also through a relative path", async () => {
@@ -45,6 +50,16 @@ describe("claudeWriteOutsideRoots", () => {
     await symlink(outside, join(workspace, "link"));
     const target = join(workspace, "link/new/a.txt");
     await expect(outsideRoots("Write", { file_path: target })).resolves.toBe(target);
+  });
+
+  it("asks for a write through a link to a file outside that does not exist yet, and through a loop", async () => {
+    await symlink(join(outside, "missing/a.txt"), join(workspace, "dangling"));
+    await symlink(join(workspace, "loop-b"), join(workspace, "loop-a"));
+    await symlink(join(workspace, "loop-a"), join(workspace, "loop-b"));
+    const dangling = join(workspace, "dangling");
+    const loop = join(workspace, "loop-a");
+    await expect(outsideRoots("Write", { file_path: dangling })).resolves.toBe(dangling);
+    await expect(outsideRoots("Write", { file_path: loop })).resolves.toBe(loop);
   });
 
   it("asks for a write to Claude's settings in the workspace", async () => {

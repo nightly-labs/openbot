@@ -1106,7 +1106,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       threadId,
       turnId: this.#threads.get(threadId)?.activeTurn?.id ?? randomUUID(),
       itemId: toolUseId,
-      reason: `Write ${path}, outside the agent's workspace and the shared folder.`,
+      reason: `Write ${path}, outside the agent's workspace, the shared folder and the temporary folders.`,
     });
     if (isRecord(result) && result.decision === "accept") return { behavior: "allow", updatedInput: toolInput };
     return { behavior: "deny", message: "The user did not allow this write outside the workspace." };

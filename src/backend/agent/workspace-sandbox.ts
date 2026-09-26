@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/ipc";
 
 type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
@@ -23,6 +24,14 @@ export type CodexSandboxPolicy =
       excludeTmpdirEnvVar: boolean;
       excludeSlashTmp: boolean;
     };
+
+/**
+ * The temporary folders that a Workspace only agent may write on every provider, as Codex allows them
+ * (`$TMPDIR` and `/tmp`). Compilers, package managers, test runners and the providers need them.
+ */
+export function workspaceTemporaryPaths(platform: NodeJS.Platform = process.platform): string[] {
+  return [...new Set(platform === "win32" ? [tmpdir()] : ["/tmp", tmpdir()])];
+}
 
 /** Sent with each turn. Codex keeps it for the turns after, so a changed setting applies at the next turn. */
 export function codexSandboxPolicy(agent: SandboxedAgent, sharedRoot: string): CodexSandboxPolicy {
