@@ -71,6 +71,9 @@ export function ServerMenu(props: ServerMenuProps) {
 
   function selectServer(server: ServerSummary): void {
     setMenuOpen(false);
+    // focusRestoreHandler runs only when Kobalte closes the menu. Give focus back to the server
+    // name after the same two frames, when the menu has closed.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => trigger?.focus()));
     if (!server.active) props.onSelect(server.id);
   }
 
