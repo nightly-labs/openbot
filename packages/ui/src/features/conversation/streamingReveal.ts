@@ -58,25 +58,86 @@ export function nextStreamingReveal(input: {
   return { length, budget: Math.max(budget, -minimumStep) };
 }
 
+/** How many characters of the body the fading steps cover. */
+export function streamingTrailReach(trail: readonly StreamingRevealChunk[]): number {
+  let reach = 0;
+  for (const chunk of trail) reach += chunk.length;
+  return reach;
+}
+
 /**
- * Split the end of rendered text into the reveal steps that are still fading.
+ * The characters of the body after each sibling, from their source lengths and the characters
+ * after the last one. A sibling with more text after it than the trail covers gets `undefined`
+ * and shows its text with no fade. An unknown source length, such as a chip, is `Infinity`: the
+ * siblings before it then do not fade, because too small an offset would fade shown words again.
+ */
+export function streamingTailOffsets(
+  lengths: readonly number[],
+  after: number | undefined,
+  reach: number,
+): (number | undefined)[] {
+  const offsets: (number | undefined)[] = lengths.map(() => undefined);
+  if (after === undefined) return offsets;
+  let rest = after;
+  for (let index = lengths.length - 1; index >= 0 && rest < reach; index -= 1) {
+    offsets[index] = rest;
+    rest += lengths[index] ?? Number.POSITIVE_INFINITY;
+  }
+  return offsets;
+}
+
+/**
+ * The characters after the children of a node, from the characters after the node. The closing
+ * markup of the node, such as `**` or `](url)`, comes between them.
+ */
+export function streamingTailInside(
+  raw: string,
+  children: readonly { raw: string }[],
+  after: number | undefined,
+): number | undefined {
+  if (after === undefined) return undefined;
+  const inner = children.map((child) => child.raw).join("");
+  const start = raw.indexOf(inner);
+  return start < 0 ? after : after + raw.length - start - inner.length;
+}
+
+export function sameStreamingTailOffsets(
+  previous: readonly (number | undefined)[],
+  next: readonly (number | undefined)[],
+): boolean {
+  return previous.length === next.length && previous.every((offset, index) => offset === next[index]);
+}
+
+/**
+ * Split the end of rendered text into the reveal steps that are still fading. `after` is the
+ * number of body characters that come after this text; the newest steps cover those first.
  *
  * The steps count characters of the Markdown source, and the rendered text has lost its markup,
- * so near a marker a fading step can cover a few words more or less. Steps that fall before
- * the start of this text belong to an earlier part, which shows them without the fade.
+ * so near a marker a fading step can cover a few words more or less.
  */
 export function splitStreamingTrail(
   text: string,
   trail: readonly StreamingRevealChunk[],
+  after = 0,
 ): { prefix: string; chunks: { text: string; revealedAt: number }[] } {
   const chunks: { text: string; revealedAt: number }[] = [];
   let end = text.length;
+  let skip = after;
   for (let index = trail.length - 1; index >= 0 && end > 0; index -= 1) {
     const step = trail[index];
     if (!step) continue;
-    let start = Math.max(0, end - step.length);
-    // Keep a word in one step, so its halves do not fade at different speeds.
-    while (start > 0 && /\S/u.test(text.charAt(start - 1)) && /\S/u.test(text.charAt(start))) start -= 1;
+    if (skip >= step.length) {
+      skip -= step.length;
+      continue;
+    }
+    let start = Math.max(0, end - step.length + skip);
+    skip = 0;
+    /* Keep a word in one step, so its halves do not fade at different speeds. Steps end on word
+       boundaries, so a start inside a word comes from markup that the text does not show, such as
+       a hidden `**`. That step then reaches too far back: give the word to the older step, so a
+       word that is already shown does not fade again. */
+    while (start < end && /\S/u.test(text.charAt(start - 1)) && /\S/u.test(text.charAt(start))) start += 1;
+    if (start >= end) continue;
     chunks.unshift({ text: text.slice(start, end), revealedAt: step.revealedAt });
     end = start;
   }

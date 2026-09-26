@@ -6,17 +6,23 @@ import { createMemo, For, Show } from "solid-js";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
 import { MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
+import {
+  sameStreamingTailOffsets,
+  streamingTailInside,
+  streamingTailOffsets,
+  streamingTrailReach,
+  useStreamingReveal,
+} from "./streamingReveal";
 
 type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter"> & {
   showCitationFooter?: boolean;
   streaming?: boolean;
-  streamingTail?: boolean;
   imagesAsLinks?: boolean;
 };
 
 type MarkdownContentProps = Omit<
   MarkdownMessageTextProps,
-  "body" | "showCitationFooter" | "streaming" | "streamingTail"
+  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter"
 > & {
   fileDirectory: FileDirectoryContext | null;
 };
@@ -137,7 +143,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
         linkDefinitions={JSON.stringify(tokens().links)}
         content={contentProps()}
         streaming={props.streaming}
-        streamingTail={props.streamingTail}
+        streamingTailAfter={props.streamingTailAfter}
       />
       <Show when={props.showCitationFooter !== false && (props.citations?.length ?? 0) > 0}>
         <RichMessageText {...contentProps()} body="" />
@@ -147,7 +153,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
 }
 
 export function MarkdownInlineText(
-  props: Omit<MarkdownMessageTextProps, "showCitationFooter" | "streaming" | "streamingTail">,
+  props: Omit<MarkdownMessageTextProps, "showCitationFooter" | "streaming" | "streamingTailAfter">,
 ) {
   const tokens = createMemo(() => lexInlineTokens(props.body));
   const contentProps = (): MarkdownContentProps => ({
@@ -169,7 +175,28 @@ export function MarkdownInlineText(
 interface RenderedToken {
   token: Token;
   streaming: boolean;
-  streamingTail: boolean;
+}
+
+/**
+ * The characters of the streaming body after each token, so each text node fades the words
+ * revealed in it. A memo compared by value, so the blocks with no fade do not update on each step.
+ */
+function createTailOffsets(tokens: () => readonly { raw: string }[], after: () => number | undefined) {
+  const trail = useStreamingReveal();
+  return createMemo(
+    () =>
+      streamingTailOffsets(
+        tokens().map((token) => token.raw.length),
+        after(),
+        streamingTrailReach(trail?.() ?? []),
+      ),
+    { equals: sameStreamingTailOffsets },
+  );
+}
+
+/** The characters after the children of `token`, from the characters after `token`. */
+function tailInside(token: Token, children: readonly Token[] | undefined, after: number | undefined) {
+  return children ? streamingTailInside(token.raw, children, after) : after;
 }
 
 function MarkdownBlocks(props: {
@@ -181,9 +208,10 @@ function MarkdownBlocks(props: {
   linkDefinitions?: string;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTail?: boolean;
+  streamingTailAfter?: number | undefined;
 }) {
   const tokens = createMemo(() => props.tokens);
+  const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
   // A streaming reply gives new tokens for the whole body on each revealed word. Keeping the
   // earlier item for a token with the same source keeps its block mounted, so only the growing
   // tail renders again.
@@ -191,29 +219,24 @@ function MarkdownBlocks(props: {
     const values = tokens();
     const linkDefinitions = props.linkDefinitions;
     const earlierItems = previous && previous.linkDefinitions === linkDefinitions ? previous.items : [];
-    const lastTokenIndex = lastRenderableTokenIndex(values);
     const streamingTokenIndex = activeStreamingBlockTokenIndex(values);
     const items = values.map((token, index) => {
       const streaming = props.streaming === true && index === streamingTokenIndex;
-      const streamingTail = props.streamingTail === true && index === lastTokenIndex;
       const earlier = earlierItems[index];
-      return earlier?.token.raw === token.raw &&
-        earlier.token.type === token.type &&
-        earlier.streaming === streaming &&
-        earlier.streamingTail === streamingTail
+      return earlier?.token.raw === token.raw && earlier.token.type === token.type && earlier.streaming === streaming
         ? earlier
-        : { token, streaming, streamingTail };
+        : { token, streaming };
     });
     return { linkDefinitions, items };
   });
   return (
     <For each={renderedTokens().items}>
-      {(item) => (
+      {(item, index) => (
         <MarkdownBlock
           token={item.token}
           content={props.content}
           streaming={item.streaming}
-          streamingTail={item.streamingTail}
+          streamingTailAfter={tailAfter()[index()]}
         />
       )}
     </For>
@@ -224,7 +247,7 @@ function MarkdownBlock(props: {
   token: Token;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTail?: boolean;
+  streamingTailAfter?: number | undefined;
 }) {
   const token = props.token;
   switch (token.type) {
@@ -240,7 +263,7 @@ function MarkdownBlock(props: {
             tokens={token.tokens}
             content={props.content}
             streaming={props.streaming}
-            streamingTail={props.streamingTail}
+            streamingTailAfter={tailInside(token, token.tokens, props.streamingTailAfter)}
           />
         </Dynamic>
       );
@@ -253,7 +276,7 @@ function MarkdownBlock(props: {
             tokens={token.tokens}
             content={props.content}
             streaming={props.streaming}
-            streamingTail={props.streamingTail}
+            streamingTailAfter={tailInside(token, token.tokens, props.streamingTailAfter)}
           />
         </p>
       );
@@ -266,7 +289,7 @@ function MarkdownBlock(props: {
             tokens={token.tokens}
             content={props.content}
             streaming={props.streaming === true && !containerClosesFinalNestedTable(token)}
-            streamingTail={props.streamingTail}
+            streamingTailAfter={tailInside(token, token.tokens, props.streamingTailAfter)}
           />
         </blockquote>
       );
@@ -278,7 +301,7 @@ function MarkdownBlock(props: {
           token={token}
           content={props.content}
           streaming={props.streaming === true && !containerClosesFinalNestedTable(token)}
-          streamingTail={props.streamingTail}
+          streamingTailAfter={props.streamingTailAfter}
         />
       );
     }
@@ -302,14 +325,14 @@ function MarkdownBlock(props: {
           tokens={token.tokens}
           content={props.content}
           streaming={props.streaming}
-          streamingTail={props.streamingTail}
+          streamingTailAfter={tailInside(token, token.tokens, props.streamingTailAfter)}
         />
       ) : (
         <RichText
           body={token.text}
           content={props.content}
           streaming={props.streaming}
-          streamingTail={props.streamingTail}
+          streamingTailAfter={props.streamingTailAfter}
         />
       );
     }
@@ -319,7 +342,7 @@ function MarkdownBlock(props: {
           body={token.raw}
           content={props.content}
           streaming={props.streaming}
-          streamingTail={props.streamingTail}
+          streamingTailAfter={props.streamingTailAfter}
         />
       );
   }
@@ -329,20 +352,22 @@ function MarkdownList(props: {
   token: Tokens.List;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTail?: boolean;
+  streamingTailAfter?: number | undefined;
 }) {
   const items = createMemo(() => props.token.items);
+  const tailAfter = createTailOffsets(items, () =>
+    streamingTailInside(props.token.raw, props.token.items, props.streamingTailAfter),
+  );
   const renderedItems = createMemo(() => {
     const values = items();
     return values.map((item, index) => ({
       item,
       streaming: props.streaming === true && index === values.length - 1,
-      streamingTail: props.streamingTail === true && index === values.length - 1,
     }));
   });
   const list = () => (
     <For each={renderedItems()}>
-      {(renderedItem) => (
+      {(renderedItem, index) => (
         <li class={renderedItem.item.task ? "message-markdown-task" : undefined}>
           <Show when={renderedItem.item.task}>
             <Checkbox
@@ -356,7 +381,11 @@ function MarkdownList(props: {
             tokens={renderedItem.item.tokens.filter((child) => child.type !== "checkbox")}
             content={props.content}
             streaming={renderedItem.streaming}
-            streamingTail={renderedItem.streamingTail}
+            streamingTailAfter={tailInside(
+              renderedItem.item,
+              renderedItem.item.tokens.filter((child) => child.type !== "checkbox"),
+              tailAfter()[index()],
+            )}
           />
         </li>
       )}
@@ -418,12 +447,12 @@ function MarkdownInline(props: {
   tokens: Token[];
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTail?: boolean;
+  streamingTailAfter?: number | undefined;
 }) {
   const tokens = createMemo(() => repairEscapedLocalFileLinkTokens(props.tokens));
+  const tailAfter = createTailOffsets(tokens, () => props.streamingTailAfter);
   const renderedTokens = createMemo(() => {
     const values = tokens();
-    const lastTokenIndex = lastRenderableTokenIndex(values);
     const markerTokenIndexes =
       props.streaming === true ? incompleteEmphasisMarkerTokenIndexes(values) : new Set<number>();
     return values.map((token, index) => ({
@@ -431,33 +460,45 @@ function MarkdownInline(props: {
       streaming: markerTokenIndexes.has(index),
       semanticTag: index > 0 && textTokenEndsWithTagMarker(values[index - 1]) ? semanticChatTag(token) : null,
       precedesSemanticTag: textTokenEndsWithTagMarker(token) && semanticChatTag(values[index + 1]) !== null,
-      streamingTail: props.streamingTail === true && index === lastTokenIndex,
     }));
   });
   return (
     <For each={renderedTokens()}>
-      {(item) => {
+      {(item, index) => {
         const token = item.token;
+        const after = () => tailAfter()[index()];
         switch (token.type) {
           case "strong":
             if (!tokenIs(token, "strong")) return token.raw;
             return (
               <strong>
-                <MarkdownInline tokens={token.tokens} content={props.content} streamingTail={item.streamingTail} />
+                <MarkdownInline
+                  tokens={token.tokens}
+                  content={props.content}
+                  streamingTailAfter={tailInside(token, token.tokens, after())}
+                />
               </strong>
             );
           case "em":
             if (!tokenIs(token, "em")) return token.raw;
             return (
               <em>
-                <MarkdownInline tokens={token.tokens} content={props.content} streamingTail={item.streamingTail} />
+                <MarkdownInline
+                  tokens={token.tokens}
+                  content={props.content}
+                  streamingTailAfter={tailInside(token, token.tokens, after())}
+                />
               </em>
             );
           case "del":
             if (!tokenIs(token, "del")) return token.raw;
             return (
               <del>
-                <MarkdownInline tokens={token.tokens} content={props.content} streamingTail={item.streamingTail} />
+                <MarkdownInline
+                  tokens={token.tokens}
+                  content={props.content}
+                  streamingTailAfter={tailInside(token, token.tokens, after())}
+                />
               </del>
             );
           case "codespan": {
@@ -486,7 +527,7 @@ function MarkdownInline(props: {
           case "link": {
             if (!tokenIs(token, "link")) return token.raw;
             if (item.semanticTag) {
-              return <RichText body={item.semanticTag} content={props.content} streamingTail={item.streamingTail} />;
+              return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
             const sharedPath = sharedFileTarget(token.href);
@@ -496,7 +537,11 @@ function MarkdownInline(props: {
                 {token.text === token.href ? (
                   token.text
                 ) : (
-                  <MarkdownInline tokens={token.tokens} content={props.content} streamingTail={item.streamingTail} />
+                  <MarkdownInline
+                    tokens={token.tokens}
+                    content={props.content}
+                    streamingTailAfter={tailInside(token, token.tokens, after())}
+                  />
                 )}
               </MessageLink>
             ) : sharedPath && props.content.onOpenSharedFile ? (
@@ -514,7 +559,7 @@ function MarkdownInline(props: {
                 onOpen={props.content.onOpenWorkspaceFile}
               />
             ) : (
-              <RichText body={token.text} content={props.content} streamingTail={item.streamingTail} />
+              <RichText body={token.text} content={props.content} streamingTailAfter={after()} />
             );
           }
           case "image": {
@@ -538,14 +583,14 @@ function MarkdownInline(props: {
                 referrerpolicy="no-referrer"
               />
             ) : (
-              <RichText body={token.text || token.raw} content={props.content} streamingTail={item.streamingTail} />
+              <RichText body={token.text || token.raw} content={props.content} streamingTailAfter={after()} />
             );
           }
           case "html":
             return token.raw;
           case "escape": {
             if (!tokenIs(token, "escape")) return token.raw;
-            return <RichText body={token.text} content={props.content} streamingTail={item.streamingTail} />;
+            return <RichText body={token.text} content={props.content} streamingTailAfter={after()} />;
           }
           case "text": {
             if (!tokenIs(token, "text")) return token.raw;
@@ -554,21 +599,21 @@ function MarkdownInline(props: {
                 tokens={token.tokens}
                 content={props.content}
                 streaming={item.streaming}
-                streamingTail={item.streamingTail}
+                streamingTailAfter={tailInside(token, token.tokens, after())}
               />
             ) : (
               <RichText
                 body={item.precedesSemanticTag ? token.text.slice(0, -1) : token.text}
                 content={props.content}
                 streaming={item.streaming}
-                streamingTail={item.streamingTail}
+                streamingTailAfter={after()}
               />
             );
           }
           case "checkbox":
             return null;
           default:
-            return <RichText body={token.raw} content={props.content} streamingTail={item.streamingTail} />;
+            return <RichText body={token.raw} content={props.content} streamingTailAfter={after()} />;
         }
       }}
     </For>
@@ -589,14 +634,14 @@ function RichText(props: {
   body: string;
   content: MarkdownContentProps;
   streaming?: boolean;
-  streamingTail?: boolean;
+  streamingTailAfter?: number | undefined;
 }) {
   return (
     <RichMessageText
       {...props.content}
       body={props.streaming ? hideIncompleteEmphasisMarker(props.body) : props.body}
       showCitationFooter={false}
-      streamingTail={props.streamingTail}
+      streamingTailAfter={props.streamingTailAfter}
     />
   );
 }
