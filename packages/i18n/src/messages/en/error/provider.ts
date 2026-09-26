@@ -119,4 +119,6 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codexLoginRequired": "Codex requires a ChatGPT subscription login. Run `codex login`.",
   "error.provider.cliUpdateFailed": "OpenBot could not update the {provider} CLI. {reason}",
   "error.provider.tryAgain": "Try again.",
+  "error.provider.noAgentProcess": "{provider} has no process running for this agent.",
+  "error.provider.stoppedBeforeAgentProcess": "{provider} stopped before the agent's process started.",
 });

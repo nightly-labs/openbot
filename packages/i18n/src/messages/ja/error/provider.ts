@@ -127,4 +127,6 @@ export const messages = {
     "Codex には ChatGPT サブスクリプションでのログインが必要です。`codex login` を実行してください。",
   "error.provider.cliUpdateFailed": "OpenBot は {provider} CLI を更新できませんでした。{reason}",
   "error.provider.tryAgain": "もう一度お試しください。",
+  "error.provider.noAgentProcess": "{provider} には、このエージェント用に実行中のプロセスがありません。",
+  "error.provider.stoppedBeforeAgentProcess": "エージェントのプロセスが開始する前に {provider} が停止しました。",
 } as const satisfies PartialTranslation<typeof source>;

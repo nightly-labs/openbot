@@ -57,4 +57,8 @@ export const messages = defineMessages("error.agent", {
   // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
+  "error.agent.workspaceOnlyMacOnly":
+    "Workspace only is available for this provider on macOS only. Choose Full access in the agent settings.",
+  "error.agent.workspaceOnlyToolMissing":
+    "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
 });

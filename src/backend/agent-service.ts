@@ -343,7 +343,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
         },
         onProviderLost: (client) => {
-          this.#boot.orphanDeliveriesOf(client.provider);
+          this.#boot.orphanDeliveriesOf(client.provider, (agentId) => this.#providers.runsOnOwnProcess(agentId));
           this.#compaction.dispose();
           this.#attention.clearPrompts(client);
           this.#attention.clearBrowserTakeovers(client);
@@ -356,20 +356,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#attention.clearApprovals(client);
           this.#turn.interruptTurnsOf(client);
         },
+        onAgentClientLost: (agentId, client) => {
+          this.#attention.clearPrompts(client);
+          this.#attention.clearBrowserTakeovers(client);
+          this.#attention.clearApprovals(client);
+          this.#boot.orphanDeliveriesOfAgent(agentId);
+          void this.#boot
+            .reconcileUnresolvedDeliveries()
+            .catch((error) => this.#emitError("delivery_reconcile_failed", error, agentId))
+            .finally(() => this.#drain.scheduleDrain(agentId));
+        },
+        sharedRoot: () => this.#store.sharedRoot,
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) =>
           this.#drain.hasStartingDeliveries(provider) ||
-          this.#store.list().some(
-            (agent) =>
-              providerForAgent(agent) === provider &&
-              // A channel turn runs on a thread of its own, so the agent's own conversation holds no
-              // turn id while the CLI works. `workingSnapshot` reads the execution threads as well.
-              //
-              // A compaction is a provider turn as well, and it holds no active turn id: its
-              // `turn/started` belongs to the compaction, not to the agent, so `claimTurn` takes
-              // it away. Only its own guard reports the turn the CLI is running.
-              (this.#conversation.workingSnapshot(agent.id) != null || !this.#compaction.mayDrain(agent.id)),
-          ),
+          this.#store.list().some((agent) => providerForAgent(agent) === provider && this.#runsTurn(agent.id)),
+        isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         onProviderActivated: (provider, configRevision) => {
@@ -1285,6 +1287,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints.remove(providerId, persist);
   }
 
+  /**
+   * True while the CLI runs a turn for this agent. A channel turn runs on a thread of its own, so the
+   * agent's own conversation holds no turn id while the CLI works. `workingSnapshot` reads the
+   * execution threads as well.
+   *
+   * A compaction is a provider turn as well, and it holds no active turn id: its `turn/started`
+   * belongs to the compaction, not to the agent, so `claimTurn` takes it away. Only its own guard
+   * reports the turn the CLI is running.
+   */
+  #runsTurn(agentId: string): boolean {
+    return this.#conversation.workingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId);
+  }
+
   /** Whether this provider reports a CLI that is installed, current, and signed in. */
   #providerAvailable(provider: AgentProvider): boolean {
     return (
@@ -1468,7 +1483,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
     const agent = await this.#store.getOrCreate(agentId);
-    const client = this.#providers.requireReadyClient(providerForAgent(agent));
+    const client = this.#providers.requireReadyClientForAgent(agent);
     const snapshot = [...this.#conversation.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];

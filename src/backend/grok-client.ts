@@ -9,6 +9,7 @@ import type {
   McpServerSource,
   McpToolRuntimeSource,
 } from "./mcp-provider-shapes";
+import { confineSpawnTarget, grokStatePaths, type ProcessConfinement } from "./process-confinement";
 import { type AccountRateLimitsReadResult, getRecord, getString } from "./protocol";
 
 export class GrokAgentClient extends AcpAgentClient {
@@ -20,9 +21,11 @@ export class GrokAgentClient extends AcpAgentClient {
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
     mcpAuthorization?: McpAuthorizationSource,
+    confinement?: ProcessConfinement,
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
+      ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, grokStatePaths()) } : {}),
       profileGeneration,
       // A profile-generation client asks one question and must not act, so it is given none.
       mcpServers: profileGeneration ? () => [] : mcpServers,

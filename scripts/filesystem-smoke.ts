@@ -2,12 +2,21 @@ import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/p
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
+import { AcpAgentClient } from "../src/backend/acp-client";
 import { codexSandboxConfig, codexSandboxMode, codexSandboxPolicy } from "../src/backend/agent/workspace-sandbox";
 import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
-import { resolveClaudeCli, resolveCodexCli } from "../src/backend/cli";
+import { resolveClaudeCli, resolveCodexCli, resolveGrokCli, resolveOpencodeCli } from "../src/backend/cli";
+import { GrokAgentClient } from "../src/backend/grok-client";
 import {
+  confineSpawnTarget,
+  OPENCODE_CONFINED_ENV,
+  openCodeStatePaths,
+  type ProcessConfinement,
+} from "../src/backend/process-confinement";
+import {
+  decodeModelListResponse,
   decodeRecordResponse,
   decodeThreadResponse,
   decodeTurnResponse,
@@ -224,7 +233,11 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     );
   }
 
-  const { client, model, version } = await createClient(provider, join(temporaryRoot, "provider-state"));
+  const { client, version, ...created } = await createClient(
+    provider,
+    { writableRoots: [workspaceRoot, sharedRoot] },
+    join(temporaryRoot, "provider-state"),
+  );
   const approvals: { method: string; reason: string | null; itemId: string | null; mentions: string[] }[] = [];
   const items = new Map<string, { type: string | null; status: string | null; mentions: string[] }>();
   client.on("request", (request) => {
@@ -240,11 +253,16 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     });
     declineServerRequest(client, request);
   });
+  // The agent's own account of each step, and each item that names a file outside.
+  let finalMessage: string | null = null;
   client.on("notification", (notification) => {
     if (notification.method !== "item/started" && notification.method !== "item/completed") return;
     const item = isRecord(notification.params) && isRecord(notification.params.item) ? notification.params.item : null;
     const id = item ? getString(item, "id") : null;
     if (!item || !id) return;
+    if (notification.method === "item/completed" && getString(item, "type") === "agentMessage") {
+      finalMessage = getString(item, "text") ?? finalMessage;
+    }
     const known = items.get(id);
     items.set(id, {
       type: getString(item, "type"),
@@ -255,6 +273,7 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
   client.start();
   try {
     await initialize(client);
+    const model = created.model ?? (await defaultModel(client));
     const codexConfig = provider === "codex" ? codexSandboxConfig(agent, sharedRoot) : {};
     const started = await client.request(
       "thread/start",
@@ -340,6 +359,7 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
       commandAttempt,
       editAttempt,
       approvals,
+      finalMessage,
     };
     const failures = [
       report.workspaceWrite === `OPENBOT_${token}_INSIDE_OK\n` ? null : "The agent could not write in its workspace.",
@@ -449,14 +469,35 @@ async function runImagegenSmoke(): Promise<void> {
   }
 }
 
+/**
+ * The smoke's client. `confinement` is for the Workspace only smoke: Codex and Claude take the sandbox
+ * with each session, and Grok and OpenCode start in the process sandbox that OpenBot gives them. A
+ * null model means the first one the provider lists, or `--model`. `stateDirectory` is where a
+ * Workspace only Claude query keeps its skill plugin.
+ */
 async function createClient(
   provider: AgentProvider,
+  confinement?: ProcessConfinement,
   stateDirectory?: string,
-): Promise<{
-  client: AgentClient;
-  model: string;
-  version: string;
-}> {
+): Promise<{ client: AgentClient; model: string | null; version: string }> {
+  if (provider === "grok" || provider === "opencode") {
+    if (!confinement) throw new Error(`The filesystem smoke runs ${provider} only with --workspace-only.`);
+    const model = modelArgument();
+    if (provider === "grok") {
+      const cli = await resolveGrokCli();
+      const client = new GrokAgentClient(cli, 60_000, false, undefined, undefined, undefined, undefined, confinement);
+      return { client, model, version: cli.version };
+    }
+    const cli = await resolveOpencodeCli();
+    const client = new AcpAgentClient(cli, 60_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: { ...OPENCODE_CONFINED_ENV },
+      signInMessage: "OpenCode is not signed in.",
+      confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()),
+    });
+    return { client, model, version: cli.version };
+  }
   if (provider === "claude") {
     const cli = await resolveClaudeCli();
     const client = new ClaudeAgentClient(
@@ -495,9 +536,23 @@ async function initialize(client: AgentClient): Promise<void> {
 function requestedProviders(): AgentProvider[] {
   const index = process.argv.indexOf("--provider");
   const requested = index >= 0 ? process.argv[index + 1] : "all";
-  if (requested === "all") return ["codex", "claude"];
+  const confined = ["grok", "opencode"] as const;
+  if (requested === "all") return workspaceOnly ? ["codex", "claude", ...confined] : ["codex", "claude"];
   if (requested === "codex" || requested === "claude") return [requested];
-  throw new Error("--provider must be codex, claude, or all.");
+  if (workspaceOnly && (requested === "grok" || requested === "opencode")) return [requested];
+  throw new Error("--provider must be codex, claude, or all; grok and opencode need --workspace-only.");
+}
+
+function modelArgument(): string | null {
+  const index = process.argv.indexOf("--model");
+  return index >= 0 ? (process.argv[index + 1] ?? null) : null;
+}
+
+async function defaultModel(client: AgentClient): Promise<string> {
+  const models = await client.request("model/list", {}, decodeModelListResponse);
+  const model = models.data[0]?.model;
+  if (!model) throw new Error(`${client.provider} listed no model. Pass --model.`);
+  return model;
 }
 
 function isApprovalRequest(method: string): boolean {
@@ -553,13 +608,15 @@ function declineServerRequest(activeClient: AgentClient, request: { id: RequestI
 function waitForTurn(activeClient: AgentClient, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Filesystem smoke turn timed out.")), timeoutMs);
+    let error: string | null = null;
     activeClient.on("notification", (notification) => {
+      if (notification.method === "error") error = getString(notification.params, "message");
       if (notification.method !== "turn/completed" || !isRecord(notification.params)) return;
       const turn = isRecord(notification.params.turn) ? notification.params.turn : null;
       const status = turn && isString(turn.status) ? turn.status : "completed";
       clearTimeout(timeout);
       if (status === "completed") resolve();
-      else reject(new Error(`Filesystem smoke turn finished with status ${status}.`));
+      else reject(new Error(`Filesystem smoke turn finished with status ${status}.${error ? ` ${error}` : ""}`));
     });
   });
 }

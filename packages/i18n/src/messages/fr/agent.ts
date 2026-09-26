@@ -3,7 +3,6 @@ import type { messages as source } from "../en/agent";
 
 export const messages = {
   "agent.access.workspaceOnly": "Espace de travail uniquement",
-  "agent.access.workspaceOnlyNotEnforced": "Espace de travail uniquement (non appliqué pour {provider})",
   "agent.setup.nameFallback": "Nouvel agent",
   "agent.setup.titleAdditional": "Créer un nouvel agent",
   "agent.setup.titleFirst": "Créez votre premier agent",

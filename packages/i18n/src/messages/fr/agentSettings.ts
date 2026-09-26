@@ -81,8 +81,6 @@ export const messages = {
   "agentSettings.links.routinesCount": { one: "{count} configurée", other: "{count} configurées" },
   "agentSettings.runtime.workspaceNote":
     "« Espace de travail uniquement » limite les écritures à l’espace de travail de cet agent, au dossier partagé et aux dossiers temporaires. La lecture et le réseau restent disponibles.",
-  "agentSettings.runtime.workspaceNotEnforced":
-    "{provider} ne l’applique pas encore : cet agent a donc toujours un accès complet. Les agents Codex et Claude sont limités.",
   "agentSettings.runtime.workspaceEnforcedCommand":
     "Une commande qui doit écrire à l’extérieur vous demande d’abord, même quand l’approbation automatique est activée.",
   "agentSettings.runtime.workspaceEnforcedClaude":
@@ -91,4 +89,6 @@ export const messages = {
     "Computer Use et le navigateur OpenBot ne sont pas limités ; vous pouvez désactiver Computer Use ci-dessous.",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "Autoriser cet agent à contrôler les apps de cet ordinateur",
+  "agentSettings.runtime.workspaceEnforcedProcess":
+    "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
 } as const satisfies PartialTranslation<typeof source>;

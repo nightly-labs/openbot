@@ -138,4 +138,6 @@ export const messages = {
     "Codex nécessite une connexion avec un abonnement ChatGPT. Exécutez `codex login`.",
   "error.provider.cliUpdateFailed": "OpenBot n’a pas pu mettre à jour la CLI {provider}. {reason}",
   "error.provider.tryAgain": "Réessayez.",
+  "error.provider.noAgentProcess": "{provider} n’a aucun processus en cours pour cet agent.",
+  "error.provider.stoppedBeforeAgentProcess": "{provider} s’est arrêté avant le démarrage du processus de l’agent.",
 } as const satisfies PartialTranslation<typeof source>;

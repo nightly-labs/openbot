@@ -286,7 +286,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run release:patch` | Create the next patch version commit and tag. |
 | `bun run test:filesystem` | **Online/manual:** run real full-access Codex and Claude filesystem turns across private and shared workspaces. |
 | `bun run test:imagegen` | **Online/manual:** run a real full-access image-generation turn. |
-| `bun run test:workspace-only` | **Online/manual:** run real Workspace only Codex and Claude turns that try to write outside; writes a JSON report per provider to `.openbot-build/workspace-only-smoke/`. Add `--provider codex` or `--provider claude` for one. |
+| `bun run test:workspace-only` | **Online/manual:** run real Workspace only Codex, Claude, Grok and OpenCode turns that try to write outside; writes a JSON report per provider to `.openbot-build/workspace-only-smoke/`. Add `--provider <id>` for one, and `--model <id>` to choose its model. |
 | `bun run test:storage-live` | **Online/manual:** verify isolated Codex and Claude turns in a temporary SQLite database. |
 
 Publishing never creates a second OpenBot instance. The host keeps its Team API on loopback. A hidden,

@@ -79,8 +79,6 @@ export const messages = {
   "agentSettings.links.routinesCount": { other: "{count} 件設定済み" },
   "agentSettings.runtime.workspaceNote":
     "「ワークスペースのみ」は、書き込みをこのエージェントのワークスペース、共有フォルダー、一時フォルダーに制限します。読み取りとネットワークは引き続き使用できます。",
-  "agentSettings.runtime.workspaceNotEnforced":
-    "{provider} はまだこれを適用しないため、このエージェントは引き続きフルアクセスを持ちます。Codex と Claude エージェントには適用されます。",
   "agentSettings.runtime.workspaceEnforcedCommand":
     "外部に書き込む必要があるコマンドは、自動承認がオンでも先に確認します。",
   "agentSettings.runtime.workspaceEnforcedClaude":
@@ -89,4 +87,6 @@ export const messages = {
     "Computer Use と OpenBot ブラウザーは制限されません。Computer Use は下でオフにできます。",
   "agentSettings.computerUse.title": "Computer Use",
   "agentSettings.computerUse.description": "このエージェントにこのコンピューターのアプリの操作を許可します",
+  "agentSettings.runtime.workspaceEnforcedProcess":
+    "{provider} のプロセス全体がサンドボックス内で実行されるため、外部への書き込みは失敗します。macOS でのみ利用できます。",
 } as const satisfies PartialTranslation<typeof source>;

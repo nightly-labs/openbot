@@ -17,7 +17,6 @@ import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
-import { providerForAgent } from "./thread-items";
 
 export interface QueueControlsHooks {
   /** The channel task that owns a delivery. Read late: the channel service is built after this. */
@@ -160,7 +159,7 @@ export class QueueControls {
 
   async steer(input: SteerQueuedMessageInput): Promise<void> {
     const agent = await this.#store.getOrCreate(input.agentId);
-    const client = this.#providers.requireReadyClient(providerForAgent(agent));
+    const client = this.#providers.requireReadyClientForAgent(agent);
     const session = this.#store.activeProviderSession(agent.id);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {

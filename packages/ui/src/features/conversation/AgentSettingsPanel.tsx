@@ -13,7 +13,6 @@ import {
   agentComputerUseEnabled,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
-  enforcesWorkspaceAccess,
   type ProviderRuntimeStatus,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -861,17 +860,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               >
                 {t("agentSettings.runtime.workspaceNote")}{" "}
-                <Show
-                  when={enforcesWorkspaceAccess(draft.runtime.provider)}
-                  fallback={t("agentSettings.runtime.workspaceNotEnforced", {
-                    provider: agentProviderName(draft.runtime.provider),
-                  })}
-                >
-                  {draft.runtime.provider === "claude"
-                    ? t("agentSettings.runtime.workspaceEnforcedClaude")
-                    : t("agentSettings.runtime.workspaceEnforcedCommand")}{" "}
-                  {t("agentSettings.runtime.workspaceUnlimited")}
-                </Show>
+                {draft.runtime.provider === "claude"
+                  ? t("agentSettings.runtime.workspaceEnforcedClaude")
+                  : draft.runtime.provider === "codex"
+                    ? t("agentSettings.runtime.workspaceEnforcedCommand")
+                    : t("agentSettings.runtime.workspaceEnforcedProcess", {
+                        provider: agentProviderName(draft.runtime.provider),
+                      })}{" "}
+                {t("agentSettings.runtime.workspaceUnlimited")}
               </Show>
             </Text>
           </SettingsSection>

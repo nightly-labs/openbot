@@ -63,4 +63,8 @@ export const messages = {
     "保存されたエージェントのプロフィール {id} に読み取れない「{field}」の値があります。OpenBot を起動する前にデータを更新してください。",
   "error.agent.queueEditRejected": "キューの編集が拒否されました: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use は、エージェントを実行しているコンピューターでのみ変更できます。",
+  "error.agent.workspaceOnlyMacOnly":
+    "このプロバイダーの「ワークスペースのみ」は macOS でのみ利用できます。エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.workspaceOnlyToolMissing":
+    "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -9,7 +9,8 @@ type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath"
  * says. A write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
  * Codex takes the mode itself. The Claude client reads `workspace-write` and applies its own
- * sandbox (`claude-workspace-sandbox.ts`). Grok and OpenCode ignore it, so their agents keep full access.
+ * sandbox (`claude-workspace-sandbox.ts`). Grok and OpenCode ignore it: `ProviderRuntime` runs such
+ * an agent in a sandboxed process of its own (`process-confinement.ts`).
  */
 export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "danger-full-access" {
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
