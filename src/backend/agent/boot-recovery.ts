@@ -94,6 +94,13 @@ export class BootRecovery {
     }
   }
 
+  /** Like `orphanDeliveriesOf`, for one agent whose own provider process exited. */
+  orphanDeliveriesOfAgent(agentId: string): void {
+    for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
+      if (delivery.recipientAgentId === agentId) this.#orphanedDeliveryIds.add(delivery.id);
+    }
+  }
+
   async reconcileUnresolvedDeliveries(): Promise<void> {
     const unresolved = this.#mailbox.unresolvedDeliveries();
     // A delivery settled by another path never becomes unresolved again, so its mark goes too.

@@ -13,7 +13,6 @@ import {
   agentComputerUseEnabled,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
-  enforcesWorkspaceAccess,
   type ProviderRuntimeStatus,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -850,20 +849,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               >
                 Workspace only limits writes to this agent's workspace, the shared folder and the temporary folders.
                 Reads and network stay available.{" "}
-                <Show
-                  when={enforcesWorkspaceAccess(draft.runtime.provider)}
-                  fallback={
-                    <>
-                      {agentProviderName(draft.runtime.provider)} does not enforce it yet, so this agent still has full
-                      access. Codex and Claude agents are enforced.
-                    </>
-                  }
-                >
-                  {draft.runtime.provider === "claude"
-                    ? "A file edit outside asks you first, also when Auto approve is on. A command cannot write outside."
-                    : "A command that must write outside asks you first, also when Auto approve is on."}{" "}
-                  Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.
-                </Show>
+                {draft.runtime.provider === "claude"
+                  ? "A file edit outside asks you first, also when Auto approve is on. A command cannot write outside."
+                  : draft.runtime.provider === "codex"
+                    ? "A command that must write outside asks you first, also when Auto approve is on."
+                    : `The whole ${agentProviderName(draft.runtime.provider)} process runs in a sandbox, so a write outside fails. Not available on Windows.`}{" "}
+                Computer Use and the OpenBot browser are not limited; you can turn Computer Use off below.
               </Show>
             </Text>
           </SettingsSection>

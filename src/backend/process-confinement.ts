@@ -1,0 +1,200 @@
+import { existsSync, realpathSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+
+/**
+ * The folders one Workspace only agent may write: its workspace and the shared folder.
+ *
+ * Grok and OpenCode take no sandbox per session, so a Workspace only agent on them gets a provider
+ * process of its own, and OpenBot starts that process inside an operating system sandbox. The whole
+ * process is confined: the file edit tools, the shell, and every command and MCP server it starts.
+ * Nothing inside the process can take the sandbox away, and a computer that cannot make it does not
+ * start the process at all.
+ */
+export interface ProcessConfinement {
+  readonly writableRoots: readonly string[];
+}
+
+/** What a provider must write to run, and what in there it must not write. */
+export interface ProviderStatePaths {
+  readonly writable: readonly string[];
+  /**
+   * Files and folders in `writable` that load code or settings for the provider processes that are
+   * not confined. A confined agent that wrote them would reach outside at the next start of one.
+   */
+  readonly protected: readonly string[];
+  /**
+   * The provider's project settings, by name, in each writable root. A process that is not confined
+   * and starts in that folder later would load them.
+   */
+  readonly protectedInRoots: readonly string[];
+}
+
+export interface SpawnTarget {
+  command: string;
+  args: string[];
+  windowsVerbatimArguments: boolean;
+}
+
+export class ProcessConfinementUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProcessConfinementUnavailableError";
+  }
+}
+
+const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
+const BWRAP_PATHS = ["/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap"];
+
+/** Grok keeps its sign-in, sessions and caches in `GROK_HOME`, and its hooks and settings too. */
+export function grokStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const grokHome = env.GROK_HOME?.trim() || join(home, ".grok");
+  return {
+    writable: [grokHome],
+    protected: [
+      "config.toml",
+      "managed_config.toml",
+      "sandbox.toml",
+      "trusted_folders.toml",
+      "hooks",
+      "hooks-paths",
+      "installed-plugins",
+      "marketplace-cache",
+      "skills",
+      "commands",
+      "agents",
+      "bin",
+      "bundled",
+    ].map((name) => join(grokHome, name)),
+    protectedInRoots: [".grok"],
+  };
+}
+
+/**
+ * OpenCode keeps its sessions under the XDG data and state folders. Its settings folder is not in the
+ * list, so it stays read-only. Its cache holds the npm packages and the language servers that every
+ * OpenCode process runs, so a confined process gets a cache of its own: `OPENCODE_CONFINED_ENV`.
+ */
+export function openCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const xdg = (name: string, fallback: string) => join(env[name]?.trim() || join(home, fallback), "opencode");
+  return {
+    writable: [xdg("XDG_DATA_HOME", ".local/share"), xdg("XDG_STATE_HOME", ".local/state"), OPENCODE_CONFINED_CACHE],
+    protected: [],
+    protectedInRoots: [".opencode", "opencode.json", "opencode.jsonc"],
+  };
+}
+
+const OPENCODE_CONFINED_CACHE = join(tmpdir(), "openbot-confined-cache");
+
+/** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
+export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
+
+/**
+ * The command that starts `target` inside the sandbox. It throws when this computer cannot make the
+ * sandbox, because a Workspace only agent must not run with full access.
+ */
+export function confineSpawnTarget(
+  target: SpawnTarget,
+  confinement: ProcessConfinement,
+  state: ProviderStatePaths,
+  platform: NodeJS.Platform = process.platform,
+): SpawnTarget {
+  const writable = [...confinement.writableRoots, ...state.writable, ...temporaryPaths()];
+  const protectedPaths = [
+    ...state.protected,
+    ...confinement.writableRoots.flatMap((root) => state.protectedInRoots.map((name) => join(root, name))),
+  ];
+  if (platform === "darwin") {
+    if (!existsSync(SANDBOX_EXEC)) throw new ProcessConfinementUnavailableError(unavailable("macOS sandbox-exec"));
+    return {
+      command: SANDBOX_EXEC,
+      args: ["-p", seatbeltProfile(writable, protectedPaths), target.command, ...target.args],
+      windowsVerbatimArguments: false,
+    };
+  }
+  if (platform === "linux") {
+    const bwrap = BWRAP_PATHS.find((path) => existsSync(path));
+    if (!bwrap) throw new ProcessConfinementUnavailableError(unavailable("bubblewrap (bwrap)"));
+    return {
+      command: bwrap,
+      args: [...bwrapArgs(writable, protectedPaths), "--", target.command, ...target.args],
+      windowsVerbatimArguments: false,
+    };
+  }
+  throw new ProcessConfinementUnavailableError(
+    "Workspace only is not available for this provider on Windows. Choose Full access in the agent settings.",
+  );
+}
+
+function unavailable(tool: string): string {
+  return `Workspace only needs ${tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.`;
+}
+
+/**
+ * Writes are denied, then allowed in the writable folders, then denied again in the protected paths:
+ * in a Seatbelt profile the last rule that matches wins. Everything else stays open, as the Access
+ * setting says: reads, the network and process starts.
+ */
+export function seatbeltProfile(writable: readonly string[], protectedPaths: readonly string[]): string {
+  const allowed = unique(writable.flatMap(realPaths)).map((path) => `(subpath ${sbplString(path)})`);
+  const denied = unique(protectedPaths.flatMap(realPaths)).map(
+    (path) => `(literal ${sbplString(path)}) (subpath ${sbplString(path)})`,
+  );
+  return [
+    "(version 1)",
+    "(allow default)",
+    "(deny file-write*)",
+    `(allow file-write* ${allowed.join(" ")})`,
+    '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
+    ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
+    "",
+  ].join("\n");
+}
+
+/** The whole file system read-only, the writable folders bound over it, the protected paths over those. */
+export function bwrapArgs(writable: readonly string[], protectedPaths: readonly string[]): string[] {
+  const args = ["--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--die-with-parent"];
+  for (const path of unique(writable.flatMap(realPaths))) {
+    if (existsSync(path)) args.push("--bind", path, path);
+  }
+  // bwrap can only bind a path that exists. A protected file that does not exist yet stays
+  // writable on Linux; the macOS profile denies it by name.
+  for (const path of unique(protectedPaths.flatMap(realPaths))) {
+    if (existsSync(path)) args.push("--ro-bind", path, path);
+  }
+  return args;
+}
+
+/**
+ * The temporary folders, as Codex allows them for a Workspace only agent. Commands, compilers and the
+ * provider itself need them.
+ */
+function temporaryPaths(): string[] {
+  return ["/tmp", "/var/tmp", tmpdir()];
+}
+
+/**
+ * The path as written and as the kernel sees it. Seatbelt matches the real path, so `/tmp` must also
+ * be given as `/private/tmp`, and a folder that does not exist yet is resolved through its parent.
+ */
+function realPaths(path: string): string[] {
+  const absolute = resolve(path);
+  return unique([absolute, resolveExisting(absolute)]);
+}
+
+function resolveExisting(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(resolveExisting(parent), basename(path));
+  }
+}
+
+function sbplString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}

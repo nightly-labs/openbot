@@ -36,6 +36,7 @@ import {
   usableMcpServers,
 } from "./mcp-provider-shapes";
 import { PendingServerRequests } from "./pending-server-requests";
+import type { SpawnTarget } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
   type AppServerNotification,
@@ -176,6 +177,11 @@ export interface AcpProviderOptions {
    * construction reach the next process without any other plumbing. Spread after `env`.
    */
   extraEnv?: () => Record<string, string>;
+  /**
+   * Wraps the command for a Workspace only agent's own process (`process-confinement.ts`). It throws
+   * when this computer cannot make the sandbox, and then the process does not start.
+   */
+  confine?(target: SpawnTarget): SpawnTarget;
   signInMessage: string;
   /**
    * Whether the model this turn runs on may still be used. Read here, after every wait this client
@@ -266,7 +272,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#stopping = false;
-    const target = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const direct = cliSpawnTarget(this.#cli.executable, this.options.argv);
+    const target = this.options.confine ? this.options.confine(direct) : direct;
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...this.options.env, ...this.options.extraEnv?.() },

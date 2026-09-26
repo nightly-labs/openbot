@@ -1302,6 +1302,55 @@ describe.sequential("AgentService: providers", () => {
     },
   );
 
+  /* Grok takes no sandbox per session. A Workspace only turn that reached the shared process would
+     run with full access, so the turn must go to the agent's own sandboxed process. */
+  it("runs a Workspace only Grok agent in a sandboxed process of its own, and back on the shared one", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const created: Array<{ client: FakeAgentClient; roots: readonly string[] | null }> = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "grok",
+      clientFactory: (provider, _cli, confinement) => {
+        const client = new FakeAgentClient(provider);
+        created.push({ client, roots: confinement?.writableRoots ?? null });
+        return client;
+      },
+    });
+    await service.initialize();
+    await store.getOrCreate("chief");
+    const agent = await service.updateAgent({
+      agentId: "chief",
+      provider: "grok",
+      model: "grok-4.5",
+      access: "workspace",
+    });
+    const turnStarts = (client: FakeAgentClient | undefined) =>
+      client?.requests.filter((request) => request.method === "turn/start").length ?? 0;
+    const sharedStarts = () =>
+      created
+        .filter((entry) => entry.roots === null && entry.client.provider === "grok")
+        .reduce((count, entry) => count + turnStarts(entry.client), 0);
+
+    await service.sendMessage({ agentId: "chief", text: "Write a file." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const own = created.find((entry) => entry.roots !== null);
+    expect(own?.roots).toEqual([agent.workspacePath, store.sharedRoot]);
+    expect(turnStarts(own?.client)).toBe(1);
+    expect(sharedStarts()).toBe(0);
+
+    await service.updateAgent({ agentId: "chief", access: "full" });
+    await service.sendMessage({ agentId: "chief", text: "Again." });
+    await waitForQueue(service, "chief", (queue) =>
+      queue.deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    expect(sharedStarts()).toBe(1);
+    expect(own?.client.running).toBe(false);
+  });
+
   it("moves an agent off a removed endpoint onto a model OpenCode still lists", async () => {
     process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
     const { service: agentService, store } = await startService(root, {
