@@ -91,8 +91,11 @@ calls to the agent settings panel, which shows only Skills and Tables in the bro
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
 route. `web-marketplace.ts` gives `SkillsMarketplaceModal` its calls: the public catalog routes of
 the account service that serves `/app` (`@openbot/team-client/marketplace-catalog`), and installs on
-the host over `skills-admin-v1`, `agent-install-v1`, and `mcp-servers-v1`. A browser publishes
-nothing and updates no installed agent; those stay on the desktop.
+the host over `skills-admin-v1`, `agent-install-v1`, and `mcp-servers-v1`. Try skill and a plugin
+prompt add a line to the agent's draft, as on desktop. A shared agent page also links
+`/app?agent=<id>`: `WebApp` reads the id once, removes the query, and keeps it through sign-in;
+`AgentTemplateInstall` then shows the preview, and the host adds the agent over `agent-install-v1`.
+A browser publishes nothing and updates no installed agent; those stay on the desktop.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
 the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
 sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The
@@ -1273,7 +1276,8 @@ card page, tinted with the avatar colour. The Bloub library uses browser-only AP
 loads, so the page loads the avatar and its colour in the browser after hydration. Its button opens
 `openbot://agents/<id>`, the third renderer link kind in
 `src/main/deep-link-router.ts`. The app then shows the template in `AgentTemplateInstallDialog`;
-like a plugin link, the link itself installs nothing.
+like a plugin link, the link itself installs nothing. The page's fallback line also links
+`/app?agent=<id>`, where the browser client shows the same preview.
 
 ## macOS Host Manager
 

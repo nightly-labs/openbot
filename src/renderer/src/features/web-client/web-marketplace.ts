@@ -1,6 +1,7 @@
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
 import {
   installAgentSkill,
+  installAgentTemplate,
   installMarketplaceAgent,
   listAgentSkills,
   listMcpServers,
@@ -11,7 +12,11 @@ import {
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import type { AgentTemplateInstallCalls } from "../agent-templates/agent-templates-port";
 import type { MarketplaceCalls } from "../settings/marketplace-calls";
+
+/** No server id: the account is a member, or the host runs an OpenBot without agent-install-v1. */
+const NO_AGENT_INSTALL = "Only an owner or admin can add an agent here, and the host must run a current OpenBot.";
 
 /**
  * The marketplace of the browser client. The catalog comes from the account service that serves
@@ -41,15 +46,38 @@ export function createWebMarketplaceCalls(
       removeMcpServer: async (input, serverId) => removeMcpServer(request(serverId), input),
     },
     addAgent: async (input, serverId) => {
-      // No id: the account is a member, or the host runs an OpenBot without agent-install-v1.
-      if (!serverId)
-        throw new Error("Only an owner or admin can add an agent here, and the host must run a current OpenBot.");
+      if (!serverId) throw new Error(NO_AGENT_INSTALL);
       return installMarketplaceAgent(request(serverId), input);
     },
     openUrl: async (url) => {
       const protocol = URL.parse(url)?.protocol;
       if (protocol !== "https:" && protocol !== "http:") throw new Error("This link cannot be opened.");
       window.open(url, "_blank", "noopener");
+    },
+  };
+}
+
+/**
+ * The shared agent dialog of the browser client. The template comes from the account service; the host
+ * adds the agent. A browser has no computer of its own to add it to.
+ */
+export function createWebAgentTemplateCalls(
+  accountFetch: typeof fetch,
+  request: (serverId?: string) => TeamApiRequest,
+): AgentTemplateInstallCalls {
+  const catalog = createMarketplaceCatalog(accountFetch);
+  return {
+    agentTemplates: {
+      get: catalog.templates.get,
+      install: async () => {
+        throw new Error(NO_AGENT_INSTALL);
+      },
+    },
+    agent: {
+      addTemplateAgent: async (input, serverId) => {
+        if (!serverId) throw new Error(NO_AGENT_INSTALL);
+        return installAgentTemplate(request(serverId), input);
+      },
     },
   };
 }

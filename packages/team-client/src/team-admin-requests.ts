@@ -29,6 +29,7 @@ import {
   decodeProviderRuntimeSnapshot,
   decodeStorageUsage,
   type GetStorageUsageInput,
+  type InstallAgentTemplateInput,
   type InstalledSkill,
   type InstallMarketplaceAgentInput,
   type InstallSkillInput,
@@ -133,6 +134,19 @@ export async function installMarketplaceAgent(
   if (input.agentId !== undefined) throw new Error("An agent on a joined server cannot be updated from here.");
   const { listingId, timezone, receiptId } = input;
   return request("POST", AGENT_INSTALL_ROUTES.marketplace, decodeHostAddedAgent, { listingId, timezone, receiptId });
+}
+
+/** A shared agent template on the host. The host reads the template again and refuses a newer version. */
+export async function installAgentTemplate(
+  request: TeamApiRequest,
+  input: InstallAgentTemplateInput,
+): Promise<AddedAgent> {
+  const { templateId, timezone, expectedUpdatedAt } = input;
+  return request("POST", AGENT_INSTALL_ROUTES.template, decodeHostAddedAgent, {
+    templateId,
+    timezone,
+    expectedUpdatedAt,
+  });
 }
 
 export function uninstallAgentSkill(request: TeamApiRequest, input: UninstallSkillInput): Promise<void> {
