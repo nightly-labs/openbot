@@ -39,7 +39,7 @@ import {
   Upload,
   X,
 } from "@openbot/ui";
-import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
+import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { SkillPreview } from "@openbot/ui/components/SkillPreview";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
@@ -2059,15 +2059,6 @@ function SkillSubmissionDetailView(props: { submission: SkillSubmission }) {
       </div>
     </section>
   );
-}
-
-function avatarImageDataUrl(image: AvatarImageInput): string {
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let offset = 0; offset < image.bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...image.bytes.subarray(offset, offset + chunkSize));
-  }
-  return `data:${image.mimeType};base64,${btoa(binary)}`;
 }
 
 function marketplaceErrorMessage(cause: unknown): string {
