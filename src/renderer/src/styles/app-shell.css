@@ -665,32 +665,31 @@ textarea {
   padding: 2px 3px 0 10px;
 }
 
-/* The frame edge. The server rail and the whole top row - the sidebar, chat and side panel headers -
- * share one darker surface, and the chat list sits inside it as an inset panel with a rounded
+/* The frame edge. The server rail, when it shows, and the whole top row - the sidebar, chat and side
+ * panel headers - share one darker surface, and the chat list sits inside it as an inset panel with a rounded
  * corner. The panel's top line runs on under the chat header, and its right edge is the divider,
  * so the sidebar's own edge stays out of the top row. The theme layer at the end of this file also
  * sets these backgrounds, so the selectors carry the frame class to win. */
 @media (min-width: 721px) {
-  .app-frame-with-server-rail > .server-rail,
-  .app-frame-with-server-rail > .sidebar,
-  .app-frame-with-server-rail .conversation-header,
-  .app-frame-with-server-rail .direct-conversation-header,
-  .app-frame-with-server-rail .first-agent-setup-header {
+  .app-frame-edge > .server-rail,
+  .app-frame-edge > .sidebar,
+  .app-frame-edge .conversation-panel,
+  .app-frame-edge .direct-conversation {
     background: var(--openbot-bg-native-sidebar);
   }
 
-  .app-frame-with-server-rail > .server-rail::before,
-  .app-frame-with-server-rail > .server-rail::after {
+  .app-frame-edge > .server-rail::before,
+  .app-frame-edge > .server-rail::after {
     content: none;
   }
 
-  .app-frame-with-server-rail > .sidebar {
+  .app-frame-edge > .sidebar {
     position: relative;
     isolation: isolate;
     border-right: 0;
   }
 
-  .app-frame-with-server-rail > .sidebar::before {
+  .app-frame-edge > .sidebar::before {
     position: absolute;
     z-index: -1;
     inset: calc(var(--left-header-height) - 1px) 0 0 0;
@@ -704,46 +703,92 @@ textarea {
     pointer-events: none;
   }
 
-  .app-frame-with-server-rail .sidebar-topbar {
+  .app-frame-edge .sidebar-topbar {
     border-bottom: 0;
   }
 
   /* The search sits as far below the panel's top line as it sits in from the side line, which
    * keeps its corner clear of the panel's rounded one. */
-  .app-frame-with-server-rail .sidebar-search-wrap {
+  .app-frame-edge .sidebar-search-wrap {
     padding-top: 11px;
   }
 
-  .app-frame-with-server-rail .sidebar-compact-search {
+  .app-frame-edge .sidebar-compact-search {
     top: 11px;
   }
 
-  .app-frame-with-server-rail .conversation-header,
-  .app-frame-with-server-rail .first-agent-setup-header {
-    border-bottom: 1px solid var(--openbot-border-strong);
+  /* The chat area is an inset panel too, with its rounded corner at the window edge. An open side
+   * panel covers that edge, so the panel's right side moves to the side panel's divider and its corner
+   * goes square. It moves with the chat's own width, so a side panel that closes shows the corner
+   * slide back to the window edge. */
+  .app-frame-edge .conversation-panel,
+  .app-frame-edge .direct-conversation {
+    isolation: isolate;
+  }
+
+  .app-frame-edge .conversation-panel::before,
+  .app-frame-edge .direct-conversation::before {
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--left-header-height) - 1px) 0 0 0;
+    border-top: 1px solid var(--openbot-border-strong);
+    border-right: 1px solid var(--openbot-border-strong);
+    border-top-right-radius: var(--openbot-radius-lg);
+    background: var(--openbot-bg-canvas) padding-box;
+    content: "";
+    pointer-events: none;
+    transition:
+      right var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1),
+      border-top-right-radius var(--panel-resize-duration, var(--openbot-duration-overlay))
+      cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* The right line sits under the side panel's divider, so the two show as one line. */
+  .app-frame-edge .conversation-panel.browser-panel-active::before {
+    right: calc(var(--browser-panel-width, 380px) - 1px);
+    border-top-right-radius: 0;
+  }
+
+  .app-frame-edge .conversation-panel:not(.browser-panel-active):has(.settings-panel)::before {
+    right: calc(var(--settings-panel-width, 296px) - 1px);
+    border-top-right-radius: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-frame-edge .conversation-panel::before {
+      transition: none;
+    }
+  }
+
+  /* The inset panel draws the top line, so that it can follow the rounded corner. */
+  .app-frame-edge .conversation-header,
+  .app-frame-edge .first-agent-setup-header {
+    border-bottom: 0;
+    background: transparent;
   }
 
   /* An open panel's toggle. The faint fill it has elsewhere disappears on the edge, so it takes the
    * ghost button's open fill. An agent at the controls keeps its accent. */
-  .app-frame-with-server-rail .header-panel-toggle[aria-expanded="true"]:not(.computer-button-agent-active) {
+  .app-frame-edge .header-panel-toggle[aria-expanded="true"]:not(.computer-button-agent-active) {
     border-color: var(--openbot-border-strong);
     background: var(--openbot-bg-control-hover);
     color: var(--openbot-text-primary);
   }
 
   /* A direct conversation's header is taller on its own, so its line would miss the panel's. */
-  .app-frame-with-server-rail .direct-conversation-header {
+  .app-frame-edge .direct-conversation-header {
     height: var(--left-header-height);
-    border-bottom: 1px solid var(--openbot-border-strong);
+    border-bottom: 0;
+    background: transparent;
   }
 
-  .app-frame-with-server-rail .direct-conversation-person .person-avatar {
+  .app-frame-edge .direct-conversation-person .person-avatar {
     width: 26px;
     height: 26px;
   }
 
   /* The compatibility screen has no header, so it paints the top row and its line itself. */
-  .app-frame-with-server-rail .remote-compatibility-screen {
+  .app-frame-edge .remote-compatibility-screen {
     background:
       linear-gradient(var(--openbot-border-strong), var(--openbot-border-strong)) 0
       calc(var(--left-header-height) - 1px) / 100% 1px no-repeat,
@@ -751,17 +796,37 @@ textarea {
       var(--left-header-height) no-repeat;
   }
 
-  /* A side panel's header continues the top row: the chat header's height, so the lines meet, and a
-   * shadow one pixel to the left that covers the panel's left border in the row. That border then
-   * starts at the line, as the sidebar's divider does. The tabbed browser covers the whole window,
-   * so its header stays as it is. */
-  .app-frame-with-server-rail .settings-panel-header,
-  .app-frame-with-server-rail .file-preview-header,
-  .app-frame-with-server-rail .browser-preview-header {
-    height: var(--left-header-height);
-    border-bottom: 1px solid var(--openbot-border-strong);
+  /* A side panel mirrors the chat list: an inset panel under the top row, with its rounded corner at
+   * the window edge. Its left border is the divider and starts at the line, as the sidebar's does.
+   * The tabbed browser covers the whole window, so it stays as it is. */
+  .app-frame-edge .settings-panel,
+  .app-frame-edge .browser-panel:not(.browser-panel-expanded) {
+    isolation: isolate;
+    border-left: 0;
     background: var(--openbot-bg-native-sidebar);
-    box-shadow: -1px -1px 0 var(--openbot-bg-native-sidebar);
+  }
+
+  .app-frame-edge .settings-panel::before,
+  .app-frame-edge .browser-panel:not(.browser-panel-expanded)::before {
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--left-header-height) - 1px) 0 0 0;
+    border: 1px solid var(--openbot-border-strong);
+    border-bottom: 0;
+    border-top-right-radius: var(--openbot-radius-lg);
+    background: var(--openbot-bg-canvas) padding-box;
+    content: "";
+    pointer-events: none;
+  }
+
+  /* A side panel's header continues the top row at the chat header's height, so the lines meet. The
+   * inset panel draws the line, so that it can follow the rounded corner. */
+  .app-frame-edge .settings-panel-header,
+  .app-frame-edge .file-preview-header,
+  .app-frame-edge .browser-preview-header {
+    height: var(--left-header-height);
+    border-bottom: 0;
+    background: transparent;
   }
 
   .app-frame-with-server-rail .account-dock-hybrid::before {
@@ -802,6 +867,79 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-server-name-chevron {
+  flex: 0 0 auto;
+  margin-left: var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+}
+
+/* The server menu view has no rail, so the server name moves right of the macOS traffic lights. */
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-topbar {
+  padding-left: 78px;
+}
+
+/* A compact sidebar is too narrow for the traffic lights and the expand button in one row, and the
+ * menu view has no rail to hold the traffic lights. The button moves to its own row under them, over
+ * the search button. */
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-topbar {
+  height: calc(var(--left-header-height) + 36px);
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 2px;
+}
+
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-server-name,
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-new-button {
+  display: none;
+}
+
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-toggle-button {
+  transform: none;
+}
+
+.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-toggle-button:active {
+  transform: scale(0.96);
+}
+
+.server-menu {
+  min-width: 220px;
+  max-width: 300px;
+  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  overflow-y: auto;
+}
+
+.server-menu-row {
+  gap: var(--openbot-space-2);
+}
+
+.server-menu-mark {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  place-items: center;
+  border-radius: var(--openbot-radius-sm);
+}
+
+.server-menu-mark > * {
+  width: 100%;
+  height: 100%;
+}
+
+.server-menu-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.server-menu-muted {
+  flex: 0 0 auto;
+  color: var(--openbot-text-secondary);
 }
 
 .sidebar-topbar-actions {
@@ -1074,9 +1212,10 @@ textarea {
   bottom: -4px;
 }
 
+/* The dragged header keeps pointer events: Chromium ends a native drag at once when its source
+ * stops taking them. */
 .sidebar-section-dragging {
   opacity: 0;
-  pointer-events: none;
   transition: none;
 }
 
@@ -1118,7 +1257,8 @@ textarea {
   cursor: grabbing;
 }
 
-.agent-list[data-sidebar-dragging] .sidebar-section-toggle {
+.agent-list[data-sidebar-dragging="chat"] .sidebar-section-toggle,
+.agent-list[data-sidebar-dragging="person"] .sidebar-section-toggle {
   pointer-events: none;
 }
 

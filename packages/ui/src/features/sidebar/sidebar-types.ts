@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
+import type { ServerMenuProps } from "../servers/ServerMenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
 /**
@@ -31,6 +32,8 @@ export interface SidebarProps {
   onDeleteChannel?: (channelId: string) => Promise<void>;
   serverName: string;
   onOpenServerSettings?: (trigger: HTMLElement) => void;
+  /** The desktop server menu. Without it, the server name opens the server settings. */
+  serverMenu?: Omit<ServerMenuProps, "serverName" | "compact">;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean;

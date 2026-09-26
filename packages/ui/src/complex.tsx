@@ -129,6 +129,9 @@ interface DropdownMenuApi {
   Portal: typeof DropdownMenuPrimitive.Portal;
   Trigger: typeof DropdownMenuPrimitive.Trigger;
   Content: typeof DropdownMenuPrimitive.Content;
+  Sub: typeof DropdownMenuPrimitive.Sub;
+  SubTrigger: typeof DropdownMenuPrimitive.SubTrigger;
+  SubContent: typeof DropdownMenuPrimitive.SubContent;
   Item: typeof DropdownMenuPrimitive.Item;
   CheckboxItem: typeof DropdownMenuPrimitive.CheckboxItem;
   RadioGroup: typeof DropdownMenuPrimitive.RadioGroup;
@@ -143,6 +146,9 @@ export const DropdownMenu: DropdownMenuApi = {
   Portal: (props) => <DropdownMenuPrimitive.Portal {...props} />,
   Trigger: (props) => <DropdownMenuPrimitive.Trigger {...props} />,
   Content: (props) => <DropdownMenuPrimitive.Content {...props} class={withBaseClass("ui-action-menu", props.class)} />,
+  Sub: DropdownMenuPrimitive.Sub,
+  SubTrigger: DropdownMenuPrimitive.SubTrigger,
+  SubContent: DropdownMenuPrimitive.SubContent,
   Item: (props) => <DropdownMenuPrimitive.Item {...props} />,
   CheckboxItem: (props) => <DropdownMenuPrimitive.CheckboxItem {...props} />,
   RadioGroup: (props) => <DropdownMenuPrimitive.RadioGroup {...props} />,

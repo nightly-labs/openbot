@@ -593,8 +593,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--openbot-border-strong) transparent;
+  scrollbar-width: none;
 }
 
 .agent-memory-row {
@@ -716,8 +715,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--openbot-border-strong) transparent;
+  scrollbar-width: none;
 }
 
 .shared-table-row {

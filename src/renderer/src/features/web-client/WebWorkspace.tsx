@@ -382,7 +382,7 @@ export function WebWorkspace(props: {
   return (
     <ConversationControllerProvider controller={controller}>
       <div
-        class="app-frame app-frame-with-server-rail web-app-frame"
+        class="app-frame app-frame-edge app-frame-with-server-rail web-app-frame"
         data-web-mobile-pane={mobilePane()}
         style="--left-panel-width: 280px"
       >

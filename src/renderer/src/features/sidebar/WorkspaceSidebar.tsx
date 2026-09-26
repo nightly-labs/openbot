@@ -6,12 +6,14 @@ import { createMemo } from "solid-js";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
 import { useNavigation } from "../../navigation";
+import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAgentActions } from "../agents/agent-actions";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { useServerActions } from "../servers/server-actions";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -31,9 +33,11 @@ import { useSidebar } from "./sidebar-context";
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { t } = useText();
   const layout = useLayout();
+  const platform = usePlatform();
   const channels = useChannels();
   const { activeServer, activeServerSupportsCapability } = useServers();
   const { openServerSettings } = useServerSettings();
+  const serverActions = useServerActions();
   const { setSkillsMarketplaceOpen } = useSettings();
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
@@ -104,6 +108,18 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         const server = activeServer();
         if (server) openServerSettings(server.id, trigger);
       }}
+      serverMenu={
+        platform.appInfo()
+          ? {
+              servers: serverActions.orderedServers(),
+              view: layout.serverView(),
+              onViewChange: layout.setServerView,
+              onSelect: serverActions.select,
+              onAdd: serverActions.add,
+              ...serverActions.callbacks,
+            }
+          : undefined
+      }
       agents={agentList()}
       activeAgentId={activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? "")}
       showPeople={props.peopleEnabled}

@@ -1,33 +1,22 @@
-import { toast } from "@openbot/ui";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
-import { useText } from "@openbot/ui/text";
 import { onSettled, Show } from "solid-js";
+import { useLayout } from "../../layout";
 import { usePlatform } from "../../platform";
-import { useUsage } from "../usage/usage-context";
-import { useServerSelection } from "./server-selection";
-import { useServerSettings } from "./server-settings";
+import { useServerActions } from "./server-actions";
 import { useServers } from "./servers-context";
 
 /**
  * The rail of team servers down the left edge. It is drawn once main has
- * reported the build, which `serverRailVisible` answers; the shell asks the
- * same question to decide whether the frame has to leave room for it.
+ * reported the build and the user has not chosen the server menu instead,
+ * which `serverRailVisible` answers; the shell asks the same question to
+ * decide whether the frame has to leave room for it. The server shortcuts
+ * work in both views.
  */
 export function WorkspaceServerRail() {
   const platform = usePlatform();
-  const { t, errorMessage } = useText();
-  const { openUsage } = useUsage();
-  const { servers, reorderServers, setServerMuted, setServerNotificationLevel, setJoinServerOpen } = useServers();
-  const { selectServer } = useServerSelection();
-  const { openServerSettings } = useServerSettings();
-
-  function handleSelect(serverId: string): void {
-    void selectServer(serverId).catch((error) => {
-      toast.error(t("server.select.failedTitle"), {
-        description: errorMessage(error, t("server.select.failedDescription")),
-      });
-    });
-  }
+  const layout = useLayout();
+  const { reorderServers } = useServers();
+  const { orderedServers, select, add, callbacks } = useServerActions();
 
   onSettled(() => {
     const handleServerShortcut = (event: KeyboardEvent) => {
@@ -45,34 +34,24 @@ export function WorkspaceServerRail() {
       ) {
         return;
       }
-      // The rail keeps local servers above the saved remote-server order.
-      const orderedServers = [
-        ...servers().filter((server) => server.kind === "local"),
-        ...servers().filter((server) => server.kind === "remote"),
-      ];
-      const server = orderedServers[Number(event.key) - 1];
+      const server = orderedServers()[Number(event.key) - 1];
       if (!server) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!server.active) handleSelect(server.id);
+      if (!server.active) select(server.id);
     };
     window.addEventListener("keydown", handleServerShortcut);
     return () => window.removeEventListener("keydown", handleServerShortcut);
   });
 
   return (
-    <Show when={platform.serverRailVisible()}>
+    <Show when={layout.serverRailVisible()}>
       <ServerRail
-        servers={servers()}
-        onSelect={handleSelect}
+        servers={orderedServers()}
+        onSelect={select}
         onReorder={(serverIds) => void reorderServers(serverIds)}
-        onSetMuted={(serverId, muted, durationMs) => void setServerMuted(serverId, muted, durationMs)}
-        onSetNotificationLevel={(serverId, level) => void setServerNotificationLevel(serverId, level)}
-        onAdd={() => {
-          if (!platform.landingPreview) setJoinServerOpen(true);
-        }}
-        onOpenUsage={openUsage}
-        onOpenSettings={openServerSettings}
+        onAdd={add}
+        {...callbacks}
       />
     </Show>
   );
