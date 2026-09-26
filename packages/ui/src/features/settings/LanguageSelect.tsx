@@ -6,7 +6,7 @@ import {
 } from "@openbot/i18n/languages";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { useI18n } from "../../i18n-context";
+import { useText } from "../../text";
 
 /** Kobalte takes a mutable array. The exported catalog stays read-only, so copy it once here. */
 const options: AppLanguageOption[] = [...APP_LANGUAGE_OPTIONS];
@@ -24,14 +24,13 @@ export interface LanguageSelectProps {
  * it, because a settings list that mixes control styles reads as two different screens.
  */
 export function LanguageSelect(props: LanguageSelectProps): JSX.Element {
-  const i18n = useI18n();
+  const { t } = useText();
   /**
    * Every row but the first is a language's own name for itself, which is the same word in any
    * interface language. The system row names a setting rather than a language, so it is the one
    * that follows the interface.
    */
-  const label = (option: AppLanguageOption) =>
-    option.id === "system" ? i18n.t("settings.language.system") : option.label;
+  const label = (option: AppLanguageOption) => (option.id === "system" ? t("settings.language.system") : option.label);
 
   return (
     <Select<AppLanguageOption>
@@ -49,7 +48,7 @@ export function LanguageSelect(props: LanguageSelectProps): JSX.Element {
         </SelectItem>
       )}
     >
-      <SelectTrigger size="sm" aria-label={i18n.t("settings.language.title")}>
+      <SelectTrigger size="sm" aria-label={t("settings.language.title")}>
         <SelectValue<AppLanguageOption>>{(state) => label(state.selectedOption())}</SelectValue>
       </SelectTrigger>
       <SelectContent mount={props.mount} />

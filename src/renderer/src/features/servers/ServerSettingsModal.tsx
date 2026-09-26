@@ -73,6 +73,7 @@ import {
   SERVER_NOTIFICATION_LEVEL_LABELS,
   serverMuteDescription,
 } from "@openbot/ui/features/servers/ServerActionItems";
+import { ServerLogo } from "@openbot/ui/features/servers/ServerLogo";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
@@ -1669,23 +1670,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   }
 }
 
-function ServerLogo(props: { name: string; url: string | null }) {
-  const [failed, setFailed] = createSignal(false);
-  createEffect(
-    () => props.url,
-    () => {
-      setFailed(false);
-    },
-  );
-  return (
-    <span class="server-settings-logo" aria-hidden="true">
-      <Show when={!failed() ? props.url : null} fallback={<span>{initials(props.name)}</span>}>
-        {(url) => <img src={url()} alt="" draggable={false} onError={() => setFailed(true)} />}
-      </Show>
-    </span>
-  );
-}
-
 function MemberActionsMenu(props: {
   member: TeamPresenceMember;
   mount: HTMLElement | undefined;
@@ -1723,12 +1707,5 @@ function MemberActionsMenu(props: {
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
-  );
-}
-
-function initials(value: string): string {
-  const parts = value.trim().split(/\s+/u).filter(Boolean);
-  return (
-    (parts.length > 1 ? `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}` : value.trim().slice(0, 2)).toUpperCase() || "OB"
   );
 }
