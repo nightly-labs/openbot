@@ -40,8 +40,8 @@ export function nextStreamingReveal(input: {
   const { target, stepMs } = input;
   const backlog = target.length - input.shownLength;
   if (backlog <= 0) return { length: target.length, budget: 0 };
-  let budget =
-    input.budget + (backlog * stepMs) / Math.max(input.catchUpMs, stepMs) + (MIN_CHARACTERS_PER_SECOND * stepMs) / 1000;
+  const minimumStep = (MIN_CHARACTERS_PER_SECOND * stepMs) / 1000;
+  let budget = input.budget + (backlog * stepMs) / Math.max(input.catchUpMs, stepMs) + minimumStep;
   let length = input.shownLength;
   while (budget > 0) {
     STREAMING_WORD.lastIndex = length;
@@ -53,7 +53,9 @@ export function nextStreamingReveal(input: {
     length += word[0].length;
     budget -= word[0].length;
   }
-  return { length, budget };
+  // A long word, such as a URL, overshoots the budget. Owe only what the next step always adds,
+  // so the text after it does not stop while a small backlog repays the debt.
+  return { length, budget: Math.max(budget, -minimumStep) };
 }
 
 /**
