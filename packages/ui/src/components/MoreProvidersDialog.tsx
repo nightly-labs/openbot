@@ -61,7 +61,7 @@ export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
           <Dialog.Content
             as="section"
             class="custom-provider-dialog provider-more-dialog"
-            onCloseAutoFocus={props.onCloseAutoFocus}
+            onCloseAutoFocus={(event) => props.onCloseAutoFocus?.(event)}
           >
             <header class="provider-more-header">
               <Dialog.Title as="h2" class="provider-more-title">

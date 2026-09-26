@@ -1,5 +1,11 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
-import type { AgentProviderId, AgentStatus, AppSetupState, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  AgentProviderStatus,
+  AgentStatus,
+  AppSetupState,
+  ProviderRuntimeStatus,
+} from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
@@ -72,23 +78,22 @@ const bothConnectingAgentStatus: AgentStatus = {
 };
 
 /** A new computer: no provider is downloaded yet, Gemini included. */
-const lazyProviderAgentStatus: AgentStatus = {
-  ...noProvidersConnectedAgentStatus,
-  providers: [
-    ...(noProvidersConnectedAgentStatus.providers ?? []).map((provider) => ({
+const lazyProviders: AgentProviderStatus[] = [
+  ...(noProvidersConnectedAgentStatus.providers ?? []).map(
+    ({ connectionState: _connectionState, ...provider }): AgentProviderStatus => ({
       ...provider,
-      state: "not-installed" as const,
-      connectionState: undefined,
+      state: "not-installed",
       message: null,
-    })),
-    { id: "antigravity", state: "not-installed", version: null, message: null },
-  ],
-};
+    }),
+  ),
+  { id: "antigravity", state: "not-installed", version: null, message: null },
+];
+const lazyProviderAgentStatus: AgentStatus = { ...noProvidersConnectedAgentStatus, providers: lazyProviders };
 
 /** Gemini is downloaded and signed in. The others are not downloaded yet. */
 const geminiSignedInAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
-  providers: lazyProviderAgentStatus.providers?.map((provider) =>
+  providers: lazyProviders.map((provider) =>
     provider.id === "antigravity"
       ? { ...provider, state: "available", version: "1.2.1", email: "ada@example.com" }
       : provider,
