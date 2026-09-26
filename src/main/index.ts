@@ -59,9 +59,24 @@ import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { TeardownRegistry } from "./teardown-registry";
+import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 
 const logger = createOpenBotLogger("main");
+
+// Electron keeps running after both events: an unhandled rejection only prints a warning, and a
+// monitor leaves the default exception handling in place. These add a redacted log line and a
+// trace span, so a diagnostics export shows that the main process failed and how often.
+let crashTrace: TraceFile | null = null;
+process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
+process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
+
+function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
+  logger.error(`Main process ${origin}:`, toLogValue(error));
+  if (!crashTrace) return;
+  crashTrace.record({ kind: "crash", name: origin, durationMs: 0, outcome: "reported" });
+  void crashTrace.flush();
+}
 
 const commandLineUserDataDirectory = app.commandLine.getSwitchValue("user-data-dir").trim();
 const developmentProfile = !app.isPackaged ? readDevelopmentProfile(process.env.OPENBOT_DEV_PROFILE) : null;
@@ -691,6 +706,7 @@ if (!hasSingleInstanceLock) {
         trace,
       } = built;
 
+      crashTrace = trace;
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));

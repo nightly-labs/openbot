@@ -1,5 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
-import { redactText } from "@openbot/logging";
+import { isSecretName, redactText, registerSecretValue } from "@openbot/logging";
 import { mcpEnvironment } from "./mcp-provider-shapes";
 
 const MASK = "•••";
@@ -31,6 +31,23 @@ export function redactMcpValues(text: string, values: Iterable<string>): string 
     result = result.split(value).join(MASK);
   }
   return redactText(result);
+}
+
+/**
+ * Adds this configuration's labelled secrets to the process-wide mask, so a log line that has no
+ * configuration at hand still hides them.
+ *
+ * Only values under a secret name go there: `Content-Type: application/json` or `NODE_ENV=production`
+ * would erase ordinary text from every log. The unlabelled rest stays masked by
+ * `redactMcpSecrets` on the paths that know the configuration.
+ */
+export function registerMcpSecretValues(config: McpServerConfig): void {
+  for (const [name, value] of Object.entries(mcpEnvironment(config))) {
+    if (isSecretName(name)) registerSecretValue(value);
+  }
+  for (const pair of config.headers) {
+    if (isSecretName(pair.key)) registerSecretValue(pair.value);
+  }
 }
 
 /**
