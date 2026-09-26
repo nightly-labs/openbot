@@ -1030,15 +1030,18 @@ async function requestStream(url: string, headers: Record<string, string>, body:
   });
 }
 
-async function waitForHttps(
-  port: number,
-  certificatePath: string,
-  child?: { exitCode: number | null } | null,
-): Promise<void> {
+type WatchedChild = Pick<ChildProcess, "exitCode" | "signalCode">;
+
+// A child that a signal ended, such as the one a stop sends, has no exit code, only a signal code.
+function childEnded(child: WatchedChild | null | undefined): boolean {
+  return child !== null && child !== undefined && (child.exitCode !== null || child.signalCode !== null);
+}
+
+async function waitForHttps(port: number, certificatePath: string, child?: WatchedChild | null): Promise<void> {
   const deadline = Date.now() + 20_000;
   let lastError: unknown;
   while (Date.now() < deadline) {
-    if (child?.exitCode !== null && child?.exitCode !== undefined) {
+    if (childEnded(child)) {
       throw new Error(`Sunshine exited before its HTTPS API on port ${port} became ready.`, { cause: lastError });
     }
     try {
@@ -1083,10 +1086,10 @@ async function sunshineTlsOptions(certificatePath: string): Promise<{
   };
 }
 
-async function waitForHttp(url: string, init: RequestInit, child?: { exitCode: number | null } | null): Promise<void> {
+async function waitForHttp(url: string, init: RequestInit, child?: WatchedChild | null): Promise<void> {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (child?.exitCode !== null && child?.exitCode !== undefined) {
+    if (childEnded(child)) {
       throw new Error(`Moonlight Web exited before ${url} became ready.`);
     }
     try {

@@ -78,6 +78,7 @@ async function readBody(request: IncomingMessage): Promise<string> {
 
 class FakeChild extends ChildProcess {
   override exitCode: number | null = null;
+  override signalCode: NodeJS.Signals | null = null;
   override killed = false;
   override stdout = new PassThrough();
   override stderr = new PassThrough();
@@ -88,12 +89,13 @@ class FakeChild extends ChildProcess {
     this.#onKill = onKill;
   }
 
-  override kill(): boolean {
-    if (this.exitCode !== null) return false;
+  // Like Node: a child that a signal ends has no exit code, only the signal.
+  override kill(signal: NodeJS.Signals = "SIGTERM"): boolean {
+    if (this.exitCode !== null || this.signalCode !== null) return false;
     this.killed = true;
-    this.exitCode = 0;
+    this.signalCode = signal;
     this.#onKill();
-    queueMicrotask(() => this.emit("exit", 0));
+    queueMicrotask(() => this.emit("exit", null, signal));
     return true;
   }
 
@@ -718,7 +720,12 @@ describe("Sunshine port isolation", () => {
 });
 
 describe("Sunshine runtime lifecycle", () => {
-  it("leaves no process and no port claim after a stop that arrives during a start", async () => {
+  // While the start waits for Sunshine, the stop ends that process with a signal. While Moonlight
+  // spawns, the stop comes before the runtime holds the new process.
+  it.each([
+    { during: "the wait for Sunshine", executable: TEST_PATHS.sunshine, spawned: 1 },
+    { during: "the Moonlight spawn", executable: TEST_PATHS.moonlightWebServer, spawned: 2 },
+  ])("leaves no process and no port claim after a stop during $during", async ({ executable: stopAt, spawned }) => {
     const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-sunshine-stop-test-"));
     const harness = createHarness(stateDirectory);
     const children: ChildProcess[] = [];
@@ -730,11 +737,17 @@ describe("Sunshine runtime lifecycle", () => {
       credentials: { username: "openbot-test", password: "test-password" },
       getDisplays: () => structuredClone(TEST_DISPLAYS),
       getIceServers: async () => [],
-      // The stop arrives while the start spawns Moonlight, after Sunshine already runs.
       spawnProcess: (executable, args, options) => {
+        if (executable === TEST_PATHS.sunshine && stopAt === executable) {
+          // A Sunshine that never answers: the start waits for it until the stop ends it.
+          const child = new FakeChild();
+          children.push(child);
+          queueMicrotask(() => stops.push(runtime.stop()));
+          return child;
+        }
         const child = harness.spawn(executable, args, options);
         children.push(child);
-        if (executable === TEST_PATHS.moonlightWebServer) stops.push(runtime.stop());
+        if (executable === TEST_PATHS.moonlightWebServer && stopAt === executable) stops.push(runtime.stop());
         return child;
       },
     });
@@ -743,7 +756,7 @@ describe("Sunshine runtime lifecycle", () => {
       await Promise.all(stops);
 
       expect(stops).toHaveLength(1);
-      expect(children.map((child) => child.exitCode !== null)).toEqual([true, true]);
+      expect(children.map((child) => child.signalCode)).toEqual(Array(spawned).fill("SIGTERM"));
       expect(runtime.state).toBeNull();
       expect(runtime.sunshineBasePort).toBeNull();
     } finally {

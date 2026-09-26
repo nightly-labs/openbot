@@ -1,45 +1,83 @@
 // The order of `start()` and `stop()` for one service that opens a process, a socket or a port.
 //
-// A start waits for a stop that is still running, and a stop waits for a start that is still running,
-// so a stop never returns while a start can still open what the stop closed. Callers that ask for the
-// same action while it runs get the same promise, so two calls do not open two listeners.
+// Starts and stops run one at a time, in the order of the calls, so the last call always decides
+// whether the service runs. A stop never returns while a start that came before it can still open
+// what the stop closed. A call that repeats the last queued action shares its promise, so two starts
+// at once do not open two listeners. A start that follows a finished start runs again: `run` must
+// return at once when the service already runs.
 //
-// A start that can take long can be told to give up first: `interruptStart` runs only when a start is
-// still running, before the stop waits for it. Without it, a slow start delays the stop, and the
-// shutdown sequence stops each step after a fixed time.
+// A start that can take long can be told to give up: a stop queued behind a start calls
+// `interruptStart` while that start runs, then waits for it. Without it, a slow start delays the
+// stop, and the shutdown sequence stops each step after a fixed time.
+
+interface QueuedStart<T> {
+  readonly kind: "start";
+  readonly promise: Promise<T>;
+  /** Runs `interrupt` now if the start runs, or when it begins. */
+  interrupt(interrupt: () => Promise<void>): void;
+  /** The interrupt that ran, for the stop behind this start to wait for. */
+  interrupted(): Promise<void>;
+}
+
+interface QueuedStop {
+  readonly kind: "stop";
+  readonly promise: Promise<void>;
+}
+
 export class LifecycleGate<T> {
-  #starting: Promise<T> | null = null;
-  #stopping: Promise<void> | null = null;
+  #queue: Promise<unknown> = Promise.resolve();
+  #last: QueuedStart<T> | QueuedStop | null = null;
 
-  async start(run: () => Promise<T>): Promise<T> {
-    while (this.#stopping) await this.#stopping.catch(() => undefined);
-    if (this.#starting) return this.#starting;
-    const starting = run();
-    this.#starting = starting;
-    try {
-      return await starting;
-    } finally {
-      if (this.#starting === starting) this.#starting = null;
-    }
+  start(run: () => Promise<T>): Promise<T> {
+    const last = this.#last;
+    if (last?.kind === "start") return last.promise;
+    let running = false;
+    let waiting: (() => Promise<void>) | null = null;
+    let interrupted: Promise<void> = Promise.resolve();
+    const interruptNow = (interrupt: () => Promise<void>): void => {
+      interrupted = interrupt();
+      // The stop behind this start awaits it and reports the error.
+      interrupted.catch(() => undefined);
+    };
+    const promise = this.#queue.then(() => {
+      running = true;
+      const starting = run();
+      if (waiting) interruptNow(waiting);
+      return starting;
+    });
+    this.#push({
+      kind: "start",
+      promise,
+      interrupt: (interrupt) => {
+        if (running) interruptNow(interrupt);
+        else waiting = interrupt;
+      },
+      interrupted: () => interrupted,
+    });
+    return promise;
   }
 
-  async stop(run: () => Promise<void>, interruptStart?: () => Promise<void>): Promise<void> {
-    if (this.#stopping) return this.#stopping;
-    const stopping = this.#stop(run, interruptStart);
-    this.#stopping = stopping;
-    try {
-      await stopping;
-    } finally {
-      if (this.#stopping === stopping) this.#stopping = null;
-    }
+  stop(run: () => Promise<void>, interruptStart?: () => Promise<void>): Promise<void> {
+    const last = this.#last;
+    if (last?.kind === "stop") return last.promise;
+    if (last?.kind === "start" && interruptStart) last.interrupt(interruptStart);
+    const promise = this.#queue.then(async () => {
+      try {
+        if (last?.kind === "start") await last.interrupted();
+      } finally {
+        await run();
+      }
+    });
+    this.#push({ kind: "stop", promise });
+    return promise;
   }
 
-  async #stop(run: () => Promise<void>, interruptStart?: () => Promise<void>): Promise<void> {
-    const starting = this.#starting;
-    if (starting) {
-      await interruptStart?.();
-      await starting.catch(() => undefined);
-    }
-    await run();
+  #push(operation: QueuedStart<T> | QueuedStop): void {
+    this.#last = operation;
+    this.#queue = operation.promise.catch(() => undefined);
+    const clear = (): void => {
+      if (this.#last === operation) this.#last = null;
+    };
+    operation.promise.then(clear, clear);
   }
 }
