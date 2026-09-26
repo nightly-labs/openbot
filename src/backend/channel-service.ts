@@ -961,6 +961,10 @@ export class ChannelService {
           assignment = { ...assignment, deliveryId: context.delivery.id };
           this.store.update(this.store.get(channelId), { assignments: [assignment] });
         }
+        // The boot recovery settles each orphaned delivery before this runs, so one that still starts
+        // or runs is a live turn of this run: on another provider, or on an agent's own process that
+        // outlived a restart of the shared one.
+        if (context?.delivery.status === "starting" || context?.delivery.status === "running") continue;
         if (
           context?.delivery.status === "queued" &&
           task?.state === "queued" &&
