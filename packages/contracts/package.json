@@ -14,6 +14,7 @@
     "./conversation-order": "./src/conversation-order.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
+    "./landing-preview-messages": "./src/landing-preview-messages.ts",
     "./ipc": "./src/ipc.ts",
     "./ipc-skills": "./src/ipc-skills.ts",
     "./mobile-connect": "./src/mobile-connect.ts",

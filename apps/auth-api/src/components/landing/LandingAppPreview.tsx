@@ -1,8 +1,10 @@
+import {
+  LANDING_PREVIEW_READY_MESSAGE,
+  LANDING_PREVIEW_START_MESSAGE,
+} from "@openbot/contracts/landing-preview-messages";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { onSettled } from "solid-js";
 
-const LANDING_PREVIEW_READY_MESSAGE = "openbot:landing-preview-ready";
-const LANDING_PREVIEW_START_MESSAGE = "openbot:landing-preview-start";
 const LANDING_PREVIEW_URL = "/app-preview";
 const LANDING_PREVIEW_LOAD_DELAY_MS = 300;
 const LANDING_PREVIEW_REVEAL_FALLBACK_MS = 240;
