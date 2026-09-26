@@ -9,9 +9,9 @@ import {
   ItemTitle,
   SettingsSection,
 } from "@openbot/ui";
+import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { LanguageSelect } from "../src/features/settings/LanguageSelect";
 
 const meta = {
   title: "Settings/Language",
