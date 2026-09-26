@@ -1,0 +1,447 @@
+{
+  "title": "Security & privacy settings",
+  "url": "https://fixtures.test/shortlist-settings.html",
+  "loading": false,
+  "text": "Home Products Pricing Blog Help Sign in Settings Email notifications Push notifications SMS alerts Weekly digest Product updates Marketing emails Dark mode Compact layout Show online status Read receipts Autoplay videos High contrast Reduce motion Two-factor authentication Login alerts Remember this device Public profile Search engine indexing Personalized ads Usage analytics Crash reports Beta features Keyboard shortcuts Sound effects Auto-update Save changes Privacy Terms Contact us © 2026 Example Inc.",
+  "elements": [
+    {
+      "role": "link",
+      "name": "Home",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Products",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Pricing",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Blog",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Help",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Sign in",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Email notifications",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Push notifications",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " SMS alerts",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Weekly digest",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Product updates",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Marketing emails",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Dark mode",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Compact layout",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Show online status",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Read receipts",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Autoplay videos",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " High contrast",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Reduce motion",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Two-factor authentication",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Login alerts",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Remember this device",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Public profile",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Search engine indexing",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Personalized ads",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Usage analytics",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Crash reports",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Beta features",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Keyboard shortcuts",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Sound effects",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "switch",
+      "name": " Auto-update",
+      "description": "",
+      "tag": "input",
+      "value": null,
+      "states": [
+        "checked:false"
+      ],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "Save changes",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Privacy",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Terms",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "link",
+      "name": "Contact us",
+      "description": "",
+      "tag": "a",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}

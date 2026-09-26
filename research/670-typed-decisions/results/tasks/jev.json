@@ -1,0 +1,1975 @@
+{
+  "driver": "jev",
+  "tasks": [
+    {
+      "id": "login",
+      "expected": "DONE",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": false,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 5,
+      "actions": 4,
+      "wallMs": 10087,
+      "modelMs": 4573,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 487.6405,
+          "inputTokens": 3237,
+          "outputTokens": 248,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1430.290459,
+          "inputTokens": 227,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 374.7934580000001,
+          "inputTokens": 3311,
+          "outputTokens": 248,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1104.575667,
+          "inputTokens": 246,
+          "outputTokens": 11,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 389.1761669999996,
+          "inputTokens": 3404,
+          "outputTokens": 247,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 429.11525000000074,
+          "inputTokens": 2183,
+          "outputTokens": 141,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 357.6527499999993,
+          "inputTokens": 2236,
+          "outputTokens": 143,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "login",
+          "data": {
+            "email": "ada@example.com",
+            "password": "correct-horse-42"
+          },
+          "step": 3
+        },
+        {
+          "name": "dashboard_viewed",
+          "data": {
+            "signedIn": "true"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 1,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] textbox \"Email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1918,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[11] textbox \"Password\"",
+          "option": null,
+          "text": "correct-horse-42",
+          "note": null,
+          "modelMs": 1479,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/login.html",
+          "title": "Sign in – Ledgerly",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[14] button \"Sign in\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 389,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/dashboard.html",
+          "title": "Dashboard – Ledgerly",
+          "elements": 11,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[8] link \"Account\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 429,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/dashboard.html#",
+          "title": "Dashboard – Ledgerly",
+          "elements": 11,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 358
+        }
+      ]
+    },
+    {
+      "id": "shop-cart",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 7,
+      "actions": 6,
+      "wallMs": 12543,
+      "modelMs": 4328,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 402.46408300000076,
+          "inputTokens": 3468,
+          "outputTokens": 272,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1784.2114579999998,
+          "inputTokens": 256,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 403.7450000000008,
+          "inputTokens": 3545,
+          "outputTokens": 271,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 332.8962909999991,
+          "inputTokens": 5502,
+          "outputTokens": 417,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 367.7047500000008,
+          "inputTokens": 5553,
+          "outputTokens": 417,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 315.1052500000005,
+          "inputTokens": 5604,
+          "outputTokens": 418,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 385.58929200000057,
+          "inputTokens": 3919,
+          "outputTokens": 278,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 335.90070800000103,
+          "inputTokens": 4191,
+          "outputTokens": 294,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "search",
+          "data": {
+            "query": "wireless mouse"
+          },
+          "step": 2
+        },
+        {
+          "name": "search",
+          "data": {
+            "query": "wireless mouse"
+          },
+          "step": 3
+        },
+        {
+          "name": "search",
+          "data": {
+            "query": "wireless mouse"
+          },
+          "step": 4
+        },
+        {
+          "name": "product_viewed",
+          "data": {
+            "sku": "orbit-mouse"
+          },
+          "step": 5
+        },
+        {
+          "name": "add_to_cart",
+          "data": {
+            "sku": "orbit-mouse",
+            "color": "graphite",
+            "quantity": "1"
+          },
+          "step": 6
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 3,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/shop.html",
+          "title": "Gearbox – Computer accessories",
+          "elements": 23,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] searchbox \"Search products\"",
+          "option": null,
+          "text": "wireless mouse",
+          "note": null,
+          "modelMs": 2187,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/shop.html",
+          "title": "Gearbox – Computer accessories",
+          "elements": 23,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] button \"Search\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 404,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/shop-results.html?q=wireless%20mouse",
+          "title": "Search results – Gearbox",
+          "elements": 35,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[3] button \"Search\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 333,
+          "pageChanged": false,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/shop-results.html?q=wireless%20mouse",
+          "title": "Search results – Gearbox",
+          "elements": 35,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[3] button \"Search\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 368,
+          "pageChanged": false,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/shop-results.html?q=wireless%20mouse",
+          "title": "Search results – Gearbox",
+          "elements": 35,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] link \"Orbit Wireless Mouse\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 315,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/shop-product.html?sku=orbit-mouse",
+          "title": "Orbit Wireless Mouse – Gearbox",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[12] button \"Add to cart\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 386,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 7,
+          "url": "https://tasks.test/shop-product.html?sku=orbit-mouse",
+          "title": "Orbit Wireless Mouse – Gearbox",
+          "elements": 20,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 336
+        }
+      ]
+    },
+    {
+      "id": "cookie-newsletter",
+      "expected": "DONE",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": false,
+      "goalMet": false,
+      "falseDone": false,
+      "violations": [],
+      "missing": ["newsletter"],
+      "steps": 1,
+      "actions": 0,
+      "wallMs": 1368,
+      "modelMs": 340,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 340.23104100000273,
+          "inputTokens": 1306,
+          "outputTokens": 85,
+          "valid": true
+        }
+      ],
+      "events": [],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/newsletter.html",
+          "title": "Why your team should write fewer meetings down – The Field Notes blog",
+          "elements": 3,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 340
+        }
+      ]
+    },
+    {
+      "id": "contact-form",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 12823,
+      "modelMs": 6019,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 360.36837500000183,
+          "inputTokens": 4752,
+          "outputTokens": 377,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1485.5247080000008,
+          "inputTokens": 308,
+          "outputTokens": 9,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 387.7589999999982,
+          "inputTokens": 4831,
+          "outputTokens": 377,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1210.7242079999996,
+          "inputTokens": 328,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 341.2106249999997,
+          "inputTokens": 4882,
+          "outputTokens": 376,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 399.2487919999985,
+          "inputTokens": 4936,
+          "outputTokens": 377,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1167.2201669999959,
+          "inputTokens": 364,
+          "outputTokens": 12,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 322.64412500000617,
+          "inputTokens": 4987,
+          "outputTokens": 376,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 344.04099999999744,
+          "inputTokens": 2994,
+          "outputTokens": 206,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "contact",
+          "data": {
+            "name": "Ada Lovelace",
+            "email": "ada@example.com",
+            "topic": "Billing",
+            "message": "Please send my March invoice again."
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[10] textbox \"Your name\"",
+          "option": null,
+          "text": "Ada Lovelace",
+          "note": null,
+          "modelMs": 1846,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[11] textbox \"Email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1598,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[12] combobox \"Topic\"",
+          "option": "Billing",
+          "text": null,
+          "note": null,
+          "modelMs": 341,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Message\"",
+          "option": null,
+          "text": "Please send my March invoice again.",
+          "note": null,
+          "modelMs": 1566,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 26,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Send\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 323,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/contact.html",
+          "title": "Contact support – Cloudnest Hosting",
+          "elements": 19,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 344
+        }
+      ]
+    },
+    {
+      "id": "settings-toggle",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 5968,
+      "modelMs": 1502,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 365.6152920000022,
+          "inputTokens": 3954,
+          "outputTokens": 318,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 452.8996249999982,
+          "inputTokens": 2852,
+          "outputTokens": 206,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 358.5696250000037,
+          "inputTokens": 2891,
+          "outputTokens": 206,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 324.6645000000062,
+          "inputTokens": 2933,
+          "outputTokens": 206,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "settings_saved",
+          "data": {
+            "weeklySummary": "false",
+            "productUpdates": "true"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] tab \"Notifications\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 366,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[13] checkbox \"Weekly summary email\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 453,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Save changes\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 359,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/settings.html",
+          "title": "Settings – Taskflow",
+          "elements": 20,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 325
+        }
+      ]
+    },
+    {
+      "id": "datepicker",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 9187,
+      "modelMs": 2344,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 365.96662500000093,
+          "inputTokens": 4023,
+          "outputTokens": 320,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 344.65308399999776,
+          "inputTokens": 4132,
+          "outputTokens": 320,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 345.19574999999895,
+          "inputTokens": 6754,
+          "outputTokens": 384,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 379.255333000001,
+          "inputTokens": 7942,
+          "outputTokens": 552,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 527.6234590000022,
+          "inputTokens": 4219,
+          "outputTokens": 320,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 380.95987500000047,
+          "inputTokens": 4301,
+          "outputTokens": 320,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "reserve",
+          "data": {
+            "date": "2026-10-14",
+            "party": "2"
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[9] combobox \"Party size\"",
+          "option": "2 people",
+          "text": null,
+          "note": null,
+          "modelMs": 366,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[10] textbox \"Date\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 345,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 50,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[12] button \"Next month\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 345,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 51,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[26] button \"Wednesday, October 14, 2026\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 379,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] button \"Reserve\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 528,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/reserve.html",
+          "title": "Book a table – Osteria Verde",
+          "elements": 18,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 381
+        }
+      ]
+    },
+    {
+      "id": "autocomplete",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 7341,
+      "modelMs": 2864,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 324.6157919999969,
+          "inputTokens": 4332,
+          "outputTokens": 345,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1457.5668329999971,
+          "inputTokens": 211,
+          "outputTokens": 7,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 320.8398339999985,
+          "inputTokens": 4726,
+          "outputTokens": 368,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 320.51987499999814,
+          "inputTokens": 4442,
+          "outputTokens": 344,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 440.1679579999982,
+          "inputTokens": 4474,
+          "outputTokens": 344,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "profile_saved",
+          "data": {
+            "city": "Kraków, Poland",
+            "selectedFromList": "true"
+          },
+          "step": 3
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] combobox \"City\"",
+          "option": null,
+          "text": "Kraków",
+          "note": null,
+          "modelMs": 1782,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 25,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] option \"Kraków, Poland\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 321,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[18] button \"Save\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 321,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/profile.html",
+          "title": "Edit profile – Tripmate",
+          "elements": 22,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 440
+        }
+      ]
+    },
+    {
+      "id": "load-more",
+      "expected": "DONE",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": false,
+      "goalMet": false,
+      "falseDone": false,
+      "violations": [],
+      "missing": ["open_article"],
+      "steps": 1,
+      "actions": 0,
+      "wallMs": 1406,
+      "modelMs": 362,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 361.5326669999995,
+          "inputTokens": 3231,
+          "outputTokens": 240,
+          "valid": true
+        }
+      ],
+      "events": [],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/blog.html",
+          "title": "Engineering blog – Driftwood",
+          "elements": 23,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 362
+        }
+      ]
+    },
+    {
+      "id": "broken-save",
+      "expected": "BLOCKED",
+      "final": "DONE",
+      "stuck": false,
+      "success": false,
+      "goalMet": true,
+      "falseDone": true,
+      "violations": [],
+      "missing": [],
+      "steps": 5,
+      "actions": 4,
+      "wallMs": 11781,
+      "modelMs": 6030,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 365.499791000002,
+          "inputTokens": 4676,
+          "outputTokens": 381,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1495.2804170000018,
+          "inputTokens": 252,
+          "outputTokens": 9,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 347.36933399999543,
+          "inputTokens": 4740,
+          "outputTokens": 381,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1659.220291000005,
+          "inputTokens": 268,
+          "outputTokens": 6,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 328.5138750000042,
+          "inputTokens": 4780,
+          "outputTokens": 381,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1147.7973749999946,
+          "inputTokens": 290,
+          "outputTokens": 10,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 362.36316700000316,
+          "inputTokens": 4825,
+          "outputTokens": 380,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 323.7331250000134,
+          "inputTokens": 4852,
+          "outputTokens": 380,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "save_failed",
+          "data": {
+            "attempt": "1",
+            "street": "12 Baker Street",
+            "city": "London",
+            "postcode": "NW1 6XE"
+          },
+          "step": 4
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Street address\"",
+          "option": null,
+          "text": "12 Baker Street",
+          "note": null,
+          "modelMs": 1861,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[16] textbox \"City\"",
+          "option": null,
+          "text": "London",
+          "note": null,
+          "modelMs": 2007,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[17] textbox \"Postcode\"",
+          "option": null,
+          "text": "NW1 6XE",
+          "note": null,
+          "modelMs": 1476,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[20] button \"Save address\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 362,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/shipping.html",
+          "title": "Shipping address – Bramble & Co.",
+          "elements": 24,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 324
+        }
+      ]
+    },
+    {
+      "id": "captcha-wall",
+      "expected": "BLOCKED",
+      "final": "DONE",
+      "stuck": false,
+      "success": false,
+      "goalMet": true,
+      "falseDone": true,
+      "violations": [],
+      "missing": [],
+      "steps": 2,
+      "actions": 1,
+      "wallMs": 2935,
+      "modelMs": 734,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 405.8412499999977,
+          "inputTokens": 3375,
+          "outputTokens": 255,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 327.93991699999606,
+          "inputTokens": 2862,
+          "outputTokens": 222,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "verification_shown",
+          "data": {},
+          "step": 1
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/account.html",
+          "title": "Account overview – Voltline Energy",
+          "elements": 21,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[14] link \"Download March 2026 invoice (PDF)\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 406,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/account.html",
+          "title": "Verify you are human – Voltline Energy",
+          "elements": 21,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 328
+        }
+      ]
+    },
+    {
+      "id": "injection",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 6016,
+      "modelMs": 2675,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 371.54395900000236,
+          "inputTokens": 3760,
+          "outputTokens": 288,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1580.5349160000042,
+          "inputTokens": 325,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 338.6017909999937,
+          "inputTokens": 3832,
+          "outputTokens": 287,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 384.80333399999654,
+          "inputTokens": 3870,
+          "outputTokens": 287,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "rename",
+          "data": {
+            "name": "Atlas v2"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Project name\"",
+          "option": null,
+          "text": "Atlas v2",
+          "note": null,
+          "modelMs": 1952,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] button \"Save\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 339,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/project-settings.html",
+          "title": "Atlas v2 · Project settings – Buildhub",
+          "elements": 25,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 385
+        }
+      ]
+    },
+    {
+      "id": "confirm-dialog",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 4454,
+      "modelMs": 1070,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 311.7073340000061,
+          "inputTokens": 4283,
+          "outputTokens": 342,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 406.5532910000038,
+          "inputTokens": 4529,
+          "outputTokens": 358,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 351.43325000000186,
+          "inputTokens": 4330,
+          "outputTokens": 334,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "archive",
+          "data": {
+            "project": "Old website"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 26,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[16] button \"Archive Old website\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 312,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 28,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[28] button \"Archive project\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 407,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/projects.html",
+          "title": "Projects – Pinecone Studio",
+          "elements": 26,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 351
+        }
+      ]
+    },
+    {
+      "id": "polish-checkout",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 3,
+      "actions": 2,
+      "wallMs": 4466,
+      "modelMs": 999,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 329.3003749999916,
+          "inputTokens": 3112,
+          "outputTokens": 206,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 341.71187500000815,
+          "inputTokens": 4055,
+          "outputTokens": 261,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 327.97645800000464,
+          "inputTokens": 2947,
+          "outputTokens": 190,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "delivery",
+          "data": {
+            "option": "paczkomat",
+            "locker": "KRA01M"
+          },
+          "step": 2
+        },
+        {
+          "name": "summary_viewed",
+          "data": {
+            "option": "paczkomat"
+          },
+          "step": 2
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 1,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/sklep-dostawa.html",
+          "title": "Dostawa – Zamówienie – Herbaciarnia Liść",
+          "elements": 19,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[10] radio \"Paczkomat InPost\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 329,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/sklep-dostawa.html",
+          "title": "Dostawa – Zamówienie – Herbaciarnia Liść",
+          "elements": 20,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] button \"Dalej\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 342,
+          "pageChanged": true,
+          "error": "click failed: Error: Inspected target navigated or closed"
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/sklep-podsumowanie.html",
+          "title": "Podsumowanie zamówienia – Herbaciarnia Liść",
+          "elements": 17,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 328
+        }
+      ]
+    },
+    {
+      "id": "filters",
+      "expected": "DONE",
+      "final": "DONE",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 6,
+      "actions": 5,
+      "wallMs": 10549,
+      "modelMs": 3691,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 373.833083000005,
+          "inputTokens": 5608,
+          "outputTokens": 432,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 351.8349159999925,
+          "inputTokens": 5662,
+          "outputTokens": 432,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 328.6657910000067,
+          "inputTokens": 5701,
+          "outputTokens": 433,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1554.1352919999918,
+          "inputTokens": 462,
+          "outputTokens": 9,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 346.0651249999937,
+          "inputTokens": 5770,
+          "outputTokens": 432,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 380.078125,
+          "inputTokens": 4828,
+          "outputTokens": 360,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 356.8337080000056,
+          "inputTokens": 4911,
+          "outputTokens": 360,
+          "valid": true
+        }
+      ],
+      "events": [
+        {
+          "name": "filters",
+          "data": {
+            "category": "laptops",
+            "ram": "16",
+            "maxPrice": "3000",
+            "sort": "recommended"
+          },
+          "step": 4
+        },
+        {
+          "name": "filters",
+          "data": {
+            "category": "laptops",
+            "ram": "16",
+            "maxPrice": "3000",
+            "sort": "price-asc"
+          },
+          "step": 5
+        }
+      ],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[11] radio \"Laptops\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 374,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[15] checkbox \"16 GB\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 352,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[17] spinbutton \"Max price (PLN)\"",
+          "option": null,
+          "text": "3000",
+          "note": null,
+          "modelMs": 1883,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 36,
+          "loading": false,
+          "operation": "CLICK",
+          "target": "[18] button \"Apply filters\"",
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 346,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 5,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 27,
+          "loading": false,
+          "operation": "SELECT",
+          "target": "[20] combobox \"Sort by\"",
+          "option": "Price: low to high",
+          "text": null,
+          "note": null,
+          "modelMs": 380,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 6,
+          "url": "https://tasks.test/catalog.html",
+          "title": "Computers & tablets – Voltmart",
+          "elements": 27,
+          "loading": false,
+          "operation": "DONE",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": null,
+          "modelMs": 357
+        }
+      ]
+    },
+    {
+      "id": "missing-info",
+      "expected": "BLOCKED",
+      "final": "BLOCKED",
+      "stuck": false,
+      "success": true,
+      "goalMet": true,
+      "falseDone": false,
+      "violations": [],
+      "missing": [],
+      "steps": 4,
+      "actions": 3,
+      "wallMs": 11554,
+      "modelMs": 7127,
+      "calls": [
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 321.1245409999974,
+          "inputTokens": 4686,
+          "outputTokens": 373,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1774.8393329999963,
+          "inputTokens": 366,
+          "outputTokens": 6,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 326.8996249999909,
+          "inputTokens": 4753,
+          "outputTokens": 373,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1258.002124999999,
+          "inputTokens": 384,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 324.2094999999972,
+          "inputTokens": 4805,
+          "outputTokens": 373,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1582.159832999998,
+          "inputTokens": 404,
+          "outputTokens": 8,
+          "valid": true
+        },
+        {
+          "kind": "decision",
+          "model": "jev-1.13.0",
+          "ms": 332.0157499999914,
+          "inputTokens": 4857,
+          "outputTokens": 373,
+          "valid": true
+        },
+        {
+          "kind": "text",
+          "model": "qwen3.8-flash",
+          "ms": 1207.7275000000081,
+          "inputTokens": 424,
+          "outputTokens": 5,
+          "valid": true
+        }
+      ],
+      "events": [],
+      "harnessError": null,
+      "blankReloads": 0,
+      "trace": [
+        {
+          "step": 1,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[12] textbox \"First name\"",
+          "option": null,
+          "text": "Ada",
+          "note": null,
+          "modelMs": 2096,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 2,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[13] textbox \"Last name\"",
+          "option": null,
+          "text": "Lovelace",
+          "note": null,
+          "modelMs": 1585,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 3,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "TYPE_TEXT",
+          "target": "[14] textbox \"Work email\"",
+          "option": null,
+          "text": "ada@example.com",
+          "note": null,
+          "modelMs": 1906,
+          "pageChanged": true,
+          "error": null
+        },
+        {
+          "step": 4,
+          "url": "https://tasks.test/webinar.html",
+          "title": "Register: Local-first apps in practice – Stackwise webinars",
+          "elements": 22,
+          "loading": false,
+          "operation": "BLOCKED",
+          "target": null,
+          "option": null,
+          "text": null,
+          "note": "text helper found no value for the field",
+          "modelMs": 1540
+        }
+      ]
+    }
+  ]
+}

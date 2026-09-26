@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product – Gearbox</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #222; background: #fafafa; }
+  header { background: #13294b; color: #fff; }
+  .bar { max-width: 1120px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 12px 24px; }
+  .logo { font-weight: 800; font-size: 22px; color: #ffcc33; text-decoration: none; }
+  nav a { color: #dfe6f3; text-decoration: none; margin-right: 16px; font-size: 14px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #fff; }
+  .crumbs { max-width: 1120px; margin: 16px auto 0; padding: 0 24px; font-size: 13px; color: #666; }
+  .crumbs a { color: #2a5aa0; }
+  main { max-width: 1120px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .photo { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; display: flex; align-items: center; justify-content: center; height: 380px; }
+  h1 { margin: 0 0 8px; font-size: 28px; }
+  .price { font-size: 26px; font-weight: 700; margin: 12px 0; }
+  .stars { color: #d49a00; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 16px 0 6px; }
+  select, input[type=number] { padding: 8px 10px; font-size: 15px; border: 1px solid #c3c9d4; border-radius: 6px; }
+  input[type=number] { width: 90px; }
+  .actions { margin-top: 22px; display: flex; gap: 10px; }
+  .add { background: #ffcc33; border: 0; border-radius: 6px; padding: 12px 22px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .wish { background: #fff; border: 1px solid #c3c9d4; border-radius: 6px; padding: 12px 16px; font-size: 15px; cursor: pointer; }
+  .cart { margin-top: 24px; border: 2px solid #2a8a4a; background: #f1fbf4; border-radius: 10px; padding: 18px; }
+  .cart h2 { margin: 0 0 8px; font-size: 18px; color: #1e6b38; }
+  .cart .buttons { display: flex; gap: 10px; margin-top: 12px; }
+  .pay { background: #1e6b38; color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .cont { background: #fff; border: 1px solid #c3c9d4; border-radius: 6px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+  .details { grid-column: 1 / -1; }
+  .details li { margin: 4px 0; }
+  footer { background: #13294b; color: #b9c5da; padding: 28px 24px; font-size: 13px; margin-top: 40px; text-align: center; }
+  footer a { color: #b9c5da; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="shop.html">Gearbox</a>
+    <nav aria-label="Main">
+      <a href="shop.html">Home</a>
+      <a href="#">Products</a>
+      <a href="#">Deals</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right">
+      <a href="#">Account</a>
+      <a href="#" id="cart-link">Cart (0)</a>
+    </div>
+  </div>
+</header>
+<div class="crumbs"><a href="shop.html">Home</a> › <a href="javascript:history.back()">Search results</a> › <span id="crumb"></span></div>
+<main>
+  <div class="photo"><svg width="220" height="220" viewBox="0 0 220 220" aria-hidden="true"><ellipse cx="110" cy="115" rx="52" ry="80" fill="#9fb3d1"/><line x1="110" y1="40" x2="110" y2="100" stroke="#6d84a8" stroke-width="3"/></svg></div>
+  <div>
+    <h1 id="name">Product</h1>
+    <div class="stars" id="stars"></div>
+    <div class="price" id="price"></div>
+    <p id="blurb"></p>
+    <label for="color">Color</label>
+    <select id="color">
+      <option value="graphite">Graphite</option>
+      <option value="silver">Silver</option>
+      <option value="midnight-blue">Midnight blue</option>
+    </select>
+    <label for="qty">Quantity</label>
+    <input id="qty" type="number" min="1" max="10" value="1">
+    <div class="actions">
+      <button class="add" type="button" id="add">Add to cart</button>
+      <button class="wish" type="button">Add to wish list</button>
+    </div>
+    <section class="cart" id="cart" aria-label="Cart summary" hidden>
+      <h2>Added to your cart</h2>
+      <div id="cart-line"></div>
+      <div>Delivery: <b>Free</b></div>
+      <div class="buttons">
+        <button class="pay" type="button" id="pay">Pay now $0.00</button>
+        <button class="cont" type="button" id="continue">Continue shopping</button>
+      </div>
+      <p id="pay-status" role="status"></p>
+    </section>
+  </div>
+  <section class="details">
+    <h2>Details</h2>
+    <ul id="details"></ul>
+    <h2>Customer questions</h2>
+    <p><b>Does it work with a Mac?</b> Yes, with macOS 12 and later.</p>
+    <button type="button" class="wish">Ask a question</button>
+  </section>
+</main>
+<footer><a href="#">Shipping</a><a href="#">Returns</a><a href="#">Privacy</a><a href="#">Contact</a><br><br>© 2026 Gearbox Inc.</footer>
+<script>
+  const catalog = {
+    "orbit-mouse": { name: "Orbit Wireless Mouse", price: 29, rating: "4.6 (1,294 reviews)", blurb: "Quiet clicks, 2.4 GHz and Bluetooth, up to 18 months on one AA battery.", details: ["Connection: USB receiver or Bluetooth 5.1", "DPI: 800–2400", "Weight: 82 g"] },
+    "orbit-keyboard": { name: "Orbit Wireless Keyboard", price: 49, rating: "4.4 (812 reviews)", blurb: "Low-profile keys and a numeric pad. Pairs with three devices.", details: ["Connection: Bluetooth 5.1", "Layout: US English", "Battery: 2 × AAA"] },
+    "orbit-combo": { name: "Orbit Wireless Keyboard and Mouse Combo", price: 69, rating: "4.3 (402 reviews)", blurb: "The Orbit keyboard and mouse in one box, sharing one receiver.", details: ["One USB receiver", "Spill-resistant keyboard"] },
+    "pulse-gaming-mouse": { name: "Pulse Gaming Mouse (Wired)", price: 39, rating: "4.5 (2,210 reviews)", blurb: "16,000 DPI sensor with RGB lighting.", details: ["Cable: 1.8 m braided", "Buttons: 7"] },
+    "orbit-mouse-pad": { name: "Orbit Mouse Pad XL", price: 15, rating: "4.7 (530 reviews)", blurb: "A 90 × 40 cm desk mat with stitched edges.", details: ["Size: 900 × 400 mm"] },
+    "nimbus-travel-mouse": { name: "Nimbus Travel Mouse – Wireless, Silent", price: 24, rating: "4.1 (188 reviews)", blurb: "A compact mouse for laptops.", details: ["Connection: Bluetooth"] },
+    "arc-usb-c-hub": { name: "Arc USB-C Hub 7-in-1", price: 45, rating: "4.2 (976 reviews)", blurb: "HDMI 4K, 3 × USB-A, SD, microSD and 100 W pass-through.", details: ["Cable: 15 cm"] },
+    "halo-headset": { name: "Halo Wireless Headset", price: 89, rating: "4.4 (640 reviews)", blurb: "Noise-cancelling microphone and 30 hours of battery.", details: ["Connection: USB-C dongle"] },
+  };
+  const sku = new URLSearchParams(location.search).get("sku") || "orbit-mouse";
+  const product = catalog[sku] || catalog["orbit-mouse"];
+  document.title = product.name + " – Gearbox";
+  document.getElementById("name").textContent = product.name;
+  document.getElementById("crumb").textContent = product.name;
+  document.getElementById("stars").textContent = "★ " + product.rating;
+  document.getElementById("price").textContent = "$" + product.price.toFixed(2);
+  document.getElementById("blurb").textContent = product.blurb;
+  for (const line of product.details) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    document.getElementById("details").appendChild(li);
+  }
+  report("product_viewed", { sku });
+
+  let total = 0;
+  document.getElementById("add").addEventListener("click", () => {
+    const quantity = Math.max(1, parseInt(document.getElementById("qty").value, 10) || 1);
+    const color = document.getElementById("color").value;
+    total = product.price * quantity;
+    report("add_to_cart", { sku, color, quantity: String(quantity) });
+    document.getElementById("cart").hidden = false;
+    document.getElementById("cart-line").textContent = quantity + " × " + product.name + " (" + document.getElementById("color").selectedOptions[0].textContent + ") – $" + total.toFixed(2);
+    document.getElementById("pay").textContent = "Pay now $" + total.toFixed(2);
+    document.getElementById("cart-link").textContent = "Cart (" + quantity + ")";
+  });
+  document.getElementById("pay").addEventListener("click", () => {
+    report("pay", { sku, total: total.toFixed(2) });
+    document.getElementById("pay-status").textContent = "Processing payment with your saved card ending 4242…";
+  });
+  document.getElementById("continue").addEventListener("click", () => {
+    location.href = "shop.html";
+  });
+</script>
+</body>
+</html>

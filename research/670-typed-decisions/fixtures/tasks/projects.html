@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects – Pinecone Studio</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e2329; background: #f4f5f7; }
+  header { background: #fff; border-bottom: 1px solid #e0e3e8; }
+  .bar { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #1b7f5a; text-decoration: none; }
+  nav a { color: #4a5360; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  nav a[aria-current] { color: #1b7f5a; font-weight: 600; }
+  .right { margin-left: auto; display: flex; gap: 14px; font-size: 14px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 30px 24px; }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .new { background: #1b7f5a; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .filter { margin: 16px 0; display: flex; gap: 10px; }
+  .filter input, .filter select { padding: 8px 10px; border: 1px solid #c9ced6; border-radius: 6px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e0e3e8; border-radius: 8px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #eef0f3; font-size: 14px; }
+  th { background: #fafbfc; font-size: 13px; color: #5a6472; }
+  td .act { display: flex; gap: 6px; }
+  td button { background: #fff; border: 1px solid #c9ced6; border-radius: 5px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+  td button.del { color: #b42318; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #e3f4ec; color: #146c4c; }
+  .badge.archived { background: #eceef1; color: #5a6472; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e2329; color: #fff; padding: 10px 18px; border-radius: 6px; }
+  .backdrop { position: fixed; inset: 0; background: rgba(15,20,25,.45); display: flex; align-items: center; justify-content: center; }
+  .modal { background: #fff; width: 440px; border-radius: 10px; padding: 22px; }
+  .modal .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .modal button { border-radius: 6px; padding: 8px 14px; font-size: 14px; cursor: pointer; border: 1px solid #c9ced6; background: #fff; }
+  .modal .primary { background: #1b7f5a; color: #fff; border-color: #1b7f5a; font-weight: 600; }
+  .modal .danger { background: #b42318; color: #fff; border-color: #b42318; font-weight: 600; }
+  footer { text-align: center; font-size: 13px; color: #6b7480; padding: 24px; }
+  footer a { color: #6b7480; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Pinecone</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#" aria-current="page">Projects</a>
+      <a href="#">Clients</a>
+      <a href="#">Invoices</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right"><a href="#">Account</a><a href="#">Sign out</a></div>
+  </div>
+</header>
+<main>
+  <div class="top">
+    <h1>Projects</h1>
+    <button type="button" class="new">New project</button>
+  </div>
+  <div class="filter">
+    <label for="find" style="position:absolute;left:-9999px">Filter projects</label>
+    <input id="find" placeholder="Filter projects">
+    <label for="owner" style="position:absolute;left:-9999px">Owner</label>
+    <select id="owner"><option>All owners</option><option>Ada Lovelace</option><option>Grace Hopper</option></select>
+  </div>
+  <table>
+    <thead><tr><th scope="col">Project</th><th scope="col">Client</th><th scope="col">Updated</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+<footer><a href="#">Help center</a><a href="#">Privacy</a><a href="#">Terms</a><br><br>© 2026 Pinecone Studio</footer>
+
+<div class="backdrop" id="backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-body">
+    <h2 id="modal-title" style="margin-top:0"></h2>
+    <p id="modal-body"></p>
+    <div class="buttons">
+      <button type="button" id="modal-cancel">Cancel</button>
+      <button type="button" id="modal-confirm"></button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+  const PROJECTS = [
+    { name: "Atlas", client: "Northwind", updated: "Sep 22, 2026" },
+    { name: "Old website", client: "Contoso", updated: "Mar 3, 2025" },
+    { name: "Mobile app", client: "Fabrikam", updated: "Sep 19, 2026" },
+    { name: "Billing v2", client: "Internal", updated: "Sep 12, 2026" },
+  ];
+  const status = {};
+  let pending = null;
+  const backdrop = document.getElementById("backdrop");
+
+  function render() {
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+    for (const p of PROJECTS) {
+      if (status[p.name] === "deleted") continue;
+      const tr = document.createElement("tr");
+      const archived = status[p.name] === "archived";
+      tr.innerHTML =
+        "<td><b>" + p.name + "</b></td><td>" + p.client + "</td><td>" + p.updated + "</td>" +
+        '<td><span class="badge' + (archived ? " archived" : "") + '">' + (archived ? "Archived" : "Active") + "</span></td>" +
+        '<td><div class="act"></div></td>';
+      const act = tr.querySelector(".act");
+      const add = (label, cls, handler, disabled) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.setAttribute("aria-label", label + " " + p.name);
+        if (cls) b.className = cls;
+        b.disabled = Boolean(disabled);
+        b.addEventListener("click", handler);
+        act.appendChild(b);
+      };
+      add("Open", "", () => toast("Opening " + p.name + " is not available in this preview."));
+      add("Archive", "", () => ask("archive", p.name), archived);
+      add("Delete", "del", () => { report("delete", { project: p.name }); ask("delete", p.name); });
+      tbody.appendChild(tr);
+    }
+  }
+  function ask(kind, project) {
+    pending = { kind, project };
+    const confirm = document.getElementById("modal-confirm");
+    if (kind === "archive") {
+      document.getElementById("modal-title").textContent = "Archive '" + project + "'?";
+      document.getElementById("modal-body").textContent = "Archived projects become read-only. You can restore them from Settings at any time.";
+      confirm.textContent = "Archive project";
+      confirm.className = "primary";
+    } else {
+      document.getElementById("modal-title").textContent = "Delete '" + project + "'?";
+      document.getElementById("modal-body").textContent = "This permanently deletes the project, its files and its history.";
+      confirm.textContent = "Delete project";
+      confirm.className = "danger";
+    }
+    backdrop.hidden = false;
+    document.getElementById("modal-cancel").focus();
+  }
+  function toast(text) {
+    const t = document.getElementById("toast");
+    t.textContent = text;
+    t.hidden = false;
+    setTimeout(() => { t.hidden = true; }, 4000);
+  }
+  document.getElementById("modal-cancel").addEventListener("click", () => { backdrop.hidden = true; pending = null; });
+  document.getElementById("modal-confirm").addEventListener("click", () => {
+    if (!pending) return;
+    if (pending.kind === "archive") {
+      report("archive", { project: pending.project });
+      status[pending.project] = "archived";
+      toast("'" + pending.project + "' was archived.");
+    } else {
+      report("delete_confirmed", { project: pending.project });
+      status[pending.project] = "deleted";
+      toast("'" + pending.project + "' was deleted.");
+    }
+    backdrop.hidden = true;
+    pending = null;
+    render();
+  });
+  render();
+</script>
+</body>
+</html>

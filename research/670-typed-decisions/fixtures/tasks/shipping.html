@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipping address – Bramble &amp; Co.</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #26221e; background: #f8f5f0; }
+  header { background: #fff; border-bottom: 1px solid #e7e0d5; }
+  .bar { max-width: 1060px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 14px 24px; }
+  .logo { font-family: Georgia, serif; font-size: 22px; color: #5b3a29; text-decoration: none; }
+  nav a { color: #5c544b; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  .right { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  .right a { color: #5b3a29; }
+  main { max-width: 1060px; margin: 0 auto; padding: 32px 24px; display: grid; grid-template-columns: 220px 1fr; gap: 32px; }
+  aside a { display: block; padding: 8px 12px; border-radius: 6px; color: #5c544b; text-decoration: none; }
+  aside a[aria-current] { background: #fff; color: #5b3a29; font-weight: 600; }
+  .card { background: #fff; border: 1px solid #e7e0d5; border-radius: 10px; padding: 26px; }
+  .current { background: #faf7f2; border: 1px dashed #d6cbb9; padding: 12px 14px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
+  .field { margin-bottom: 16px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  input, select { width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid #cfc5b6; border-radius: 6px; background: #fff; }
+  .actions { display: flex; gap: 10px; margin-top: 6px; }
+  .save { background: #5b3a29; color: #fff; border: 0; border-radius: 6px; padding: 11px 24px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .save:disabled { opacity: .6; cursor: progress; }
+  .cancel { background: #fff; border: 1px solid #cfc5b6; border-radius: 6px; padding: 11px 18px; font-size: 15px; cursor: pointer; }
+  .alert { margin-top: 16px; background: #fdecea; border: 1px solid #f1b5ae; color: #8c1d13; padding: 12px 14px; border-radius: 8px; }
+  footer { text-align: center; font-size: 13px; color: #7a7066; padding: 24px; }
+  footer a { color: #7a7066; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Bramble &amp; Co.</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Shop</a>
+      <a href="#">Gifts</a>
+      <a href="#">Journal</a>
+      <a href="#">Help</a>
+    </nav>
+    <div class="right"><a href="#">Account</a><a href="#">Basket (2)</a></div>
+  </div>
+</header>
+<main>
+  <aside aria-label="Account menu">
+    <a href="#">Orders</a>
+    <a href="#" aria-current="page">Addresses</a>
+    <a href="#">Payment methods</a>
+    <a href="#">Subscriptions</a>
+    <a href="#">Sign out</a>
+  </aside>
+  <section class="card">
+    <h1 style="margin-top:0">Shipping address</h1>
+    <div class="current">Current address: 221 Hill Road, Manchester M4 1AB, United Kingdom</div>
+    <form id="address-form" novalidate>
+      <div class="field"><label for="street">Street address</label><input id="street" autocomplete="address-line1" value="221 Hill Road"></div>
+      <div class="field"><label for="street2">Apartment, suite, etc. (optional)</label><input id="street2" autocomplete="address-line2"></div>
+      <div class="two">
+        <div class="field"><label for="city">City</label><input id="city" autocomplete="address-level2" value="Manchester"></div>
+        <div class="field"><label for="postcode">Postcode</label><input id="postcode" autocomplete="postal-code" value="M4 1AB"></div>
+      </div>
+      <div class="field"><label for="country">Country</label>
+        <select id="country" autocomplete="country-name">
+          <option>United Kingdom</option><option>Ireland</option><option>France</option><option>Germany</option><option>Poland</option><option>United States</option>
+        </select></div>
+      <div class="field"><label><input type="checkbox" id="default" checked style="width:auto"> Use as my default billing address</label></div>
+      <div class="actions">
+        <button type="submit" class="save" id="save">Save address</button>
+        <button type="button" class="cancel">Cancel</button>
+      </div>
+      <div class="alert" id="alert" role="alert" hidden></div>
+    </form>
+  </section>
+</main>
+<footer><a href="#">Delivery</a><a href="#">Returns</a><a href="#">Privacy</a><br><br>© 2026 Bramble &amp; Co.</footer>
+<script>
+  let attempts = 0;
+  document.getElementById("address-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const save = document.getElementById("save");
+    const alert = document.getElementById("alert");
+    alert.hidden = true;
+    save.disabled = true;
+    save.textContent = "Saving…";
+    attempts += 1;
+    setTimeout(() => {
+      save.disabled = false;
+      save.textContent = "Save address";
+      alert.hidden = false;
+      alert.textContent = "Service unavailable. Your changes were not saved. Try again later.";
+      report("save_failed", {
+        attempt: String(attempts),
+        street: document.getElementById("street").value.trim(),
+        city: document.getElementById("city").value.trim(),
+        postcode: document.getElementById("postcode").value.trim(),
+      });
+    }, 700);
+  });
+</script>
+</body>
+</html>

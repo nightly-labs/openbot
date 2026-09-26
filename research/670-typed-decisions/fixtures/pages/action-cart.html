@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><title>Ceramic mug – HomeGoods</title></head><body>
+<main><h1>Ceramic mug, 350 ml</h1><p>$14.00</p><a href="#" id="cart">Cart (0)</a><button type="button" id="add">Add to cart</button><p role="status" id="status"></p></main>
+<script>
+  const mode = new URLSearchParams(location.search).get("mode");
+  document.querySelector("#add").onclick = () => {
+    const status = document.querySelector("#status");
+    if (mode === "oos") { status.textContent = "Sorry, this item is out of stock."; return; }
+    document.querySelector("#cart").textContent = "Cart (1)"; status.textContent = "Added to cart.";
+  };
+</script>
+<script src="site.js"></script></body></html>

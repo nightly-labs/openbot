@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engineering blog – Driftwood</title>
+<script src="report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1b1f24; background: #fff; }
+  header { border-bottom: 1px solid #e6e8eb; }
+  .bar { max-width: 980px; margin: 0 auto; display: flex; align-items: center; gap: 26px; padding: 14px 24px; }
+  .logo { font-weight: 800; font-size: 20px; color: #0b6bcb; text-decoration: none; }
+  nav a { color: #444c56; text-decoration: none; margin-right: 16px; font-size: 15px; }
+  nav a[aria-current] { color: #0b6bcb; font-weight: 600; }
+  .right { margin-left: auto; display: flex; gap: 10px; }
+  .right button { background: #0b6bcb; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  main { max-width: 980px; margin: 0 auto; padding: 36px 24px; }
+  .intro { margin-bottom: 26px; }
+  .tags button { background: #eef4fb; color: #0b4f96; border: 0; border-radius: 14px; padding: 5px 12px; margin: 0 6px 6px 0; cursor: pointer; font-size: 13px; }
+  .post { display: grid; grid-template-columns: 180px 1fr; gap: 22px; padding: 24px 0; border-bottom: 1px solid #eef0f2; }
+  .post svg { width: 180px; height: 110px; border-radius: 8px; }
+  .post h2 { margin: 0 0 6px; font-size: 21px; }
+  .post h2 a { color: #1b1f24; text-decoration: none; }
+  .post h2 a:hover { color: #0b6bcb; text-decoration: underline; }
+  .post p { margin: 0 0 8px; color: #57606a; line-height: 1.55; }
+  .meta { font-size: 13px; color: #768390; }
+  .more { display: block; margin: 30px auto; background: #fff; border: 1px solid #c9d1d9; border-radius: 6px; padding: 12px 24px; font-size: 15px; cursor: pointer; }
+  .end { text-align: center; color: #768390; margin: 30px 0; }
+  footer { border-top: 1px solid #e6e8eb; padding: 26px; text-align: center; font-size: 13px; color: #768390; }
+  footer a { color: #768390; margin: 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="#">Driftwood</a>
+    <nav aria-label="Main">
+      <a href="#">Home</a>
+      <a href="#">Product</a>
+      <a href="#">Docs</a>
+      <a href="#" aria-current="page">Blog</a>
+      <a href="#">Changelog</a>
+    </nav>
+    <div class="right"><button type="button">Download</button></div>
+  </div>
+</header>
+<main>
+  <div class="intro">
+    <h1>Engineering blog</h1>
+    <p>Notes from the team building Driftwood, a local-first notes app.</p>
+    <div class="tags"><button type="button">All</button><button type="button">Databases</button><button type="button">Sync</button><button type="button">Performance</button><button type="button">Design</button></div>
+  </div>
+  <div id="posts"></div>
+  <button type="button" class="more" id="more">Load more articles</button>
+  <p class="end" id="end" hidden>You have reached the end.</p>
+</main>
+<footer><a href="#">RSS</a><a href="#">About</a><a href="#">Careers</a><a href="#">Privacy</a><br><br>© 2026 Driftwood Labs</footer>
+<script>
+  const POSTS = [
+    ["crdt-text", "What we learned shipping CRDT text editing", "Six months of merging paragraphs without a server, and the three bugs that almost stopped us.", "Sep 18, 2026"],
+    ["cold-start", "Cutting cold start time by 40 percent", "Lazy loading the search index, and why we moved font parsing off the main thread.", "Sep 10, 2026"],
+    ["offline-images", "Offline images without filling the disk", "An eviction policy that users never notice.", "Sep 2, 2026"],
+    ["design-sidebar", "Redesigning the sidebar, again", "The fourth sidebar in two years, and why this one stays.", "Aug 27, 2026"],
+    ["sync-conflicts", "Explaining sync conflicts to humans", "Conflict dialogs are a design failure. Here is what we show instead.", "Aug 19, 2026"],
+    ["rust-bindings", "Moving our core to Rust bindings", "How we kept the TypeScript API while replacing the engine under it.", "Aug 11, 2026"],
+    ["encryption-at-rest", "Encryption at rest on every platform", "Keychains, keystores and the one platform that made us write our own.", "Aug 3, 2026"],
+    ["search-ranking", "Ranking search results you wrote yourself", "Recency beats relevance more often than you think.", "Jul 26, 2026"],
+    ["backup-format", "A backup format that will outlive us", "Plain folders, Markdown files, and a JSON sidecar.", "Jul 18, 2026"],
+    ["mobile-memory", "Staying under 200 MB on older phones", "Memory budgets per screen, enforced in CI.", "Jul 10, 2026"],
+    ["postgres-sync-server", "Scaling Postgres for our sync relay", "The relay stores nothing but ciphertext. It still needed a bigger database.", "Jul 2, 2026"],
+    ["accessibility-audit", "What an accessibility audit taught us", "Forty-one findings, and the one that changed our component library.", "Jun 24, 2026"],
+    ["sqlite-local-first", "Scaling SQLite for local-first apps", "WAL mode, page size, and why one 9 GB database was faster than many small ones.", "Jun 16, 2026"],
+    ["sqlite-fts", "Full-text search in SQLite: FTS5 in practice", "Tokenizers for twelve languages, and the Polish stemming problem.", "Jun 8, 2026"],
+    ["local-first-auth", "Accounts in a local-first app", "Why signing in is optional, and what still needs a server.", "May 30, 2026"],
+    ["release-train", "Our two-week release train", "Feature flags, a beta channel, and a rollback we used twice.", "May 22, 2026"],
+    ["scaling-sync", "Scaling sync to a million devices", "Fan-out, backpressure and a very long queue.", "May 14, 2026"],
+    ["first-year", "Driftwood's first year", "What worked, what did not, and what comes next.", "May 6, 2026"],
+  ];
+  const colors = ["#dbeafe", "#fde68a", "#d1fae5", "#fbcfe8", "#e9d5ff", "#fed7aa"];
+  let shown = 0;
+  function more() {
+    const container = document.getElementById("posts");
+    POSTS.slice(shown, shown + 6).forEach(([slug, title, excerpt, date], i) => {
+      const el = document.createElement("article");
+      el.className = "post";
+      const href = slug === "sqlite-local-first" ? "article-sqlite.html" : "article.html?slug=" + slug;
+      el.innerHTML =
+        '<svg viewBox="0 0 180 110" aria-hidden="true"><rect width="180" height="110" fill="' + colors[(shown + i) % colors.length] + '"/><circle cx="130" cy="40" r="22" fill="rgba(255,255,255,.7)"/></svg>' +
+        '<div><h2><a href="' + href + '">' + title + '</a></h2><p>' + excerpt + '</p><div class="meta">' + date + ' · 8 min read</div></div>';
+      container.appendChild(el);
+    });
+    shown += 6;
+    if (shown >= POSTS.length) {
+      document.getElementById("more").hidden = true;
+      document.getElementById("end").hidden = false;
+    }
+  }
+  more();
+  document.getElementById("more").addEventListener("click", () => {
+    report("load_more", { page: String(shown / 6 + 1) });
+    more();
+  });
+</script>
+</body>
+</html>

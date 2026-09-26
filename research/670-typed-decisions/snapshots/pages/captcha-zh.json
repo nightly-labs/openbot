@@ -1,0 +1,45 @@
+{
+  "title": "安全验证",
+  "url": "https://fixtures.test/captcha-zh.html",
+  "loading": false,
+  "text": "安全验证 为了保护您的账号安全，请完成下方验证后继续访问。 请拖动下方滑块完成拼图 → 刷新 反馈",
+  "elements": [
+    {
+      "role": "slider",
+      "name": "拖动滑块",
+      "description": "",
+      "tag": "div",
+      "value": "0",
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "刷新",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    },
+    {
+      "role": "button",
+      "name": "反馈",
+      "description": "",
+      "tag": "button",
+      "value": null,
+      "states": [],
+      "disabled": false,
+      "bounds": null,
+      "frame": null
+    }
+  ],
+  "focus": {
+    "role": null,
+    "name": ""
+  }
+}
