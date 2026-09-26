@@ -215,8 +215,16 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     return outsideFiles.filter((name) => text.includes(name));
   };
   await mkdir(workspaceRoot, { recursive: true });
+  if (provider === "claude") {
+    // Settings that another provider could write in the workspace. Workspace only must ignore them.
+    await mkdir(join(workspaceRoot, ".claude"), { recursive: true });
+    await writeFile(
+      join(workspaceRoot, ".claude", "settings.json"),
+      `${JSON.stringify({ sandbox: { filesystem: { allowWrite: [outsideRoot] } } })}\n`,
+    );
+  }
 
-  const { client, model, version } = await createClient(provider);
+  const { client, model, version } = await createClient(provider, join(temporaryRoot, "provider-state"));
   const approvals: { method: string; reason: string | null; itemId: string | null; mentions: string[] }[] = [];
   const items = new Map<string, { type: string | null; status: string | null; mentions: string[] }>();
   client.on("request", (request) => {
@@ -441,14 +449,28 @@ async function runImagegenSmoke(): Promise<void> {
   }
 }
 
-async function createClient(provider: AgentProvider): Promise<{
+async function createClient(
+  provider: AgentProvider,
+  stateDirectory?: string,
+): Promise<{
   client: AgentClient;
   model: string;
   version: string;
 }> {
   if (provider === "claude") {
     const cli = await resolveClaudeCli();
-    return { client: new ClaudeAgentClient(cli), model: "claude-sonnet-5", version: cli.version };
+    const client = new ClaudeAgentClient(
+      cli,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      stateDirectory,
+    );
+    return { client, model: "claude-sonnet-5", version: cli.version };
   }
   const cli = await resolveCodexCli();
   return { client: new CodexAppServerClient(cli.executable, 60_000), model: "gpt-5.6-luna", version: cli.version };
