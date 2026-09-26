@@ -1,5 +1,6 @@
 import {
   type AccountUsage,
+  type AddedAgent,
   type AgentEvent,
   type AgentModelOption,
   type AgentStatus,
@@ -32,7 +33,7 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { createEffect, createMemo, createSignal, Loading, Show } from "solid-js";
 import { toAgentMessage } from "../../app-message-projection";
-import { ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
+import { AgentTemplateInstall, ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
@@ -45,7 +46,7 @@ import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
-import { createWebMarketplaceCalls } from "./web-marketplace";
+import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
 import { createWebProviderSettings } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
@@ -66,6 +67,9 @@ export function WebWorkspace(props: {
   onSessionCheck: () => Promise<void>;
   onLogout: () => Promise<void>;
   createRuntime?: WebRuntimeFactory;
+  /** A shared agent that a `/app?agent=<id>` link named. The dialog installs it only on a press. */
+  agentTemplateId?: string | null;
+  onAgentTemplateClose?: () => void;
 }) {
   const [status, setStatus] = createSignal<AgentStatus>(CONNECTING_STATUS);
   const [models, setModels] = createSignal<AgentModelOption[]>([]);
@@ -177,9 +181,34 @@ export function WebWorkspace(props: {
     refreshHosts: () => workspace.refreshHosts(),
   });
   const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest);
+  const agentTemplateCalls = createWebAgentTemplateCalls(props.accountFetch, hostRequest);
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /* As in the desktop app: an owner or admin installs on the host's agents, and a member browses. */
   const manageSkills = createMemo(() => serverCanAdminister(server(), "skills-admin-v1"));
+  /* As in the desktop app: a managed agent whose composer is free to take another line. */
+  const composerFree = createMemo(
+    () =>
+      manageSkills() &&
+      status().phase === "ready" &&
+      !creating() &&
+      !controller.submitting() &&
+      !controller.selectionSending() &&
+      controller.voicePhase() === "idle" &&
+      !controller.editingDeliveryId(),
+  );
+  /** Adds a marketplace example to an agent's draft, then opens that agent's conversation. */
+  function appendMarketplaceExample(agentId: string, append: (target: { serverId: string; agentId: string }) => void) {
+    const target = server();
+    if (
+      !serverCanAdminister(target, "skills-admin-v1") ||
+      !workspace.state.agents.some((agent) => agent.id === agentId)
+    )
+      return;
+    append({ serverId: target.id, agentId });
+    setMarketplaceOpen(false);
+    setMobilePane("conversation");
+    if (agentId !== workspace.state.selectedId) void select(agentId);
+  }
   const saveFile = createWebFileSaver();
   const storageCalls: FilesPort = {
     agent: { listAgents: () => workspace.runtime.listAgents() },
@@ -335,6 +364,13 @@ export function WebWorkspace(props: {
   async function select(id: string) {
     setCreating(false);
     await workspace.select(id);
+  }
+  async function openAddedAgent(agent: AddedAgent) {
+    setMobilePane("conversation");
+    await workspace.run(async () => {
+      await workspace.refresh();
+      await select(agent.id);
+    });
   }
   const unavailable = async (): Promise<never> => {
     throw new Error("This action is available in the desktop app.");
@@ -680,19 +716,40 @@ export function WebWorkspace(props: {
               onOpenChange={setMarketplaceOpen}
               onAgentInstalled={async (agent) => {
                 setMarketplaceOpen(false);
-                setMobilePane("conversation");
-                await workspace.run(async () => {
-                  await workspace.refresh();
-                  await select(agent.id);
-                });
+                await openAddedAgent(agent);
               }}
               plugins={MARKETPLACE_PLUGINS}
               pluginServerId={
                 manageSkills() && serverCanAdminister(server(), MCP_SERVERS_CAPABILITY) ? server()?.id : undefined
               }
               pluginHostName={manageSkills() ? remoteAdminServer(server(), MCP_SERVERS_CAPABILITY)?.name : undefined}
+              onTrySkill={
+                composerFree()
+                  ? (agentId, skill) =>
+                      appendMarketplaceExample(agentId, (target) => controller.appendSkillExample(target, skill))
+                  : undefined
+              }
+              onRunPluginPrompt={
+                composerFree()
+                  ? (agentId, prompt) =>
+                      appendMarketplaceExample(agentId, (target) => controller.appendPluginPrompt(target, prompt.text))
+                  : undefined
+              }
             />
           </Loading>
+        </Show>
+        <Show when={props.agentTemplateId}>
+          {(templateId) => (
+            <Loading>
+              <AgentTemplateInstall
+                templateId={templateId()}
+                server={remoteAdminServer(server(), "agent-install-v1")}
+                calls={agentTemplateCalls}
+                onClose={() => props.onAgentTemplateClose?.()}
+                onInstalled={openAddedAgent}
+              />
+            </Loading>
+          )}
         </Show>
         <Show when={serverSettings.state.open && server()}>
           {(target) => (

@@ -1,10 +1,11 @@
 /**
- * The two addresses one agent template has: the page a person shares, and the link that opens that
- * template in the app.
+ * The addresses one agent template has: the page a person shares, the link that opens that template in
+ * the app, and the browser client's entry for it.
  *
  * ```
  * https://openbot.run/agents/<id>    the link a person shares and the app copies
  * openbot://agents/<id>              the link the page button opens
+ * /app?agent=<id>                    the page's link to the browser client, on the same origin
  * ```
  *
  * This follows `plugin-links.ts`: the host gives the kind, one path segment gives the id, and a
@@ -15,6 +16,7 @@
 export const OPENBOT_AGENT_TEMPLATE_ORIGIN = "https://openbot.run";
 export const OPENBOT_AGENT_TEMPLATE_PATH_PREFIX = "/agents/";
 export const OPENBOT_AGENT_TEMPLATE_HOST = "agents";
+export const WEB_APP_AGENT_TEMPLATE_PARAM = "agent";
 
 /** The Worker makes ids from 16 random bytes in base64url, which is 22 characters. */
 const AGENT_TEMPLATE_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/u;
@@ -53,6 +55,21 @@ export function createAgentTemplateShareUrl(id: string, origin: string = OPENBOT
   assertAgentTemplateId(id);
   if (!isAgentTemplateShareOrigin(origin)) throw new Error("The OpenBot agent link origin is invalid.");
   return `${origin}${OPENBOT_AGENT_TEMPLATE_PATH_PREFIX}${id}`;
+}
+
+/**
+ * The browser client's entry for a template. It opens the same preview as the app; `/app` removes the
+ * query after it reads it, so a reload does not open the preview again.
+ */
+export function createWebAppAgentTemplatePath(id: string): string {
+  assertAgentTemplateId(id);
+  return `/app?${WEB_APP_AGENT_TEMPLATE_PARAM}=${id}`;
+}
+
+/** The template id in a `/app` query, or null when the query names none or an invalid one. */
+export function agentTemplateIdFromWebAppSearch(search: string): string | null {
+  const id = new URLSearchParams(search).get(WEB_APP_AGENT_TEMPLATE_PARAM);
+  return id !== null && isAgentTemplateId(id) ? id : null;
 }
 
 export function createOpenBotAgentTemplateUrl(id: string): string {

@@ -1,13 +1,27 @@
+import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@openbot/contracts/agent-template-links";
 import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Toaster } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
-import { createStore, onSettled, Show } from "solid-js";
+import { createSignal, createStore, onSettled, Show } from "solid-js";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";
 
 /** A sign-in refusal that the login form already shows. */
 class SignInIssueShown extends Error {}
+
+/**
+ * The shared agent a `/app?agent=<id>` link names. The query is removed after it is read, so a reload
+ * does not open the preview again.
+ */
+function takeAgentTemplateLink(): string | null {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(WEB_APP_AGENT_TEMPLATE_PARAM)) return null;
+  const id = agentTemplateIdFromWebAppSearch(url.search);
+  url.searchParams.delete(WEB_APP_AGENT_TEMPLATE_PARAM);
+  window.history.replaceState(window.history.state, "", url);
+  return id;
+}
 
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const [state, setState] = createStore<{
@@ -25,6 +39,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     busy: false,
     error: null,
   });
+  // Kept here, not in the workspace, so the link waits through sign-in.
+  const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
   let channel: BroadcastChannel | null = null;
   let disposed = false;
   let sessionGeneration = 0;
@@ -243,6 +259,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                 onSessionCheck={checkSession}
                 onLogout={() => action(logout)}
                 createRuntime={props.createRuntime}
+                agentTemplateId={agentTemplateId()}
+                onAgentTemplateClose={() => setAgentTemplateId(null)}
               />
             </>
           )}

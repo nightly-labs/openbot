@@ -9,6 +9,12 @@ export interface AgentTemplatesPort {
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "get" | "install" | "preview" | "publish" | "unpublish">;
 }
 
+/** What the install dialog reaches: reading a template, and adding its agent. The web client passes its own. */
+export interface AgentTemplateInstallCalls {
+  agent: AgentTemplatesPort["agent"];
+  agentTemplates: Pick<AgentTemplatesPort["agentTemplates"], "get" | "install">;
+}
+
 /** Read on each call: tests and stories replace `window.openbot` per case. */
 export function agentTemplatesPort(): AgentTemplatesPort {
   return window.openbot;

@@ -21,10 +21,10 @@ import {
   type AgentTemplateSnapshot,
   type AvatarImageInput,
   agentTemplateSnapshotProblem,
+  decodeAgentTemplateDetail,
   type InstallAgentTemplateInput,
   type InstallAgentTemplateResult,
   isAgentTemplateCardPng,
-  isAgentTemplateDetail,
   isAgentTemplateSnapshot,
   type PublishAgentTemplateInput,
   type RoutineSchedule,
@@ -163,15 +163,9 @@ export class AgentTemplateService {
     const detail = await this.auth.requestAuthorized(
       `/v1/agent-templates/${encodeURIComponent(templateId)}`,
       { method: "GET" },
-      decodeTemplateDetail,
+      decodeAgentTemplateDetail,
     );
-    return {
-      ...toAgentTemplateSnapshot(detail),
-      id: detail.id,
-      creatorName: detail.creatorName,
-      updatedAt: detail.updatedAt,
-      avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null,
-    };
+    return { ...detail, avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null };
   }
 
   async install(input: InstallAgentTemplateInput): Promise<InstallAgentTemplateResult> {
@@ -353,11 +347,6 @@ function decodeOwnedTemplate(value: unknown): OwnedTemplate {
 function decodeOwnedTemplates(value: unknown): OwnedTemplate[] {
   if (!Array.isArray(value)) throw new Error("Invalid agent template list.");
   return value.map(decodeOwnedTemplate);
-}
-
-function decodeTemplateDetail(value: unknown): AgentTemplateDetail {
-  if (!isAgentTemplateDetail(value) || !isAgentTemplateId(value.id)) throw new Error("Invalid agent template.");
-  return value;
 }
 
 function decodeDeleted(value: unknown): { deleted: true } {

@@ -1,3 +1,4 @@
+import { isAgentTemplateId } from "./agent-template-links";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
 import type { AgentSummary, AvatarImageInput } from "./ipc-agents";
@@ -207,6 +208,21 @@ export function isAgentTemplateDetail(value: unknown): value is AgentTemplateDet
     isString(value.creatorName) &&
     isString(value.updatedAt)
   );
+}
+
+/**
+ * A template from `GET /v1/agent-templates/<id>`, with only the known fields. `avatarUrl` stays as the
+ * account service sent it: a path on the service's origin.
+ */
+export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {
+  if (!isAgentTemplateDetail(value) || !isAgentTemplateId(value.id)) throw new Error("Invalid agent template.");
+  return {
+    ...toAgentTemplateSnapshot(value),
+    id: value.id,
+    creatorName: value.creatorName,
+    updatedAt: value.updatedAt,
+    avatarUrl: value.avatarUrl,
+  };
 }
 
 /** Copies only the known fields, so an extra key from the wire never reaches storage or the renderer. */
