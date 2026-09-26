@@ -427,7 +427,8 @@ export class ProviderRuntime implements ProviderPort {
       const collected = new Map<AgentProvider, AccountUsage["limits"][number]>();
       await Promise.all(
         providers.map(async (provider) => {
-          if (provider === "opencode") return;
+          // The OpenCode quota belongs to a Go key; without one, do not spawn OpenCode to learn nothing.
+          if (provider === "opencode" && !this.#credentials.apiKey("opencode")) return;
           try {
             const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
             if (kept && !usageWindowHasReset(kept)) {

@@ -18,6 +18,7 @@ import {
   openCodeConfigEnv,
   openCodeSignInMessage,
 } from "./opencode-config";
+import { readOpenCodeGoUsage } from "./opencode-usage";
 import type { AccountReadResult } from "./protocol";
 
 /** One command OpenBot runs against a provider's own CLI, waiting for the process to exit. */
@@ -218,6 +219,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpAuthorization: context.mcpAuthorization,
+        readRateLimits: () => readOpenCodeGoUsage(context.apiKey("opencode")),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {

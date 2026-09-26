@@ -394,8 +394,11 @@ so a first OpenCode turn leaves this computer without a sign-in.
 
 An OpenCode Go key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
 system's secret storage, writes it to a file that only your user account can read, and passes it
-only to the local OpenCode process. No screen, log, data export, or diagnostics report contains it;
-the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
+to the local OpenCode process. To show the remaining Go quota in Usage, OpenBot also sends the key
+to `opencode.ai/zen/go/v1/usage`; that request contains no conversation, file, or model data, and
+the response contains only the used percentage and reset time of each Go limit. OpenBot does not
+send that usage to its maintainer. No screen, log, data export, or diagnostics report contains the
+key; the data export lists it under `scope.excludes`. OpenBot does not copy OpenCode credentials or
 upload its session files. OpenCode manages its own login and resume state.
 
 ## Shared desktop channels
