@@ -1,0 +1,36 @@
+.ui-chart {
+  width: 100%;
+  height: 300px;
+  min-width: 0;
+  font-size: var(--openbot-text-sm);
+}
+.ui-chart-tooltip {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+/* One row per series: mark, name, value. The value column takes the remaining width so
+   the numbers line up under each other however long the names are. */
+.ui-chart-tooltip-row {
+  display: grid;
+  grid-template-columns: var(--openbot-space-4) auto 1fr;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-2);
+}
+.ui-chart-tooltip-value {
+  text-align: right;
+}
+.ui-chart-tooltip-mark {
+  display: flex;
+  align-items: center;
+}
+.ui-chart-tooltip-total {
+  border-top: 1px solid var(--openbot-border-strong);
+  padding-top: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+}
