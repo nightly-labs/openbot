@@ -202,6 +202,13 @@ describe("registerSecretValue", () => {
     expect(redactText("password=monkey22 suffix99 rejected")).toMatch(/=\[redacted\] rejected$/u);
   });
 
+  // The marker hides the scheme a rule would have matched, so the token it sits in goes with it.
+  it("masks a longer credential that starts with a registered value", () => {
+    registerSecretValue("Bearer abc");
+
+    expect(redactText("sent Bearer abcdefghijklmnop to the server")).toBe("sent [redacted] to the server");
+  });
+
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
     const secret = "12345678\uD800";
     registerSecretValue(secret);

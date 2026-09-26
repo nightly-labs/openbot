@@ -81,17 +81,22 @@ const UNSERIALIZABLE = "[unserializable]";
 // the secrets the user saves while the app runs.
 //
 // Every value is masked before the rules run, in one pass, so no rule can cut one and leave a part
-// of it in the log. A value becomes a marker the rules read as one token. A value that holds a word
-// the rules read, such as `password` or `Authorization`, may be the label or header name that hides
-// the next value, so its marker is itself a secret label that ends in `authorization`.
+// of it in the log. A match grows to the whole token around it: a longer credential that starts or
+// ends with a registered value, such as `Bearer abc…` after `Bearer abc` was saved, must not keep
+// its unregistered part once the marker has hidden the part a rule would have matched. The token is
+// replaced by a marker the rules read as one value. A token that holds a word the rules read, such
+// as `password` or `Authorization`, may be the label or header name that hides the next value, so
+// its marker is itself a secret label that ends in `authorization`.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
+// The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
+// label before a value stays readable.
+const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
-// Each registered form and the marker it becomes.
-const registeredSecrets = new Map<string, string>();
+const registeredSecrets = new Set<string>();
 // One alternation, longest first, so a secret that contains another one is masked whole.
 let registeredSecretPattern: RegExp | null = null;
 
@@ -101,13 +106,12 @@ let registeredSecretPattern: RegExp | null = null;
  */
 export function registerSecretValue(value: string): void {
   if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
-  const marker = RULE_WORD.test(value) ? LABEL_MARKER : VALUE_MARKER;
   const size = registeredSecrets.size;
   for (const form of [value, JSON.stringify(value).slice(1, -1), uriEncoded(value)]) {
-    if (form !== null && !registeredSecrets.has(form)) registeredSecrets.set(form, marker);
+    if (form !== null) registeredSecrets.add(form);
   }
   if (registeredSecrets.size === size) return;
-  const alternatives = [...registeredSecrets.keys()]
+  const alternatives = [...registeredSecrets]
     .sort((left, right) => right.length - left.length)
     .map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
   registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
@@ -129,11 +133,28 @@ export function isSecretName(name: string): boolean {
 }
 
 export function redactText(value: string): string {
-  const marked = registeredSecretPattern
-    ? value.replace(registeredSecretPattern, (secret) => registeredSecrets.get(secret) ?? VALUE_MARKER)
-    : value;
+  const marked = markRegisteredSecrets(value);
   const redacted = redactSerializedJson(marked) ?? applyTextRules(redactEmbeddedJson(marked));
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
+}
+
+function markRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  pattern.lastIndex = 0;
+  let result = "";
+  let copied = 0;
+  for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
+    let start = match.index;
+    let end = start + match[0].length;
+    while (start > copied && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    const token = value.slice(start, end);
+    result += value.slice(copied, start) + (RULE_WORD.test(token) ? LABEL_MARKER : VALUE_MARKER);
+    copied = end;
+    pattern.lastIndex = end;
+  }
+  return copied === 0 ? value : result + value.slice(copied);
 }
 
 function applyTextRules(value: string): string {
