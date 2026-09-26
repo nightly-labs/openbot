@@ -90,7 +90,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         state.skills.open = false;
         state.skills.reopenAfterMarketplace = false;
       });
-      if (!props.remoteClient || props.tablesVisible !== false) {
+      if (untrack(() => !props.remoteClient || props.tablesVisible !== false)) {
         void tableCalls()
           .listTables()
           .catch(() => [])

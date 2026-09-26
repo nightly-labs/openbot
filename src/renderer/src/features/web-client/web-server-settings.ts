@@ -18,7 +18,7 @@ import {
   updateHostIdentity,
 } from "@openbot/team-client/team-admin-requests";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, untrack } from "solid-js";
 import { serverCanAdminister, serverRoleCanAdminister } from "../servers/server-capabilities";
 import type { WebAdminRuntime } from "./web-runtime";
 
@@ -75,12 +75,12 @@ export function createWebServerSettings(options: {
     () => (state.open ? options.presence() : null),
     (presence) => {
       if (!presence) return;
-      const signature = JSON.stringify(
-        presence.members.map((member) => [member.id, member.role, member.disabled, member.online]),
+      const signature = untrack(() =>
+        JSON.stringify(presence.members.map((member) => [member.id, member.role, member.disabled, member.online])),
       );
       if (signature === previousPresence) return;
       previousPresence = signature;
-      void refresh();
+      void untrack(refresh);
     },
   );
 
@@ -91,7 +91,7 @@ export function createWebServerSettings(options: {
     (serverState) => {
       const reconnected = serverState === "online" && previousState !== undefined && previousState !== "online";
       previousState = serverState;
-      if (reconnected) void refresh();
+      if (reconnected) void untrack(refresh);
     },
   );
 
