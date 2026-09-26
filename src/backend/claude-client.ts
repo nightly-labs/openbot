@@ -18,6 +18,7 @@ import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
+import { claudeWorkspaceHooks, claudeWorkspaceSandbox, claudeWriteOutsideRoots } from "./claude-workspace-sandbox";
 import { type ClaudeCliInfo, claudeTakesPromptSnapshotFlag } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
 import {
@@ -69,6 +70,8 @@ interface ThreadConfig {
   profileGeneration: boolean;
   /** Part of the config so that a change restarts the query with the new servers. */
   computerUse: boolean;
+  /** Workspace only: Bash runs in the Claude sandbox, and a file write outside the roots asks the user. */
+  workspaceOnly: boolean;
 }
 
 interface ActiveTurn {
@@ -469,6 +472,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const appliedEffort = this.#resolveEffort(config.model, config.effort);
     const canUseTool: CanUseTool = async (toolName, toolInput, options) => {
       if (config.profileGeneration) return { behavior: "deny", message: "Profile generation has no tools." };
+      if (config.workspaceOnly) {
+        const outside = await claudeWriteOutsideRoots(toolName, toolInput, config.cwd, config.additionalDirectories);
+        if (outside) return this.#requestWriteApproval(threadId, outside, toolInput, options.toolUseID ?? randomUUID());
+      }
       if (toolName !== "AskUserQuestion") {
         return { behavior: "allow", updatedInput: toolInput } satisfies PermissionResult;
       }
@@ -522,6 +529,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         persistSession: config.persistSession,
         additionalDirectories: config.additionalDirectories,
         canUseTool,
+        ...(config.workspaceOnly
+          ? {
+              sandbox: claudeWorkspaceSandbox(config.additionalDirectories),
+              hooks: claudeWorkspaceHooks(config.cwd, config.additionalDirectories),
+            }
+          : {}),
         mcpServers,
         env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
       },
@@ -1079,6 +1092,26 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
   }
 
+  /**
+   * A Workspace only agent's file write outside its roots, shown as a file-change approval. The
+   * approval registry never answers it without the user, as for a Codex write outside the sandbox.
+   */
+  async #requestWriteApproval(
+    threadId: string,
+    path: string,
+    toolInput: DynamicRecord,
+    toolUseId: string,
+  ): Promise<PermissionResult> {
+    const result = await this.#serverRequests.call("item/fileChange/requestApproval", {
+      threadId,
+      turnId: this.#threads.get(threadId)?.activeTurn?.id ?? randomUUID(),
+      itemId: toolUseId,
+      reason: `Write ${path}, outside the agent's workspace and the shared folder.`,
+    });
+    if (isRecord(result) && result.decision === "accept") return { behavior: "allow", updatedInput: toolInput };
+    return { behavior: "deny", message: "The user did not allow this write outside the workspace." };
+  }
+
   #requireThread(threadId: string): ThreadRuntime {
     const runtime = this.#threads.get(threadId);
     if (!runtime) throw new Error(`Unknown Claude thread: ${threadId}`);
@@ -1200,6 +1233,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     persistSession: !isRecord(params) || params.persistSession !== false,
     profileGeneration: isRecord(params) && params.profileGeneration === true,
     computerUse: computerUseParam(params),
+    workspaceOnly: isRecord(params) && params.sandbox === "workspace-write",
   };
 }
 

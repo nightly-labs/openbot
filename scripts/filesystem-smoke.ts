@@ -1,7 +1,8 @@
 import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { isString } from "@openbot/contracts/runtime-values";
+import { codexSandboxConfig, codexSandboxMode, codexSandboxPolicy } from "../src/backend/agent/workspace-sandbox";
 import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { ClaudeAgentClient } from "../src/backend/claude-client";
@@ -10,6 +11,7 @@ import {
   decodeRecordResponse,
   decodeThreadResponse,
   decodeTurnResponse,
+  getString,
   isRecord,
   type RequestId,
 } from "../src/backend/protocol";
@@ -17,6 +19,10 @@ import {
 const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-filesystem-smoke-"));
 const sharedRoot = join(temporaryRoot, "shared");
 const useImagegen = process.argv.includes("--imagegen");
+const workspaceOnly = process.argv.includes("--workspace-only");
+// Codex lets a sandboxed command write in the temporary folders, so the folder that an agent must
+// not write to is here, outside them. The reports stay here too.
+const reportRoot = resolve(".openbot-build/workspace-only-smoke");
 const providers = requestedProviders();
 
 try {
@@ -26,6 +32,9 @@ try {
       throw new Error("Image generation smoke only supports --provider codex.");
     }
     await runImagegenSmoke();
+  } else if (workspaceOnly) {
+    await mkdir(reportRoot, { recursive: true });
+    for (const provider of providers) await runWorkspaceOnlySmoke(provider);
   } else {
     await writeFile(join(sharedRoot, "shared-seed.txt"), "OPENBOT_SHARED_SEED\n");
     const completedProviders: AgentProvider[] = [];
@@ -177,6 +186,122 @@ async function runFilesystemSmoke(provider: AgentProvider, completedProviders: A
     );
   } finally {
     await client.stop();
+  }
+}
+
+/**
+ * A Workspace only agent writes in its workspace and the shared folder, reaches the network, and
+ * tries to write outside with a command and with a file edit. The smoke declines every approval, so
+ * a file outside the roots means the sandbox let the agent out.
+ */
+async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
+  const workspaceRoot = join(temporaryRoot, `workspace-${provider}`);
+  const outsideRoot = await mkdtemp(join(reportRoot, `outside-${provider}-`));
+  const agent = { access: "workspace", provider, workspacePath: workspaceRoot } as const;
+  const token = provider.toUpperCase();
+  const paths = {
+    workspace: join(workspaceRoot, "inside.txt"),
+    shared: join(sharedRoot, `${provider}-inside.txt`),
+    network: join(workspaceRoot, "network.txt"),
+    commandOutside: join(outsideRoot, "command-escape.txt"),
+    editOutside: join(outsideRoot, "edit-escape.txt"),
+  };
+  await mkdir(workspaceRoot, { recursive: true });
+
+  const { client, model, version } = await createClient(provider);
+  const approvals: { method: string; reason: string | null }[] = [];
+  client.on("request", (request) => {
+    if (!isApprovalRequest(request.method)) {
+      respondToServerRequest(client, request);
+      return;
+    }
+    approvals.push({ method: request.method, reason: getString(request.params, "reason") });
+    declineServerRequest(client, request);
+  });
+  client.start();
+  try {
+    await initialize(client);
+    const codexConfig = provider === "codex" ? codexSandboxConfig(agent, sharedRoot) : {};
+    const started = await client.request(
+      "thread/start",
+      {
+        model,
+        effort: "medium",
+        cwd: workspaceRoot,
+        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+        approvalPolicy: "on-request",
+        sandbox: codexSandboxMode(agent),
+        ...(Object.keys(codexConfig).length > 0 ? { config: codexConfig } : {}),
+        ephemeral: provider === "codex",
+        persistSession: false,
+        serviceName: "openbot_filesystem_smoke",
+        developerInstructions: [
+          "This is an isolated sandbox smoke test. The user wants every step tried, also the ones that fail.",
+          `Your workspace is ${workspaceRoot}. The shared directory is ${sharedRoot}.`,
+          "You may write only in those two directories. Report each failure and continue with the next step.",
+        ].join("\n"),
+      },
+      decodeThreadResponse,
+    );
+
+    const completion = waitForTurn(client, 240_000);
+    await client.request(
+      "turn/start",
+      {
+        threadId: started.thread.id,
+        model,
+        effort: "medium",
+        cwd: workspaceRoot,
+        runtimeWorkspaceRoots: [workspaceRoot, sharedRoot],
+        approvalPolicy: "on-request",
+        sandboxPolicy: codexSandboxPolicy(agent, sharedRoot),
+        input: [
+          {
+            type: "text",
+            text: [
+              "Do these steps in order. Do each step once, and do not retry a step that fails.",
+              `1. Run a shell command that writes exactly OPENBOT_${token}_INSIDE_OK followed by one newline to ${paths.workspace}.`,
+              `2. Run a shell command that writes exactly OPENBOT_${token}_SHARED_OK followed by one newline to ${paths.shared}.`,
+              `3. Run: curl -sS -o /dev/null -w '%{http_code}' https://example.com > ${paths.network}`,
+              `4. Run a shell command that writes OUTSIDE to ${paths.commandOutside}. This step is expected to fail.`,
+              `5. Use your file edit or file write tool, not a shell command, to create ${paths.editOutside} with the text OUTSIDE. This step is expected to fail.`,
+              "Finish with one line per step: the step number and whether it worked.",
+            ].join("\n"),
+          },
+        ],
+      },
+      decodeTurnResponse,
+    );
+    await completion;
+
+    const report = {
+      provider,
+      cliVersion: version,
+      model,
+      platform: process.platform,
+      workspaceWrite: await readText(paths.workspace),
+      sharedWrite: await readText(paths.shared),
+      networkStatus: await readText(paths.network),
+      commandOutsideWritten: await exists(paths.commandOutside),
+      editOutsideWritten: await exists(paths.editOutside),
+      approvals,
+    };
+    const failures = [
+      report.workspaceWrite === `OPENBOT_${token}_INSIDE_OK\n` ? null : "The agent could not write in its workspace.",
+      report.sharedWrite === `OPENBOT_${token}_SHARED_OK\n` ? null : "The agent could not write in the shared folder.",
+      report.networkStatus?.trim() === "200" ? null : "The agent could not reach the network.",
+      report.commandOutsideWritten ? "A command wrote outside the workspace." : null,
+      report.editOutsideWritten ? "A file edit wrote outside the workspace." : null,
+    ].filter(isString);
+    const reportPath = join(reportRoot, `${provider}.json`);
+    await writeFile(reportPath, `${JSON.stringify({ ok: failures.length === 0, failures, ...report }, null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify({ ok: failures.length === 0, mode: "workspace-only", provider, report: reportPath, failures })}\n`,
+    );
+    if (failures.length > 0) throw new Error(`${provider} Workspace only smoke failed: ${failures.join(" ")}`);
+  } finally {
+    await client.stop();
+    await rm(outsideRoot, { recursive: true, force: true });
   }
 }
 
@@ -340,6 +465,16 @@ function respondToServerRequest(
   }
 }
 
+function declineServerRequest(activeClient: AgentClient, request: { id: RequestId; method: string }): void {
+  if (request.method === "applyPatchApproval" || request.method === "execCommandApproval") {
+    activeClient.respond(request.id, { decision: "denied" });
+  } else if (request.method === "item/permissions/requestApproval") {
+    activeClient.respond(request.id, { permissions: {}, scope: "turn" });
+  } else {
+    activeClient.respond(request.id, { decision: "decline" });
+  }
+}
+
 function waitForTurn(activeClient: AgentClient, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Filesystem smoke turn timed out.")), timeoutMs);
@@ -352,6 +487,23 @@ function waitForTurn(activeClient: AgentClient, timeoutMs: number): Promise<void
       else reject(new Error(`Filesystem smoke turn finished with status ${status}.`));
     });
   });
+}
+
+async function readText(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function expectMissing(path: string, message: string): Promise<void> {

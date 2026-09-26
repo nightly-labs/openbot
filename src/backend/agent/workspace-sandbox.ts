@@ -3,11 +3,12 @@ import { type AgentSummary, workspaceAccessEnforced } from "@openbot/contracts/i
 type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath">;
 
 /**
- * The Codex sandbox for one agent. A `workspace` agent can write only in its workspace, the shared
- * folder and the temporary folders. Reads and the network stay open, as the Access setting says. A command that must
- * write outside asks for approval, and `AttentionRegistry` always shows that approval.
+ * The sandbox mode sent with each thread. A `workspace` agent can write only in its workspace, the
+ * shared folder and the temporary folders. Reads and the network stay open, as the Access setting
+ * says. A write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
- * The other providers ignore these fields, so their agents keep full access.
+ * Codex takes the mode itself. The Claude client reads `workspace-write` and applies its own
+ * sandbox (`claude-workspace-sandbox.ts`). Grok and OpenCode ignore it, so their agents keep full access.
  */
 export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "danger-full-access" {
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
