@@ -9,7 +9,7 @@ import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { createEffect, createStore } from "solid-js";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { filesPort } from "./files-port";
 
 /** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
@@ -19,7 +19,7 @@ export function serverHasStorage(server: ServerSummary | undefined): server is S
 
 /** Every member reads storage; the host lets only an owner or admin delete or clear. */
 export function canManageStorage(server: ServerSummary): boolean {
-  return server.kind === "local" || server.role === "owner" || server.role === "admin";
+  return serverRoleCanAdminister(server);
 }
 
 /** One storage scope of one server. Settings can be open for a server that is not the selected one. */

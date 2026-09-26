@@ -9,6 +9,7 @@ import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { mergeChannelPage } from "./channel-page-merge";
@@ -331,8 +332,7 @@ const Channels = createSimpleContext({
       state,
       supported,
       deletionSupported: () =>
-        supported() &&
-        (activeServer()?.kind !== "remote" || activeServer()?.role === "owner" || activeServer()?.role === "admin"),
+        supported() && (activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer())),
       refresh,
       retry: async () => {
         const previous = failedCommand;

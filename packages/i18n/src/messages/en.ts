@@ -137,6 +137,7 @@ export const en = {
   "settings.save.save": "Save",
   // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Available on this computer",
+  "provider.availableOnHost": "Runs on {name}",
   "provider.custom.name": "Custom provider",
   "provider.custom.description": "Your own model endpoint",
   "provider.custom.addLabel": "Add custom provider",

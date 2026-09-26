@@ -1,3 +1,4 @@
+import type { ProviderAdminDesktopApi } from "@openbot/contracts/ipc";
 import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 
 /**
@@ -13,3 +14,16 @@ export const providerKeyApi: ProviderKeyApi = {
   clearProviderApiKey: (provider) => window.openbot.clearProviderApiKey(provider),
   openExternal: (destination) => window.openbot.openExternal(destination),
 };
+
+/**
+ * The same four calls for the host of a joined server the account administers. The key goes to that
+ * host, and only its state comes back. Links still open in the browser of this computer.
+ */
+export function hostProviderKeyApi(admin: () => ProviderAdminDesktopApi, serverId: string): ProviderKeyApi {
+  return {
+    getProviderApiKeyState: (provider) => admin().getApiKeyState(provider, serverId),
+    setProviderApiKey: (input) => admin().setApiKey(input, serverId),
+    clearProviderApiKey: (provider) => admin().clearApiKey(provider, serverId),
+    openExternal: (destination) => window.openbot.openExternal(destination),
+  };
+}

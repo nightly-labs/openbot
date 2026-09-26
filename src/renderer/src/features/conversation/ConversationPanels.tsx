@@ -1,9 +1,10 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
+import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationController } from "./conversation-controller-context";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -241,13 +242,24 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
               skillsMarketplaceOpen={props.skillsMarketplaceOpen}
-              onAddFromMarketplace={props.server?.kind === "local" ? props.onOpenMarketplace : undefined}
-              skillsMode={props.runtime ? "hidden" : props.server?.kind === "local" ? "mutable" : "readonly"}
-              tablesVisible={props.server?.kind === "local"}
-              accessEditable={props.server?.kind === "local"}
+              onAddFromMarketplace={
+                serverCanAdminister(props.server, "skills-admin-v1") ? props.onOpenMarketplace : undefined
+              }
+              skillsMode={
+                props.runtime
+                  ? "hidden"
+                  : props.server?.kind === "local"
+                    ? "mutable"
+                    : serverCanAdminister(props.server, "skills-admin-v1")
+                      ? "host"
+                      : "readonly"
+              }
+              skillsServerId={props.server?.id}
+              tablesVisible={!props.runtime && serverCanAdminister(props.server, "shared-tables-v1")}
+              accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               agents={props.agents}
               onCreateSkill={
-                props.server?.kind === "local" &&
+                serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
                 !controller.selectionSending() &&
@@ -261,7 +273,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                   : undefined
               }
               onTrySkill={
-                props.server?.kind === "local" &&
+                serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
                 !controller.submitting() &&
                 !controller.selectionSending() &&

@@ -27,6 +27,8 @@ const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
   computerUse: "computerUse",
   skills: "skills",
   customProviders: "customProviders",
+  providerAdmin: "providerAdmin",
+  hostAdmin: "hostAdmin",
   hostedSites: "hostedSites",
   marketplaceAgents: "marketplaceAgents",
   agentTemplates: "agentTemplates",
@@ -40,6 +42,7 @@ const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
   channelMemories: "agent",
   channelRoutines: "agent",
   mcpServers: "agent",
+  agentAdmin: "agent",
   agentAttachments: "agent",
   // The preload calls it from its own drop, paste, and file input handlers.
   attachmentImports: null,

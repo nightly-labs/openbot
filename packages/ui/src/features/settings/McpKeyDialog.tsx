@@ -13,6 +13,8 @@ export interface McpKeyDialogProps extends McpConnectBaseProps {
   flow: McpKeyFlow;
   /** Opens the page the key is created on. Without it the dialog shows no link. */
   onOpenUrl?: (url: string) => void;
+  /** The joined server whose host keeps the credential. Absent when this computer keeps it. */
+  hostName?: string | undefined;
 }
 
 export function McpKeyDialog(props: McpKeyDialogProps) {
@@ -54,7 +56,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
       busy={busy}
       description={
         props.flow.fields.length > 0
-          ? `Paste a credential from your ${props.subject.name} account. OpenBot connects with it and keeps it on this computer.`
+          ? `Paste a credential from your ${props.subject.name} account. OpenBot connects with it and keeps it on ${props.hostName ?? "this computer"}.`
           : `${props.subject.name} asks for no credential. OpenBot connects once to see which tools it offers.`
       }
       onSubmit={submit}
@@ -118,7 +120,7 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
           <p class="mcp-connect-row mcp-connect-privacy">
             <ShieldCheck aria-hidden="true" />
             <Text as="span" tone="muted">
-              Kept on this computer.
+              Kept on {props.hostName ?? "this computer"}.
             </Text>
           </p>
         </div>

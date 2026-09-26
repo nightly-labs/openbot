@@ -1,4 +1,5 @@
 import type {
+  AddedAgent,
   AgentPublicationPreview,
   AgentSubmission,
   AgentSummary,
@@ -76,7 +77,7 @@ import { appPort } from "../../app-port";
 import { writeClipboardText } from "../../clipboard";
 import { createAsyncPanel } from "../../components/createAsyncPanel";
 import { SkillPreview } from "../../components/SkillPreview";
-import { type SkillsPort, skillsPort } from "../../skills-port";
+import { agentSkillCalls, type SkillsPort, skillsPort } from "../../skills-port";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import type { PluginUninstallPlan } from "./PluginUninstallDialog";
 import { PluginUninstallDialog } from "./PluginUninstallDialog";
@@ -94,11 +95,24 @@ interface SkillsMarketplaceModalProps {
   activeAgentId: string;
   onOpenChange: (open: boolean) => void;
   onTrySkill?: (agentId: string, skill: MarketplaceSkillDetail) => void;
-  onAgentInstalled?: (agent: AgentSummary) => void | Promise<void>;
+  /** `serverId` is the joined server the agent was added to, or absent for this computer. */
+  onAgentInstalled?: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   /** Optional plugin listings; absent = not served yet. */
   plugins?: PluginDetail[];
   /** Host server id for plugin app installs. */
   pluginServerId?: string;
+  /** The joined server that keeps a plugin's credential. Absent when this computer keeps it. */
+  pluginHostName?: string | undefined;
+  /**
+   * The joined server whose agents `agents` lists, when this account is its owner or admin. Skills
+   * then install on that host, which downloads them with its own account. Absent: this computer.
+   */
+  hostServerId?: string | undefined;
+  /**
+   * The joined server a marketplace agent is added to, when this account is its owner or admin and
+   * the host serves `agent-install-v1`. Absent: this computer.
+   */
+  agentServerId?: string | undefined;
   /** Insert a listing's example question into the chosen agent's composer. */
   onRunPluginPrompt?: (agentId: string, prompt: MarketplacePluginPrompt) => void;
   /**
@@ -372,13 +386,19 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       setError("Choose an agent to install this plugin's skills.");
       return;
     }
+    /* A browser sign-in saves its grant on the computer that finishes it, so an app that asks for
+       one is installed on the host itself. */
+    if (props.hostServerId && plugin.apps.some((app) => app.server.auth?.[0]?.kind === "link")) {
+      setError(`Install ${plugin.name} on the computer that runs these agents: its app needs a browser sign-in.`);
+      return;
+    }
     setBusy(`plugin:${plugin.id}`);
     const installed = await run(async () => {
       const added: string[] = [];
       try {
         for (const skill of plugin.skills) {
           const held = installedById().has(skill.id);
-          await skillsPort().skills.install({ agentId, skillId: skill.id, versionId: skill.versionId });
+          await agentSkillCalls(props.hostServerId).install({ agentId, skillId: skill.id, versionId: skill.versionId });
           if (!held) added.push(skill.id);
         }
         for (const app of plugin.apps) {
@@ -410,8 +430,8 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
   /** Takes back only what this attempt installed. A skill the agent already had is the user's. */
   async function undoSkills(agentId: string, skillIds: readonly string[]) {
     for (const skillId of skillIds)
-      await skillsPort()
-        .skills.uninstall({ agentId, skillId })
+      await agentSkillCalls(props.hostServerId)
+        .uninstall({ agentId, skillId })
         .catch(() => undefined);
   }
 
@@ -466,7 +486,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       for (const skill of plugin.skills) {
         if (!installedById().has(skill.id)) continue;
         try {
-          await skillsPort().skills.uninstall({ agentId, skillId: skill.id });
+          await agentSkillCalls(props.hostServerId).uninstall({ agentId, skillId: skill.id });
         } catch (cause) {
           failures.push(`${skill.slug}: ${marketplaceErrorMessage(cause)}`);
         }
@@ -579,7 +599,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     setMarket((state) => {
       state.installedLoad = "loading";
     });
-    const values = await run(() => skillsPort().skills.listInstalled(agentId));
+    const values = await run(() => agentSkillCalls(props.hostServerId).listInstalled(agentId));
     if (request !== installedRequest || !props.open || market.browse.targetAgentId !== agentId) return;
     if (!values) {
       setMarket((state) => {
@@ -740,7 +760,9 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     }
     const analytics = desktopAnalytics.scope();
     setBusy(skill.id);
-    const result = await run(() => skillsPort().skills.install({ agentId, skillId: skill.id, replaceModified }));
+    const result = await run(() =>
+      agentSkillCalls(props.hostServerId).install({ agentId, skillId: skill.id, replaceModified }),
+    );
     analytics.track("marketplace_action", {
       entity: "skill",
       action,
@@ -1256,7 +1278,10 @@ description: Turn merged work into clear, consistent release notes.
                   </Show>
                   <Show when={market.browse.kind === "agents"}>
                     <AgentMarketplacePanel
-                      agents={props.agents}
+                      /* The Team API agent summary has no marketplace source, and publishing reads
+                         this computer's agents, so the agents of a joined server are neither. */
+                      agents={props.hostServerId ? [] : props.agents}
+                      serverId={props.agentServerId}
                       view={market.browse.tab}
                       query={searchQuery()}
                       refreshVersion={agentRefreshVersion()}
@@ -1312,6 +1337,7 @@ description: Turn merged work into clear, consistent release notes.
                   onConnected={(config) => pending.settle(config)}
                   onCancel={() => pending.settle(null)}
                   onOpenUrl={openPluginUrl}
+                  hostName={props.pluginHostName}
                 />
               )}
             </Match>
@@ -1341,7 +1367,8 @@ function AgentMarketplacePanel(props: {
   query: string;
   refreshVersion: number;
   addVersion: number;
-  onInstalled?: (agent: AgentSummary) => void | Promise<void>;
+  serverId: string | undefined;
+  onInstalled?: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   onEnterDetail: (name: string, close: () => void) => void;
   onLeaveDetail: () => void;
 }) {
@@ -1444,13 +1471,17 @@ function AgentMarketplacePanel(props: {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const analytics = desktopAnalytics.scope();
     setBusy(updating ? `update:${agent.id}` : agent.id);
-    const value = await run(() =>
-      skillsPort().marketplaceAgents.install({
-        listingId: agent.id,
-        ...(installation ? { agentId: installation.id } : {}),
-        timezone,
-        receiptId: crypto.randomUUID(),
-      }),
+    const serverId = props.serverId;
+    const input = {
+      listingId: agent.id,
+      ...(installation ? { agentId: installation.id } : {}),
+      timezone,
+      receiptId: crypto.randomUUID(),
+    };
+    const value = await run(async () =>
+      serverId
+        ? skillsPort().agent.addMarketplaceAgent(input, serverId)
+        : (await skillsPort().marketplaceAgents.install(input)).agent,
     );
     analytics.track("marketplace_action", {
       entity: "agent",
@@ -1458,7 +1489,7 @@ function AgentMarketplacePanel(props: {
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: updating ? "update_failed" : "install_failed" }),
     });
-    if (value) await props.onInstalled?.(value.agent);
+    if (value) await props.onInstalled?.(value, serverId);
     setBusy(null);
   }
 

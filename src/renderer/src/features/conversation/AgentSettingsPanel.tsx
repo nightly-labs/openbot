@@ -7,7 +7,7 @@ import SharedAgentSettingsPanel, {
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
-import { skillsPort } from "../../skills-port";
+import { agentSkillCalls, skillsPort } from "../../skills-port";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesModal } from "./AgentMemoriesModal";
@@ -31,8 +31,10 @@ interface AgentSettingsPanelProps
   onRoutineSelectionRequestHandled?: (nonce: number) => void;
   onOpenRoutineRun?: (messageId: string) => void;
   skillsMode?: AgentSkillsMode;
+  /** The joined server that runs the agent, for the `host` skills mode. */
+  skillsServerId?: string;
   skillsMarketplaceOpen?: boolean;
-  /** The shared data lives on the computer that runs the agents, so a remote server hides it. */
+  /** The shared data lives on the computer that runs the agents. A joined server shows it to an admin only. */
   tablesVisible?: boolean;
   /** Names the agent that keeps each set of records. Threaded like `customProviders`, for the same reason. */
   agents?: readonly AgentProfile[];
@@ -121,7 +123,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       const items =
         skillsMode() === "readonly"
           ? await skillsPort().agent.listInstalledSkills(agentId)
-          : await skillsPort().skills.listInstalled(agentId);
+          : await agentSkillCalls(skillsMode() === "host" ? props.skillsServerId : undefined).listInstalled(agentId);
       setDraft((state) => {
         state.skills.count = assignedSkillCount(items);
       });
@@ -307,6 +309,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           agentName={props.agent.name}
           open={draft.skills.open}
           skillsMode={skillsMode()}
+          serverId={props.skillsServerId}
           onCreateSkill={props.onCreateSkill}
           onTrySkill={props.onTrySkill}
           onAddFromMarketplace={

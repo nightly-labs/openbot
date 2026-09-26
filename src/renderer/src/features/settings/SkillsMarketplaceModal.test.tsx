@@ -352,7 +352,7 @@ describe("SkillsMarketplaceModal", () => {
     expect(window.openbot.marketplaceAgents.install).toHaveBeenCalledWith(
       expect.objectContaining({ listingId: detail.id }),
     );
-    await waitFor(() => expect(onInstalled).toHaveBeenCalledWith(installedAgent));
+    await waitFor(() => expect(onInstalled).toHaveBeenCalledWith(installedAgent, undefined));
     expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
       entity: "agent",
       action: "install",

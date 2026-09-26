@@ -1,4 +1,4 @@
-import type { AgentSummary, AgentTemplateDetail } from "@openbot/contracts/ipc";
+import type { AddedAgent, AgentTemplateDetail, ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { errorMessage } from "@openbot/ui/error-message";
 import { AgentTemplateInstallDialog } from "@openbot/ui/features/agents/AgentTemplateInstallDialog";
@@ -12,12 +12,14 @@ interface InstallState {
 
 /**
  * The dialog an `openbot://agents/<id>` link opens. It reads the template by the id the link named
- * and installs it on this computer only when the user presses Add agent.
+ * and installs it only when the user presses Add agent: on `server` when one is given, whose host
+ * downloads the template itself, otherwise on this computer.
  */
 export function AgentTemplateInstall(props: {
   templateId: string | null;
+  server?: ServerSummary | undefined;
   onClose: () => void;
-  onInstalled: (agent: AgentSummary) => Promise<void>;
+  onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {
   const [state, setState] = createStore<InstallState>({ detail: null, loading: false });
 
@@ -58,15 +60,22 @@ export function AgentTemplateInstall(props: {
     const templateId = props.templateId;
     const reviewed = state.detail;
     if (!templateId || !reviewed) return;
-    const { agent } = await agentTemplatesPort().agentTemplates.install({
+    const server = props.server;
+    const input = {
       templateId,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       expectedUpdatedAt: reviewed.updatedAt,
-    });
+    };
+    const port = agentTemplatesPort();
+    const agent = server
+      ? await port.agent.addTemplateAgent(input, server.id)
+      : (await port.agentTemplates.install(input)).agent;
     props.onClose();
-    toast.success(`${agent.name} added`, { description: "Its instructions, skills and routines are ready." });
+    toast.success(server ? `${agent.name} added to ${server.name}` : `${agent.name} added`, {
+      description: "Its instructions, skills and routines are ready.",
+    });
     // Opening the new agent reports its own failure and never rejects, so it cannot read as a failed install.
-    await props.onInstalled(agent);
+    await props.onInstalled(agent, server?.id);
   }
 
   return (

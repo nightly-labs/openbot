@@ -2,9 +2,15 @@ import { BROWSER_SECRET_CAPABILITY } from "../ipc-browser-secret";
 import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
+import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
+import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY } from "./browser-view-v1";
+import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
+import { PROVIDERS_ADMIN_CAPABILITY } from "./providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
+import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
+import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { TEAM_PROTOCOL_V4_CAPABILITIES } from "./v4";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
@@ -20,8 +26,14 @@ export const TEAM_AGENT_CREATE_MODEL_CAPABILITY = "agent-create-model";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export {
+  AGENT_ADMIN_CAPABILITY,
+  AGENT_INSTALL_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  HOST_ADMIN_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  PROVIDERS_ADMIN_CAPABILITY,
+  SHARED_TABLES_CAPABILITY,
+  SKILLS_ADMIN_CAPABILITY,
   STORAGE_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
@@ -50,6 +62,12 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_DELETE_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   STORAGE_CAPABILITY,
+  AGENT_ADMIN_CAPABILITY,
+  SKILLS_ADMIN_CAPABILITY,
+  SHARED_TABLES_CAPABILITY,
+  AGENT_INSTALL_CAPABILITY,
+  PROVIDERS_ADMIN_CAPABILITY,
+  HOST_ADMIN_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

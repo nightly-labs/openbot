@@ -1,4 +1,11 @@
 import type { ChannelService } from "../../backend/channel-service";
+import type { AgentAdminSettingsService } from "../agent-admin-settings";
+import type { AgentMarketplaceService } from "../agent-marketplace-service";
+import type { AgentTemplateService } from "../agent-template-service";
+import type { CustomProviderChanges } from "../custom-provider-changes";
+import type { ProviderCredentialStore } from "../provider-credential-store";
+import type { ProviderRuntimeManager } from "../provider-runtime-manager";
+import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
 // Every service arrives as a `Pick<>` of the real class. The point is not brevity: the Team API is
@@ -17,6 +24,7 @@ import type {
   InviteSummary,
   SidebarLayoutSnapshot,
   TeamPresenceSnapshot,
+  UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
@@ -116,6 +124,37 @@ export type TeamApiMcpServers = Pick<
 /** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
 
+/**
+ * The admin routes, one member per optional capability. A member's presence is what
+ * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
+ */
+export interface TeamApiAdmin {
+  /** `agent-admin-v1`: access and auto-approve of one agent. */
+  agents?: AgentAdminSettingsService;
+  /** `skills-admin-v1`: list, install, remove and enable the skills of one agent. */
+  skills?: Pick<SkillMarketplaceService, "listInstalled" | "install" | "uninstall" | "setEnabled">;
+  /** `shared-tables-v1`: list and delete the tables the agents share. */
+  sharedTables?: Pick<AgentService, "listTables" | "deleteTable">;
+  /** `agent-install-v1`: add an agent from a marketplace listing or a shared template. Both must be set. */
+  marketplaceAgents?: Pick<AgentMarketplaceService, "install">;
+  agentTemplates?: Pick<AgentTemplateService, "install">;
+  /** `providers-v1`: code sign-in, provider API keys, managed CLI runtimes and custom endpoints. */
+  providers?: TeamApiProviders;
+  /** `host-admin-v1`: the server name and logo. */
+  identity?: TeamApiHostIdentity;
+}
+
+interface TeamApiHostIdentity {
+  updateIdentity(input: UpdateHostIdentityInput): Promise<unknown>;
+}
+
+interface TeamApiProviders {
+  service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
+  credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
+  runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
+  customProviders: CustomProviderChanges;
+}
+
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,
@@ -168,6 +207,7 @@ export interface TeamApiOptions {
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
+  admin?: TeamApiAdmin;
   appVersion?: string;
   store: TeamStore;
   agents: TeamApiAgents;
