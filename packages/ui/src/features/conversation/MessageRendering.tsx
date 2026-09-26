@@ -15,7 +15,13 @@ import { ImageGeneration } from "./ImageGeneration";
 import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
-import { nextStreamingReveal, type StreamingRevealChunk, StreamingRevealContext } from "./streamingReveal";
+import {
+  nextStreamingReveal,
+  type StreamingRevealChunk,
+  StreamingRevealContext,
+  sameStreamingTailOffsets,
+  streamingTrailReach,
+} from "./streamingReveal";
 
 export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
   if (message.author === "you") return "secondary";
@@ -167,6 +173,23 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   return { animateTail, body, smoothHeight, revealing, trail };
 }
 
+/**
+ * The characters of the body after each text block that the fading steps reach. The search for a
+ * block starts after the previous one, and a code block can hold the same text, so an offset can
+ * only be too large: that shows words without a fade instead of fading shown words again.
+ */
+function textBlockTailOffsets(body: string, blocks: readonly MessageContentBlock[], reach: number) {
+  let cursor = 0;
+  return blocks.map((block) => {
+    if (block.type !== "text") return undefined;
+    const start = body.indexOf(block.text, cursor);
+    if (start < 0) return undefined;
+    cursor = start + block.text.length;
+    const after = body.length - cursor;
+    return after < reach ? after : undefined;
+  });
+}
+
 const comparisonTableContent = (block: MessageContentBlock) => (block.type === "comparison-table" ? block : undefined);
 const dataTableContent = (block: MessageContentBlock) => (block.type === "table" ? block : undefined);
 const codeContent = (block: MessageContentBlock) => (block.type === "code" ? block : undefined);
@@ -228,6 +251,13 @@ export function MessageBody(props: {
         ? messageContentBlocks(streamedBody(), streamingBody.revealing())
         : [{ type: "text", text: selectionInstruction()?.instruction ?? props.message.body }],
     ),
+  );
+  const textTailAfter = createMemo(
+    () =>
+      streamingBody.animateTail()
+        ? textBlockTailOffsets(streamedBody(), contentBlocks(), streamingTrailReach(streamingBody.trail()))
+        : [],
+    { equals: sameStreamingTailOffsets },
   );
   const lastTextBlockIndex = createMemo(() => {
     const blocks = contentBlocks();
@@ -345,9 +375,7 @@ export function MessageBody(props: {
                                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                                 showCitationFooter={index === lastTextBlockIndex()}
                                 streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                                // Only the last block holds the newest text. While a code block after it
-                                // streams, a tail here would fade words that are already shown.
-                                streamingTail={streamingBody.animateTail() && index === contentBlocks().length - 1}
+                                streamingTailAfter={textTailAfter()[index]}
                               />
                             </div>
                           );

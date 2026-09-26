@@ -66,42 +66,42 @@ export interface ProviderPickerProps {
   allowUnavailableSelection?: boolean;
   focusFirst?: boolean;
   refreshingProviders?: boolean;
-  onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
+  onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
    * Starts the update the row offers, or asks for one when none is offered yet. Whether that
    * re-downloads the managed runtime or runs the CLI's own updater is decided by the caller, which
    * knows who owns the install.
    */
-  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
    * Starts the sign-in the user finishes on another device. Offered beside the row's usual sign-in,
    * never instead of it: this is the way out for a computer whose browser cannot complete the
    * hand-off, and only for a provider whose descriptor says `codeSignIn`.
    */
-  onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
+  onSignInWithCodeProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /**
    * The dialog element a row's actions menu portals into. Without it the menu lands beside the
    * dialog in `body`, where a modal makes it inert and out of reach.
    */
-  menuMount?: HTMLElement;
+  menuMount?: HTMLElement | undefined;
   onRefreshProviders?: () => void | Promise<void>;
   /** Add row gated by OpenCode install; else offers install. */
-  onAddCustomProvider?: () => void;
+  onAddCustomProvider?: (() => void) | undefined;
   /** Named endpoints share one row; endpoint pick is model pick. */
   customProviders?: readonly CustomProviderSummary[];
   /** Custom check suppresses provider check; needs endpoint + handler. */
   customSelected?: boolean;
-  onSelectCustomProvider?: () => void;
+  onSelectCustomProvider?: (() => void) | undefined;
   /**
    * Opens the list of saved endpoints, where they are removed. With it the count is a button beside
    * Add; without it the count stays a badge inside the label, because a button must not sit inside
    * a `<label>`: a click there would answer the radio instead.
    */
-  onManageCustomProviders?: () => void;
+  onManageCustomProviders?: (() => void) | undefined;
   onChange: (provider: AgentProviderId) => void;
 }
 
