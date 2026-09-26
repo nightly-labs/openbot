@@ -93,7 +93,7 @@ interface SkillsMarketplaceModalProps {
   agents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
   activeAgentId: string;
   onOpenChange: (open: boolean) => void;
-  onTrySkill?: (agentId: string, skill: MarketplaceSkillDetail) => void;
+  onTrySkill?: ((agentId: string, skill: MarketplaceSkillDetail) => void) | undefined;
   /** `serverId` is the joined server the agent was added to, or absent for this computer. */
   onAgentInstalled?: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   /** Optional plugin listings; absent = not served yet. */
@@ -113,7 +113,7 @@ interface SkillsMarketplaceModalProps {
    */
   agentServerId?: string | undefined;
   /** Insert a listing's example question into the chosen agent's composer. */
-  onRunPluginPrompt?: (agentId: string, prompt: MarketplacePluginPrompt) => void;
+  onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   /**
    * The listing an `openbot://plugins/<slug>` link asked for. It selects the tab and opens the page;
    * it never installs, so what a link can do is show a user a listing they then decide about.
