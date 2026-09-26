@@ -57,6 +57,7 @@ import {
   SettingsSection,
   ShieldCheck,
   SlidingTabs,
+  Sparkles,
   SwitchField,
   Tabs,
   Text,
@@ -73,6 +74,7 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { truncateMiddle } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, snapshot } from "solid-js";
 import { type ServerStorageOptions, ServerStoragePanel } from "../files/ServerStoragePanel";
+import { type HostProviderSettings, HostProviderSettingsPanel } from "../settings/ProviderSettingsSection";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
 import { RemoteDesktopSetup } from "./RemoteDesktopSetup";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
@@ -134,11 +136,16 @@ export interface ServerSettingsModalProps {
    * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
    */
   storage?: ServerStorageOptions | undefined;
+  /**
+   * The Providers section appears only when a caller supplies this. The desktop app passes nothing:
+   * its own Settings holds the providers of every host it administers.
+   */
+  providers?: HostProviderSettings | undefined;
   /** The Import section appears only when a caller supplies this: agents import into the local server. */
   agentImport?: ServerImportOptions;
 }
 
-type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "import";
+type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "providers" | "import";
 type InviteMode = "link" | "email" | "perma";
 type InviteRole = Exclude<TeamRole, "owner">;
 
@@ -155,6 +162,10 @@ const sections: Record<Section, { title: string; description: string }> = {
   storage: {
     title: "Storage",
     description: "See what OpenBot keeps on this server’s disk, and free space.",
+  },
+  providers: {
+    title: "Providers",
+    description: "Manage the AI providers of the computer that runs this server.",
   },
   import: {
     title: "Import",
@@ -615,6 +626,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "desktop" ||
         value === "mcp" ||
         value === "storage" ||
+        value === "providers" ||
         value === "import"
       )
         setSection(value);
@@ -798,6 +810,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>Storage</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.providers}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="providers">
+                <Sparkles aria-hidden="true" />
+                <span>Providers</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={props.agentImport}>
               <Tabs.Trigger class="settings-modal-nav-item" value="import">
                 <Download aria-hidden="true" />
@@ -845,6 +863,13 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
               <ServerStoragePanel serverId={props.server.id} {...storage()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={props.providers}>
+          {(providers) => (
+            <Tabs.Content value="providers" class="settings-modal-tab-panel server-settings-panel" data-tab="providers">
+              <HostProviderSettingsPanel {...providers()} hostName={props.server.name} selectMount={modalElement()} />
             </Tabs.Content>
           )}
         </Show>

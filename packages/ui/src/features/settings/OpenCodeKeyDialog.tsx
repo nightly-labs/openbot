@@ -44,7 +44,7 @@ export interface OpenCodeKeyDialogProps {
    * no stored key could never retry from here: saving needs a key, removing needs one saved,
    * and closing answers nothing.
    */
-  onReconnect?: () => void | Promise<void>;
+  onReconnect?: (() => void | Promise<void>) | undefined;
 }
 
 type DialogPhase = "idle" | "loading" | "saving" | "removing";

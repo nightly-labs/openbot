@@ -90,6 +90,11 @@ the directory still lists the host. `ConversationRuntime.admin` carries the skil
 calls to the agent settings panel, which shows only Skills and Tables in the browser. Memories,
 routines, and files stay on the desktop. The auto-approve switch writes through the agent-admin
 route. The skills dialog has no marketplace catalog in the browser yet.
+`web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
+the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
+sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The
+browser applies host `status` events, and reads the status every 3 seconds while a code sign-in waits.
+A provider key stays in the dialog input until it is sent to the host.
 
 Browser sign-in, account reads, and connection tickets are always available. No host or D1
 migration is needed. See [web client delivery](web-client.md) for the seven review scopes, local

@@ -1,9 +1,3 @@
-import type {
-  AgentProviderId,
-  CustomProviderRestart,
-  CustomProviderSummary,
-  SaveCustomProviderInput,
-} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -21,18 +15,13 @@ import {
   SelectValue,
   SettingsSection,
   SwitchField,
-  Text,
   toast,
 } from "@openbot/ui";
-import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
-import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, Show } from "solid-js";
-import { ProviderPicker } from "../../components/ProviderPicker";
 import { useI18n } from "../../i18n-context";
-import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { LanguageSelect } from "./LanguageSelect";
-import type { SettingsGeneralStore } from "./stores/general-store";
+import { ProviderSettingsSection, type ProviderSettingsSectionProps } from "./ProviderSettingsSection";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
 
@@ -45,30 +34,9 @@ const LINK_TARGET_KEYS = {
   OpenBot: "settings.externalLinks.openbot",
 } as const satisfies Record<GeneralSettingsValue["externalLinkTarget"], AppTextKey>;
 
-interface SettingsGeneralTabProps {
-  store: SettingsGeneralStore;
+interface SettingsGeneralTabProps extends ProviderSettingsSectionProps {
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  /** The dialog element the Select popovers portal into, captured when this tab was created. */
-  selectMount: HTMLElement | undefined;
-  onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
-  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /**
-   * Accepts a described endpoint. Without it the section offers no custom provider at all, which is
-   * how a remote server hides the whole feature: these endpoints merge into the OpenCode process on
-   * this computer.
-   */
-  onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
-  /** The endpoints already saved, without their keys. Empty until the first list arrives. */
-  customProviders?: readonly CustomProviderSummary[];
-  /** Without it the rows are listed but not removable, which is what a story without the callback shows. */
-  onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
-  onSignInProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
-  onSignInWithCodeProvider?: (provider: AgentProviderId) => void | Promise<void>;
   turboModePending?: boolean;
   /** Shows one desktop notification now. Absent where there is no operating system to show it. */
   onTestNotification?: () => void | Promise<void>;
@@ -88,79 +56,10 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   };
   const linkTargetLabel = (value: GeneralSettingsValue["externalLinkTarget"] | undefined) =>
     value === undefined ? "" : i18n.t(LINK_TARGET_KEYS[value]);
-  const customProviders = () => props.customProviders ?? [];
-  /**
-   * Which row holds the check here. Nothing stores it: the whole Settings picker is local state
-   * today, so this row matches its neighbours and no more. Do not wire it to a saved default without
-   * first deciding what a saved default means for the four rows beside it.
-   */
-  const [customSelected, setCustomSelected] = createSignal(false);
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
-  const host = createCustomProviderHostState({
-    onAdd: (value) => props.onAddCustomProvider?.(value),
-    onDelete: (id) => props.onDeleteCustomProvider?.(id),
-    onRemoved: () => {
-      if (customProviders().length === 0) {
-        setCustomSelected(false);
-      }
-    },
-  });
-
   return (
     <>
-      <SettingsSection title={i18n.t("settings.providers.title")}>
-        <ProviderPicker
-          value={props.store.selectedProvider()}
-          options={props.store.providerOptions()}
-          ariaLabel={i18n.t("settings.providers.title")}
-          embedded
-          allowUnavailableSelection
-          customProviders={customProviders()}
-          customSelected={customSelected()}
-          onChange={(provider) => {
-            setCustomSelected(false);
-            props.store.setSelectedProvider(provider);
-          }}
-          onDownloadProvider={props.onDownloadProvider}
-          onCancelProviderDownload={props.onCancelProviderDownload}
-          onUpdateProvider={props.onUpdateProvider}
-          onConnectProvider={props.onConnectProvider}
-          onInstallProvider={props.onInstallProvider}
-          onAddCustomProvider={props.onAddCustomProvider ? host.openForm : undefined}
-          onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
-          onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
-          onSignInProvider={props.onSignInProvider}
-          onSignInWithCodeProvider={props.onSignInWithCodeProvider}
-          menuMount={props.selectMount}
-        />
-        {/* The outcome is shown where the user is looking. While the list is open the section behind
-            it is hidden from assistive technology, so a status left here could not be read. */}
-        <Show when={host.state.manageOpen ? null : host.state.note}>
-          {(message) => (
-            <Text tone="muted" variant="caption" role="status">
-              {message()}
-            </Text>
-          )}
-        </Show>
-        <Show when={props.onAddCustomProvider}>
-          <CustomProviderDialog
-            open={host.state.open}
-            busy={host.state.saving}
-            submitError={host.state.submitError}
-            takenProviderIds={customProviders().map((provider) => provider.id)}
-            onSubmit={(value) => void host.submit(value)}
-            onCancel={host.closeForm}
-          />
-          <CustomProviderListDialog
-            open={host.state.manageOpen}
-            providers={customProviders()}
-            removing={host.state.removing}
-            note={host.state.note}
-            onDelete={props.onDeleteCustomProvider ? (provider) => void host.remove(provider) : undefined}
-            onClose={host.closeList}
-          />
-        </Show>
-      </SettingsSection>
+      <ProviderSettingsSection {...props} />
 
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
