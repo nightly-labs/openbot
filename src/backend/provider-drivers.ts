@@ -313,6 +313,17 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpAuthorization: context.mcpAuthorization,
       }),
+    // A profile-generation client asks one question and must not act: no MCP servers, and every
+    // permission request is cancelled.
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "antigravity",
+        argv: ANTIGRAVITY_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.antigravitySignIn"),
+        servesModel: context.servesModel,
+      }),
     authState: (account) => ({ kind: "antigravity", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },

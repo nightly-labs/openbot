@@ -71,9 +71,6 @@ export function ServerMenu(props: ServerMenuProps) {
 
   function selectServer(server: ServerSummary): void {
     setMenuOpen(false);
-    // focusRestoreHandler runs only when Kobalte closes the menu. Give focus back to the server
-    // name after the same two frames, when the menu has closed.
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => trigger?.focus()));
     if (!server.active) props.onSelect(server.id);
   }
 
@@ -89,14 +86,7 @@ export function ServerMenu(props: ServerMenuProps) {
   }
 
   return (
-    <ContextMenu.Root modal={false}>
-      <ContextMenu.Trigger
-        hidden
-        ref={(element) => (anchor = element)}
-        onContextMenu={(event) => {
-          if (!activeServer()) event.preventDefault();
-        }}
-      />
+    <>
       <DropdownMenu.Root open={menuOpen()} onOpenChange={setMenuOpen} placement="bottom-start" gutter={4}>
         <DropdownMenu.Trigger
           ref={(element) => (trigger = element)}
@@ -242,23 +232,33 @@ export function ServerMenu(props: ServerMenuProps) {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-      <ContextMenu.Portal>
-        <ContextMenu.Content class="agent-context-menu" aria-label={t("server.rail.actions")}>
-          <Show when={activeServer()}>
-            {(server) => (
-              <ServerActionItems
-                menu={ContextMenu}
-                server={server()}
-                trigger={() => trigger ?? null}
-                onSetMuted={props.onSetMuted}
-                onSetNotificationLevel={props.onSetNotificationLevel}
-                onOpenUsage={props.onOpenUsage}
-                onOpenSettings={props.onOpenSettings}
-              />
-            )}
-          </Show>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
+      {/* A sibling, not a parent: inside a menu root, Kobalte makes the dropdown a submenu without a focus trap. */}
+      <ContextMenu.Root modal={false}>
+        <ContextMenu.Trigger
+          hidden
+          ref={(element) => (anchor = element)}
+          onContextMenu={(event) => {
+            if (!activeServer()) event.preventDefault();
+          }}
+        />
+        <ContextMenu.Portal>
+          <ContextMenu.Content class="agent-context-menu" aria-label={t("server.rail.actions")}>
+            <Show when={activeServer()}>
+              {(server) => (
+                <ServerActionItems
+                  menu={ContextMenu}
+                  server={server()}
+                  trigger={() => trigger ?? null}
+                  onSetMuted={props.onSetMuted}
+                  onSetNotificationLevel={props.onSetNotificationLevel}
+                  onOpenUsage={props.onOpenUsage}
+                  onOpenSettings={props.onOpenSettings}
+                />
+              )}
+            </Show>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+    </>
   );
 }
