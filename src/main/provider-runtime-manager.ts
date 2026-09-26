@@ -80,6 +80,8 @@ const COMMIT_ATTEMPTS = 3;
 const STAGING_PREFIXES = [".staging-", ".installing-", ".replaced-"];
 /** How often a running app asks upstream for a newer provider CLI. A user can also ask at any time. */
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+/** How long a first install waits for the release check before it takes the pinned version. */
+const RELEASE_CHECK_WAIT_MS = 10_000;
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type PartialMetadata = { url: string; etag: string | null; expectedBytes: number };
@@ -350,6 +352,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
       throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
     if (this.#tasks.has(runtime)) return this.getStatus();
+    if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
+      await this.#awaitReleaseCheck(this.#check);
+      if (this.#stopping) throw new Error("OpenBot is closing.");
+      if (this.#tasks.has(runtime)) return this.getStatus();
+    }
     const spec = this.#targetSpec(runtime, this.#target);
     const current = this.#statuses[runtime];
     // A download goes only toward a newer version, never back to an older one. A failed update keeps
@@ -386,6 +393,26 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       });
     this.#tasks.set(runtime, task);
     return this.getStatus();
+  }
+
+  /**
+   * Waits for the running release check, so a first install gets the latest release, not the pin.
+   *
+   * The first install is on the onboarding screen, often seconds after launch, while the check that
+   * `startUpdateChecks` began still waits for GitHub, npm and x.ai. A download that did not wait
+   * would install the pinned version and offer the update a moment later. A check that fails, or
+   * that takes longer than `RELEASE_CHECK_WAIT_MS`, leaves the pinned version, so a slow source
+   * holds a first install back only that long. No check is started here: one that already failed
+   * would fail again, and the hourly check or the user's own check finds the release later.
+   */
+  async #awaitReleaseCheck(check: Promise<void>): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, RELEASE_CHECK_WAIT_MS);
+      timer.unref();
+    });
+    await Promise.race([check.catch(() => undefined), timeout]);
+    clearTimeout(timer);
   }
 
   async downloadAndWait(runtime: ManagedRuntimeId): Promise<void> {
