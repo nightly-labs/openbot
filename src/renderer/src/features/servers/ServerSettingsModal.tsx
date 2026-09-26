@@ -111,7 +111,7 @@ export interface ServerSettingsModalProps {
    * servers - a remote host without the capability, or a `member` account - passes nothing, and
    * then neither the tab nor the panel exists.
    */
-  mcpServers?: McpServerConfig[];
+  mcpServers?: McpServerConfig[] | undefined;
   /** Why the MCP list is empty, when the read failed rather than found nothing. */
   mcpLoadError?: string | null;
   /**
@@ -133,7 +133,7 @@ export interface ServerSettingsModalProps {
    * The Storage section appears only when a caller supplies this: a remote host without
    * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
    */
-  storage?: ServerStorageOptions;
+  storage?: ServerStorageOptions | undefined;
   /** The Import section appears only when a caller supplies this: agents import into the local server. */
   agentImport?: ServerImportOptions;
 }

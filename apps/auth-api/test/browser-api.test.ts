@@ -44,7 +44,7 @@ function setup() {
 }
 function request(
   path: string,
-  options: { method?: string; body?: object; cookie?: string; origin?: string; csrf?: string } = {},
+  options: { method?: string; body?: object | undefined; cookie?: string; origin?: string; csrf?: string } = {},
 ) {
   const method = options.method ?? (options.body ? "POST" : "GET");
   return new Request(`https://openbot.test/api/browser/${path}`, {
