@@ -13,6 +13,15 @@ When a step doesn't need the developer's input, keep going. Put status notes in 
 your next action. Stop and ask only when you can't continue without the developer, or before
 anything destructive: deleting data, force-pushing, or changing anything outside this repository.
 
+For work with more than a few steps, keep a checklist in `TASKS.md` at the worktree root (git
+ignores it). Tick each item when it is done, and add new items that you find. The file stays
+available after the context is summarized.
+
+For an audit or migration that divides into independent areas, give each area to its own subagent.
+Check the evidence in each subagent's report before you accept it. Finish with one table.
+
+Mark each claim that you could not confirm, and say where you looked.
+
 **Non-negotiable** rules protect user data, released contracts, and security. Change them only on
 an explicit developer decision. All other rules are defaults: follow the developer's preference
 and state which default you set aside. Do not argue by citing this file.
