@@ -4,13 +4,14 @@ import { Blocks, Button, Puzzle } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import type { AgentProfile, MessageCitation } from "../../data";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AnchoredTooltip } from "./AnchoredTooltip";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { LinkIcon } from "./ConversationIcons";
 import { messageFileReferences } from "./FileReference";
+import { splitStreamingTrail, useStreamingReveal } from "./streamingReveal";
 
 export interface RichMessageTextProps {
   body: string;
@@ -212,44 +213,26 @@ export function RichMessageText(props: RichMessageTextProps) {
 }
 
 function StreamingTailText(props: { body: string }) {
-  const parts = createMemo(() => splitStreamingTail(props.body));
-  let word: HTMLSpanElement | undefined;
-  let revealFrame: number | undefined;
-
-  const revealWord = (element: HTMLSpanElement) => {
-    word = element;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      word.classList.add("is-in");
-      return;
-    }
-    word.style.transition = "none";
-    word.classList.remove("is-in");
-    void word.offsetWidth;
-    word.style.removeProperty("transition");
-    revealFrame = window.requestAnimationFrame(() => word?.classList.add("is-in"));
-  };
-  onCleanup(() => {
-    if (revealFrame !== undefined) window.cancelAnimationFrame(revealFrame);
-  });
+  const trail = useStreamingReveal();
+  const parts = createMemo(() => splitStreamingTrail(props.body, trail?.() ?? []));
 
   return (
     <>
       {parts().prefix}
-      <Show when={parts().tail}>
-        {(tail) => (
-          <span ref={revealWord} class="t-stream-w">
-            {tail()}
+      <For each={parts().chunks}>
+        {(chunk) => (
+          /* The block that holds the tail renders again on each step. A delay of minus the step's
+             age continues its fade where it was, instead of starting it again. */
+          <span
+            class="t-stream-w"
+            style={{ "animation-delay": `${Math.min(0, chunk.revealedAt - performance.now())}ms` }}
+          >
+            {chunk.text}
           </span>
         )}
-      </Show>
+      </For>
     </>
   );
-}
-
-function splitStreamingTail(body: string): { prefix: string; tail: string } {
-  const match = /(\S+\s*)$/u.exec(body);
-  if (!match || match.index === undefined) return { prefix: body, tail: "" };
-  return { prefix: body.slice(0, match.index), tail: match[1] ?? "" };
 }
 
 export function MessageLink(props: {
