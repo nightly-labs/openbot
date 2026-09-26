@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { parseInstallAgentTemplate } from "../ipc/agent-template-handlers";
 import { parseInstallMarketplaceAgent } from "../ipc/app-inputs";
@@ -9,8 +12,8 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 /**
  * A new agent on this computer from a marketplace listing or a shared template, added from a joined
- * server. This computer downloads the listing or template with its own account. Frozen by
- * `agent-install-v1`.
+ * server, or an agent from a listing updated to its current version. This computer downloads the
+ * listing or template with its own account. Frozen by `agent-install-v1` and `agent-update-v1`.
  */
 export async function routeAgentInstall(
   context: TeamApiRequestContext,
@@ -19,14 +22,27 @@ export async function routeAgentInstall(
   const { method, url, capabilities, member, request, json } = context;
   const marketplace = method === "POST" && url.pathname === AGENT_INSTALL_ROUTES.marketplace;
   const template = method === "POST" && url.pathname === AGENT_INSTALL_ROUTES.template;
-  if (!marketplace && !template) return "unmatched";
+  const update = method === "POST" && url.pathname === AGENT_UPDATE_ROUTES.marketplace;
+  if (!marketplace && !template && !update) return "unmatched";
   const marketplaceAgents = admin?.marketplaceAgents;
   const agentTemplates = admin?.agentTemplates;
+  if (update) {
+    if (!marketplaceAgents || !capabilities.has(AGENT_UPDATE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.agentUpdateUnsupported"));
+    requireAdmin(member);
+    return answer(json, updateFromMarketplace(marketplaceAgents, await readJson(request)));
+  }
   if (!marketplaceAgents || !agentTemplates || !capabilities.has(AGENT_INSTALL_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.agentInstallUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
-  const add = marketplace ? addFromMarketplace(marketplaceAgents, body) : addFromTemplate(agentTemplates, body);
+  return answer(
+    json,
+    marketplace ? addFromMarketplace(marketplaceAgents, body) : addFromTemplate(agentTemplates, body),
+  );
+}
+
+async function answer(json: TeamApiRequestContext["json"], add: Install): Promise<RouteOutcome> {
   try {
     const { agent } = await add();
     return json(200, { agentId: agent.id, name: agent.name });
@@ -51,6 +67,17 @@ function addFromMarketplace(service: NonNullable<TeamApiAdmin["marketplaceAgents
   // agent-install-v1 only adds a new agent, so an id to update is never passed on.
   const { listingId, timezone, receiptId } = parsed(parseInstallMarketplaceAgent, body);
   return () => service.install({ listingId, timezone, receiptId });
+}
+
+function updateFromMarketplace(service: NonNullable<TeamApiAdmin["marketplaceAgents"]>, body: unknown): Install {
+  // An update records no install receipt, so the id only fills the shared input. The service refuses
+  // an agent that is gone or was added from another listing.
+  const input = parsed(parseInstallMarketplaceAgent, {
+    ...(isDynamicRecord(body) ? body : {}),
+    receiptId: randomUUID(),
+  });
+  if (input.agentId === undefined) throw new HttpError(400, sourceText("error.team.agentUpdateTargetRequired"));
+  return () => service.install(input);
 }
 
 function addFromTemplate(service: NonNullable<TeamApiAdmin["agentTemplates"]>, body: unknown): Install {

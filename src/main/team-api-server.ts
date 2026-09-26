@@ -28,6 +28,7 @@ import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   isTeamCurrentCapability,
@@ -1158,6 +1159,7 @@ export class TeamApiServer {
           return (
             this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
           );
+        if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
         if (capability === PROVIDERS_ADMIN_CAPABILITY) return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         return true;

@@ -115,6 +115,11 @@ interface SkillsMarketplaceModalProps {
    * the host serves `agent-install-v1`. Absent: this computer.
    */
   agentServerId?: string | undefined;
+  /**
+   * The joined server in `hostServerId` when its host also updates an agent from its listing
+   * (`agent-update-v1`). Absent with a `hostServerId`: its agents offer no update.
+   */
+  agentUpdateServerId?: string | undefined;
   /** Insert a listing's example question into the chosen agent's composer. */
   onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   /**
@@ -1333,10 +1338,14 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                   </Show>
                   <Show when={market.browse.kind === "agents"}>
                     <AgentMarketplacePanel
-                      /* The Team API agent summary has no marketplace source, and publishing reads
-                         this computer's agents, so the agents of a joined server are neither. */
+                      /* Publishing reads this computer's agents, so a joined server's agents are only
+                         checked for an update, and only when their host can update them. */
                       agents={props.hostServerId ? [] : props.agents}
+                      installedAgents={
+                        !props.hostServerId || props.agentUpdateServerId === props.hostServerId ? props.agents : []
+                      }
                       serverId={props.agentServerId}
+                      updateServerId={props.hostServerId ? props.agentUpdateServerId : undefined}
                       calls={calls()}
                       view={market.browse.tab}
                       query={searchQuery()}
@@ -1418,12 +1427,16 @@ interface AgentsMarketplace {
 }
 
 function AgentMarketplacePanel(props: {
+  /** This computer's agents, which can be published. */
   agents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
+  /** The agents whose listing offers an update; they live on `updateServerId`. */
+  installedAgents: Array<Pick<AgentSummary, "id" | "name" | "marketplaceSource">>;
   view: Tab;
   query: string;
   refreshVersion: number;
   addVersion: number;
   serverId: string | undefined;
+  updateServerId: string | undefined;
   calls: MarketplaceCalls;
   onInstalled?: (agent: AddedAgent, serverId?: string) => void | Promise<void>;
   onEnterDetail: (name: string, close: () => void) => void;
@@ -1529,7 +1542,7 @@ function AgentMarketplacePanel(props: {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const analytics = desktopAnalytics.scope();
     setBusy(updating ? `update:${agent.id}` : agent.id);
-    const serverId = props.serverId;
+    const serverId = updating ? props.updateServerId : props.serverId;
     const input = {
       listingId: agent.id,
       ...(installation ? { agentId: installation.id } : {}),
@@ -1548,7 +1561,9 @@ function AgentMarketplacePanel(props: {
   }
 
   function installedAgent(agent: MarketplaceAgentSummary) {
-    const installations = props.agents.filter((installed) => installed.marketplaceSource?.listingId === agent.id);
+    const installations = props.installedAgents.filter(
+      (installed) => installed.marketplaceSource?.listingId === agent.id,
+    );
     return (
       installations.find((installed) => (installed.marketplaceSource?.version ?? 0) < agent.version) ?? installations[0]
     );

@@ -716,6 +716,7 @@ export function WebWorkspace(props: {
               activeAgentId={manageSkills() ? (workspace.state.selectedId ?? "") : ""}
               hostServerId={remoteAdminServer(server(), "skills-admin-v1")?.id}
               agentServerId={remoteAdminServer(server(), "agent-install-v1")?.id}
+              agentUpdateServerId={remoteAdminServer(server(), "agent-update-v1")?.id}
               onOpenChange={setMarketplaceOpen}
               onAgentInstalled={async (agent) => {
                 setMarketplaceOpen(false);

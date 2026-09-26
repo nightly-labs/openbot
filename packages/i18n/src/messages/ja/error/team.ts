@@ -59,6 +59,8 @@ export const messages = {
   "error.team.membersCannotArchiveChannels": "メンバーはチャンネルをアーカイブできません。",
   "error.team.sharedDataUnsupported": "この接続では共有データを利用できません。",
   "error.team.agentInstallUnsupported": "この接続ではエージェントを追加できません。",
+  "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
+  "error.team.agentUpdateTargetRequired": "更新するエージェントを指定してください。",
   "error.team.queueEditUnsupported": "このクライアントはキューの編集に対応していません。",
   "error.team.skillsUnsupported": "この接続ではスキルを利用できません。",
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",

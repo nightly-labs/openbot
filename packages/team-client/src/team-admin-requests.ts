@@ -57,6 +57,7 @@ import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -64,7 +65,6 @@ import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-ta
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiRequest } from "./team-api-requests";
 
 // The route codec has already checked the empty reply.
@@ -124,16 +124,17 @@ export function installAgentSkill(request: TeamApiRequest, input: InstallSkillIn
 }
 
 /**
- * Adds a new agent from a marketplace listing. Only ids cross the wire: the host downloads the listing
- * with its own account. agent-install-v1 only adds, so an update of an agent is refused here rather
- * than sent as an add that would make a copy.
+ * Adds a new agent from a marketplace listing, or updates one added from it. Only ids cross the wire:
+ * the host downloads the listing with its own account. agent-install-v1 only adds, so an update goes
+ * to agent-update-v1 rather than as an add that would make a copy.
  */
 export async function installMarketplaceAgent(
   request: TeamApiRequest,
   input: InstallMarketplaceAgentInput,
 ): Promise<AddedAgent> {
-  if (input.agentId !== undefined) throw new Error(sourceText("error.agent.joinedServerUpdate"));
-  const { listingId, timezone, receiptId } = input;
+  const { listingId, agentId, timezone, receiptId } = input;
+  if (agentId !== undefined)
+    return request("POST", AGENT_UPDATE_ROUTES.marketplace, decodeHostAddedAgent, { agentId, listingId, timezone });
   return request("POST", AGENT_INSTALL_ROUTES.marketplace, decodeHostAddedAgent, { listingId, timezone, receiptId });
 }
 
