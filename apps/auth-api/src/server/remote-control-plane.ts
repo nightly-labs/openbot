@@ -380,9 +380,9 @@ export class RemoteControlPlane {
     input: {
       hostId: string;
       role: Exclude<RemoteMemberRole, "owner">;
-      email?: string | null;
-      expiresInSeconds?: number;
-      permanent?: boolean;
+      email?: string | null | undefined;
+      expiresInSeconds?: number | undefined;
+      permanent?: boolean | undefined;
     },
   ) {
     await this.#requireRole(input.hostId, user.id, ["owner", "admin"]);
