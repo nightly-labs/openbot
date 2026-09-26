@@ -893,11 +893,14 @@ export class RemoteControlPlane {
     const now = this.#now();
     // The database trigger revokes the bound remote sessions and writes the
     // disconnect outbox atomically with logout, including concurrent starts.
-    const result = await this.#database
-      .prepare("UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL")
+    // RETURNING, not meta.changes: D1 also counts the rows that the trigger changes.
+    const revoked = await this.#database
+      .prepare(
+        "UPDATE auth_sessions SET revoked_at = ? WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL RETURNING token_hash",
+      )
       .bind(now, authSessionHash, userId)
-      .run();
-    if ((result.meta.changes ?? 0) !== 1) {
+      .first<{ token_hash: string }>();
+    if (!revoked) {
       throw new RemoteControlPlaneError(401, "auth_session_revoked", "The account session has ended.");
     }
     await this.#flushAuthEvents();
