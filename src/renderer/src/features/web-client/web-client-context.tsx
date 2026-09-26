@@ -74,6 +74,8 @@ export function createWebWorkspace(
     accountId: string;
     accountFetch: typeof fetch;
     onSessionCheck: () => Promise<void>;
+    /** Read when the workspace closes: true when its account session has ended. */
+    accountSessionEnded?: () => boolean;
     createRuntime?: WebRuntimeFactory;
   },
   hooks: {
@@ -697,7 +699,7 @@ export function createWebWorkspace(
       generation += 1;
       acceptedInvite = null;
       window.removeEventListener("focus", focus);
-      void runtime.dispose().catch(() => undefined);
+      void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
     };
   });
   return {
