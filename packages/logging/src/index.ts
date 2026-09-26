@@ -138,23 +138,33 @@ export function redactText(value: string): string {
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
+// Every exact match is found before any grows, so a match inside the token an earlier one grew to
+// still extends the range past it. Ranges that overlap or touch become one token.
 function markRegisteredSecrets(value: string): string {
   const pattern = registeredSecretPattern;
   if (!pattern) return value;
   pattern.lastIndex = 0;
-  let result = "";
-  let copied = 0;
+  const ranges: Array<{ start: number; end: number }> = [];
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
-    while (start > copied && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    const previous = ranges.at(-1);
+    const floor = previous?.end ?? 0;
+    while (start > floor && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    if (previous && end <= previous.end) continue;
     while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    if (previous && start <= previous.end) previous.end = end;
+    else ranges.push({ start, end });
+  }
+  if (ranges.length === 0) return value;
+  let result = "";
+  let copied = 0;
+  for (const { start, end } of ranges) {
     const token = value.slice(start, end);
     result += value.slice(copied, start) + (RULE_WORD.test(token) ? LABEL_MARKER : VALUE_MARKER);
     copied = end;
-    pattern.lastIndex = end;
   }
-  return copied === 0 ? value : result + value.slice(copied);
+  return result + value.slice(copied);
 }
 
 function applyTextRules(value: string): string {

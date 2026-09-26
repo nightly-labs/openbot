@@ -209,6 +209,13 @@ describe("registerSecretValue", () => {
     expect(redactText("sent Bearer abcdefghijklmnop to the server")).toBe("sent [redacted] to the server");
   });
 
+  it("masks a registered value that starts inside the token of another", () => {
+    registerSecretValue("prefix88");
+    registerSecretValue("Basic c2VjcmV0");
+
+    expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
+  });
+
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
     const secret = "12345678\uD800";
     registerSecretValue(secret);
