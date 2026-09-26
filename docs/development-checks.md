@@ -135,6 +135,20 @@ break a destructured export.
 deliberately not cached: `install-electron` takes 2.6s on a runner, and a measured cache hit
 restored 123 MB in 4.4s and left `bun install` at 29.9s against 29.0s with no cache at all.
 
+## Test environment guard
+
+`tools/vitest/hermetic-setup.ts` is the first setup file of the `node` and `renderer` projects, so it
+runs before each test file imports anything. It deletes credential-shaped variables (`*_API_KEY`,
+`*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_PRIVATE_KEY`, and `ANTHROPIC_*`, `OPENAI_*`, `OPENROUTER_*`,
+`XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and `XDG_*`,
+and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME` and `USERPROFILE`
+at a temporary directory for the file, which it removes after the file.
+
+A key in the developer's shell could otherwise let a fake-provider test reach a real provider, and
+every profile path (`~/OpenBot`, the app data directory) comes from `homedir()`, so a path bug could
+write into the developer's own conversations. A test that needs a token or a directory sets it
+itself. `tools/vitest/hermetic-environment.test.ts` covers the guard.
+
 ## Why the jsdom projects use `vmThreads`
 
 `test:desktop` is not slow because of test count. The 54 `renderer` files hold 732 of the 3401

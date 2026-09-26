@@ -10,6 +10,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database/database-rows";
+import { registerMcpSecretValues } from "./mcp-redaction";
 import type { OpenBotDatabase } from "./openbot-database";
 
 /**
@@ -220,10 +221,12 @@ export class McpServerStore {
  * A row becomes a configuration only if every parsed value is the shape the spawn expects. A
  * hand-edited database must not be able to put a non-string into a child process environment.
  */
+// Every read goes through here, so each stored secret is masked in logs before any caller can
+// pass it to a provider or quote it in an error.
 function toConfig(row: DynamicRecord): McpServerConfig {
   const transport = requiredStringColumn(row, "transport");
   if (transport !== "stdio" && transport !== "http") throw new Error("Invalid SQLite column transport.");
-  return {
+  const config: McpServerConfig = {
     id: requiredStringColumn(row, "mcp_server_id"),
     name: requiredStringColumn(row, "name"),
     transport,
@@ -236,6 +239,8 @@ function toConfig(row: DynamicRecord): McpServerConfig {
     url: requiredStringColumn(row, "url"),
     headers: parsePairs(row, "headers_json"),
   };
+  registerMcpSecretValues(config);
+  return config;
 }
 
 // A hand-edited database is untrusted input: a non-string here would reach a spawn's `env`, so

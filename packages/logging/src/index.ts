@@ -74,10 +74,56 @@ const MAX_PARAM_LENGTH = 2_000;
 // caller-controlled getter and would leak what redaction just refused to read.
 const UNSERIALIZABLE = "[unserializable]";
 
+// A value the owner knows is secret: a saved provider key, an MCP header. No rule above can
+// recognise `x7Kq…` as a credential, so each one is masked by its exact text. Short values are
+// refused because masking `true` or `8080` would erase ordinary diagnostics. The set is bounded so
+// that rotating keys cannot grow it without limit; the oldest value goes first.
+const MIN_REGISTERED_SECRET_LENGTH = 8;
+const MAX_REGISTERED_SECRETS = 1_024;
+const registeredSecrets = new Set<string>();
+// Longest first, so a secret that contains another one is masked whole, not in parts.
+let registeredSecretsByLength: string[] = [];
+
+/**
+ * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
+ * URL-encoded forms.
+ */
+export function registerSecretValue(value: string): void {
+  if (value.length < MIN_REGISTERED_SECRET_LENGTH) return;
+  const forms = new Set([value, JSON.stringify(value).slice(1, -1), encodeURIComponent(value)]);
+  let changed = false;
+  for (const form of forms) {
+    if (registeredSecrets.has(form)) continue;
+    registeredSecrets.add(form);
+    changed = true;
+  }
+  if (!changed) return;
+  while (registeredSecrets.size > MAX_REGISTERED_SECRETS) {
+    const oldest = registeredSecrets.values().next();
+    if (oldest.done) break;
+    registeredSecrets.delete(oldest.value);
+  }
+  registeredSecretsByLength = [...registeredSecrets].sort((left, right) => right.length - left.length);
+}
+
+/** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */
+export function isSecretName(name: string): boolean {
+  return SECRET_KEY.test(name);
+}
+
+function maskRegisteredSecrets(value: string): string {
+  let result = value;
+  for (const secret of registeredSecretsByLength) {
+    if (result.includes(secret)) result = result.split(secret).join("[redacted]");
+  }
+  return result;
+}
+
 export function redactText(value: string): string {
-  const reparsed = redactSerializedJson(value);
+  const masked = maskRegisteredSecrets(value);
+  const reparsed = redactSerializedJson(masked);
   if (reparsed !== null) return reparsed;
-  return applyTextRules(redactEmbeddedJson(value));
+  return applyTextRules(redactEmbeddedJson(masked));
 }
 
 function applyTextRules(value: string): string {

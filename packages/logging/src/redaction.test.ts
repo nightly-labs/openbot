@@ -1,7 +1,15 @@
 // Automation and diagnostic logs must never leak tokens or emails,
 // even when a caller passes them as structured params.
 import { describe, expect, it, vi } from "vitest";
-import { createOpenBotLogger, type LogValue, redactText, redactValue, resolveLogLevel, toLogValue } from "./index";
+import {
+  createOpenBotLogger,
+  type LogValue,
+  redactText,
+  redactValue,
+  registerSecretValue,
+  resolveLogLevel,
+  toLogValue,
+} from "./index";
 
 describe("redactText", () => {
   it("redacts bearer tokens while keeping surrounding text", () => {
@@ -154,6 +162,25 @@ describe("redactText", () => {
 
   it("keeps the text around an embedded payload", () => {
     expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
+  });
+});
+
+describe("registerSecretValue", () => {
+  // A saved key has no prefix or label that a rule can match, so only its exact text can mask it.
+  it("masks a registered value in every form a log line can carry it", () => {
+    const secret = 'x7Kq"9Lm/2Pz';
+    registerSecretValue(secret);
+
+    expect(redactText(`provider said ${secret} was refused`)).toBe("provider said [redacted] was refused");
+    expect(redactText(`body ${JSON.stringify({ note: secret })}`)).toBe('body {"note":"[redacted]"}');
+    expect(redactText(`GET /v1?k=${encodeURIComponent(secret)} failed`)).toBe("GET /v1?k=[redacted] failed");
+    expect(redactValue({ detail: [`retry ${secret}`] })).toEqual({ detail: ["retry [redacted]"] });
+  });
+
+  it("does not register a value too short to be a secret", () => {
+    registerSecretValue("8080");
+
+    expect(redactText("listening on 8080")).toBe("listening on 8080");
   });
 });
 

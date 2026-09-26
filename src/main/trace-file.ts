@@ -5,12 +5,12 @@ import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { redactValue } from "@openbot/logging";
 
 /**
- * One timed operation. The name is a fixed string - an IPC channel, a turn origin - and the outcome
- * is a status word. A span holds no payload, message, path, URL or identifier, so the file can go
- * into a diagnostics export under the same promise as the rest of it.
+ * One timed operation. The name is a fixed string - an IPC channel, a turn origin, a crash origin -
+ * and the outcome is a status word. A span holds no payload, message, path, URL or identifier, so the
+ * file can go into a diagnostics export under the same promise as the rest of it.
  */
 export interface TraceSpan {
-  kind: "ipc" | "turn";
+  kind: "ipc" | "turn" | "crash";
   name: string;
   durationMs: number;
   outcome: string;
@@ -185,7 +185,7 @@ function parseLine(line: string): TraceSpan | null {
   }
   if (!isDynamicRecord(parsed)) return null;
   const { kind, name, durationMs, outcome } = parsed;
-  if (kind !== "ipc" && kind !== "turn") return null;
+  if (kind !== "ipc" && kind !== "turn" && kind !== "crash") return null;
   if (typeof name !== "string" || typeof outcome !== "string" || typeof durationMs !== "number") return null;
   return { kind, name, durationMs, outcome };
 }
