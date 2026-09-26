@@ -4,6 +4,7 @@
 import { LOCAL_SERVER_ID, type ServerSummary, type UpdateHostIdentityInput } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { HostService } from "../host-service";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -39,12 +40,12 @@ export function hostAdminIpcHandlers({
           const summary = withLocalHostSummary(remoteServers.list(), status).find(
             (server) => server.id === LOCAL_SERVER_ID,
           );
-          if (!summary) throw new Error("This computer has no server to change.");
+          if (!summary) throw new Error(sourceText("error.host.noServer"));
           return summary;
         },
         remote: async (input, serverId) => {
           if (!remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
-            throw new Error("The server name and logo can only be changed on the computer that runs it.");
+            throw new Error(sourceText("error.host.identityLocalOnly"));
           await remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
             method: "POST",
             body: wireIdentity(input),

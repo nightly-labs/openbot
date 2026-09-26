@@ -14,11 +14,13 @@
 
 import { Button, ExternalLink } from "@openbot/ui";
 import { Show } from "solid-js";
+import { useText } from "../../text";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
 
 export type McpSignInDialogProps = McpConnectBaseProps;
 
 export function McpSignInDialog(props: McpSignInDialogProps) {
+  const { t } = useText();
   const { state, busy, attempt } = createConnectRun(props);
 
   return (
@@ -26,17 +28,17 @@ export function McpSignInDialog(props: McpSignInDialogProps) {
       {...props}
       state={state}
       busy={busy}
-      description={`Sign in to your ${props.subject.name} account. OpenBot gets the tools that account can reach, and no password.`}
+      description={t("mcp.signIn.description", { name: props.subject.name })}
       onSubmit={() => void attempt(async () => props.subject.config)}
       action={
         <Button
           class="mcp-connect-primary"
           type="submit"
           loading={busy()}
-          loadingLabel="Waiting for the browser…"
+          loadingLabel={t("mcp.signIn.waiting")}
           disabled={busy()}
         >
-          {state.phase === "failed" ? "Try again" : `Continue to ${props.subject.name}`}
+          {state.phase === "failed" ? t("common.tryAgain") : t("mcp.signIn.continue", { name: props.subject.name })}
           <Show when={state.phase !== "failed"}>
             <ExternalLink aria-hidden="true" />
           </Show>

@@ -13,6 +13,7 @@ import {
   decodeRemoteDesktopSignalControl,
   encodeRemoteDesktopSignalControl,
 } from "@openbot/contracts/team-protocol/remote-stream-v1";
+import { sourceText } from "@openbot/i18n/source";
 
 export interface RemoteBrowserView {
   input(value: BrowserViewInput): Promise<void>;
@@ -92,7 +93,7 @@ export function createRemoteBrowserView(
       );
       if (current !== generation || session.tabId !== tabId) {
         await request("DELETE", TEAM_API_ROUTES.browser.viewSession(session.id));
-        throw new Error("The browser view changed.");
+        throw new Error(sourceText("error.remote.browserViewChanged"));
       }
       const next: View = {
         sessionId: session.id,
@@ -122,7 +123,7 @@ export function createRemoteBrowserView(
       }
       return {
         async input(input) {
-          if (view !== next || !next.ready) throw new Error("The browser view is not connected.");
+          if (view !== next || !next.ready) throw new Error(sourceText("error.remote.browserViewNotConnected"));
           const wire = browserViewInputForHost(input, acksFrames);
           if (!wire) return;
           await send(

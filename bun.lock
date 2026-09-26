@@ -112,6 +112,7 @@
         "@norbert_bodziony/bloub": "catalog:",
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
         "@openbot/team-client": "workspace:*",
         "@openbot/user-errors": "workspace:*",
         "@openpanel/react-native": "1.4.1",
@@ -255,6 +256,7 @@
         "@noble/ed25519": "3.1.0",
         "@noble/hashes": "2.3.0",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
       },
       "devDependencies": {
         "typescript": "catalog:",
@@ -290,6 +292,7 @@
       "name": "@openbot/user-errors",
       "version": "0.0.0",
       "dependencies": {
+        "@openbot/i18n": "workspace:*",
         "@openbot/logging": "workspace:*",
       },
       "devDependencies": {

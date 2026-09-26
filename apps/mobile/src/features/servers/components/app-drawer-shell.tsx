@@ -18,6 +18,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { ServerDrawerContent } from "@/features/servers/components/server-drawer-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 
 interface AppDrawerContextValue {
   openDrawer: () => void;
@@ -45,6 +46,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { session } = useMobileSession();
+  const { t } = useText();
   const { activeServer, reorderServers, selectServer, servers } = useMobileWorkspace();
   const [muted] = useThemeColor(["muted"]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -239,7 +241,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                 <Animated.View className="absolute inset-0 bg-drawer-scrim" pointerEvents="none" style={scrimStyle} />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Close server drawer"
+                  accessibilityLabel={t("mobile.server.drawer.close")}
                   className="flex-1"
                   onPress={closeDrawer}
                 />

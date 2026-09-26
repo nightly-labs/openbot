@@ -1,4 +1,5 @@
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import {
   createRemoteConnectionRecovery,
   type RemoteConnectionStage,
@@ -126,7 +127,7 @@ export function ServerConnection({
             if (activeRef.current) void onMembershipChanged?.().catch(() => undefined);
             else membershipRefreshPending.current = true;
           }
-          const error = new Error(update.message ?? "The desktop went offline.");
+          const error = new Error(update.message ?? sourceText("error.remote.desktopOffline"));
           if (update.code === "protocol_error") controller.current?.suspend(error);
           else controller.current?.offline(error);
         }

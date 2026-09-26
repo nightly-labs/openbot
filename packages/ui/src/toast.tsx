@@ -2,6 +2,7 @@ import type { ComponentProps, JSX } from "@solidjs/web";
 import { createSignal, onSettled } from "solid-js";
 import { Toaster as Sonner, toast } from "solid-sonner";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
+import { useText } from "./text";
 import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner>;
@@ -12,6 +13,7 @@ export const TOAST_DURATION = 6_000;
 const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);
 
 export function Toaster(props: ToasterProps): JSX.Element {
+  const { t } = useText();
   let layer: HTMLDivElement | undefined;
   onSettled(() => {
     if (!layer) return;
@@ -38,8 +40,8 @@ export function Toaster(props: ToasterProps): JSX.Element {
         richColors={props.richColors ?? false}
         closeButton={props.closeButton ?? true}
         pauseWhenPageIsHidden={props.pauseWhenPageIsHidden ?? true}
-        containerAriaLabel={props.containerAriaLabel ?? "Notifications"}
-        toastOptions={{ closeButtonAriaLabel: "Close notification", ...props.toastOptions }}
+        containerAriaLabel={props.containerAriaLabel ?? t("notification.toast.region")}
+        toastOptions={{ closeButtonAriaLabel: t("notification.toast.close"), ...props.toastOptions }}
         icons={{
           success: <CircleCheck class="ui-toast-icon" aria-hidden="true" />,
           info: <Info class="ui-toast-icon" aria-hidden="true" />,

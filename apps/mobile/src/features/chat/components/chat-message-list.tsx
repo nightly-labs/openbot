@@ -1,4 +1,5 @@
 import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { Link, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import {
@@ -52,6 +53,7 @@ import { type ChatMessage, indexChatMessages, type RoutineMarkerEvent } from "@/
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import { useText } from "@/shared/lib/text";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
 import { mentionDraft } from "../model/chat-mentions";
@@ -100,10 +102,10 @@ const ChatScrollView = forwardRef<Animated.ScrollView, KeyboardChatScrollViewPro
 );
 
 const STARTER_OPTIONS = [
-  { id: "plan", label: "Plan the next steps", detail: "Turn a goal into a clear plan" },
-  { id: "research", label: "Research something", detail: "Compare sources and summarize" },
-  { id: "solve", label: "Work through a problem", detail: "Think it through together" },
-] as const;
+  { id: "plan", label: "mobile.chat.starter.planLabel", detail: "mobile.chat.starter.planDetail" },
+  { id: "research", label: "mobile.chat.starter.researchLabel", detail: "mobile.chat.starter.researchDetail" },
+  { id: "solve", label: "mobile.chat.starter.solveLabel", detail: "mobile.chat.starter.solveDetail" },
+] as const satisfies readonly { id: string; label: MobileTextKey; detail: MobileTextKey }[];
 
 const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
@@ -175,9 +177,12 @@ function ChatBubble({
  * Matches the desktop marker. An absent mark means a request: that is what a host older than the
  * mark reports, and what every message stored before it meant.
  */
-function exchangeLabel(exchange: AgentExchangeSummary) {
-  if (exchange.expectsReply === false) return exchange.direction === "outgoing" ? "Informed" : "Update from";
-  return exchange.direction === "outgoing" ? "Messaged" : "Message from";
+function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
+  if (exchange.expectsReply === false)
+    return exchange.direction === "outgoing"
+      ? t("mobile.chat.exchange.informed")
+      : t("mobile.chat.exchange.updateFrom");
+  return exchange.direction === "outgoing" ? t("mobile.chat.exchange.messaged") : t("mobile.chat.exchange.messageFrom");
 }
 
 interface ChatMessageListProps {
@@ -283,6 +288,7 @@ function RoutineMarkerRow({
   message: Extract<ChatMessage, { kind: "routine" }>;
   muted: ViewStyle["backgroundColor"];
 }) {
+  const { t } = useText();
   const [success, danger] = useCSSVariable(["--openbot-success-text", "--openbot-danger-text"]);
   const Icon = ROUTINE_MARKER_ICONS[message.event];
   const color =
@@ -294,12 +300,12 @@ function RoutineMarkerRow({
   return (
     <View
       accessible
-      accessibilityLabel={`${message.label}, ${message.routineName}`}
+      accessibilityLabel={`${t(message.label)}, ${message.routineName}`}
       className="flex-row flex-wrap items-center justify-center gap-1.5 py-2"
     >
       <Icon size={16} color={color} strokeWidth={1.75} />
       <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {message.label}
+        {t(message.label)}
       </Typography.Paragraph>
       <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
         {message.routineName}
@@ -354,6 +360,7 @@ const MessageRow = memo(function MessageRow({
   upload?: ChatUpload;
   shared: MessageRowShared;
 }) {
+  const { t } = useText();
   const {
     agents,
     agentsById,
@@ -404,9 +411,9 @@ const MessageRow = memo(function MessageRow({
         <Typography.Paragraph type="body-sm" style={{ color: muted }}>
           {message.kind === "channel-routing"
             ? message.event.action === "assigned"
-              ? "Assigned to"
-              : "Continuing with"
-            : exchangeLabel(message.exchange)}
+              ? t("mobile.chat.exchange.assignedTo")
+              : t("mobile.chat.exchange.continuingWith")
+            : exchangeLabel(message.exchange, t)}
         </Typography.Paragraph>
         {(message.kind === "channel-routing"
           ? [message.event.agentId]
@@ -431,7 +438,9 @@ const MessageRow = memo(function MessageRow({
               ) : null}
               <Typography.Paragraph type="body-sm" style={{ color: muted }}>
                 {participant?.name ??
-                  (message.kind === "channel-routing" ? (legacyName ?? "Unavailable agent") : "Unknown agent")}
+                  (message.kind === "channel-routing"
+                    ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
+                    : t("mobile.chat.exchange.unknownAgent"))}
               </Typography.Paragraph>
             </View>
           );
@@ -441,7 +450,10 @@ const MessageRow = memo(function MessageRow({
               href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
               asChild
             >
-              <Pressable accessibilityRole="link" accessibilityLabel={`Open chat with ${participant.name}`}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t("mobile.chat.exchange.openChat", { name: participant.name })}
+              >
                 {badge}
               </Pressable>
             </Link>
@@ -512,8 +524,11 @@ const MessageRow = memo(function MessageRow({
           <Button variant="ghost" size="sm" className="self-end" isDisabled={upload.cancelling} onPress={upload.cancel}>
             <Button.Label>
               {upload.cancelling
-                ? "Cancelling…"
-                : `Cancel upload · ${upload.completed} of ${message.attachments?.length ?? 0}`}
+                ? t("mobile.chat.upload.cancelling")
+                : t("mobile.chat.upload.cancel", {
+                    completed: upload.completed,
+                    total: message.attachments?.length ?? 0,
+                  })}
             </Button.Label>
           </Button>
         ) : null}
@@ -544,6 +559,10 @@ const MessageRow = memo(function MessageRow({
       </Animated.View>
     );
   if (message.kind !== "message") return rendered;
+  const replyPreview =
+    source?.kind === "message"
+      ? mentionDraft(source.body).text || t("mobile.chat.reply.attachment")
+      : t("mobile.chat.reply.unavailable");
   return (
     <View
       key={message.id}
@@ -563,9 +582,9 @@ const MessageRow = memo(function MessageRow({
             type="body-xs"
             numberOfLines={1}
             className="shrink text-muted"
-            accessibilityLabel={`Reply to: ${source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}`}
+            accessibilityLabel={t("mobile.chat.reply.to", { text: replyPreview })}
           >
-            {source?.kind === "message" ? mentionDraft(source.body).text || "Attachment" : "Message unavailable"}
+            {replyPreview}
           </Typography.Paragraph>
         </View>
       ) : null}
@@ -619,6 +638,7 @@ export function ChatMessageList({
   onReply,
   onOpenActions,
 }: ChatMessageListProps) {
+  const { t, sourceText } = useText();
   const isFocused = useIsFocused();
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
@@ -642,8 +662,10 @@ export function ChatMessageList({
     const promptId = questionForm?.messageId ?? null;
     if (!questionForm?.question || !promptId || announcedPromptId.current === promptId) return;
     announcedPromptId.current = promptId;
-    AccessibilityInfo.announceForAccessibility(`Input required. ${questionForm.question.question}`);
-  }, [questionForm?.messageId, questionForm?.question]);
+    AccessibilityInfo.announceForAccessibility(
+      t("mobile.chat.question.inputRequired", { question: questionForm.question.question }),
+    );
+  }, [questionForm?.messageId, questionForm?.question, t]);
   const [userForegroundColor, themeForegroundColor, themeMutedColor] = useCSSVariable([
     "--openbot-text-on-light",
     "--openbot-text-primary",
@@ -833,18 +855,22 @@ export function ChatMessageList({
     const thinkingDetail = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1)?.text : null;
     const activityLabel =
       sending && !activity
-        ? "Sending…"
+        ? t("common.sending")
         : activity?.phase === "waiting"
           ? messages.some(
               (message) => message.kind === "question" && !message.prompt.resolution && message.turnId === activeTurnId,
             )
-            ? "Waiting for your answer"
-            : "Waiting for your input on desktop"
+            ? t("mobile.chat.activity.waitingForAnswer")
+            : t("mobile.chat.activity.waitingOnDesktop")
           : thinkingDetail
             ? thinkingDetail
             : activity?.phase === "responding"
-              ? "Responding…"
-              : activity?.detail || (replying ? "Responding…" : "Thinking…");
+              ? t("mobile.chat.activity.responding")
+              : activity?.detail
+                ? sourceText(activity.detail)
+                : replying
+                  ? t("mobile.chat.activity.responding")
+                  : t("mobile.chat.activity.thinking");
     const activityAgent = activity?.agentId
       ? agentsById.get(activity.agentId)
       : target.kind === "agent"
@@ -939,10 +965,10 @@ export function ChatMessageList({
                   <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={loadPrevious}>
                     <Button.Label>
                       {!hasCachedOlder && olderLoading
-                        ? "Loading older messages…"
+                        ? t("mobile.chat.history.loadingOlder")
                         : !hasCachedOlder && olderError
-                          ? "Try loading older messages again"
-                          : "Load older messages"}
+                          ? t("mobile.chat.history.retryOlder")
+                          : t("mobile.chat.history.loadOlder")}
                     </Button.Label>
                   </Button>
                 </View>
@@ -951,22 +977,28 @@ export function ChatMessageList({
                 <View
                   className="flex-1"
                   accessible
-                  accessibilityLabel={historyState === "connecting" ? "Connecting to server" : "Loading chat history"}
+                  accessibilityLabel={
+                    historyState === "connecting"
+                      ? t("mobile.chat.history.connecting")
+                      : t("mobile.chat.history.loading")
+                  }
                   accessibilityState={{ busy: true }}
                 />
               ) : historyState !== "ready" ? (
                 <View className="flex-1 items-center justify-center gap-2">
                   <Typography.Paragraph align="center" className="text-text-secondary">
-                    {historyState === "waiting" ? "Waiting for connection" : "Could not load chat history"}
+                    {historyState === "waiting"
+                      ? t("mobile.chat.history.waiting")
+                      : t("mobile.chat.history.loadFailed")}
                   </Typography.Paragraph>
                   {historyState === "waiting" ? (
                     <Typography.Paragraph type="body-xs" align="center" className="text-muted">
-                      Your chat history will load when the server reconnects.
+                      {t("mobile.chat.history.loadsOnReconnect")}
                     </Typography.Paragraph>
                   ) : null}
                   {historyState === "error" ? (
                     <Button variant="tertiary" onPress={onRetryHistory}>
-                      <Button.Label>Try again</Button.Label>
+                      <Button.Label>{t("common.tryAgain")}</Button.Label>
                     </Button>
                   ) : null}
                 </View>
@@ -992,13 +1024,13 @@ export function ChatMessageList({
                 >
                   <View className="flex-row items-start gap-3">
                     <View className="min-w-0 flex-1 gap-1">
-                      <Typography.Heading type="h4">What should we work on first?</Typography.Heading>
+                      <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
                       <Typography.Paragraph className="text-text-secondary">
-                        Pick one, or type your own — we can change course anytime.
+                        {t("mobile.chat.starter.body")}
                       </Typography.Paragraph>
                     </View>
                     <Pressable
-                      accessibilityLabel="Dismiss suggestions"
+                      accessibilityLabel={t("mobile.chat.starter.dismiss")}
                       accessibilityRole="button"
                       hitSlop={8}
                       onPress={onDismissStarter}
@@ -1020,7 +1052,7 @@ export function ChatMessageList({
                           borderBottomWidth: index < STARTER_OPTIONS.length - 1 ? 0.5 : 0,
                           opacity: !canSend ? 0.45 : pressed ? 0.55 : 1,
                         })}
-                        onPress={() => onSelectStarter(option.label)}
+                        onPress={() => onSelectStarter(t(option.label))}
                       >
                         <View className="size-7 items-center justify-center rounded-lg bg-control">
                           <Typography.Paragraph type="body-xs" className="text-text-secondary">
@@ -1028,9 +1060,9 @@ export function ChatMessageList({
                           </Typography.Paragraph>
                         </View>
                         <View className="min-w-0 flex-1">
-                          <Typography.Paragraph weight="medium">{option.label}</Typography.Paragraph>
+                          <Typography.Paragraph weight="medium">{t(option.label)}</Typography.Paragraph>
                           <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                            {option.detail}
+                            {t(option.detail)}
                           </Typography.Paragraph>
                         </View>
                       </Pressable>
@@ -1038,7 +1070,7 @@ export function ChatMessageList({
                   </View>
 
                   <Typography.Paragraph type="body-xs" className="text-text-secondary">
-                    Or answer in the chat below
+                    {t("mobile.chat.starter.orAnswer")}
                   </Typography.Paragraph>
                 </View>
               ) : null}

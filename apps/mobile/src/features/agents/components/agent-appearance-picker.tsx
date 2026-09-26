@@ -1,5 +1,6 @@
 import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Shuffle } from "lucide-react-native";
@@ -7,7 +8,21 @@ import { memo, type ReactNode, useCallback, useState } from "react";
 import { View } from "react-native";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
+import { useText } from "@/shared/lib/text";
 import type { AgentPhotoProps } from "./agent-photo";
+
+const HUE_LABELS = {
+  0: "mobile.agent.appearance.hue.red",
+  30: "mobile.agent.appearance.hue.orange",
+  55: "mobile.agent.appearance.hue.yellow",
+  100: "mobile.agent.appearance.hue.lime",
+  150: "mobile.agent.appearance.hue.green",
+  185: "mobile.agent.appearance.hue.cyan",
+  215: "mobile.agent.appearance.hue.blue",
+  245: "mobile.agent.appearance.hue.indigo",
+  280: "mobile.agent.appearance.hue.violet",
+  320: "mobile.agent.appearance.hue.magenta",
+} as const satisfies Record<AvatarHue, MobileTextKey>;
 
 interface AgentAppearancePickerProps extends AgentPhotoProps {
   seed: string;
@@ -35,6 +50,7 @@ export function AgentAppearancePicker({
   onSeedChange,
   onHueChange,
 }: AgentAppearancePickerProps) {
+  const { t } = useText();
   const [candidates, setCandidates] = useState(() => createAvatarCandidates(seed));
   const shuffle = useCallback(() => setCandidates((current) => createAvatarCandidates(seed, current)), [seed]);
 
@@ -43,7 +59,9 @@ export function AgentAppearancePicker({
       <View
         className="items-center gap-2"
         accessible
-        accessibilityLabel={`Avatar preview for ${name.trim() || "New agent"}`}
+        accessibilityLabel={t("mobile.agent.appearance.preview", {
+          name: name.trim() || t("mobile.agent.appearance.newAgent"),
+        })}
       >
         <BloubAvatarPreview
           agentId={agentId}
@@ -93,11 +111,12 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
   onShuffle: () => void;
   photoField?: ReactNode;
 }) {
+  const { t } = useText();
   return (
     <View
       className="mt-4 flex-row flex-wrap items-center justify-center gap-2"
       accessibilityRole="radiogroup"
-      accessibilityLabel="Shape and expression"
+      accessibilityLabel={t("mobile.agent.appearance.faces")}
     >
       {seeds.map((candidate, index) => (
         <Button
@@ -105,7 +124,7 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
           isIconOnly
           variant={seed === candidate ? "secondary" : "ghost"}
           accessibilityRole="radio"
-          accessibilityLabel={`Agent face ${index + 1}`}
+          accessibilityLabel={t("mobile.agent.appearance.face", { index: index + 1 })}
           accessibilityState={{ checked: seed === candidate, disabled }}
           isDisabled={disabled}
           onPress={() => onSeedChange(candidate)}
@@ -113,7 +132,13 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
           <AvatarThumbnail seed={candidate} hue={hue} size={36} />
         </Button>
       ))}
-      <Button isIconOnly variant="ghost" accessibilityLabel="More faces" isDisabled={disabled} onPress={onShuffle}>
+      <Button
+        isIconOnly
+        variant="ghost"
+        accessibilityLabel={t("mobile.agent.appearance.moreFaces")}
+        isDisabled={disabled}
+        onPress={onShuffle}
+      >
         <ShuffleIcon />
       </Button>
       {photoField}
@@ -130,11 +155,12 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
   disabled: boolean;
   onHueChange: (hue: AvatarHue | null) => void;
 }) {
+  const { t } = useText();
   return (
     <View
       className="mt-4 flex-row flex-wrap items-center justify-center gap-2"
       accessibilityRole="radiogroup"
-      accessibilityLabel="Avatar color"
+      accessibilityLabel={t("mobile.agent.appearance.color")}
     >
       {AVATAR_HUE_CHOICES.map((option) => {
         // A stored hue 100 or 280 shows as its same-color choice.
@@ -145,7 +171,7 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
             isIconOnly
             variant={checked ? "secondary" : "ghost"}
             accessibilityRole="radio"
-            accessibilityLabel={option.label}
+            accessibilityLabel={t(HUE_LABELS[option.hue])}
             accessibilityState={{ checked, disabled }}
             isDisabled={disabled}
             onPress={() => onHueChange(option.hue)}
@@ -158,13 +184,13 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
         isIconOnly
         variant={hue === null ? "secondary" : "ghost"}
         accessibilityRole="radio"
-        accessibilityLabel="Automatic"
+        accessibilityLabel={t("mobile.agent.appearance.automatic")}
         accessibilityState={{ checked: hue === null, disabled }}
         isDisabled={disabled}
         onPress={() => onHueChange(null)}
       >
         <Typography type="body-sm" className="font-semibold text-foreground">
-          A
+          {t("mobile.agent.appearance.automaticShort")}
         </Typography>
       </Button>
     </View>

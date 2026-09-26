@@ -5,6 +5,7 @@ import {
   STORAGE_CAPABILITY,
 } from "@openbot/contracts/ipc";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { StorageNotFoundError } from "../../backend/storage-usage";
 import type { TeamApiStorage } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -29,7 +30,7 @@ export async function routeStorage(
   const clear = method === "POST" && url.pathname === STORAGE_ROUTES.clear;
   if (!usage && !deleteFile && !clear) return "unmatched";
   if (!storage || !capabilities.has(STORAGE_CAPABILITY))
-    throw new HttpError(400, "Storage is not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.storageUnsupported"));
   if (!usage) requireAdmin(member);
   // `readJson` has already run the body through the storage wire codec.
   const body = await readJson(request);

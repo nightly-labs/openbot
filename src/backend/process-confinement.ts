@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+import { sourceText } from "@openbot/i18n/source";
 import { workspaceTemporaryPaths } from "./agent/workspace-sandbox";
 
 /**
@@ -118,13 +119,11 @@ export function confineSpawnTarget(
   }
   // bubblewrap on Linux cannot deny a protected file that does not exist yet, such as a new
   // `opencode.json`, so Linux fails closed until it can.
-  throw new ProcessConfinementUnavailableError(
-    "Workspace only is available for this provider on macOS only. Choose Full access in the agent settings.",
-  );
+  throw new ProcessConfinementUnavailableError(sourceText("error.agent.workspaceOnlyMacOnly"));
 }
 
 function unavailable(tool: string): string {
-  return `Workspace only needs ${tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.`;
+  return sourceText("error.agent.workspaceOnlyToolMissing", { tool });
 }
 
 /**

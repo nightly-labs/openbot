@@ -16,6 +16,7 @@ import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contrac
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
@@ -64,25 +65,25 @@ export function agentAdminIpcHandlers({
 }: AgentAdminIpcDependencies): Pick<IpcGroupHandlers, "agentAdmin"> {
   function remote(serverId: string, path: string, body: unknown): Promise<AgentAdminSettings> {
     if (!remoteServers.supportsCapability(serverId, AGENT_ADMIN_CAPABILITY))
-      throw new Error("Agent settings can only be changed on the computer that runs the agent.");
+      throw new Error(sourceText("error.agent.settingsLocalOnly"));
     return remoteServers.request(serverId, path, decodeAgentAdminSettings, { method: "POST", body });
   }
 
   function remoteSkills<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, SKILLS_ADMIN_CAPABILITY))
-      throw new Error("Skills can only be changed on the computer that runs the agent.");
+      throw new Error(sourceText("error.agent.skillsLocalOnly"));
     return remoteServers.request(serverId, path, decoder, { method: "POST", body });
   }
 
   function remoteAdd(serverId: string, path: string, body: unknown): Promise<AddedAgent> {
     if (!remoteServers.supportsCapability(serverId, AGENT_INSTALL_CAPABILITY))
-      throw new Error("Agents can only be added on the computer that runs them.");
+      throw new Error(sourceText("error.agent.addLocalOnly"));
     return remoteServers.request(serverId, path, decodeHostAddedAgent, { method: "POST", body });
   }
 
   function remoteUpdate(serverId: string, body: unknown): Promise<AddedAgent> {
     if (!remoteServers.supportsCapability(serverId, AGENT_UPDATE_CAPABILITY))
-      throw new Error("An agent on a joined server cannot be updated from here.");
+      throw new Error(sourceText("error.agent.joinedServerUpdate"));
     return remoteServers.request(serverId, AGENT_UPDATE_ROUTES.marketplace, decodeHostAddedAgent, {
       method: "POST",
       body,

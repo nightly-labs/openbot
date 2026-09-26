@@ -1,3 +1,5 @@
+import { pluralCategory } from "./plural";
+
 /**
  * The message format the whole app translates through: plain strings with `{name}` placeholders,
  * plus one form per plural category where a sentence changes with a count.
@@ -38,35 +40,38 @@ type ParamsArgument<M extends Message> =
 export type MessageCatalog = Readonly<Record<string, Message>>;
 
 /**
- * A translation of `Source`. Every key is required: a catalog that quietly omits a key renders
- * English inside an otherwise translated screen, and nothing in review would catch it.
+ * A translation of `Source`. Keys are optional: a key a translator has not reached yet renders its
+ * English source, and `bun run i18n:check` lists it. The shape is not optional - a translation of
+ * a plural message is a plural message, so a translator cannot collapse "1 reply / 2 replies"
+ * into one string by mistake.
  */
-export type Translation<Source extends MessageCatalog> = { readonly [Key in keyof Source]: Message };
+export type PartialTranslation<Source extends MessageCatalog> = {
+  readonly [Key in keyof Source]?: TranslatedMessage<Source[Key]>;
+};
+
+type TranslatedMessage<M extends Message> = M extends string ? string : PluralMessage;
+
+/**
+ * Declare one area's messages. Every key must start with `<prefix>.`, so two area modules spread
+ * into one catalog can never overwrite each other's keys without a compile error.
+ *
+ * The prefix is only read by the type checker; `scripts/i18n-check.ts` checks that it matches the
+ * module path.
+ */
+export function defineMessages<const Prefix extends string, const Messages extends MessageCatalog>(
+  _prefix: Prefix,
+  messages: Messages & { readonly [Key in keyof Messages]: Key extends `${Prefix}.${string}` ? Message : never },
+): Messages {
+  return messages;
+}
 
 export type Translate<Source extends MessageCatalog> = <Key extends keyof Source & string>(
   key: Key,
   ...params: ParamsArgument<Source[Key]>
 ) => string;
 
-const pluralRulesByLocale = new Map<string, Intl.PluralRules>();
-
-function pluralRules(locale: string): Intl.PluralRules {
-  const cached = pluralRulesByLocale.get(locale);
-  if (cached) return cached;
-  // An unknown tag throws rather than falling back, and a bad stored preference must not blank the
-  // interface. English rules are wrong for that language but still render a readable sentence.
-  let rules: Intl.PluralRules;
-  try {
-    rules = new Intl.PluralRules(locale);
-  } catch {
-    rules = new Intl.PluralRules("en");
-  }
-  pluralRulesByLocale.set(locale, rules);
-  return rules;
-}
-
 function selectForm(message: PluralMessage, count: number, locale: string): string {
-  const category = pluralRules(locale).select(count);
+  const category = pluralCategory(locale, count);
   return message[category] ?? message.other;
 }
 
@@ -96,10 +101,9 @@ function countOf(values: ReadonlyMap<string, MessageValue> | undefined): number 
  */
 export function createTranslate<Source extends MessageCatalog>(input: {
   source: Source;
-  // `Partial`, because the strict "every key" rule belongs on the catalog where it is declared
-  // (`satisfies Translation<AppMessages>`). Here it would only deny the fallback below its reason
-  // to exist: a catalog shipped by an older build does not have a key this build just added.
-  translation?: Partial<Translation<Source>> | undefined;
+  // Partial: a key a translator has not reached, or a key this build added after the catalog was
+  // written, renders its source text instead of disappearing.
+  translation?: PartialTranslation<Source> | undefined;
   locale: string;
   /**
    * The language `source` is written in. Plural forms are chosen by the language of the text that

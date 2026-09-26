@@ -4,6 +4,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import type { Href } from "expo-router";
 import { requestAvatarCrop } from "@/shared/lib/avatar-crop-request";
+import { currentText } from "@/shared/lib/text";
 
 const OUTPUT_SIZES = [512, 448, 384, 320] as const;
 const OUTPUT_QUALITIES = [0.88, 0.82, 0.76, 0.7] as const;
@@ -25,7 +26,7 @@ export async function pickAvatarPhoto(cropRoute: Href): Promise<AvatarPhoto | nu
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] });
   if (result.canceled) return null;
   const [asset] = result.assets;
-  if (!asset) throw new Error("Could not open this photo. Try again.");
+  if (!asset) throw new Error(currentText().t("mobile.shared.photo.openFailed"));
   const source = await ImageManipulator.manipulate(asset.uri).renderAsync();
   const crop = await requestAvatarCrop({ uri: asset.uri, width: source.width, height: source.height }, cropRoute);
   if (!crop) return null;
@@ -45,5 +46,5 @@ export async function pickAvatarPhoto(cropRoute: Href): Promise<AvatarPhoto | nu
         base64: await file.base64(),
       };
   }
-  throw new Error("OpenBot could not make this photo small enough. Choose a simpler photo.");
+  throw new Error(currentText().t("mobile.shared.photo.tooLarge"));
 }

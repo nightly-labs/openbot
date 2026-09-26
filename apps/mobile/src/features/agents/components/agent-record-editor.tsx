@@ -8,7 +8,7 @@ import {
   type RoutineSchedule,
   type UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { userErrorMessage } from "@openbot/user-errors";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -20,20 +20,33 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
+
+// 2023-01-01 is a Sunday, so day 0 is Sunday, as in cron.
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
   const navigation = useNavigation();
+  const { t } = useText();
   usePreventRemove(dirty || pending, ({ data }) => {
     if (pending) return;
-    Alert.alert("Discard changes?", "Your changes have not been saved.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => navigation.dispatch(data.action) },
+    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
+      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
+      {
+        text: t("mobile.agent.discard.discard"),
+        style: "destructive",
+        onPress: () => navigation.dispatch(data.action),
+      },
     ]);
   });
 }
 
-function useRecordAction(invalidate: QueryKey = ["agent-info"], failure = "Could not save changes. Try again.") {
+function useRecordAction(
+  invalidate: QueryKey = ["agent-info"],
+  failure: MobileTextKey = "mobile.agent.record.saveFailed",
+) {
+  const { t, errorMessage } = useText();
   const client = useQueryClient();
   const lock = useRef(false);
   const [pending, setPending] = useState(false);
@@ -48,7 +61,7 @@ function useRecordAction(invalidate: QueryKey = ["agent-info"], failure = "Could
       done?.();
       void client.invalidateQueries({ queryKey: invalidate });
     } catch (cause) {
-      setError(userErrorMessage(cause, failure));
+      setError(errorMessage(cause, t(failure)));
     } finally {
       lock.current = false;
       setPending(false);
@@ -72,6 +85,7 @@ export function MemoryEditor({
     queryKey: QueryKey;
   };
 }) {
+  const { t } = useText();
   const workspace = useMobileWorkspace();
   const action = useRecordAction(port?.queryKey);
   const [editedText, setEditedText] = useState<string | undefined>();
@@ -87,7 +101,7 @@ export function MemoryEditor({
   return (
     <View className="gap-5">
       <SheetFormField
-        label="Memory"
+        label={t("mobile.agent.record.memory")}
         appearance="soft"
         multiline
         value={text}
@@ -119,10 +133,10 @@ export function MemoryEditor({
             disclosure={false}
             disabled={disabled}
             onPress={() =>
-              Alert.alert("Delete memory?", "This memory will be removed.", [
-                { text: "Cancel", style: "cancel" },
+              Alert.alert(t("mobile.agent.record.deleteMemoryTitle"), t("mobile.agent.record.deleteMemoryBody"), [
+                { text: t("common.cancel"), style: "cancel" },
                 {
-                  text: "Delete",
+                  text: t("common.delete"),
                   style: "destructive",
                   onPress: () =>
                     void action.run(
@@ -136,7 +150,9 @@ export function MemoryEditor({
               ])
             }
           >
-            <Typography.Paragraph className="text-danger-text">Delete memory</Typography.Paragraph>
+            <Typography.Paragraph className="text-danger-text">
+              {t("mobile.agent.record.deleteMemory")}
+            </Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : null}
@@ -166,10 +182,11 @@ export function RoutineEditor({
     queryKey: QueryKey;
   };
 }) {
+  const { t, format } = useText();
   const workspace = useMobileWorkspace();
   const action = useRecordAction(port?.queryKey);
   const toggle = useRecordAction(port?.queryKey);
-  const testRun = useRecordAction(port?.queryKey, "Could not start the test run.");
+  const testRun = useRecordAction(port?.queryKey, "mobile.agent.record.testFailed");
   const [testStarted, setTestStarted] = useState(false);
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
   useEffect(() => {
@@ -254,8 +271,8 @@ export function RoutineEditor({
     <View className="gap-5">
       <SheetFormField
         appearance="soft"
-        label="Routine name"
-        placeholder="Morning brief"
+        label={t("mobile.agent.record.routineName")}
+        placeholder={t("mobile.agent.record.routineNamePlaceholder")}
         value={name}
         editable={!disabled}
         maxLength={INPUT_LIMITS.routineName}
@@ -263,8 +280,12 @@ export function RoutineEditor({
       />
       <SheetFormField
         appearance="soft"
-        label="Routine instructions"
-        placeholder={`Describe what this ${port ? "channel" : "agent"} should do.`}
+        label={t("mobile.agent.record.routineInstructions")}
+        placeholder={t(
+          port
+            ? "mobile.agent.record.channelInstructionsPlaceholder"
+            : "mobile.agent.record.agentInstructionsPlaceholder",
+        )}
         multiline
         value={instruction}
         editable={!disabled}
@@ -286,20 +307,20 @@ export function RoutineEditor({
                   else if (kind === "custom") setSchedule({ kind, expression: "0 9 * * *" });
                 }}
               >
-                <Picker.Item label="Every day" value="daily" />
-                <Picker.Item label="Weekdays" value="weekdays" />
-                <Picker.Item label="Every hour" value="hourly" />
-                <Picker.Item label="Every week" value="weekly" />
-                <Picker.Item label="Every month" value="monthly" />
-                <Picker.Item label="Custom schedule" value="custom" />
+                <Picker.Item label={t("mobile.agent.record.schedule.daily")} value="daily" />
+                <Picker.Item label={t("mobile.agent.record.schedule.weekdays")} value="weekdays" />
+                <Picker.Item label={t("mobile.agent.record.schedule.hourly")} value="hourly" />
+                <Picker.Item label={t("mobile.agent.record.schedule.weekly")} value="weekly" />
+                <Picker.Item label={t("mobile.agent.record.schedule.monthly")} value="monthly" />
+                <Picker.Item label={t("mobile.agent.record.schedule.custom")} value="custom" />
                 {schedule.kind === "advanced" || schedule.kind === "interval" ? (
-                  <Picker.Item label="Current schedule" value={schedule.kind} />
+                  <Picker.Item label={t("mobile.agent.record.schedule.current")} value={schedule.kind} />
                 ) : null}
               </Picker>
             </Host>
           }
         >
-          <Typography.Paragraph>Schedule</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.agent.record.schedule")}</Typography.Paragraph>
         </SettingsRow>
         {schedule.kind === "daily" ||
         schedule.kind === "weekdays" ||
@@ -314,7 +335,7 @@ export function RoutineEditor({
           <View className="p-4">
             <SheetFormField
               appearance="soft"
-              label="Cron expression"
+              label={t("mobile.agent.record.cronExpression")}
               value={schedule.expression}
               maxLength={INPUT_LIMITS.routineCron}
               editable={!disabled}
@@ -323,9 +344,7 @@ export function RoutineEditor({
           </View>
         ) : schedule.kind === "hourly" ? null : (
           <SettingsRow>
-            <Typography.Paragraph>
-              The current schedule is kept unless you select another schedule.
-            </Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.scheduleKept")}</Typography.Paragraph>
           </SettingsRow>
         )}
         {schedule.kind === "weekly" ? (
@@ -337,14 +356,18 @@ export function RoutineEditor({
                   enabled={!disabled}
                   onValueChange={(weekday) => setSchedule({ ...schedule, weekday })}
                 >
-                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, index) => (
-                    <Picker.Item key={day} label={day} value={index} />
+                  {WEEKDAYS.map((weekday) => (
+                    <Picker.Item
+                      key={weekday}
+                      label={format.date(Date.UTC(2023, 0, 1 + weekday), { weekday: "long", timeZone: "UTC" })}
+                      value={weekday}
+                    />
                   ))}
                 </Picker>
               </Host>
             }
           >
-            <Typography.Paragraph>Day</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.day")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
         {schedule.kind === "monthly" ? (
@@ -363,7 +386,7 @@ export function RoutineEditor({
               </Host>
             }
           >
-            <Typography.Paragraph>Day of month</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.dayOfMonth")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
         {schedule.kind === "hourly" ? (
@@ -382,7 +405,7 @@ export function RoutineEditor({
               </Host>
             }
           >
-            <Typography.Paragraph>Minute</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.minute")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
         {routine ? (
@@ -393,12 +416,17 @@ export function RoutineEditor({
               </Typography>
             }
           >
-            <Typography.Paragraph>Time zone</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.timeZone")}</Typography.Paragraph>
           </SettingsRow>
         ) : null}
       </SettingsSection>
       {!routine ? (
-        <SheetFormField label="Time zone" value={timezone} editable={!disabled} onChangeText={setTimezone} />
+        <SheetFormField
+          label={t("mobile.agent.record.timeZone")}
+          value={timezone}
+          editable={!disabled}
+          onChangeText={setTimezone}
+        />
       ) : null}
       <SheetSaveAction
         dirty={dirty}
@@ -418,7 +446,7 @@ export function RoutineEditor({
             trailing={
               <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
                 <Switch
-                  label="Enabled"
+                  label={t("mobile.agent.record.enabled")}
                   value={activeOverride ?? routine.active}
                   disabled={disabled || toggle.pending}
                   onValueChange={toggleActive}
@@ -426,7 +454,7 @@ export function RoutineEditor({
               </Host>
             }
           >
-            <Typography.Paragraph>Routine</Typography.Paragraph>
+            <Typography.Paragraph>{t("mobile.agent.record.routine")}</Typography.Paragraph>
           </SettingsRow>
           <SettingsRow
             disclosure={false}
@@ -440,17 +468,17 @@ export function RoutineEditor({
             }}
           >
             <Typography.Paragraph className="text-accent">
-              {testRun.pending ? "Starting…" : "Test run"}
+              {t(testRun.pending ? "mobile.agent.record.testStarting" : "mobile.agent.record.testRun")}
             </Typography.Paragraph>
           </SettingsRow>
           <SettingsRow
             disclosure={false}
             disabled={disabled}
             onPress={() =>
-              Alert.alert("Delete routine?", "This routine will be removed.", [
-                { text: "Cancel", style: "cancel" },
+              Alert.alert(t("mobile.agent.record.deleteRoutineTitle"), t("mobile.agent.record.deleteRoutineBody"), [
+                { text: t("common.cancel"), style: "cancel" },
                 {
-                  text: "Delete",
+                  text: t("common.delete"),
                   style: "destructive",
                   onPress: () =>
                     void action.run(
@@ -464,13 +492,15 @@ export function RoutineEditor({
               ])
             }
           >
-            <Typography.Paragraph className="text-danger-text">Delete routine</Typography.Paragraph>
+            <Typography.Paragraph className="text-danger-text">
+              {t("mobile.agent.record.deleteRoutine")}
+            </Typography.Paragraph>
           </SettingsRow>
         </SettingsSection>
       ) : null}
       {testStarted ? (
         <Typography.Paragraph accessibilityLiveRegion="polite">
-          The test run started. The result shows in the chat.
+          {t("mobile.agent.record.testStarted")}
         </Typography.Paragraph>
       ) : null}
       {testRun.error ? (

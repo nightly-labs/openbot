@@ -1,19 +1,32 @@
 import type { AnalyticsDay, AnalyticsModel, AnalyticsProviderDay } from "@openbot/contracts/ipc";
 import { agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
+import { currentText, type TextValue } from "../../text";
 
-// The header filters render these lists directly, so the visible label and the
-// stored value are one string.
-export const usageMetrics = ["Cost", "Tokens"] as const;
+type UsageText = Pick<TextValue, "t" | "format">;
+
+// The header filters keep these ids in memory only. The labels come from the maps below.
+export const usageMetrics = ["cost", "tokens"] as const;
 export type UsageMetric = (typeof usageMetrics)[number];
-export const usagePeriods = ["7 days", "30 days", "90 days", "1 year"] as const;
+export const usageMetricLabels = {
+  cost: "usage.metric.cost",
+  tokens: "usage.metric.tokens",
+} as const satisfies Record<UsageMetric, AppTextKey>;
+export const usagePeriods = ["7d", "30d", "90d", "1y"] as const;
 export type UsagePeriod = (typeof usagePeriods)[number];
+export const usagePeriodLabels = {
+  "7d": "usage.period.days7",
+  "30d": "usage.period.days30",
+  "90d": "usage.period.days90",
+  "1y": "usage.period.year",
+} as const satisfies Record<UsagePeriod, AppTextKey>;
 // A label is not a number of days once "1 year" is an option, and the host rejects a
 // range wider than 367 days, so a year is the 365 the calendar names rather than 366.
 export const usagePeriodDays: Record<UsagePeriod, number> = {
-  "7 days": 7,
-  "30 days": 30,
-  "90 days": 90,
-  "1 year": 365,
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+  "1y": 365,
 };
 // A report row names an agent by id, and the provider is empty when the agent is not in
 // the list the panel read, because UsageProviderMark already draws nothing for a string
@@ -22,27 +35,28 @@ export interface UsageAgentLabel {
   name: string;
   provider: string;
 }
-export function usageNumber(value: number | null): string {
-  return value === null ? "Unavailable" : value.toLocaleString();
+export function usageNumber(value: number | null, text: UsageText = currentText()): string {
+  return value === null ? text.t("usage.unavailable") : text.format.number(value);
 }
-export function usageCompact(value: number | null): string {
+export function usageCompact(value: number | null, text: UsageText = currentText()): string {
   return value === null
-    ? "Unavailable"
-    : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(value);
+    ? text.t("usage.unavailable")
+    : text.format.number(value, { notation: "compact", maximumFractionDigits: 2 });
 }
-export function usageCost(value: number | null): string {
-  if (value !== null && value > 0 && value < 1e-12) return "<$0.000000000001";
+export function usageCost(value: number | null, text: UsageText = currentText()): string {
+  if (value !== null && value > 0 && value < 1e-12)
+    return `<${text.format.currencyUsd(1e-12, { minimumFractionDigits: 2, maximumFractionDigits: 12 })}`;
   return value === null
-    ? "Unavailable"
-    : new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
+    ? text.t("usage.unavailable")
+    : text.format.currencyUsd(value, {
         minimumFractionDigits: 2,
         maximumFractionDigits: value > 0 && value < 0.01 ? Math.min(12, -Math.floor(Math.log10(value)) + 1) : 2,
-      }).format(value);
+      });
 }
-export function usageExactCost(value: number | null): string {
-  return value === null ? "Unavailable" : `${value.toLocaleString(undefined, { maximumFractionDigits: 12 })} USD`;
+export function usageExactCost(value: number | null, text: UsageText = currentText()): string {
+  return value === null
+    ? text.t("usage.unavailable")
+    : text.t("usage.exactCost", { amount: text.format.number(value, { maximumFractionDigits: 12 }) });
 }
 /**
  * Usage rows name the tool rather than the account: a cost line is about what ran, not about who
@@ -95,7 +109,7 @@ export function usageSeries(
   metric: UsageMetric,
 ): { series: string[]; rows: UsageSeriesRow[] } {
   const measure = (value: { processedTokens: number; estimatedCostUsd: number | null }) =>
-    metric === "Cost" ? value.estimatedCostUsd : value.processedTokens;
+    metric === "cost" ? value.estimatedCostUsd : value.processedTokens;
   if (cells.length === 0)
     return {
       series: [usageTotalSeries],

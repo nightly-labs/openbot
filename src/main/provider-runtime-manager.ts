@@ -16,6 +16,7 @@ import {
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
@@ -250,7 +251,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     this.#revision += 1;
     this.emit("status", this.getStatus());
     if (releases.every((result) => result.status === "rejected")) {
-      throw new Error("OpenBot could not reach the provider release sources. Check the connection and try again.");
+      throw new Error(sourceText("error.provider.releaseSourcesUnreachable"));
     }
   }
 
@@ -346,15 +347,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   async download(runtime: ManagedRuntimeId): Promise<ProviderRuntimeSnapshot> {
-    if (!this.#target) throw new Error("Provider runtimes are not available on this platform.");
-    if (this.#stopping) throw new Error("OpenBot is closing.");
+    if (!this.#target) throw new Error(sourceText("error.provider.runtimesUnsupported"));
+    if (this.#stopping) throw new Error(sourceText("error.provider.closing"));
     // Only a provider CLI has a path override; nothing points `OPENBOT_BUN_PATH` at a tool runtime.
     if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
-      throw new Error("Remove the explicit CLI path override before updating in OpenBot.");
+      throw new Error(sourceText("error.provider.cliOverride"));
     if (this.#tasks.has(runtime)) return this.getStatus();
     if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
       await this.#awaitReleaseCheck(this.#check);
-      if (this.#stopping) throw new Error("OpenBot is closing.");
+      if (this.#stopping) throw new Error(sourceText("error.provider.closing"));
       if (this.#tasks.has(runtime)) return this.getStatus();
     }
     const spec = this.#targetSpec(runtime, this.#target);
@@ -419,7 +420,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     await this.download(runtime);
     await this.#tasks.get(runtime);
     const status = this.#statuses[runtime];
-    if (status.phase !== "ready") throw new Error(status.message ?? "The runtime update did not complete.");
+    if (status.phase !== "ready")
+      throw new Error(status.message ?? sourceText("error.provider.runtimeUpdateIncomplete"));
   }
 
   async cancel(runtime: ManagedRuntimeId): Promise<ProviderRuntimeSnapshot> {
@@ -505,7 +507,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       await this.#activate(spec, null);
       return;
     }
-    if (this.#stopping) throw new Error("OpenBot is closing.");
+    if (this.#stopping) throw new Error(sourceText("error.provider.closing"));
     signal.throwIfAborted();
     this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
     await this.#activate(spec, signal);
@@ -582,9 +584,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       response = await this.#fetchRuntime(spec, signal, 0, null);
     }
     if (!response.ok || (offset > 0 && response.status !== 206)) {
-      throw new Error(`Runtime download failed with HTTP ${response.status}.`);
+      throw new Error(sourceText("error.provider.downloadHttp", { status: response.status }));
     }
-    if (!response.body) throw new Error("Runtime download returned no data.");
+    if (!response.body) throw new Error(sourceText("error.provider.downloadNoData"));
 
     const etag = response.headers.get("etag");
     await writeFile(
@@ -612,12 +614,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
     const downloaded = await stat(partialPath);
     if (downloaded.size !== spec.downloadBytes) {
-      throw new Error("The runtime download has an unexpected size.");
+      throw new Error(sourceText("error.provider.downloadSize"));
     }
     // No digest is Grok's upstream release, which x.ai publishes no hash for and TLS alone vouches for.
     if (spec.archiveDigest && !(await digestMatches(partialPath, spec.archiveDigest))) {
       await this.#removePartial(spec);
-      throw new Error("The runtime download failed its integrity check.");
+      throw new Error(sourceText("error.provider.downloadIntegrity"));
     }
 
     return await this.#install(spec, partialPath);
@@ -707,7 +709,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const outcome = await this.#replaceUnderLock(staging, destination, spec);
       if (outcome !== "moved") return outcome === "committed";
     }
-    throw new Error("The runtime could not be installed because another instance is replacing it.");
+    throw new Error(sourceText("error.provider.runtimeReplacing"));
   }
 
   /**
@@ -774,10 +776,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   async #downloadSmallFile(url: string, expectedSha256: string | null): Promise<Uint8Array> {
     const response = await this.#fetch(url, { headers: { "User-Agent": "OpenBot-runtime-installer" } });
-    if (!response.ok) throw new Error(`Runtime metadata download failed with HTTP ${response.status}.`);
+    if (!response.ok) throw new Error(sourceText("error.provider.metadataHttp", { status: response.status }));
     const value = await readSmallResponse(response);
     if (expectedSha256 !== null && createHash("sha256").update(value).digest("hex") !== expectedSha256) {
-      throw new Error("Runtime metadata failed its integrity check.");
+      throw new Error(sourceText("error.provider.metadataIntegrity"));
     }
     return value;
   }
@@ -799,17 +801,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     const available = await this.#availableDiskBytes();
     const existing = await fileSize(this.#partialPath(spec));
     const required = Math.max(0, spec.downloadBytes - existing) + spec.installedBytes + FREE_SPACE_HEADROOM;
-    if (available < required) throw new Error("There is not enough free disk space for this provider.");
+    if (available < required) throw new Error(sourceText("error.provider.diskSpace"));
   }
 
   async #handleDownloadFailure(runtime: ManagedRuntimeId, error: unknown): Promise<void> {
     if (this.#cancelled.has(runtime)) return;
     if (this.#stopping && isAbortError(error)) return;
     const message = isAbortError(error)
-      ? "Download stopped. Try again."
+      ? sourceText("status.provider.downloadStopped")
       : error instanceof Error
         ? redactText(error.message)
-        : "Download failed. Try again.";
+        : sourceText("status.provider.downloadFailed");
     this.#setStatus(runtime, {
       phase: "download-error",
       progress: null,
@@ -943,7 +945,7 @@ async function verifyInstalledRuntime(root: string, spec: RuntimeSpec, lock: Age
   else await verifyInstallRecord(root, spec);
   const { stdout } = await execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true });
   if (descriptor.parseVersion(stdout) !== spec.version) {
-    throw new Error("Provider runtime returned an unexpected version.");
+    throw new Error(sourceText("error.provider.unexpectedVersion"));
   }
 }
 
@@ -1071,7 +1073,7 @@ async function streamResponse(
   onProgress: (received: number) => void,
 ): Promise<void> {
   const body = response.body;
-  if (!body) throw new Error("Runtime download returned no data.");
+  if (!body) throw new Error(sourceText("error.provider.downloadNoData"));
   const writer = createWriteStream(path, { flags: offset > 0 ? "a" : "w", mode: 0o600 });
   writer.on("error", () => undefined);
   const reader = body.getReader();
@@ -1146,7 +1148,7 @@ function isValidPartialResponse(
 }
 
 async function readSmallResponse(response: Response): Promise<Uint8Array> {
-  if (!response.body) throw new Error("Runtime metadata download returned no data.");
+  if (!response.body) throw new Error(sourceText("error.provider.metadataNoData"));
   const chunks: Uint8Array[] = [];
   const reader = response.body.getReader();
   let size = 0;
@@ -1155,7 +1157,7 @@ async function readSmallResponse(response: Response): Promise<Uint8Array> {
       const chunk = await reader.read();
       if (chunk.done) break;
       size += chunk.value.byteLength;
-      if (size > MAX_METADATA_BYTES) throw new Error("Runtime metadata is too large.");
+      if (size > MAX_METADATA_BYTES) throw new Error(sourceText("error.provider.metadataTooLarge"));
       chunks.push(chunk.value);
     }
   } catch (error) {
@@ -1237,14 +1239,14 @@ async function verifyInstallRecord(root: string, spec: RuntimeSpec): Promise<voi
     record.target !== spec.target ||
     !isDynamicRecord(record.files)
   ) {
-    throw new Error("The runtime install record does not match.");
+    throw new Error(sourceText("error.provider.installRecordMismatch"));
   }
   const files = await installedFiles(root);
-  if (files.length !== Object.keys(record.files).length) throw new Error("Provider runtime checksum mismatch.");
+  if (files.length !== Object.keys(record.files).length) throw new Error(sourceText("error.provider.runtimeChecksum"));
   for (const file of files) {
     const expected = record.files[file];
     if (!isString(expected) || (await sha256File(join(root, file))) !== expected) {
-      throw new Error("Provider runtime checksum mismatch.");
+      throw new Error(sourceText("error.provider.runtimeChecksum"));
     }
   }
 }
@@ -1255,7 +1257,7 @@ async function installedFiles(root: string, prefix = ""): Promise<string[]> {
   for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isDirectory()) files.push(...(await installedFiles(root, path)));
-    else if (!entry.isFile()) throw new Error("The runtime contains a link or special file.");
+    else if (!entry.isFile()) throw new Error(sourceText("error.provider.runtimeSpecialFile"));
     else if (path !== INSTALL_RECORD) files.push(path);
   }
   return files;

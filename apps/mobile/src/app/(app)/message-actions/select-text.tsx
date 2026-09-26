@@ -5,8 +5,10 @@ import { useCopyMessage } from "@/features/chat/components/use-copy-message";
 import { useMessageActions } from "@/features/chat/context/message-actions-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 export default function SelectMessageTextScreen() {
+  const { t } = useText();
   const { selected } = useMessageActions();
   const { copy, copied } = useCopyMessage(selected?.message.body ?? "");
   return (
@@ -14,19 +16,19 @@ export default function SelectMessageTextScreen() {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Button
           icon={copied ? "checkmark" : "doc.on.doc"}
-          accessibilityLabel={copied ? "Message copied" : "Copy message"}
+          accessibilityLabel={copied ? t("mobile.app.messageActions.copied") : t("mobile.app.messageActions.copy")}
           onPress={() => {
             void copy();
           }}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("common.copied") : t("common.copy")}
         </Stack.Toolbar.Button>
       </Stack.Toolbar>
       <SheetScrollView contentContainerClassName="px-4 pb-safe-offset-5 pt-5">
         {isIOS ? (
           // iOS Text offers whole-message Copy only. UITextView supports range selection handles.
           <TextInput
-            accessibilityLabel="Message text"
+            accessibilityLabel={t("mobile.app.messageActions.text")}
             value={selected?.message.body ?? ""}
             multiline
             editable={false}

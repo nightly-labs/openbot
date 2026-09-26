@@ -16,6 +16,7 @@ import {
   isCustomProviderModelId,
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
   Input,
@@ -35,6 +36,7 @@ import {
 } from "@openbot/ui";
 import { cx } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
 import {
   customProviderIds,
@@ -90,7 +92,28 @@ const PROVIDERS: readonly RailId[] = [...PICKER_PROVIDERS, CUSTOM_RAIL];
 /** Long enough that sweeping the rail does not flash a name per mark. */
 const RAIL_TOOLTIP_OPEN_DELAY = 150;
 
+/** The part of the interface text that the provider helpers below read. */
+type PickerText = Pick<TextValue, "t" | "sourceText">;
+
+/** The panel button for a provider runtime. The value selects the action; the key is its label. */
+const RUNTIME_ACTION_LABEL = {
+  Cancel: "common.cancel",
+  Connect: "provider.action.connect",
+  Retry: "common.retry",
+  Download: "common.download",
+} as const satisfies Record<string, AppTextKey>;
+
+const REASONING_LABEL = {
+  low: "provider.effort.low",
+  medium: "provider.effort.medium",
+  high: "provider.effort.high",
+  xhigh: "provider.effort.xhigh",
+  max: "provider.effort.max",
+} as const satisfies Record<AgentReasoningEffort, AppTextKey>;
+
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
+  const text = useText();
+  const { t, format } = text;
   const [open, setOpen] = createSignal(false);
   const [search, setSearch] = createSignal("");
   const [grantConfirmation, setGrantConfirmation] = createSignal<{ name?: string; confirm: () => void } | null>(null);
@@ -120,15 +143,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
   const customSummary = () => {
     const count = props.customProviders?.length ?? 0;
-    if (count === 0) return "No endpoints yet";
-    return count === 1 ? "1 endpoint" : `${count} endpoints`;
+    if (count === 0) return t("provider.picker.noEndpoints");
+    return t("provider.endpointCount", { count });
   };
   const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status);
+    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
   const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
-    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status);
+    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
-    return status.state === "available" ? customSummary() : providerStatusLabel(status.state);
+    return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
 
   createEffect(
@@ -172,7 +195,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
   function selectModel(model: AgentModelId, rail: RailId): void {
     if (props.disabled || props.modelChangesDisabled) return;
-    if (providerAvailability(props.agentStatus, props.modelOptions, rail).state !== "available") return;
+    if (providerAvailability(props.agentStatus, props.modelOptions, rail, t).state !== "available") return;
     if (
       !showsReasoningEffort() &&
       !pickerModels(railModelOptions(rail)).find((option) => option.id === model)?.variants.length
@@ -200,12 +223,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           ref={trigger}
           type="button"
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
-          aria-label={`${props.ariaLabel ?? "Agent model"}: ${triggerModelName()}`}
+          aria-label={`${props.ariaLabel ?? t("provider.picker.agentModel")}: ${triggerModelName()}`}
           disabled={props.disabled}
           title={
             props.disabled || props.modelChangesDisabled
               ? props.disabledReason
-              : `${railName(activeProvider())} · ${triggerModelName()}`
+              : `${railName(activeProvider(), t)} · ${triggerModelName()}`
           }
           onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
@@ -214,7 +237,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           }}
         >
           <Show when={field()}>
-            <span class="provider-model-field-label">{props.label ?? "Model"}</span>
+            <span class="provider-model-field-label">{props.label ?? t("provider.picker.model")}</span>
           </Show>
           <span class="provider-model-trigger-value">
             <ProviderMark provider={activeProvider()} />
@@ -230,7 +253,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             if (event.key === "Escape") setOpen(false);
           }}
         >
-          <Popover.Title class="sr-only">Choose agent model</Popover.Title>
+          <Popover.Title class="sr-only">{t("provider.picker.title")}</Popover.Title>
           <Tabs.Root
             value={railProvider()}
             onChange={(value) => {
@@ -241,10 +264,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             activationMode="automatic"
             class="provider-model-layout"
           >
-            <Tabs.List class="provider-model-rail" aria-label="Model providers">
+            <Tabs.List class="provider-model-rail" aria-label={t("provider.picker.providers")}>
               <For each={PROVIDERS}>
                 {(provider) => {
-                  const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
+                  const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider, t);
                   return (
                     // The rail shows a mark alone, so hovering one names it. Focus needs no tooltip:
                     // tabs activate on focus, and the panel heading beside them names the tab.
@@ -268,7 +291,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               "provider-model-rail-button-unavailable": status().state !== "available",
                             },
                           ]}
-                          aria-label={`${railName(provider)}: ${railSummary(provider, status())}`}
+                          aria-label={`${railName(provider, t)}: ${railSummary(provider, status())}`}
                           onClick={(event) => {
                             const target = event.currentTarget;
                             selectRailProvider(provider);
@@ -292,7 +315,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       </Tooltip.Trigger>
                       <Tooltip.Portal>
                         <Tooltip.Content class="provider-model-rail-tooltip">
-                          <strong>{railName(provider)}</strong>
+                          <strong>{railName(provider, t)}</strong>
                           <small>{railSummary(provider, status())}</small>
                         </Tooltip.Content>
                       </Tooltip.Portal>
@@ -304,7 +327,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
             <For each={PROVIDERS}>
               {(provider) => {
-                const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider);
+                const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider, t);
                 const models = createMemo(() => pickerModels(railModelOptions(provider)));
                 const groups = createMemo(() => groupPickerModels(models(), search()));
                 const selected = createMemo(() =>
@@ -321,7 +344,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return showsReasoningEffort()
                     ? (selectedModel()?.supportedReasoningEfforts ?? []).map((effort) => ({
                         id: effort,
-                        name: reasoningLabel(effort),
+                        name: reasoningLabel(effort, t),
                       }))
                     : [];
                 });
@@ -359,26 +382,31 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const runtimeMessage = () => {
                   const runtimeStatus = runtime();
                   if (runtimeStatus?.phase === "downloading") {
-                    return `Downloading ${Math.round(runtimeStatus.progress ?? 0)}%`;
+                    return t("provider.picker.downloading", {
+                      percent: format.percent(Math.round(runtimeStatus.progress ?? 0) / 100),
+                    });
                   }
-                  if (runtimeStatus?.phase === "finishing") return "Setting up";
-                  return runtimeStatus?.message ?? status().message ?? `${railName(provider)} is unavailable.`;
+                  if (runtimeStatus?.phase === "finishing") return t("provider.status.settingUp");
+                  const message = runtimeStatus?.message ?? status().message;
+                  return message
+                    ? text.sourceText(message)
+                    : t("provider.picker.unavailable", { name: railName(provider, t) });
                 };
                 return (
                   <Tabs.Content
                     value={provider}
                     class="provider-model-panel"
-                    aria-label={`${railName(provider)} models`}
+                    aria-label={t("provider.picker.models", { name: railName(provider, t) })}
                   >
                     <div class="provider-model-heading">
                       <div class="provider-model-heading-text">
-                        <strong>{railName(provider)}</strong>
+                        <strong>{railName(provider, t)}</strong>
                         <span>{railHeadingSummary(provider, status())}</span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && props.onAddCustomProvider}>
                         <Button type="button" size="xs" variant="default" onClick={() => props.onAddCustomProvider?.()}>
                           <Plus />
-                          Add provider
+                          {t("provider.picker.addProvider")}
                         </Button>
                       </Show>
                     </div>
@@ -386,7 +414,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       <div class="provider-model-empty" role="status">
                         <span>{runtimeMessage()}</span>
                         <Show when={runtime()?.phase === "downloading"}>
-                          <Progress value={runtime()?.progress ?? 0} aria-label={`${railName(provider)} download`} />
+                          <Progress
+                            value={runtime()?.progress ?? 0}
+                            aria-label={t("provider.picker.download", { name: railName(provider, t) })}
+                          />
                         </Show>
                         <Show when={runtimeAction()}>
                           {(action) => (
@@ -401,7 +432,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 else void props.onDownloadProvider?.(target);
                               }}
                             >
-                              {action()}
+                              {t(RUNTIME_ACTION_LABEL[action()])}
                             </Button>
                           )}
                         </Show>
@@ -409,8 +440,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </Show>
                     <Input
                       class="provider-model-search"
-                      aria-label="Search models"
-                      placeholder="Search models"
+                      aria-label={t("provider.picker.search")}
+                      placeholder={t("provider.picker.search")}
                       value={search()}
                       onValueChange={setSearch}
                     />
@@ -424,14 +455,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
                                   search().trim()
-                                    ? "No models match your search."
-                                    : `No models are available from ${railName(provider)}.`
+                                    ? t("provider.picker.noMatches")
+                                    : t("provider.picker.noModels", { name: railName(provider, t) })
                                 }
                               >
-                                <span>
-                                  Add an OpenAI-compatible endpoint — a model server on this computer, or any service
-                                  with a base URL and a key.
-                                </span>
+                                <span>{t("provider.picker.customEmpty")}</span>
                               </Show>
                             </div>
                           </Show>
@@ -439,7 +467,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       >
                         <Listbox.Root<PickerModel, PickerModelGroup>
                           class="provider-model-list"
-                          aria-label={`${railName(provider)} models`}
+                          aria-label={t("provider.picker.models", { name: railName(provider, t) })}
                           options={groups()}
                           optionGroupChildren="models"
                           renderSection={(section) => (
@@ -463,9 +491,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 item={item}
                                 type="button"
                                 class={["provider-model-option", { "provider-model-option-selected": isSelected() }]}
-                                aria-label={`${displayModelName(model.name, model.id)}${
-                                  model.id === railDefaultModel(provider) ? ", default" : ""
-                                }`}
+                                aria-label={
+                                  model.id === railDefaultModel(provider)
+                                    ? t("provider.picker.defaultModelLabel", {
+                                        name: displayModelName(model.name, model.id),
+                                      })
+                                    : displayModelName(model.name, model.id)
+                                }
                                 disabled={!available() || props.modelChangesDisabled}
                                 onClick={() => {
                                   if (!isSelected() || props.provider !== provider) selectModel(model.id, provider);
@@ -474,10 +506,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 <span class="provider-model-option-name">
                                   <span>{displayModelName(model.name, model.id)}</span>
                                   <Show when={model.free}>
-                                    <small>Free</small>
+                                    <small>{t("provider.model.free")}</small>
                                   </Show>
                                   <Show when={model.id === railDefaultModel(provider)}>
-                                    <small>default</small>
+                                    <small>{t("provider.model.default")}</small>
                                   </Show>
                                 </span>
                                 <Show when={isSelected()}>
@@ -491,7 +523,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </div>
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
-                        <span>Effort</span>
+                        <span>{t("provider.picker.effort")}</span>
                         <Select<{ id: string; name: string }>
                           class="provider-model-effort-select"
                           options={effortOptions()}
@@ -519,11 +551,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         >
                           <SelectTrigger
                             size="sm"
-                            aria-label="Agent reasoning effort"
+                            aria-label={t("provider.picker.effortLabel")}
                             disabled={!available() || props.modelChangesDisabled}
                           >
                             <SelectValue<{ id: string; name: string }>>
-                              {(state) => state.selectedOption()?.name ?? "Select effort"}
+                              {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent class="provider-model-effort-content" />
@@ -533,10 +565,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     <Show when={props.onAutoApproveChange}>
                       {(change) => (
                         <div class="provider-model-effort">
-                          <span>Auto approve</span>
+                          <span>{t("provider.picker.autoApprove")}</span>
                           <Switch
                             size="sm"
-                            aria-label="Auto approve this agent's actions"
+                            aria-label={t("provider.picker.autoApproveLabel")}
                             checked={props.autoApprove === true}
                             disabled={props.autoApproveLocked === true}
                             onChange={(next) => {
@@ -576,8 +608,8 @@ function wireProvider(rail: RailId): AgentProviderId {
   return rail === CUSTOM_RAIL ? "opencode" : rail;
 }
 
-function railName(rail: RailId): string {
-  return rail === CUSTOM_RAIL ? "Custom" : agentProviderName(rail);
+function railName(rail: RailId, t: AppTranslate): string {
+  return rail === CUSTOM_RAIL ? t("provider.picker.custom") : agentProviderName(rail);
 }
 
 /** Nothing is the default on the Custom tab: the user's own endpoints have no shipped starting model. */
@@ -585,7 +617,12 @@ function railDefaultModel(rail: RailId): AgentModelId | null {
   return rail === CUSTOM_RAIL ? null : defaultProviderModel(rail);
 }
 
-function providerAvailability(status: AgentStatus, models: AgentModelOption[], rail: RailId): AgentProviderStatus {
+function providerAvailability(
+  status: AgentStatus,
+  models: AgentModelOption[],
+  rail: RailId,
+  t: AppTranslate,
+): AgentProviderStatus {
   const provider = wireProvider(rail);
   const explicit = status.providers?.find((item) => item.id === provider);
   if (explicit) return explicit;
@@ -597,41 +634,38 @@ function providerAvailability(status: AgentStatus, models: AgentModelOption[], r
     id: provider,
     state: available ? "available" : "error",
     version: null,
-    message: available ? null : `${agentProviderName(provider)} is unavailable.`,
+    message: available ? null : t("provider.picker.unavailable", { name: agentProviderName(provider) }),
   };
 }
 
-function providerSummary(provider: AgentProviderId, status: AgentProviderStatus): string {
+function providerSummary(provider: AgentProviderId, status: AgentProviderStatus, text: PickerText): string {
   if (status.state === "available") {
     return status.version
       ? `${status.version} (${agentProviderCliName(provider)})`
-      : `${agentProviderCliName(provider)} ready`;
+      : text.t("provider.picker.cliReady", { cli: agentProviderCliName(provider) });
   }
-  return status.message ?? providerStatusLabel(status.state);
+  return status.message ? text.sourceText(status.message) : providerStatusLabel(status.state, text.t);
 }
 
-function providerHeadingSummary(provider: AgentProviderId, status: AgentProviderStatus): string {
-  if (status.state === "available") return providerSummary(provider, status);
-  return providerStatusLabel(status.state);
+function providerHeadingSummary(provider: AgentProviderId, status: AgentProviderStatus, text: PickerText): string {
+  if (status.state === "available") return providerSummary(provider, status, text);
+  return providerStatusLabel(status.state, text.t);
 }
 
-function providerStatusLabel(
-  state: AgentProviderStatus["state"],
-): "Sign in required" | "Not installed" | "Update required" | "Unavailable" | "Checking" {
-  if (state === "sign-in-required") return "Sign in required";
-  if (state === "not-installed") return "Not installed";
-  if (state === "outdated") return "Update required";
-  if (state === "error") return "Unavailable";
-  return "Checking";
+function providerStatusLabel(state: AgentProviderStatus["state"], t: AppTranslate): string {
+  if (state === "sign-in-required") return t("provider.status.signInRequired");
+  if (state === "not-installed") return t("provider.status.notInstalled");
+  if (state === "outdated") return t("provider.status.updateRequired");
+  if (state === "error") return t("provider.status.unavailable");
+  return t("provider.status.checking");
 }
 
 function displayModelName(name: string | undefined, fallback: string): string {
   return name?.replace(/^[\s:–—-]+/, "") || fallback;
 }
 
-export function reasoningLabel(effort: AgentReasoningEffort): string {
-  if (effort === "xhigh") return "Extra high";
-  return `${effort.slice(0, 1).toUpperCase()}${effort.slice(1)}`;
+export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
+  return t(REASONING_LABEL[effort]);
 }
 
 /** A custom endpoint has no brand mark and must not borrow one, so the rail draws sliders instead. */

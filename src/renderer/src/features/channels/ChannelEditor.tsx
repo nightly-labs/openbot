@@ -15,6 +15,7 @@ import {
 import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, For, Show } from "solid-js";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "./channels-context";
@@ -42,6 +43,7 @@ interface ChannelEditorProps {
  */
 export function ChannelEditor(props: ChannelEditorProps) {
   const channels = useChannels();
+  const { t } = useText();
   const { agentList } = useAgents();
   const channel = () => channels.state.page?.channel;
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
@@ -196,10 +198,10 @@ export function ChannelEditor(props: ChannelEditorProps) {
 
   return (
     <div class="channel-editor">
-      <SettingsField label="Name">
+      <SettingsField label={t("channel.form.nameShort")}>
         <Input
-          aria-label="Channel name"
-          placeholder="Ex: Project Falcon"
+          aria-label={t("channel.form.name")}
+          placeholder={t("channel.form.namePlaceholder")}
           maxlength={INPUT_LIMITS.agentName}
           value={fields.name}
           onValueChange={(name) => {
@@ -213,10 +215,10 @@ export function ChannelEditor(props: ChannelEditorProps) {
           onBlur={saveName}
         />
       </SettingsField>
-      <SettingsField label="Title">
+      <SettingsField label={t("channel.form.title")}>
         <Input
-          aria-label="Channel title"
-          placeholder="Describe what this channel does"
+          aria-label={t("channel.form.titleLabel")}
+          placeholder={t("channel.form.titlePlaceholder")}
           maxlength={INPUT_LIMITS.agentTitle}
           value={fields.title}
           onValueChange={(title) => {
@@ -230,11 +232,11 @@ export function ChannelEditor(props: ChannelEditorProps) {
           onBlur={saveText("title")}
         />
       </SettingsField>
-      <SettingsField label="Instructions">
+      <SettingsField label={t("channel.form.instructions")}>
         <Textarea
           rows="4"
-          aria-label="Channel instructions"
-          placeholder="What will this channel work on?"
+          aria-label={t("channel.form.instructionsLabel")}
+          placeholder={t("channel.form.instructionsPlaceholder")}
           maxlength={INPUT_LIMITS.agentDescription}
           value={fields.instructions}
           onValueChange={(instructions) => {
@@ -249,17 +251,25 @@ export function ChannelEditor(props: ChannelEditorProps) {
         />
       </SettingsField>
       <SettingsLinkGroup>
-        <SettingsLinkRow label="Memories" value={`${props.memoryCount} saved`} onClick={props.onOpenMemories} />
-        <SettingsLinkRow label="Routines" value={`${props.routineCount} configured`} onClick={props.onOpenRoutines} />
+        <SettingsLinkRow
+          label={t("channel.settings.memories")}
+          value={t("channel.settings.memoryCount", { count: props.memoryCount })}
+          onClick={props.onOpenMemories}
+        />
+        <SettingsLinkRow
+          label={t("channel.settings.routines")}
+          value={t("channel.settings.routineCount", { count: props.routineCount })}
+          onClick={props.onOpenRoutines}
+        />
       </SettingsLinkGroup>
-      <section class="channel-members" aria-label="Members">
-        <h3 class="channel-members-title">Members</h3>
+      <section class="channel-members" aria-label={t("channel.members.title")}>
+        <h3 class="channel-members-title">{t("channel.members.title")}</h3>
         <ItemGroup class="channel-member-list">
           <For each={members()}>
             {(entry) => (
               <ChannelMemberRow
                 agent={entry.agent}
-                fallbackName={`Unavailable member ${entry.agentId}`}
+                fallbackName={t("channel.members.unavailable", { id: entry.agentId })}
                 actions={
                   <ItemActions>
                     <Show when={entry.agent}>
@@ -278,8 +288,8 @@ export function ChannelEditor(props: ChannelEditorProps) {
                             aria-pressed={channel()?.leadAgentId === entry.agentId ? "true" : "false"}
                             aria-label={
                               channel()?.leadAgentId === entry.agentId
-                                ? `${agent().name} is the channel lead`
-                                : `Make ${agent().name} the channel lead`
+                                ? t("channel.members.isLead", { name: agent().name })
+                                : t("channel.members.makeLeadLabel", { name: agent().name })
                             }
                             onClick={() =>
                               void commit((draft) => {
@@ -291,7 +301,9 @@ export function ChannelEditor(props: ChannelEditorProps) {
                           </Tooltip.Trigger>
                           <Tooltip.Portal>
                             <Tooltip.Content class="ui-tooltip">
-                              {channel()?.leadAgentId === entry.agentId ? "Channel lead" : "Make channel lead"}
+                              {channel()?.leadAgentId === entry.agentId
+                                ? t("channel.members.lead")
+                                : t("channel.members.makeLead")}
                             </Tooltip.Content>
                           </Tooltip.Portal>
                         </Tooltip.Root>
@@ -302,11 +314,13 @@ export function ChannelEditor(props: ChannelEditorProps) {
                       variant="destructive"
                       class="channel-member-remove"
                       aria-label={
-                        entry.agent ? `Remove ${entry.agent.name}` : `Remove unavailable member ${entry.agentId}`
+                        entry.agent
+                          ? t("channel.members.remove", { name: entry.agent.name })
+                          : t("channel.members.removeUnavailable", { id: entry.agentId })
                       }
                       onClick={() => void commit((draft) => toggleChannelMember(draft, entry.agentId, false))}
                     >
-                      Remove
+                      {t("common.remove")}
                     </Button>
                   </ItemActions>
                 }
@@ -319,7 +333,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
               disabled={!available().length}
             >
               <Plus aria-hidden="true" />
-              Add member
+              {t("channel.members.add")}
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content class="channel-member-menu">
@@ -338,7 +352,7 @@ export function ChannelEditor(props: ChannelEditorProps) {
           </DropdownMenu.Root>
         </ItemGroup>
         <Show when={!members().length}>
-          <p class="channel-members-note">A channel needs one member before it can route work.</p>
+          <p class="channel-members-note">{t("channel.members.empty")}</p>
         </Show>
       </section>
     </div>

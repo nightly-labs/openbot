@@ -1,5 +1,6 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, Loading, Show } from "solid-js";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
@@ -298,8 +299,8 @@ function ServerSettings() {
       hostName:
         server.kind === "local"
           ? platform.appInfo()?.platform === "darwin"
-            ? "This Mac"
-            : "This computer"
+            ? currentText().t("app.host.thisMac")
+            : currentText().t("app.host.thisComputer")
           : server.name,
       canManage: canManageStorage(server),
       onOpenAgent: (agentId) => openOnServer(server, agentId, () => selectAgent(agentId)),

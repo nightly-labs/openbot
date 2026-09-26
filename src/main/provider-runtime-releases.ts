@@ -1,5 +1,6 @@
 import { MANAGED_RUNTIME_PROVIDERS, type ManagedProviderId } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
   codexTag,
@@ -52,14 +53,14 @@ const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext)
     const release = await fetchJson(fetch, `${api}/releases/latest`, { Accept: "application/vnd.github+json" });
     const version = isString(release.tag_name) ? versionFromTag(release.tag_name) : null;
     if (!(version && Array.isArray(release.assets))) {
-      throw new Error("The Codex release has an unexpected shape.");
+      throw new Error(sourceText("error.provider.codexReleaseShape"));
     }
     const name = lock.codex.artifacts[target].asset;
     const asset = release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === name);
     const sha256 =
       isDynamicRecord(asset) && isString(asset.digest) ? /^sha256:([0-9a-f]{64})$/u.exec(asset.digest)?.[1] : null;
     if (!(sha256 && isDynamicRecord(asset) && isNumber(asset.size) && asset.size > 0)) {
-      throw new Error("The Codex release has no verifiable download for this computer.");
+      throw new Error(sourceText("error.provider.codexReleaseNoDownload"));
     }
     return {
       ...pinned,
@@ -78,7 +79,7 @@ const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext)
     const sdkVersion = isString(sdk.version) ? sdk.version : null;
     const cliVersion = isString(sdk.claudeCodeVersion) ? sdk.claudeCodeVersion : null;
     if (!(sdkVersion && cliVersion && VERSION.test(sdkVersion) && VERSION.test(cliVersion))) {
-      throw new Error("The Claude release has an unexpected shape.");
+      throw new Error(sourceText("error.provider.claudeReleaseShape"));
     }
     const artifact = await npmArtifact(fetch, lock.claude.registry, lock.claude.artifacts[target].package, sdkVersion);
     return { ...pinned, ...artifact, version: cliVersion, packageVersion: sdkVersion, source: "latest" };
@@ -97,7 +98,7 @@ const LATEST_RELEASES: Record<ManagedProviderId, (context: LatestReleaseContext)
     const pinned = providerRuntimeDescriptor("grok").spec(target, lock);
     const response = await request(fetch, `${lock.grok.distribution}/stable`);
     const version = (await readText(response)).trim();
-    if (!VERSION.test(version)) throw new Error("The Grok release has an unexpected version.");
+    if (!VERSION.test(version)) throw new Error(sourceText("error.provider.grokReleaseVersion"));
     const asset = lock.grok.artifacts[target].asset.replace(`grok-${lock.grok.version}-`, `grok-${version}-`);
     const url = `${lock.grok.distribution}/${asset}`;
     return {
@@ -120,7 +121,7 @@ export function latestRelease(provider: ManagedProviderId, context: LatestReleas
 export async function fetchBlockedVersions(fetch: Fetch): Promise<BlockedVersions> {
   const value = await fetchJson(fetch, BLOCKED_VERSIONS_URL);
   if (!(value.schemaVersion === 1 && isDynamicRecord(value.blocked))) {
-    throw new Error("The blocked version list has an unexpected shape.");
+    throw new Error(sourceText("error.provider.blockedListShape"));
   }
   const blocked = new Map<ManagedProviderId, ReadonlySet<string>>();
   for (const provider of MANAGED_RUNTIME_PROVIDERS) {
@@ -147,7 +148,7 @@ async function npmArtifact(
     !(packageVersion && VERSION.test(packageVersion) && tarball?.startsWith(`${registry}/${packageName}/-/`)) ||
     !integrity
   ) {
-    throw new Error(`The ${packageName} release has no verifiable download.`);
+    throw new Error(sourceText("error.provider.releaseNoDownload", { name: packageName }));
   }
   return {
     packageVersion,
@@ -186,7 +187,7 @@ async function downloadSize(fetch: Fetch, url: string): Promise<number> {
       ? Number(/\/(\d+)$/u.exec(response.headers.get("content-range") ?? "")?.[1])
       : Number(response.headers.get("content-length"));
   if (!(response.ok && Number.isSafeInteger(total) && total > 0)) {
-    throw new Error("The release download has no known size.");
+    throw new Error(sourceText("error.provider.releaseSizeUnknown"));
   }
   return total;
 }
@@ -194,7 +195,7 @@ async function downloadSize(fetch: Fetch, url: string): Promise<number> {
 /** Every source answers with a JSON object; anything else is a failed check, not a value. */
 async function fetchJson(fetch: Fetch, url: string, headers: Record<string, string> = {}): Promise<DynamicRecord> {
   const value = JSON.parse(await readText(await request(fetch, url, headers)));
-  if (!isDynamicRecord(value)) throw new Error("The release metadata is not a JSON object.");
+  if (!isDynamicRecord(value)) throw new Error(sourceText("error.provider.releaseMetadataNotObject"));
   return value;
 }
 
@@ -206,7 +207,7 @@ async function request(fetch: Fetch, url: string, headers: Record<string, string
   });
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    throw new Error(`The release check failed with HTTP ${response.status}.`);
+    throw new Error(sourceText("error.provider.releaseCheckHttp", { status: response.status }));
   }
   return response;
 }
@@ -214,9 +215,9 @@ async function request(fetch: Fetch, url: string, headers: Record<string, string
 async function readText(response: Response): Promise<string> {
   if (Number(response.headers.get("content-length") ?? 0) > MAX_METADATA_BYTES) {
     await response.body?.cancel().catch(() => undefined);
-    throw new Error("The release metadata is too large.");
+    throw new Error(sourceText("error.provider.releaseMetadataTooLarge"));
   }
   const text = await response.text();
-  if (text.length > MAX_METADATA_BYTES) throw new Error("The release metadata is too large.");
+  if (text.length > MAX_METADATA_BYTES) throw new Error(sourceText("error.provider.releaseMetadataTooLarge"));
   return text;
 }

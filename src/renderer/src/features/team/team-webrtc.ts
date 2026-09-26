@@ -7,6 +7,7 @@ import {
   type SignalServerMessage,
 } from "@openbot/contracts/signal-protocol/messages";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
+import { sourceText } from "@openbot/i18n/source";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
 
 export interface BridgeCommand {
@@ -128,7 +129,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
       const state = requirePeer(command.peerId);
       const channel = command.channel ? state.channels[command.channel] : null;
       if (channel?.readyState !== "open" || command.data === undefined)
-        throw new Error("The WebRTC channel is not open.");
+        throw new Error(sourceText("error.remote.channelNotOpen"));
       await sendChannelPayload(state, channel, command.data);
     } else if (command.type === "restart-ice") {
       await restartIce(requirePeer(command.peerId));
@@ -140,7 +141,7 @@ async function handleCommand(command: BridgeCommand): Promise<void> {
     post({
       type: "command-error",
       commandId: command.commandId,
-      message: error instanceof Error ? error.message : "The WebRTC command failed.",
+      message: error instanceof Error ? error.message : sourceText("error.remote.webRtcCommandFailed"),
     });
   }
 }
@@ -449,7 +450,12 @@ function bindDataChannel(
     }
   };
   channel.onerror = () =>
-    post({ type: "peer-error", peerId: state.id, code: "data_channel_error", message: `${kind} channel failed.` });
+    post({
+      type: "peer-error",
+      peerId: state.id,
+      code: "data_channel_error",
+      message: sourceText("error.remote.dataChannelFailed", { kind }),
+    });
 }
 
 function descriptionFingerprint(description: RTCSessionDescription | null): string {
@@ -479,7 +485,7 @@ function waitForWritableChannel(channel: RTCDataChannel): Promise<void> {
       if (settled) return;
       settled = true;
       channel.removeEventListener("bufferedamountlow", onLow);
-      reject(new Error("The WebRTC channel stayed under backpressure."));
+      reject(new Error(sourceText("error.remote.channelBackpressure")));
     }, 60_000);
     const onLow = () => {
       if (settled) return;
@@ -553,7 +559,7 @@ async function reportSelectedPath(state: PeerState, connection: RTCPeerConnectio
 
 function sendSignal(state: PeerState, message: SignalClientMessage): void {
   const socket = (state.signalHost ?? state).socket;
-  if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error("Signal is not connected.");
+  if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error(sourceText("error.remote.signalNotConnected"));
   socket.send(JSON.stringify(message));
 }
 
@@ -627,7 +633,7 @@ function failSignalProtocol(state: PeerState, error: unknown): void {
     type: "peer-error",
     peerId: state.id,
     code: "protocol_error",
-    message: error instanceof Error ? error.message : "Signal sent a frame this peer cannot read.",
+    message: error instanceof Error ? error.message : sourceText("error.remote.signalFrameUnreadable"),
   });
   disconnect(state.id);
   post({ type: "peer-disconnected", peerId: state.id });
@@ -638,7 +644,7 @@ function failPeer(state: PeerState, error: unknown): void {
     type: "peer-error",
     peerId: state.id,
     code: "webrtc_error",
-    message: error instanceof Error ? error.message : "WebRTC failed.",
+    message: error instanceof Error ? error.message : sourceText("error.remote.webRtcFailed"),
   });
 }
 

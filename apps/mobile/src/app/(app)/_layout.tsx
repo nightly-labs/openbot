@@ -12,12 +12,14 @@ import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-
 import { AppDrawerShell } from "@/features/servers/components/app-drawer-shell";
 import { MobileWorkspaceProvider } from "@/features/workspace/context/mobile-workspace-context";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = {
   initialRouteName: "connected",
 };
 
 function AuthenticatedStack() {
+  const { t } = useText();
   const segments = useSegments();
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
@@ -89,7 +91,7 @@ function AuthenticatedStack() {
             presentation: "formSheet",
             sheetAllowedDetents: [0.6],
             sheetGrabberVisible: true,
-            title: "Actions needed",
+            title: t("mobile.app.route.actionsNeeded"),
           }}
         />
         <Stack.Screen
@@ -103,7 +105,7 @@ function AuthenticatedStack() {
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: "New channel",
+            title: t("mobile.app.route.newChannel"),
           }}
         />
         <Stack.Screen
@@ -117,7 +119,7 @@ function AuthenticatedStack() {
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: "Create an agent",
+            title: t("mobile.app.route.createAgent"),
           }}
         />
         <Stack.Screen
@@ -142,7 +144,7 @@ function AuthenticatedStack() {
             presentation: "formSheet",
             sheetAllowedDetents: [0.85],
             sheetGrabberVisible: true,
-            title: "New section",
+            title: t("mobile.app.route.newSection"),
           }}
         />
         <Stack.Screen

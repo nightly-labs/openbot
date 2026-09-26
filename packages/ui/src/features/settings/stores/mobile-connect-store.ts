@@ -1,6 +1,6 @@
 import type { MobileConnectedDevice, MobileConnectTicket } from "@openbot/contracts/ipc";
 import { createEffect, createMemo, createSignal, createStore, onCleanup } from "solid-js";
-import { errorMessage } from "../../../error-message";
+import { currentText } from "../../../text";
 
 const MOBILE_CONNECT_SUCCESS_FEEDBACK_MS = 900;
 const MOBILE_CONNECT_COLLAPSE_MS = 240;
@@ -140,7 +140,7 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       if (props.onListMobileConnectedDevices) {
         const refreshedDevices = await refreshDevices(true);
         if (!refreshedDevices) {
-          throw new Error(panels.devices.error ?? "Could not load connected devices before generating a code.");
+          throw new Error(panels.devices.error ?? currentText().t("settings.mobileConnect.error.loadBeforeGenerate"));
         }
         baselineDevices = refreshedDevices;
       }
@@ -154,7 +154,8 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     } catch (error) {
       setPanels((state) => {
         state.connect.session = null;
-        state.connect.error = errorMessage(error, "Could not generate a Mobile Connect code.");
+        const text = currentText();
+        state.connect.error = text.errorMessage(error, text.t("settings.mobileConnect.error.generate"));
       });
     } finally {
       setPanels((state) => {
@@ -186,7 +187,8 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     } catch (error) {
       if (revision !== devicesRequestRevision) return null;
       setPanels((state) => {
-        state.devices.error = errorMessage(error, "Could not load connected devices.");
+        const text = currentText();
+        state.devices.error = text.errorMessage(error, text.t("settings.mobileConnect.error.loadDevices"));
       });
       return null;
     } finally {
@@ -259,7 +261,8 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       });
     } catch (error) {
       setPanels((state) => {
-        state.devices.error = errorMessage(error, "Could not disconnect this device.");
+        const text = currentText();
+        state.devices.error = text.errorMessage(error, text.t("settings.mobileConnect.error.disconnect"));
       });
     } finally {
       setPanels((state) => {
@@ -269,13 +272,14 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
   }
 
   function deviceTimeLabel(timestamp: number): string {
+    const { t, format } = currentText();
     const elapsedSeconds = Math.max(0, Math.floor((now() - timestamp) / 1_000));
-    if (elapsedSeconds < 60) return "Just now";
+    if (elapsedSeconds < 60) return t("settings.mobileConnect.time.justNow");
     const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-    if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+    if (elapsedMinutes < 60) return t("settings.mobileConnect.time.minutesAgo", { minutes: elapsedMinutes });
     const elapsedHours = Math.floor(elapsedMinutes / 60);
-    if (elapsedHours < 24) return `${elapsedHours}h ago`;
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(timestamp);
+    if (elapsedHours < 24) return t("settings.mobileConnect.time.hoursAgo", { hours: elapsedHours });
+    return format.date(timestamp, { dateStyle: "medium" });
   }
 
   return { createTicket, deviceTimeLabel, expired, expiryLabel, revokeDevice, secondsRemaining, state: panels };

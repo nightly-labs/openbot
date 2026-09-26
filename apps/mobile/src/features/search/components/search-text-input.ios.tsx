@@ -5,8 +5,10 @@ import { CircleX } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 
 import type { MobileSearchTextInputProps } from "@/features/search/components/search-text-input.types";
+import { useText } from "@/shared/lib/text";
 
 export function MobileSearchTextInput({ value, onChangeText }: MobileSearchTextInputProps) {
+  const { t } = useText();
   const [foreground, muted, background] = useThemeColor(["foreground", "muted", "background"]);
   const nativeValue = useNativeState(value);
   const clear = () => {
@@ -21,7 +23,7 @@ export function MobileSearchTextInput({ value, onChangeText }: MobileSearchTextI
           autoCapitalize="none"
           autoCorrect={false}
           autoFocus
-          placeholder="Search"
+          placeholder={t("common.search")}
           placeholderTextColor={muted}
           returnKeyType="search"
           selectionColor={foreground}
@@ -33,7 +35,7 @@ export function MobileSearchTextInput({ value, onChangeText }: MobileSearchTextI
       </Host>
       {value ? (
         <Pressable
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t("mobile.search.clear")}
           accessibilityRole="button"
           className="size-8 items-center justify-center"
           hitSlop={6}

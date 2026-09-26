@@ -4,6 +4,7 @@ import Svg, { Polyline, Rect } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 
 import { type AppLogoAnimation, useAppLogoMotion } from "@/features/auth/components/use-app-logo-motion";
+import { useText } from "@/shared/lib/text";
 
 export interface AppLogoProps {
   animation?: AppLogoAnimation;
@@ -31,6 +32,7 @@ export function AppLogo({
   interactive = false,
   size = VIEWBOX_SIZE,
 }: AppLogoProps) {
+  const { t } = useText();
   const backgroundColor = resolveColor(useCSSVariable("--openbot-logo-production"), "#d6adf2");
   const eyeColor = resolveColor(useCSSVariable("--openbot-logo-eye"), "#040007");
   const { deviceRotationAnimatedStyle, handlePressIn, leftEyeAnimatedStyle, rightEyeAnimatedStyle } = useAppLogoMotion({
@@ -105,8 +107,8 @@ export function AppLogo({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Animate OpenBot logo"
-      accessibilityHint="Makes the logo wink"
+      accessibilityLabel={t("mobile.auth.logo.animate")}
+      accessibilityHint={t("mobile.auth.logo.animateHint")}
       onPressIn={handlePressIn}
       pressRetentionOffset={12}
     >

@@ -2,6 +2,7 @@ import { serializeChatTagReference } from "@openbot/contracts/chat-tag-reference
 import { isAttachmentSummary, type MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { skillExamplePrompt } from "@openbot/ui/components/SkillPreview";
 import type { ComposerDraft } from "./conversation-types";
 
 export const EMPTY_DRAFT: ComposerDraft = {
@@ -24,7 +25,7 @@ export function appendSkillExample(
 ): ComposerDraft {
   return appendDraftLine(
     draft,
-    `${serializeChatTagReference("skill", skill.name, skill.id)} ${skill.examplePrompt?.trim() || "Help me use this skill."}`,
+    `${serializeChatTagReference("skill", skill.name, skill.id)} ${skillExamplePrompt(skill)}`,
   );
 }
 

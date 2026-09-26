@@ -1,5 +1,5 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { appendVoiceTranscript, recordingToWav } from "../../../voice-recording";
@@ -82,7 +82,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         deps.setVoiceModelProgress(null);
         deps.setConversationError(
           target,
-          errorMessage(modelStatus.message, "Could not prepare the voice model. Try again."),
+          currentText().errorMessage(modelStatus.message, currentText().t("composer.voice.prepareFailed")),
         );
         return;
       }
@@ -150,10 +150,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const audioDurationSeconds = deps.voiceElapsedSeconds();
     const startedAt = performance.now();
     try {
-      if (chunks.length === 0) throw new Error("No speech was recorded.");
+      if (chunks.length === 0) throw new Error(currentText().t("composer.voice.noSpeechRecorded"));
       const audio = await recordingToWav(new Blob(chunks, { type: mimeType }));
       const result = await conversationRuntime(deps.props).voice.transcribe({ audio });
-      if (!result.text.trim()) throw new Error("No speech was detected.");
+      if (!result.text.trim()) throw new Error(currentText().t("composer.voice.noSpeechDetected"));
       analytics.track("voice_transcription", {
         result: "succeeded",
         audio_duration_seconds: audioDurationSeconds,

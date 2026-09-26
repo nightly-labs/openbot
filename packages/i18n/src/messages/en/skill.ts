@@ -1,0 +1,72 @@
+import { defineMessages } from "../../message";
+
+export const messages = defineMessages("skill", {
+  "skill.title": "Skills",
+  "skill.close": "Close skills",
+  "skill.detailsDescription": "{name} details",
+  "skill.assignedDescription": "Assigned skills for {name}",
+  "skill.addFromMarketplace": "Add from marketplace",
+  "skill.limitReached":
+    "This agent has reached the limit of {limit} skills. Remove a skill before you add another one.",
+  "skill.managedOnHost": "Skills for this agent are managed on the host.",
+  "skill.loading": "Loading skills…",
+  "skill.loadingDetails": "Loading details…",
+  "skill.emptyEnabled": "This agent has no enabled skills.",
+  "skill.emptyAssigned": "This agent has no assigned skills yet.",
+  "skill.folderSkill": "OpenBot did not install this skill. Edit or remove it in {location}.",
+  "skill.localOnHost": "This local skill is stored on the host. Open its details on that computer.",
+  "skill.moreFor": "More for {name}",
+  "skill.update": "Update",
+  "skill.updateName": "Update {name}",
+  "skill.enableName": "Enable {name}",
+  "skill.repair": "Repair",
+  "skill.uninstall": "Uninstall",
+  "skill.version": "v{version}",
+  "skill.versionUpdate": "v{installed} · v{available} available",
+
+  "skill.loadFailed": "Could not load skills.",
+  "skill.loadDetailsFailed": "Could not load skill details.",
+  "skill.enableFailed": "Could not enable the skill.",
+  "skill.disableFailed": "Could not disable the skill.",
+  "skill.removeFailed": "Could not remove the skill.",
+  "skill.updateFailed": "Could not update the skill.",
+
+  "skill.confirm.replaceTitle": "Replace local changes?",
+  "skill.confirm.removeTitle": "Remove this skill?",
+  "skill.confirm.replaceBody":
+    "Updating this skill replaces the local files with the latest skill package. Your edits in this skill folder will be lost.",
+  "skill.confirm.removeModifiedBody":
+    "This skill has local changes in the agent workspace. Remove deletes those files. Original chat messages stay.",
+  "skill.confirm.removeBody": "OpenBot will remove this skill from the agent. Chat history stays.",
+  "skill.confirm.replace": "Replace skill",
+  "skill.confirm.remove": "Remove skill",
+
+  "skill.unavailable.readOnly": "Remote skills are read-only.",
+  "skill.unavailable.add": "Add this skill to try it.",
+  "skill.unavailable.repair": "Repair this skill to try it.",
+  "skill.unavailable.updateVersion": "Update this skill to try this version.",
+  "skill.unavailable.updateRevision": "Update this skill to try this revision.",
+  "skill.unavailable.saving": "Wait for this skill to finish saving, then try it.",
+  "skill.unavailable.composer": "The agent composer is unavailable.",
+
+  "skill.toolbar.source": "Skill source",
+  "skill.toolbar.all": "All",
+  "skill.toolbar.local": "Local",
+  "skill.toolbar.enabled": "Enabled",
+  "skill.toolbar.create": "Create skill",
+
+  "skill.local.loadFailed": "Could not load local skills.",
+  "skill.local.toggleFailed": "Could not change the skill state.",
+  "skill.local.addFailed": "Could not add the local skill.",
+  "skill.local.back": "Back to local skills",
+  "skill.local.added": "Added",
+  "skill.local.add": "Add skill",
+  "skill.local.loading": "Loading local skills…",
+  "skill.local.empty": "No local skills yet.",
+
+  "skill.preview.label": "{name} preview",
+  "skill.preview.creator": "By {name}",
+  "skill.preview.examplePrompt": "Help me use this skill.",
+  "skill.preview.try": "Try skill",
+  "skill.preview.linkFailed": "Could not open the link.",
+});

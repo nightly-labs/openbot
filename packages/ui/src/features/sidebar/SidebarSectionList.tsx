@@ -6,6 +6,7 @@
 
 import { SIDEBAR_PEOPLE_SECTION_ID } from "@openbot/contracts/ipc";
 import { For, Show } from "solid-js";
+import { useText } from "../../text";
 import { SidebarAgentSection } from "./SidebarAgentSection";
 import { SidebarPeopleSection } from "./SidebarPeopleSection";
 import { SidebarSectionEditor } from "./SidebarSectionEditor";
@@ -13,6 +14,7 @@ import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarSectionList() {
   const { pending, props } = useSidebarScope();
+  const { t } = useText();
   return (
     <>
       <For each={props.layout.order}>
@@ -25,7 +27,7 @@ export function SidebarSectionList() {
         }
       </For>
       <Show when={pending.sectionEditor?.target.kind === "create"}>
-        <section class="sidebar-chat-group sidebar-section sidebar-section-draft" aria-label="New section">
+        <section class="sidebar-chat-group sidebar-section sidebar-section-draft" aria-label={t("sidebar.new.section")}>
           <SidebarSectionEditor />
         </section>
       </Show>

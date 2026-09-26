@@ -10,6 +10,7 @@
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@openbot/i18n": "workspace:*",
     "@openbot/logging": "workspace:*"
   },
   "devDependencies": {

@@ -21,6 +21,7 @@ import {
   type StoredFileRow,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import {
   type StoragePlacement,
   type StorageThread,
@@ -173,7 +174,8 @@ export class StorageUsageScanner {
     const scannedAt = new Date().toISOString();
     const agents = this.#sources.agents();
     const scopeAgent = input.agentId === undefined ? null : agents.find((agent) => agent.id === input.agentId);
-    if (input.scope === "agent" && !scopeAgent) throw new StorageNotFoundError("The agent does not exist.");
+    if (input.scope === "agent" && !scopeAgent)
+      throw new StorageNotFoundError(sourceText("error.storage.agentMissing"));
 
     const db = this.#sources.database();
     let threads = storageThreads(db, input.agentId);
@@ -502,7 +504,7 @@ export class StorageUsageService {
 
   async deleteFile(fileId: string): Promise<void> {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
-      throw new StorageNotFoundError("The file does not exist or is already deleted.");
+      throw new StorageNotFoundError(sourceText("error.backend.fileGone"));
     try {
       await this.#sources.mailbox.deleteStoredFile(fileId);
     } finally {

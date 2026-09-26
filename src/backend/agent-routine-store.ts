@@ -6,6 +6,7 @@ import type {
   RoutineRunStatus,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
@@ -33,7 +34,7 @@ const AGENT_ROUTINE_TABLES: RoutineTables = {
   commandPrefix: "routine",
   eventPrefix: "routine",
   limit: INPUT_LIMITS.agentRoutines,
-  limitMessage: `An agent can have at most ${INPUT_LIMITS.agentRoutines} routines.`,
+  limitMessage: sourceText("error.backend.agentRoutineLimit", { limit: INPUT_LIMITS.agentRoutines }),
 };
 
 /**

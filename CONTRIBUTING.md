@@ -149,6 +149,12 @@ Preserve the following boundaries and their tests:
 Full agent access is intentional today, but new privileges or network surfaces still require an
 explicit threat-model note in the pull request.
 
+## Translations
+
+English is the source text. A French or Japanese catalog can be partial: a key it does not have
+shows in English. To add a key, a translation or a language, follow [docs/i18n.md](docs/i18n.md) and
+run `bun run i18n:check`.
+
 ## Dependencies
 
 Prefer the platform and existing dependencies. A new runtime dependency should remove more

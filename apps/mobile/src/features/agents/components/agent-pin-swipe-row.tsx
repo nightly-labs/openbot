@@ -7,6 +7,7 @@ import { GestureDetector } from "react-native-gesture-handler";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, { type SharedValue, useAnimatedStyle, useReducedMotion } from "react-native-reanimated";
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
+import { useText } from "@/shared/lib/text";
 
 import { PIN_COMMIT_DISTANCE, PIN_REVEAL_DISTANCE, useAgentPinSwipe } from "./use-agent-pin-swipe";
 
@@ -39,6 +40,7 @@ function PinAction({
     ],
   }));
 
+  const { t } = useText();
   const actionStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: Math.min(0, (translation.get() + PIN_REVEAL_DISTANCE) / 2) }],
   }));
@@ -51,9 +53,11 @@ function PinAction({
       importantForAccessibility={revealed ? "auto" : "no-hide-descendants"}
     >
       <Pressable
-        accessibilityLabel={`${pinned ? "Unpin" : "Pin"} ${agentName}`}
+        accessibilityLabel={t(pinned ? "mobile.agent.pin.unpinNamed" : "mobile.agent.pin.pinNamed", {
+          name: agentName,
+        })}
         accessibilityRole="button"
-        accessibilityHint={pinBlocked ? "Pin limit reached. Unpin a chat first." : undefined}
+        accessibilityHint={pinBlocked ? t("mobile.agent.pin.limitReached") : undefined}
         className="size-16 items-center justify-center"
         onPress={onPress}
         style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
@@ -69,7 +73,7 @@ function PinAction({
           <Pin color={String(foreground)} fill={String(foreground)} size={22} strokeWidth={1.8} />
         )}
         <Typography.Paragraph type="body-xs" weight="semibold" style={{ color: foreground }}>
-          {pinned ? "Unpin" : "Pin"}
+          {t(pinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin")}
         </Typography.Paragraph>
       </Pressable>
     </Animated.View>
@@ -91,6 +95,7 @@ export function AgentPinSwipeRow({
   const [background] = useThemeColor(["background"]);
   const { openingGesture } = useAppDrawer();
   const swipe = useAgentPinSwipe(openingGesture, onPin, pinBlocked);
+  const { t } = useText();
 
   return (
     <GestureDetector gesture={swipe.gesture}>
@@ -131,7 +136,7 @@ export function AgentPinSwipeRow({
           <Pressable
             className="absolute inset-0"
             accessibilityRole="button"
-            accessibilityLabel={`Close pin action for ${agentName}`}
+            accessibilityLabel={t("mobile.agent.pin.closeAction", { name: agentName })}
             onPress={swipe.close}
           />
         ) : null}

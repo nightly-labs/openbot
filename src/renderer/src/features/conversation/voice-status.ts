@@ -1,13 +1,15 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import type { AppTextKey } from "@openbot/i18n";
+import { currentText } from "@openbot/ui/text";
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
-export function voiceButtonLabel(phase: VoicePhase) {
-  if (phase === "recording") return "Stop voice recording";
-  if (phase === "preparing") return "Downloading voice model";
-  if (phase === "requesting") return "Requesting microphone access";
-  if (phase === "transcribing") return "Transcribing voice prompt";
-  return "Create prompt with voice";
+/** The catalog key of the voice button's accessible name. */
+export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
+  if (phase === "recording") return "composer.voice.stop";
+  if (phase === "preparing") return "composer.voice.preparing";
+  if (phase === "requesting") return "composer.voice.requesting";
+  if (phase === "transcribing") return "composer.voice.transcribing";
+  return "composer.voice.start";
 }
 
 /**
@@ -26,13 +28,15 @@ export function formatVoiceDuration(totalSeconds: number): string {
 }
 
 export function voiceCaptureError(error: unknown) {
+  const { t } = currentText();
   if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
-    return "Microphone access is blocked. Allow OpenBot to use the microphone in system settings.";
+    return t("composer.voice.blocked");
   }
-  if (error instanceof DOMException && error.name === "NotFoundError") return "No microphone is available.";
-  return "OpenBot could not start voice recording.";
+  if (error instanceof DOMException && error.name === "NotFoundError") return t("composer.voice.noMicrophone");
+  return t("composer.voice.startFailed");
 }
 
 export function voiceTranscriptionError(error: unknown): string {
-  return errorMessage(error, "OpenBot could not transcribe this recording.");
+  const { t, errorMessage } = currentText();
+  return errorMessage(error, t("composer.voice.transcribeFailed"));
 }

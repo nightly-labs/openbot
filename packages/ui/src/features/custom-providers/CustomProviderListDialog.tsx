@@ -18,6 +18,7 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { useText } from "../../text";
 
 interface CustomProviderListDialogProps {
   open: boolean;
@@ -46,6 +47,7 @@ interface CustomProviderListDialogProps {
  * is cheaper to accept than a focus handle on the picker for this one case.
  */
 export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
+  const { t } = useText();
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   const busy = () => props.removing !== null;
@@ -65,10 +67,8 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
         <Dialog.Portal>
           <Dialog.Overlay class="custom-provider-backdrop">
             <Dialog.Content as="section" class="custom-provider-dialog" aria-busy={busy() ? "true" : undefined}>
-              <Dialog.Title class="sr-only">Custom providers</Dialog.Title>
-              <Dialog.Description class="sr-only">
-                The endpoints you have saved. Remove the ones you no longer use.
-              </Dialog.Description>
+              <Dialog.Title class="sr-only">{t("customProvider.list.title")}</Dialog.Title>
+              <Dialog.Description class="sr-only">{t("customProvider.list.description")}</Dialog.Description>
 
               <header class="custom-provider-header">
                 <span class="custom-provider-mark" aria-hidden="true">
@@ -76,13 +76,18 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                 </span>
                 <div class="custom-provider-title">
                   <Heading as="h2" size="md">
-                    Custom providers
+                    {t("customProvider.list.title")}
                   </Heading>
                   <Text tone="muted" variant="caption">
-                    Your own model endpoints.
+                    {t("customProvider.list.subtitle")}
                   </Text>
                 </div>
-                <IconButton class="custom-provider-close" label="Close" variant="ghost" onClick={props.onClose}>
+                <IconButton
+                  class="custom-provider-close"
+                  label={t("common.close")}
+                  variant="ghost"
+                  onClick={props.onClose}
+                >
                   <X />
                 </IconButton>
               </header>
@@ -93,11 +98,11 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                     when={props.providers.length > 0}
                     fallback={
                       <Text class="custom-provider-list-empty" tone="muted" variant="caption">
-                        No custom endpoints yet.
+                        {t("customProvider.list.empty")}
                       </Text>
                     }
                   >
-                    <ItemGroup surface="subtle" aria-label="Custom endpoints">
+                    <ItemGroup surface="subtle" aria-label={t("customProvider.list.label")}>
                       <For each={props.providers}>
                         {(provider) => (
                           <Item>
@@ -105,7 +110,7 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                               <ItemTitle>{provider.name}</ItemTitle>
                               <ItemDescription>
                                 {provider.baseUrl}
-                                {provider.hasApiKey ? " · API key saved" : ""}
+                                {provider.hasApiKey ? ` · ${t("customProvider.list.apiKeySaved")}` : ""}
                               </ItemDescription>
                             </ItemContent>
                             <Show when={props.onDelete}>
@@ -113,12 +118,12 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                                 <Button
                                   variant="destructive-ghost"
                                   size="sm"
-                                  aria-label={`Delete ${provider.name}`}
+                                  aria-label={t("customProvider.list.deleteLabel", { name: provider.name })}
                                   disabled={busy()}
                                   onClick={() => setConfirming(provider)}
                                 >
                                   <Trash2 size={14} aria-hidden="true" />
-                                  Delete
+                                  {t("common.delete")}
                                 </Button>
                               </ItemActions>
                             </Show>
@@ -138,7 +143,7 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
                     )}
                   </Show>
                   <Button type="button" variant="default" onClick={props.onClose}>
-                    Done
+                    {t("common.done")}
                   </Button>
                 </footer>
               </div>
@@ -148,9 +153,9 @@ export function CustomProviderListDialog(props: CustomProviderListDialogProps) {
       </Dialog.Root>
       <ConfirmDialog
         open={props.open && confirming() !== null}
-        title={`Remove ${confirming()?.name ?? ""}?`}
-        description="Its API key is discarded, its models disappear from the picker, and any agent using one falls back to a default model."
-        confirmLabel="Remove"
+        title={t("customProvider.list.confirmTitle", { name: confirming()?.name ?? "" })}
+        description={t("customProvider.list.confirmDescription")}
+        confirmLabel={t("common.remove")}
         onCancel={() => setConfirming(null)}
         onConfirm={confirmRemoval}
       />

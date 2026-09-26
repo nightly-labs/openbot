@@ -7,6 +7,7 @@ import type {
   UpdateAgentMemoryInput,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { AgentMemoryStore } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
@@ -92,7 +93,7 @@ export class AgentMemories {
   delete(input: DeleteAgentMemoryInput): void {
     this.#conversation.requireKnownAgent(input.agentId);
     if (!this.#memories.delete(input.agentId, input.memoryId)) {
-      throw new Error("This memory no longer exists.");
+      throw new Error(sourceText("error.backend.memoryGone"));
     }
     this.stateChanged(input.agentId);
   }

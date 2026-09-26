@@ -1,4 +1,5 @@
 import { request as httpRequest } from "node:http";
+import { translateFor } from "@openbot/i18n";
 import { describe, expect, it } from "vitest";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 
@@ -16,6 +17,7 @@ async function withServer(
 ): Promise<void> {
   const delivered: Delivered[] = [];
   const server = await startMcpOAuthRedirectServer({
+    language: { locale: "en", translate: translateFor("en") },
     deliver: (state, code) => {
       if (!accept(state)) return false;
       delivered.push({ state, code });
@@ -109,7 +111,10 @@ describe("the MCP sign-in listener", () => {
   });
 
   it("stops answering once it is closed", async () => {
-    const server = await startMcpOAuthRedirectServer({ deliver: () => true });
+    const server = await startMcpOAuthRedirectServer({
+      language: { locale: "en", translate: translateFor("en") },
+      deliver: () => true,
+    });
     const { redirectUrl } = server;
     await server.close();
 

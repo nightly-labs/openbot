@@ -2,6 +2,7 @@ import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contr
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
@@ -29,7 +30,7 @@ export async function routeProviders(
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
   if (!providers || !capabilities.has(PROVIDERS_ADMIN_CAPABILITY))
-    throw new HttpError(400, "Provider settings are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
   const { service, credentials, runtimes, customProviders } = providers;
@@ -90,7 +91,7 @@ function provider(body: DynamicRecord) {
 
 function managedProvider(body: DynamicRecord): ManagedProviderId {
   const id = provider(body);
-  if (!isManagedRuntimeProvider(id)) throw new Error("OpenBot does not manage this provider's CLI.");
+  if (!isManagedRuntimeProvider(id)) throw new Error(sourceText("error.team.providerNotManaged"));
   return id;
 }
 

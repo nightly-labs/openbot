@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { AlarmClock, Input } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, Match, onSettled, Show, Switch } from "solid-js";
+import { useText } from "../../text";
 import { RoutineChipSelect } from "./RoutineChipSelect";
 import { RoutineDateField } from "./RoutineDateField";
 import { RoutineHoursWindowPicker } from "./RoutineHoursWindowPicker";
@@ -11,10 +12,11 @@ import {
   isRoutineDraftKind,
   parseRoutineDateKey,
   ROUTINE_DRAFT_KINDS,
-  ROUTINE_MONTH_DAY_OPTIONS,
   type RoutineDraftKind,
+  type RoutineDraftKindOption,
   type RoutineScheduleDraft,
   routineHourlyLabel,
+  routineMonthDayOptions,
   routineYearlyDateKey,
   switchDraftKind,
 } from "./routine-schedule-draft";
@@ -33,8 +35,11 @@ export interface RoutineSchedulePickerProps {
   /** The first day a one-time run can use, and the source of new dates. Defaults to now. */
   today?: Date;
   /** The frequencies the menu offers. Defaults to all of them. */
-  kinds?: { value: RoutineDraftKind; label: string }[];
+  kinds?: RoutineDraftKindOption[];
 }
+
+/** A cron example. It is the same in each language. */
+const CRON_PLACEHOLDER = "0 9 * * 1-5";
 
 type DraftOf<K extends RoutineDraftKind> = Extract<RoutineScheduleDraft, { kind: K }>;
 
@@ -75,7 +80,11 @@ function fitRow(picker: HTMLElement) {
  * the smallest control that edits it, and a change of frequency keeps the time already set.
  */
 export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
+  const text = useText();
+  const { t } = text;
   const today = () => props.today ?? new Date();
+  const kindOptions = () =>
+    (props.kinds ?? ROUTINE_DRAFT_KINDS).map((option) => ({ value: option.value, label: t(option.label) }));
   const editEnd = () => props.onEditEnd?.();
   // Days 29 to 31 do not exist in every month, and the run skips those months.
   const lateMonthDay = () => {
@@ -86,7 +95,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   // An hourly run with a longer step names it on the frequency chip: "Every 2h".
   const hourlyLabel = () => {
     const draft = draftOf(props.schedule, "hourly");
-    return draft && draft.everyHours > 1 ? routineHourlyLabel(draft.everyHours) : undefined;
+    return draft && draft.everyHours > 1 ? routineHourlyLabel(draft.everyHours, text) : undefined;
   };
 
   let picker: HTMLDivElement | undefined;
@@ -118,14 +127,14 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
       class="routine-schedule-picker"
       data-density={props.density ?? "panel"}
     >
-      <fieldset class="routine-trigger-row" aria-label="Schedule">
+      <fieldset class="routine-trigger-row" aria-label={t("routine.picker.schedule")}>
         <span class="routine-trigger-icon" aria-hidden="true">
           <AlarmClock />
         </span>
         <span class="routine-trigger-chips">
           <RoutineChipSelect
-            ariaLabel="Frequency"
-            options={props.kinds ?? ROUTINE_DRAFT_KINDS}
+            ariaLabel={t("routine.picker.frequency")}
+            options={kindOptions()}
             value={props.schedule.kind}
             valueLabel={hourlyLabel()}
             disabled={props.disabled}
@@ -138,7 +147,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "once")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible>
+                  <Phrase word={t("routine.picker.on")} flexible>
                     <RoutineDateField
                       value={draft().date}
                       today={today()}
@@ -147,9 +156,9 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                       onChange={(date) => props.onChange({ ...draft(), date })}
                     />
                   </Phrase>
-                  <Phrase word="at">
+                  <Phrase word={t("routine.picker.at")}>
                     <RoutineTimeField
-                      label="Time"
+                      label={t("routine.picker.time")}
                       value={draft().time}
                       disabled={props.disabled}
                       onClose={editEnd}
@@ -162,7 +171,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "hourly")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible optional>
+                  <Phrase word={t("routine.picker.on")} flexible optional>
                     <RoutineWeekdayPicker
                       mode="many"
                       days={draft().days}
@@ -186,7 +195,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "daily")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible>
+                  <Phrase word={t("routine.picker.on")} flexible>
                     <RoutineWeekdayPicker
                       mode="many"
                       days={draft().days}
@@ -195,9 +204,9 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                       onChange={(days) => props.onChange({ ...draft(), days })}
                     />
                   </Phrase>
-                  <Phrase word="at">
+                  <Phrase word={t("routine.picker.at")}>
                     <RoutineTimeField
-                      label="Time"
+                      label={t("routine.picker.time")}
                       value={draft().time}
                       disabled={props.disabled}
                       onClose={editEnd}
@@ -210,7 +219,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "weekly")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible>
+                  <Phrase word={t("routine.picker.on")} flexible>
                     <RoutineWeekdayPicker
                       mode="one"
                       day={draft().weekday}
@@ -219,9 +228,9 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                       onChange={(weekday) => props.onChange({ ...draft(), weekday })}
                     />
                   </Phrase>
-                  <Phrase word="at">
+                  <Phrase word={t("routine.picker.at")}>
                     <RoutineTimeField
-                      label="Time"
+                      label={t("routine.picker.time")}
                       value={draft().time}
                       disabled={props.disabled}
                       onClose={editEnd}
@@ -234,20 +243,20 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "monthly")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible>
+                  <Phrase word={t("routine.picker.on")} flexible>
                     <RoutineChipSelect
-                      ariaLabel="Day of month"
+                      ariaLabel={t("routine.picker.dayOfMonth")}
                       flexible
-                      options={ROUTINE_MONTH_DAY_OPTIONS}
+                      options={routineMonthDayOptions(text)}
                       value={String(draft().day)}
                       disabled={props.disabled}
                       onClose={editEnd}
                       onChange={(day) => props.onChange({ ...draft(), day: Number(day) })}
                     />
                   </Phrase>
-                  <Phrase word="at">
+                  <Phrase word={t("routine.picker.at")}>
                     <RoutineTimeField
-                      label="Time"
+                      label={t("routine.picker.time")}
                       value={draft().time}
                       disabled={props.disabled}
                       onClose={editEnd}
@@ -260,7 +269,7 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
             <Match when={draftOf(props.schedule, "yearly")}>
               {(draft) => (
                 <>
-                  <Phrase word="on" flexible>
+                  <Phrase word={t("routine.picker.on")} flexible>
                     <RoutineDateField
                       yearly
                       value={routineYearlyDateKey(draft().month, draft().day)}
@@ -273,9 +282,9 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                       }}
                     />
                   </Phrase>
-                  <Phrase word="at">
+                  <Phrase word={t("routine.picker.at")}>
                     <RoutineTimeField
-                      label="Time"
+                      label={t("routine.picker.time")}
                       value={draft().time}
                       disabled={props.disabled}
                       onClose={editEnd}
@@ -290,9 +299,9 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                 <Input
                   class="routine-cron-input"
                   size="sm"
-                  aria-label="Cron expression"
+                  aria-label={t("routine.picker.cronExpression")}
                   spellcheck={false}
-                  placeholder="0 9 * * 1-5"
+                  placeholder={CRON_PLACEHOLDER}
                   maxlength={INPUT_LIMITS.routineCron}
                   value={draft().expression}
                   disabled={props.disabled}
@@ -308,10 +317,10 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
         </span>
       </fieldset>
       <Show when={lateMonthDay()}>
-        {(day) => <p class="routine-schedule-hint">Skipped in months without day {day()}.</p>}
+        {(day) => <p class="routine-schedule-hint">{t("routine.picker.lateMonthDay", { day: day() })}</p>}
       </Show>
       <Show when={props.schedule.kind === "custom"}>
-        <p class="routine-schedule-hint">Five fields: minute, hour, day of month, month, day of week.</p>
+        <p class="routine-schedule-hint">{t("routine.picker.cronHint")}</p>
       </Show>
     </div>
   );

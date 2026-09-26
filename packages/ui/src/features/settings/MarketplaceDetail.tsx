@@ -1,6 +1,7 @@
 import { Button } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, onCleanup, Show } from "solid-js";
+import { useText } from "../../text";
 import { MarketplaceIdentity } from "./MarketplaceCatalog";
 
 export function MarketplaceDetail(props: {
@@ -12,6 +13,7 @@ export function MarketplaceDetail(props: {
   action: JSX.Element;
   sections: Array<{ title: string; subtitle: string; content: () => JSX.Element }>;
 }) {
+  const { t } = useText();
   const [selected, setSelected] = createSignal(0);
   const [height, setHeight] = createSignal<string>();
   /*
@@ -31,7 +33,7 @@ export function MarketplaceDetail(props: {
   return (
     <section
       class="skills-marketplace-detail marketplace-detail-page"
-      aria-label={`${props.name} details`}
+      aria-label={t("marketplace.detail.label", { name: props.name })}
       /* The way back is the header crumb, so the page itself takes the focus the row gave up. */
       tabindex="-1"
       ref={(element) => queueMicrotask(() => element.focus())}
@@ -53,14 +55,16 @@ export function MarketplaceDetail(props: {
           </MarketplaceIdentity>
           <div class="marketplace-detail-copy">
             <h1>{props.name}</h1>
-            <p class="marketplace-detail-creator">By {props.creatorName}</p>
+            <p class="marketplace-detail-creator">
+              {t("marketplace.detail.byCreator", { creator: props.creatorName })}
+            </p>
           </div>
           <div class="marketplace-detail-action">{props.action}</div>
         </div>
         <p class="marketplace-detail-lead">{props.description}</p>
       </div>
       <div class="marketplace-detail-sections">
-        <nav aria-label="Detail sections">
+        <nav aria-label={t("marketplace.detail.sections")}>
           <For each={props.sections}>
             {(section, index) => (
               <Button

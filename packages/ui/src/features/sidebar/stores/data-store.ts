@@ -6,6 +6,7 @@
 
 import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
+import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
 import { sidebarPinnedItemKey } from "../sidebar-pins";
@@ -171,7 +172,11 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
 
   /** The name for an announcement, whichever kind of chat the id belongs to. */
   function chatName(chatId: string): string {
-    return agentById().get(chatId)?.name ?? channelById().get(chatId)?.name ?? "chat";
+    return (
+      agentById().get(chatId)?.name ??
+      channelById().get(chatId)?.name ??
+      currentText().t("sidebar.announce.chatFallback")
+    );
   }
 
   /** Which kind of chat an id names, or null when the sidebar shows no chat under it. */
@@ -181,9 +186,10 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
   }
 
   function sectionLabel(sectionId: string): string {
-    if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return "People";
-    if (sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) return "Unassigned";
-    return customSectionById().get(sectionId)?.name ?? "Section";
+    const { t } = currentText();
+    if (sectionId === SIDEBAR_PEOPLE_SECTION_ID) return t("sidebar.section.people");
+    if (sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) return t("sidebar.section.unassigned");
+    return customSectionById().get(sectionId)?.name ?? t("sidebar.section.fallback");
   }
 
   function visiblePinnedKeys(): string[] {

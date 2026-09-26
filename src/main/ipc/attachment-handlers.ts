@@ -23,6 +23,8 @@ import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import type { AppTranslate } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import { type Zippable, zip } from "fflate";
 import type { AgentService } from "../../backend/agent-service";
@@ -64,6 +66,7 @@ export interface AttachmentIpcDependencies {
     | "uploadAttachment"
   >;
   getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
 }
 
 export function attachmentIpcHandlers({
@@ -71,6 +74,7 @@ export function attachmentIpcHandlers({
   mailbox,
   remoteServers,
   getMainWindow,
+  translate,
 }: AttachmentIpcDependencies): Pick<IpcGroupHandlers, "agentAttachments" | "attachmentImports"> {
   return {
     attachmentImports: {
@@ -94,10 +98,10 @@ export function attachmentIpcHandlers({
           properties: ["openFile", "multiSelections"],
           filters:
             filter === "images"
-              ? [{ name: "Images", extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }]
+              ? [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }]
               : [
                   {
-                    name: "Supported files",
+                    name: translate("dialog.filter.supportedFiles"),
                     extensions: supportedAttachmentExtensions({ eml: supportsEml, media: supportsMedia }),
                   },
                 ],
@@ -120,14 +124,14 @@ export function attachmentIpcHandlers({
         const parsed = scoped.payload;
         await saveAttachmentArchive(
           parsed,
-          () => chooseSavePath(getMainWindow(), "attachments.zip"),
+          () => chooseSavePath(getMainWindow(), translate, "attachments.zip"),
           (item) =>
             routeToServer(scoped.serverId, {
               local: async () => {
                 const attachment = await mailbox.resolveAttachment(item.id);
-                if (!attachment) throw new Error("Attachment was not found.");
+                if (!attachment) throw new Error(sourceText("error.attachment.notFound"));
                 if ((await stat(attachment.path)).size > ATTACHMENT_LIMITS.fileBytes)
-                  throw new Error("A file exceeds the 100 MB limit.");
+                  throw new Error(sourceText("error.attachment.fileTooLarge"));
                 return readFile(attachment.path);
               },
               remote: async (serverId) => (await remoteServers.downloadAttachment(item.id, serverId)).bytes,
@@ -135,7 +139,7 @@ export function attachmentIpcHandlers({
         );
       }),
       openAttachment: payloadHandler(agentRequest(parseOpenAttachment), (scoped) =>
-        openAttachmentForServer({ mailbox, remoteServers, getMainWindow }, scoped.serverId, scoped.payload),
+        openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, scoped.payload),
       ),
       openSharedFile: scopedHandler(parseOpenSharedFile, {
         local: async (parsed) => {
@@ -184,7 +188,7 @@ export function attachmentIpcHandlers({
   };
 }
 
-export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMainWindow"> & {
+export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMainWindow" | "translate"> & {
   mailbox: Pick<MailboxStore, "resolveAttachment">;
   remoteServers: Pick<RemoteServerManager, "downloadAttachment">;
 };
@@ -194,18 +198,18 @@ export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMai
  * chat and the storage surfaces both reach a file by its attachment id, so they share this.
  */
 export function openAttachmentForServer(
-  { mailbox, remoteServers, getMainWindow }: OpenAttachmentDependencies,
+  { mailbox, remoteServers, getMainWindow, translate }: OpenAttachmentDependencies,
   serverId: string,
   input: OpenAttachmentInput,
 ): Promise<void> {
   return routeToServer<void>(serverId, {
     local: async () => {
       const attachment = await mailbox.resolveAttachment(input.attachmentId);
-      if (!attachment) throw new Error("This file is no longer available.");
+      if (!attachment) throw new Error(sourceText("error.attachment.unavailable"));
       if (input.action === "download") {
         const safeId = basename(input.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
         const suggestedName = basename(attachment.name) || `attachment-${safeId}`;
-        const filePath = await chooseSavePath(getMainWindow(), suggestedName);
+        const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);
         if (!filePath) return;
         await copyFile(attachment.path, filePath);
         return;
@@ -220,7 +224,7 @@ export function openAttachmentForServer(
       const downloaded = await remoteServers.downloadAttachment(input.attachmentId, target);
       const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
       if (input.action === "download") {
-        const filePath = await chooseSavePath(getMainWindow(), suggestedName);
+        const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);
         if (!filePath) return;
         await writeFile(filePath, downloaded.bytes, { mode: 0o600 });
         return;
@@ -258,11 +262,15 @@ async function openPath(path: string): Promise<void> {
 }
 
 // Returns the chosen path, or undefined when the user cancelled.
-async function chooseSavePath(mainWindow: BrowserWindow | null, suggestedName: string): Promise<string | undefined> {
+async function chooseSavePath(
+  mainWindow: BrowserWindow | null,
+  translate: AppTranslate,
+  suggestedName: string,
+): Promise<string | undefined> {
   const extension = extname(suggestedName).slice(1).toLowerCase();
   const options: Electron.SaveDialogOptions = {
     defaultPath: join(app.getPath("downloads"), suggestedName),
-    filters: [{ name: "Attachment", extensions: extension ? [extension] : ["*"] }],
+    filters: [{ name: translate("dialog.filter.attachment"), extensions: extension ? [extension] : ["*"] }],
     showsTagField: false,
   };
   const result =
@@ -278,7 +286,7 @@ async function uploadRemotePaths(
   paths: string[],
 ) {
   if (paths.length > INPUT_LIMITS.attachments) {
-    throw new Error(`Choose at most ${INPUT_LIMITS.attachments} files.`);
+    throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
   }
   assertRemoteAttachmentSupport(
     remoteServers,
@@ -294,10 +302,10 @@ async function uploadRemotePaths(
   );
   const total = files.reduce((sum, file) => sum + file.bytes.byteLength, 0);
   if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
-    throw new Error("A file exceeds the 100 MB limit.");
+    throw new Error(sourceText("error.attachment.fileTooLarge"));
   }
   if (total > ATTACHMENT_LIMITS.totalBytes) {
-    throw new Error("Attachments exceed the 250 MB total limit.");
+    throw new Error(sourceText("error.attachment.totalTooLarge"));
   }
   return Promise.all(
     files.map((file) => remoteServers.uploadAttachment(file.name, mimeTypeForName(file.name), file.bytes, serverId)),
@@ -310,7 +318,7 @@ async function uploadRemoteImports(
   input: ImportAttachmentsInput,
 ) {
   if (input.paths.length + input.data.length > INPUT_LIMITS.attachments) {
-    throw new Error(`Choose at most ${INPUT_LIMITS.attachments} files.`);
+    throw new Error(sourceText("error.attachment.tooMany", { limit: INPUT_LIMITS.attachments }));
   }
   assertRemoteAttachmentSupport(remoteServers, serverId, [
     ...input.paths.map((path) => basename(path)),
@@ -333,10 +341,10 @@ async function uploadRemoteImports(
   ];
   for (const file of files) assertSupportedAttachmentName(file.name);
   if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
-    throw new Error("A file exceeds the 100 MB limit.");
+    throw new Error(sourceText("error.attachment.fileTooLarge"));
   }
   if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > ATTACHMENT_LIMITS.totalBytes) {
-    throw new Error("Attachments exceed the 250 MB total limit.");
+    throw new Error(sourceText("error.attachment.totalTooLarge"));
   }
   return Promise.all(
     files.map((file) => remoteServers.uploadAttachment(file.name, file.mimeType, file.bytes, serverId)),
@@ -354,11 +362,11 @@ function assertRemoteAttachmentSupport(
     ) &&
     !remoteServers.supportsCapability(serverId, TEAM_MEDIA_ATTACHMENTS_CAPABILITY)
   ) {
-    throw new Error("This server does not support MP3 or MOV attachments. Update OpenBot on the host and retry.");
+    throw new Error(sourceText("error.attachment.mediaUnsupported"));
   }
   if (!names.some((name) => attachmentFileExtension(name) === "eml")) return;
   if (remoteServers.supportsCapability(serverId, TEAM_EML_ATTACHMENTS_CAPABILITY)) return;
-  throw new Error("This server does not support EML attachments. Update OpenBot on the host and retry.");
+  throw new Error(sourceText("error.attachment.emlUnsupported"));
 }
 
 // Names are archive labels only; file access always uses a managed attachment ID.
@@ -375,8 +383,8 @@ export async function saveAttachmentArchive(
   for (const item of input.attachments) {
     const bytes = await readAttachment(item);
     totalBytes += bytes.byteLength;
-    if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) throw new Error("A file exceeds the 100 MB limit.");
-    if (totalBytes > ATTACHMENT_LIMITS.totalBytes) throw new Error("Attachments exceed the 250 MB total limit.");
+    if (bytes.byteLength > ATTACHMENT_LIMITS.fileBytes) throw new Error(sourceText("error.attachment.fileTooLarge"));
+    if (totalBytes > ATTACHMENT_LIMITS.totalBytes) throw new Error(sourceText("error.attachment.totalTooLarge"));
     const safeName =
       item.name
         .replaceAll("\\", "/")

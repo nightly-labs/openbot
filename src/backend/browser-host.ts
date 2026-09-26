@@ -20,6 +20,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
   BrowserWindow,
@@ -413,7 +414,7 @@ export class BrowserHost {
     focus = false,
   ): Promise<BrowserTab> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
-      throw new Error(`The browser can have up to ${INPUT_LIMITS.browserTabs} open tabs.`);
+      throw new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs }));
     }
     const normalizedUrl = normalizeBrowserUrl(url);
     const focusedContents = focus ? null : webContents.getFocusedWebContents();
@@ -451,7 +452,7 @@ export class BrowserHost {
       }
       this.#emitChanged();
       await this.#persistState();
-      throw new Error(`Unable to open ${normalizedUrl}: ${String(error)}`);
+      throw new Error(sourceText("error.backend.browserOpenFailed", { url: normalizedUrl, reason: String(error) }));
     }
 
     return toPublicTab(tab);
@@ -552,7 +553,7 @@ export class BrowserHost {
 
   async beginTakeover(tabId: string): Promise<void> {
     const tab = this.#tabs.get(tabId);
-    if (!tab) throw new Error("Browser tab not found.");
+    if (!tab) throw new Error(sourceText("error.backend.browserTabNotFound"));
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
     this.#syncAttachedView();
@@ -573,11 +574,11 @@ export class BrowserHost {
     const args = call.args;
     this.#requireToolTab(params, args.tabId);
     const tab = this.#requireTab(args.tabId);
-    if (tab.secret) throw new Error("Authentication is already active.");
+    if (tab.secret) throw new Error(sourceText("error.backend.authActive"));
     const url = new URL(currentTabUrl(tab));
-    if (url.protocol !== "https:") throw new Error("Secure authentication requires HTTPS.");
+    if (url.protocol !== "https:") throw new Error(sourceText("error.backend.authHttpsRequired"));
     this.#requireIsolatedFromConnectedTabs(tab, url.origin);
-    if (args.method !== "password" && args.digits === 0) throw new Error("Authentication codes require 4–12 digits.");
+    if (args.method !== "password" && args.digits === 0) throw new Error(sourceText("error.backend.authDigitsRange"));
     if (
       (args.method === "password" && args.targets.length !== 1) ||
       (args.targets.length !== 1 && args.targets.length !== args.digits) ||
@@ -615,11 +616,12 @@ export class BrowserHost {
           }
         },
         submit: async (secret) => {
-          if (tab.secret !== protection || protection.submitted) throw new Error("Authentication request expired.");
+          if (tab.secret !== protection || protection.submitted)
+            throw new Error(sourceText("error.backend.authExpired"));
           // A connected page can navigate to the secret's site while the card is open.
           this.#requireIsolatedFromConnectedTabs(tab, url.origin);
           if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
-            throw new Error("Enter the requested number of digits.");
+            throw new Error(sourceText("error.backend.authDigitsRequired"));
           protection.submitted = true;
           this.#invalidateViews(tab);
           protection.running = true;
@@ -908,7 +910,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
   ): Promise<() => Promise<void>> {
     const tab = this.#requireTab(tabId);
-    if (tab.secret?.submitted) throw new Error("Browser view is protected during authentication.");
+    if (tab.secret?.submitted) throw new Error(sourceText("error.backend.browserViewProtected"));
     const generation = tab.captureGeneration;
     let invalidated = false;
     const invalidate = () => {
@@ -953,7 +955,7 @@ export class BrowserHost {
    */
   async dispatchViewInput(tabId: string, input: BrowserViewportInput): Promise<void> {
     const tab = this.#requireTab(tabId);
-    if (tab.secret?.submitted) throw new Error("Browser input is protected during authentication.");
+    if (tab.secret?.submitted) throw new Error(sourceText("error.backend.browserInputProtected"));
     if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
     await tab.engine.dispatchViewportInput(input);
   }
@@ -1546,13 +1548,13 @@ export class BrowserHost {
       if (this.#destroyPromise || this.#tabs.get(tab.id) !== tab) return { action: "deny" };
       const unsupported = !["foreground-tab", "background-tab", "new-window"].includes(disposition);
       const failure = tab.secret
-        ? "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page."
+        ? sourceText("error.backend.popupSecureInput")
         : unsupported
-          ? "This popup type is not supported. Use a normal link or sign-in button on the page."
+          ? sourceText("error.backend.popupUnsupportedType")
           : !isAllowedMainUrl(url)
-            ? "This popup uses an unsupported address. Use an HTTP or HTTPS sign-in option on the page."
+            ? sourceText("error.backend.popupUnsupportedAddress")
             : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
-              ? "The browser tab limit was reached. Close a tab, then retry from the page."
+              ? sourceText("error.backend.popupTabLimit")
               : undefined;
       if (failure) {
         tab.popupFailure = { id: randomUUID(), message: failure };
@@ -1614,7 +1616,7 @@ export class BrowserHost {
                 if (this.#tabs.get(tab.id) !== tab) return;
                 tab.popupFailure = {
                   id: randomUUID(),
-                  message: "The popup could not load. Retry sign-in from the original page.",
+                  message: sourceText("error.backend.popupLoadFailed"),
                 };
                 this.#emitChanged();
               });

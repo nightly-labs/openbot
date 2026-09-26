@@ -33,6 +33,7 @@ import {
   decodeTeamProtocolV4WebRtcHttpRequest,
   encodeTeamProtocolV4WebRtcHttpResponse,
 } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
+import { sourceText } from "@openbot/i18n/source";
 import type * as Ws from "ws";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import { contentDispositionFileName } from "./content-disposition";
@@ -405,7 +406,7 @@ export class TeamWebRtcHostPeer {
         requestId: request.requestId,
         error: {
           code: error instanceof GatewayError ? error.code : "host_error",
-          message: error instanceof Error ? error.message : "The host could not complete the request.",
+          message: error instanceof Error ? error.message : sourceText("error.remote.hostRequestFailed"),
           retryable: status >= 500,
           status,
         },
@@ -415,13 +416,13 @@ export class TeamWebRtcHostPeer {
 
   async #dispatchHttp(input: HttpRequestPayload): Promise<TeamProtocolV2Json> {
     if (!this.#localApiPort || !this.#localSessionToken)
-      throw new GatewayError(401, "remote_session_missing", "The remote session is not ready.");
+      throw new GatewayError(401, "remote_session_missing", sourceText("error.remote.sessionNotReady"));
     const url = new URL(input.path, `http://127.0.0.1:${this.#localApiPort}`);
     if (url.origin !== `http://127.0.0.1:${this.#localApiPort}` || !url.pathname.startsWith("/v1/")) {
       throw new GatewayError(400, "invalid_operation_path", "The Team API path is invalid.");
     }
     const peerId = this.#peerId;
-    if (!peerId) throw new GatewayError(503, "remote_disconnected", "The WebRTC peer disconnected.");
+    if (!peerId) throw new GatewayError(503, "remote_disconnected", sourceText("error.remote.peerDisconnected"));
     const peerCapabilities = new Set(input.capabilities ?? []);
     const capabilitiesChanged =
       peerCapabilities.size !== this.#peerCapabilities.size ||
@@ -659,7 +660,7 @@ export class TeamWebRtcHostPeer {
           encodeRemoteDesktopSignalControl({
             type: "error",
             streamId,
-            message: allowed ? "Too many host streams are open." : "The remote desktop signal path is invalid.",
+            message: allowed ? sourceText("error.remote.tooManyStreams") : "The remote desktop signal path is invalid.",
           }),
         )
         .catch(() => undefined);
@@ -697,7 +698,11 @@ export class TeamWebRtcHostPeer {
       this.#sendRecoverable(
         peerId,
         "desktop",
-        encodeRemoteDesktopSignalControl({ type: "error", streamId, message: "The host stream socket failed." }),
+        encodeRemoteDesktopSignalControl({
+          type: "error",
+          streamId,
+          message: sourceText("error.remote.streamSocketFailed"),
+        }),
       );
     });
   }

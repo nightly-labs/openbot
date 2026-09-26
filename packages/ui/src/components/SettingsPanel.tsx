@@ -1,6 +1,7 @@
 import { Button, ChevronRight, FieldContext } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createUniqueId, Show } from "solid-js";
+import { useText } from "../text";
 import { PanelResizer } from "./PanelResizer";
 
 export const SETTINGS_PANEL_DEFAULT = 296;
@@ -28,11 +29,12 @@ export interface SettingsPanelProps {
 }
 
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
+  const { t } = useText();
   return (
     <aside id={props.id} class="settings-panel" aria-label={props.label}>
       <PanelResizer
         class="right-panel-resizer"
-        label="Resize right panel"
+        label={t("settings.panel.resize")}
         controls={props.id}
         direction="right"
         value={props.width}
@@ -74,6 +76,7 @@ export interface SettingsPanelHeaderProps {
 
 /** Fixed 3-column header keeps title centred. */
 export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Element {
+  const { t } = useText();
   return (
     <header class="settings-panel-header">
       <Show when={props.onBack} fallback={<span />}>
@@ -81,7 +84,7 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
           variant="ghost"
           type="button"
           class="settings-panel-nav-button"
-          aria-label={props.backLabel ?? "Back"}
+          aria-label={props.backLabel ?? t("common.back")}
           onClick={() => props.onBack?.()}
         >
           <SettingsBackIcon />

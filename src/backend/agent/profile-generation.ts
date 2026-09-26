@@ -9,6 +9,7 @@ import {
   type SidebarSection,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
 import { decodeRecordResponse, getRecord, getString } from "../protocol";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
@@ -16,7 +17,7 @@ import { extractJsonObject, StructuredOutputError } from "../structured-output";
 const GENERATION_TIMEOUT_MS = 120_000;
 
 /** Shown when the endpoints changed under a generation that had not yet spawned its process. */
-const CANCELLED_MESSAGE = "The custom endpoints changed while this was generating. Try again.";
+const CANCELLED_MESSAGE = sourceText("error.agent.profileEndpointsChanged");
 
 /** Owns a disposable provider session; no durable agent, tools, workspace or conversation is involved. */
 export async function generateProfile(
@@ -32,11 +33,11 @@ export async function generateProfile(
     parsed = extractJsonObject(result);
   } catch (error) {
     if (!(error instanceof StructuredOutputError)) throw error;
-    throw new Error("The provider returned an invalid profile. Try revising your prompt.");
+    throw new Error(sourceText("error.agent.profileInvalid"));
   }
   const draft = decodeAgentProfileDraft(parsed);
   if (draft.sectionId !== null && !sections.some((section) => section.id === draft.sectionId)) {
-    throw new Error("The generated section is unavailable. Try again or choose a section manually.");
+    throw new Error(sourceText("error.agent.profileSectionUnavailable"));
   }
   return draft;
 }
@@ -56,11 +57,11 @@ export async function generateTextWithoutTools(
   let timer: NodeJS.Timeout | undefined;
   let text = "";
   const completion = new Promise<string>((resolve, reject) => {
-    timer = setTimeout(() => reject(new Error("Profile generation timed out. Try again.")), GENERATION_TIMEOUT_MS);
-    client.once("exit", () => reject(new Error("The provider disconnected while generating the profile.")));
+    timer = setTimeout(() => reject(new Error(sourceText("error.agent.profileTimedOut"))), GENERATION_TIMEOUT_MS);
+    client.once("exit", () => reject(new Error(sourceText("error.agent.profileDisconnected"))));
     client.on("request", (request) => {
       client.respondError(request.id, { code: -32601, message: "Tools are unavailable during profile generation." });
-      reject(new Error("The provider attempted to use a tool. Try revising your prompt."));
+      reject(new Error(sourceText("error.agent.profileToolUse")));
     });
     client.on("notification", (notification) => {
       if (notification.method === "item/agentMessage/delta") text += getString(notification.params, "delta") ?? "";
@@ -71,9 +72,9 @@ export async function generateTextWithoutTools(
       if (notification.method === "turn/completed") {
         const turn = getRecord(notification.params, "turn");
         if (getString(turn, "status") === "completed") resolve(text);
-        else reject(new Error("The provider could not generate a profile. Try again."));
+        else reject(new Error(sourceText("error.agent.profileFailed")));
       }
-      if (text.length > 32_000) reject(new Error("The generated profile is too large. Try a shorter prompt."));
+      if (text.length > 32_000) reject(new Error(sourceText("error.agent.profileTooLarge")));
     });
   });
   // Observe rejection during initialization too; the owning await below still reports it.
@@ -154,7 +155,7 @@ export async function generateTextWithoutTools(
       decodeRecordResponse,
     );
     const threadId = getString(getRecord(thread, "thread"), "id");
-    if (!threadId) throw new Error("The provider could not start profile generation.");
+    if (!threadId) throw new Error(sourceText("error.agent.profileNotStarted"));
     await client.request(
       "turn/start",
       {

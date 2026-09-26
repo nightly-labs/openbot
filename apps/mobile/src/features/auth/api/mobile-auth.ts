@@ -17,6 +17,7 @@ import * as SecureStore from "expo-secure-store";
 import { z } from "zod";
 
 import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { currentText } from "@/shared/lib/text";
 
 const MOBILE_SESSION_KEY = "openbot.mobile.session.v1";
 const MOBILE_REVOCATIONS_KEY = "openbot.mobile.pending-revocations.v1";
@@ -29,7 +30,7 @@ let mobileConnectInFlight = false;
 
 export class MobileSessionExpiredError extends Error {
   constructor() {
-    super("Your session has ended. Scan a new code from OpenBot on your desktop.");
+    super(currentText().t("mobile.auth.error.sessionEnded"));
   }
 }
 
@@ -43,7 +44,7 @@ export interface MobileSession {
 type MobileCredential = Pick<MobileSession, "apiUrl" | "sessionToken">;
 
 export async function redeemMobileConnectUrl(value: string): Promise<MobileSession> {
-  if (mobileConnectInFlight) throw new Error("Another connection is in progress. Wait for it to finish.");
+  if (mobileConnectInFlight) throw new Error(currentText().t("mobile.auth.error.connectionInProgress"));
   mobileConnectInFlight = true;
   try {
     return await redeemMobileConnectSession(value);
@@ -56,16 +57,16 @@ async function redeemMobileConnectSession(value: string): Promise<MobileSession>
   void retryMobileSessionRevocations();
   const payload = parseMobileConnectUrl(value);
   if (!payload) {
-    throw new Error("This is not a valid OpenBot Mobile Connect code.");
+    throw new Error(currentText().t("mobile.auth.error.invalidCode"));
   }
-  if (!payload.host) throw new Error("Generate a new Mobile Connect code in an updated desktop app.");
+  if (!payload.host) throw new Error(currentText().t("mobile.auth.error.codeOutdated"));
 
   // Do not consume a one-time ticket or overwrite a permanent legacy token before
   // its revocation is confirmed. Retry cleanup against the OLD account service.
   const current = await serializeMobileSessionStorage(() => readStoredSessionAndRevokeInvalid(true));
   // A QR screen can still be finishing its animation after credentials are saved.
   // Protect that handoff too, before its caller updates the React session context.
-  if (current) throw new Error("You are already signed in. Sign out before connecting another account.");
+  if (current) throw new Error(currentText().t("mobile.auth.error.alreadySignedIn"));
 
   let response: Response;
   let body: unknown;
@@ -89,13 +90,13 @@ async function redeemMobileConnectSession(value: string): Promise<MobileSession>
     const apiUrl = new URL(payload.apiUrl);
     throw new Error(
       apiUrl.protocol === "http:" && isMobileConnectDevelopmentHost(apiUrl.hostname)
-        ? "OpenBot could not reach your desktop. Keep both devices on the same Wi-Fi network and allow Local Network access."
-        : "OpenBot could not reach the account service. Check your connection and try again.",
+        ? currentText().t("mobile.auth.error.desktopUnreachable")
+        : currentText().t("mobile.auth.error.accountServiceUnreachable"),
     );
   }
 
   if (!response.ok) {
-    throw new Error(apiErrorMessage(body) ?? "This Mobile Connect code is invalid or has expired.");
+    throw new Error(apiErrorMessage(body) ?? currentText().t("mobile.auth.error.codeExpired"));
   }
 
   const session = decodeMobileSession(body, payload.apiUrl);
@@ -132,7 +133,7 @@ async function readStoredSessionAndRevokeInvalid(requireRevocation: boolean): Pr
         await revokeMobileCredential(credential);
       } catch {
         if (requireRevocation) {
-          throw new Error("Could not revoke the previous mobile session. Check your connection and scan again.");
+          throw new Error(currentText().t("mobile.auth.error.revokePreviousFailed"));
         }
         return null;
       }
@@ -167,7 +168,7 @@ async function refreshMobileProfile(session: MobileSession): Promise<MobileSessi
     return null;
   }
   if (!response.ok) {
-    throw new Error(apiErrorMessage(body) ?? "OpenBot could not verify this mobile session.");
+    throw new Error(apiErrorMessage(body) ?? currentText().t("mobile.auth.error.verifyFailed"));
   }
   const user = decodeUser(body);
   if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
@@ -196,14 +197,14 @@ export async function listMobileAccountSessions(
       signal,
     });
     await checkMobileAuthorization(response, session);
-    if (!response.ok) throw new Error("Could not load account sessions. Try again.");
+    if (!response.ok) throw new Error(currentText().t("mobile.auth.error.sessionsLoadFailed"));
     return z.object({ sessions: z.array(accountSessionSchema) }).parse(await response.json()).sessions;
   }, signal);
 }
 
 export async function revokeMobileAccountSession(session: MobileSession, target: MobileAccountSession): Promise<void> {
-  if (target.current) throw new Error("Use Sign out to disconnect this device.");
-  if (target.kind === "desktop") throw new Error("Desktop sessions cannot be disconnected from mobile.");
+  if (target.current) throw new Error(currentText().t("mobile.auth.error.useSignOut"));
+  if (target.kind === "desktop") throw new Error(currentText().t("mobile.auth.error.desktopSession"));
   await withMobileAuthRequestTimeout(async (signal) => {
     const response = await fetch(
       new URL(
@@ -217,7 +218,7 @@ export async function revokeMobileAccountSession(session: MobileSession, target:
       },
     );
     await checkMobileAuthorization(response, session);
-    if (!response.ok) throw new Error("Could not disconnect this session. Refresh and try again.");
+    if (!response.ok) throw new Error(currentText().t("mobile.auth.error.disconnectFailed"));
   });
 }
 
@@ -237,13 +238,13 @@ export function updateMobileProfile(
 
 async function writeMobileProfile(session: MobileSession, change: MobileProfileChange): Promise<MobileSession> {
   if ("name" in change && validateProfileName(change.name).error) {
-    throw new Error("Enter a display name between 3 and 20 characters.");
+    throw new Error(currentText().t("mobile.auth.error.nameLength"));
   }
   if ("avatar" in change && change.avatar) {
     if (change.avatar.bytes.byteLength > AVATAR_IMAGE_LIMITS.storedBytes)
-      throw new Error("Choose a photo smaller than 512 KB.");
+      throw new Error(currentText().t("mobile.auth.error.photoTooLarge"));
     if (!isValidAvatarImage(change.avatar.mimeType, change.avatar.bytes)) {
-      throw new Error("The selected photo is invalid. Choose another image.");
+      throw new Error(currentText().t("mobile.auth.error.photoInvalid"));
     }
   }
   const isName = "name" in change;
@@ -269,9 +270,9 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileC
   });
   await checkMobileAuthorization(response, session);
   if (!response.ok) {
-    if (response.status === 429) throw new Error("Too many changes. Wait a moment and try again.");
-    if (response.status === 409) throw new Error("Your photo changed on another device. Try again.");
-    throw new Error("Could not save your profile. Check your connection and try again.");
+    if (response.status === 429) throw new Error(currentText().t("mobile.auth.error.tooManyChanges"));
+    if (response.status === 409) throw new Error(currentText().t("mobile.auth.error.photoConflict"));
+    throw new Error(currentText().t("mobile.auth.error.profileSaveFailed"));
   }
   const user = decodeUser(body);
   if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
@@ -379,7 +380,7 @@ async function revokeMobileCredential(session: MobileCredential): Promise<void> 
     } catch {
       // Without confirmation, keep the credential available for another attempt.
     }
-    throw new Error("Could not confirm sign-out. Check your connection and try again.");
+    throw new Error(currentText().t("mobile.auth.error.signOutUnconfirmed"));
   }
 }
 

@@ -11,7 +11,7 @@ import type {
   DynamicIslandTakeoverItem,
   QueueSnapshot,
 } from "@openbot/contracts/ipc";
-import { errorMessage } from "@openbot/ui/error-message";
+import { currentText } from "@openbot/ui/text";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
 type BrowserTakeoverEvent = Extract<AgentEvent, { type: "browser-takeover-requested" }>;
@@ -143,7 +143,7 @@ function isAgentWorking(agentId: string, input: DynamicIslandPresentationInput):
 }
 
 function currentTask(agentId: string, queues: Record<string, QueueSnapshot>): string {
-  return truncate(runningDelivery(queues[agentId])?.text.trim() || "Working on your request", 240);
+  return truncate(runningDelivery(queues[agentId])?.text.trim() || currentText().t("island.task.working"), 240);
 }
 
 function runningDelivery(snapshot: QueueSnapshot | undefined) {
@@ -208,7 +208,7 @@ function collectAttention(
         item: {
           requestId: event.requestId,
           agent: agentIdentity(agent),
-          title: truncate(question?.header || "Question from your agent", 180),
+          title: truncate(question?.header || currentText().t("island.question.defaultHeader"), 180),
           detail: truncateNullable(question?.question),
           questions,
         },
@@ -220,8 +220,8 @@ function collectAttention(
       item: {
         requestId: event.request.requestId,
         agent: agentIdentity(agent),
-        title: "Browser step needs you",
-        detail: "Complete the sign-in, verification, or consent in the browser.",
+        title: currentText().t("island.takeover.title"),
+        detail: currentText().t("island.takeover.detail"),
       },
     });
   }
@@ -236,7 +236,7 @@ function collectAttention(
       item: {
         turnId,
         agent: agentIdentity(agent),
-        title: "Task failed",
+        title: currentText().t("island.failure.title"),
         detail: failureDetail(delivery?.error),
       },
     });
@@ -245,10 +245,8 @@ function collectAttention(
 }
 
 function failureDetail(error: string | null | undefined): string {
-  return truncate(
-    errorMessage(error, "The task stopped before it could finish. Open the conversation to try again."),
-    600,
-  );
+  const text = currentText();
+  return truncate(text.errorMessage(error, text.t("island.failure.detail")), 600);
 }
 
 function truncate(value: string, length: number): string {
@@ -256,20 +254,22 @@ function truncate(value: string, length: number): string {
 }
 
 function normalizeQuestions(questions: PromptEvent["questions"]): DynamicIslandQuestionItem[] {
+  const { t } = currentText();
   return questions.slice(0, INPUT_LIMITS.promptQuestions).map((question, questionIndex) => ({
     id: normalizeTechnical(question.id, `question-${questionIndex + 1}`, INPUT_LIMITS.identifier),
-    header: normalizeRequired(question.header, "Question from your agent", INPUT_LIMITS.promptHeader),
-    question: normalizeRequired(
-      question.question,
-      "Open OpenBot to answer this question.",
-      INPUT_LIMITS.promptQuestion,
-    ),
+    header: normalizeRequired(question.header, t("island.question.defaultHeader"), INPUT_LIMITS.promptHeader),
+    question: normalizeRequired(question.question, t("island.question.defaultText"), INPUT_LIMITS.promptQuestion),
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
+        // The technical label is the answer the agent reads, so it stays in English.
         const fallback = `Option ${optionIndex + 1}`;
         const label = normalizeTechnical(option.label, fallback, INPUT_LIMITS.promptOptionLabel);
-        const displayLabel = normalizeRequired(option.label, fallback, INPUT_LIMITS.promptOptionLabel);
+        const displayLabel = normalizeRequired(
+          option.label,
+          t("island.question.optionFallback", { number: optionIndex + 1 }),
+          INPUT_LIMITS.promptOptionLabel,
+        );
         return {
           label,
           description: normalizeRequired(option.description, displayLabel, INPUT_LIMITS.promptOptionDescription),
@@ -292,9 +292,10 @@ function truncateNullable(value: string | null | undefined): string | null {
 }
 
 function approvalTitle(approval: AgentApproval) {
-  if (approval.kind === "command") return "Command needs review";
-  if (approval.kind === "file-change") return "File changes need review";
-  return "Permissions need review";
+  const { t } = currentText();
+  if (approval.kind === "command") return t("island.approval.title.command");
+  if (approval.kind === "file-change") return t("island.approval.title.fileChange");
+  return t("island.approval.title.permissions");
 }
 
 function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {

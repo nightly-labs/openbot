@@ -1,3 +1,5 @@
+import { currentText } from "@openbot/ui/text";
+
 /**
  * Writes text to the clipboard. When the async clipboard is missing or refuses the write, such as
  * when the document has no focus, a hidden text area and the copy command are used. Throws when
@@ -23,7 +25,7 @@ export async function writeClipboardText(text: string): Promise<void> {
   host.append(input);
   try {
     input.select();
-    if (!document.execCommand("copy")) throw new Error("Could not copy the text.");
+    if (!document.execCommand("copy")) throw new Error(currentText().t("app.clipboard.copyFailed"));
   } finally {
     input.remove();
     previous?.focus({ preventScroll: true });

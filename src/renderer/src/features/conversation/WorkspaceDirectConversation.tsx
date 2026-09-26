@@ -1,4 +1,5 @@
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
+import { useText } from "@openbot/ui/text";
 import { Loading } from "solid-js";
 import { DirectConversation } from "../../lazy-views";
 import { useServers } from "../servers/servers-context";
@@ -29,13 +30,14 @@ export function WorkspaceDirectConversation(props: { member: TeamPresenceMember 
     openDirectMessage,
     setDirectTyping,
   } = useDirectMessages();
+  const { t } = useText();
 
   return (
     <Loading
       fallback={
-        <main class="direct-conversation" aria-label="Loading direct conversation">
+        <main class="direct-conversation" aria-label={t("conversation.direct.loadingLabel")}>
           <div class="direct-conversation-state" role="status">
-            Loading messages…
+            {t("conversation.direct.loading")}
           </div>
         </main>
       }

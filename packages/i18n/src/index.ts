@@ -1,31 +1,30 @@
-import { type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/ipc";
+import type { AppLanguage } from "@openbot/contracts/app-language";
+import { resolveLocale, type TranslatedLocale } from "./locale";
 import { createTranslate, type MessageParams, type Translate } from "./message";
-import { type AppMessages, en } from "./messages/en";
-import { fr } from "./messages/fr";
-import { ja } from "./messages/ja";
+import { type AppMessages, en } from "./messages/en/index";
+import { fr } from "./messages/fr/index";
+import { ja } from "./messages/ja/index";
 
+export { APP_LANGUAGES, type AppLanguage, DEFAULT_APP_LANGUAGE } from "@openbot/contracts/app-language";
+export { type AppFormat, createFormat } from "./format";
+export { formatLocale, resolveLocale, TRANSLATED_LOCALES, type TranslatedLocale } from "./locale";
 export {
   createTranslate,
   type Message,
   type MessageCatalog,
   type MessageParams,
+  type PartialTranslation,
   type PluralMessage,
   type Translate,
-  type Translation,
 } from "./message";
-export type { AppMessages } from "./messages/en";
-export { en } from "./messages/en";
-export { fr } from "./messages/fr";
-export { ja } from "./messages/ja";
-
-/** The languages a catalog exists for. `"system"` resolves to one of these; it is never one itself. */
-export const TRANSLATED_LOCALES = ["en", "fr", "ja"] as const;
-
-export type TranslatedLocale = (typeof TRANSLATED_LOCALES)[number];
+export type { AppMessages } from "./messages/en/index";
+export { localizeSourceText, type SourceMessages, sourceText } from "./source-text";
+export { en, fr, ja };
 
 const catalogs = { en, fr, ja } as const;
 
-export type AppTranslate = Translate<typeof en>;
+/** The desktop translator: every key of the desktop catalog, including shared and source keys. */
+export type AppTranslate = Translate<AppMessages>;
 
 /**
  * A key whose message takes no placeholders.
@@ -38,33 +37,19 @@ export type AppTextKey = {
   [Key in keyof AppMessages]: Record<never, never> extends MessageParams<AppMessages[Key]> ? Key : never;
 }[keyof AppMessages];
 
-function isTranslatedLocale(value: string): value is TranslatedLocale {
-  return TRANSLATED_LOCALES.some((locale) => locale === value);
-}
-
-/**
- * The locale to draw in, given the saved preference and the computer's own language.
- *
- * A system locale is matched on its language subtag, so `ja-JP` and `ja` both read Japanese, and
- * anything without a catalog falls back to English rather than to a half-translated screen.
- */
-export function resolveLocale(language: AppLanguage, systemLocale: string): TranslatedLocale {
-  if (language !== "system") {
-    return isTranslatedLocale(language) ? language : "en";
-  }
-  const subtag = systemLocale.split("-")[0]?.toLowerCase() ?? "";
-  return isTranslatedLocale(subtag) ? subtag : "en";
-}
+/** One translator per locale: a screen that reads `t` on every render must not rebuild it. */
+const translators = new Map<TranslatedLocale, AppTranslate>();
 
 /** The translator for a resolved locale. English is both a catalog and every other catalog's fallback. */
 export function translateFor(locale: TranslatedLocale): AppTranslate {
-  return createTranslate({ source: en, translation: catalogs[locale], locale, sourceLocale: "en" });
+  const cached = translators.get(locale);
+  if (cached) return cached;
+  const translate = createTranslate({ source: en, translation: catalogs[locale], locale, sourceLocale: "en" });
+  translators.set(locale, translate);
+  return translate;
 }
 
 /** The translator for a preference, in one step, for a caller that holds no resolved locale. */
 export function translateForLanguage(language: AppLanguage, systemLocale: string): AppTranslate {
   return translateFor(resolveLocale(language, systemLocale));
 }
-
-export type { AppLanguage };
-export { DEFAULT_APP_LANGUAGE };

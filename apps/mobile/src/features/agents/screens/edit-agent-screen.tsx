@@ -1,6 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AvatarHue, UpdateAgentInput } from "@openbot/contracts/ipc";
-import { userErrorMessage as errorMessage } from "@openbot/user-errors";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -18,6 +17,7 @@ import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/conte
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { useText } from "@/shared/lib/text";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
@@ -37,6 +37,7 @@ type AgentPage =
   | "routine";
 
 export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
+  const { t } = useText();
   const { agentId, serverId } = useLocalSearchParams<{ agentId: string; serverId?: string }>();
   const workspace = useMobileWorkspace();
   const [hostId] = useState(serverId ?? workspace.activeServer.id);
@@ -52,13 +53,14 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   return (
     <SheetScrollView className="bg-sheet" contentContainerClassName="p-5 pb-safe-offset-5">
       <Typography.Paragraph>
-        {host?.initialConnectionPending ? "Loading agent…" : "This agent is no longer available on this host."}
+        {t(host?.initialConnectionPending ? "mobile.agent.edit.loading" : "mobile.agent.edit.gone")}
       </Typography.Paragraph>
     </SheetScrollView>
   );
 }
 
 function AgentForm({ agent, available, page }: { agent: MobileAgent; available: boolean; page: AgentPage }) {
+  const { t, errorMessage } = useText();
   const { updateAgent, setAgentAvatar } = useMobileWorkspace();
   const navigation = useNavigation();
   const [edits, setEdits] = useState<AgentEdits>({});
@@ -93,9 +95,13 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
 
   usePreventRemove(dirty || saving || pickingPhoto, ({ data }) => {
     if (pending.current || pickingPhoto) return;
-    Alert.alert("Discard changes?", "Your changes have not been saved.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: () => navigation.dispatch(data.action) },
+    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
+      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
+      {
+        text: t("mobile.agent.discard.discard"),
+        style: "destructive",
+        onPress: () => navigation.dispatch(data.action),
+      },
     ]);
   });
 
@@ -159,7 +165,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
         setPhoto(undefined);
       }
     } catch (cause) {
-      setError(errorMessage(cause, "OpenBot could not update this agent."));
+      setError(errorMessage(cause, t("mobile.agent.edit.failed")));
     } finally {
       pending.current = false;
       setSaving(false);
@@ -179,7 +185,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
             <Pressable
               className="self-center"
               accessibilityRole="button"
-              accessibilityLabel="Edit appearance"
+              accessibilityLabel={t("mobile.agent.edit.appearance")}
               onPress={() =>
                 router.push({
                   pathname: "/agent-info/[agentId]/appearance",
@@ -202,7 +208,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
               </View>
             </Pressable>
             <SheetFormField
-              label="Name"
+              label={t("mobile.agent.form.name")}
               appearance="soft"
               autoCapitalize="words"
               maxLength={INPUT_LIMITS.agentName}
@@ -212,18 +218,18 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
             />
           </View>
           <SheetFormField
-            label="Title"
+            label={t("mobile.agent.edit.title")}
             appearance="soft"
-            placeholder="Describe what your agent does"
+            placeholder={t("mobile.agent.edit.titlePlaceholder")}
             maxLength={INPUT_LIMITS.agentTitle}
             value={title}
             editable={!saving}
             onChangeText={(value) => change({ title: value })}
           />
           <SheetFormField
-            label="Instructions"
+            label={t("mobile.agent.edit.instructions")}
             appearance="soft"
-            placeholder="What this agent is for"
+            placeholder={t("mobile.agent.edit.instructionsPlaceholder")}
             multiline
             maxLength={INPUT_LIMITS.agentDescription}
             value={description}
@@ -268,11 +274,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
       page === "routine" ? (
         <AgentInformation agent={agent} available={available} section={page} />
       ) : null}
-      {!available ? (
-        <Typography.Paragraph>
-          This agent is unavailable. Your edits are kept until you close this sheet.
-        </Typography.Paragraph>
-      ) : null}
+      {!available ? <Typography.Paragraph>{t("mobile.agent.edit.unavailable")}</Typography.Paragraph> : null}
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {error}
@@ -288,7 +290,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
       ) : null}
       {page === "info" ? (
         <>
-          <SettingsSection title="Info">
+          <SettingsSection title={t("mobile.agent.menu.info")}>
             <SettingsRow
               onPress={() =>
                 router.push({
@@ -297,7 +299,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Usage</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.usage.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
               onPress={() =>
@@ -307,7 +309,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Memories</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.memories.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
               onPress={() =>
@@ -317,7 +319,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Skills</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.skills.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
               onPress={() =>
@@ -327,7 +329,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Files</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.files.title")}</Typography.Paragraph>
             </SettingsRow>
             <SettingsRow
               onPress={() =>
@@ -337,7 +339,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Routines</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.info.routines.title")}</Typography.Paragraph>
             </SettingsRow>
           </SettingsSection>
           <SettingsSection>
@@ -350,7 +352,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
                 })
               }
             >
-              <Typography.Paragraph>Runtime</Typography.Paragraph>
+              <Typography.Paragraph>{t("mobile.agent.runtime.title")}</Typography.Paragraph>
             </SettingsRow>
           </SettingsSection>
         </>

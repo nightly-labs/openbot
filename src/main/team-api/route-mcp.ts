@@ -1,5 +1,6 @@
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import { MCP_ROUTES, mcpRequest } from "@openbot/contracts/team-protocol/mcp-v1";
+import { sourceText } from "@openbot/i18n/source";
 import {
   parseRemoveMcpServer,
   parseSaveMcpServer,
@@ -36,7 +37,7 @@ export async function routeMcpServers(
   const test = method === "POST" && url.pathname === MCP_ROUTES.test;
   if (!list && !save && !remove && !toggle && !test) return "unmatched";
   if (!mcpServers || !capabilities.has(MCP_SERVERS_CAPABILITY))
-    throw new HttpError(400, "MCP servers are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.mcpUnsupported"));
   requireAdmin(member);
   if (list) return json(200, mcpServers.listMcpServers());
   // `readJson` has already run the body through the MCP wire codec, so every field below is decoded

@@ -1,4 +1,5 @@
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
+import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -14,6 +15,7 @@ import {
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { currentText, useText } from "@/shared/lib/text";
 import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal } from "../model/reply-reveal";
@@ -38,6 +40,9 @@ interface MarkdownTokenByType {
 }
 
 // Marked's public Token union includes extension tokens; narrow its built-in tokens here.
+// Keeps the link icon on the same line as the first word of the link.
+const NO_BREAK_SPACE = "\u00a0";
+
 function tokenIs<K extends keyof MarkdownTokenByType>(token: Token, type: K): token is MarkdownTokenByType[K] {
   return token.type === type;
 }
@@ -50,6 +55,7 @@ interface TextPresentation {
   animateTail: boolean;
   agents: readonly MobileAgent[];
   mentionOffset: number;
+  t: MobileTranslate;
 }
 
 // The inline badge is shifted to align its label with native text. Reserve the
@@ -183,7 +189,7 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     if (tokenIs(token, "link") || tokenIs(token, "image")) {
       const url = webLink(token.href);
       const label = tokenIs(token, "image")
-        ? token.text || "Image"
+        ? token.text || presentation.t("mobile.chat.markdown.image")
         : inline(token.tokens, { ...presentation, agents: [] });
       if (!url) return <Fragment key={offset}>{label}</Fragment>;
       return (
@@ -194,15 +200,16 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
           accessibilityRole="link"
           accessibilityHint={url}
           onPress={() =>
-            void Linking.openURL(url).catch(() =>
-              Alert.alert("Couldn’t open link", "You can select and copy the link instead."),
-            )
+            void Linking.openURL(url).catch(() => {
+              const { t } = currentText();
+              Alert.alert(t("mobile.chat.markdown.linkFailedTitle"), t("mobile.chat.markdown.linkFailedMessage"));
+            })
           }
         >
           {tokenIs(token, "link") ? (
             <>
               <ChatLinkIcon color={presentation.style.color} compact={presentation.type === "body-sm"} />
-              {"\u00a0"}
+              {NO_BREAK_SPACE}
             </>
           ) : null}
           {label}
@@ -424,6 +431,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   const reveal = useMemo(() => createReplyReveal(tokens), [tokens]);
   const visibleTokens = useReplyPlayback(reveal, playback);
   const codeColor = useThemeColor("foreground");
+  const { t } = useText();
   return (
     <StreamRevealProvider>
       <MarkdownBlocks
@@ -435,6 +443,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           codeColor,
           agents,
           mentionOffset: 4 * fontScale,
+          t,
           animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
         }}
       />

@@ -2,6 +2,7 @@ import { ONE_TIME_CODE_ALPHABET, ONE_TIME_CODE_LENGTH } from "@openbot/contracts
 import { Input } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { useText } from "../../text";
 
 export type OtpInputStatus = "idle" | "verifying" | "error" | "success";
 
@@ -22,6 +23,7 @@ interface OtpInputProps {
 }
 
 export function OtpInput(props: OtpInputProps) {
+  const { t } = useText();
   const length = () => props.length ?? ONE_TIME_CODE_LENGTH;
   const alphabet = () => (props.numeric ? "0123456789" : ONE_TIME_CODE_ALPHABET);
   const groupAt = () => Math.ceil(length() / 2);
@@ -37,9 +39,9 @@ export function OtpInput(props: OtpInputProps) {
   const status = () => props.status ?? "idle";
   const disabled = () => Boolean(props.disabled || status() === "verifying" || status() === "success");
   const message = createMemo(() => {
-    if (status() === "success") return props.successMessage ?? "Verified. Opening OpenBot…";
-    if (status() === "error") return props.errorMessage ?? "That code is incorrect. Try again.";
-    if (status() === "verifying") return "Verifying…";
+    if (status() === "success") return props.successMessage ?? t("account.login.verified");
+    if (status() === "error") return props.errorMessage ?? t("account.otp.incorrect");
+    if (status() === "verifying") return t("account.otp.verifying");
     return props.hint;
   });
 
@@ -197,7 +199,7 @@ export function OtpInput(props: OtpInputProps) {
       */}
       <fieldset
         class="otp-input-fieldset"
-        aria-label="One-time code entry"
+        aria-label={t("account.otp.entry")}
         aria-disabled={disabled() ? "true" : undefined}
         onPointerDown={handlePointerDown}
       >
@@ -213,7 +215,7 @@ export function OtpInput(props: OtpInputProps) {
           value=""
           readonly={Boolean(props.disabled || status() === "success")}
           maxlength={length()}
-          aria-label={props.label ?? "One-time code"}
+          aria-label={props.label ?? t("account.otp.label")}
           aria-invalid={status() === "error" ? "true" : undefined}
           aria-describedby={message() ? messageId : undefined}
           autofocus={props.autofocus}

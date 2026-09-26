@@ -1,4 +1,5 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 
 export function appendVoiceTranscript(draft: string, transcript: string): string {
   const text = transcript.trim();
@@ -14,7 +15,7 @@ export async function recordingToWav(recording: Blob): Promise<Uint8Array> {
     const mono = mixToMono(decoded);
     const resampled = resample(mono, decoded.sampleRate, VOICE_AUDIO_LIMITS.sampleRate);
     if (resampled.length > VOICE_AUDIO_LIMITS.sampleRate * VOICE_AUDIO_LIMITS.maximumSeconds) {
-      throw new Error("Voice recordings are limited to two minutes.");
+      throw new Error(currentText().t("app.voice.tooLong"));
     }
     return encodePcmWav(resampled, VOICE_AUDIO_LIMITS.sampleRate);
   } finally {

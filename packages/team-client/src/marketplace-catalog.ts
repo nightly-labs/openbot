@@ -18,6 +18,7 @@ import {
   type MarketplaceSkillQuery,
   marketplaceQueryParams,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 
 export interface MarketplaceCatalog {
   skills: {
@@ -36,7 +37,7 @@ export function createMarketplaceCatalog(request: typeof fetch): MarketplaceCata
   async function read<T>(
     path: string,
     decode: (value: unknown) => T,
-    failure = "The marketplace could not be loaded. Try again.",
+    failure = sourceText("error.marketplace.catalogLoadFailed"),
   ): Promise<T> {
     const response = await request(path, { headers: { accept: "application/json" } });
     if (!response.ok) throw new Error(failure);
@@ -57,7 +58,7 @@ export function createMarketplaceCatalog(request: typeof fetch): MarketplaceCata
         read(
           `/v1/agent-templates/${encodeURIComponent(templateId)}`,
           decodeAgentTemplateDetail,
-          "This shared agent could not be read. Its owner may have removed it.",
+          sourceText("error.marketplace.templateUnreadable"),
         ),
     },
   };

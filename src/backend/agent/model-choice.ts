@@ -1,5 +1,6 @@
 import type { AgentModelId, AgentModelOption, CreateAgentInput } from "@openbot/contracts/ipc";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
 import { DEVELOPMENT_DEFAULT_PROVIDER, developmentStartingModel } from "./development-defaults";
@@ -48,9 +49,9 @@ export function creationModel(input: CreateAgentInput, models: AgentModelOption[
     const model = models.find(
       (candidate) => candidate.id === requestedId && (provider === undefined || candidate.provider === provider),
     );
-    if (!model) throw new Error("The selected agent model is unavailable.");
+    if (!model) throw new Error(sourceText("error.agent.modelUnavailable"));
     if (provider !== undefined && model.provider !== provider) {
-      throw new Error("The selected model does not belong to that provider.");
+      throw new Error(sourceText("error.agent.modelProviderMismatch"));
     }
     return { provider: model.provider, model };
   }

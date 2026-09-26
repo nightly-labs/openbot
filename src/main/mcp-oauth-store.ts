@@ -2,6 +2,7 @@
 // encrypted at rest by the operating system.
 
 import { readFile, rm } from "node:fs/promises";
+import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { type McpOAuthRecord, type McpOAuthStorage, mcpOAuthRecordSchema } from "../backend/mcp-oauth-provider";
@@ -66,7 +67,7 @@ export class McpOAuthStore implements McpOAuthStorage {
     try {
       this.#records = await this.#read();
     } catch (error) {
-      this.#loadError = error instanceof Error ? error : new Error("The MCP sign-in file is unreadable.");
+      this.#loadError = error instanceof Error ? error : new Error(sourceText("error.mcp.signInFileUnreadable"));
     }
     this.#loaded = true;
     return this.#loadError;
@@ -87,7 +88,7 @@ export class McpOAuthStore implements McpOAuthStorage {
       // already gave a temporarily locked keychain its chance, and a corrupt file (nothing to
       // keep) still takes the replacement path below.
       if (this.#loadError && this.#unreadableServers) {
-        throw new Error("The MCP sign-in file is unreadable.");
+        throw new Error(sourceText("error.mcp.signInFileUnreadable"));
       }
       const next = this.#editableRecords();
       // An empty record is the absence of one. `invalidateCredentials("all")` arrives as a clear, and
@@ -183,14 +184,14 @@ export class McpOAuthStore implements McpOAuthStorage {
       }
       throw error;
     }
-    if (source.length > MAX_ENVELOPE_BYTES) throw new Error("The MCP sign-in file is too large.");
+    if (source.length > MAX_ENVELOPE_BYTES) throw new Error(sourceText("error.mcp.signInFileTooLarge"));
     let envelope: { version: 1; servers: Record<string, string> };
     try {
       envelope = envelopeSchema.parse(JSON.parse(source));
     } catch {
       // Nothing in it can be decrypted, so nothing is kept: a sign-in that succeeds replaces it.
       this.#unreadableServers = null;
-      throw new Error("The MCP sign-in file is unreadable.");
+      throw new Error(sourceText("error.mcp.signInFileUnreadable"));
     }
     try {
       const records = new Map<string, McpOAuthRecord>();
@@ -206,7 +207,7 @@ export class McpOAuthStore implements McpOAuthStorage {
       // The envelope parsed but a record did not decrypt: the encrypted records stay on disk and
       // in this stash, so a change refuses rather than writing them away.
       this.#unreadableServers = { ...envelope.servers };
-      throw new Error("The MCP sign-in file is unreadable.");
+      throw new Error(sourceText("error.mcp.signInFileUnreadable"));
     }
   }
 

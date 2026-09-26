@@ -1,4 +1,5 @@
 import type { AgentMessage } from "@openbot/ui/data";
+import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { toAgentMessage } from "./app-message-projection";
@@ -143,10 +144,10 @@ const Navigation = createSimpleContext({
           }
           await markAgentMessagesRead(agentId, readBoundary, serverId);
         } catch (error) {
-          appendUiError(agentId, error, "Read state failed", serverId);
+          appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
         }
       } catch (error) {
-        appendUiError(agentId, error, "Message load failed", serverId);
+        appendUiError(agentId, error, currentText().t("app.errorStatus.messageLoad"), serverId);
       }
     }
 

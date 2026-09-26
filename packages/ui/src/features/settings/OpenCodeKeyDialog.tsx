@@ -26,7 +26,9 @@ import {
   OctagonX,
 } from "@openbot/ui";
 import { createSignal, onSettled, Show } from "solid-js";
-import { errorMessage } from "../../error-message";
+import { useText } from "../../text";
+
+const OPENCODE_GO = "OpenCode Go";
 
 /** The provider-key half of the desktop API, narrowed so a test can pass four functions. */
 export interface ProviderKeyApi {
@@ -50,6 +52,7 @@ export interface OpenCodeKeyDialogProps {
 type DialogPhase = "idle" | "loading" | "saving" | "removing";
 
 export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
+  const { t, errorMessage } = useText();
   const [key, setKey] = createSignal("");
   const [stored, setStored] = createSignal<ProviderApiKeyStatus>("missing");
   const [phase, setPhase] = createSignal<DialogPhase>("loading");
@@ -65,7 +68,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     try {
       setStored((await props.api.getProviderApiKeyState("opencode")).status);
     } catch (cause) {
-      setError(errorMessage(cause, "Could not read the saved key."));
+      setError(errorMessage(cause, t("provider.openCodeKey.readFailed")));
     } finally {
       setPhase("idle");
     }
@@ -83,7 +86,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
       setKey("");
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not save the key."));
+      setError(errorMessage(cause, t("provider.openCodeKey.saveFailed")));
       setPhase("idle");
     }
   }
@@ -97,7 +100,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
       setKey("");
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not remove the key."));
+      setError(errorMessage(cause, t("provider.openCodeKey.removeFailed")));
       setPhase("idle");
     }
   }
@@ -107,7 +110,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     try {
       await props.onReconnect();
     } catch (cause) {
-      setError(errorMessage(cause, "Could not reconnect."));
+      setError(errorMessage(cause, t("provider.openCodeKey.reconnectFailed")));
     }
   }
   return (
@@ -121,23 +124,20 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
         <Dialog.Overlay class="opencode-key-backdrop">
           <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
-              <Dialog.Title class="opencode-key-title">Sign in to OpenCode Go</Dialog.Title>
+              <Dialog.Title class="opencode-key-title">{t("provider.openCodeKey.title")}</Dialog.Title>
               {/* One line that is always the dialog's whole message: the default pitch, the saved
                   fact, or the unreadable warning. A second text block would repeat it. */}
               <Dialog.Description class="opencode-key-description">
                 <Show
                   when={stored() === "saved"}
                   fallback={
-                    <Show
-                      when={stored() === "unreadable"}
-                      fallback={"Free models need no account. A key unlocks the paid Go models."}
-                    >
-                      Saved key is unreadable. Paste it again, or remove it.
+                    <Show when={stored() === "unreadable"} fallback={t("provider.openCodeKey.description")}>
+                      {t("provider.openCodeKey.unreadable")}
                     </Show>
                   }
                 >
                   <span class="opencode-key-status-dot" aria-hidden="true" />
-                  Key saved. Paste a new one to replace it.
+                  {t("provider.openCodeKey.saved")}
                 </Show>
               </Dialog.Description>
             </header>
@@ -149,12 +149,12 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 void save();
               }}
             >
-              <Field label="OpenCode Go key">
+              <Field label={t("provider.openCodeKey.label")}>
                 <Input
                   type="password"
                   autocomplete="off"
                   spellcheck={false}
-                  placeholder="Paste your key"
+                  placeholder={t("provider.openCodeKey.placeholder")}
                   value={key()}
                   disabled={busy()}
                   onValueChange={setKey}
@@ -168,7 +168,7 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                       <OctagonX />
                     </AlertIcon>
                     <AlertContent>
-                      <AlertTitle>OpenCode Go</AlertTitle>
+                      <AlertTitle>{OPENCODE_GO}</AlertTitle>
                       <AlertDescription>{message()}</AlertDescription>
                     </AlertContent>
                   </Alert>
@@ -177,11 +177,11 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
 
               <footer class="opencode-key-actions">
                 <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Show when={props.onReconnect}>
                   <Button type="button" variant="ghost" disabled={busy()} onClick={() => void reconnect()}>
-                    Reconnect
+                    {t("provider.action.reconnect")}
                   </Button>
                 </Show>
                 <Show when={stored() !== "missing"}>
@@ -189,21 +189,21 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                     type="button"
                     variant="destructive-ghost"
                     loading={phase() === "removing"}
-                    loadingLabel="Removing…"
+                    loadingLabel={t("common.removing")}
                     disabled={busy()}
                     onClick={() => void remove()}
                   >
-                    Remove key
+                    {t("provider.openCodeKey.remove")}
                   </Button>
                 </Show>
                 <Button
                   type="submit"
                   variant="default"
                   loading={phase() === "saving"}
-                  loadingLabel="Saving…"
+                  loadingLabel={t("common.saving")}
                   disabled={busy() || !key().trim()}
                 >
-                  Save key
+                  {t("provider.openCodeKey.save")}
                 </Button>
               </footer>
             </form>

@@ -1,4 +1,5 @@
 import type { ChannelCommand, ChannelMember } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { ChatAttachment } from "@/features/chat/components/use-chat-attachments";
 import type { ChatHistoryReceipt } from "../../chat/model/chat-messages";
 import { channelRecipient } from "./channel-draft";
@@ -69,7 +70,7 @@ export class ChannelSend {
       let id = this.uploaded.get(file.id);
       if (!id) {
         // Finished uploads stay retained, so a send after a cancellation reuses them.
-        if (upload?.cancelled()) throw new Error("Attachment upload cancelled.");
+        if (upload?.cancelled()) throw new Error(sourceText("error.remote.attachmentUploadCancelled"));
         upload?.fileProgress?.(0);
         id = (await this.store.upload(this.serverId, file, upload?.fileProgress)).id;
         this.uploaded.set(file.id, id);
@@ -77,7 +78,7 @@ export class ChannelSend {
       ids.push(id);
       upload?.progress(ids.length);
     }
-    if (upload?.cancelled()) throw new Error("Attachment upload cancelled.");
+    if (upload?.cancelled()) throw new Error(sourceText("error.remote.attachmentUploadCancelled"));
     const command: SendCommand = {
       type: "send",
       channelId: this.channelId,

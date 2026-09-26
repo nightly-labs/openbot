@@ -40,6 +40,7 @@ import {
   TEAM_PROTOCOL_V1,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
+import { sourceText } from "@openbot/i18n/source";
 import { HttpError } from "./http-error";
 
 export const JSON_LIMIT = 1024 * 1024;
@@ -142,7 +143,7 @@ export function firstHeaderValue(value: string | string[] | undefined): string |
 }
 
 export function requireAdmin(member: TeamMemberSummary): void {
-  if (member.role === "member") throw new HttpError(403, "Administrator access is required.");
+  if (member.role === "member") throw new HttpError(403, sourceText("error.team.adminRequired"));
 }
 
 export function parseBrowserBounds(value: unknown): {
@@ -174,7 +175,7 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
   for await (const chunk of request) {
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += bytes.length;
-    if (size > JSON_LIMIT) throw new HttpError(413, "Request body is too large.");
+    if (size > JSON_LIMIT) throw new HttpError(413, sourceText("error.team.requestTooLarge"));
     chunks.push(bytes);
   }
   try {
@@ -288,7 +289,7 @@ export function promptAnswers(value: unknown): Record<string, string[]> {
     }
     totalTextLength += answer.reduce((length, item) => length + item.length, 0);
     if (totalTextLength > INPUT_LIMITS.promptAnswersTotalText) {
-      throw new HttpError(400, "Prompt answers are too long.");
+      throw new HttpError(400, sourceText("error.agent.promptAnswersTooLong"));
     }
     answers[key] = answer;
   }

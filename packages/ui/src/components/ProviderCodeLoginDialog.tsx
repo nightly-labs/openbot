@@ -24,6 +24,7 @@
 
 import { Button, CopyButton, Dialog, ExternalLink, IconButton, QrCode, Spinner, Text, X } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { useText } from "../text";
 
 /**
  * One phase of a code sign-in while it is still running, with the fields only that phase has.
@@ -61,6 +62,7 @@ export interface ProviderCodeLoginDialogProps {
 }
 
 export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
+  const { t } = useText();
   const waiting = () => (props.state.phase === "waiting" ? props.state : null);
   // The clock only runs while a code is on screen, so an open dialog on any other phase does not
   // wake the view once a second for a label nothing shows.
@@ -77,9 +79,11 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
         <Dialog.Overlay class="provider-code-login-backdrop">
           <Dialog.Content class="provider-code-login-dialog" as="section">
             <header class="provider-code-login-header">
-              <Dialog.Title class="provider-code-login-title">Log in to {props.providerName} with a code</Dialog.Title>
+              <Dialog.Title class="provider-code-login-title">
+                {t("provider.codeLogin.title", { name: props.providerName })}
+              </Dialog.Title>
               <Dialog.Description class="provider-code-login-description">
-                Finish on your phone or another browser. OpenBot waits here.
+                {t("provider.codeLogin.description")}
               </Dialog.Description>
             </header>
 
@@ -90,7 +94,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                 <div class="provider-code-login-pending" role="status">
                   <Spinner size="sm" />
                   <Text as="span" tone="muted">
-                    Getting a code from {props.providerName}…
+                    {t("provider.codeLogin.starting", { name: props.providerName })}
                   </Text>
                 </div>
               </Show>
@@ -103,13 +107,13 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                       the code is on this screen to type next to it. */}
                     <QrCode
                       value={code().verificationUrlComplete ?? code().verificationUrl}
-                      label={`QR code for the ${props.providerName} login page`}
+                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
                       size={160}
                     />
 
                     <ol class="provider-code-login-steps">
                       <li>
-                        <Text as="span">Open</Text>{" "}
+                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
                         <Button
                           class="provider-code-login-url"
                           type="button"
@@ -121,21 +125,24 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                         </Button>
                       </li>
                       <li>
-                        <Text as="span">Enter this code</Text>
+                        <Text as="span">{t("provider.codeLogin.enterCode")}</Text>
                       </li>
                     </ol>
 
                     <div class="provider-code-login-value">
                       {/* The code is read one group at a time, because it is about to be typed on
                         another device from this screen alone. */}
-                      <output class="provider-code-login-digits" aria-label={`Login code ${spellOut(code().userCode)}`}>
+                      <output
+                        class="provider-code-login-digits"
+                        aria-label={t("provider.codeLogin.codeLabel", { code: spellOut(code().userCode) })}
+                      >
                         {code().userCode}
                       </output>
                       <CopyButton
                         class="provider-code-login-copy"
                         value={code().userCode}
-                        label="Copy code"
-                        copiedLabel="Copied"
+                        label={t("provider.codeLogin.copyCode")}
+                        copiedLabel={t("common.copied")}
                         variant="outline"
                       />
                     </div>
@@ -143,8 +150,8 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                     {/* Outside the live region the code sits in: a countdown read out every
                       second would bury the code it is counting down. */}
                     <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
-                      <Show when={remaining() > 0} fallback="This code has expired.">
-                        Waiting for you. The code expires in {formatCountdown(remaining())}.
+                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.expired")}>
+                        {t("provider.codeLogin.expiresIn", { time: formatCountdown(remaining()) })}
                       </Show>
                     </Text>
                   </div>
@@ -155,7 +162,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                 <div class="provider-code-login-pending" role="status">
                   <Spinner size="sm" />
                   <Text as="span" tone="muted">
-                    Code accepted. Finishing the {props.providerName} sign-in…
+                    {t("provider.codeLogin.verifying", { name: props.providerName })}
                   </Text>
                 </div>
               </Show>
@@ -164,7 +171,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
             {/* Last in the order, first in the corner: the dialog opens on the code, not on the way out. */}
             <IconButton
               class="provider-code-login-close"
-              label={`Close log in to ${props.providerName}`}
+              label={t("provider.codeLogin.closeLabel", { name: props.providerName })}
               variant="ghost"
               onClick={props.onCancel}
             >

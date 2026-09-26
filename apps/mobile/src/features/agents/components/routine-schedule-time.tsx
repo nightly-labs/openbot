@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUniwind } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
 import { isAndroid } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 export function RoutineTimePicker({
   time,
@@ -14,6 +15,7 @@ export function RoutineTimePicker({
   disabled: boolean;
   onChange: (time: string) => void;
 }) {
+  const { t } = useText();
   const { theme } = useUniwind();
   const [open, setOpen] = useState(false);
   const [hour, minute] = time.split(":").map(Number);
@@ -44,7 +46,7 @@ export function RoutineTimePicker({
           isAndroid ? <Typography.Paragraph className="text-grouped-secondary">{time}</Typography.Paragraph> : picker
         }
       >
-        <Typography.Paragraph>Time</Typography.Paragraph>
+        <Typography.Paragraph>{t("mobile.agent.record.time")}</Typography.Paragraph>
       </SettingsRow>
       {isAndroid && open ? picker : null}
     </>

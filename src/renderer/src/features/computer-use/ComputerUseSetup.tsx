@@ -1,4 +1,5 @@
 import type { ComputerUseState, MacPermissionId } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
   AlertActions,
@@ -24,7 +25,7 @@ import {
   Skeleton,
   TriangleAlert,
 } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
+import { useText } from "@openbot/ui/text";
 import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { computerUsePort } from "./computer-use-port";
 
@@ -43,20 +44,24 @@ export interface ComputerUseSetupProps {
  * macOS puts a permission between OpenBot and the desktop, and a row shown elsewhere would name a
  * setting the user cannot find.
  */
-const PERMISSION_DETAILS: Record<MacPermissionId, { title: string; description: string; icon: typeof Monitor }> = {
+const PERMISSION_DETAILS: Record<
+  MacPermissionId,
+  { title: AppTextKey; description: AppTextKey; icon: typeof Monitor }
+> = {
   "screen-recording": {
-    title: "Screen Recording",
-    description: "Lets OpenBot see app windows.",
+    title: "computerUse.permission.screenRecording.title",
+    description: "computerUse.permission.screenRecording.description",
     icon: Monitor,
   },
   accessibility: {
-    title: "Accessibility",
-    description: "Lets OpenBot click and type.",
+    title: "computerUse.permission.accessibility.title",
+    description: "computerUse.permission.accessibility.description",
     icon: MousePointer2,
   },
 };
 
 export function ComputerUseSetup(props: ComputerUseSetupProps) {
+  const { t, errorMessage } = useText();
   const [state, setState] = createSignal<ComputerUseState | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [busyPermission, setBusyPermission] = createSignal<MacPermissionId | null>(null);
@@ -73,7 +78,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
       const next = await computerUsePort().computerUse.getState();
       if (!disposed) setState(next);
     } catch (cause) {
-      if (!disposed) setError(errorMessage(cause, "OpenBot could not check Computer Use."));
+      if (!disposed) setError(errorMessage(cause, t("computerUse.error.check")));
     } finally {
       if (!disposed) setLoading(false);
     }
@@ -87,7 +92,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
       const next = await computerUsePort().computerUse.openPermissionPane(permission);
       if (!disposed) setState(next);
     } catch (cause) {
-      if (!disposed) setError(errorMessage(cause, "OpenBot could not open System Settings."));
+      if (!disposed) setError(errorMessage(cause, t("computerUse.error.openSettings")));
     } finally {
       if (!disposed) setBusyPermission(null);
     }
@@ -129,7 +134,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     <Show when={showPermissions()}>
       <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
         <RefreshCw aria-hidden="true" />
-        Check again
+        {t("computerUse.checkAgain")}
       </Button>
     </Show>
   );
@@ -143,7 +148,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
   const content = () => (
     <>
       <Show when={loading() && state() === null}>
-        <ItemGroup class="computer-use-card computer-use-loading" aria-label="Checking Computer Use">
+        <ItemGroup class="computer-use-card computer-use-loading" aria-label={t("computerUse.checking")}>
           <For each={[0, 1]}>
             {() => (
               <Item class="computer-use-row">
@@ -171,15 +176,15 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
             <TriangleAlert />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Computer Use isn’t available yet</AlertTitle>
+            <AlertTitle>{t("computerUse.unavailable.title")}</AlertTitle>
             <AlertDescription>
-              {errorMessage(state()?.message ?? error(), "OpenBot could not start the Computer Use driver.")}
+              {errorMessage(state()?.message ?? error(), t("computerUse.error.startDriver"))}
             </AlertDescription>
           </AlertContent>
           <AlertActions>
             <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
               <RefreshCw aria-hidden="true" />
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </AlertActions>
         </Alert>
@@ -190,7 +195,10 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
           when={props.variant === "settings"}
           fallback={<PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />}
         >
-          <SettingsSection title="System permissions" description="Permissions are managed by macOS.">
+          <SettingsSection
+            title={t("computerUse.permissions.title")}
+            description={t("computerUse.permissions.description")}
+          >
             <PermissionGroup busy={busyPermission()} permissions={permissions()} onOpen={openPermission} />
             {recheck()}
           </SettingsSection>
@@ -203,10 +211,8 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
             <CircleCheck />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Computer Use is ready</AlertTitle>
-            <AlertDescription>
-              OpenBot can see and interact with apps on this computer. This system asks for no extra permission.
-            </AlertDescription>
+            <AlertTitle>{t("computerUse.ready.title")}</AlertTitle>
+            <AlertDescription>{t("computerUse.ready.description")}</AlertDescription>
           </AlertContent>
         </Alert>
       </Show>
@@ -217,7 +223,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
             <Info />
           </AlertIcon>
           <AlertContent>
-            <AlertTitle>Couldn’t open System Settings</AlertTitle>
+            <AlertTitle>{t("computerUse.openSettingsFailed.title")}</AlertTitle>
             <AlertDescription>{error()}</AlertDescription>
           </AlertContent>
         </Alert>
@@ -232,8 +238,8 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
         <section class="computer-use-compact" aria-labelledby="computer-use-compact-title">
           <header class="computer-use-compact-header">
             <div>
-              <h2 id="computer-use-compact-title">Enable Computer Use</h2>
-              <p>Let OpenBot see and interact with apps on this computer.</p>
+              <h2 id="computer-use-compact-title">{t("computerUse.compact.title")}</h2>
+              <p>{t("computerUse.compact.description")}</p>
             </div>
             {recheckButton()}
           </header>
@@ -251,6 +257,7 @@ function PermissionGroup(props: {
   permissions: ComputerUseState["permissions"];
   onOpen: (permission: MacPermissionId) => Promise<void>;
 }) {
+  const { t } = useText();
   return (
     <ItemGroup class="settings-modal-card computer-use-card computer-use-permission-list">
       <For each={props.permissions}>
@@ -263,8 +270,8 @@ function PermissionGroup(props: {
                 <PermissionIcon aria-hidden="true" />
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>{details.title}</ItemTitle>
-                <ItemDescription>{details.description}</ItemDescription>
+                <ItemTitle>{t(details.title)}</ItemTitle>
+                <ItemDescription>{t(details.description)}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 {/*
@@ -279,7 +286,7 @@ function PermissionGroup(props: {
                 <Show when={permission.granted}>
                   <Badge variant="success-light">
                     <CircleCheck aria-hidden="true" />
-                    Granted
+                    {t("computerUse.granted")}
                   </Badge>
                 </Show>
                 <Button
@@ -288,14 +295,16 @@ function PermissionGroup(props: {
                   size="sm"
                   class={permission.granted ? undefined : "computer-use-grant"}
                   loading={props.busy === permission.id}
-                  loadingLabel="Opening…"
+                  loadingLabel={t("computerUse.opening")}
                   disabled={props.busy !== null}
                   // "Grant" alone is the same word on both rows, which says nothing about which
                   // permission it opens to anybody who reads the buttons on their own.
-                  aria-label={`${permission.granted ? "Manage" : "Grant"} ${details.title}`}
+                  aria-label={t(permission.granted ? "computerUse.manageLabel" : "computerUse.grantLabel", {
+                    permission: t(details.title),
+                  })}
                   onClick={() => void props.onOpen(permission.id)}
                 >
-                  {permission.granted ? "Manage" : "Grant"}
+                  {permission.granted ? t("computerUse.manage") : t("computerUse.grant")}
                 </Button>
               </ItemActions>
             </Item>

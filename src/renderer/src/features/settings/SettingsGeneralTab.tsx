@@ -146,7 +146,7 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
         initialFocus="cancel"
         title={i18n.t("settings.turbo.confirmTitle")}
         description={i18n.t("settings.turbo.confirmDescription")}
-        cancelLabel={i18n.t("settings.turbo.confirmCancel")}
+        cancelLabel={i18n.t("common.cancel")}
         confirmLabel={i18n.t("settings.turbo.confirmAccept")}
         onCancel={() => setConfirmingTurbo(false)}
         onConfirm={() => {

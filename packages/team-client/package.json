@@ -24,7 +24,8 @@
   "dependencies": {
     "@noble/ed25519": "3.1.0",
     "@noble/hashes": "2.3.0",
-    "@openbot/contracts": "workspace:*"
+    "@openbot/contracts": "workspace:*",
+    "@openbot/i18n": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:"

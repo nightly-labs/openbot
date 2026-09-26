@@ -19,6 +19,7 @@ import type {
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
+import { currentText } from "@openbot/ui/text";
 import { createMemo, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage } from "../conversation/conversation-merge";
@@ -279,7 +280,7 @@ export function createWebWorkspace(
           void refresh();
         if (event.type === "error")
           setState((draft) => {
-            draft.error = "The host reported an error. Check the conversation and host status.";
+            draft.error = currentText().t("webClient.error.hostReported");
           });
       },
     },
@@ -292,7 +293,7 @@ export function createWebWorkspace(
   function report(error: unknown) {
     if (!disposed)
       setState((draft) => {
-        draft.error = error instanceof Error ? error.message : "The request failed.";
+        draft.error = error instanceof Error ? error.message : currentText().t("webClient.error.requestFailed");
       });
   }
   async function run(action: () => Promise<void>) {
@@ -380,7 +381,7 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = "Access to this host has ended.";
+            draft.error = currentText().t("webClient.error.accessEnded");
           });
           await runtime.disconnect().catch(() => undefined);
         }
@@ -398,7 +399,7 @@ export function createWebWorkspace(
         if (!hostId && hosts[0]) await connect(hosts[0]);
       } catch (error) {
         if (!disposed) {
-          const message = error instanceof Error ? error.message : "Could not load your hosts.";
+          const message = error instanceof Error ? error.message : currentText().t("webClient.error.hostsFailed");
           setState((draft) => {
             draft.hostsError = message;
           });
@@ -432,7 +433,7 @@ export function createWebWorkspace(
   }
   async function joinInvite(inviteUrl: string): Promise<void> {
     const normalizedInviteUrl = inviteUrl.trim();
-    if (!normalizedInviteUrl) throw new Error("Enter an invitation link.");
+    if (!normalizedInviteUrl) throw new Error(currentText().t("webClient.error.enterInvitation"));
     const cached = acceptedInvite?.inviteUrl === normalizedInviteUrl ? acceptedInvite : null;
     const host = cached?.host ?? (await runtime.acceptInvite(normalizedInviteUrl));
     acceptedInvite = { inviteUrl: normalizedInviteUrl, host };
@@ -440,7 +441,7 @@ export function createWebWorkspace(
     await refreshHosts();
     if (state.host?.hostId !== host.hostId || (state.status !== "online" && hadHostSelection)) await connect(host);
     if (state.status !== "online" || state.host?.hostId !== host.hostId)
-      throw new Error("The invitation was accepted, but the host is offline. Try again.");
+      throw new Error(currentText().t("webClient.error.invitationOffline"));
     acceptedInvite = null;
   }
   async function connect(host: RemoteTeamHost) {
@@ -527,7 +528,7 @@ export function createWebWorkspace(
     if (older && !before) return;
     const page = await runtime.conversation(id, before);
     if (disposed || current !== generation) return;
-    if (page.agentId !== id) throw new Error("The host returned another conversation.");
+    if (page.agentId !== id) throw new Error(currentText().t("webClient.error.otherConversation"));
     setState((draft) => {
       const item = draft.conversations[id];
       if (!item) return;
@@ -637,7 +638,7 @@ export function createWebWorkspace(
     const current = generation;
     const text = textOverride ?? item.draft;
     if (text.length > INPUT_LIMITS.messageText) {
-      report(new Error("The message is too long."));
+      report(new Error(currentText().t("webClient.error.messageTooLong")));
       return false;
     }
     setState((draft) => {
@@ -670,7 +671,7 @@ export function createWebWorkspace(
       setState((draft) => {
         const conversation = draft.conversations[id];
         if (conversation) conversation.uncertain = true;
-        draft.error = "Message delivery is not confirmed. Refresh and check the conversation before sending again.";
+        draft.error = currentText().t("webClient.error.deliveryUnconfirmed");
       });
       return false;
     } finally {
@@ -716,10 +717,10 @@ export function createWebWorkspace(
     send,
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
-        throw new Error("This host does not support sidebar layout changes.");
+        throw new Error(currentText().t("webClient.error.sidebarLayout"));
       }
       const mutate = runtime.mutateSidebarLayout;
-      if (!mutate) throw new Error("This host does not support sidebar layout changes.");
+      if (!mutate) throw new Error(currentText().t("webClient.error.sidebarLayout"));
       const current = generation;
       const layout = await mutate(action);
       if (disposed || current !== generation) return;
@@ -755,8 +756,8 @@ export function createWebWorkspace(
       }
     },
     async deleteAgent(agentId: string): Promise<void> {
-      if (state.status !== "online") throw new Error("Connect to your host before deleting an agent.");
-      if (state.host?.role === "member") throw new Error("Members cannot delete agents.");
+      if (state.status !== "online") throw new Error(currentText().t("webClient.error.deleteOffline"));
+      if (state.host?.role === "member") throw new Error(currentText().t("error.team.membersCannotDeleteAgents"));
       if (!state.agents.some((agent) => agent.id === agentId)) return;
       const current = generation;
       const wasSelected = selectedId === agentId;
@@ -875,7 +876,7 @@ export function createWebWorkspace(
       const id = selectedId;
       if (!id) return;
       if ((state.conversations[id]?.attachments.length ?? 0) >= INPUT_LIMITS.attachments) {
-        report(new Error(`A message can have up to ${INPUT_LIMITS.attachments} attachments.`));
+        report(new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments })));
         return;
       }
       const current = generation;

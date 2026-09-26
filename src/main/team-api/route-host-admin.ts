@@ -2,6 +2,7 @@ import type { UpdateHostIdentityInput } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { parseHostIdentity } from "../ipc/server-inputs";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -20,7 +21,7 @@ export async function routeHostAdmin(
   if (method !== "POST" || url.pathname !== HOST_ADMIN_ROUTES.identity) return "unmatched";
   const identity = admin?.identity;
   if (!identity || !capabilities.has(HOST_ADMIN_CAPABILITY))
-    throw new HttpError(400, "Server identity changes are not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.hostIdentityUnsupported"));
   requireAdmin(member);
   const input = parsedIdentity(await readJson(request));
   try {

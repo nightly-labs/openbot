@@ -1,4 +1,5 @@
 import { type AgentSummary, analyticsRange, type HostAnalytics, type HostAnalyticsInput } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   ArrowLeft,
   Button,
@@ -15,10 +16,13 @@ import {
   type UsageAgentLabel,
   type UsageMetric,
   type UsagePeriod,
+  usageMetricLabels,
   usageMetrics,
   usagePeriodDays,
+  usagePeriodLabels,
   usagePeriods,
 } from "@openbot/ui/features/usage/usage-format";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { usagePort } from "./usage-port";
 
@@ -40,13 +44,14 @@ interface UsageState {
 }
 
 export function AgentUsagePanel(props: AgentUsagePanelProps) {
+  const { t } = useText();
   const [state, setState] = createStore<UsageState>({
     range: { ...analyticsRange("range"), agentId: props.agentId },
     agents: [],
     result: null,
     phase: "loading",
-    metric: "Cost",
-    period: "30 days",
+    metric: "cost",
+    period: "30d",
     serverId: props.serverId,
   });
   let generation = 0;
@@ -140,14 +145,14 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
   let heading: HTMLHeadingElement | undefined;
   onSettled(() => heading?.focus());
   return (
-    <section class="agent-usage" aria-label="Agent usage">
+    <section class="agent-usage" aria-label={t("usage.panel.label")}>
       <header class="agent-usage-header">
         <div class="agent-usage-identity">
-          <IconButton variant="ghost" label="Back" onClick={props.onBack}>
+          <IconButton variant="ghost" label={t("common.back")} onClick={props.onBack}>
             <ArrowLeft />
           </IconButton>
           <h2 ref={heading} tabindex={-1}>
-            Usage <span aria-hidden="true">/</span> <span>{props.hostName}</span>
+            {t("usage.panel.title")} <span aria-hidden="true">/</span> <span>{props.hostName}</span>
           </h2>
         </div>
         <div class="agent-usage-controls">
@@ -170,15 +175,17 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             }}
             itemComponent={(itemProps) => (
               <SelectItem item={itemProps.item}>
-                {itemProps.item.rawValue === "all" ? "All agents" : agentLabel(itemProps.item.rawValue.slice(6)).name}
+                {itemProps.item.rawValue === "all"
+                  ? t("usage.panel.allAgents")
+                  : agentLabel(itemProps.item.rawValue.slice(6)).name}
               </SelectItem>
             )}
           >
-            <SelectTrigger aria-label="Usage agents" size="sm">
+            <SelectTrigger aria-label={t("usage.panel.agents")} size="sm">
               <SelectValue<string>>
                 {(selection) =>
                   selection.selectedOption() === "all"
-                    ? "All agents"
+                    ? t("usage.panel.allAgents")
                     : agentLabel(selection.selectedOption().slice(6)).name
                 }
               </SelectValue>
@@ -186,8 +193,9 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             <SelectContent />
           </Select>
           <UsageSelect
-            label="Usage metric"
+            label={t("usage.panel.metric")}
             options={usageMetrics}
+            optionLabels={usageMetricLabels}
             value={state.metric}
             onChange={(value) => {
               setState((draft) => {
@@ -196,8 +204,9 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
             }}
           />
           <UsageSelect
-            label="Usage period"
+            label={t("usage.panel.period")}
             options={usagePeriods}
+            optionLabels={usagePeriodLabels}
             value={state.period}
             onChange={(value) => {
               setState((draft) => {
@@ -211,7 +220,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           />
           <IconButton
             variant="outline"
-            label="Refresh usage"
+            label={t("usage.panel.refresh")}
             disabled={state.phase === "loading"}
             onClick={() => void load()}
           >
@@ -222,20 +231,20 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       <div ref={reportBody} class="agent-usage-body">
         <Show when={state.phase === "loading"}>
           <div class="agent-usage-loading" role="status">
-            <span>Loading usage…</span>
+            <span>{t("usage.panel.loading")}</span>
             <div class="agent-usage-placeholder" />
           </div>
         </Show>
         <Show when={state.phase === "unsupported"}>
           <p class="agent-usage-notice" role="status">
-            This host does not support agent analytics. Update the host to use this view.
+            {t("usage.panel.unsupported")}
           </p>
         </Show>
         <Show when={state.phase === "error"}>
           <div class="agent-usage-notice">
-            <p role="alert">Could not load usage. Check the connection and date range.</p>
+            <p role="alert">{t("usage.panel.loadFailed")}</p>
             <Button variant="secondary" onClick={() => void load()}>
-              Retry
+              {t("common.retry")}
             </Button>
           </div>
         </Show>
@@ -271,9 +280,12 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
 function UsageSelect<Value extends string>(props: {
   label: string;
   options: readonly Value[];
+  optionLabels: Record<Value, AppTextKey>;
   value: Value;
   onChange: (value: Value) => void;
 }) {
+  const { t } = useText();
+  const optionLabel = (value: Value): AppTextKey => props.optionLabels[value];
   return (
     <Select<Value>
       options={[...props.options]}
@@ -281,10 +293,12 @@ function UsageSelect<Value extends string>(props: {
       onChange={(value) => {
         if (value) props.onChange(value);
       }}
-      itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{itemProps.item.rawValue}</SelectItem>}
+      itemComponent={(itemProps) => (
+        <SelectItem item={itemProps.item}>{t(optionLabel(itemProps.item.rawValue))}</SelectItem>
+      )}
     >
       <SelectTrigger size="sm" aria-label={props.label}>
-        <SelectValue<Value>>{(selection) => selection.selectedOption()}</SelectValue>
+        <SelectValue<Value>>{(selection) => t(optionLabel(selection.selectedOption()))}</SelectValue>
       </SelectTrigger>
       <SelectContent />
     </Select>

@@ -1,7 +1,7 @@
 import type { RemoteDesktopErrorCode, RemoteDesktopSession, ServerSummary } from "@openbot/contracts/ipc";
 import { ArrowLeft, Button, Monitor, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openbot/ui";
-import { errorMessage } from "@openbot/ui/error-message";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { useText } from "@openbot/ui/text";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { z } from "zod";
@@ -36,6 +36,7 @@ const viewerMessageSchema = z.object({
 });
 
 export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
+  const { t, errorMessage } = useText();
   const [viewerState, setViewerState] = createSignal<ViewerState>("idle");
   const [viewerError, setViewerError] = createSignal<string | null>(null);
   const [actionBusy, setActionBusy] = createSignal<"retry" | "disconnect" | "display" | null>(null);
@@ -103,9 +104,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     setViewerState(parsed.data.state);
     props.onViewerState?.(parsed.data.state);
     setViewerError(
-      parsed.data.state === "error"
-        ? errorMessage(parsed.data.message, "Remote control failed. Reconnect and try again.")
-        : null,
+      parsed.data.state === "error" ? errorMessage(parsed.data.message, t("remoteDesktop.controlFailed")) : null,
     );
   };
   onSettled(() => {
@@ -122,7 +121,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onRetry();
     } catch (error) {
       setViewerState("error");
-      setViewerError(errorMessage(error, "Could not start remote control."));
+      setViewerError(errorMessage(error, t("remoteDesktop.startFailed")));
     } finally {
       setActionBusy(null);
     }
@@ -136,7 +135,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onDisconnect();
     } catch (error) {
       setViewerState("error");
-      setViewerError(errorMessage(error, "Could not disconnect remote control."));
+      setViewerError(errorMessage(error, t("remoteDesktop.disconnectFailed")));
       setActionBusy(null);
     }
   }
@@ -150,7 +149,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
       await props.onSelectDisplay(props.server.id, displayId);
     } catch (error) {
       setViewerState("error");
-      setViewerError(errorMessage(error, "Could not switch the shared monitor."));
+      setViewerError(errorMessage(error, t("remoteDesktop.switchDisplayFailed")));
     } finally {
       setActionBusy(null);
     }
@@ -166,7 +165,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
           { "remote-desktop-workspace-visible": props.visible },
         ]}
         aria-hidden={props.visible ? undefined : "true"}
-        aria-label="Remote control"
+        aria-label={t("remoteDesktop.workspaceLabel")}
         tabindex={-1}
       >
         <header class="window-drag remote-desktop-header">
@@ -183,9 +182,9 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                   onChange={(display) => display && void selectDisplay(display.id)}
                   itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.label}</SelectItem>}
                 >
-                  <SelectTrigger size="sm" aria-label="Remote display">
+                  <SelectTrigger size="sm" aria-label={t("remoteDesktop.displayLabel")}>
                     <SelectValue<RemoteDisplay>>
-                      {(state) => state.selectedOption()?.label ?? "Select display"}
+                      {(state) => state.selectedOption()?.label ?? t("remoteDesktop.selectDisplay")}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent class="remote-desktop-display-select-content" />
@@ -195,7 +194,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
             <div class="no-drag remote-desktop-actions">
               <Button type="button" class="remote-desktop-back-button" size="sm" variant="ghost" onClick={props.onHide}>
                 <ArrowLeft size={14} aria-hidden="true" />
-                Back to OpenBot
+                {t("remoteDesktop.backToOpenBot")}
               </Button>
               <Button
                 type="button"
@@ -206,7 +205,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 loading={actionBusy() === "disconnect"}
                 onClick={() => void disconnect()}
               >
-                Disconnect
+                {t("remoteDesktop.disconnect")}
               </Button>
             </div>
           </Show>
@@ -220,7 +219,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
               <iframe
                 ref={(element) => (viewerFrame = element)}
                 class="remote-desktop-viewer"
-                title="Sunshine remote desktop"
+                title={t("remoteDesktop.viewerTitle")}
                 inert={props.viewOnly}
                 tabindex={props.viewOnly ? -1 : undefined}
                 src={source()}
@@ -229,14 +228,17 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 onLoad={() => setViewerState("connecting")}
                 onError={() => {
                   setViewerState("error");
-                  setViewerError("The Moonlight viewer could not load.");
+                  setViewerError(t("remoteDesktop.viewerLoadFailed"));
                   props.onViewerState?.("error");
                 }}
               />
             )}
           </Show>
           <Show when={props.server.state !== "online"}>
-            <DesktopEmptyState title="Host is offline" message="Reconnect to the host before you open its desktop." />
+            <DesktopEmptyState
+              title={t("remoteDesktop.hostOfflineTitle")}
+              message={t("remoteDesktop.hostOfflineMessage")}
+            />
           </Show>
           <Show when={effectiveState() === "connecting"}>
             <div class="remote-desktop-overlay" role="status">
@@ -246,7 +248,7 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 mood="connecting"
                 class="remote-desktop-connecting-avatar"
               />
-              <strong>Connecting…</strong>
+              <strong>{t("common.connecting")}</strong>
             </div>
           </Show>
           <Show when={effectiveState() === "error" || props.session?.errorCode}>
@@ -255,24 +257,21 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
                 when={failureCode() === "host_permissions_required"}
                 fallback={
                   <>
-                    <strong>Could not open the desktop</strong>
+                    <strong>{t("remoteDesktop.openFailed")}</strong>
                     <span>
                       {errorMessage(
                         viewerError() ?? props.connectionError ?? props.session?.message,
-                        "Remote control failed. Reconnect and try again.",
+                        t("remoteDesktop.controlFailed"),
                       )}
                     </span>
                   </>
                 }
               >
-                <strong>{props.server.name} is not sharing its screen</strong>
-                <span>
-                  The host blocks OpenBot from recording its screen. On that computer, open System Settings → Privacy
-                  &amp; Security → Screen Recording, turn on OpenBot, then try again here.
-                </span>
+                <strong>{t("remoteDesktop.notSharingTitle", { name: props.server.name })}</strong>
+                <span>{t("remoteDesktop.notSharingDescription")}</span>
               </Show>
               <Button variant="outline" type="button" loading={actionBusy() === "retry"} onClick={() => void retry()}>
-                Try again
+                {t("common.tryAgain")}
               </Button>
             </div>
           </Show>

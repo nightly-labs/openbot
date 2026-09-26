@@ -1,14 +1,17 @@
 import type { AgentTemplateSkill, MarketplaceAgentRoutine } from "@openbot/contracts/ipc";
+import type { AppTranslate } from "@openbot/i18n";
 import { Button, ChevronDown, ChevronRight, Text } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
+import { useText } from "../../text";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 
 /** The agent's standing remit: its title and description. */
 export function TemplateInstructions(props: { title: string; description: string }) {
+  const { t } = useText();
   return (
-    <section class="agent-template-section" aria-label="Instructions">
+    <section class="agent-template-section" aria-label={t("agentTemplate.section.instructions")}>
       <Text variant="label" as="strong">
-        Instructions
+        {t("agentTemplate.section.instructions")}
       </Text>
       <Show when={props.title}>
         <Text variant="body-sm">{props.title}</Text>
@@ -25,16 +28,17 @@ export function TemplateInstructions(props: { title: string; description: string
  * text it installs, so a user reads what an agent from another person will follow.
  */
 export function TemplateSkills(props: { skills: readonly AgentTemplateSkill[]; expandable?: boolean }) {
+  const { t } = useText();
   return (
-    <section class="agent-template-section" aria-label="Skills">
+    <section class="agent-template-section" aria-label={t("agentTemplate.section.skills")}>
       <Text variant="label" as="strong">
-        Skills
+        {t("agentTemplate.section.skills")}
       </Text>
       <Show
         when={props.skills.length > 0}
         fallback={
           <Text tone="muted" variant="body-sm">
-            No skills.
+            {t("agentTemplate.section.noSkills")}
           </Text>
         }
       >
@@ -48,7 +52,7 @@ export function TemplateSkills(props: { skills: readonly AgentTemplateSkill[]; e
                     <>
                       <Text variant="body-sm">{skill.name}</Text>
                       <Text tone="muted" variant="caption">
-                        {skillOrigin(skill)}
+                        {skillOrigin(skill, t)}
                       </Text>
                     </>
                   }
@@ -65,6 +69,7 @@ export function TemplateSkills(props: { skills: readonly AgentTemplateSkill[]; e
 }
 
 function EmbeddedSkill(props: { name: string; markdown: string }) {
+  const { t } = useText();
   const [open, setOpen] = createSignal(false);
   return (
     <>
@@ -82,7 +87,7 @@ function EmbeddedSkill(props: { name: string; markdown: string }) {
         {props.name}
       </Button>
       <Text tone="muted" variant="caption">
-        Local skill (SKILL.md only)
+        {t("agentTemplate.skill.local")}
       </Text>
       <Show when={open()}>
         <pre class="agent-template-skill-text">{props.markdown}</pre>
@@ -93,18 +98,20 @@ function EmbeddedSkill(props: { name: string; markdown: string }) {
 
 /** Each routine with its schedule and instruction. `labelled` adds the heading a mixed page needs. */
 export function TemplateRoutines(props: { routines: readonly MarketplaceAgentRoutine[]; labelled?: boolean }) {
+  const text = useText();
+  const { t } = text;
   return (
-    <section class="agent-template-section" aria-label="Routines">
+    <section class="agent-template-section" aria-label={t("agentTemplate.section.routines")}>
       <Show when={props.labelled}>
         <Text variant="label" as="strong">
-          Routines
+          {t("agentTemplate.section.routines")}
         </Text>
       </Show>
       <Show
         when={props.routines.length > 0}
         fallback={
           <Text tone="muted" variant="body-sm">
-            No routines.
+            {t("agentTemplate.section.noRoutines")}
           </Text>
         }
       >
@@ -114,8 +121,8 @@ export function TemplateRoutines(props: { routines: readonly MarketplaceAgentRou
               <li>
                 <Text variant="body-sm">{routine.name}</Text>
                 <Text tone="muted" variant="caption">
-                  {routineScheduleSummary(routine.schedule)}
-                  {routine.active ? "" : " · Paused"}
+                  {routineScheduleSummary(routine.schedule, false, text)}
+                  {routine.active ? "" : ` · ${t("agentTemplate.routine.paused")}`}
                 </Text>
                 <Text tone="secondary" variant="caption" class="agent-template-prose">
                   {routine.instruction}
@@ -129,6 +136,8 @@ export function TemplateRoutines(props: { routines: readonly MarketplaceAgentRou
   );
 }
 
-function skillOrigin(skill: AgentTemplateSkill): string {
-  return skill.kind === "marketplace" ? `Marketplace skill, version ${skill.version}` : "Local skill (SKILL.md only)";
+function skillOrigin(skill: AgentTemplateSkill, t: AppTranslate): string {
+  return skill.kind === "marketplace"
+    ? t("agentTemplate.skill.marketplace", { version: skill.version })
+    : t("agentTemplate.skill.local");
 }

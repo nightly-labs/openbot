@@ -5,6 +5,7 @@ import type {
   UpdateQueuedMessageInput,
 } from "@openbot/contracts/ipc";
 import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
 import type { MailboxStore } from "../mailbox-store";
@@ -64,8 +65,7 @@ export class QueueControls {
   }
 
   async cancel(agentId: string, deliveryId: string): Promise<void> {
-    if (this.#hooks.channelAssignment(deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
+    if (this.#hooks.channelAssignment(deliveryId)) throw new Error(sourceText("error.backend.useChannelTaskControls"));
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
@@ -75,7 +75,7 @@ export class QueueControls {
     const finished = this.#mailbox.finishedQueueEditAction(agentId, input.deliveryId, input.editId);
     if (finished) {
       if (input.action === "begin" || input.action === "retain-attachments")
-        throw new QueueEditRejectedError("This edit has already finished.");
+        throw new QueueEditRejectedError(sourceText("error.backend.editFinished"));
       // The uploads belong to an edit that is over, so they never stay behind.
       if (input.action === "save")
         await Promise.all(input.attachmentDraftIds.map((id) => this.#mailbox.discardDraft(id)));
@@ -83,9 +83,7 @@ export class QueueControls {
       // finished Cancel never reached the message, so the client must keep its text.
       if (input.action !== finished)
         throw new QueueEditRejectedError(
-          finished === "cancel"
-            ? "This edit was cancelled, so the message keeps its original text."
-            : "This edit was already saved.",
+          finished === "cancel" ? sourceText("error.backend.editCancelled") : sourceText("error.backend.editSaved"),
         );
       if (
         input.action === "save" &&
@@ -98,15 +96,13 @@ export class QueueControls {
           input.attachmentDraftIds,
         )
       )
-        throw new QueueEditRejectedError(
-          "This edit was already saved with different contents. Your changes were not saved.",
-        );
+        throw new QueueEditRejectedError(sourceText("error.backend.editSavedDifferent"));
       this.#drain.scheduleDrain(agentId);
       this.#mailboxSync.emitQueue(agentId);
       return this.#mailboxSync.queueSnapshot(agentId);
     }
     if (this.#hooks.channelAssignment(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
+      throw new Error(sourceText("error.backend.useChannelTaskControls"));
     if (input.action === "begin") this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId);
     else {
       if (input.action === "retain-attachments")
@@ -135,7 +131,7 @@ export class QueueControls {
 
   async update(input: UpdateQueuedMessageInput): Promise<void> {
     if (this.#hooks.channelAssignment(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
+      throw new Error(sourceText("error.backend.useChannelTaskControls"));
     await this.#mailbox.updateQueuedMessage(
       input.agentId,
       input.deliveryId,
@@ -152,7 +148,7 @@ export class QueueControls {
 
   async reorder(input: ReorderQueueInput): Promise<void> {
     if (input.deliveryIds.some((id) => this.#hooks.channelAssignment(id)))
-      throw new Error("Use the channel task controls for channel work.");
+      throw new Error(sourceText("error.backend.useChannelTaskControlsWork"));
     // The queue the user reads holds no channel work, so the order it sends names the normal
     // messages alone, and the mailbox reads the whole queued order. Channel work stays at the head:
     // it reserved the agent before these messages arrived.
@@ -167,13 +163,13 @@ export class QueueControls {
     const session = this.#store.activeProviderSession(agent.id);
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId) {
-      throw new Error("The active turn changed before this message could be steered.");
+      throw new Error(sourceText("error.backend.steerTurnChanged"));
     }
     if (this.#hooks.channelAssignment(input.deliveryId))
-      throw new Error("Use the channel task controls for this assignment.");
+      throw new Error(sourceText("error.backend.useChannelTaskControls"));
     const context = this.#mailbox.getDelivery(input.deliveryId);
     if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued") {
-      throw new Error("Only queued messages can be steered.");
+      throw new Error(sourceText("error.backend.steerQueuedOnly"));
     }
 
     const turnId = snapshot.activeTurnId;

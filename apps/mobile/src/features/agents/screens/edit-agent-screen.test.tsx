@@ -510,7 +510,6 @@ vi.mock("lucide-react-native", () => ({
 }));
 vi.mock("@/features/chat/components/attachment-preview", () => ({
   AttachmentThumbnail: () => null,
-  formatFileSize: (bytes: number) => `${bytes} B`,
   useAttachmentFile: () => ({ uri: null, busy: false, share: mocks.shareFile }),
 }));
 

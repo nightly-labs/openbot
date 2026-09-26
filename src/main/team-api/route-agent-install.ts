@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { AGENT_INSTALL_CAPABILITY, AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { parseInstallAgentTemplate } from "../ipc/agent-template-handlers";
 import { parseInstallMarketplaceAgent } from "../ipc/app-inputs";
 import type { TeamApiAdmin } from "./dependencies";
@@ -27,12 +28,12 @@ export async function routeAgentInstall(
   const agentTemplates = admin?.agentTemplates;
   if (update) {
     if (!marketplaceAgents || !capabilities.has(AGENT_UPDATE_CAPABILITY))
-      throw new HttpError(400, "Updating agents is not supported by this connection.");
+      throw new HttpError(400, sourceText("error.team.agentUpdateUnsupported"));
     requireAdmin(member);
     return answer(json, updateFromMarketplace(marketplaceAgents, await readJson(request)));
   }
   if (!marketplaceAgents || !agentTemplates || !capabilities.has(AGENT_INSTALL_CAPABILITY))
-    throw new HttpError(400, "Adding agents is not supported by this connection.");
+    throw new HttpError(400, sourceText("error.team.agentInstallUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
   return answer(
@@ -75,7 +76,7 @@ function updateFromMarketplace(service: NonNullable<TeamApiAdmin["marketplaceAge
     ...(isDynamicRecord(body) ? body : {}),
     receiptId: randomUUID(),
   });
-  if (input.agentId === undefined) throw new HttpError(400, "An agent to update is required.");
+  if (input.agentId === undefined) throw new HttpError(400, sourceText("error.team.agentUpdateTargetRequired"));
   return () => service.install(input);
 }
 

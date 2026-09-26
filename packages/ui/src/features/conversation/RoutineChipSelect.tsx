@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectPrimitive } from "@openbot/ui";
+import { useText } from "../../text";
 import type { RoutineSelectOption } from "./routine-schedule-ui";
 
 interface RoutineChipSelectProps {
@@ -19,6 +20,7 @@ interface RoutineChipSelectProps {
 
 /** A `Select` dressed as a chip. The chip has no icon: its fill shows that it opens a menu. */
 export function RoutineChipSelect(props: RoutineChipSelectProps) {
+  const { t } = useText();
   const selected = () => props.options.find((option) => option.value === props.value) ?? null;
   let open = false;
   return (
@@ -55,7 +57,7 @@ export function RoutineChipSelect(props: RoutineChipSelectProps) {
         aria-label={props.ariaLabel}
       >
         <SelectPrimitive.Value<RoutineSelectOption> class="routine-chip-text">
-          {(state) => props.valueLabel ?? state.selectedOption()?.label ?? "Select"}
+          {(state) => props.valueLabel ?? state.selectedOption()?.label ?? t("routine.chip.select")}
         </SelectPrimitive.Value>
       </SelectPrimitive.Trigger>
       <SelectContent class="routine-chip-select-content" mount={props.mount} />

@@ -4,6 +4,7 @@ import type {
   CustomProvidersDesktopApi,
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 
 interface CustomProvidersState {
@@ -54,7 +55,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
    */
   async function saveCustomProvider(input: SaveCustomProviderInput): Promise<CustomProviderRestart> {
     const group = api();
-    if (!group) throw new Error("This build cannot save an endpoint.");
+    if (!group) throw new Error(currentText().t("customProvider.saveUnavailable"));
     const result = await group.save(input);
     apply(result.providers);
     return result.restart;
@@ -62,7 +63,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
 
   async function deleteCustomProvider(id: string): Promise<CustomProviderRestart> {
     const group = api();
-    if (!group) throw new Error("This build cannot remove an endpoint.");
+    if (!group) throw new Error(currentText().t("customProvider.removeUnavailable"));
     const result = await group.delete({ id });
     apply(result.providers);
     return result.restart;

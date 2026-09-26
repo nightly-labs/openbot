@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
+import { useText } from "@/shared/lib/text";
 import type { ImageDimensions } from "../model/image-dimensions";
 import {
   clamp,
@@ -126,6 +127,7 @@ export function ImageViewer({
   const reduceTransparency = useReduceTransparency();
   const { theme } = useUniwind();
   const [foreground, fallbackBackground] = useThemeColor(["foreground", "default"]);
+  const text = useText();
   // The same glass as the chat header's buttons. Without Liquid Glass, or with Reduce
   // Transparency on, they fall back to the theme's solid control colour.
   const liquidGlassAvailable = isLiquidGlassAvailable() && reduceTransparency === false;
@@ -479,7 +481,7 @@ export function ImageViewer({
           >
             {/* Close at the leading edge, where the platform puts the way out of a full-screen view. */}
             <ChatGlassIconButton
-              accessibilityLabel="Close"
+              accessibilityLabel={text.t("common.close")}
               hidden={!chromeVisible}
               fallbackBackground={fallbackBackground}
               liquidGlassAvailable={liquidGlassAvailable}
@@ -489,7 +491,7 @@ export function ImageViewer({
             </ChatGlassIconButton>
             <View className="flex-row gap-2">
               <ChatGlassIconButton
-                accessibilityLabel={`Share ${name}`}
+                accessibilityLabel={text.t("mobile.chat.imageViewer.share", { name })}
                 hidden={!chromeVisible}
                 disabled={busy}
                 fallbackBackground={fallbackBackground}
@@ -499,7 +501,9 @@ export function ImageViewer({
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>
               <ChatGlassIconButton
-                accessibilityLabel={saved ? "Saved to Photos" : `Save ${name} to Photos`}
+                accessibilityLabel={
+                  saved ? text.t("mobile.chat.imageViewer.saved") : text.t("mobile.chat.imageViewer.save", { name })
+                }
                 hidden={!chromeVisible}
                 disabled={busy || saved}
                 fallbackBackground={fallbackBackground}
