@@ -18,8 +18,11 @@ export const interruptAgentToolSchema = z.strictObject({
 
 export interface AgentInterruptHooks {
   listAgents(): AgentSummary[];
-  /** `false` when the turn no longer runs, so no stop was sent. */
-  interrupt(agentId: string, turnId: string): Promise<boolean>;
+  /**
+   * `mayStop` is asked again right before the stop is sent. `false` when the turn no longer runs or
+   * `mayStop` refuses, so no stop was sent.
+   */
+  interrupt(agentId: string, turnId: string, mayStop: () => boolean): Promise<boolean>;
 }
 
 export interface AgentInterruptToolOptions {
@@ -85,12 +88,7 @@ export class AgentInterruptTool {
       ) {
         return openBotToolFailure(sourceText("error.backend.useChannelTaskControlsWork"));
       }
-      if (
-        deliveries.length === 0 ||
-        !deliveries.every(
-          ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === callerAgentId,
-        )
-      ) {
+      if (!ownedBy(deliveries, callerAgentId)) {
         return openBotToolFailure(sourceText("error.backend.interruptOtherWork"));
       }
       if (!this.#store.activeProviderSession(agentId)) {
@@ -103,8 +101,10 @@ export class AgentInterruptTool {
     const cancelledMessages = this.#cancelQueuedFrom(agentId, callerAgentId);
     if (!turnId) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
 
-    // The turn can end while the stop is on its way. Its work then finished, so no notice is sent.
-    if (!(await this.#hooks.interrupt(agentId, turnId))) {
+    // The turn can end, or the user can steer a message into it, while the stop is on its way. The
+    // check then runs again on the deliveries the turn has at that moment. No stop, no notice.
+    const mayStop = () => ownedBy(this.#mailbox.findDeliveriesByTurn(agentId, turnId), callerAgentId);
+    if (!(await this.#hooks.interrupt(agentId, turnId, mayStop))) {
       return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
     }
     await this.#notify(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
@@ -171,4 +171,12 @@ export class AgentInterruptTool {
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
   }
+}
+
+/** Every delivery the turn runs came from the caller, and it runs at least one. */
+function ownedBy(deliveries: readonly DeliveryContext[], callerAgentId: string): boolean {
+  return (
+    deliveries.length > 0 &&
+    deliveries.every(({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === callerAgentId)
+  );
 }

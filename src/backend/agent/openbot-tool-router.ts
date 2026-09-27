@@ -50,8 +50,8 @@ export interface OpenBotToolRouterHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   /** True while the provider runs a turn for this agent, a context compaction included. */
   runsTurn(agentId: string): boolean;
-  /** `false` when the turn no longer runs, so no stop was sent. */
-  interrupt(agentId: string, turnId: string): Promise<boolean>;
+  /** `false` when the turn no longer runs or `mayStop` refuses, so no stop was sent. */
+  interrupt(agentId: string, turnId: string, mayStop: () => boolean): Promise<boolean>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
 }
@@ -130,7 +130,7 @@ export class OpenBotToolRouter {
       drain: options.drain,
       hooks: {
         listAgents: () => options.hooks.listAgents(),
-        interrupt: (agentId, turnId) => options.hooks.interrupt(agentId, turnId),
+        interrupt: (agentId, turnId, mayStop) => options.hooks.interrupt(agentId, turnId, mayStop),
       },
     });
   }
