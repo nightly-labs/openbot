@@ -1,3 +1,4 @@
+import type { CustomProviderRestart } from "@openbot/contracts/ipc";
 import { createEffect, createSignal } from "solid-js";
 import { useText } from "../../text";
 import { CustomAcpAgentDialog } from "./CustomAcpAgentDialog";
@@ -19,6 +20,8 @@ interface DetectedProviderSetupProps {
   takenProviderIds?: readonly string[];
   takenAgentIds?: readonly string[];
   onClose: () => void;
+  /** After a save, so the host can say when the new models appear. */
+  onSaved?: (kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void;
 }
 
 /**
@@ -68,7 +71,8 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
     setSaving(true);
     setSubmitError(null);
     try {
-      await props.api.save(provider, value);
+      const restart = await props.api.save(provider, value);
+      props.onSaved?.(value.kind, restart);
       props.onClose();
     } catch (error) {
       setSubmitError(errorMessage(error, t("customProvider.saveFailed")));

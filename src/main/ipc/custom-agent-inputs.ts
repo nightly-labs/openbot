@@ -2,20 +2,25 @@
 // message here quotes a value.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  CheckCustomAgentInput,
-  CustomAgentEnvInput,
-  DeleteCustomAgentInput,
-  SaveCustomAgentInput,
+import {
+  type CheckCustomAgentInput,
+  CUSTOM_AGENT_LIMITS,
+  type CustomAgentEnvInput,
+  type DeleteCustomAgentInput,
+  isCustomAgentEnvName,
+  isCustomAgentId,
+  isNewCustomAgentId,
+  type SaveCustomAgentInput,
 } from "@openbot/contracts/ipc";
-import { CUSTOM_AGENT_LIMITS, isCustomAgentEnvName, isCustomAgentId } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { agentCommandForm } from "../../backend/acp-agent-command";
 import { isObject, requireString } from "./validation";
 
-function parseAgentId(value: unknown): string {
-  if (!isString(value) || !isCustomAgentId(value)) throw new Error(sourceText("error.provider.customAgentIdInvalid"));
+/** `isNew` refuses a provider added after the agent was saved: only a delete or a check may name it. */
+function parseAgentId(value: unknown, isNew = false): string {
+  if (!isString(value) || !(isNew ? isNewCustomAgentId : isCustomAgentId)(value))
+    throw new Error(sourceText("error.provider.customAgentIdInvalid"));
   return value;
 }
 
@@ -61,7 +66,7 @@ function parseEnv(value: unknown): CustomAgentEnvInput[] {
 export function parseSaveCustomAgent(input: unknown): SaveCustomAgentInput {
   if (!isObject(input)) throw new Error(sourceText("error.provider.customAgentCommandInvalid"));
   return {
-    id: parseAgentId(input.id),
+    id: parseAgentId(input.id, true),
     name: requireString(input.name, "Display name", INPUT_LIMITS.agentName).trim(),
     command: parseCommand(input.command),
     args: parseArgs(input.args),

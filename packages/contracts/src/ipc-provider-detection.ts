@@ -21,6 +21,14 @@ export const PROVIDER_DETECTION_LIMITS = {
   models: 256,
 } as const;
 
+/** The default addresses of the local servers OpenBot knows. Product names are not translated. */
+export const DEFAULT_MODEL_SERVERS = {
+  ollama: { name: "Ollama", baseUrl: "http://127.0.0.1:11434/v1" },
+  lmstudio: { name: "LM Studio", baseUrl: "http://127.0.0.1:1234/v1" },
+} as const;
+
+export type DefaultModelServerId = keyof typeof DEFAULT_MODEL_SERVERS;
+
 /** Where the host looks, besides the default addresses and PATH, and the rows the user hid. */
 export interface ProviderDetectionSettings {
   enabled: boolean;
@@ -126,6 +134,11 @@ const DEFAULT_PORTS: Readonly<Record<string, string>> = { "http:": "80", "https:
  * the host is lowercase, a loopback name is `127.0.0.1`, the default port is dropped, and so is a
  * trailing `/`. Null for a text that is not an http or https URL.
  */
+/** The detection key of a found server, which `hiddenIds` stores: `models:<endpoint key>`. */
+export function detectedModelServerKey(baseUrl: string): string {
+  return `models:${customProviderEndpointKey(baseUrl) ?? baseUrl}`;
+}
+
 export function customProviderEndpointKey(baseUrl: string): string | null {
   const url = parseHttpUrl(baseUrl);
   if (!url) return null;

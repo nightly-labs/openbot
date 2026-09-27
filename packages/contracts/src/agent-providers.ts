@@ -239,9 +239,22 @@ export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
  */
 export const CUSTOM_AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
-/** Ids a custom agent may not take: a provider id or `custom` would read as another provider's model. */
+/**
+ * The ids no custom agent could have when custom agents shipped: a provider id or `custom` would read
+ * as another provider's model. Frozen: a provider added later is refused only for a new agent
+ * (`isNewCustomAgentId`), so an agent saved under that name before the upgrade stays readable,
+ * routable and removable.
+ */
+const AGENT_IDS_RESERVED_AT_RELEASE = ["codex", "claude", "grok", "opencode", "antigravity", "acp", "custom"] as const;
+
+/** A saved custom agent id: what the list decoders, a delete and the model router accept. */
 export function isCustomAgentId(value: string): boolean {
-  return CUSTOM_AGENT_ID_PATTERN.test(value) && value !== "custom" && !isAgentProvider(value);
+  return CUSTOM_AGENT_ID_PATTERN.test(value) && !isOneOf(AGENT_IDS_RESERVED_AT_RELEASE, value);
+}
+
+/** The id of an agent to save or of a found agent. It must not be the name of a built-in provider. */
+export function isNewCustomAgentId(value: string): boolean {
+  return isCustomAgentId(value) && !isAgentProvider(value);
 }
 
 /** The model a custom agent with no model list runs on. The agent is given no model. */

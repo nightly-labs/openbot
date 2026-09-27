@@ -116,6 +116,14 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 
   async request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     if (!this.#running) throw new Error("ACP client is not running.");
+    try {
+      return await this.#request(method, params, decoder, timeoutMs);
+    } catch (error) {
+      throw this.#redactError(error);
+    }
+  }
+
+  async #request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
     switch (method) {
       case "initialize":
         return decoder({});
@@ -138,7 +146,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         return decoder(withThreadId(response, agentId));
       }
       case "thread/resume": {
-        const routed = this.#routed(params, true);
+        const routed = this.#routed(params);
         const child = await this.#child(routed.agentId);
         const response = await child.request(
           method,
@@ -166,7 +174,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       }
       case "turn/start":
       case "turn/steer": {
-        const routed = this.#routed(params, true);
+        const routed = this.#routed(params);
         const child = await this.#child(routed.agentId);
         return child.request(method, forChild(params, routed.sessionId), decoder, timeoutMs);
       }
@@ -211,12 +219,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
    * for this turn: the user switched agents, and the caller opens a session on the new one, with the
    * conversation handed over.
    */
-  #routed(params: unknown, checkModel: boolean): { agentId: string; sessionId: string } {
+  #routed(params: unknown): { agentId: string; sessionId: string } {
     const threadId = getString(params, "threadId") ?? "";
     const routed = splitCustomAgentSessionId(threadId);
     if (!routed) throw unknownSession(threadId);
     const model = getString(params, "model");
-    if (checkModel && model && customAgentIdOfModel(model) !== routed.agentId) throw unknownSession(threadId);
+    if (model && customAgentIdOfModel(model) !== routed.agentId) throw unknownSession(threadId);
     return routed;
   }
 
@@ -249,8 +257,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       this.#requests.set(id, { child, id: request.id });
       this.emit("request", withRoutedThreadId({ ...request, id }, agentId));
     });
-    child.on("diagnostic", (message) => this.emit("diagnostic", message));
-    child.once("exit", (error) => this.#childExited(agentId, child, error));
+    child.on("diagnostic", (message) => this.emit("diagnostic", this.#redact(message)));
+    child.once("exit", (error) => this.#childExited(agentId, child, this.#redactError(error)));
     child.start();
     try {
       await child.request("initialize", {}, decodeRecordResponse);
@@ -276,6 +284,27 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       .catch(() => undefined);
   }
 
+  /**
+   * The saved environment values of every custom agent, masked. An agent can quote one in an RPC
+   * error, and the router's errors and diagnostics go to the log and to the renderer.
+   */
+  #redact(text: string): string {
+    let result = text;
+    for (const config of this.#source()) {
+      for (const { value } of config.env) {
+        if (value.length >= 4) result = result.split(value).join("[redacted]");
+      }
+    }
+    return result;
+  }
+
+  /** The same error when it holds no value, so its type and fields stay for the callers that read them. */
+  #redactError<E>(error: E): E | Error {
+    if (!(error instanceof Error)) return error;
+    const message = this.#redact(error.message);
+    return message === error.message ? error : new Error(message);
+  }
+
   async #listModels(params: unknown, timeoutMs: number): Promise<ModelEntry[]> {
     const configs = this.#source();
     const lists = await Promise.all(
@@ -292,7 +321,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           this.#lastModels.set(config.id, models);
           return models;
         } catch (error) {
-          this.emit("diagnostic", `Custom agent ${config.id} did not list its models: ${String(error)}`);
+          this.emit("diagnostic", this.#redact(`Custom agent ${config.id} did not list its models: ${String(error)}`));
           return this.#lastModels.get(config.id) ?? [];
         }
       }),

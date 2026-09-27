@@ -11,6 +11,8 @@ export const messages = {
   "error.provider.endpointNotSaved": "Ce point de terminaison n’est pas enregistré. Actualisez la liste et réessayez.",
   "error.provider.endpointKeyForNewAddress":
     "L’adresse a un nouvel hôte ou un nouveau port. Saisissez de nouveau la clé d’API et les en-têtes, pour que ceux enregistrés ne lui soient pas envoyés.",
+  "error.provider.endpointSecretUnreadable":
+    "Cet ordinateur ne peut pas lire la clé d’API et les en-têtes enregistrés. Saisissez de nouveau la clé d’API et les en-têtes, pour qu’aucun ne soit perdu.",
   "error.provider.discoveryTimeout": "{host} n’a pas répondu à temps.",
   "error.provider.discoveryUnreachable": "OpenBot n’a pas pu se connecter à {host}.",
   "error.provider.discoveryRedirect": "{host} a envoyé une redirection. Saisissez l’adresse finale du serveur.",

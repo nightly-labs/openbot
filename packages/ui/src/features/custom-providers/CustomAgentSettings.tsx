@@ -61,6 +61,11 @@ const RESTART_NOTE = {
   },
 } as const satisfies Record<"saved" | "removed", Record<CustomProviderRestart, AppTextKey>>;
 
+/** The note after an agent is saved or removed: when the agent list catches up. */
+export function customAgentRestartKey(action: "saved" | "removed", restart: CustomProviderRestart): AppTextKey {
+  return RESTART_NOTE[action][restart];
+}
+
 /** The form of one agent: a new one, or a saved one that keeps its ID. */
 type AgentForm = { draft: CustomAcpAgentDraft; saved?: CustomAgentSummary };
 

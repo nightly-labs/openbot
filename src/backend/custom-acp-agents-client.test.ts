@@ -157,4 +157,32 @@ describe("CustomAcpAgentsClient", () => {
     await expect(exited).resolves.toMatchObject({ message: "crashed" });
     expect(client.running).toBe(false);
   });
+
+  it("masks a saved environment value that an agent quotes in an error or a diagnostic", async () => {
+    const token = "tok-e2e-secret";
+    const { client, children } = router([{ ...config("goose"), env: [{ name: "MY_TOKEN", value: token }] }]);
+    const diagnostics: string[] = [];
+    client.on("diagnostic", (message) => diagnostics.push(message));
+    await client.request("thread/start", { model: "goose/default" }, record);
+    const goose = children.get("goose");
+    if (!goose) throw new Error("The process must start.");
+    goose.answers["turn/start"] = () => {
+      throw new Error(`bad token ${token}`);
+    };
+    goose.answers["model/list"] = () => {
+      throw new Error(`bad token ${token}`);
+    };
+
+    await expect(client.request("turn/start", { threadId: "goose:s1" }, record)).rejects.toThrow(
+      "bad token [redacted]",
+    );
+    await client.request("model/list", {}, record);
+    goose.emit("diagnostic", `stderr ${token}`);
+    const exited = new Promise<Error>((resolve) => client.once("exit", resolve));
+    goose.emit("exit", new Error(`exited with ${token}`));
+
+    expect((await exited).message).toBe("exited with [redacted]");
+    expect(diagnostics.length).toBeGreaterThan(1);
+    expect(diagnostics.join("\n")).not.toContain(token);
+  });
 });

@@ -11,6 +11,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.endpointNotSaved": "This endpoint is not saved. Refresh the list and try again.",
   "error.provider.endpointKeyForNewAddress":
     "The address has a new host or port. Enter the API key and the headers again, so the saved ones do not go to it.",
+  "error.provider.endpointSecretUnreadable":
+    "This computer cannot read the saved API key and headers. Enter the API key and the headers again, so that none of them is lost.",
   "error.provider.discoveryTimeout": "{host} did not answer in time.",
   "error.provider.discoveryUnreachable": "OpenBot could not connect to {host}.",
   "error.provider.discoveryRedirect": "{host} sent a redirect. Enter the final address of the server.",

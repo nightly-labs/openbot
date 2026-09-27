@@ -114,7 +114,7 @@ export function AppAccessGate() {
                       onAddCustomProvider={saveCustomProvider}
                       onDeleteCustomProvider={deleteCustomProvider}
                       providerDetection={detection.detection()}
-                      detectedProviderApi={detection.api}
+                      detectedProviderApi={detection.firstRunApi}
                       takenAgentIds={detection.takenAgentIds()}
                       onProviderStepShown={detection.scanOnce}
                     />

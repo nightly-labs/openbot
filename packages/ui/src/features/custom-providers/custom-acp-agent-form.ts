@@ -10,7 +10,7 @@ import {
   CUSTOM_AGENT_ID_PATTERN,
   CUSTOM_AGENT_LIMITS,
   type CustomAgentSummary,
-  isCustomAgentId,
+  isNewCustomAgentId,
   type SaveCustomAgentInput,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
@@ -103,7 +103,7 @@ export function validateCustomAcpAgent(
 
   if (!agentId) errors.agentId = t("customProvider.acp.error.agentIdRequired");
   else if (!CUSTOM_AGENT_ID_PATTERN.test(agentId)) errors.agentId = t("customProvider.acp.error.agentIdPattern");
-  else if (!isCustomAgentId(agentId) || takenAgentIds.includes(agentId)) {
+  else if (!isNewCustomAgentId(agentId) || takenAgentIds.includes(agentId)) {
     errors.agentId = t("customProvider.acp.error.agentIdTaken", { id: agentId });
   }
 

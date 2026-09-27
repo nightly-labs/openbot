@@ -5,7 +5,7 @@
 // The environment values are the secret half. They travel renderer-to-main on `save` and `check`,
 // and never come back: the summary has the names only, and its guard refuses a row that has more.
 
-import { isCustomAgentId } from "./agent-providers";
+import { isCustomAgentId, isNewCustomAgentId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isNullableBoundedString } from "./ipc-bounded-values";
 import { CUSTOM_PROVIDER_RESTARTS, type CustomProviderRestart } from "./ipc-custom-providers";
@@ -152,7 +152,7 @@ export function isDetectedAcpAgent(value: unknown): value is DetectedAcpAgent {
     isDynamicRecord(value) &&
     !("env" in value) &&
     isString(value.id) &&
-    isCustomAgentId(value.id) &&
+    isNewCustomAgentId(value.id) &&
     isBoundedString(value.name, INPUT_LIMITS.agentName) &&
     isBoundedString(value.command, CUSTOM_AGENT_LIMITS.command) &&
     isArgs(value.args)

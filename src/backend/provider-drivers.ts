@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentAuthState, AgentProviderId } from "@openbot/contracts/ipc";
@@ -392,9 +392,16 @@ export function savedCustomAgents(context: ProviderClientContext): readonly Cust
   return context.customAgents?.() ?? [];
 }
 
-/** An empty folder for the session that lists an agent's models, apart from every workspace. */
+let customAgentDiscoveryRoot: string | undefined;
+
+/**
+ * An empty folder for the session that lists an agent's models, apart from every workspace. The
+ * root is new for each run and private (`mkdtemp`): a fixed path in a shared temp folder could be made
+ * first by another user, with an agent config file in it that the agent would then load.
+ */
 function customAgentDiscoveryFolder(agentId: string): string {
-  const folder = join(tmpdir(), "openbot-custom-agents", agentId);
+  customAgentDiscoveryRoot ??= mkdtempSync(join(tmpdir(), "openbot-custom-agents-"));
+  const folder = join(customAgentDiscoveryRoot, agentId);
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   return folder;
 }

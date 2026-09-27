@@ -11,12 +11,13 @@ export function isPeerHiddenProvider(value: unknown, protocol: number): boolean 
 }
 
 /**
- * The same test for an object `id`. `acp` counts only for a provider status row: a custom endpoint
- * saved as `acp` before the provider existed is a peer-visible endpoint, and it must stay one.
+ * The same test for an object `id`. `acp` counts only for a provider status row, which has a
+ * `state`: a custom endpoint saved as `acp` before the provider existed is a peer-visible endpoint,
+ * also in the `providers` list of a custom endpoint save or delete reply, and it must stay one.
  */
-function isPeerHiddenId(value: unknown, protocol: number, listKey: string): boolean {
-  if (value === "acp") return listKey === "providers";
-  return isPeerHiddenProvider(value, protocol);
+function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
+  if (value.id === "acp") return listKey === "providers" && typeof value.state === "string";
+  return isPeerHiddenProvider(value.id, protocol);
 }
 
 /** A protocol view never changes the host's stored agents or provider sessions. */
@@ -52,7 +53,7 @@ function project(
   if (value === null || typeof value !== "object") return value;
   if (
     isPeerHiddenProvider(value.provider, protocol) ||
-    isPeerHiddenId(value.id, protocol, listKey) ||
+    isPeerHiddenId(value, protocol, listKey) ||
     (typeof value.id === "string" && hiddenIds.has(value.id)) ||
     // Sender and reaction identities contain no provider-specific fields and remain valid for old peers.
     (value.kind !== "agent" && typeof value.agentId === "string" && hiddenIds.has(value.agentId))

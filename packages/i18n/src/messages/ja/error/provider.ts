@@ -11,6 +11,8 @@ export const messages = {
   "error.provider.endpointNotSaved": "このエンドポイントは保存されていません。一覧を更新して、もう一度お試しください。",
   "error.provider.endpointKeyForNewAddress":
     "アドレスのホストまたはポートが変わりました。保存済みの API キーとヘッダーが新しいアドレスに送られないように、もう一度入力してください。",
+  "error.provider.endpointSecretUnreadable":
+    "このコンピューターは保存済みの API キーとヘッダーを読み取れません。失われないように、API キーとヘッダーをもう一度入力してください。",
   "error.provider.discoveryTimeout": "{host} から時間内に応答がありませんでした。",
   "error.provider.discoveryUnreachable": "OpenBot は {host} に接続できませんでした。",
   "error.provider.discoveryRedirect":

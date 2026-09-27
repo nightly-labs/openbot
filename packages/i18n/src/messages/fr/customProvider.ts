@@ -96,7 +96,6 @@ export const messages = {
   "customProvider.preset.acpDescription": "Cursor, Copilot CLI, Qwen Code, Goose et d’autres.",
   "customProvider.probe.checking": "Vérification",
   "customProvider.probe.running": { one: "Actif · {count} modèle", other: "Actif · {count} modèles" },
-  "customProvider.probe.missing": "Introuvable",
 
   "customProvider.detected.title": "Trouvé sur cet ordinateur",
   "customProvider.detected.scanning": "Recherche de modèles et d’agents locaux.",

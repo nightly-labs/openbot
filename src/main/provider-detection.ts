@@ -13,7 +13,12 @@ import type {
   DiscoverModelsResult,
   ProviderDetectionSettings,
 } from "@openbot/contracts/ipc";
-import { customProviderEndpointKey, isNewCustomProviderId, sameCustomProviderOrigin } from "@openbot/contracts/ipc";
+import {
+  customProviderEndpointKey,
+  DEFAULT_MODEL_SERVERS,
+  isNewCustomProviderId,
+  sameCustomProviderOrigin,
+} from "@openbot/contracts/ipc";
 import { scanAcpAgents } from "../backend/acp-agent-scan";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 import type { ProbeModels } from "./model-server-probe";
@@ -28,12 +33,6 @@ interface KnownServer {
   name: string;
   baseUrl: string;
 }
-
-/** The default addresses of the servers that OpenBot knows. Product names are not translated. */
-export const DEFAULT_MODEL_SERVERS: readonly KnownServer[] = [
-  { id: "ollama", name: "Ollama", baseUrl: "http://127.0.0.1:11434/v1" },
-  { id: "lmstudio", name: "LM Studio", baseUrl: "http://127.0.0.1:1234/v1" },
-];
 
 export interface ProviderDetectionDependencies {
   settings: { get(): ProviderDetectionSettings };
@@ -80,7 +79,7 @@ function scanTargets(addresses: readonly string[]): KnownServer[] {
     keys.add(key);
     targets.push(server);
   };
-  for (const server of DEFAULT_MODEL_SERVERS) add(server);
+  for (const [id, server] of Object.entries(DEFAULT_MODEL_SERVERS)) add({ id, ...server });
   for (const address of addresses) {
     const baseUrl = address.trim();
     if (!baseUrl) continue;

@@ -1,4 +1,5 @@
 import type { CustomProviderRestart, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import { customAgentRestartKey } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 import { customProviderRestartMessage } from "./custom-provider-restart";
@@ -128,5 +129,18 @@ export function createCustomProviderHostState(options: CustomProviderHostOptions
     }
   }
 
-  return { state, openForm, closeForm, openList, closeList, submit, remove };
+  /** A save made in another form, such as a detected provider's: the same note as `submit` writes. */
+  function showSaved(kind: "models" | "agent", restart: CustomProviderRestart | undefined): void {
+    const { t } = currentText();
+    setState((current) => {
+      if (!restart) current.note = null;
+      else
+        current.note =
+          kind === "agent"
+            ? t(customAgentRestartKey("saved", restart))
+            : customProviderRestartMessage("Saved", restart, t);
+    });
+  }
+
+  return { state, openForm, closeForm, openList, closeList, submit, remove, showSaved };
 }

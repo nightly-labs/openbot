@@ -40,11 +40,7 @@ function ProbeBadge(badge: { probe: LocalServerProbe }) {
   return (
     <Show
       when={badge.probe.status === "running" ? badge.probe : undefined}
-      fallback={
-        <Badge variant={badge.probe.status === "checking" ? "secondary" : "outline"}>
-          {badge.probe.status === "checking" ? t("customProvider.probe.checking") : t("customProvider.probe.missing")}
-        </Badge>
-      }
+      fallback={<Badge variant="secondary">{t("customProvider.probe.checking")}</Badge>}
     >
       {(running) => (
         <Badge variant="success-light">{t("customProvider.probe.running", { count: running().models })}</Badge>

@@ -131,6 +131,7 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
                       api={api()}
                       takenProviderIds={customProviders().map((provider) => provider.id)}
                       takenAgentIds={props.takenAgentIds}
+                      onSaved={host.showSaved}
                     />
                   )}
                 </Show>
@@ -183,6 +184,7 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
                 takenProviderIds={customProviders().map((provider) => provider.id)}
                 takenAgentIds={props.takenAgentIds}
                 onClose={() => setPresetFor(null)}
+                onSaved={host.showSaved}
               />
             </>
           )}

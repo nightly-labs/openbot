@@ -95,7 +95,6 @@ export const messages = {
   "customProvider.preset.acpDescription": "Cursor、Copilot CLI、Qwen Code、Goose など。",
   "customProvider.probe.checking": "確認中",
   "customProvider.probe.running": { other: "実行中 · モデル {count} 個" },
-  "customProvider.probe.missing": "見つかりません",
 
   "customProvider.detected.title": "このコンピュータで見つかったもの",
   "customProvider.detected.scanning": "ローカルのモデルとエージェントを探しています。",

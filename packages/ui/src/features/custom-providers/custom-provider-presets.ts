@@ -1,26 +1,17 @@
 // The starting points of the add flow. A preset only fills the form: the user still sees and can
 // change every field before OpenBot saves anything.
 
+import { DEFAULT_MODEL_SERVERS, type DefaultModelServerId, detectedModelServerKey } from "@openbot/contracts/ipc";
 import type { DetectedProvider, ProviderDetection } from "./detected-providers";
 
 export type CustomProviderPresetId = "ollama" | "lmstudio" | "openai-compatible" | "acp";
 
 /** What the host found at a local server's default address. */
-export type LocalServerProbe = { status: "checking" } | { status: "running"; models: number } | { status: "missing" };
+export type LocalServerProbe = { status: "checking" } | { status: "running"; models: number };
 
-// The default addresses of the two local servers. They are the same in each language.
-const LOCAL_SERVERS = {
-  ollama: { providerId: "ollama", displayName: "Ollama", baseUrl: "http://127.0.0.1:11434/v1" },
-  lmstudio: { providerId: "lmstudio", displayName: "LM Studio", baseUrl: "http://127.0.0.1:1234/v1" },
-} as const;
-
-const LOCAL_SERVER_KEYS = {
-  ollama: "models:http://127.0.0.1:11434/v1",
-  lmstudio: "models:http://127.0.0.1:1234/v1",
-} as const;
-
-function foundServer(detection: ProviderDetection | undefined, id: keyof typeof LOCAL_SERVERS) {
-  return detection?.found.find((row) => row.kind === "models" && row.key === LOCAL_SERVER_KEYS[id]);
+function foundServer(detection: ProviderDetection | undefined, id: DefaultModelServerId) {
+  const key = detectedModelServerKey(DEFAULT_MODEL_SERVERS[id].baseUrl);
+  return detection?.found.find((row) => row.kind === "models" && row.key === key);
 }
 
 /**
@@ -29,8 +20,8 @@ function foundServer(detection: ProviderDetection | undefined, id: keyof typeof 
  */
 export function localServerProbes(
   detection: ProviderDetection | undefined,
-): Partial<Record<keyof typeof LOCAL_SERVERS, LocalServerProbe>> {
-  const probes: Partial<Record<keyof typeof LOCAL_SERVERS, LocalServerProbe>> = {};
+): Partial<Record<DefaultModelServerId, LocalServerProbe>> {
+  const probes: Partial<Record<DefaultModelServerId, LocalServerProbe>> = {};
   for (const id of ["ollama", "lmstudio"] as const) {
     const found = foundServer(detection, id);
     if (found?.kind === "models") probes[id] = { status: "running", models: found.models.length };
@@ -51,12 +42,12 @@ export function presetSetupProvider(
   if (preset === "openai-compatible") return { kind: "models", key: "", id: "", name: "", baseUrl: "", models: [] };
   const found = foundServer(detection, preset);
   if (found) return found;
-  const server = LOCAL_SERVERS[preset];
+  const server = DEFAULT_MODEL_SERVERS[preset];
   return {
     kind: "models",
-    key: LOCAL_SERVER_KEYS[preset],
-    id: server.providerId,
-    name: server.displayName,
+    key: detectedModelServerKey(server.baseUrl),
+    id: preset,
+    name: server.name,
     baseUrl: server.baseUrl,
     models: [],
   };

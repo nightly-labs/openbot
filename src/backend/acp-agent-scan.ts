@@ -6,7 +6,12 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ACP_AGENT_PRESETS, type AcpAgentPreset, type DetectedAcpAgent, isCustomAgentId } from "@openbot/contracts/ipc";
+import {
+  ACP_AGENT_PRESETS,
+  type AcpAgentPreset,
+  type DetectedAcpAgent,
+  isNewCustomAgentId,
+} from "@openbot/contracts/ipc";
 import { resolveAgentCommand } from "./acp-agent-command";
 import { withTimeout } from "./with-timeout";
 
@@ -36,7 +41,9 @@ export async function scanAcpAgents(options: ScanAcpAgentsOptions): Promise<Dete
     if (folder.startsWith("~/")) return [join(home, folder.slice(2))];
     return [folder];
   });
-  const names = (command: string) => (platform === "win32" ? [command, `${command}.exe`, `${command}.cmd`] : [command]);
+  // On Windows an npm folder holds an extensionless shell script next to the `.cmd` shim, and only
+  // the shim or an `.exe` can be started.
+  const names = (command: string) => (platform === "win32" ? [`${command}.exe`, `${command}.cmd`] : [command]);
   const find = async (preset: AcpAgentPreset): Promise<string | null> => {
     if (folders.length > 0) {
       for (const name of names(preset.command)) {
@@ -69,7 +76,7 @@ export async function scanAcpAgents(options: ScanAcpAgentsOptions): Promise<Dete
 function freeId(base: string, taken: ReadonlySet<string>): string | null {
   for (let suffix = 1; suffix <= 99; suffix += 1) {
     const id = suffix === 1 ? base : `${base}-${suffix}`;
-    if (!taken.has(id) && isCustomAgentId(id)) return id;
+    if (!taken.has(id) && isNewCustomAgentId(id)) return id;
   }
   return null;
 }

@@ -97,7 +97,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.preset.acpDescription": "Cursor, Copilot CLI, Qwen Code, Goose and others.",
   "customProvider.probe.checking": "Checking",
   "customProvider.probe.running": { one: "Running · {count} model", other: "Running · {count} models" },
-  "customProvider.probe.missing": "Not found",
 
   // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
   // at their default addresses and for known ACP agent commands on the PATH.

@@ -303,6 +303,23 @@ describe("CustomProviderStore", () => {
       });
     });
 
+    it("refuses to replace one part of a ciphertext this computer cannot read, and changes nothing", async () => {
+      await (await loaded()).save(input());
+      const before = await readFile(path, "utf8");
+      const foreign = await loaded(
+        testCipher({
+          decrypt: () => {
+            throw new Error("This ciphertext belongs to another keychain.");
+          },
+        }),
+      );
+
+      await expect(foreign.update({ ...edit, apiKey: "sk-new" })).rejects.toThrow(/cannot read/);
+      expect(await readFile(path, "utf8")).toBe(before);
+      await foreign.update({ ...edit, apiKey: "sk-new", headers: [] });
+      expect((await loaded()).configs()[0]).toMatchObject({ apiKey: "sk-new", headers: [] });
+    });
+
     it("refuses an endpoint that is not saved", async () => {
       const store = await loaded();
       await expect(store.update({ ...edit })).rejects.toThrow();

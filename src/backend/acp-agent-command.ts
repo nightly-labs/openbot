@@ -112,6 +112,8 @@ function searchPath(): Promise<readonly string[]> {
   if (loginPath && Date.now() - loginPath.readAt < LOGIN_PATH_TTL_MS) return loginPath.value;
   const value = runInLoginShell('printf %s "$PATH"')
     .catch(() => "")
+    // `printf` writes no newline, so the value is the last line, whatever the profile printed first.
+    .then((stdout) => stdout.split(/\r?\n/u).pop()?.trim() ?? "")
     .then((shellPath) => [
       ...new Set([...shellPath.split(delimiter), ...(process.env.PATH ?? "").split(delimiter)].filter(Boolean)),
     ]);

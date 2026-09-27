@@ -1,3 +1,4 @@
+import type { CustomProviderRestart } from "@openbot/contracts/ipc";
 import {
   Badge,
   Bot,
@@ -33,6 +34,8 @@ interface DetectedProvidersProps {
   takenProviderIds?: readonly string[];
   takenAgentIds?: readonly string[];
   disabled?: boolean;
+  /** After an Add or an Edit, so the host can say when the new models appear. */
+  onSaved?: (kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void;
 }
 
 export function DetectedProviders(props: DetectedProvidersProps) {
@@ -99,21 +102,22 @@ export function DetectedProviders(props: DetectedProvidersProps) {
         }
       >
         <ItemGroup surface="subtle">
-          <For each={props.detection.found}>
+          {/* Keyed by the detection key, so a store update keeps the row and the focus of its Edit button. */}
+          <For each={props.detection.found} keyed={(row) => row.key}>
             {(provider) => (
               <Item size="compact">
                 <ItemMedia class="detected-providers-icon" aria-hidden="true">
-                  <Show when={provider.kind === "agent"} fallback={<HardDrive />}>
+                  <Show when={provider().kind === "agent"} fallback={<HardDrive />}>
                     <Bot />
                   </Show>
                 </ItemMedia>
                 <ItemContent>
-                  <ItemTitle>{title(provider)}</ItemTitle>
-                  <ItemDescription>{detail(provider)}</ItemDescription>
+                  <ItemTitle>{title(provider())}</ItemTitle>
+                  <ItemDescription>{detail(provider())}</ItemDescription>
                 </ItemContent>
                 <ItemActions>
                   <Show
-                    when={!provider.added}
+                    when={!provider().added}
                     fallback={
                       <>
                         <Badge variant="success-light">{t("customProvider.detected.added")}</Badge>
@@ -121,9 +125,9 @@ export function DetectedProviders(props: DetectedProvidersProps) {
                           type="button"
                           variant="ghost"
                           size="xs"
-                          aria-label={t("customProvider.detected.editLabel", { name: provider.name })}
+                          aria-label={t("customProvider.detected.editLabel", { name: provider().name })}
                           disabled={props.disabled}
-                          onClick={() => setSetupFor(provider)}
+                          onClick={() => setSetupFor(provider())}
                         >
                           {t("customProvider.detected.edit")}
                         </Button>
@@ -134,18 +138,18 @@ export function DetectedProviders(props: DetectedProvidersProps) {
                       type="button"
                       variant="outline"
                       size="xs"
-                      aria-label={t("customProvider.detected.addLabel", { name: provider.name })}
+                      aria-label={t("customProvider.detected.addLabel", { name: provider().name })}
                       disabled={props.disabled}
-                      onClick={() => setSetupFor(provider)}
+                      onClick={() => setSetupFor(provider())}
                     >
                       {t("customProvider.detected.add")}
                     </Button>
                     <IconButton
-                      label={t("customProvider.detected.hide", { name: provider.name })}
+                      label={t("customProvider.detected.hide", { name: provider().name })}
                       variant="ghost"
                       size="icon-xs"
                       disabled={props.disabled}
-                      onClick={() => props.api.hide(provider)}
+                      onClick={() => props.api.hide(provider())}
                     >
                       <X />
                     </IconButton>
@@ -174,6 +178,7 @@ export function DetectedProviders(props: DetectedProvidersProps) {
         takenProviderIds={props.takenProviderIds}
         takenAgentIds={props.takenAgentIds}
         onClose={() => setSetupFor(null)}
+        onSaved={props.onSaved}
       />
     </section>
   );

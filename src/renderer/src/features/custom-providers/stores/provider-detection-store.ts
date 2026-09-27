@@ -6,6 +6,7 @@ import {
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   type DetectedAcpAgent,
   type DetectedModelServer,
+  detectedModelServerKey,
   type ProviderDetectionDesktopApi,
   type ProviderDetectionSettings,
   type SaveCustomProviderInput,
@@ -47,10 +48,6 @@ interface ProviderDetectionStoreOptions {
   agents: Pick<ReturnType<typeof createCustomAgentsStore>, "customAgents" | "saveCustomAgent" | "checkCustomAgent">;
 }
 
-function modelsKey(baseUrl: string): string {
-  return `models:${customProviderEndpointKey(baseUrl) ?? baseUrl}`;
-}
-
 function agentKey(command: string): string {
   return `agent:${command}`;
 }
@@ -68,7 +65,7 @@ function savedAgent(found: DetectedAcpAgent, saved: readonly CustomAgentSummary[
 }
 
 function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | undefined): DetectedProvider {
-  const base = { kind: "models" as const, key: modelsKey(server.baseUrl), models: server.models };
+  const base = { kind: "models" as const, key: detectedModelServerKey(server.baseUrl), models: server.models };
   if (!saved) return { ...base, id: server.id, name: server.name, baseUrl: server.baseUrl };
   return {
     ...base,
@@ -130,6 +127,10 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingRescan = false;
   let settingsLoad: Promise<ProviderDetectionSettings | null> | undefined;
+  /** The value main last accepted. Its lists are valid, also while the user types one that is not. */
+  let lastSaved: ProviderDetectionSettings | null = null;
+  /** One write at a time, so the reply to an older write cannot replace what a newer one saved. */
+  let writes: Promise<void> = Promise.resolve();
 
   function settings(): ProviderDetectionSettings {
     return state.settings ?? DEFAULT_PROVIDER_DETECTION_SETTINGS;
@@ -141,6 +142,7 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       if (!group) return null;
       try {
         const value = await group.getSettings();
+        lastSaved = value;
         setState((current) => {
           current.settings = value;
         });
@@ -206,28 +208,34 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     if (!state.scanned) void scan();
   }
 
-  async function writeSettings(next: ProviderDetectionSettings, rescan: boolean): Promise<void> {
+  /**
+   * Saves the value that `payload` gives when the write starts. `listsChanged` is false for Hide
+   * and Show hidden, whose reply must not replace lists that the user is still typing.
+   */
+  function writeSettings(payload: () => ProviderDetectionSettings, listsChanged: boolean, rescan: boolean): void {
     const group = options.api();
     if (!group) return;
     setState((draft) => {
-      draft.settings = next;
       draft.settingsError = null;
     });
-    try {
-      const saved = await group.setSettings(next);
-      // An edit made while this save ran is newer than its reply, and its own save follows.
-      if (saveTimer === undefined) {
+    writes = writes.then(async () => {
+      try {
+        const saved = await group.setSettings(payload());
+        lastSaved = saved;
+        // An edit made while this save ran is newer than its reply, and its own save follows.
+        if (listsChanged && saveTimer === undefined) {
+          setState((draft) => {
+            draft.settings = saved;
+          });
+        }
+        if (rescan) void scan();
+      } catch (error) {
         setState((draft) => {
-          draft.settings = saved;
+          const text = currentText();
+          draft.settingsError = text.errorMessage(error, text.t("customProvider.detection.saveFailed"));
         });
       }
-      if (rescan) await scan();
-    } catch (error) {
-      setState((draft) => {
-        const text = currentText();
-        draft.settingsError = text.errorMessage(error, text.t("customProvider.detection.saveFailed"));
-      });
-    }
+    });
   }
 
   /** The switch and the lists. A new place to look scans again once the change is saved. */
@@ -253,13 +261,19 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       const rescan = pendingRescan;
       pendingRescan = false;
       // The current value, not the one of the last key press: a Hide in the delay stays saved.
-      void writeSettings(settings(), rescan);
+      writeSettings(settings, true, rescan);
     }, SETTINGS_SAVE_DELAY_MS);
   }
 
-  /** Hide and Show hidden are one click each, so they save at once. */
+  /**
+   * Hide and Show hidden are one click each, so they save at once, with the lists main last
+   * accepted: a list the user is still typing may not be valid yet, and main refuses the whole write.
+   */
   function setHidden(hiddenIds: string[]): void {
-    void writeSettings({ ...settings(), hiddenIds }, false);
+    setState((draft) => {
+      draft.settings = { ...settings(), hiddenIds };
+    });
+    writeSettings(() => ({ ...(lastSaved ?? settings()), hiddenIds: settings().hiddenIds }), false, false);
   }
 
   function rows(): DetectedProvider[] {
@@ -291,11 +305,11 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     return options.endpoints.saveCustomProvider(value.value);
   }
 
-  const api: DetectedProviderApi = {
+  /** First run scans once, so it has no scan-again control. */
+  const firstRunApi: DetectedProviderApi = {
     save,
     hide: (provider) => setHidden([...new Set([...settings().hiddenIds, provider.key])]),
     showHidden: () => setHidden([]),
-    scan: () => void scan(),
     discoverModels: async (endpoint) => {
       const group = options.api();
       if (!group) throw new Error(currentText().t("customProvider.discovery.empty"));
@@ -310,10 +324,12 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     checkAgent: async (value, savedAgentId) =>
       checkResult(await options.agents.checkCustomAgent(customAgentCheckInput(value, savedAgentId))),
   };
+  const api: DetectedProviderApi = { ...firstRunApi, scan: () => void scan() };
 
   return {
     detection,
     api,
+    firstRunApi,
     scan,
     scanOnce,
     loadSettings,

@@ -64,6 +64,7 @@ const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.endpointNoSecureSto
 const DUPLICATE_MESSAGE = sourceText("error.provider.endpointDuplicate");
 const NOT_SAVED_MESSAGE = sourceText("error.provider.endpointNotSaved");
 const KEY_FOR_NEW_ADDRESS_MESSAGE = sourceText("error.provider.endpointKeyForNewAddress");
+const SECRET_UNREADABLE_MESSAGE = sourceText("error.provider.endpointSecretUnreadable");
 
 export class CustomProviderStore {
   readonly #path: string;
@@ -212,6 +213,10 @@ export class CustomProviderStore {
     if (!current) throw new Error(NOT_SAVED_MESSAGE);
     const keepKey = input.apiKey === undefined;
     const keepHeaders = input.headers === undefined;
+    // A ciphertext this computer cannot open cannot be merged: replacing one part would drop the other.
+    if (keepKey !== keepHeaders && current.stored.secret && !current.secret) {
+      throw new Error(SECRET_UNREADABLE_MESSAGE);
+    }
     const keptSecret =
       (keepKey && Boolean(current.secret?.apiKey)) ||
       (keepHeaders && (current.secret?.headers.length ?? 0) > 0) ||
