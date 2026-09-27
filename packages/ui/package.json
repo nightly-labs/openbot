@@ -27,6 +27,7 @@
     "./alert": "./src/alert.tsx",
     "./switch": "./src/switch.tsx",
     "./pointer-focus": "./src/pointer-focus.ts",
+    "./menu-motion": "./src/menu-motion.tsx",
     "./item": "./src/item.tsx",
     "./skill-gradient": "./src/skill-gradient.tsx",
     "./sliding-tabs": "./src/sliding-tabs.tsx",

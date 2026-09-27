@@ -1,6 +1,8 @@
+import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { App } from "../src/App";
+import { LEFT_PANEL_COLLAPSED_STORAGE_KEY, SERVER_VIEW_STORAGE_KEY } from "../src/layout-constants";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 import { OpenBotPlayground } from "../src/preview/OpenBotPlayground";
 import { STORY_AGENT_STATUS, STORY_AGENT_SUMMARIES, STORY_APP_INFO, STORY_SERVERS } from "./fixtures";
@@ -19,14 +21,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function SidebarStatePlayground(props: { compact: boolean; options?: MockOpenBotOptions }) {
-  const key = "openbot:left-panel-collapsed";
+/** Sets one stored layout value for the story, and puts the old value back when the story ends. */
+function useStoredLayoutValue(key: string, value: string): void {
   const previous = window.localStorage.getItem(key);
-  window.localStorage.setItem(key, props.compact ? "true" : "false");
+  window.localStorage.setItem(key, value);
   onCleanup(() => {
     if (previous === null) window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, previous);
   });
+}
+
+function SidebarStatePlayground(props: { compact: boolean; serverView?: ServerView; options?: MockOpenBotOptions }) {
+  useStoredLayoutValue(LEFT_PANEL_COLLAPSED_STORAGE_KEY, props.compact ? "true" : "false");
+  if (props.serverView) useStoredLayoutValue(SERVER_VIEW_STORAGE_KEY, props.serverView);
   return <OpenBotPlayground options={props.options} />;
 }
 
@@ -36,6 +43,11 @@ export const Playground: Story = {
 
 export const AccountMenu: Story = {
   render: () => <SidebarStatePlayground compact={false} />,
+};
+
+/** The servers in the menu on the server name, instead of the rail. Click the server name to open it. */
+export const ServerMenuView: Story = {
+  render: () => <SidebarStatePlayground compact={false} serverView="menu" />,
 };
 
 export const CompactAccountMenu: Story = {

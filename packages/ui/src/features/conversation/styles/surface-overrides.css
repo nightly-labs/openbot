@@ -51,9 +51,20 @@
   transform: scale(0.97);
 }
 
+/* A filled field with no border, in the menu item shape. */
 .provider-model-search {
+  height: var(--openbot-control-md);
   flex-shrink: 0;
-  margin-bottom: var(--openbot-space-2);
+  margin-bottom: var(--ui-menu-padding);
+  border-color: transparent;
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
+  padding-inline: var(--ui-menu-inset);
+  font-size: var(--openbot-text-md);
+}
+
+.provider-model-search:focus-visible {
+  border-color: var(--ui-menu-edge);
 }
 
 .provider-model-scroll {
@@ -63,7 +74,7 @@
 }
 
 .provider-model-group {
-  padding: var(--openbot-space-3) var(--openbot-space-2) var(--openbot-space-1);
+  padding: var(--openbot-space-2) var(--ui-menu-inset) var(--openbot-space-1);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-weight: 500;
