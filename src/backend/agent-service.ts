@@ -361,10 +361,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#attention.clearBrowserTakeovers(client);
           this.#attention.clearApprovals(client);
           this.#boot.orphanDeliveriesOfAgent(agentId);
+          // A teammate that asked this agent may hold the other answers until this work ends.
+          const requesters = this.#mailbox
+            .unresolvedDeliveries()
+            .flatMap(({ delivery }) =>
+              delivery.recipientAgentId === agentId && delivery.sender.kind === "agent"
+                ? [delivery.sender.agentId]
+                : [],
+            );
           void this.#boot
             .reconcileUnresolvedDeliveries()
             .catch((error) => this.#emitError("delivery_reconcile_failed", error, agentId))
-            .finally(() => this.#drain.scheduleDrain(agentId));
+            .finally(() => {
+              this.#drain.scheduleDrain(agentId);
+              for (const requester of new Set(requesters)) this.#drain.scheduleDrain(requester);
+            });
         },
         sharedRoot: () => this.#store.sharedRoot,
         isStopping: () => this.#stopping,

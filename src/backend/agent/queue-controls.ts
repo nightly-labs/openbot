@@ -66,9 +66,12 @@ export class QueueControls {
 
   async cancel(agentId: string, deliveryId: string): Promise<void> {
     if (this.#hooks.channelAssignment(deliveryId)) throw new Error(sourceText("error.backend.useChannelTaskControls"));
+    const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
     await this.#mailbox.cancel(agentId, deliveryId);
     this.#mailboxSync.emitQueue(agentId);
     this.#drain.scheduleDrain(agentId);
+    // The requester may hold the other answers until this request ends.
+    if (sender?.kind === "agent") this.#drain.scheduleDrain(sender.agentId);
   }
 
   async edit(agentId: string, input: QueueEditRequest): Promise<QueueSnapshot> {

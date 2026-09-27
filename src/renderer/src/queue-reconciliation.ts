@@ -31,7 +31,12 @@ export function activeQueueDeliveries(
 
 /** A queued answer from another agent. The waiting block shows it, so the queue panel does not. */
 export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
-  return delivery.status === "queued" && delivery.sender.kind === "agent" && delivery.replyToMessageId !== null;
+  return (
+    delivery.status === "queued" &&
+    delivery.sender.kind === "agent" &&
+    delivery.replyToMessageId !== null &&
+    delivery.expectsReply === false
+  );
 }
 
 /**

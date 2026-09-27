@@ -392,14 +392,16 @@ export class TurnLifecycle {
         await this.#mailbox.markTerminal(delivery.delivery.id, terminal);
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
-      const relayDelivery = deliveries.find((delivery) => delivery.delivery.sender.kind === "agent");
-      if (
-        !this.#conversation.isExecutionThread(snapshot.threadId) &&
-        terminal === "completed" &&
-        latestAssistant &&
-        relayDelivery
-      ) {
-        await this.#relayAgentResult(agentId, turnId, relayDelivery, latestAssistant.text);
+      // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
+      // that wants no answer, so only a teammate that asked for a result gets one.
+      if (!this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed" && latestAssistant) {
+        for (const delivery of deliveries)
+          await this.#relayAgentResult(agentId, turnId, delivery, latestAssistant.text);
+      }
+      // The requester holds the answers of the other teammates until each request has ended, so
+      // this end can release them, also when this turn failed and sends no result.
+      for (const { delivery } of deliveries) {
+        if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
       }
     }
     if (latestAssistant && !this.#conversation.isExecutionThread(snapshot.threadId)) {
@@ -428,11 +430,13 @@ export class TurnLifecycle {
   }
 
   async #associateStartedTurn(agentId: string, turnId: string, snapshot: ConversationSnapshot): Promise<void> {
-    const delivery = this.#mailbox.startingDeliveryForAgent(agentId);
-    if (!delivery) return;
+    const deliveries = this.#mailbox.startingDeliveriesForAgent(agentId);
+    if (deliveries.length === 0) return;
     try {
-      await this.#mailbox.markRunning(delivery.delivery.id, turnId);
-      this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
+      for (const { delivery } of deliveries) {
+        await this.#mailbox.markRunning(delivery.id, turnId);
+        this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
+      }
       this.#mailboxSync.emitQueue(agentId);
     } catch (error) {
       this.#hooks.emitError("delivery_turn_association_failed", error, agentId);

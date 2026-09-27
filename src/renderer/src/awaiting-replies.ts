@@ -43,6 +43,7 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
   input.messages.forEach((message, index) => {
     const exchange = message.exchange;
     if (exchange?.direction !== "outgoing" || exchange.expectsReply === false) return;
+    const firstRow = rows.length;
     for (const delivery of exchange.deliveries) {
       const reply = replies.find(
         (candidate) =>
@@ -59,6 +60,11 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
       const state = deliveryState(delivery.status);
       if (!state || (state === "failed" && index < lastUserIndex)) continue;
       rows.push(rowFor(delivery.recipientAgentId, state, id));
+    }
+    // The answers wait until every teammate of this request is done, so none is read next yet.
+    const exchangeRows = rows.slice(firstRow);
+    if (exchangeRows.some((row) => row.state === "asked" || row.state === "working")) {
+      for (const row of exchangeRows) delete row.detail;
     }
   });
   // An answer to a question on an earlier page, or to one sent from another conversation.

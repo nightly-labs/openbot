@@ -121,13 +121,20 @@ export class AgentInterruptTool {
     );
   }
 
-  /** `listQueue` leaves channel work out, and channel work is not the caller's to cancel. */
+  /**
+   * `listQueue` leaves channel work out, and channel work is not the caller's to cancel. An answer
+   * (linked, and expecting no reply) is not work that the caller gave, and the target may hold it
+   * until its other teammates answer. A linked follow-up request is work, so it is cancelled.
+   */
   #cancelQueuedFrom(agentId: string, callerAgentId: string): number {
     const deliveryIds = this.#mailbox
       .listQueue(agentId)
       .deliveries.filter(
         (delivery) =>
-          delivery.status === "queued" && delivery.sender.kind === "agent" && delivery.sender.agentId === callerAgentId,
+          delivery.status === "queued" &&
+          delivery.sender.kind === "agent" &&
+          delivery.sender.agentId === callerAgentId &&
+          !(delivery.replyToMessageId && delivery.expectsReply === false),
       )
       .map((delivery) => delivery.id);
     try {
