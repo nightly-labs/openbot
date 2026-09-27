@@ -31,7 +31,12 @@ import {
   type RuntimeSpec,
   type RuntimeTarget,
 } from "./provider-runtime-descriptors";
-import { type BlockedVersions, fetchBlockedVersions, latestRelease } from "./provider-runtime-releases";
+import {
+  type BlockedVersions,
+  fetchBlockedVersions,
+  latestRelease,
+  readLimitedBody,
+} from "./provider-runtime-releases";
 
 const execFileAsync = promisify(execFile);
 const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
@@ -42,7 +47,6 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
-const MAX_METADATA_BYTES = 4 * 1024 * 1024;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -778,7 +782,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   async #downloadSmallFile(url: string, expectedSha256: string | null): Promise<Uint8Array> {
     const response = await this.#fetch(url, { headers: { "User-Agent": "OpenBot-runtime-installer" } });
     if (!response.ok) throw new Error(sourceText("error.provider.metadataHttp", { status: response.status }));
-    const value = await readSmallResponse(response);
+    const value = await readLimitedBody(response, sourceText("error.provider.metadataTooLarge"));
+    if (!value) throw new Error(sourceText("error.provider.metadataNoData"));
     if (expectedSha256 !== null && createHash("sha256").update(value).digest("hex") !== expectedSha256) {
       throw new Error(sourceText("error.provider.metadataIntegrity"));
     }
@@ -1148,32 +1153,6 @@ function isValidPartialResponse(
   const end = Number(range[2]);
   const total = Number(range[3]);
   return start === offset && end >= start && end < total && total === expectedBytes;
-}
-
-async function readSmallResponse(response: Response): Promise<Uint8Array> {
-  if (!response.body) throw new Error(sourceText("error.provider.metadataNoData"));
-  const chunks: Uint8Array[] = [];
-  const reader = response.body.getReader();
-  let size = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      size += chunk.value.byteLength;
-      if (size > MAX_METADATA_BYTES) throw new Error(sourceText("error.provider.metadataTooLarge"));
-      chunks.push(chunk.value);
-    }
-  } catch (error) {
-    await reader.cancel().catch(() => undefined);
-    throw error;
-  }
-  const value = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    value.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return value;
 }
 
 async function fileSize(path: string): Promise<number> {

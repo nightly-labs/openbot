@@ -257,11 +257,40 @@ async function request(fetch: Fetch, url: string, headers: Record<string, string
 }
 
 async function readText(response: Response): Promise<string> {
+  const value = await readLimitedBody(response, sourceText("error.provider.releaseMetadataTooLarge"));
+  return value ? new TextDecoder().decode(value) : "";
+}
+
+/**
+ * Reads a small metadata body, and stops at the first byte past `MAX_METADATA_BYTES`: a server that
+ * sends no `content-length` cannot make OpenBot buffer an unbounded body. `null` for no body.
+ */
+export async function readLimitedBody(response: Response, tooLargeMessage: string): Promise<Uint8Array | null> {
   if (Number(response.headers.get("content-length") ?? 0) > MAX_METADATA_BYTES) {
     await response.body?.cancel().catch(() => undefined);
-    throw new Error(sourceText("error.provider.releaseMetadataTooLarge"));
+    throw new Error(tooLargeMessage);
   }
-  const text = await response.text();
-  if (text.length > MAX_METADATA_BYTES) throw new Error(sourceText("error.provider.releaseMetadataTooLarge"));
-  return text;
+  if (!response.body) return null;
+  const chunks: Uint8Array[] = [];
+  const reader = response.body.getReader();
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > MAX_METADATA_BYTES) throw new Error(tooLargeMessage);
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+  const value = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    value.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return value;
 }
