@@ -284,7 +284,7 @@ export const STORY_ATTACHMENTS: AttachmentSummary[] = [
 ];
 
 /** The plan Chief kept while it wrote the launch plan. */
-export const STORY_PLAN: ConversationPlan = {
+const STORY_PLAN: ConversationPlan = {
   explanation: null,
   steps: [
     { id: "0", text: "Read the latest release notes", status: "completed" },

@@ -22,7 +22,6 @@ export const messages = {
   "chat.taskList.state.pending": "Pas commencée",
   "chat.taskList.state.active": "En cours",
   "chat.taskList.state.done": "Terminée",
-  "chat.taskList.state.failed": "Échec",
   "chat.taskList.stopped": "Arrêtée",
   "chat.awaiting.title": "En attente de réponses",
   "chat.awaiting.subtasks": "En attente des sous-tâches",

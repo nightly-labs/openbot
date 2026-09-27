@@ -22,7 +22,6 @@ export const messages = {
   "chat.taskList.state.pending": "未着手",
   "chat.taskList.state.active": "進行中",
   "chat.taskList.state.done": "完了",
-  "chat.taskList.state.failed": "失敗",
   "chat.taskList.stopped": "停止",
   "chat.awaiting.title": "返信を待っています",
   "chat.awaiting.subtasks": "サブタスクを待っています",

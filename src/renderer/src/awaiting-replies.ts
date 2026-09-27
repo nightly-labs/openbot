@@ -92,6 +92,7 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
     const parent = task.parentTaskId ? waiting.get(task.parentTaskId) : undefined;
     if (!parent) return [];
     const state = channelTaskState(task.state);
+    if (!state) return [];
     return [
       {
         id: task.id,
@@ -107,7 +108,9 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
   });
 }
 
-function channelTaskState(state: ChannelTask["state"]): AwaitingReplyState {
+function channelTaskState(state: ChannelTask["state"]): AwaitingReplyState | null {
+  // A paused sub-task shows in the stopped tasks with Resume. It did not fail.
+  if (state === "paused") return null;
   if (state === "queued") return "asked";
   if (state === "running" || state === "waiting") return "working";
   if (state === "completed") return "replied";

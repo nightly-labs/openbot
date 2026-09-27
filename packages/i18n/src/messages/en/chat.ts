@@ -21,7 +21,6 @@ export const messages = defineMessages("chat", {
   "chat.taskList.state.pending": "Not started",
   "chat.taskList.state.active": "In progress",
   "chat.taskList.state.done": "Done",
-  "chat.taskList.state.failed": "Failed",
   "chat.taskList.stopped": "Stopped",
   "chat.awaiting.title": "Waiting for replies",
   "chat.awaiting.subtasks": "Waiting for sub-tasks",

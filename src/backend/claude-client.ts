@@ -24,6 +24,7 @@ import {
   newClaudePlanState,
   PLAN_UPDATED_METHOD,
   type PlanUpdateStep,
+  startClaudePlanTurn,
 } from "./agent/plan-updates";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
@@ -644,6 +645,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       toolCalls: new Map<string, string>(),
     };
     runtime.activeTurn = activeTurn;
+    startClaudePlanTurn(runtime.plan);
     // Only now: a model or effort change that fails above leaves the idle timer armed, so the
     // pool can still release the thread.
     this.#threads.holdForTurn(runtime);

@@ -42,7 +42,7 @@ export function planFromNotification(params: unknown): ConversationPlan | null {
 }
 
 /** Codex writes `inProgress`; Claude and ACP write `in_progress`. Anything else is not started. */
-export function planStepStatus(value: unknown): ConversationPlanStepStatus {
+function planStepStatus(value: unknown): ConversationPlanStepStatus {
   if (value === "completed") return "completed";
   if (value === "inProgress" || value === "in_progress") return "inProgress";
   return "pending";
@@ -69,6 +69,11 @@ export interface ClaudePlanState {
 
 export function newClaudePlanState(): ClaudePlanState {
   return { steps: new Map(), creates: new Set() };
+}
+
+/** A new turn shows only the tasks that are still open. The finished ones belong to earlier turns. */
+export function startClaudePlanTurn(state: ClaudePlanState): void {
+  for (const [id, step] of state.steps) if (step.status === "completed") state.steps.delete(id);
 }
 
 /**
@@ -107,7 +112,9 @@ export function foldClaudePlanCall(
   }
   if (call.name === "TaskUpdate") {
     if (!isString(input.taskId)) return null;
-    const current = state.steps.get(input.taskId);
+    // A task from before a runtime release is unknown here. With its subject, it can show again.
+    const current =
+      state.steps.get(input.taskId) ?? (isString(input.subject) ? { step: input.subject, status: "pending" } : null);
     if (!current) return null;
     if (input.status === "deleted") {
       state.steps.delete(input.taskId);
