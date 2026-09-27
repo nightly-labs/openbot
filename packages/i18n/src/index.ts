@@ -1,5 +1,4 @@
-import type { AppLanguage } from "@openbot/contracts/app-language";
-import { resolveLocale, type TranslatedLocale } from "./locale";
+import type { TranslatedLocale } from "./locale";
 import { createTranslate, type MessageParams, type Translate } from "./message";
 import { type AppMessages, en } from "./messages/en/index";
 import { fr } from "./messages/fr/index";
@@ -47,9 +46,4 @@ export function translateFor(locale: TranslatedLocale): AppTranslate {
   const translate = createTranslate({ source: en, translation: catalogs[locale], locale, sourceLocale: "en" });
   translators.set(locale, translate);
   return translate;
-}
-
-/** The translator for a preference, in one step, for a caller that holds no resolved locale. */
-export function translateForLanguage(language: AppLanguage, systemLocale: string): AppTranslate {
-  return translateFor(resolveLocale(language, systemLocale));
 }

@@ -22,10 +22,6 @@ export interface MarkdownFilePreviewProps {
 /** The text limit of the callers that set `truncated`. */
 const TRUNCATED_AFTER = 1_000_000;
 
-export function isMarkdownFileName(name: string): boolean {
-  return /\.(?:md|markdown)$/iu.test(name);
-}
-
 export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
   const { t, format } = useText();
   const contentReady = () => props.loading !== true && !props.error;

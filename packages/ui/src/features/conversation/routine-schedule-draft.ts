@@ -374,10 +374,6 @@ export function routineMonthName(month: number, text: RoutineText = currentText(
   return text.format.date(monthDate(month), { month: "long" });
 }
 
-export function routineMonthShort(month: number, text: RoutineText = currentText()): string {
-  return text.format.date(monthDate(month), { month: "short" });
-}
-
 const HOURLY_DAYS_SUMMARY = {
   everyDay: "routine.draftSummary.hourlyEveryDay",
   weekdays: "routine.draftSummary.hourlyWeekdays",

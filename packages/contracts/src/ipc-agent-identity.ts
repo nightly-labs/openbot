@@ -37,10 +37,6 @@ export function defaultProviderModel(provider: AgentProviderId): AgentModelId {
   return agentProviderDescriptor(provider).defaultModel;
 }
 
-export function isClaudeModel(model: AgentModelId): boolean {
-  return model.startsWith("claude-");
-}
-
 /**
  * `codex` is the historical answer for a model no prefix claims, and it has to stay that way: an
  * import that never named a provider already landed there, and moving it would move those agents.
