@@ -286,7 +286,7 @@ function PlanCard(props: { plan: OpenBotPlan; index: number }) {
 }
 
 /** A value in the table. The better one says so in words, for a reader who does not see the mark. */
-function ValueCell(props: { side: ComparisonSide; better?: ComparisonSide; text: string }) {
+function ValueCell(props: { side: ComparisonSide; better: ComparisonSide | undefined; text: string }) {
   const isBetter = () => props.better === props.side;
   return (
     <td data-side={props.side} data-better={isBetter() ? "true" : undefined}>
@@ -362,7 +362,7 @@ function ChoiceCard(props: SideProps & { points: readonly string[]; recommended?
   );
 }
 
-function SideCard(props: SideProps & { text: string; better?: ComparisonSide }) {
+function SideCard(props: SideProps & { text: string; better: ComparisonSide | undefined }) {
   const isBetter = () => props.better === props.side;
   return (
     <div class="compare-card" data-side={props.side} data-better={isBetter() ? "true" : undefined}>

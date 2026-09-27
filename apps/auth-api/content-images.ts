@@ -55,7 +55,7 @@ export interface ContentImageJob {
   /** Draw the title into the image. False for the card, which has live text over it. */
   withTitle: boolean;
   /** The two marks side by side, over the title. Only on the social card of a comparison. */
-  lockup?: ContentImageLockup;
+  lockup?: ContentImageLockup | undefined;
 }
 
 export interface ContentImageLockup {
