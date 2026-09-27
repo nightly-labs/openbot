@@ -52,7 +52,8 @@
 .provider-model-trigger {
   display: flex;
   width: max-content;
-  max-width: 190px;
+  /* Room for the effort after the model name. The model name shortens first. */
+  max-width: 240px;
   height: 28px;
   align-items: center;
   gap: 6px;
@@ -99,13 +100,88 @@
 }
 
 .provider-model-trigger-name {
+  flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--openbot-text-md);
   font-weight: 470;
   line-height: 18px;
+}
+
+.provider-model-trigger-effort {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.provider-model-trigger-effort::before {
+  margin-right: var(--openbot-space-1-5);
+  content: "·";
+}
+
+/* SwapLabel: the old text sits on top of the new text while both animate. */
+.ui-swap {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ui-swap > span,
+.ui-swap-digits {
+  display: inline-block;
+}
+
+.ui-swap > .ui-swap-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* The trigger swap is mostly a blur. The box does not clip it: a clip cuts the blur and the old
+ * text with a hard edge while the box eases to the new width. The name clips itself instead. */
+.provider-model-trigger-value .ui-swap {
+  overflow: visible;
+}
+
+/* A name without SwapLabel, such as a static copy of the trigger, clips itself. */
+.provider-model-trigger-name:not(.ui-swap) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-model-trigger-name > span:not(.ui-swap-leaving) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-model-trigger-name > .ui-swap-leaving {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A newly chosen provider's mark springs in. */
+.provider-model-trigger-mark {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.provider-model-trigger-mark[data-entering] {
+  animation: provider-model-mark-in 420ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+
+@keyframes provider-model-mark-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+    filter: blur(2px);
+  }
 }
 
 .provider-model-picker-field {
@@ -237,6 +313,7 @@
 }
 
 .provider-model-rail-button {
+  position: relative;
   display: grid;
   width: 36px;
   height: 36px;
@@ -264,6 +341,37 @@
 .provider-model-rail-button-selected .provider-model-mark {
   fill: var(--openbot-text-primary);
   opacity: 1;
+}
+
+/* A provider that cannot run: a dim mark and a dot. The dot uses the warning color when the user can
+ * fix it here (sign in, update), and the muted text color otherwise. The tooltip names the state. */
+.provider-model-rail-button-unavailable .provider-model-mark {
+  opacity: 0.28;
+}
+
+.provider-model-rail-button-unavailable:is(:hover, .provider-model-rail-button-selected) .provider-model-mark {
+  opacity: 0.6;
+}
+
+.provider-model-rail-button:is(
+  [data-state="not-installed"],
+  [data-state="sign-in-required"],
+  [data-state="outdated"],
+  [data-state="error"]
+)::after {
+  position: absolute;
+  top: var(--openbot-space-1-5);
+  right: var(--openbot-space-1-5);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-muted);
+  box-shadow: 0 0 0 2px var(--openbot-bg-sidebar);
+  content: "";
+}
+
+.provider-model-rail-button:is([data-state="sign-in-required"], [data-state="outdated"])::after {
+  background: var(--openbot-warning);
 }
 
 .provider-model-panel {
@@ -344,9 +452,11 @@
 .provider-model-effort {
   flex-shrink: 0;
   display: flex;
+  /* The effort segments go to a line of their own when they do not fit beside the label. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--openbot-space-1) 12px;
   margin: 9px 4px 0;
   border-top: 1px solid var(--openbot-border);
   padding-top: 10px;
@@ -355,8 +465,100 @@
   line-height: 17px;
 }
 
+/* Each row is as high as the effort control, so the switch and the segments have room. */
+.provider-model-effort > :first-child {
+  display: flex;
+  min-height: var(--openbot-control-md);
+  align-items: center;
+}
+
 .provider-model-effort-select {
   width: 128px;
+}
+
+/* Effort as segments, in the SlidingTabs look and timing. */
+.provider-model-effort-segments {
+  --provider-model-effort-duration: 250ms;
+  --provider-model-effort-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  display: flex;
+  /* On a line of their own, the segments can shrink. A long label then ends in an ellipsis. */
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: var(--openbot-space-0-5);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-tabs-bar-bg);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  padding: var(--openbot-space-0-5);
+}
+
+.provider-model-effort-segment {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.provider-model-effort-segment-control {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: var(--openbot-control-sm);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--openbot-radius-sm);
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--provider-model-effort-duration) var(--provider-model-effort-ease);
+}
+
+.provider-model-effort-segment-control label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: inherit;
+}
+
+.provider-model-effort-segment-control:hover:not([data-disabled]),
+.provider-model-effort-segment-control[data-checked] {
+  color: var(--openbot-text-primary);
+}
+
+.provider-model-effort-segment:has(:focus-visible) .provider-model-effort-segment-control {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+.provider-model-effort-segment-control[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The chosen segment's background. EffortSegments places it, and it slides to a new choice. */
+.provider-model-effort-pill {
+  position: absolute;
+  top: var(--openbot-space-0-5);
+  left: 0;
+  z-index: 0;
+  width: 0;
+  height: var(--openbot-control-sm);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-tabs-pill-bg);
+  pointer-events: none;
+  transition:
+    transform var(--provider-model-effort-duration) var(--provider-model-effort-ease),
+    width var(--provider-model-effort-duration) var(--provider-model-effort-ease);
+}
+
+.provider-model-effort-pill[data-initializing] {
+  transition: none;
+}
+
+.provider-model-effort-segments:has([data-disabled]) .provider-model-effort-pill {
+  opacity: 0.5;
 }
 
 .provider-model-effort-select .ui-select-trigger {
@@ -444,14 +646,25 @@
   .provider-model-trigger {
     max-width: 148px;
   }
+
+  /* A narrow header keeps the model name; the label and the title still name the effort. */
+  .provider-model-trigger-effort {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .provider-model-chevron,
   .provider-model-trigger,
   .provider-model-rail-button,
-  .provider-model-option {
+  .provider-model-option,
+  .provider-model-effort-segment-control,
+  .provider-model-effort-pill {
     transition: none;
+  }
+
+  .provider-model-trigger-mark[data-entering] {
+    animation: none;
   }
 }
 

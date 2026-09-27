@@ -45,6 +45,7 @@
     "./bloub-avatar": "./src/bloub-avatar.tsx",
     "./components/ProviderModelPicker": "./src/components/ProviderModelPicker.tsx",
     "./components/StandingApprovalConfirmation": "./src/components/StandingApprovalConfirmation.tsx",
+    "./components/SwapLabel": "./src/components/SwapLabel.tsx",
     "./components/TypingDots": "./src/components/TypingDots.tsx",
     "./components/createBoundedDragPreview": "./src/components/createBoundedDragPreview.ts",
     "./components/createScrollFades": "./src/components/createScrollFades.ts",

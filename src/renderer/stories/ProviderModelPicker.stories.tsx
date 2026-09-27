@@ -25,6 +25,23 @@ export const Pill: Story = {
   args: { reasoningEffort: "medium", onReasoningEffortChange: fn() },
 };
 
+/** A Claude model with every effort level, and the auto-approve switch. */
+export const AllEffortLevels: Story = {
+  args: {
+    provider: "claude",
+    value: "claude-opus-5-5",
+    modelOptions: STORY_MODELS.map((model) =>
+      model.id === "claude-opus-5-5"
+        ? { ...model, supportedReasoningEfforts: ["low", "medium", "high", "xhigh", "max"] }
+        : model,
+    ),
+    reasoningEffort: "high",
+    onReasoningEffortChange: fn(),
+    agentName: "Researcher",
+    onAutoApproveChange: fn(),
+  },
+};
+
 export const Field: Story = {
   args: { variant: "field", label: "Model" },
 };

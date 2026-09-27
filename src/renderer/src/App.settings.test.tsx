@@ -79,7 +79,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.getApprovalAutomation).mockResolvedValue(preference);
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const toggle = await screen.findByRole("switch", { name: "Auto approve this agent's actions" });
     if (enabled) expect(toggle).toBeChecked();
     else expect(toggle).not.toBeChecked();
@@ -96,7 +96,7 @@ describe("OpenBot connected desktop shell", () => {
     vi.mocked(window.openbot.setApprovalAutomation).mockRejectedValueOnce(new Error("Write failed"));
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const toggle = await screen.findByRole("switch", { name: "Auto approve this agent's actions" });
     expect(toggle).toBeChecked();
     await fireEvent.click(toggle);
@@ -647,7 +647,7 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
+    const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" });
     await fireEvent.click(trigger);
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     expect(within(picker).getByText("0.144.1 (Codex CLI)")).toBeInTheDocument();
@@ -668,7 +668,7 @@ describe("OpenBot connected desktop shell", () => {
     );
     expect(screen.getByRole("dialog", { name: "Choose agent model" })).toBeInTheDocument();
     const claudeTrigger = await screen.findByRole("button", {
-      name: "Agent model: Claude Opus 5",
+      name: "Agent model: Claude Opus 5 · Medium",
     });
     expect(claudeTrigger).toBeEnabled();
   });
@@ -693,16 +693,15 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "High" }));
+    const effort = () => within(within(picker).getByRole("radiogroup", { name: "Agent reasoning effort" }));
+    await fireEvent.click(effort().getByRole("radio", { name: "High" }));
 
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledTimes(1);
-    expect(effort).toHaveTextContent("High");
+    expect(effort().getByRole("radio", { name: "High" })).toBeChecked();
     resolveModelUpdate({
       ...chief,
       provider: "claude",
@@ -733,8 +732,8 @@ describe("OpenBot connected desktop shell", () => {
       reasoningEffort: "high",
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.getByRole("button", { name: "Agent model: Claude Opus 5" })).toBeEnabled();
-    expect(effort).toHaveTextContent("High");
+    expect(screen.getByRole("button", { name: "Agent model: Claude Opus 5 · High" })).toBeEnabled();
+    expect(effort().getByRole("radio", { name: "High" })).toBeChecked();
   });
 
   it("does not send a queued settings save to the server the user switched to", async () => {
@@ -755,7 +754,7 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("tab", { name: /^Claude:/ }));
     await fireEvent.click(within(picker).getByRole("option", { name: "Claude Opus 5" }));
@@ -792,34 +791,33 @@ describe("OpenBot connected desktop shell", () => {
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const picker = screen.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(picker).getByRole("option", { name: "GPT-5.6 Sol" }));
-    const effort = within(picker).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-    await fireEvent.click(screen.getByRole("option", { name: "Extra high" }));
+    const effort = () => within(within(picker).getByRole("radiogroup", { name: "Agent reasoning effort" }));
+    await fireEvent.click(effort().getByRole("radio", { name: "Extra high" }));
 
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledTimes(1);
     rejectModelUpdate(new Error("Model failed"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not change effort. Try again.");
     expect(window.openbot.agent.updateAgent).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" })).toBeEnabled();
-    expect(effort).toHaveTextContent("Medium");
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" })).toBeEnabled();
+    expect(effort().getByRole("radio", { name: "Medium" })).toBeChecked();
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
   });
 
   it("rolls back a failed header model change and reports the error", async () => {
     vi.mocked(window.openbot.agent.updateAgent).mockRejectedValueOnce(new Error("Provider failed"));
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" });
+    await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     await fireEvent.click(screen.getByRole("option", { name: "GPT-5.6 Sol" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not change model. Try again.");
-    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" })).toBeEnabled();
     expect(
       screen.queryByRole("radiogroup", { name: "What do you want me helping with most?" }),
     ).not.toBeInTheDocument();
@@ -834,7 +832,7 @@ describe("OpenBot connected desktop shell", () => {
     });
     render(() => <App />);
     await screen.findByRole("heading", { name: "Chief" });
-    const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna" });
+    const trigger = screen.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" });
     await waitFor(() => expect(trigger).toBeEnabled());
     await fireEvent.click(trigger);
     await screen.findByRole("option", { name: "GPT-5.6 Sol" });
@@ -847,7 +845,8 @@ describe("OpenBot connected desktop shell", () => {
     });
     await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeDisabled());
     expect(trigger).toBeEnabled();
-    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeDisabled();
+    const effort = () => within(screen.getByRole("radiogroup", { name: "Agent reasoning effort" }));
+    expect(effort().getByRole("radio", { name: "Medium" })).toBeDisabled();
     const approval = screen.getByRole("switch", { name: "Auto approve this agent's actions" });
     expect(approval).toBeChecked();
     await fireEvent.click(approval);
@@ -862,7 +861,7 @@ describe("OpenBot connected desktop shell", () => {
       status: "completed",
     });
     await waitFor(() => expect(screen.getByRole("option", { name: "GPT-5.6 Sol" })).toBeEnabled());
-    expect(screen.getByRole("button", { name: /Agent reasoning effort/ })).toBeEnabled();
+    expect(effort().getByRole("radio", { name: "Medium" })).toBeEnabled();
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_started", expect.anything());
     expect(trackAnalytics).not.toHaveBeenCalledWith("system_turn_completed", expect.anything());
   });

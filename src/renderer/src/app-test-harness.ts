@@ -338,7 +338,7 @@ export function testConversationPage(
 }
 
 export async function confirmOnboardingModel(): Promise<void> {
-  await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna" });
+  await screen.findByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" });
 }
 
 export function queuedDelivery(
