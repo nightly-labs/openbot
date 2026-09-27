@@ -3,6 +3,7 @@ import emojiRegex from "emoji-regex";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier, isRequestId } from "./ipc-bounded-values";
+import { type ConversationPlan, isConversationPlan } from "./ipc-conversation-plan";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -184,6 +185,8 @@ export interface ConversationMessage {
     scheduledFor: string;
   };
   questionPrompt?: ConversationQuestionPrompt;
+  /** Set on the one `plan` message of a turn. The text holds the same plan as a checklist. */
+  plan?: ConversationPlan;
 }
 
 export function isConversationMessage(value: unknown): value is ConversationMessage {
@@ -224,7 +227,8 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.name, INPUT_LIMITS.routineName) &&
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
-    (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt))
+    (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
+    (value.plan === undefined || isConversationPlan(value.plan))
   );
 }
 

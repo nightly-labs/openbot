@@ -13,6 +13,7 @@ import { channelRoutingConversationEvent, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@
 import type { AgentMessage, AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { currentText } from "@openbot/ui/text";
+import { messagePlan } from "../../app-message-projection";
 import { type DayMarkerOptions, dayMarkerLabel } from "../conversation/chat-day-markers";
 import { withinGroupingWindow } from "../conversation/chat-grouping";
 
@@ -49,12 +50,14 @@ function channelRoutingMarker(entry: ChannelMessage): ChatActionMarkerModel | nu
 function toAgentMessage(entry: ChannelMessage, own: boolean, options: DayMarkerOptions): AgentMessage {
   const message = entry.message;
   const actionMarker = channelRoutingMarker(entry);
+  const plan = actionMarker ? null : messagePlan(message);
   const time = { hour: "numeric", minute: "2-digit" } as const;
   const createdAt = new Date(message.createdAt);
   return {
     id: entry.id,
     author: own ? "you" : "agent",
     ...(actionMarker ? { kind: "action-marker" as const, actionMarker } : {}),
+    ...(plan ? { kind: "plan" as const, plan } : {}),
     body: message.text,
     // Intl throws on an invalid date, where `toLocaleTimeString` returns text.
     time:
@@ -160,8 +163,8 @@ export function firstUnreadChannelMessageId(entries: ChannelTimelineEntry[], unr
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
     if (!entry) continue;
-    // The count from the channel list leaves out activity rows, so the walk back leaves them out.
-    if (entry.author.kind === "you" || entry.message.actionMarker) continue;
+    // The count from the channel list leaves out activity rows and plans, so the walk back leaves them out.
+    if (entry.author.kind === "you" || entry.message.actionMarker || entry.message.kind === "plan") continue;
     remaining -= 1;
     if (remaining === 0) return entry.id;
   }

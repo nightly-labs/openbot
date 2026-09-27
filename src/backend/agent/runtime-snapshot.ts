@@ -8,6 +8,7 @@ import {
   type AgentPromptQuestion,
   type AgentRuntimeSnapshot,
   type AgentSummary,
+  CONVERSATION_PLAN_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -164,7 +165,8 @@ export function buildRuntimeSnapshot({
           (message.author === "assistant" || message.author === "agent") &&
           message.itemType !== "commentary" &&
           message.itemType !== "question_prompt" &&
-          message.itemType !== "agent_attachment",
+          message.itemType !== "agent_attachment" &&
+          message.itemType !== CONVERSATION_PLAN_ITEM_TYPE,
       );
     const persisted =
       !live || !liveLatest

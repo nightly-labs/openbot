@@ -1,0 +1,426 @@
+/* Task list: the chat block of a plan an agent works through. */
+
+.task-list {
+  --task-list-glyph: var(--openbot-icon-sm);
+  --task-list-ease: var(--openbot-ease-out);
+  /* The open is slower than the close: rows settle in one after another, and leave together. */
+  --task-list-open: 320ms;
+  --task-list-close: 200ms;
+  --task-list-close-ease: cubic-bezier(0.32, 0.08, 0.24, 1);
+  --task-list-blur: 4px;
+  --task-list-stagger: 28ms;
+
+  box-sizing: border-box;
+  width: min(100%, 448px);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+/* The ghost button is the whole header row, so it takes the card corners and the row height.
+ * An open list is not a pressed control: the transparent background overrides the expanded
+ * ghost fill, and the ghost hover rule still wins. */
+.task-list .task-list-header {
+  display: flex;
+  background: transparent;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-card);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  padding: var(--openbot-space-3);
+  text-align: left;
+}
+
+.task-list .task-list-header:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
+}
+
+.task-list-summary-glyph {
+  display: inline-flex;
+  width: var(--task-list-glyph);
+  height: var(--task-list-glyph);
+  flex: 0 0 auto;
+}
+
+.task-list-donut {
+  width: 100%;
+  height: 100%;
+}
+
+.task-list-donut circle {
+  stroke-width: 1.5;
+}
+
+.task-list-donut-track {
+  stroke: var(--openbot-border-strong);
+}
+
+.task-list-donut-value {
+  stroke: var(--openbot-text-primary);
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--openbot-duration-slow) var(--task-list-ease);
+}
+
+/* The title and the running task share one cell, and swap with a blur when the list closes. */
+.task-list-title {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.task-list-title-layer {
+  overflow: hidden;
+  min-width: 0;
+  grid-area: 1 / 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    opacity var(--task-list-open) var(--task-list-ease),
+    filter var(--task-list-open) var(--task-list-ease),
+    transform var(--task-list-open) var(--task-list-ease);
+}
+
+.task-list-title-name {
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.task-list-title-task {
+  font-weight: var(--openbot-weight-regular);
+}
+
+.task-list-title[data-showing="task"] .task-list-title-name,
+.task-list-title[data-showing="title"] .task-list-title-task {
+  filter: blur(var(--task-list-blur));
+  opacity: 0;
+}
+
+.task-list-title[data-showing="task"] .task-list-title-name {
+  transform: translateY(calc(-1 * var(--openbot-space-1)));
+}
+
+.task-list-title[data-showing="title"] .task-list-title-task {
+  transform: translateY(var(--openbot-space-1));
+}
+
+/* The next task enters from below while the list stays closed. */
+.task-list-title-task-text {
+  animation: task-list-title-in var(--task-list-open) var(--task-list-ease);
+}
+
+.task-list-count {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-md);
+}
+
+.task-list-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  transform: rotate(-90deg);
+  transition: transform var(--openbot-duration-normal) var(--task-list-ease);
+}
+
+.task-list[data-open] .task-list-chevron {
+  transform: rotate(0deg);
+}
+
+/* The panel animates its row from 0fr to 1fr, so the chat below moves with it. */
+.task-list-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--task-list-close) var(--task-list-close-ease);
+}
+
+.task-list[data-open] .task-list-panel {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--task-list-open) var(--task-list-ease);
+}
+
+.task-list-items {
+  display: grid;
+  overflow: hidden;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--openbot-space-3);
+  list-style: none;
+  transition: padding var(--task-list-close) var(--task-list-close-ease);
+}
+
+.task-list[data-open] .task-list-items {
+  padding-bottom: var(--openbot-space-3);
+  transition: padding var(--task-list-open) var(--task-list-ease);
+}
+
+/* A closing list blurs and lifts away as one; an opening list focuses in row by row. The delay
+ * stops growing after the eighth row, so a long plan does not wait for its last rows. */
+.task-list-item {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-0-5) 0;
+  filter: blur(var(--task-list-blur));
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--openbot-space-1))) scale(0.98);
+  transform-origin: left top;
+  transition:
+    opacity var(--task-list-close) var(--task-list-close-ease),
+    filter var(--task-list-close) var(--task-list-close-ease),
+    transform var(--task-list-close) var(--task-list-close-ease);
+}
+
+.task-list[data-open] .task-list-item {
+  filter: blur(0);
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--task-list-open) var(--task-list-ease),
+    filter var(--task-list-open) var(--task-list-ease),
+    transform var(--task-list-open) var(--task-list-ease);
+  transition-delay: calc(min(var(--task-list-index, 0), 8) * var(--task-list-stagger));
+}
+
+.task-list-item-mark {
+  display: inline-flex;
+  width: var(--task-list-glyph);
+  height: var(--openbot-leading-md);
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.task-list-item-label {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  transition: color var(--openbot-duration-normal) var(--task-list-ease);
+}
+
+.task-list-item[data-state="pending"] .task-list-item-label {
+  color: var(--openbot-text-muted);
+}
+
+.task-list-item[data-state="done"] .task-list-item-label {
+  color: var(--openbot-text-dim);
+}
+
+/* The strike line draws from the start of the text when the task is done. */
+.task-list-item-text {
+  position: relative;
+}
+
+.task-list-item-text::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--openbot-duration-slow) var(--task-list-ease);
+}
+
+.task-list-item[data-state="done"] .task-list-item-text::after {
+  transform: scaleX(1);
+}
+
+.task-list-item[data-state="active"] .task-list-item-text,
+.task-list-title[data-showing="task"] .task-list-title-task-text {
+  background: linear-gradient(
+    90deg,
+    var(--openbot-text-primary) 0%,
+    var(--openbot-text-primary) 35%,
+    var(--openbot-text-muted) 50%,
+    var(--openbot-text-primary) 65%,
+    var(--openbot-text-primary) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: task-list-shine 1.6s linear infinite;
+}
+
+.task-list-title[data-showing="task"] .task-list-title-task-text {
+  animation:
+    task-list-title-in var(--task-list-open) var(--task-list-ease),
+    task-list-shine 1.6s linear infinite;
+}
+
+/* The same roll as the update island: each settled value lifts in from below and sharpens. */
+.task-list-item-progress {
+  --digit-dur: var(--openbot-duration-overlay);
+  --digit-distance: var(--openbot-space-1);
+  --digit-blur: var(--openbot-space-0-5);
+  --digit-stagger: 40ms;
+
+  display: inline-flex;
+  min-width: 4ch;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--openbot-leading-md);
+  padding: 0 var(--openbot-space-1-5);
+}
+
+/* One glyph for all states. Each layer shows for its own state, so a change animates in place. */
+.task-list-mark {
+  width: var(--task-list-glyph);
+  height: var(--task-list-glyph);
+  overflow: visible;
+}
+
+.task-list-mark circle,
+.task-list-mark path {
+  transition:
+    opacity var(--openbot-duration-normal) var(--task-list-ease),
+    transform var(--openbot-duration-normal) var(--task-list-ease),
+    stroke-dashoffset var(--openbot-duration-slow) var(--task-list-ease);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.task-list-mark-pending {
+  opacity: 0;
+  stroke: var(--openbot-text-dim);
+  stroke-dasharray: 1.2 2;
+  stroke-width: 1.5;
+}
+
+.task-list-mark-track {
+  opacity: 0;
+  stroke: var(--openbot-border-strong);
+  stroke-width: 1.5;
+}
+
+.task-list-mark-arc {
+  opacity: 0;
+  stroke: var(--openbot-text-primary);
+  stroke-dasharray: 12 100;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.task-list-mark-fill {
+  fill: var(--openbot-text-dim);
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+.task-list-mark-check {
+  stroke: var(--openbot-bg-canvas);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+.task-list-mark-cross {
+  stroke: var(--openbot-bg-canvas);
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  stroke-linecap: round;
+  stroke-width: 1.75;
+}
+
+.task-list-mark[data-state="pending"] .task-list-mark-pending,
+.task-list-mark[data-state="active"] .task-list-mark-track,
+.task-list-mark[data-state="active"] .task-list-mark-arc,
+.task-list-mark[data-state="done"] .task-list-mark-fill,
+.task-list-mark[data-state="failed"] .task-list-mark-fill {
+  opacity: 1;
+}
+
+.task-list-mark[data-state="active"] .task-list-mark-arc {
+  animation: task-list-turn 0.9s linear infinite;
+}
+
+.task-list-mark[data-state="done"] .task-list-mark-fill,
+.task-list-mark[data-state="failed"] .task-list-mark-fill {
+  transform: scale(1);
+}
+
+.task-list-mark[data-state="failed"] .task-list-mark-fill {
+  fill: var(--openbot-danger);
+}
+
+/* The check and the cross draw after the disc has filled. */
+.task-list-mark[data-state="done"] .task-list-mark-check,
+.task-list-mark[data-state="failed"] .task-list-mark-cross {
+  stroke-dashoffset: 0;
+  transition-delay: var(--openbot-duration-fast);
+}
+
+@keyframes task-list-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes task-list-title-in {
+  from {
+    filter: blur(var(--task-list-blur));
+    opacity: 0;
+    transform: translateY(var(--openbot-space-1));
+  }
+}
+
+@keyframes task-list-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-list-donut-value,
+  .task-list-chevron,
+  .task-list-panel,
+  .task-list-items,
+  .task-list-item,
+  .task-list[data-open] .task-list-panel,
+  .task-list[data-open] .task-list-items,
+  .task-list[data-open] .task-list-item,
+  .task-list-item-label,
+  .task-list-title-layer,
+  .task-list-item-text::after,
+  .task-list-mark circle,
+  .task-list-mark path {
+    transition: none;
+  }
+
+  .task-list-mark[data-state="active"] .task-list-mark-arc,
+  .task-list-item[data-state="active"] .task-list-item-text,
+  .task-list-title-task-text,
+  .task-list-title[data-showing="task"] .task-list-title-task-text {
+    animation: none;
+  }
+
+  .task-list-item[data-state="active"] .task-list-item-text,
+  .task-list-title[data-showing="task"] .task-list-title-task-text {
+    background: none;
+    color: var(--openbot-text-primary);
+  }
+}

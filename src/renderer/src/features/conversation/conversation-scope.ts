@@ -229,7 +229,8 @@ export function createConversationViewScope(props: ConversationProps) {
     clearChatErrors,
   } = composer;
   const queue = createQueueStore({ props });
-  const { activeDeliveries, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } = queue;
+  const { activeDeliveries, awaitingReplies, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } =
+    queue;
   const activity = createActivityStore({
     props,
     activeDeliveries,
@@ -1091,6 +1092,7 @@ export function createConversationViewScope(props: ConversationProps) {
     downloadSidebarFile,
     revealSidebarFile,
     openWorkspaceFile,
+    awaitingReplies,
     presentedQueueDeliveries,
     previewAttachment,
     props,

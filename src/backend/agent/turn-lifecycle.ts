@@ -1,9 +1,12 @@
-import type {
-  AgentEvent,
-  AgentSummary,
-  BrowserControlState,
-  BrowserTab,
-  ConversationSnapshot,
+import {
+  type AgentEvent,
+  type AgentSummary,
+  type BrowserControlState,
+  type BrowserTab,
+  CONVERSATION_PLAN_ITEM_TYPE,
+  type ConversationPlan,
+  type ConversationSnapshot,
+  conversationPlanText,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import type { AgentClient } from "../agent-client";
@@ -27,6 +30,7 @@ import type { DeltaBuffer } from "./delta-buffer";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteImageGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
+import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
@@ -286,6 +290,17 @@ export class TurnLifecycle {
         });
         return;
       }
+      case PLAN_UPDATED_METHOD: {
+        if (!threadId || !agentId) return;
+        const turnId = getString(params, "turnId");
+        const plan = planFromNotification(params);
+        // A plan for a turn that is not running has no row to update, so it is dropped.
+        if (!turnId || !this.#runningTurns.has(turnId)) return;
+        if (plan) this.#applyPlan(agentId, threadId, turnId, plan);
+        // An empty list removes the turn's plan: the agent deleted its last task.
+        else if (isRecord(params) && Array.isArray(params.plan)) this.#clearPlan(agentId, threadId, turnId);
+        return;
+      }
       case "turn/completed": {
         if (!threadId || !agentId) return;
         const turn = getRecord(params, "turn");
@@ -368,6 +383,7 @@ export class TurnLifecycle {
           message.turnId === turnId &&
           message.itemType !== "commentary" &&
           message.itemType !== "question_prompt" &&
+          message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
           message.text.trim(),
       );
     if (deliveries.length > 0) {
@@ -479,6 +495,36 @@ export class TurnLifecycle {
     this.#conversation.emitConversation(snapshot);
   }
 
+  /**
+   * Shows a turn's plan as one message, which each update replaces. The first update places it in
+   * the transcript; the later ones keep that place, so the list does not move while it fills.
+   */
+  #applyPlan(agentId: string, threadId: string, turnId: string, plan: ConversationPlan): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    const id = `${turnId}:plan`;
+    let message = snapshot.messages.find((candidate) => candidate.id === id);
+    if (!message) {
+      message = newAssistantMessage(id, turnId);
+      snapshot.messages.push(message);
+    }
+    message.itemType = CONVERSATION_PLAN_ITEM_TYPE;
+    message.text = conversationPlanText(plan);
+    message.plan = plan;
+    message.status = "streaming";
+    this.#itemTurns.set(id, turnId);
+    this.#conversation.emitConversation(snapshot);
+  }
+
+  #clearPlan(agentId: string, threadId: string, turnId: string): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    const index = snapshot.messages.findIndex((candidate) => candidate.id === `${turnId}:plan`);
+    if (index < 0) return;
+    // The write rewrites the thread, which deletes the projection row of the removed message.
+    snapshot.messages.splice(index, 1);
+    this.#itemTurns.delete(`${turnId}:plan`);
+    this.#conversation.emitConversation(snapshot);
+  }
+
   #emitTurnProgress(agentId: string, threadId: string, turnId: string, text: string): void {
     this.#hooks.emit({
       type: "turn-progress",
@@ -508,7 +554,12 @@ function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string):
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
     const message = snapshot.messages[index];
     if (message?.author !== "assistant" || message.turnId !== turnId) continue;
-    if (message.itemType === "commentary" || message.itemType === "question_prompt") continue;
+    if (
+      message.itemType === "commentary" ||
+      message.itemType === "question_prompt" ||
+      message.itemType === CONVERSATION_PLAN_ITEM_TYPE
+    )
+      continue;
     if (message.attachments?.length || message.imageGeneration) continue;
     if (!message.text.trim() || /[\p{L}\p{N}]/u.test(message.text)) continue;
     snapshot.messages.splice(index, 1);

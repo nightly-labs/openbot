@@ -66,7 +66,7 @@ export function tallyNewMessages(
 /** Rows the reader would call a new message. */
 export function countableTimelineMessage(message: AgentMessage): boolean {
   if (message.author === "you") return false;
-  if (message.kind === "thinking") return false;
+  if (message.kind === "thinking" || message.kind === "plan") return false;
   // A routine notice or a lifecycle marker carries no message of its own.
   if (message.actionMarker && !message.exchange) return false;
   return true;

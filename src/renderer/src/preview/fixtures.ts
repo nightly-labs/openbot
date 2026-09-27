@@ -8,6 +8,7 @@ import type {
   BrowserControlState,
   BrowserTab,
   ConversationMessage,
+  ConversationPlan,
   ConversationSnapshot,
   DirectConversationSnapshot,
   DirectThreadSummary,
@@ -20,6 +21,7 @@ import type {
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillSummary,
+  QueueDelivery,
   RemoteDesktopSession,
   ServerSummary,
   SharedTable,
@@ -31,6 +33,7 @@ import type {
   TeamSessionSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { CONVERSATION_PLAN_ITEM_TYPE, conversationPlanText } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 import type { McpServerConfig } from "../features/servers/mcp-servers";
@@ -280,6 +283,17 @@ export const STORY_ATTACHMENTS: AttachmentSummary[] = [
   },
 ];
 
+/** The plan Chief kept while it wrote the launch plan. */
+const STORY_PLAN: ConversationPlan = {
+  explanation: null,
+  steps: [
+    { id: "0", text: "Read the latest release notes", status: "completed" },
+    { id: "1", text: "Group the changes by launch milestone", status: "completed" },
+    { id: "2", text: "Ask Research to check the sources", status: "completed" },
+    { id: "3", text: "Write the draft plan", status: "completed" },
+  ],
+};
+
 export const STORY_CONVERSATION_MESSAGES: ConversationMessage[] = [
   {
     id: "message-user-1",
@@ -287,6 +301,16 @@ export const STORY_CONVERSATION_MESSAGES: ConversationMessage[] = [
     source: "user",
     text: "Use @[Release notes](skill:skill-release-notes) to turn the latest notes into a short plan and tag @Research for the source check.",
     createdAt: "2026-08-19T09:42:00.000Z",
+    status: "completed",
+  },
+  {
+    id: "message-plan",
+    author: "assistant",
+    source: "assistant",
+    itemType: CONVERSATION_PLAN_ITEM_TYPE,
+    text: conversationPlanText(STORY_PLAN),
+    plan: STORY_PLAN,
+    createdAt: "2026-08-19T09:42:30.000Z",
     status: "completed",
   },
   {
@@ -339,6 +363,30 @@ export const STORY_CONVERSATION_MESSAGES: ConversationMessage[] = [
     status: "completed",
   },
 ];
+
+/**
+ * Research answered Chief's question while Chief was busy, so the answer waits in Chief's queue.
+ * The waiting block above the composer shows it, next to Sales, which still works.
+ */
+export const STORY_QUEUES: Record<string, QueueDelivery[]> = {
+  chief: [
+    {
+      id: "delivery-research-reply",
+      messageId: "message-research-reply",
+      recipientAgentId: "chief",
+      sender: { kind: "agent", agentId: "research" },
+      text: "All four sources check out. The pricing link now points to the new page.",
+      attachments: [],
+      replyToMessageId: "message-exchange",
+      status: "queued",
+      position: 1,
+      turnId: null,
+      error: null,
+      createdAt: "2026-08-19T09:46:00.000Z",
+      expectsReply: false,
+    },
+  ],
+};
 
 export const STORY_SNAPSHOTS: Record<string, ConversationSnapshot> = Object.fromEntries(
   STORY_AGENT_SUMMARIES.map((agent) => [

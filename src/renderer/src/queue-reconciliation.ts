@@ -29,6 +29,11 @@ export function activeQueueDeliveries(
   return matching.length > 0 ? matching : running;
 }
 
+/** A queued answer from another agent. The waiting block shows it, so the queue panel does not. */
+export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
+  return delivery.status === "queued" && delivery.sender.kind === "agent" && delivery.replyToMessageId !== null;
+}
+
 /**
  * What is still waiting, in the order it will run: by the position main
  * assigned, and by arrival for anything main has not positioned yet.
@@ -51,7 +56,8 @@ export function queuedDeliveriesInOrder(snapshot: QueueSnapshot | undefined): Qu
  * already seen land in the transcript, so showing it again would be a panel
  * that never goes away. Two more things drop out: a delivery already rendered
  * as a message, which the transcript is showing, and a queued delivery that
- * belongs to the running turn, which the activity line above is showing.
+ * belongs to the running turn, which the activity line above is showing. An answer from another
+ * agent goes too: the waiting block above the panel shows it with the question it answers.
  *
  * Two exceptions keep the panel open with nothing running. A held queue waits on
  * a channel turn on another thread, and a queue whose head is being edited on
@@ -69,7 +75,9 @@ export function presentQueueDeliveries(input: {
   if (!snapshot.hold && !editHold && activeQueueDeliveries(snapshot, input.activeTurnId).length === 0) return [];
   const queued = queuedDeliveriesInOrder(snapshot).filter(
     (delivery) =>
-      (!input.activeTurnId || delivery.turnId !== input.activeTurnId) && !input.renderedMessageIds.has(delivery.id),
+      (!input.activeTurnId || delivery.turnId !== input.activeTurnId) &&
+      !input.renderedMessageIds.has(delivery.id) &&
+      !isQueuedAgentReply(delivery),
   );
   const steering = snapshot.deliveries.filter(
     (delivery) =>

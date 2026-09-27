@@ -33,6 +33,7 @@ import {
   STORY_CONVERSATION_MESSAGES,
   STORY_MODELS,
   STORY_PRESENCE,
+  STORY_QUEUES,
   STORY_REMOTE_DESKTOP_SESSION,
   STORY_SERVERS,
 } from "./fixtures";
@@ -71,7 +72,8 @@ const messages: RendererAgentMessage[] = STORY_CONVERSATION_MESSAGES.map((messag
       : undefined,
   exchange: message.exchange,
   reaction: message.reaction,
-  kind: message.exchange ? "exchange" : "text",
+  kind: message.exchange ? "exchange" : message.plan ? "plan" : "text",
+  plan: message.plan && { ...message.plan, stopped: false },
 }));
 
 const unreadStoryMessages: RendererAgentMessage[] = [
@@ -1324,6 +1326,52 @@ export const PromptQuestionsInChat: Story = {
 
 export const Queued: Story = {
   args: { queue },
+};
+
+/**
+ * Chief asked Research and Sales. Research answered while Chief worked, so its answer waits above
+ * the composer with the question, not in the queue panel. The person's own message stays queued.
+ */
+export const WaitingForReplies: Story = {
+  args: {
+    queue: { agentId: "chief", deliveries: [...(STORY_QUEUES.chief ?? []), queuedDelivery, runningDelivery] },
+    activeTurnId: "turn-active",
+  },
+};
+
+/** The plan of the turn that runs: the block is open and the running step shimmers. */
+export const PlanInProgress: Story = {
+  args: {
+    activeTurnId: "turn-plan-live",
+    messages: [
+      ...messages.filter((message) => message.kind !== "plan"),
+      {
+        id: "turn-plan-live:plan",
+        author: "agent",
+        body: "",
+        time: "10:05",
+        turnId: "turn-plan-live",
+        itemType: "plan",
+        status: "streaming",
+        streaming: true,
+        kind: "plan",
+        plan: {
+          explanation: null,
+          stopped: false,
+          steps: [
+            { id: "0", text: "Read the migration notes", status: "completed" },
+            {
+              id: "1",
+              text: "Add the column for the saved provider",
+              activeText: "Adding the column for the saved provider",
+              status: "inProgress",
+            },
+            { id: "2", text: "Run the migration tests", status: "pending" },
+          ],
+        },
+      },
+    ],
+  },
 };
 
 export const ThreeQueuedMessages: Story = {
