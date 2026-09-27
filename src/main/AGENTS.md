@@ -115,7 +115,7 @@ error paths by importing each other.
 | Concern | Files |
 | --- | --- |
 | Stored server list and schema | `remote-server-store.ts`, `remote-server-stored-shape.ts` |
-| Team API requests | `remote-server-client.ts`, `remote-server-http.ts`, `remote-server-errors.ts` |
+| Team API requests | `remote-server-client.ts`, `remote-server-http.ts`, `remote-server-errors.ts`, `remote-attachment-cache.ts` |
 | User-visible connection failures | `remote-server-connection-status.ts`, `remote-server-connections.ts` |
 | Events and reconnects | `remote-server-event-stream.ts`, `remote-server-event-refresh.ts` |
 | Team directory, presence, host reconciliation | `remote-team-directory.ts`, `remote-server-presence.ts`, `remote-server-host-directory.ts` |

@@ -222,6 +222,21 @@ export class RemoteEventStream {
     if (focused) this.retryOfflineHosts();
   }
 
+  /**
+   * The computer woke from sleep. A socket from before the sleep can be dead with no close event,
+   * and the backoff was earned on a network that is gone, so each host connects again at once. A
+   * host whose credentials were rejected stays paused.
+   */
+  wake(): void {
+    if (!this.#enabled) return;
+    for (const server of this.#servers.servers) {
+      if (this.#authenticationPaused.has(server.id)) continue;
+      this.clearReconnectBackoff(server.id);
+      if (server.transport === "webrtc-v2") this.ensure(server.id);
+      else this.restart(server.id);
+    }
+  }
+
   /** Retries each offline host once, unless Signal reported it offline within the last minute. */
   retryOfflineHosts(): void {
     const now = Date.now();
