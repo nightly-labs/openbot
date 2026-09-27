@@ -147,7 +147,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.command": "Command",
   "customProvider.acp.commandHint": "The program to start. OpenBot looks for it on your PATH.",
   "customProvider.acp.args": "Arguments",
-  "customProvider.acp.argsHint": "Separate arguments with spaces.",
+  "customProvider.acp.argsHint": "Separate arguments with spaces. Put quotes around an argument that has spaces.",
   "customProvider.acp.env": "Environment variables",
   "customProvider.acp.env.name": "Variable {number} name",
   "customProvider.acp.env.value": "Variable {number} value",

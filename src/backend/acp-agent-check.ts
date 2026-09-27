@@ -4,7 +4,7 @@
 // MCP servers, or sign in. The process starts in an empty temporary folder, in a process group of
 // its own on POSIX, and the whole group is stopped when the check ends, however it ends.
 
-import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -16,6 +16,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { OPENBOT_ACP_CLIENT_CAPABILITIES, OPENBOT_ACP_CLIENT_INFO } from "./acp-client";
 import { cliSpawnTarget } from "./cli";
+import { stopWindowsProcessTree } from "./windows-process-tree";
 import { TimeoutError, withTimeout } from "./with-timeout";
 
 const AGENT_CHECK_TIMEOUT_MS = 20_000;
@@ -197,7 +198,10 @@ function processStreams(
 
 /** Stops the process group, and waits for the process to exit. SIGKILL after a short wait. */
 async function stopGroup(child: ChildProcessWithoutNullStreams): Promise<void> {
-  if (process.platform === "win32") return stopWindowsTree(child);
+  if (process.platform === "win32") {
+    child.stdin.destroy();
+    return stopWindowsProcessTree(child);
+  }
   const signal = (name: NodeJS.Signals) => {
     try {
       if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, name);
@@ -221,19 +225,4 @@ async function stopGroup(child: ChildProcessWithoutNullStreams): Promise<void> {
     });
     signal("SIGTERM");
   });
-}
-
-/**
- * Windows has no process group: a `.cmd` agent runs under `cmd.exe`, and a kill of the wrapper
- * leaves the agent running. `taskkill /T` stops the whole tree while the wrapper still holds it.
- */
-async function stopWindowsTree(child: ChildProcessWithoutNullStreams): Promise<void> {
-  child.stdin.destroy();
-  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
-  await new Promise<void>((resolve) =>
-    execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }, () => resolve()),
-  );
-  if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-  await exited;
 }

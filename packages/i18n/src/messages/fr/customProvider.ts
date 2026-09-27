@@ -142,7 +142,8 @@ export const messages = {
   "customProvider.acp.command": "Commande",
   "customProvider.acp.commandHint": "Le programme à démarrer. OpenBot le cherche dans votre PATH.",
   "customProvider.acp.args": "Arguments",
-  "customProvider.acp.argsHint": "Séparez les arguments par des espaces.",
+  "customProvider.acp.argsHint":
+    "Séparez les arguments par des espaces. Mettez entre guillemets un argument qui contient des espaces.",
   "customProvider.acp.env": "Variables d’environnement",
   "customProvider.acp.env.name": "Nom de la variable {number}",
   "customProvider.acp.env.value": "Valeur de la variable {number}",

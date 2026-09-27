@@ -54,6 +54,7 @@ import {
   type ThreadItem,
 } from "./protocol";
 import { createDiagnosticStream } from "./stderr-diagnostics";
+import { stopWindowsProcessTree } from "./windows-process-tree";
 import { withTimeout } from "./with-timeout";
 
 /**
@@ -384,6 +385,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     await this.#bridge.close();
     if (!child || child.exitCode !== null) return;
     child.stdin.end();
+    // A `.cmd` agent runs under `cmd.exe`; a kill of the wrapper alone leaves the agent running.
+    if (process.platform === "win32") return stopWindowsProcessTree(child);
     await new Promise<void>((resolve) => {
       const forceKill = setTimeout(() => {
         if (child.exitCode === null) child.kill("SIGKILL");

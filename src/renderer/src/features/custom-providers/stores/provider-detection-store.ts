@@ -13,7 +13,11 @@ import {
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { checkResult } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
-import { customAgentCheckInput, customAgentInput } from "@openbot/ui/features/custom-providers/custom-acp-agent-form";
+import {
+  customAgentCheckInput,
+  customAgentInput,
+  formatAgentArgs,
+} from "@openbot/ui/features/custom-providers/custom-acp-agent-form";
 import type {
   DetectedProvider,
   DetectedProviderApi,
@@ -80,13 +84,13 @@ function modelsRow(server: DetectedModelServer, saved: CustomProviderSummary | u
 
 function agentRow(found: DetectedAcpAgent, saved: CustomAgentSummary | undefined): DetectedProvider {
   const base = { kind: "agent" as const, key: agentKey(found.command), command: found.command };
-  if (!saved) return { ...base, id: found.id, name: found.name, args: found.args.join(" ") };
+  if (!saved) return { ...base, id: found.id, name: found.name, args: formatAgentArgs(found.args) };
   return {
     ...base,
     id: saved.id,
     name: saved.name,
     command: saved.command,
-    args: saved.args.join(" "),
+    args: formatAgentArgs(saved.args),
     added: true,
     envNames: saved.envNames,
   };

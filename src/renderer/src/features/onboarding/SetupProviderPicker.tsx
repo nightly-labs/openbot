@@ -570,10 +570,13 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         onChooseMoreProvider={props.providers.chooseProvider}
         onChooseMoreCustom={props.providers.chooseMoreCustom}
         detected={
-          // In setup a scan that found nothing is noise, so the list goes away.
+          // In setup a scan that found nothing is noise, so the list goes away. Hidden rows keep it:
+          // Show hidden is the only way back to them in this step.
           <Show
             when={
-              source().providerDetection?.scanning || source().providerDetection?.found.length
+              source().providerDetection?.scanning ||
+              source().providerDetection?.found.length ||
+              source().providerDetection?.hidden
                 ? source().providerDetection
                 : undefined
             }

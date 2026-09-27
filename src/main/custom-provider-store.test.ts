@@ -243,7 +243,7 @@ describe("CustomProviderStore", () => {
     const edit = {
       id: "studio-local",
       name: "Studio",
-      baseUrl: "http://localhost:11434/v1",
+      baseUrl: "http://127.0.0.1:11434/api/v1",
       models: [{ id: "a", name: "A" }],
     };
 
@@ -266,7 +266,7 @@ describe("CustomProviderStore", () => {
       expect(JSON.parse(await readFile(path, "utf8")).providers[0].secret).toBe(before);
       expect((await loaded()).configs()[0]).toMatchObject({
         name: "Studio",
-        baseUrl: "http://localhost:11434/v1",
+        baseUrl: "http://127.0.0.1:11434/api/v1",
         apiKey: "sk-secret-key",
         headers: [{ name: "X-Tenant", value: "tenant-secret" }],
         models: [{ id: "a", name: "A" }],
@@ -279,6 +279,7 @@ describe("CustomProviderStore", () => {
       const before = await readFile(path, "utf8");
 
       await expect(store.update({ ...edit, baseUrl: "https://attacker.example/v1" })).rejects.toThrow();
+      await expect(store.update({ ...edit, baseUrl: "http://[::1]:11434/v1" })).rejects.toThrow();
       await expect(store.update({ ...edit, baseUrl: "http://127.0.0.1:9999/v1", apiKey: "sk-new" })).rejects.toThrow();
 
       expect(await readFile(path, "utf8")).toBe(before);

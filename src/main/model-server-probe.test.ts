@@ -147,7 +147,7 @@ describe("discoverModels", () => {
   it("uses the stored key and headers for the saved origin", async () => {
     const server = await serve((_request, response) => modelList(response));
     await detection(server.baseUrl).discoverModels({
-      baseUrl: server.baseUrl.replace("127.0.0.1", "localhost"),
+      baseUrl: `${server.baseUrl}/`,
       apiKey: null,
       headers: [],
       savedProviderId: "studio",

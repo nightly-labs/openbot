@@ -65,7 +65,7 @@ export function presetAcpAgentDraft(preset: AcpAgentPreset): CustomAcpAgentDraft
     agentId: preset.id,
     displayName: preset.name,
     command: preset.command,
-    args: preset.args.join(" "),
+    args: formatAgentArgs(preset.args),
     env: [{ name: "", value: "" }],
   };
 }
@@ -76,7 +76,7 @@ export function savedAcpAgentDraft(agent: CustomAgentSummary): CustomAcpAgentDra
     agentId: agent.id,
     displayName: agent.name,
     command: agent.command,
-    args: agent.args.join(" "),
+    args: formatAgentArgs(agent.args),
     env:
       agent.envNames.length > 0
         ? agent.envNames.map((name) => ({ name, value: "", savedName: name }))
@@ -151,9 +151,39 @@ export function customAcpAgentValue(draft: CustomAcpAgentDraft): CustomAcpAgentD
   };
 }
 
-/** Split as a shell splits plain words. Main refuses a line break and more than 32 arguments. */
-function draftArgs(args: string): string[] {
-  return args.split(/\s+/).filter(Boolean);
+/**
+ * Splits the arguments line with no shell. Quotes keep an argument with spaces as one argument; in
+ * double quotes, `\"` and `\\` are one character. A backslash out of quotes stays, so a Windows path
+ * needs no escape. Main refuses a line break and more than 32 arguments.
+ */
+function draftArgs(text: string): string[] {
+  const args: string[] = [];
+  let current: string | null = null;
+  let quote: string | null = null;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text.charAt(index);
+    const next = text.charAt(index + 1);
+    if (quote) {
+      if (char === quote) quote = null;
+      else if (quote === '"' && char === "\\" && (next === '"' || next === "\\")) {
+        current = (current ?? "") + next;
+        index += 1;
+      } else current = (current ?? "") + char;
+    } else if (/\s/.test(char)) {
+      if (current !== null) args.push(current);
+      current = null;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      current ??= "";
+    } else current = (current ?? "") + char;
+  }
+  if (current !== null) args.push(current);
+  return args;
+}
+
+/** The arguments line that `draftArgs` reads back as the same arguments. */
+export function formatAgentArgs(args: readonly string[]): string {
+  return args.map((arg) => (/^[^\s"']+$/.test(arg) ? arg : `"${arg.replace(/["\\]/g, "\\$&")}"`)).join(" ");
 }
 
 function draftEnv(draft: CustomAcpAgentDraft): SaveCustomAgentInput["env"] {

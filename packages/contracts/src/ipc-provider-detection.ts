@@ -148,13 +148,15 @@ export function customProviderEndpointKey(baseUrl: string): string | null {
   return `${url.protocol}//${host}${port}${path}`;
 }
 
-/** Whether two addresses have the same scheme, host and port, with loopback names as one host. */
+/**
+ * Whether two addresses have the same scheme, host and port, so a stored key may go to the second.
+ * Loopback names stay separate here: a server on `[::1]` can be a different server from the one on
+ * `127.0.0.1` at the same port, and `localhost` can resolve to either.
+ */
 export function sameCustomProviderOrigin(a: string, b: string): boolean {
   const first = parseHttpUrl(a);
   const second = parseHttpUrl(b);
-  if (!first || !second) return false;
-  const origin = (url: URL) => customProviderEndpointKey(`${url.protocol}//${url.host}`);
-  return origin(first) === origin(second);
+  return first !== null && second !== null && first.origin === second.origin;
 }
 
 function parseHttpUrl(value: string): URL | null {
