@@ -25,13 +25,13 @@ import {
   encodeTeamProtocolV4WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
+import type { RemoteConnectionBootstrap } from "./central-auth-manager";
 import type {
-  RemoteConnectionBootstrap,
   RemoteHostSummary,
   RemoteInvitePreview,
   RemoteInviteRecord,
   RemoteMemberRecord,
-} from "./central-auth-manager";
+} from "./central-auth-records";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 

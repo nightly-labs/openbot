@@ -1,3 +1,4 @@
+import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { RemoteApiConfig } from "./config";
@@ -17,7 +18,7 @@ const authEventSchema = z.discriminatedUnion("type", [
     hostId: z.string().min(1),
     sessionId: z.string().min(1),
   }),
-]);
+]) satisfies z.ZodType<RemoteAuthEvent>;
 
 export function createRemoteApiApp(config: RemoteApiConfig, signal: SignalService) {
   const app = new Elysia()
@@ -101,7 +102,7 @@ export function signalClientIp(
   return forwarded || remoteAddress || "unknown";
 }
 
-function decodeAuthEvent(body: string): z.infer<typeof authEventSchema> | null {
+function decodeAuthEvent(body: string): RemoteAuthEvent | null {
   try {
     const result = authEventSchema.safeParse(JSON.parse(body));
     return result.success ? result.data : null;
