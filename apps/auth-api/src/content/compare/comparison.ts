@@ -7,7 +7,7 @@ import type { LandingIconName } from "../../components/landing/LandingIcon";
 
 export type ComparisonSide = "openbot" | "rival";
 
-export interface ComparisonRow {
+interface ComparisonRow {
   icon: LandingIconName;
   topic: string;
   openbot: string;
@@ -16,19 +16,19 @@ export interface ComparisonRow {
   better?: ComparisonSide;
 }
 
-export interface ComparisonSection {
+interface ComparisonSection {
   title: string;
   openbot: string;
   rival: string;
   better?: ComparisonSide;
 }
 
-export interface ComparisonQuestion {
+interface ComparisonQuestion {
   question: string;
   answer: string;
 }
 
-export interface ComparisonSource {
+interface ComparisonSource {
   label: string;
   url: string;
 }

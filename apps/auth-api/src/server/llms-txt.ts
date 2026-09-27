@@ -15,7 +15,7 @@ function absolute(path: string): string {
   return new URL(path, OPENBOT_SITE_URL).href;
 }
 
-export function llmsTxt(): string {
+function llmsTxt(): string {
   const lines = [
     "# OpenBot",
     "",
