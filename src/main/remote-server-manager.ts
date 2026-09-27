@@ -1063,6 +1063,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async disconnectRemoteSessions(): Promise<void> {
+    // A copy skips the host's check of the account, so the next account must not see it.
+    this.#attachments.clear();
     if (!this.#webrtcTransport) return;
     await Promise.all(
       this.#store.servers
