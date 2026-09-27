@@ -353,13 +353,14 @@ export class TurnLifecycle {
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
         // Codex retries on its own and reports the final failure again without `willRetry`.
         if (isRecord(params) && params.willRetry === true) return;
+        // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
+        const errorTurnId = getString(params, "turnId");
+        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId))
+          this.#turnErrors.set(errorTurnId, message);
         if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
           this.#providers.refreshUsageAfterLimit(source);
           return;
         }
-        const errorTurnId = getString(params, "turnId");
-        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId))
-          this.#turnErrors.set(errorTurnId, message);
         this.#hooks.emitError(`agent_${notification.method}`, message, agentId);
       }
     }
