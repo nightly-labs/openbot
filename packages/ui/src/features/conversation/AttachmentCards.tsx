@@ -53,7 +53,8 @@ export function AttachmentDownloadAll(props: { count: number; pending: boolean; 
 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
-  onPreview: (attachment: AttachmentSummary) => void;
+  /** `origin` is the clicked card, for a viewer that zooms out of it. */
+  onPreview: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
   const { t, format } = useText();
@@ -87,7 +88,8 @@ export function AttachmentCards(props: {
                 class="attachment-preview-button"
                 disabled={isMissing(attachment) || !canPreviewAttachment(attachment)}
                 aria-label={t("attachment.preview", { name: attachment.name })}
-                onClick={() => props.onPreview(attachment)}
+                data-attachment-id={attachment.id}
+                onClick={(event) => props.onPreview(attachment, event.currentTarget)}
               >
                 <Show
                   when={attachment.previewKind === "image" && !isMissing(attachment)}

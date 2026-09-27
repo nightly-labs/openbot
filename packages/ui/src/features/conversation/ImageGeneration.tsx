@@ -14,7 +14,8 @@ export interface ImageGenerationProps {
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary;
   error?: string;
-  onPreview?: (attachment: AttachmentSummary) => void;
+  /** `origin` is the clicked image, for a viewer that zooms out of it. */
+  onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: (attachment: AttachmentSummary) => void;
 }
 
@@ -108,8 +109,9 @@ export function ImageGeneration(props: ImageGenerationProps) {
             type="button"
             class={["image-generation-preview", { "image-generation-preview-visible": hasImage() }]}
             aria-label={previewLabel()}
-            onClick={() => {
-              if (props.attachment) props.onPreview?.(props.attachment);
+            data-attachment-id={props.attachment?.id}
+            onClick={(event) => {
+              if (props.attachment) props.onPreview?.(props.attachment, event.currentTarget);
             }}
           >
             <img

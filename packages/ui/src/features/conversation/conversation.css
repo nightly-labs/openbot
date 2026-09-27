@@ -13,6 +13,7 @@
 @import "./styles/message-content.css";
 @import "./styles/composer.css";
 @import "./styles/attachments.css";
+@import "./styles/image-lightbox.css";
 @import "./styles/queue.css";
 @import "./styles/panel-layout.css";
 @import "./styles/notices.css";

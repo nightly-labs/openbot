@@ -89,6 +89,7 @@
     "./features/conversation/DataTable": "./src/features/conversation/DataTable.tsx",
     "./features/conversation/FileReference": "./src/features/conversation/FileReference.ts",
     "./features/conversation/ImageGeneration": "./src/features/conversation/ImageGeneration.tsx",
+    "./features/conversation/ImageLightbox": "./src/features/conversation/ImageLightbox.tsx",
     "./features/conversation/MarkdownFilePreview": "./src/features/conversation/MarkdownFilePreview.tsx",
     "./features/conversation/MarkdownMessageText": "./src/features/conversation/MarkdownMessageText.tsx",
     "./features/conversation/MessageNavigation": "./src/features/conversation/MessageNavigation.tsx",

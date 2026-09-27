@@ -13,6 +13,7 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
+import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
 import { MarkdownInlineText, MarkdownMessageText } from "./MarkdownMessageText";
 import { RichMessageText } from "./RichMessageText";
 import { parseSelectionInstruction } from "./SelectionActions";
@@ -276,6 +277,26 @@ export function MessageBody(props: {
     content: () => messageContent,
     enabled: () => props.message.author === "agent" && streamingBody.smoothHeight(),
   });
+  const [lightbox, setLightbox] = createSignal<ImageLightboxOpening | null>(null);
+  const lightboxImages = createMemo(() => (props.message.attachments ?? []).filter(isLightboxImage));
+  /* An image opens in the viewer with the other images of its message. A quoted message's image
+     is not one of them, so it opens alone. Other files open in the preview panel. */
+  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
+    if (isLightboxImage(attachment)) {
+      const siblings = lightboxImages();
+      const images = siblings.some((image) => image.id === attachment.id) ? siblings : [attachment];
+      setLightbox({ images, index: images.findIndex((image) => image.id === attachment.id), origin });
+    } else if (canPreviewAttachment(attachment)) {
+      props.onPreview(attachment);
+    } else {
+      props.onAttachmentAction(attachment, "open");
+    }
+  };
+  /* The images, the cards and the text blocks of one message share this parent. */
+  const imageThumbnail = (attachment: AttachmentSummary) =>
+    messageContentResize?.parentElement?.querySelector<HTMLElement>(
+      `[data-attachment-id="${CSS.escape(attachment.id)}"]`,
+    ) ?? undefined;
   const renderMarkdownInline = (body: string) => (
     <MarkdownInlineText
       body={body}
@@ -285,9 +306,7 @@ export function MessageBody(props: {
       citations={props.message.citations}
       onSelectAgent={props.onSelectAgent}
       onOpenLink={props.onOpenLink}
-      onOpenAttachment={(attachment) =>
-        !canPreviewAttachment(attachment) ? props.onAttachmentAction(attachment, "open") : props.onPreview(attachment)
-      }
+      onOpenAttachment={openAttachment}
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
     />
@@ -320,11 +339,7 @@ export function MessageBody(props: {
                 citations={referenced().citations}
                 onSelectAgent={props.onSelectAgent}
                 onOpenLink={props.onOpenLink}
-                onOpenAttachment={(attachment) =>
-                  !canPreviewAttachment(attachment)
-                    ? props.onAttachmentAction(attachment, "open")
-                    : props.onPreview(attachment)
-                }
+                onOpenAttachment={openAttachment}
                 onOpenSharedFile={props.onOpenSharedFile}
                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                 showCitationFooter={false}
@@ -373,11 +388,7 @@ export function MessageBody(props: {
                                 citations={props.message.citations}
                                 onSelectAgent={props.onSelectAgent}
                                 onOpenLink={props.onOpenLink}
-                                onOpenAttachment={(attachment) =>
-                                  !canPreviewAttachment(attachment)
-                                    ? props.onAttachmentAction(attachment, "open")
-                                    : props.onPreview(attachment)
-                                }
+                                onOpenAttachment={openAttachment}
                                 onOpenSharedFile={props.onOpenSharedFile}
                                 onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                                 showCitationFooter={index === lastTextBlockIndex()}
@@ -400,11 +411,7 @@ export function MessageBody(props: {
                               citations={props.message.citations}
                               onSelectAgent={props.onSelectAgent}
                               onOpenLink={props.onOpenLink}
-                              onOpenAttachment={(attachment) =>
-                                !canPreviewAttachment(attachment)
-                                  ? props.onAttachmentAction(attachment, "open")
-                                  : props.onPreview(attachment)
-                              }
+                              onOpenAttachment={openAttachment}
                               onOpenSharedFile={props.onOpenSharedFile}
                               onOpenWorkspaceFile={props.onOpenWorkspaceFile}
                             />
@@ -431,28 +438,33 @@ export function MessageBody(props: {
             aspectRatio={imageGeneration().aspectRatio}
             attachment={props.message.attachments?.[0]}
             error={imageGeneration().error}
-            onPreview={props.onPreview}
+            onPreview={openAttachment}
             onDownload={props.onDownload}
           />
         )}
       </Show>
-      <Show when={standaloneImageAttachments().length > 0}>
-        <div class="message-image-attachments">
-          <For each={standaloneImageAttachments()}>
-            {(attachment) => (
-              <ImageGeneration
-                presentation="attachment"
-                status="completed"
-                prompt={attachment.name}
-                aspectRatio="square"
-                attachment={attachment}
-                onPreview={props.onPreview}
-                onDownload={props.onDownload}
-              />
-            )}
-          </For>
-        </div>
-      </Show>
+      <Switch>
+        <Match when={standaloneImageAttachments().length > 1}>
+          <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} />
+        </Match>
+        <Match when={standaloneImageAttachments().length === 1}>
+          <div class="message-image-attachments">
+            <For each={standaloneImageAttachments()}>
+              {(attachment) => (
+                <ImageGeneration
+                  presentation="attachment"
+                  status="completed"
+                  prompt={attachment.name}
+                  aspectRatio="square"
+                  attachment={attachment}
+                  onPreview={openAttachment}
+                  onDownload={props.onDownload}
+                />
+              )}
+            </For>
+          </div>
+        </Match>
+      </Switch>
       <Show when={standaloneFileAttachments().length > 0}>
         <div class="message-attachments-group">
           <Show when={(props.message.attachments?.length ?? 0) > 2 && props.onDownloadAttachments}>
@@ -470,10 +482,20 @@ export function MessageBody(props: {
           </Show>
           <AttachmentCards
             attachments={standaloneFileAttachments()}
-            onPreview={props.onPreview}
+            onPreview={openAttachment}
             onAction={props.onAttachmentAction}
           />
         </div>
+      </Show>
+      <Show when={lightbox()}>
+        {(opening) => (
+          <ImageLightbox
+            opening={opening()}
+            thumbnail={imageThumbnail}
+            onDownload={props.onDownload}
+            onClose={() => setLightbox(null)}
+          />
+        )}
       </Show>
     </>
   );

@@ -916,8 +916,15 @@ button.chat-action-target:active,
   max-width: min(420px, calc(100% - var(--message-actions-inline-size) - 5px));
 }
 
+.message-entry-agent .ui-bubble:has(.image-gallery) {
+  width: min(520px, calc(100% - var(--message-actions-inline-size) - 5px));
+  max-width: min(520px, calc(100% - var(--message-actions-inline-size) - 5px));
+}
+
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(:is(.choice-card, .image-generation, .message-code-block, .message-data-table-scroll))
+  .ui-bubble-variant-ghost:has(
+    :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
+  )
   > .ui-bubble-content {
   width: 100%;
 }

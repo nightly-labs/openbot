@@ -1,0 +1,255 @@
+/* The images of one agent message, laid out in justified rows by `justifiedGalleryLayout`. The
+ * tiles are placed absolutely, so a new width or a loaded aspect ratio moves a tile but never
+ * mounts a new image. */
+.image-gallery {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.image-gallery-item {
+  position: absolute;
+}
+
+.image-gallery-tile {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding: 0;
+  color: var(--openbot-text-muted);
+}
+
+.image-gallery-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.image-gallery-tile:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.image-gallery-tile-missing > svg {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .image-gallery-tile:not(:disabled):hover img {
+    transform: scale(1.03);
+  }
+}
+
+/* The viewer. The backdrop is a sibling below the content, and the content covers the window so
+ * that its empty stage can take the click that closes it. */
+.ui-dialog-overlay.image-lightbox-backdrop {
+  position: fixed;
+  z-index: var(--openbot-layer-dialog);
+  inset: 0;
+  background: var(--openbot-bg-overlay);
+}
+
+.ui-dialog-content.image-lightbox {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-dialog) + 1);
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Clips the slides beside the stage. The window, not the stage, clips them, so the image can
+   * zoom from a thumbnail under the toolbar or the strip. */
+  overflow: hidden;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--openbot-text-primary);
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.image-lightbox-chrome {
+  animation: image-lightbox-fade-in var(--openbot-duration-overlay) var(--openbot-ease-out);
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.image-lightbox[data-closing] .image-lightbox-chrome {
+  opacity: 0;
+}
+
+.image-lightbox-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.image-lightbox-caption {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+
+.image-lightbox-name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-lightbox-position {
+  flex: none;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.image-lightbox-actions {
+  display: flex;
+  flex: none;
+  gap: var(--openbot-space-1);
+}
+
+.image-lightbox-stage {
+  position: relative;
+  min-height: 0;
+  /* A sideways swipe steps the images; the browser keeps vertical scroll only. */
+  touch-action: pan-y;
+}
+
+/* The current image and its neighbours sit side by side, one stage width apart. A step moves the
+ * track, so the images slide as a carousel. */
+.image-lightbox-track {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.image-lightbox-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  /* Fixed tracks, so the image's percentage limits resolve and a tall image fits the stage. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: 0 calc(var(--openbot-space-8) * 2);
+  transform: translateX(calc(var(--image-lightbox-slide) * 100%));
+}
+
+.image-lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--openbot-radius-md);
+  user-select: none;
+  will-change: transform;
+}
+
+/* Hidden until it loads, so the zoom starts from the thumbnail rather than after a flash of the
+ * image at full size. */
+.image-lightbox-image-pending {
+  opacity: 0;
+}
+
+.image-lightbox-error {
+  margin: 0;
+  color: var(--openbot-text-muted);
+}
+
+.image-lightbox-step {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+}
+
+.image-lightbox-step-previous {
+  left: var(--openbot-space-4);
+}
+
+.image-lightbox-step-next {
+  right: var(--openbot-space-4);
+}
+
+.image-lightbox-strip {
+  /* Above the image, which gets its own layer while it zooms. */
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  /* `safe` keeps the first thumbnails reachable when the strip is wider than the window. */
+  justify-content: safe center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-4);
+  scrollbar-width: none;
+}
+
+.image-lightbox-thumb {
+  flex: none;
+  width: var(--openbot-control-xl);
+  height: var(--openbot-control-xl);
+  overflow: hidden;
+  border-radius: var(--openbot-radius-sm);
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.image-lightbox-thumb[aria-current="true"] {
+  box-shadow: 0 0 0 2px var(--openbot-text-primary);
+  opacity: 1;
+}
+
+.image-lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-lightbox-thumb:focus-visible,
+.image-lightbox-step:focus-visible,
+.image-lightbox-action:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .image-lightbox-thumb:hover {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .image-lightbox-slide {
+    padding: 0;
+  }
+
+  .image-lightbox-step {
+    display: none;
+  }
+}
+
+@keyframes image-lightbox-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-gallery-tile img,
+  .image-lightbox-chrome,
+  .image-lightbox-thumb {
+    animation: none;
+    transition: none;
+  }
+}
