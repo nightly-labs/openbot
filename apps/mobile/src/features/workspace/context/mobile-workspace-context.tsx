@@ -1,36 +1,13 @@
-import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AgentEvent,
-  type AgentSummary,
-  assertStorageUsageScope,
   type CreateAgentInput,
-  decodeInstalledSkills,
-  decodeStorageUsage,
-  isAgentMemory,
-  isAgentModel,
-  isAgentModelOption,
-  isAgentProvider,
-  isAvatarHue,
   isQueuedMessageReceipt,
-  isQueueSnapshot,
-  isReasoningEffort,
-  isRoutine,
-  isSidebarLayoutSnapshot,
   type SidebarLayoutSnapshot,
-  STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import {
-  TEAM_CONVERSATION_UNREAD_CAPABILITY,
-  TEAM_EML_ATTACHMENTS_CAPABILITY,
-  TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
-  TEAM_SEMANTIC_TAGS_CAPABILITY,
-} from "@openbot/contracts/team-protocol/current";
-import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
-import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -59,7 +36,6 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import { replaceEqualDeep, useQueryClient } from "@tanstack/react-query";
 import { fetch } from "expo/fetch";
-import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import {
   createContext,
@@ -82,6 +58,7 @@ import {
   type ServerConnectionHandle,
   type ServerLoadContext,
 } from "@/features/workspace/components/server-connection";
+import { createHostRequestActions } from "@/features/workspace/context/host-request-actions";
 import { reduceAgentActivity } from "@/features/workspace/model/agent-activity";
 import {
   canToggleAgentPin,
@@ -93,17 +70,25 @@ import { conversationMessageId, decodeConversationPage } from "@/features/worksp
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import { applyMobileQueueEvent } from "@/features/workspace/model/queue-cache";
-import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { decodeServerOrder, serverAccent, serverOrderKey, sortServers } from "@/features/workspace/model/server-order";
 import { applyServerRecovery, serverKind } from "@/features/workspace/model/server-status";
 import { trustedHostKeys } from "@/features/workspace/model/trusted-host-keys";
+import {
+  decodeAgent,
+  decodeAgentSummaries,
+  decodeConversationReads,
+  decodeSidebarLayout,
+  ignoreResponse,
+  projectAgent,
+  type RemoteAgent,
+  updateAgentPayload,
+} from "@/features/workspace/model/workspace-records";
 import type {
   MobileAgent,
   MobileServer,
   MobileServerDirectoryState,
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
-import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
@@ -114,11 +99,6 @@ export type {
   MobileWorkspaceContextValue,
 } from "@/features/workspace/model/workspace-types";
 
-type RemoteAgent = Pick<
-  AgentSummary,
-  "id" | "name" | "title" | "description" | "preview" | "updatedAt" | "avatarSeed" | "avatarHue"
-> &
-  Partial<Pick<AgentSummary, "provider" | "model" | "reasoningEffort" | "avatarUrl">>;
 const NO_IDS: string[] = [];
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
@@ -888,134 +868,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         void refreshHosts().catch(() => undefined);
         return host.hostId;
       },
-      saveAgentMemory: async (agentId, text, serverId, memoryId) => {
-        await saveAgentRecord(
-          queryClient,
-          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, agentId, "memories"],
-          () =>
-            request(
-              memoryId ? "PATCH" : "POST",
-              memoryId ? TEAM_API_ROUTES.agent.memory(agentId, memoryId) : TEAM_API_ROUTES.agent.memories(agentId),
-              (value) => {
-                if (
-                  !isAgentMemory(value) ||
-                  value.agentId !== agentId ||
-                  (memoryId !== undefined && value.id !== memoryId)
-                )
-                  throw new Error("The host returned an invalid saved record.");
-                return value;
-              },
-              { text },
-              serverId,
-            ),
-        );
-      },
-      deleteAgentMemory: async (agentId, memoryId, serverId) => {
-        await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
-      },
-      createAgentRoutine: async (input, serverId) => {
-        await saveAgentRecord(
-          queryClient,
-          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
-          () =>
-            request(
-              "POST",
-              TEAM_API_ROUTES.agent.routines(input.agentId),
-              (value) => {
-                if (!isRoutine(value) || value.agentId !== input.agentId)
-                  throw new Error("The host returned an invalid saved record.");
-                return value;
-              },
-              {
-                name: input.name,
-                instruction: input.instruction,
-                active: input.active,
-                timezone: input.timezone,
-                schedule: input.schedule,
-              },
-              serverId,
-            ),
-        );
-      },
-      updateAgentRoutine: async (input, serverId) => {
-        await saveAgentRecord(
-          queryClient,
-          ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, input.agentId, "routines"],
-          () =>
-            request(
-              "PATCH",
-              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-              (value) => {
-                if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-                  throw new Error("The host returned an invalid saved record.");
-                return value;
-              },
-              {
-                ...(input.name === undefined ? {} : { name: input.name }),
-                ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-                ...(input.active === undefined ? {} : { active: input.active }),
-                ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-              },
-              serverId,
-            ),
-        );
-      },
-      deleteAgentRoutine: async (agentId, routineId, serverId) => {
-        await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
-      },
-      testAgentRoutine: async (agentId, routineId, serverId) => {
-        await request(
-          "POST",
-          TEAM_API_ROUTES.agent.routineTest(agentId, routineId),
-          ignoreResponse,
-          undefined,
-          serverId,
-        );
-      },
-      loadAgentModels: (serverId) =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.agents.models,
-          (value) => {
-            if (!Array.isArray(value) || !value.every(isAgentModelOption))
-              throw new Error("The host returned invalid models.");
-            return value;
-          },
-          undefined,
-          serverId,
-        ),
-      loadAgentMemories: (agentId, serverId) =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.agent.memories(agentId),
-          (value) => {
-            if (
-              !Array.isArray(value) ||
-              !value.every(isAgentMemory) ||
-              value.some((memory) => memory.agentId !== agentId)
-            )
-              throw new Error("The host returned invalid memories.");
-            return value;
-          },
-          undefined,
-          serverId,
-        ),
-      loadAgentRoutines: (agentId, serverId) =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.agent.routines(agentId),
-          (value) => {
-            if (
-              !Array.isArray(value) ||
-              !value.every(isRoutine) ||
-              value.some((routine) => routine.agentId !== agentId)
-            )
-              throw new Error("The host returned invalid routines.");
-            return value;
-          },
-          undefined,
-          serverId,
-        ),
+      ...createHostRequestActions({
+        request,
+        queryClient,
+        queryScope: [session.apiUrl, session.user.id, sessionScope],
+        capabilities: serverCapabilities.current,
+        attachmentDownloads,
+      }),
       loadAgentAnalytics: async (input, serverId) => {
         if (!agents.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentNotOnHost"));
@@ -1024,24 +883,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverCapabilities.current.get(serverId) ?? [],
           input,
         );
-      },
-      // A host too old to know the route answers 404, so ask its advertised capabilities first.
-      loadAgentSkills: async (agentId, serverId) =>
-        serverCapabilities.current.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
-          ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
-          : null,
-      loadAgentStorage: async (agentId, serverId, force = false) => {
-        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
-        const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };
-        return assertStorageUsageScope(
-          await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
-          input,
-        );
-      },
-      deleteStoredFile: async (fileId, serverId) => {
-        if (!serverCapabilities.current.get(serverId)?.includes(STORAGE_CAPABILITY))
-          throw new Error(currentText().t("mobile.workspace.error.filesUnsupported"));
-        await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
       },
       createAgent: async (input: CreateAgentInput) => {
         const created = await request("POST", TEAM_API_ROUTES.agents.all, decodeAgent, {
@@ -1095,75 +936,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           ),
         );
       },
-      loadAgentAvatar: async (agentId, avatarUrl, serverId) => {
-        const version = new URL(avatarUrl).searchParams.get("v");
-        if (!version) throw new Error("The agent avatar has no version.");
-        return request(
-          "GET",
-          `${TEAM_API_ROUTES.agent.avatar(agentId)}?${new URLSearchParams({ v: version })}`,
-          (value) => {
-            if (
-              !isDynamicRecord(value) ||
-              !isString(value.mimeType) ||
-              !isAvatarMimeType(value.mimeType) ||
-              !isString(value.base64)
-            )
-              throw new Error("The host returned an invalid avatar.");
-            return `data:${value.mimeType};base64,${value.base64}`;
-          },
-          undefined,
-          serverId,
-        );
-      },
       deleteAgent: (agentId) => deleteAgent(teamApi(), agentId),
-      duplicateAgent: async (agentId) => {
-        await request("POST", TEAM_API_ROUTES.agent.duplicate(agentId), ignoreResponse, {
-          operationId: Crypto.randomUUID(),
-        });
-      },
-      loadQueue: (agentId, serverId) =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.agent.queue(agentId),
-          (value) => {
-            if (!isQueueSnapshot(value) || value.agentId !== agentId)
-              throw new Error("The host returned an invalid queue.");
-            return value;
-          },
-          undefined,
-          serverId,
-        ),
-      canEditQueue: (serverId) =>
-        serverCapabilities.current.get(serverId)?.includes(TEAM_QUEUE_EDIT_CAPABILITY) ?? false,
-      attachmentSupport: (serverId) => {
-        const capabilities = serverCapabilities.current.get(serverId) ?? [];
-        return {
-          eml: capabilities.includes(TEAM_EML_ATTACHMENTS_CAPABILITY),
-          media: capabilities.includes(TEAM_MEDIA_ATTACHMENTS_CAPABILITY),
-        };
-      },
-      editQueue: async (agentId, serverId, input) => {
-        return request(
-          "POST",
-          TEAM_API_ROUTES.agent.queueEdit(agentId),
-          (value) => {
-            if (!isQueueSnapshot(value) || value.agentId !== agentId)
-              throw new Error("The host returned an invalid queue edit.");
-            return value;
-          },
-          { ...input },
-          serverId,
-        );
-      },
-      changeQueue: async (agentId, serverId, action, input) => {
-        const route =
-          action === "cancel"
-            ? TEAM_API_ROUTES.agent.queueCancel
-            : action === "steer"
-              ? TEAM_API_ROUTES.agent.queueSteer
-              : TEAM_API_ROUTES.agent.queueReorder;
-        await request("POST", route(agentId), ignoreResponse, input, serverId);
-      },
       interruptTurn: (agentId, turnId, serverId) => interruptAgentTurn(teamApi(serverId), agentId, turnId),
       loadConversation,
       loadOlderMessages,
@@ -1172,33 +945,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
         return uploadAttachmentDraft(teamApi(serverId, onProgress), input);
       },
-      downloadAttachment: (serverId, attachmentId) => {
-        const download = () =>
-          request(
-            "GET",
-            TEAM_API_ROUTES.attachment(attachmentId),
-            (value) => {
-              if (
-                !isDynamicRecord(value) ||
-                !isString(value.name) ||
-                !isString(value.mimeType) ||
-                !isString(value.base64)
-              )
-                throw new Error("The host returned an invalid file.");
-              return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
-            },
-            undefined,
-            serverId,
-          );
-        // Limit native/DOM copies when a message contains several large images.
-        const result = attachmentDownloads.current.then(download);
-        attachmentDownloads.current = result.then(
-          () => {},
-          () => {},
-        );
-        return result;
-      },
-
       discardAttachment: async (agentId, attachmentId, targetServerId) => {
         const serverId = targetServerId ?? agents.find((candidate) => candidate.id === agentId)?.serverId;
         if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
@@ -1362,97 +1108,5 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 export function useMobileWorkspace(): MobileWorkspaceContextValue {
   const value = useContext(MobileWorkspaceContext);
   if (!value) throw new Error("useMobileWorkspace must be used within MobileWorkspaceProvider.");
-  return value;
-}
-
-function projectAgent(serverId: string, agent: RemoteAgent): MobileAgent {
-  return {
-    id: agent.id,
-    serverId,
-    name: agent.name,
-    title: agent.title,
-    description: agent.description,
-    preview: agent.preview,
-    updatedLabel: formatUpdatedAt(agent.updatedAt),
-    provider: agent.provider,
-    model: agent.model,
-    reasoningEffort: agent.reasoningEffort,
-    avatarUrl: agent.avatarUrl ?? null,
-    avatarSeed: agent.avatarSeed,
-    avatarHue: agent.avatarHue,
-  };
-}
-
-function decodeAgent(value: unknown): RemoteAgent {
-  if (
-    !isDynamicRecord(value) ||
-    !isString(value.id) ||
-    !isString(value.name) ||
-    !isString(value.title) ||
-    !isString(value.description) ||
-    !isString(value.preview) ||
-    (value.updatedAt !== null && !isString(value.updatedAt)) ||
-    !isString(value.avatarSeed) ||
-    (value.avatarHue !== null && !isAvatarHue(value.avatarHue))
-  ) {
-    throw new Error("The server returned an invalid agent.");
-  }
-  return {
-    id: value.id,
-    name: value.name,
-    title: value.title,
-    description: value.description,
-    preview: value.preview,
-    updatedAt: value.updatedAt,
-    provider: isAgentProvider(value.provider) ? value.provider : undefined,
-    model: isAgentModel(value.model) ? value.model : undefined,
-    reasoningEffort: isReasoningEffort(value.reasoningEffort) ? value.reasoningEffort : undefined,
-    avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
-    avatarSeed: value.avatarSeed,
-    avatarHue: value.avatarHue,
-  };
-}
-
-function decodeAgentSummaries(value: unknown): RemoteAgent[] {
-  if (!Array.isArray(value)) throw new Error("The server returned an invalid agent list.");
-  return value.map(decodeAgent);
-}
-
-function decodeConversationReads(value: unknown): Record<string, { unreadCount: number }> {
-  if (!isDynamicRecord(value)) throw new Error("The server returned invalid read states.");
-  const reads: Record<string, { unreadCount: number }> = {};
-  for (const [agentId, readState] of Object.entries(value)) {
-    if (
-      !isDynamicRecord(readState) ||
-      !isNumber(readState.unreadCount) ||
-      !Number.isSafeInteger(readState.unreadCount) ||
-      readState.unreadCount < 0
-    ) {
-      throw new Error("The server returned an invalid read state.");
-    }
-    reads[agentId] = { unreadCount: readState.unreadCount };
-  }
-  return reads;
-}
-
-function ignoreResponse(): void {}
-
-function updateAgentPayload(input: UpdateAgentInput): TeamProtocolV2Json {
-  return {
-    agentId: input.agentId,
-    ...(input.name === undefined ? {} : { name: input.name }),
-    ...(input.title === undefined ? {} : { title: input.title }),
-    ...(input.description === undefined ? {} : { description: input.description }),
-    ...(input.notifications === undefined ? {} : { notifications: input.notifications }),
-    ...(input.provider === undefined ? {} : { provider: input.provider }),
-    ...(input.model === undefined ? {} : { model: input.model }),
-    ...(input.reasoningEffort === undefined ? {} : { reasoningEffort: input.reasoningEffort }),
-    ...(input.avatarSeed === undefined ? {} : { avatarSeed: input.avatarSeed }),
-    ...(input.avatarHue === undefined ? {} : { avatarHue: input.avatarHue }),
-  };
-}
-
-function decodeSidebarLayout(value: unknown): SidebarLayoutSnapshot {
-  if (!isSidebarLayoutSnapshot(value)) throw new Error("The server returned an invalid section layout.");
   return value;
 }

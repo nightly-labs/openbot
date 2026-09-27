@@ -244,6 +244,18 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
   };
 }
 
+/** The answer for a question that expired before the user answered it. Only the model reads it. */
+export function expiredPromptResult(
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input",
+): DynamicToolResult | { answers: Record<string, never> } | { action: "cancel"; content: null; _meta: null } {
+  if (responseKind === "mcp-elicitation") return { action: "cancel", content: null, _meta: null };
+  if (responseKind === "user-input") return { answers: {} };
+  return {
+    success: false,
+    contentItems: [{ type: "inputText", text: "The question expired before the user answered." }],
+  };
+}
+
 export function browserTakeoverResult(decision: RespondToBrowserTakeoverInput["decision"]): DynamicToolResult {
   return {
     success: true,

@@ -18,11 +18,30 @@ export class PendingServerRequests {
     this.#send = send;
   }
 
-  call(method: string, params: unknown): Promise<unknown> {
+  /**
+   * `signal` aborts when the provider stops waiting for this request. The request then rejects and
+   * leaves the table, and the same signal on the sent request tells OpenBot to stop asking the user.
+   */
+  call(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
     const id = randomUUID();
     return new Promise((resolve, reject) => {
-      this.#pending.set(id, { resolve, reject });
-      this.#send({ id, method, params });
+      if (signal?.aborted) {
+        reject(new Error("The provider cancelled the request."));
+        return;
+      }
+      const abandon = () => this.reject(id, { code: -32800, message: "The provider cancelled the request." });
+      signal?.addEventListener("abort", abandon, { once: true });
+      this.#pending.set(id, {
+        resolve: (value) => {
+          signal?.removeEventListener("abort", abandon);
+          resolve(value);
+        },
+        reject: (error) => {
+          signal?.removeEventListener("abort", abandon);
+          reject(error);
+        },
+      });
+      this.#send({ id, method, params, ...(signal ? { signal } : {}) });
     });
   }
 
