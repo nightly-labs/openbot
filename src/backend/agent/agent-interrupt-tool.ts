@@ -152,7 +152,7 @@ export class AgentInterruptTool {
         ? `I interrupted your turn for my message ${messageId}.`
         : "I interrupted the turn that you ran for my message.",
       reason ? `Reason: ${reason}` : null,
-      "Do not resume that work unless I send you a new request. Do not reply to this notice.",
+      "Do not resume that work unless I send you a new request. I do not need a result for it, and I do not need a reply to this notice.",
     ]
       .filter(Boolean)
       .join("\n");
