@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descriptiveSlug } from "../src/server/hosted-site-service";
+import { descriptiveSlug } from "../src/server/hosted-site-records";
 
 describe("hosted site hostname", () => {
   it("keeps the descriptive prefix between 32 and 48 characters", () => {
