@@ -373,9 +373,11 @@ export function ImageLightbox(props: {
             swipeStart = undefined;
           }}
           onClick={(event: MouseEvent) => {
-            // A click beside the image closes the viewer, as a click beside a dialog does.
+            // A click anywhere but the image or a control closes the viewer, as a click beside a
+            // dialog does.
             if (swiped) swiped = false;
-            else if (event.target instanceof HTMLElement && event.target.parentElement === track) close();
+            else if (event.target instanceof Element && !event.target.closest("button, a, .image-lightbox-image"))
+              close();
           }}
           onKeyDown={(event: KeyboardEvent) => {
             const offset = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
