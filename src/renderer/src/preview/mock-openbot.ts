@@ -78,6 +78,7 @@ import {
   STORY_MARKETPLACE_AGENTS,
   STORY_MCP_SERVERS,
   STORY_MODELS,
+  STORY_QUEUES,
   STORY_SHARED_TABLES,
   STORY_SNAPSHOTS,
   STORY_UPDATE_STATUS,
@@ -109,6 +110,8 @@ export interface MockOpenBotOptions
   agents?: AgentSummary[];
   models?: AgentModelOption[];
   snapshots?: Record<string, ConversationSnapshot>;
+  /** Deliveries that wait in each agent's queue when the preview starts. */
+  queues?: Record<string, QueueDelivery[]>;
   updateStatus?: UpdateStatus;
   memories?: Record<string, AgentMemory[]>;
   tables?: SharedTable[];
@@ -260,7 +263,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const runtime: MockRuntime = { emit, schedule };
   const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
   const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
-  const queues = new Map<string, QueueSnapshot>(agents.map((agent) => [agent.id, emptyQueue(agent.id)]));
+  const queueSeeds = clone(options.queues ?? STORY_QUEUES);
+  const queues = new Map<string, QueueSnapshot>(
+    agents.map((agent) => [agent.id, { agentId: agent.id, deliveries: queueSeeds[agent.id] ?? [] }]),
+  );
   const memories = new Map<string, AgentMemory[]>(Object.entries(clone(options.memories ?? {})));
   let tables: SharedTable[] = clone(options.tables ?? STORY_SHARED_TABLES);
   const routines = new Map<string, Routine[]>(Object.entries(clone(options.routines ?? {})));

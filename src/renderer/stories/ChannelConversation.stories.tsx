@@ -2,6 +2,7 @@ import { ArrowUp, Button, Plus, X } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
@@ -199,11 +200,37 @@ export const AuthorLayout: Story = {
   ),
 };
 
-function StoppedTaskConversation(props: { long?: boolean; expanded?: boolean; multiple?: boolean }) {
+const waitingSubtasks: AwaitingReplyItem[] = [
+  {
+    id: "task-research",
+    agent: research,
+    name: research.name,
+    state: "replied",
+    preview: "Draft the pricing section for the launch post",
+    detail: `${chief.name} reads it next`,
+  },
+  {
+    id: "task-sales",
+    agent: sales,
+    name: sales.name,
+    state: "working",
+    preview: "Check the sources in the launch notes",
+  },
+];
+
+function StoppedTaskConversation(props: {
+  long?: boolean;
+  expanded?: boolean;
+  multiple?: boolean;
+  /** The sub-tasks an owner waits for, above the stopped tasks as in `ChannelConversation`. */
+  waiting?: boolean;
+  /** No stopped task: the waiting block sits on the composer. */
+  noStopped?: boolean;
+}) {
   const [state, setState] = createStore({
     text: props.expanded ? "Check the report again.\nInclude the source data." : "",
     attachment: Boolean(props.expanded),
-    tasks: (props.multiple ? [chief, sales, research] : [chief]).map((agent) => ({
+    tasks: (props.noStopped ? [] : props.multiple ? [chief, sales, research] : [chief]).map((agent) => ({
       id: `stopped-${agent.id}`,
       ownerAgentId: agent.id,
       error: props.expanded
@@ -219,6 +246,7 @@ function StoppedTaskConversation(props: { long?: boolean; expanded?: boolean; mu
   return (
     <ChannelTranscript rows={transcript} workers={[]}>
       <div class="composer-wrap">
+        <AwaitingReplies items={props.waiting ? waitingSubtasks : []} title="Waiting for sub-tasks" />
         <ChannelStoppedTasks
           tasks={state.tasks}
           members={STORY_AGENTS.map((agent) => ({ agentId: agent.id }))}
@@ -310,4 +338,13 @@ export const StoppedTaskWithShortConversation: Story = {
 /** Resize the viewport, remove the attachment, and shorten the draft to check both composer sizes. */
 export const StoppedTasksWithAttachments: Story = {
   render: () => <StoppedTaskConversation long expanded multiple />,
+};
+
+/** An owner waits for its sub-tasks while another task is stopped: the two blocks stack. */
+export const WaitingSubtasksAboveStoppedTask: Story = {
+  render: () => <StoppedTaskConversation long waiting />,
+};
+
+export const WaitingSubtasksAboveComposer: Story = {
+  render: () => <StoppedTaskConversation long waiting noStopped />,
 };

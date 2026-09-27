@@ -102,6 +102,7 @@ export function reduceAgentActivity(
         message.turnId === activeTurnId &&
         message.author === "assistant" &&
         message.itemType !== "commentary" &&
+        message.itemType !== "plan" &&
         message.status === "streaming" &&
         message.text.trim().length > 0,
     );

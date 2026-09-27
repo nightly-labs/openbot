@@ -21,6 +21,7 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
@@ -1007,16 +1008,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "plan") {
-      const text = update.entries
-        .map((entry) => `- [${entry.status === "completed" ? "x" : " "}] ${entry.content}`)
-        .join("\n");
       this.emit("notification", {
-        method: "item/completed",
-        params: {
-          threadId: thread.id,
-          turnId: turn.id,
-          item: { id: `${turn.id}:plan`, type: "agentMessage", phase: "analysis", text },
-        },
+        method: PLAN_UPDATED_METHOD,
+        params: { threadId: thread.id, turnId: turn.id, explanation: null, plan: acpPlanSteps(update.entries) },
       });
     }
   }

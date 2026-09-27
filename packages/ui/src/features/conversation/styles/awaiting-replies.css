@@ -1,0 +1,108 @@
+/*
+ * Waiting for replies: the task list rows, in the queue panel's surface. It hangs off the top of the
+ * next panel like the queue: its bottom goes under the composer, or under the queue when the queue
+ * shows, and that panel paints over the overlap.
+ */
+
+.awaiting-replies {
+  --awaiting-composer-overlap: 14px;
+
+  position: relative;
+  z-index: 9;
+  width: auto;
+  margin: 0 12px calc(-1 * var(--awaiting-composer-overlap));
+  border-color: var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-queue-surface);
+  padding-bottom: var(--awaiting-composer-overlap);
+  animation: queue-panel-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.awaiting-replies.task-list .task-list-header {
+  border-radius: var(--openbot-radius-lg);
+}
+
+.composer-wrap:has(.composer-attachment) .awaiting-replies:last-child {
+  margin-bottom: 0;
+}
+
+.awaiting-replies-item {
+  align-items: center;
+}
+
+.awaiting-replies-avatar {
+  --agent-avatar-optical-offset: -1px;
+
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+}
+
+.awaiting-replies-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+}
+
+.awaiting-replies-name {
+  flex: 0 0 auto;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.awaiting-replies-preview {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.awaiting-replies-state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
+}
+
+.awaiting-replies-detail {
+  color: var(--openbot-text-dim);
+}
+
+.awaiting-replies-item[data-state="failed"] .awaiting-replies-state-label {
+  color: var(--openbot-danger-text);
+}
+
+.awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {
+  background: linear-gradient(
+    90deg,
+    var(--openbot-text-muted) 0%,
+    var(--openbot-text-muted) 35%,
+    var(--openbot-text-primary) 50%,
+    var(--openbot-text-muted) 65%,
+    var(--openbot-text-muted) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: task-list-shine 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .awaiting-replies {
+    animation: none;
+  }
+
+  .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label {
+    background: none;
+    color: var(--openbot-text-muted);
+    animation: none;
+  }
+}

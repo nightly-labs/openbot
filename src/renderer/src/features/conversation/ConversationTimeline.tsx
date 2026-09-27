@@ -8,9 +8,11 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
+import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
+import { planItems, planTitle } from "../../app-message-projection";
 import { dayMarkerLabel } from "./chat-day-markers";
 import { continuesSenderRun } from "./chat-grouping";
 import { conversationRuntime } from "./conversation-runtime";
@@ -33,11 +35,12 @@ function markerOnlyMessage(message: AgentMessage): boolean {
 /**
  * Does this row draw a time of its own?
  *
- * A marker-only row carries the marker's own time, and a question prompt draws a card instead of a
- * message row. Neither shows the header a run continues under, so neither can hold a run open.
+ * A marker-only row carries the marker's own time, and a question prompt and a plan draw a card
+ * instead of a message row. None shows the header a run continues under, so none can hold a run
+ * open.
  */
 function rowDrawsTime(message: AgentMessage): boolean {
-  return !markerOnlyMessage(message) && !message.questionPrompt;
+  return !markerOnlyMessage(message) && !message.questionPrompt && message.kind !== "plan";
 }
 
 /** Marker-only rows that render attachment cards below the marker do not end with one. */
@@ -355,6 +358,52 @@ export function ConversationTimeline() {
                               onAction={attachmentAction}
                             />
                           </div>
+                        </Show>
+                      </article>
+                    </div>
+                  );
+                }
+                if (untrack(() => initialMessage.kind === "plan")) {
+                  // A plan has no bubble, reactions or time: it is the agent's live checklist.
+                  const plan = () => message()?.plan ?? initialMessage.plan;
+                  return (
+                    <div
+                      data-index={virtualRow.index}
+                      ref={messageVirtualizer.measureElement}
+                      class="virtual-chat-row"
+                      style={{
+                        transform: messageVirtualizer.isVirtualized()
+                          ? `translateY(${virtualRow.start - messageVirtualizer.scrollMargin()}px)`
+                          : "none",
+                      }}
+                    >
+                      <Show when={dayMarker()}>
+                        {(label) => (
+                          <div class="time-marker">
+                            <span>{label()}</span>
+                          </div>
+                        )}
+                      </Show>
+                      <Show when={message()?.id === props.firstUnreadMessageId}>
+                        <UnreadMessagesDivider
+                          elementRef={(element) => {
+                            setUnreadMessagesDividerElement(element);
+                            scheduleUnreadDividerVisibilityUpdate();
+                          }}
+                        />
+                      </Show>
+                      <article
+                        data-chat-search-message={message()?.id}
+                        class={{ "message-entry-animated": animateEntrance }}
+                      >
+                        <Show when={plan()}>
+                          {(current) => (
+                            <TaskList
+                              items={planItems(current(), message()?.streaming === true)}
+                              title={planTitle(current())}
+                              defaultOpen={untrack(() => initialMessage.streaming === true)}
+                            />
+                          )}
                         </Show>
                       </article>
                     </div>

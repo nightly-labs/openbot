@@ -79,6 +79,8 @@
     "./features/conversation/ChatActionMarker": "./src/features/conversation/ChatActionMarker.tsx",
     "./features/conversation/ChatMessageRow": "./src/features/conversation/ChatMessageRow.tsx",
     "./features/conversation/ChatSearch": "./src/features/conversation/ChatSearch.tsx",
+    "./features/conversation/TaskList": "./src/features/conversation/TaskList.tsx",
+    "./features/conversation/AwaitingReplies": "./src/features/conversation/AwaitingReplies.tsx",
     "./features/conversation/CodeBlock": "./src/features/conversation/CodeBlock.tsx",
     "./features/conversation/ComparisonTable": "./src/features/conversation/ComparisonTable.tsx",
     "./features/conversation/ComposerEditor": "./src/features/conversation/ComposerEditor.tsx",

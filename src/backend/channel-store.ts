@@ -118,6 +118,7 @@ export class ChannelStore {
           `SELECT c.channel_json AS channel_json,
             (SELECT m.message_json FROM projection_channel_messages AS m
               WHERE m.channel_id = c.channel_id
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
               ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
             (SELECT COUNT(*) FROM projection_channel_messages AS m
               WHERE m.channel_id = c.channel_id

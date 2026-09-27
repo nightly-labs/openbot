@@ -21,6 +21,7 @@ export * from "./ipc-channel-routines";
 export * from "./ipc-chat-channels";
 export * from "./ipc-conversation-events";
 export * from "./ipc-conversation-messages";
+export * from "./ipc-conversation-plan";
 export * from "./ipc-conversations";
 export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";

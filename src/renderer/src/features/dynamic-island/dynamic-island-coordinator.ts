@@ -491,7 +491,8 @@ function toDynamicIslandMessage(
     (message.author !== "assistant" && message.author !== "agent") ||
     message.itemType === "commentary" ||
     message.itemType === "question_prompt" ||
-    message.itemType === "agent_attachment"
+    message.itemType === "agent_attachment" ||
+    message.itemType === "plan"
   ) {
     return [];
   }

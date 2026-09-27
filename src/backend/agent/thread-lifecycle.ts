@@ -47,9 +47,15 @@ import { codexSandboxConfig, codexSandboxMode, workspaceWritableRoots } from "./
  * the replacement flow. Bump it when what Codex is sent changes; 2 is HTTP servers joining
  * the payload, 3 is the sweep that turns off the servers `~/.codex/config.toml` declares, and 4 is
  * the managed tool runtimes joining the fingerprint, so a session started before Bun finished
- * downloading is replaced once its servers can actually start.
+ * downloading is replaced once its servers can actually start, and 5 is the plan tool below.
  */
-const CODEX_MCP_ADAPTER_VERSION = 4;
+const CODEX_MCP_ADAPTER_VERSION = 5;
+
+/**
+ * Codex offers `update_plan` only when this is on, and without it a turn sends no
+ * `turn/plan/updated`, so the conversation shows no task list.
+ */
+const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
 
 // A handoff can follow an edit of the profile. The earlier replies then show the old standing
 // remit, and without this line the model copies them instead of following the new one.
@@ -400,17 +406,20 @@ export class ThreadLifecycle {
   ): Promise<{
     config?: {
       mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
+      tools: typeof CODEX_TOOLS_CONFIG;
     } & ReturnType<typeof codexSandboxConfig>;
   }> {
     if (client.provider !== "codex") return {};
     const { servers, dropped } = codexMcpServers(await usableMcpServers(configs, toolRuntimes, this.#mcpAuthorization));
     this.#hooks.reportMcpDrops(client.provider, dropped);
     const mcpServers = { ...disabled, ...servers };
-    const config = {
-      ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
-      ...codexSandboxConfig(agent, this.#store.sharedRoot),
+    return {
+      config: {
+        ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
+        tools: CODEX_TOOLS_CONFIG,
+        ...codexSandboxConfig(agent, this.#store.sharedRoot),
+      },
     };
-    return Object.keys(config).length > 0 ? { config } : {};
   }
 
   /**

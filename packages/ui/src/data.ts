@@ -8,6 +8,7 @@ import type {
   AttachmentSummary,
   AvatarHue,
   ChannelRoutingConversationEvent,
+  ConversationPlan,
   ConversationQuestionPrompt,
   ConversationReaction,
   HostedSiteConversationEvent,
@@ -23,7 +24,12 @@ import type {
  * `error` is a message the renderer wrote itself, not one the provider sent: an action of the
  * user failed, and `status` names which one.
  */
-export type MessageKind = "text" | "thinking" | "exchange" | "question" | "action-marker" | "error";
+export type MessageKind = "text" | "thinking" | "exchange" | "question" | "action-marker" | "plan" | "error";
+
+/** The plan of one turn. `stopped` is true when the turn was stopped or failed before it ended. */
+export interface AgentMessagePlan extends ConversationPlan {
+  stopped: boolean;
+}
 
 export type ChatActionMarkerStatus =
   | "queued"
@@ -138,6 +144,7 @@ export interface AgentMessage {
   actionMarker?: ChatActionMarkerModel;
   items?: string[];
   itemIds?: string[];
+  plan?: AgentMessagePlan;
 }
 
 export interface AgentProfile {

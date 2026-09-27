@@ -17,6 +17,14 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import {
+  type ClaudePlanState,
+  foldClaudePlanCall,
+  foldClaudePlanResult,
+  newClaudePlanState,
+  PLAN_UPDATED_METHOD,
+  type PlanUpdateStep,
+} from "./agent/plan-updates";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import { BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import {
@@ -117,6 +125,8 @@ interface ThreadRuntime {
   consume: Promise<void>;
   idleRelease: ReturnType<typeof setTimeout> | null;
   idleSince: number;
+  /** The plan Claude keeps with its todo and task tools, which OpenBot shows as a task list. */
+  plan: ClaudePlanState;
 }
 
 /**
@@ -145,6 +155,8 @@ interface ClaudeStreamMessage {
   terminal_reason?: string;
   modelUsage?: unknown;
   total_cost_usd?: number;
+  /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
+  tool_use_result?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -557,7 +569,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             }
           : {}),
         mcpServers,
-        env: { ...claudeEnvironment(this.#cli), CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0" },
+        env: {
+          ...claudeEnvironment(this.#cli),
+          CLAUDE_AGENT_SDK_CLIENT_APP: "openbot/0.1.0",
+          // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
+          // agent has no plan for OpenBot to show as a task list.
+          CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
+        },
       },
     });
     const runtime: ThreadRuntime = {
@@ -572,6 +590,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       consume: Promise.resolve(),
       idleRelease: null,
       idleSince: 0,
+      plan: newClaudePlanState(),
     };
     runtime.consume = this.#consume(runtime);
     this.#threads.add(runtime);
@@ -732,6 +751,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (turn.toolCalls.has(toolCall.id)) continue;
         turn.toolCalls.set(toolCall.id, toolCall.name);
         this.#emitToolCall(runtime, toolCall.id, toolCall.name, false);
+        const plan = foldClaudePlanCall(runtime.plan, toolCall);
+        if (plan) this.#emitPlan(runtime, plan);
       }
       return;
     }
@@ -739,7 +760,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "user") {
       const turn = runtime.activeTurn;
       if (!turn) return;
-      for (const toolCallId of messageToolResults(message.message)) {
+      for (const { id: toolCallId, text } of messageToolResults(message.message)) {
+        // A subagent's task ids are its own, so only the main agent's results name a plan task.
+        if (!message.parent_tool_use_id) foldClaudePlanResult(runtime.plan, toolCallId, message.tool_use_result, text);
         const name = turn.toolCalls.get(toolCallId);
         if (!name) continue;
         turn.toolCalls.delete(toolCallId);
@@ -796,6 +819,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         turnId: turn.id,
         item: { id, type: "toolCall", name, status: completed ? "completed" : "in_progress" },
       },
+    });
+  }
+
+  #emitPlan(runtime: ThreadRuntime, plan: PlanUpdateStep[]): void {
+    const turn = runtime.activeTurn;
+    if (!turn) return;
+    this.emit("notification", {
+      method: PLAN_UPDATED_METHOD,
+      params: { threadId: runtime.id, turnId: turn.id, explanation: null, plan },
     });
   }
 
@@ -1319,22 +1351,31 @@ function messageThinking(message: unknown): string {
     .join("\n");
 }
 
-function messageToolCalls(message: unknown): Array<{ id: string; name: string }> {
+function messageToolCalls(message: unknown): Array<{ id: string; name: string; input: unknown }> {
   if (!isRecord(message) || !Array.isArray(message.content)) return [];
   return message.content.filter(isRecord).flatMap((block) => {
     const id = getString(block, "id");
     const name = getString(block, "name");
-    return block.type === "tool_use" && id && name ? [{ id, name }] : [];
+    return block.type === "tool_use" && id && name ? [{ id, name, input: block.input }] : [];
   });
 }
 
-function messageToolResults(message: unknown): string[] {
+function messageToolResults(message: unknown): Array<{ id: string; text: string }> {
   if (!isRecord(message) || !Array.isArray(message.content)) return [];
-  return message.content
-    .filter(isRecord)
-    .filter((block) => block.type === "tool_result")
-    .map((block) => getString(block, "tool_use_id"))
-    .filter(isString);
+  return message.content.filter(isRecord).flatMap((block) => {
+    const id = getString(block, "tool_use_id");
+    if (block.type !== "tool_result" || !id) return [];
+    const content = block.content;
+    const text = isString(content)
+      ? content
+      : Array.isArray(content)
+        ? content
+            .filter(isRecord)
+            .map((part) => getString(part, "text") ?? "")
+            .join("\n")
+        : "";
+    return [{ id, text }];
+  });
 }
 
 function dynamicContent(value: unknown): CallToolResult["content"] {
