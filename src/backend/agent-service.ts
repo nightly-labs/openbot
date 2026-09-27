@@ -1058,8 +1058,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         // A new record starts on the built-in default provider, so this is the one place a preferred
         // provider lands on a new agent -- and with it the model setup chose, which is how a custom
-        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
-        if (starting.provider !== agent.provider) {
+        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider. A
+        // fallback from the preferred provider always lands: the record's own provider can be the
+        // fallback, and the model the record holds need not be one that provider lists.
+        if (starting.provider !== agent.provider || starting.provider !== preference.provider) {
           agent = await this.#store.updateAgent({
             agentId: agent.id,
             provider: starting.provider,
