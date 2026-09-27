@@ -133,5 +133,9 @@ function isBinaryText(value: string): boolean {
 function structuredText(copy: DynamicRecord): string {
   const json = JSON.stringify(copy, (_key, value) => (typeof value === "string" ? readableText(value) : value));
   if (json.length <= MAX_STRUCTURED_TEXT_CHARS) return `${STRUCTURED_TEXT_LABEL}\n${json}`;
-  return `${STRUCTURED_TEXT_LABEL}\n${json.slice(0, MAX_STRUCTURED_TEXT_CHARS)}\n[OpenBot cut this copy at ${MAX_STRUCTURED_TEXT_CHARS} of ${json.length} characters. Ask the tool for less: get_window_state takes query and max_elements.]`;
+  // A cut between the two halves of a surrogate pair leaves a lone half, which the driver's JSON
+  // parser refuses, and the whole call then fails.
+  const lastKept = json.charCodeAt(MAX_STRUCTURED_TEXT_CHARS - 1);
+  const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? MAX_STRUCTURED_TEXT_CHARS - 1 : MAX_STRUCTURED_TEXT_CHARS;
+  return `${STRUCTURED_TEXT_LABEL}\n${json.slice(0, end)}\n[OpenBot cut this copy at ${MAX_STRUCTURED_TEXT_CHARS} of ${json.length} characters. Ask the tool for less: get_window_state takes query and max_elements.]`;
 }
