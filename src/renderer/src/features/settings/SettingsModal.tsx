@@ -23,6 +23,7 @@ import {
   PanelTop,
   Settings,
   Smartphone,
+  Sparkles,
   Tabs,
   Text,
   UserRound,
@@ -36,11 +37,11 @@ import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdate
 import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import { createProviderKeyState, ProviderSettingsDialogs } from "./ProviderSettingsSection";
+import { createProviderKeyState, ProviderSettingsDialogs, ProviderSettingsSection } from "./ProviderSettingsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
@@ -72,7 +73,7 @@ export interface SettingsModalProps {
   onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /** Accepts a described endpoint from the General tab. Omitted on a remote server, which hides it. */
+  /** Accepts a described endpoint from the AI providers tab. Omitted on a remote server, which hides it. */
   onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
   customProviders?: readonly CustomProviderSummary[];
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
@@ -95,10 +96,13 @@ export interface SettingsModalProps {
   /** Opens the operating system notification settings. Shown only on macOS and Windows. */
   onOpenNotificationSettings?: () => void | Promise<void>;
   restoreFocusTarget?: HTMLElement | null;
+  /** The tab shown when the modal is created. Read once; the user moves between tabs after that. */
+  initialTab?: SettingsTab;
 }
 
-type SettingsTab =
+export type SettingsTab =
   | "general"
+  | "providers"
   | "dynamic-island"
   | "computer-use"
   | "profile"
@@ -124,6 +128,12 @@ const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.general.title",
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
+  },
+  {
+    value: "providers",
+    titleKey: "settings.tab.providers.title",
+    descriptionKey: "settings.tab.providers.description",
+    icon: Sparkles,
   },
   {
     value: "dynamic-island",
@@ -179,11 +189,11 @@ function navItem(tab: SettingsTab): SettingsNavItem {
  */
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
-  const [activeTab, setActiveTab] = createSignal<SettingsTab>("general");
+  const [activeTab, setActiveTab] = createSignal<SettingsTab>(untrack(() => props.initialTab) ?? "general");
   let modalElement: HTMLElement | undefined;
   const providerKeyState = createProviderKeyState(props);
 
-  const general = createSettingsGeneralStore({
+  const providers = createSettingsGeneralStore({
     get agentStatus() {
       return props.agentStatus;
     },
@@ -217,6 +227,7 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        value === "providers" ||
         (value === "dynamic-island" && isMac()) ||
         value === "computer-use" ||
         value === "profile" ||
@@ -311,9 +322,22 @@ export function SettingsModal(props: SettingsModalProps) {
       >
         <Tabs.Content value="general" class="settings-modal-tab-panel" data-tab="general">
           <SettingsGeneralTab
-            store={general}
             value={props.value}
             onUpdateSetting={updateSetting}
+            selectMount={modalElement}
+            turboModePending={props.turboModePending}
+            onTestNotification={props.onTestNotification}
+            onOpenNotificationSettings={
+              props.appInfo?.platform === "darwin" || props.appInfo?.platform === "win32"
+                ? props.onOpenNotificationSettings
+                : undefined
+            }
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="providers" class="settings-modal-tab-panel" data-tab="providers">
+          <ProviderSettingsSection
+            store={providers}
             selectMount={modalElement}
             onDownloadProvider={props.onDownloadProvider}
             onCancelProviderDownload={props.onCancelProviderDownload}
@@ -325,13 +349,6 @@ export function SettingsModal(props: SettingsModalProps) {
             onDeleteCustomProvider={props.onDeleteCustomProvider}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
-            turboModePending={props.turboModePending}
-            onTestNotification={props.onTestNotification}
-            onOpenNotificationSettings={
-              props.appInfo?.platform === "darwin" || props.appInfo?.platform === "win32"
-                ? props.onOpenNotificationSettings
-                : undefined
-            }
           />
         </Tabs.Content>
 

@@ -96,6 +96,7 @@ it("announces an offer and follows only current snapshots", async () => {
   const { store, emit } = runtimeHarness();
   await waitFor(() => expect(store.providerAvailableVersions().claude).toBe("2.1.250"));
   expect(await screen.findByText("Claude update available")).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
   // The row's offer is in its actions menu, a Kobalte trigger that wants the pointer press too.
   const moreActions = await screen.findByRole("button", { name: "More actions for Claude" });
   fireEvent.pointerDown(moreActions, { button: 0 });
