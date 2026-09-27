@@ -48,6 +48,7 @@ import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team
 import { sourceText } from "@openbot/i18n/source";
 import { contentDispositionFileName } from "./content-disposition";
 import { decodeAgentSummary, decodeDraftAttachment, decodeDuplicateAgentResultFromHost } from "./remote-agent-decoding";
+import { type RemoteAttachment, RemoteAttachmentCache } from "./remote-attachment-cache";
 import {
   decodeConversationPageFromHost,
   decodeConversationReadState,
@@ -129,6 +130,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #refresh: RemoteEventRefresh;
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
+  readonly #attachments = new RemoteAttachmentCache();
   readonly #team: RemoteTeamDirectory;
   readonly #centralAccount: CentralAccountSession;
   readonly #allowLocalDevelopmentInvites: boolean;
@@ -297,6 +299,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   setAppFocused(focused: boolean): void {
     this.#events.setAppFocused(focused);
+  }
+
+  /** The computer woke from sleep. Each host reconnects at once instead of after its backoff. */
+  wake(): void {
+    this.#events.wake();
+  }
+
+  /** A file on this server was deleted, so a copy of it must not be shown again. */
+  forgetCachedAttachments(serverId: string): void {
+    this.#attachments.forget(serverId);
   }
 
   async syncRemoteHosts(): Promise<ServerSummary[]> {
@@ -636,6 +648,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#connections.forget(serverId);
     this.#client.forget(serverId);
     this.#presence.forget(serverId);
+    this.#attachments.forget(serverId);
   }
 
   // The server comes first because every caller knows which one it means, and the decoder sits next
@@ -989,21 +1002,19 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return { bytes, mimeType };
   }
 
-  async downloadAttachment(
-    attachmentId: string,
-    serverId = this.#store.activeServerId,
-  ): Promise<{
-    bytes: Uint8Array;
-    name: string;
-    mimeType: string;
-  }> {
+  async downloadAttachment(attachmentId: string, serverId = this.#store.activeServerId): Promise<RemoteAttachment> {
     const server = this.#store.require(serverId);
-    const response = await this.#client.fetch(server, new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl));
-    return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
-      name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
-      mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-    };
+    return this.#attachments.get(server.id, attachmentId, async () => {
+      const response = await this.#client.fetch(
+        server,
+        new URL(TEAM_API_ROUTES.attachment(attachmentId), server.apiUrl),
+      );
+      return {
+        bytes: new Uint8Array(await response.arrayBuffer()),
+        name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
+        mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+      };
+    });
   }
 
   async downloadSharedFile(
@@ -1041,6 +1052,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#events.stop();
     this.#refresh.clear();
     this.#client.clear();
+    this.#attachments.clear();
     await this.#remoteViewerProxy?.stop().catch(() => undefined);
     await this.#webrtcTransport?.stop().catch(() => undefined);
   }
@@ -1051,6 +1063,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   async disconnectRemoteSessions(): Promise<void> {
+    // A copy skips the host's check of the account, so the next account must not see it.
+    this.#attachments.clear();
     if (!this.#webrtcTransport) return;
     await Promise.all(
       this.#store.servers

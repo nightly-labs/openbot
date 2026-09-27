@@ -11,6 +11,10 @@ All notable changes to OpenBot will be documented here. The project follows
   A path such as `api/…`, `server/…` or `node_modules/…`, or a path longer than 240 characters,
   now shows a translated error.
 - Show the Grok sign-in text and the skill folder warning in French and Japanese.
+- Connect to joined servers again at once when the computer wakes from sleep. Before, the app
+  could wait up to one minute, or longer for a host that was offline.
+- Show images from a joined server again without a new download each time. The app keeps a copy in
+  memory for 10 minutes.
 
 ### Fixed
 

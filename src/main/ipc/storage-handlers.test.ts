@@ -57,6 +57,7 @@ function setup(options: { capable: boolean; answer?: unknown }) {
       return decoder(options.answer ?? {});
     },
     downloadAttachment: vi.fn(),
+    forgetCachedAttachments: vi.fn(),
   };
   const mailbox = {
     resolveAttachment: vi.fn(async () => ({ path: "/transfers/report.pdf", mimeType: "application/pdf", name: "a" })),
