@@ -162,6 +162,9 @@ export function SiteNavigationMenu() {
     const previous = current;
     current = null;
     setMotion({ opened: "enter", closed: { id: previous, motion: "exit" } });
+    // A panel still fading out of a switch loses its motion here, so its
+    // animation is cancelled and no animationend will stop its artwork.
+    setShown([previous]);
     setActive(null);
     settlePill();
   }

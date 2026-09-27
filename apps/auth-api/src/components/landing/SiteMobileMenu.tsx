@@ -13,8 +13,9 @@ export interface SiteMobileMenuProps {
 
 // The header menu on a narrow screen: a button that turns into a close mark, and
 // a sheet under the header with the same sections as the desktop panels. The
-// sheet covers the page, so the page stops scrolling while it is open, and it
-// closes on Escape, on a link, and when the window grows past the breakpoint.
+// sheet covers the page, so the page stops scrolling and leaves the tab order
+// while it is open, and it closes on Escape, on a link, and when the window grows
+// past the breakpoint.
 export function SiteMobileMenu(props: SiteMobileMenuProps) {
   const sheetId = createUniqueId();
   const [open, setOpen] = createSignal(false);
@@ -22,11 +23,31 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
   const [live, setLive] = createSignal(false);
   let button: HTMLButtonElement | undefined;
   let sheet: HTMLDivElement | undefined;
+  // The page elements this menu made inert, so it gives back only those.
+  let covered: HTMLElement[] = [];
+
+  /** Take everything beside the header out of reach, so Tab stays in the header and the sheet. */
+  function coverPage(): void {
+    for (let node = sheet?.closest("header"); node && node !== document.body; node = node.parentElement) {
+      for (const sibling of node.parentElement?.children ?? []) {
+        if (sibling === node || !(sibling instanceof HTMLElement) || sibling.inert) continue;
+        sibling.inert = true;
+        covered.push(sibling);
+      }
+    }
+  }
+
+  function uncoverPage(): void {
+    for (const element of covered) element.inert = false;
+    covered = [];
+  }
 
   function setSheet(next: boolean): void {
     setOpen(next);
     if (next) setLive(true);
     document.documentElement.toggleAttribute("data-site-sheet-open", next);
+    if (next && covered.length === 0) coverPage();
+    if (!next) uncoverPage();
   }
 
   onSettled(() => {
@@ -59,6 +80,7 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
       document.removeEventListener("click", handleClick);
       sheet?.removeEventListener("transitionend", handleSheetTransitionEnd);
       document.documentElement.removeAttribute("data-site-sheet-open");
+      uncoverPage();
     };
   });
 
