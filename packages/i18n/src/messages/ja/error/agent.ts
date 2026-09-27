@@ -22,6 +22,8 @@ export const messages = {
   "error.agent.setupCleanupFailed": "エージェントのセットアップに失敗し、不完全なエージェントを削除できませんでした。",
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderMismatch": "選択したモデルはそのプロバイダーのものではありません。",
+  "error.agent.noStartingModel":
+    "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、「プロバイダーと権限」でデフォルトのプロバイダーを変更してください。",
   "error.agent.waitBeforeProviderChange":
     "プロバイダーを変更する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.unknown": "不明なエージェントです: {id}",

@@ -23,6 +23,8 @@ export const messages = {
     "La configuration de l’agent a échoué et l’agent incomplet n’a pas pu être supprimé.",
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
   "error.agent.modelProviderMismatch": "Le modèle sélectionné n’appartient pas à ce fournisseur.",
+  "error.agent.noStartingModel":
+    "{provider} n’a aucun modèle disponible, et aucun autre fournisseur connecté n’en a. Connectez-vous à un fournisseur, ou changez le fournisseur par défaut dans Fournisseurs et autorisations.",
   "error.agent.waitBeforeProviderChange":
     "Attendez la fin du tour actif et de la file d’attente avant de changer de fournisseur.",
   "error.agent.unknown": "Agent inconnu : {id}",

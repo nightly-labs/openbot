@@ -79,6 +79,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.keyRequired": "A provider key is required.",
   "error.provider.keyTooLong": "The provider key is too long.",
   "error.provider.noModel": "The selected provider has no available model.",
+  "error.provider.noModelNamed": "{provider} has no model available.",
   "error.provider.acpNoModels": "ACP CLI did not advertise any ACP models. OpenBot will not guess a fallback model.",
   "error.provider.endpointRemoveBusy": "Wait for the active turn and queue to finish before you remove this endpoint.",
   "error.provider.codexOutdated": "Codex CLI {version} is too old. OpenBot requires 0.144.1 or newer.",

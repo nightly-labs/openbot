@@ -377,6 +377,24 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it("starts a new agent on another signed-in provider when the preferred one lists no model", async () => {
+    // Grok has no built-in model list, so a Grok CLI that is not ready lists nothing. Codex and
+    // Claude are not installed either, but still list their built-in models.
+    process.env.OPENBOT_CODEX_PATH = join(root, "missing-codex");
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { service: agentService } = await startService(root, {
+      preferredProvider: "grok",
+      client: (provider) => new FakeAgentClient(provider),
+    });
+    service = agentService;
+    await service.ensureProvider("opencode");
+
+    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
+      provider: "opencode",
+      model: "opencode/example-model",
+    });
+  });
+
   it("detects a newly installed provider without disconnecting an available one", async () => {
     const codexPath = process.env.OPENBOT_CODEX_PATH;
     if (!codexPath) throw new Error("The fake Codex path is missing.");
