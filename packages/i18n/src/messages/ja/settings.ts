@@ -62,6 +62,8 @@ export const messages = {
     "利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。",
   "settings.tab.general.title": "一般",
   "settings.tab.general.description": "このコンピュータでの OpenBot の動作を設定します。",
+  "settings.tab.providers.title": "AI プロバイダー",
+  "settings.tab.providers.description": "このコンピュータでエージェントが使う AI プロバイダーを接続します。",
   "settings.tab.computerUse.title": "コンピュータ操作",
   "settings.tab.computerUse.description": "このコンピュータのアプリを OpenBot が見て操作できるようにします。",
   "settings.tab.profile.title": "プロフィール",

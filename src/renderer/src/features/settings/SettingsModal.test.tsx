@@ -225,6 +225,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
     const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
     fireEvent.pointerDown(moreActions, { button: 0 });
@@ -868,6 +869,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     await fireEvent.click(screen.getByRole("button", { name: "Add custom provider" }));
     // A required field appends an aria-hidden asterisk to its label, so its name is not an exact match.
     await fireEvent.input(await screen.findByLabelText(/^Provider ID/u), { target: { value: "studio-local" } });
@@ -927,6 +929,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     // The endpoints are listed in a dialog now, which the count on the Custom provider row opens.
     await fireEvent.click(screen.getByRole("button", { name: "Manage 1 endpoint" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Delete Studio Local" }));
@@ -975,6 +978,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     const custom = await screen.findByRole("radio", { name: /Custom provider/ });
     const openCode = screen.getByRole("radio", { name: /OpenCode/ });
     await fireEvent.click(openCode);
@@ -1023,6 +1027,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     await screen.findByText("Free");
     expect(providerKeys.getProviderApiKeyState).toHaveBeenCalledTimes(1);
 
@@ -1116,6 +1121,7 @@ describe("SettingsModal", () => {
       />
     ));
 
+    await fireEvent.click(await screen.findByRole("tab", { name: "AI providers" }));
     // The menu is a Kobalte trigger: it wants the pointer press as well as the click.
     const moreActions = await screen.findByRole("button", { name: "More actions for ChatGPT" });
     fireEvent.pointerDown(moreActions, { button: 0 });

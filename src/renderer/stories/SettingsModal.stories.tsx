@@ -14,7 +14,7 @@ import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
-import { SettingsModal } from "../src/features/settings/SettingsModal";
+import { SettingsModal, type SettingsTab } from "../src/features/settings/SettingsModal";
 import { createFakeCodeLogin } from "./code-login-fixture";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -117,6 +117,7 @@ function SettingsModalStory(props: {
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   codeSignIn?: boolean;
+  initialTab?: SettingsTab;
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
@@ -197,6 +198,7 @@ function SettingsModalStory(props: {
           Open settings
         </Button>
         <SettingsModal
+          initialTab={props.initialTab}
           open={open()}
           onOpenChange={setOpen}
           value={value()}
@@ -303,7 +305,7 @@ export const Open: Story = {
 
 /** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
 export const AddCustomProvider: Story = {
-  render: () => <SettingsModalStory initialOpen openCodeInstalled />,
+  render: () => <SettingsModalStory initialOpen openCodeInstalled initialTab="providers" />,
 };
 
 /**
@@ -311,7 +313,7 @@ export const AddCustomProvider: Story = {
  * AI providers section keeps its rows of fixed height.
  */
 export const CustomProviderList: Story = {
-  render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderList />,
+  render: () => <SettingsModalStory initialOpen openCodeInstalled customProviderList initialTab="providers" />,
 };
 
 /**
@@ -319,7 +321,7 @@ export const CustomProviderList: Story = {
  * menu, so the row still leads with one button.
  */
 export const CodeSignIn: Story = {
-  render: () => <SettingsModalStory initialOpen codeSignIn />,
+  render: () => <SettingsModalStory initialOpen codeSignIn initialTab="providers" />,
 };
 
 export const Narrow: Story = {
@@ -328,17 +330,17 @@ export const Narrow: Story = {
 };
 
 export const ProviderDownloads: Story = {
-  render: () => <SettingsModalStory initialOpen providerDownloads />,
+  render: () => <SettingsModalStory initialOpen providerDownloads initialTab="providers" />,
   parameters: { viewport: { defaultViewport: "settingsPhone" } },
 };
 
 /** The durable surface: the update the toast offers is still here after the toast is gone. */
 export const ProviderUpdateAvailable: Story = {
-  render: () => <SettingsModalStory initialOpen providerUpdate />,
+  render: () => <SettingsModalStory initialOpen providerUpdate initialTab="providers" />,
 };
 
 export const ProviderUpdateRetry: Story = {
-  render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure />,
+  render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure initialTab="providers" />,
 };
 
 export const Interactive: Story = {

@@ -21,7 +21,6 @@ import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-set
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { createSignal, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
-import { ProviderSettingsSection, type ProviderSettingsSectionProps } from "./ProviderSettingsSection";
 
 const linkTargetOptions: GeneralSettingsValue["externalLinkTarget"][] = ["Default browser", "OpenBot"];
 
@@ -34,8 +33,10 @@ const LINK_TARGET_KEYS = {
   OpenBot: "settings.externalLinks.openbot",
 } as const satisfies Record<GeneralSettingsValue["externalLinkTarget"], AppTextKey>;
 
-interface SettingsGeneralTabProps extends ProviderSettingsSectionProps {
+interface SettingsGeneralTabProps {
   value: GeneralSettingsValue;
+  /** The dialog element the Select popovers portal into, captured when the tab was created. */
+  selectMount: HTMLElement | undefined;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   turboModePending?: boolean;
   /** Shows one desktop notification now. Absent where there is no operating system to show it. */
@@ -59,8 +60,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const [confirmingTurbo, setConfirmingTurbo] = createSignal(false);
   return (
     <>
-      <ProviderSettingsSection {...props} />
-
       <SettingsSection title={i18n.t("settings.appBehavior.title")}>
         <ItemGroup class="settings-modal-card">
           <SwitchField
