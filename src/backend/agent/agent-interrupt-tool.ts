@@ -18,7 +18,8 @@ export const interruptAgentToolSchema = z.strictObject({
 
 export interface AgentInterruptHooks {
   listAgents(): AgentSummary[];
-  interrupt(agentId: string, turnId: string): Promise<void>;
+  /** `false` when the turn no longer runs, so no stop was sent. */
+  interrupt(agentId: string, turnId: string): Promise<boolean>;
 }
 
 export interface AgentInterruptToolOptions {
@@ -102,7 +103,10 @@ export class AgentInterruptTool {
     const cancelledMessages = this.#cancelQueuedFrom(agentId, callerAgentId);
     if (!turnId) return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
 
-    await this.#hooks.interrupt(agentId, turnId);
+    // The turn can end while the stop is on its way. Its work then finished, so no notice is sent.
+    if (!(await this.#hooks.interrupt(agentId, turnId))) {
+      return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
+    }
     await this.#notify(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
     return openBotToolResult({ interruptedTurnId: turnId, cancelledMessages });
   }

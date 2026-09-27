@@ -871,6 +871,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     this.#requireServedModel(thread);
     if (steer) {
+      // A steered message can want an answer, so an empty turn is again a failure to report.
+      if (activeTurn) activeTurn.answerOptional = false;
       void this.#requireConnection()
         .prompt({ sessionId: thread.id, prompt: blocks })
         .catch((error) => {
