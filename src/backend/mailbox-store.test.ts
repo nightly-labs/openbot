@@ -750,6 +750,7 @@ describe("MailboxStore", () => {
         recipientAgentIds: ["chief"],
         text,
         replyToMessageId: request.messageId,
+        expectsReply: false,
       });
     await store.markStarting(required(research));
     await store.markRunning(required(research), "turn-research");
@@ -759,6 +760,16 @@ describe("MailboxStore", () => {
     await store.markStarting(required(builder));
     const second = await answer("builder", "Risk: no rollback.");
     expect(store.nextQueued("chief")).toBeNull();
+    // A linked question asks for a reply, so it is a request and is not held.
+    const question = await store.enqueue({
+      sender: { kind: "agent", agentId: "builder" },
+      recipientAgentIds: ["chief"],
+      text: "Which release?",
+      replyToMessageId: request.messageId,
+    });
+    expect(store.nextQueued("chief")?.delivery.messageId).toBe(question.messageId);
+    expect(store.repliesToStartWith(required(question.deliveries[0]).id)).toEqual([]);
+    store.cancelNow("chief", required(question.deliveries[0]).id);
 
     await store.markTerminal(required(builder), "completed");
     expect(store.nextQueued("chief")).toBeNull();

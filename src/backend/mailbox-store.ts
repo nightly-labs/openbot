@@ -697,14 +697,14 @@ export class MailboxStore {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next) return [];
     const message = this.#requireMessage(next.messageId);
-    const requestId = message.sender.kind === "agent" ? message.replyToMessageId : null;
+    const requestId = isAnswer(message) ? message.replyToMessageId : null;
     if (message.sender.kind !== "user" && !requestId) return [];
     return this.#queuedFor(next.recipientAgentId)
       .filter((candidate) => {
         if (candidate.id === next.id || !this.#mayStart(candidate)) return false;
         if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId);
-        return reply.sender.kind === "agent" && reply.replyToMessageId === requestId;
+        return isAnswer(reply) && reply.replyToMessageId === requestId;
       })
       .map((delivery) => this.#context(delivery));
   }
@@ -738,7 +738,7 @@ export class MailboxStore {
    */
   #isHeldReply(delivery: StoredDelivery): boolean {
     const reply = this.#requireMessage(delivery.messageId);
-    if (reply.sender.kind !== "agent" || !reply.replyToMessageId) return false;
+    if (!isAnswer(reply)) return false;
     const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
     if (
       request?.sender.kind !== "agent" ||
@@ -1877,4 +1877,11 @@ function queueSaveHash(text: string, keepAttachmentIds: string[], attachmentDraf
  */
 function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outcome: StoredFinishedEdit): void {
   delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
+}
+
+/** An agent's answer to a request. A linked message that asks for a reply is a new request. */
+function isAnswer(
+  message: StoredMessage,
+): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
+  return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
 }
