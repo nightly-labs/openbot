@@ -201,7 +201,8 @@ export class CodexLoginFlow {
     this.#host.setConnecting();
 
     try {
-      cli = await resolveCodexCli({ bundledExecutable: this.#host.bundledExecutable() });
+      const bundledExecutable = this.#host.bundledExecutable();
+      cli = await resolveCodexCli(bundledExecutable === undefined ? {} : { bundledExecutable });
       client = this.#host.createClient(cli);
       client.start();
       await client.request(

@@ -84,7 +84,7 @@
     "src/backend/agent/image-gen-runtime.ts": 4,
     "src/backend/agent/mailbox-sync.ts": 1,
     "src/backend/agent/openbot-tool-router.ts": 3,
-    "src/backend/agent/provider-runtime.ts": 4,
+    "src/backend/agent/provider-runtime.ts": 3,
     "src/backend/agent/routine-scheduler.ts": 3,
     "src/backend/agent/skill-tools.ts": 1,
     "src/backend/agent/thread-items.ts": 1,
