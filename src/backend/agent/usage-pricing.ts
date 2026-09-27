@@ -13,6 +13,7 @@ interface Price {
 }
 const PRICES: Readonly<Record<string, Price>> = {
   "codex:gpt-6-astra": { input: 10, cached: 1, output: 50, source: OPENAI },
+  "codex:gpt-6-luna": { input: 0.1, cached: 0.01, output: 0.5, source: OPENAI },
   "codex:gpt-5.6-sol": { input: 4, cached: 0.4, output: 20, source: OPENAI },
   "codex:gpt-5.6-terra": { input: 2, cached: 0.2, output: 12, source: OPENAI },
   "codex:gpt-5.6-luna": { input: 0.2, cached: 0.02, output: 1.2, source: OPENAI },

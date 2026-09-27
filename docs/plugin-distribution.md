@@ -1,13 +1,15 @@
 # Plugin distribution and sharing
 
-Status: design. No code exists for this yet. This document records the decisions, so that the work
-can start from an agreed shape.
+Status: partly built. The catalog source, the build, the Plugins tab, install and uninstall, the
+public pages and the deep link exist. The served catalog does not: steps 3 to 5 of
+[Order of work](#8-order-of-work) are open. This document records the decisions.
 
 ## Why this document exists
 
 The marketplace modal has a Plugins tab with a catalog list and a detail page
 (`src/renderer/src/features/settings/MarketplacePluginDetail.tsx`). The tab has an agent picker
-beside `Install plugin`, and a `Copy link` button. All of it reads story fixtures.
+beside `Install plugin`, and a `Copy link` button. When this document was written, all of it read
+story fixtures.
 
 Two things are not decided:
 
@@ -454,7 +456,9 @@ Ordered by cost.
    the source holds 14 listings (no-auth, header key, stdio env key, and OAuth
    over HTTP, which the main process signs in to itself), and the build writes the renderer literal,
    the Worker module, and the offline snapshot, with `--check` for CI.
-3. The Worker routes: the JSON first, then the page and the sitemap entries.
+3. The Worker routes: the JSON first, then the page and the sitemap entries. Partly done: the pages
+   (`apps/auth-api/src/routes/plugins/`) and the sitemap entries (`apps/auth-api/src/server/content-feed.ts`)
+   read the generated catalog. The JSON route does not exist.
 4. The contract types, the channels, the decoders, the preload and the mock.
 5. `src/main/plugin-catalog-service.ts`: the request, the cache and the snapshot.
 6. ~~Connect the Plugins tab to the real data. Keep the fixtures for Storybook.~~ Partly done: the
