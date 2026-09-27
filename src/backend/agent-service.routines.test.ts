@@ -913,6 +913,8 @@ describe.sequential("AgentService: routines", () => {
   it("reads the canonical SQLite conversation during an active stream", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
     await service.initialize();
     await service.sendMessage({ agentId: "chief", text: "First turn" });
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
@@ -922,9 +924,13 @@ describe.sequential("AgentService: routines", () => {
     await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "interrupted");
     await service.sendMessage({ agentId: "chief", text: "New live turn" });
     await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "running");
+    const liveTurnId = service.listQueue("chief").deliveries[1]?.turnId;
+    // The queue can report `running` before the streamed text reaches the conversation,
+    // so a read right away can miss it. The flushed delta writes it to SQLite.
+    await waitFor(() => events.some((event) => event.type === "conversation-delta" && event.turnId === liveTurnId));
 
     const snapshot = await service.readConversation("chief");
-    expect(snapshot.activeTurnId).toBe(service.listQueue("chief").deliveries[1]?.turnId);
+    expect(snapshot.activeTurnId).toBe(liveTurnId);
     expect(snapshot.messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ text: "Streaming", status: "streaming" })]),
     );

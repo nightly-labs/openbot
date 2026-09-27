@@ -227,6 +227,29 @@ Move this pin at release preparation, with the release-upgrade-safety audit, and
 a pinned runtime is OpenBot's supply chain, and a Bun security release only reaches users through an
 OpenBot release. One reviewed commit per release.
 
+## Release notes
+
+`CHANGELOG.md` is the text of the `/changelog` page on the public site. Write the notes before the
+version bump:
+
+- Put each change that a user can see under `## [Unreleased]`, in one of these groups:
+  `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, `### Security`.
+- Write one `- ` item for each change, for a user and not for a developer. Say what changed. For a
+  fix, say what happened before.
+- Write a step that the user must do after the upgrade as a bold sentence that ends with a full
+  stop, for example `**Sign in again after you upgrade.**`. The page shows these items under "Action
+  needed after you upgrade". Do not use bold for other sentences.
+
+`scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
+times, or when it has an unknown group, a group with no items, an item with no text or outside a
+group, a placeholder such as `TODO`, or a heading with no real date. These steps run it:
+
+- `bun run release:patch`, `release:minor` and `release:major` check `## [Unreleased]` before the
+  bump.
+- The pre-commit hook checks the staged `CHANGELOG.md` when a commit changes the `package.json`
+  version.
+- `bun run release:preflight` and the tag workflow check the section of the `package.json` version.
+
 ## Publish a version
 
 Start from a clean, up-to-date `main` branch. For the first release, `package.json` and

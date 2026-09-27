@@ -32,11 +32,11 @@ export interface ProviderPickerOption {
   name: string;
   state: AgentProviderState;
   description?: string | null;
-  message?: string | null;
-  email?: string | null;
-  connectionState?: "connecting";
-  checkError?: string | null;
-  runtimeStatus?: ProviderRuntimeStatus;
+  message?: string | null | undefined;
+  email?: string | null | undefined;
+  connectionState?: "connecting" | undefined;
+  checkError?: string | null | undefined;
+  runtimeStatus?: ProviderRuntimeStatus | undefined;
   /**
    * Whether the optional OpenCode key is saved. Only the OpenCode row carries it: no other
    * provider signs in with a pasted key. Absent while unknown, so the row shows no badge rather
@@ -61,13 +61,13 @@ export interface ProviderPickerProps {
   value: AgentProviderId | null;
   options: ProviderPickerOption[];
   ariaLabel: string;
-  label?: string;
-  hint?: string;
+  label?: string | undefined;
+  hint?: string | undefined;
   embedded?: boolean;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   allowUnavailableSelection?: boolean;
   focusFirst?: boolean;
-  refreshingProviders?: boolean;
+  refreshingProviders?: boolean | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
@@ -90,11 +90,11 @@ export interface ProviderPickerProps {
    * dialog in `body`, where a modal makes it inert and out of reach.
    */
   menuMount?: HTMLElement | undefined;
-  onRefreshProviders?: () => void | Promise<void>;
+  onRefreshProviders?: (() => void | Promise<void>) | undefined;
   /** Add row gated by OpenCode install; else offers install. */
   onAddCustomProvider?: (() => void) | undefined;
   /** Named endpoints share one row; endpoint pick is model pick. */
-  customProviders?: readonly CustomProviderSummary[];
+  customProviders?: readonly CustomProviderSummary[] | undefined;
   /** Custom check suppresses provider check; needs endpoint + handler. */
   customSelected?: boolean;
   onSelectCustomProvider?: (() => void) | undefined;

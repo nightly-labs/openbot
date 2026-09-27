@@ -21,6 +21,60 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   imageEyebrow: "OPENBOT · COMPARE",
   articles: publishedFirst([
     {
+      slug: "devin",
+      title: "OpenBot vs Devin: A Local Devin Alternative",
+      description:
+        "OpenBot is a free, local Devin alternative: run Codex, Claude Code, Gemini and Grok as a team of coding agents on your computer, with the AI plans you already pay for.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "claude-cowork",
+      title: "OpenBot vs Claude Cowork: A Local Alternative",
+      description:
+        "OpenBot vs Claude Cowork: run Claude Code, Codex, Gemini and Grok as a team on your own computer, with the AI plans you already pay for. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "manus",
+      title: "OpenBot vs Manus: A Local Manus Alternative",
+      description:
+        "OpenBot is a free, local Manus alternative: run a team of AI agents on your own computer with the ChatGPT, Claude, Gemini or Grok plan you already pay for. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "openclaw",
+      title: "OpenBot vs OpenClaw: An OpenClaw Alternative",
+      description:
+        "OpenBot vs OpenClaw (formerly Clawdbot and Moltbot): run Codex, Claude Code, Gemini and Grok as a team on your computer, and reach them from your phone. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "hermes-agent",
+      title: "OpenBot vs Hermes Agent: A Hermes Agent Alternative",
+      description:
+        "OpenBot vs Hermes Agent: run Codex, Claude Code, Gemini and Grok as a team on your computer, with the AI plans you already pay for. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "muse",
+      title: "OpenBot vs Muse: A Local Alternative to Meta's Muse",
+      description:
+        "OpenBot is a free, local alternative to Meta's Muse: run a team of AI agents on your own computer with the ChatGPT, Claude, Gemini or Grok plan you already pay for.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
       // Published first in /news, as openbot-vs-grokbot. That URL answers with a
       // permanent redirect here (routes/news/openbot-vs-grokbot.ts).
       slug: "grok-bot",

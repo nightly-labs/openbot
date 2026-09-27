@@ -28,6 +28,7 @@ import { scopedHandler } from "./scoped-handler";
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
+  forgetCachedAttachments(serverId: string): void;
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, init?: RemoteRequestInit): Promise<T>;
 }
@@ -58,7 +59,12 @@ export function storageIpcHandlers({
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<void> {
     if (!remoteServers.supportsCapability(serverId, STORAGE_CAPABILITY))
       throw new Error(sourceText("error.storage.unsupported"));
-    return remoteServers.request(serverId, path, decodeStorageChange, { method: "POST", body });
+    try {
+      await remoteServers.request(serverId, path, decodeStorageChange, { method: "POST", body });
+    } finally {
+      // A failed answer can still follow a delete that the host completed.
+      remoteServers.forgetCachedAttachments(serverId);
+    }
   }
 
   return {

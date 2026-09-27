@@ -159,6 +159,9 @@ Read the instruction file for each directory you change. Use the
 | [apps/mobile/AGENTS.md](apps/mobile/AGENTS.md) | Expo and build/simulator permissions |
 | [remote/api/AGENTS.md](remote/api/AGENTS.md) | Signal and TURN credentials |
 
+Write release notes under `## [Unreleased]` in `CHANGELOG.md` as
+[docs/RELEASING.md](docs/RELEASING.md#release-notes) says. A version bump with no notes fails.
+
 Before a version bump or tag, use
 [release-upgrade-safety](.agents/skills/release-upgrade-safety/SKILL.md) to audit upgrade and data-loss
 risks since the last release.

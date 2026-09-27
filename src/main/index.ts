@@ -789,6 +789,7 @@ if (!hasSingleInstanceLock) {
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
+      powerMonitor.on("resume", () => remoteServers.wake());
       const teamIdentity = teamStore.getIdentity();
       if (
         shouldAutoStartHost({

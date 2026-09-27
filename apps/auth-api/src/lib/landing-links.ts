@@ -14,6 +14,7 @@ export const OPENBOT_LINKS = {
   news: "/news",
   guides: "/guides",
   plugins: "/plugins",
+  changelog: "/changelog",
   releases: "https://github.com/nightly-labs/openbot/releases",
   repository: "https://github.com/nightly-labs/openbot",
   license: "https://github.com/nightly-labs/openbot/blob/main/LICENSE",
@@ -38,7 +39,7 @@ export type FooterLink =
   | {
       readonly label: string;
       readonly external: false;
-      readonly to: "/" | "/news" | "/guides" | "/plugins" | "/compare";
+      readonly to: "/" | "/news" | "/guides" | "/plugins" | "/changelog" | "/compare";
       readonly hash?: string;
     }
   | { readonly label: string; readonly external: false; readonly to: "/compare/$slug"; readonly slug: string };
@@ -56,7 +57,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "News", external: false, to: "/news" },
       { label: "Guides", external: false, to: "/guides" },
       { label: "Plugins", external: false, to: "/plugins" },
-      { label: "Releases", external: true, href: OPENBOT_LINKS.releases },
+      { label: "Changelog", external: false, to: "/changelog" },
       { label: "Source code", external: true, href: OPENBOT_LINKS.repository },
       { label: "License", external: true, href: OPENBOT_LINKS.license },
       { label: "Privacy", external: true, href: OPENBOT_LINKS.privacy },
@@ -77,6 +78,12 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
     title: "Compare",
     links: [
       { label: "OpenBot vs Grok Bot", external: false, to: "/compare/$slug", slug: "grok-bot" },
+      { label: "OpenBot vs Muse", external: false, to: "/compare/$slug", slug: "muse" },
+      { label: "OpenBot vs Hermes Agent", external: false, to: "/compare/$slug", slug: "hermes-agent" },
+      { label: "OpenBot vs OpenClaw", external: false, to: "/compare/$slug", slug: "openclaw" },
+      { label: "OpenBot vs Manus", external: false, to: "/compare/$slug", slug: "manus" },
+      { label: "OpenBot vs Claude Cowork", external: false, to: "/compare/$slug", slug: "claude-cowork" },
+      { label: "OpenBot vs Devin", external: false, to: "/compare/$slug", slug: "devin" },
       { label: "All comparisons", external: false, to: "/compare" },
     ],
   },

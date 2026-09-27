@@ -39,6 +39,13 @@ fi
 
 staged_paths=$(git diff --cached --name-only --diff-filter=ACMRD)
 
+# A version bump is a release: its CHANGELOG.md section is the /changelog page. It runs first
+# because it takes less time than the type checks.
+if printf '%s\n' "$staged_paths" | grep -Fxq package.json; then
+  echo "Checking the release notes..."
+  bun scripts/check-release-notes.ts --staged
+fi
+
 # Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.
 code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|json|jsonc|grit)$|(^|/)bun\.lock$'
 if printf '%s\n' "$staged_paths" | grep -Eq "$code_pattern"; then

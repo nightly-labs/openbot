@@ -8,7 +8,7 @@ import type {
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
-import { SettingsSection, Text } from "@openbot/ui";
+import { Text } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import {
@@ -90,108 +90,103 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   });
 
   return (
-    <>
-      <SettingsSection title={i18n.t("settings.providers.title")}>
-        <ProviderPicker
-          value={props.store.selectedProvider()}
-          options={props.store.providerOptions()}
-          ariaLabel={i18n.t("settings.providers.title")}
-          embedded
-          allowUnavailableSelection
-          customProviders={customProviders()}
-          customSelected={customSelected()}
-          onChange={(provider) => {
-            setCustomSelected(false);
-            props.store.setSelectedProvider(provider);
-          }}
-          onDownloadProvider={props.onDownloadProvider}
-          onCancelProviderDownload={props.onCancelProviderDownload}
-          onUpdateProvider={props.onUpdateProvider}
-          onConnectProvider={props.onConnectProvider}
-          onInstallProvider={props.onInstallProvider}
-          onAddCustomProvider={
-            props.onAddCustomProvider
-              ? props.detectedProviderApi
-                ? () => setChoosing(true)
-                : host.openForm
-              : undefined
-          }
-          onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
-          onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
-          onSignInProvider={props.onSignInProvider}
-          onSignInWithCodeProvider={props.onSignInWithCodeProvider}
-          menuMount={props.selectMount}
-          detected={
-            <Show when={props.providerDetection}>
-              {(detection) => (
-                <Show when={props.detectedProviderApi}>
-                  {(api) => (
-                    <DetectedProviders
-                      detection={detection()}
-                      api={api()}
-                      takenProviderIds={customProviders().map((provider) => provider.id)}
-                      takenAgentIds={props.takenAgentIds}
-                      onSaved={host.showSaved}
-                    />
-                  )}
-                </Show>
-              )}
-            </Show>
-          }
+    // The tab title already names this list, so it has no heading of its own.
+    <div class="settings-provider-section">
+      <ProviderPicker
+        value={props.store.selectedProvider()}
+        options={props.store.providerOptions()}
+        ariaLabel={i18n.t("settings.providers.title")}
+        embedded
+        allowUnavailableSelection
+        customProviders={customProviders()}
+        customSelected={customSelected()}
+        onChange={(provider) => {
+          setCustomSelected(false);
+          props.store.setSelectedProvider(provider);
+        }}
+        onDownloadProvider={props.onDownloadProvider}
+        onCancelProviderDownload={props.onCancelProviderDownload}
+        onUpdateProvider={props.onUpdateProvider}
+        onConnectProvider={props.onConnectProvider}
+        onInstallProvider={props.onInstallProvider}
+        onAddCustomProvider={
+          props.onAddCustomProvider ? (props.detectedProviderApi ? () => setChoosing(true) : host.openForm) : undefined
+        }
+        onSelectCustomProvider={props.onAddCustomProvider ? () => setCustomSelected(true) : undefined}
+        onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
+        onSignInProvider={props.onSignInProvider}
+        onSignInWithCodeProvider={props.onSignInWithCodeProvider}
+        menuMount={props.selectMount}
+        detected={
+          <Show when={props.providerDetection}>
+            {(detection) => (
+              <Show when={props.detectedProviderApi}>
+                {(api) => (
+                  <DetectedProviders
+                    detection={detection()}
+                    api={api()}
+                    takenProviderIds={customProviders().map((provider) => provider.id)}
+                    takenAgentIds={props.takenAgentIds}
+                    onSaved={host.showSaved}
+                  />
+                )}
+              </Show>
+            )}
+          </Show>
+        }
+      />
+      {/* The outcome is shown where the user is looking. While the list is open the section behind
+        it is hidden from assistive technology, so a status left here could not be read. */}
+      <Show when={host.state.manageOpen ? null : host.state.note}>
+        {(message) => (
+          <Text tone="muted" variant="caption" role="status">
+            {message()}
+          </Text>
+        )}
+      </Show>
+      <Show when={props.onAddCustomProvider}>
+        <CustomProviderDialog
+          open={host.state.open}
+          busy={host.state.saving}
+          submitError={host.state.submitError}
+          takenProviderIds={customProviders().map((provider) => provider.id)}
+          onSubmit={(value) => void host.submit(value)}
+          onCancel={host.closeForm}
         />
-        {/* The outcome is shown where the user is looking. While the list is open the section behind
-          it is hidden from assistive technology, so a status left here could not be read. */}
-        <Show when={host.state.manageOpen ? null : host.state.note}>
-          {(message) => (
-            <Text tone="muted" variant="caption" role="status">
-              {message()}
-            </Text>
-          )}
-        </Show>
-        <Show when={props.onAddCustomProvider}>
-          <CustomProviderDialog
-            open={host.state.open}
-            busy={host.state.saving}
-            submitError={host.state.submitError}
-            takenProviderIds={customProviders().map((provider) => provider.id)}
-            onSubmit={(value) => void host.submit(value)}
-            onCancel={host.closeForm}
-          />
-          <CustomProviderListDialog
-            open={host.state.manageOpen}
-            providers={customProviders()}
-            removing={host.state.removing}
-            note={host.state.note}
-            onDelete={props.onDeleteCustomProvider ? (provider) => void host.remove(provider) : undefined}
-            onClose={host.closeList}
-          />
-        </Show>
-        <Show when={props.detectedProviderApi}>
-          {(api) => (
-            <>
-              <CustomProviderPresetDialog
-                open={choosing()}
-                probes={localServerProbes(props.providerDetection)}
-                onChoose={(preset) => {
-                  setChoosing(false);
-                  setPresetFor(presetSetupProvider(preset, props.providerDetection));
-                }}
-                onCancel={() => setChoosing(false)}
-              />
-              <DetectedProviderSetup
-                provider={presetFor()}
-                api={api()}
-                takenProviderIds={customProviders().map((provider) => provider.id)}
-                takenAgentIds={props.takenAgentIds}
-                onClose={() => setPresetFor(null)}
-                onSaved={host.showSaved}
-              />
-            </>
-          )}
-        </Show>
-      </SettingsSection>
+        <CustomProviderListDialog
+          open={host.state.manageOpen}
+          providers={customProviders()}
+          removing={host.state.removing}
+          note={host.state.note}
+          onDelete={props.onDeleteCustomProvider ? (provider) => void host.remove(provider) : undefined}
+          onClose={host.closeList}
+        />
+      </Show>
+      <Show when={props.detectedProviderApi}>
+        {(api) => (
+          <>
+            <CustomProviderPresetDialog
+              open={choosing()}
+              probes={localServerProbes(props.providerDetection)}
+              onChoose={(preset) => {
+                setChoosing(false);
+                setPresetFor(presetSetupProvider(preset, props.providerDetection));
+              }}
+              onCancel={() => setChoosing(false)}
+            />
+            <DetectedProviderSetup
+              provider={presetFor()}
+              api={api()}
+              takenProviderIds={customProviders().map((provider) => provider.id)}
+              takenAgentIds={props.takenAgentIds}
+              onClose={() => setPresetFor(null)}
+              onSaved={host.showSaved}
+            />
+          </>
+        )}
+      </Show>
       <Show when={props.customAgents}>{(api) => <CustomAgentSettings api={api()} />}</Show>
-    </>
+    </div>
   );
 }
 

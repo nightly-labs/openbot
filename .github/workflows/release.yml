@@ -77,7 +77,7 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match package.json version $package_version." >&2
             exit 1
           fi
-          grep -F "## [$package_version]" CHANGELOG.md
+          bun scripts/check-release-notes.ts
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$package_version" >> "$GITHUB_OUTPUT"
 

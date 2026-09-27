@@ -13,6 +13,7 @@ import { useProviderDetection } from "./features/custom-providers/provider-detec
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
 import { useSetup } from "./features/onboarding/onboarding-context";
+import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { remoteAdminServer, serverCanAdminister } from "./features/servers/server-capabilities";
@@ -74,16 +75,17 @@ function PermissionsReview(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const setup = useSetup();
-  const { agentStatus } = useAgents();
+  const { activeServer } = useServers();
   const { joinRemoteDuringSetup } = useServerSelection();
+  const setupProviders = useSetupProviderProps(() => activeServer()?.kind === "local");
 
   return (
     <Show when={setup.permissionsOpen()}>
       <Loading>
         <InitialSetup
+          {...setupProviders}
           reviewing
           state={setup.setupState() ?? { completed: true, preferredProvider: "codex", preferredModel: null }}
-          agentStatus={agentStatus()}
           platform={platform.appInfo()?.platform ?? "darwin"}
           accountEmail={props.account().email}
           onSave={setup.saveSetup}
