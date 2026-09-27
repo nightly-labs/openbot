@@ -56,6 +56,7 @@ export interface TurnHooks {
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
   listAgents(): AgentSummary[];
+  redactMcp(text: string): string;
 }
 
 export interface TurnLifecycleOptions {
@@ -98,6 +99,12 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
+  /**
+   * The last error a provider reported for each running turn. The provider sends it just before
+   * `turn/completed`, which carries only the status, so without this a failed delivery keeps no
+   * reason once the banner that showed it is gone.
+   */
+  readonly #turnErrors = new Map<string, string>();
   /** The client, provider thread and start time of each running turn, from its `turn/started`. */
   readonly #runningTurns = new Map<
     string,
@@ -156,6 +163,7 @@ export class TurnLifecycle {
   dispose(): void {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
+    this.#turnErrors.clear();
     this.#runningTurns.clear();
     this.#lastEventAt.clear();
   }
@@ -345,6 +353,10 @@ export class TurnLifecycle {
         if (notification.method === "warning" && isNonActionableCodexWarning(message)) return;
         // Codex retries on its own and reports the final failure again without `willRetry`.
         if (isRecord(params) && params.willRetry === true) return;
+        // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
+        const errorTurnId = getString(params, "turnId");
+        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId))
+          this.#turnErrors.set(errorTurnId, message);
         if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
           this.#providers.refreshUsageAfterLimit(source);
           return;
@@ -356,6 +368,8 @@ export class TurnLifecycle {
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
     this.#runningTurns.delete(turnId);
+    const reportedError = this.#turnErrors.get(turnId);
+    this.#turnErrors.delete(turnId);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
@@ -389,7 +403,8 @@ export class TurnLifecycle {
     if (deliveries.length > 0) {
       const terminal = status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {
-        await this.#mailbox.markTerminal(delivery.delivery.id, terminal);
+        const reason = terminal === "failed" && reportedError ? this.#hooks.redactMcp(reportedError) : null;
+        await this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason);
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
       // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one

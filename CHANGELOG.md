@@ -17,6 +17,15 @@ All notable changes to OpenBot will be documented here. The project follows
 - Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
   model list from the server.
 
+### Fixed
+
+- Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
+  closes and after a restart. Before, a failed message kept no reason.
+- Do not ask a joined server for its MCP server list when you are a member without the admin role.
+  Before, each visit logged a refused request.
+- Show the loading placeholder in a browser tab preview while the page loads. Before, the preview
+  could show a failure icon until the next capture.
+
 ## [0.23.0] - 2026-09-27
 
 ### Added
