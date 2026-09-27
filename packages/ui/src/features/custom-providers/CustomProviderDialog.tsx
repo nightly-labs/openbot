@@ -68,29 +68,29 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
 interface CustomProviderDialogProps {
   open: boolean;
   /** Prefilled fields, for editing a provider or for a story. Defaults to a blank form. */
-  draft?: CustomProviderDraft;
+  draft?: CustomProviderDraft | undefined;
   /** Set by a story to show the messages without typing into every field first. */
-  showErrors?: boolean;
-  busy?: boolean;
-  submitError?: string | null;
+  showErrors?: boolean | undefined;
+  busy?: boolean | undefined;
+  submitError?: string | null | undefined;
   /**
    * The provider IDs already saved. A duplicate is a field error before a round trip; main refuses
    * one as well, because this list is only as fresh as the last list the renderer was given.
    */
-  takenProviderIds?: readonly string[];
+  takenProviderIds?: readonly string[] | undefined;
   /** Edit of a saved endpoint: the ID names it, so it cannot change. */
-  providerIdLocked?: boolean;
+  providerIdLocked?: boolean | undefined;
   /** Main holds a key or headers for this endpoint. A blank key field keeps them. */
-  apiKeyKept?: boolean;
+  apiKeyKept?: boolean | undefined;
   /**
    * The last model list request. The host owns it because the request leaves the renderer. Without
    * `onDiscoverModels` the dialog has no find control and only the typed rows.
    */
-  discovery?: ModelDiscovery;
-  onDiscoverModels?: (endpoint: CustomProviderEndpoint) => void;
+  discovery?: ModelDiscovery | undefined;
+  onDiscoverModels?: ((endpoint: CustomProviderEndpoint) => void) | undefined;
   onSubmit: (value: SaveCustomProviderInput) => void;
   onCancel: () => void;
-  onBack?: () => void;
+  onBack?: (() => void) | undefined;
 }
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {

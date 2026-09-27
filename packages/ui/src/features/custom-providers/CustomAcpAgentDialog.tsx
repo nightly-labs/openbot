@@ -51,24 +51,24 @@ function cloneDraft(draft: CustomAcpAgentDraft): CustomAcpAgentDraft {
 
 interface CustomAcpAgentDialogProps {
   open: boolean;
-  draft?: CustomAcpAgentDraft;
+  draft?: CustomAcpAgentDraft | undefined;
   /** Known agents whose command fills the form in one press. A saved agent is not offered them. */
-  presets?: readonly AcpAgentPreset[];
+  presets?: readonly AcpAgentPreset[] | undefined;
   /**
    * The draft is a saved agent: its ID cannot change, and a saved variable with an empty value keeps
    * the value that main holds.
    */
-  editing?: boolean;
+  editing?: boolean | undefined;
   /** The last trial start. The host owns it because it starts a process. */
-  check?: AcpAgentCheck;
-  onCheck?: (value: CustomAcpAgentDraft) => void;
-  showErrors?: boolean;
-  busy?: boolean;
-  submitError?: string | null;
-  takenAgentIds?: readonly string[];
+  check?: AcpAgentCheck | undefined;
+  onCheck?: ((value: CustomAcpAgentDraft) => void) | undefined;
+  showErrors?: boolean | undefined;
+  busy?: boolean | undefined;
+  submitError?: string | null | undefined;
+  takenAgentIds?: readonly string[] | undefined;
   onSubmit: (value: CustomAcpAgentDraft) => void;
   onCancel: () => void;
-  onBack?: () => void;
+  onBack?: (() => void) | undefined;
 }
 
 export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {

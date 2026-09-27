@@ -31,11 +31,11 @@ interface DetectedProvidersProps {
   detection: ProviderDetection;
   api: DetectedProviderApi;
   /** Saved IDs, so a duplicate is a field error in the form before a round trip. */
-  takenProviderIds?: readonly string[];
-  takenAgentIds?: readonly string[];
-  disabled?: boolean;
+  takenProviderIds?: readonly string[] | undefined;
+  takenAgentIds?: readonly string[] | undefined;
+  disabled?: boolean | undefined;
   /** After an Add or an Edit, so the host can say when the new models appear. */
-  onSaved?: (kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void;
+  onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
 }
 
 export function DetectedProviders(props: DetectedProvidersProps) {

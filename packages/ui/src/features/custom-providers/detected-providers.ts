@@ -15,7 +15,7 @@ interface DetectedBase {
   id: string;
   name: string;
   /** Already saved, so the row offers Edit instead of Add. */
-  added?: boolean;
+  added?: boolean | undefined;
 }
 
 export type DetectedProvider =
@@ -25,18 +25,18 @@ export type DetectedProvider =
       /** The list the server gave when the host asked it, so the form opens with them. */
       models: readonly DiscoveredModel[];
       /** For a saved endpoint: the models the user chose, which Edit opens with. */
-      savedModels?: readonly DiscoveredModel[];
+      savedModels?: readonly DiscoveredModel[] | undefined;
       /** For a saved endpoint: main holds a key or headers, which a blank key field keeps. */
-      keyStored?: boolean;
+      keyStored?: boolean | undefined;
     })
   | (DetectedBase & {
       kind: "agent";
       /** The full path that the host found, so the saved agent does not depend on PATH. */
       command: string;
       args: string;
-      version?: string;
+      version?: string | undefined;
       /** For a saved agent: the names of its values, which Edit keeps unless the user types new ones. */
-      envNames?: readonly string[];
+      envNames?: readonly string[] | undefined;
     });
 
 /** `found` can grow while `scanning` is true. */
@@ -44,7 +44,7 @@ export interface ProviderDetection {
   scanning: boolean;
   found: readonly DetectedProvider[];
   /** Found, but hidden by the user. The host does not put them in `found`. */
-  hidden?: number;
+  hidden?: number | undefined;
 }
 
 export type DetectedProviderValue =
@@ -61,10 +61,10 @@ export interface DetectedProviderApi {
   hide: (provider: DetectedProvider) => void;
   showHidden: () => void;
   /** Without it there is no scan-again control, as on a first run that scans once. */
-  scan?: () => void;
-  discoverModels?: (endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>;
+  scan?: (() => void) | undefined;
+  discoverModels?: ((endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>) | undefined;
   /** `savedAgentId` names the saved agent whose kept values the check uses. */
-  checkAgent?: (value: CustomAcpAgentDraft, savedAgentId?: string) => Promise<AcpAgentCheck>;
+  checkAgent?: ((value: CustomAcpAgentDraft, savedAgentId?: string) => Promise<AcpAgentCheck>) | undefined;
 }
 
 /** Where the provider is: a host and port for a server, the command for an agent. */

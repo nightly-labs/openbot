@@ -45,10 +45,10 @@ const REPLY_MS = 500;
 
 interface StoryDetectionOptions {
   /** Detection keys that the user hid in an earlier run. */
-  hidden?: readonly string[];
+  hidden?: readonly string[] | undefined;
   /** Without it there is no Scan again, as on the first-run step. */
-  rescan?: boolean;
-  onSaved?: (value: DetectedProviderValue) => void;
+  rescan?: boolean | undefined;
+  onSaved?: ((value: DetectedProviderValue) => void) | undefined;
 }
 
 interface StoryDetectionState {

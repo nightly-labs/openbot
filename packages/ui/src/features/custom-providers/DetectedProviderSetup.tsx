@@ -17,11 +17,11 @@ interface DetectedProviderSetupProps {
   /** The provider to add or edit. `null` keeps both forms closed. */
   provider: DetectedProvider | null;
   api: DetectedProviderApi;
-  takenProviderIds?: readonly string[];
-  takenAgentIds?: readonly string[];
+  takenProviderIds?: readonly string[] | undefined;
+  takenAgentIds?: readonly string[] | undefined;
   onClose: () => void;
   /** After a save, so the host can say when the new models appear. */
-  onSaved?: (kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void;
+  onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
 }
 
 /**

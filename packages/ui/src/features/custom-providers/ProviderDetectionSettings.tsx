@@ -17,9 +17,9 @@ export interface ProviderDetectionSettingsValue {
 interface ProviderDetectionSettingsProps {
   value: ProviderDetectionSettingsValue;
   onChange: (value: ProviderDetectionSettingsValue) => void;
-  busy?: boolean;
+  busy?: boolean | undefined;
   /** The last save failed. The host keeps the rows, so the user can correct them. */
-  error?: string | null;
+  error?: string | null | undefined;
 }
 
 // The examples are the same in each language.
@@ -91,7 +91,7 @@ export function ProviderDetectionSettings(props: ProviderDetectionSettingsProps)
       <ItemGroup class="settings-modal-card">
         <SwitchField
           checked={props.value.enabled}
-          disabled={props.busy}
+          disabled={props.busy === true}
           onChange={(enabled) => props.onChange({ ...props.value, enabled })}
           label={t("customProvider.detection.enabled")}
           description={t("customProvider.detection.enabledDescription")}
