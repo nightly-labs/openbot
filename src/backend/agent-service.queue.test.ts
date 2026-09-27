@@ -1695,6 +1695,79 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it("creates a teammate on a listed model and effort, and rejects the rest before it exists", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      hostedSites: null,
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Create a research teammate." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+
+    const listed = openBotToolPayload((await callOpenBotTool(client, threadId, "list_models", {})).result);
+    expect(listed).toMatchObject({
+      preferredProvider: "codex",
+      providers: expect.arrayContaining([
+        expect.objectContaining({
+          provider: "codex",
+          models: expect.arrayContaining([
+            expect.objectContaining({ id: "gpt-5.5", supportedReasoningEfforts: ["medium"] }),
+          ]),
+        }),
+      ]),
+    });
+
+    const created = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Terra",
+      description: "",
+      initialMessage: "Start.",
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "high",
+    });
+    expect(created.error).toBeUndefined();
+    expect(service.listAgents().find((agent) => agent.name === "Terra")).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "high",
+    });
+
+    const unknownModel = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Unknown model",
+      description: "",
+      initialMessage: "Start.",
+      provider: "codex",
+      model: "gpt-missing",
+    });
+    expect(unknownModel.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
+    expect(unknownModel.error?.message).toContain("gpt-5.6-terra");
+    const unsupportedEffort = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Unsupported effort",
+      description: "",
+      initialMessage: "Start.",
+      model: "gpt-5.5",
+      reasoningEffort: "high",
+    });
+    expect(unsupportedEffort.error?.message).toContain(
+      'Model "gpt-5.5" does not support reasoning effort "high". Supported efforts: medium.',
+    );
+    expect(
+      service.listAgents().filter((agent) => agent.name === "Unknown model" || agent.name === "Unsupported effort"),
+    ).toEqual([]);
+  });
+
   it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

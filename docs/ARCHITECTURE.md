@@ -804,6 +804,11 @@ paths resolved from the calling agent’s workspace. The agent uses its availabl
 compress a copy when needed. OpenBot validates the prepared file before profile changes and copies
 it into managed avatar storage. Generated avatar settings remove the custom image. Both run through
 the existing agent service and validate arguments before changing state.
+`openbot.create_agent` also accepts an optional `provider`, `model` and `reasoningEffort`. The
+read-only `openbot.list_models` returns the models of each provider that the model picker shows, with
+their reasoning efforts and the default model for a request that names only a provider. An unknown
+model or an unsupported effort is an error that names the valid values; OpenBot checks them before
+it creates the agent. Without these fields, the new agent starts on the user's default.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
 its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
 argument shapes used by both declarations. It reuses the profile, section, and routine schemas.

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { HOSTED_SITE_ACTIVE_LIMIT } from "@openbot/contracts/hosted-sites";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AgentModelOption,
   AgentSummary,
   AvatarImageInput,
   CreateAgentInput,
@@ -10,8 +11,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import { isMessageReaction, skillConversationEventItemType } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import type { AgentClient } from "../agent-client";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
@@ -30,7 +32,8 @@ import type { DrainScheduler } from "./drain-scheduler";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
-import { createAgentToolSchema, updateProfileToolSchema } from "./profile-tools";
+import { listModelsPayload, requestedToolModel, requireReasoningEffort } from "./model-tools";
+import { createAgentToolSchema, listModelsToolSchema, updateProfileToolSchema } from "./profile-tools";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
@@ -40,6 +43,8 @@ import type { AgentBrowserHost } from "./turn-lifecycle";
 
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
+  listModels(): AgentModelOption[];
+  preferredProvider(): AgentProvider;
   createAgent(
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
@@ -312,9 +317,20 @@ export class OpenBotToolRouter {
       };
     }
 
+    if (params.tool === "list_models") {
+      const args = listModelsToolSchema.parse(params.arguments ?? {});
+      const payload = listModelsPayload(this.#hooks.listModels(), this.#hooks.preferredProvider(), args.provider);
+      return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(payload) }] };
+    }
+
     if (params.tool === "create_agent") {
       const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
+      // Checked before the agent exists: a named model the provider does not list, or an effort the
+      // model does not support, is an error the calling agent can correct, never a silent default.
+      const requested = requestedToolModel(args, this.#hooks.listModels());
+      // An effort alone applies to the model the new agent starts on, known only once it exists.
+      const lateEffort = requested === null ? args.reasoningEffort : undefined;
       const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
       const create = (assign?: (agentId: string) => Promise<SidebarLayoutSnapshot>) =>
         this.#hooks.createAgent(
@@ -324,10 +340,21 @@ export class OpenBotToolRouter {
             initialMessage: args.initialMessage,
             avatarSeed: args.avatarSeed ?? randomUUID(),
             avatarHue: hue,
+            ...(requested
+              ? { provider: requested.provider, model: requested.id, reasoningEffort: args.reasoningEffort }
+              : {}),
           },
           async (agent) => {
             if (assign) await assign(agent.id);
-            return args.title === undefined ? agent : this.#store.updateAgent({ agentId: agent.id, title: args.title });
+            if (lateEffort !== undefined) {
+              const model = this.#hooks
+                .listModels()
+                .find((candidate) => candidate.provider === agent.provider && candidate.id === agent.model);
+              if (!model) throw new Error(sourceText("error.agent.modelUnavailable"));
+              requireReasoningEffort(model, lateEffort);
+            }
+            if (args.title === undefined && lateEffort === undefined) return agent;
+            return this.#store.updateAgent({ agentId: agent.id, title: args.title, reasoningEffort: lateEffort });
           },
         );
       const created =

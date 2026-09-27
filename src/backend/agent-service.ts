@@ -733,6 +733,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       localSkillTools: this.#localSkillTools,
       hooks: {
         listAgents: () => this.listAgents(),
+        listModels: () => this.listModels(),
+        preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) => this.createAgent(input, configure),
         updateAgent: (input) => this.updateAgent(input),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image),

@@ -2504,6 +2504,7 @@ describe.sequential("AgentService: providers", () => {
               expect.objectContaining({ name: "list_agents" }),
               expect.objectContaining({ name: "update_profile" }),
               expect.objectContaining({ name: "create_agent" }),
+              expect.objectContaining({ name: "list_models" }),
               expect.objectContaining({ name: "list_sections" }),
               expect.objectContaining({ name: "create_section" }),
               expect.objectContaining({ name: "rename_section" }),
