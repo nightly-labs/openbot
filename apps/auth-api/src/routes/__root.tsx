@@ -5,6 +5,7 @@ import { onSettled } from "solid-js";
 import "@openbot/brand/logo.css";
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import "../styles.css";
+import { NotFoundPage } from "../components/landing/NotFoundPage";
 import { PageError } from "../components/landing/PageError";
 import { servingSiteUrl } from "../lib/serving-site-url";
 import { OPENBOT_SECURITY_HEADERS, openBotRootHead } from "../lib/site-metadata";
@@ -16,7 +17,7 @@ export const Route = createRootRoute({
   component: RootComponent,
   shellComponent: RootDocument,
   errorComponent: () => <PageError onRetry={() => window.location.reload()} />,
-  notFoundComponent: () => <PageError notFound onRetry={() => window.location.reload()} />,
+  notFoundComponent: NotFoundPage,
 });
 
 function RootComponent() {
