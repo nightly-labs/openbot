@@ -26,13 +26,16 @@ export const STRUCTURED_TEXT_LABEL = "structuredContent as JSON, copied by OpenB
  * larger. A copy of all of it would fill the model's context with one call, so the copy stops here
  * and tells the agent how to ask for less.
  */
-export const MAX_STRUCTURED_TEXT_CHARS = 65_536;
+const MAX_STRUCTURED_TEXT_CHARS = 65_536;
 
 /** A string this long that the result text already holds is not copied again. */
 const REPEATED_TEXT_MIN_CHARS = 256;
-/** A string this long made only of base64 characters is image or file data, not something to read. */
+/**
+ * A string this long made only of base64 characters is image or file data, not something to read.
+ * Line breaks are allowed, as in wrapped base64, but spaces are not: readable text has them.
+ */
 const BINARY_TEXT_MIN_CHARS = 1_024;
-const BASE64_TEXT = /^[A-Za-z0-9+/=\s]+$/u;
+const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
 /**
  * An integer literal JavaScript cannot hold exactly.
  *
@@ -69,7 +72,7 @@ export function rewriteCallAnswer(line: string): string | null {
  * Nothing is added when the result has no structured content, or when its text already holds the
  * copy. Every existing item, images included, stays as it is and in its place.
  */
-export function withStructuredText(result: unknown): DynamicRecord | null {
+function withStructuredText(result: unknown): DynamicRecord | null {
   if (!isDynamicRecord(result) || !Array.isArray(result.content)) return null;
   const structured = result.structuredContent;
   if (!isDynamicRecord(structured)) return null;
@@ -124,7 +127,7 @@ function readableText(value: string): string {
 
 function isBinaryText(value: string): boolean {
   if (value.length < BINARY_TEXT_MIN_CHARS) return false;
-  return (value.startsWith("data:") && value.includes(";base64,")) || BASE64_TEXT.test(value);
+  return (value.startsWith("data:") && value.includes(";base64,")) || BASE64_TEXT.test(value.replace(/\r?\n/gu, ""));
 }
 
 function structuredText(copy: DynamicRecord): string {
