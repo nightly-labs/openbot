@@ -181,7 +181,7 @@
     "src/renderer/src/features/settings/SettingsModal.test.tsx": 1,
     "src/renderer/src/features/settings/SettingsModal.tsx": 3,
     "src/renderer/src/features/settings/SkillsMarketplaceModal.test.tsx": 2,
-    "src/renderer/src/features/settings/SkillsMarketplaceModal.tsx": 8,
+    "src/renderer/src/features/settings/SkillsMarketplaceModal.tsx": 7,
     "src/renderer/src/features/settings/stores/general-store.ts": 1,
     "src/renderer/src/features/sidebar/WorkspaceSidebar.tsx": 1,
     "src/renderer/src/features/usage/AgentUsagePanel.tsx": 4,
