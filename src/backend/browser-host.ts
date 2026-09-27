@@ -5,7 +5,6 @@ import { basename, extname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   BrowserBounds,
-  BrowserControlSession,
   BrowserControlState,
   BrowserEnvironment,
   BrowserImageMode,
@@ -23,7 +22,7 @@ import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import {
-  BrowserWindow,
+  type BrowserWindow,
   type BrowserWindowConstructorOptions,
   clipboard,
   Menu,
@@ -42,8 +41,15 @@ import {
   type BrowserViewportInput,
   type SnapshotReadResult,
 } from "./browser-cdp";
-import { browserControlAction, browserControlDetailAction, controlSessionId } from "./browser-control";
+import { BrowserControlSessions } from "./browser-control-sessions";
 import { BrowserDiagnostics } from "./browser-diagnostics";
+import {
+  type BrowserHostTab,
+  currentTabUrl,
+  type KeepQueueBlocked,
+  restoreWebContentsFocus,
+  toPublicTab,
+} from "./browser-host-tab";
 import { describeBrowserTarget, navigateAndWait } from "./browser-navigation";
 import {
   browserLoadOptions,
@@ -75,6 +81,16 @@ import {
   type StoredBrowserStateV2,
 } from "./browser-state";
 import {
+  boundEngineOperation,
+  enqueueTabOperation,
+  isTimeoutError,
+  readTabSnapshot,
+  remainingTime,
+  runTabAction,
+  runTabEvaluation,
+  unwindStalledOperation,
+} from "./browser-tab-operations";
+import {
   type BrowserDynamicToolHooks,
   type BrowserInputCall,
   browserInputAction,
@@ -88,7 +104,7 @@ import {
 } from "./browser-tools";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
-import { TimeoutError, withTimeout } from "./with-timeout";
+import { withTimeout } from "./with-timeout";
 
 interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
@@ -96,28 +112,7 @@ interface BrowserHostEvents {
   documentChanged: [tabId: string, documentIds: ReadonlySet<string>];
 }
 
-type KeepQueueBlocked = (promise: Promise<unknown>) => void;
-
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
-const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
-/**
- * How long an operation that missed its deadline gets to unwind on its own before the debugger is
- * detached under it, and again to unwind after the detach. Long enough that a renderer which is
- * merely slower than the deadline it was given is never cancelled, short enough that the tab's queue
- * is not held by a renderer that will never answer.
- */
-const OPERATION_UNWIND_GRACE_MS = 1_000;
-/**
- * How long past its deadline an operation gets before the backstop timer answers for it.
- *
- * An operation carries the same deadline and reports what it managed to do with it: typing states
- * how many characters reached the page, so a caller knows what not to send twice. A backstop that
- * expires at the same millisecond as that check is a race, and the generic message wins it often
- * enough that the caller loses the count. The backstop is there for an operation that does not
- * unwind itself at all, so it starts after the operation's own last chance to answer, and the wait
- * it adds is short beside the ten seconds an action gets by default.
- */
-const OPERATION_DEADLINE_BACKSTOP_MS = 250;
 /**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
@@ -150,45 +145,6 @@ const BROWSER_WEB_PREFERENCES = {
   webSecurity: true,
   allowRunningInsecureContent: false,
 };
-
-interface InternalTab {
-  id: string;
-  view: WebContentsView;
-  /** WebContentsView clears its property after native destruction. Keep the handle for cleanup. */
-  contents: WebContents;
-  requestedUrl: string;
-  openerTabId?: string;
-  /** Retained document references can outlive popup closure and navigation. */
-  hasSharedBrowsingContext?: boolean;
-  /**
-   * The current document received a secret and was kept, with its filled fields empty and no
-   * readable copy of the value, so a
-   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
-   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
-   */
-  secretDocument?: boolean;
-  popup: boolean;
-  popupFailure?: BrowserTab["popupFailure"];
-  closing?: boolean;
-  ownerThreadId: string | null;
-  ownerAgentId: string | null;
-  revision: number;
-  queue: Promise<unknown>;
-  /**
-   * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
-   * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
-   */
-  pendingRestore?: () => Promise<void>;
-  focusOnVisible: boolean;
-  environment: BrowserEnvironment;
-  engine: BrowserCdpEngine;
-  diagnostics: BrowserDiagnostics;
-  recording: boolean;
-  captureGeneration: number;
-  viewInvalidations: Set<() => void>;
-  // Pending consent permits human takeover; submission blocks captures until document replacement.
-  secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean };
-}
 
 export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
@@ -224,18 +180,16 @@ async function rejectTakeoverTool(): Promise<DynamicToolResult> {
 }
 
 export class BrowserHost {
-  static readonly CONTROL_IDLE_GRACE_MS = 1_200;
+  static readonly CONTROL_IDLE_GRACE_MS = BrowserControlSessions.IDLE_GRACE_MS;
   readonly #window: BrowserWindow;
   readonly #session: Session;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
-  readonly #tabs = new Map<string, InternalTab>();
+  readonly #tabs = new Map<string, BrowserHostTab>();
   readonly #closingTabDrains = new Map<string, Promise<void>>();
   readonly #listeners = new Set<(...args: BrowserHostEvents["changed"]) => void>();
-  readonly #controlListeners = new Set<(...args: BrowserHostEvents["controlChanged"]) => void>();
   readonly #documentListeners = new Set<(...args: BrowserHostEvents["documentChanged"]) => void>();
-  readonly #controlSessions = new Map<string, BrowserControlSession>();
-  readonly #controlTimers = new Map<string, NodeJS.Timeout>();
+  readonly #controls = new BrowserControlSessions();
   readonly #reservedDownloadPaths = new Set<string>();
   readonly #recorder: BrowserRecorder;
   #activeTabId: string | null = null;
@@ -290,7 +244,7 @@ export class BrowserHost {
     const state = await readBrowserState(this.#statePath);
     if (state.tabs.length === 0) return;
 
-    const tabs: InternalTab[] = [];
+    const tabs: BrowserHostTab[] = [];
     for (const saved of state.tabs) {
       const stored = reownStoredBrowserTab(saved, agents);
       const ownerAgentId =
@@ -307,7 +261,7 @@ export class BrowserHost {
     this.#syncAttachedView();
     this.#emitChanged();
 
-    const restoreTab = async (tab: InternalTab) => {
+    const restoreTab = async (tab: BrowserHostTab) => {
       await tab.contents.loadURL("about:blank");
       await tab.engine.setEnvironment(tab.environment);
       await tab.engine.navigate(tab.requestedUrl);
@@ -324,7 +278,7 @@ export class BrowserHost {
   }
 
   /** Starts the held-back first load of a restored tab, once, ahead of anything else queued on it. */
-  #wake(tab: InternalTab): void {
+  #wake(tab: BrowserHostTab): void {
     const pending = tab.pendingRestore;
     if (!pending) return;
     tab.pendingRestore = undefined;
@@ -337,8 +291,7 @@ export class BrowserHost {
   }
 
   onControlChanged(listener: (...args: BrowserHostEvents["controlChanged"]) => void): () => void {
-    this.#controlListeners.add(listener);
-    return () => this.#controlListeners.delete(listener);
+    return this.#controls.onChanged(listener);
   }
 
   onDocumentChanged(listener: (...args: BrowserHostEvents["documentChanged"]) => void): () => void {
@@ -347,28 +300,15 @@ export class BrowserHost {
   }
 
   getControlState(): BrowserControlState {
-    return {
-      sessions: [...this.#controlSessions.values()]
-        .sort((left, right) => left.startedAt.localeCompare(right.startedAt))
-        .map((session) => ({ ...session })),
-    };
+    return this.#controls.state();
   }
 
   endControl(threadId: string, turnId: string): void {
-    const id = controlSessionId(threadId, turnId);
-    const timer = this.#controlTimers.get(id);
-    if (timer) clearTimeout(timer);
-    this.#controlTimers.delete(id);
-    if (!this.#controlSessions.delete(id)) return;
-    this.#emitControlChanged();
+    this.#controls.end(threadId, turnId);
   }
 
   clearControls(): void {
-    for (const timer of this.#controlTimers.values()) clearTimeout(timer);
-    this.#controlTimers.clear();
-    if (this.#controlSessions.size === 0) return;
-    this.#controlSessions.clear();
-    this.#emitControlChanged();
+    this.#controls.clear();
   }
 
   listTabs(): BrowserTab[] {
@@ -417,11 +357,7 @@ export class BrowserHost {
       throw new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs }));
     }
     const normalizedUrl = normalizeBrowserUrl(url);
-    const focusedContents = focus ? null : webContents.getFocusedWebContents();
-    const previouslyFocused =
-      focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
-        ? focusedContents
-        : null;
+    const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerAgentId);
 
     this.#tabs.set(tab.id, tab);
@@ -595,7 +531,7 @@ export class BrowserHost {
         async (_tab, keepQueueBlocked) => {
           await this.#recorder.discard(args.tabId, "requested");
           tab.diagnostics.clearDiagnostics();
-          return this.#boundEngineOperation(
+          return boundEngineOperation(
             tab,
             tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
             10_000,
@@ -631,7 +567,7 @@ export class BrowserHost {
             await this.#enqueue(
               args.tabId,
               async (_tab, keepQueueBlocked) => {
-                await this.#boundEngineOperation(
+                await boundEngineOperation(
                   tab,
                   entry.enter(secret),
                   10_000,
@@ -655,7 +591,7 @@ export class BrowserHost {
                 if (!protection.replaced) {
                   // A reload would restart a single-page sign-in at its first step. Keep the
                   // document when its fields are empty and nothing a snapshot reads shows the value.
-                  const cleared = await this.#boundEngineOperation(
+                  const cleared = await boundEngineOperation(
                     tab,
                     entry.clear(secret),
                     10_000,
@@ -667,7 +603,7 @@ export class BrowserHost {
                 if (!protection.replaced && !kept) {
                   // Load with GET rather than replaying a possible form POST. Keep capture
                   // blocked until navigation has replaced the document and this operation ends.
-                  await this.#boundEngineOperation(
+                  await boundEngineOperation(
                     tab,
                     navigateAndWait(tab.contents, () => tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions())),
                     10_000,
@@ -708,7 +644,7 @@ export class BrowserHost {
    * secure input is allowed in a connected tab only when no frame in another connected tab has the
    * secret's site.
    */
-  #requireIsolatedFromConnectedTabs(tab: InternalTab, origin: string): void {
+  #requireIsolatedFromConnectedTabs(tab: BrowserHostTab, origin: string): void {
     if (!tab.hasSharedBrowsingContext) return;
     const site = approximateSite(origin);
     for (const connected of this.#connectedTabs(tab)) {
@@ -721,14 +657,14 @@ export class BrowserHost {
     }
   }
 
-  #requireNoSecretDocument(tab: InternalTab, action: string): void {
+  #requireNoSecretDocument(tab: BrowserHostTab, action: string): void {
     if ([...this.#connectedTabs(tab)].some((connected) => connected.secretDocument))
       throw new Error(
         `${action} is unavailable while a page that received a secret is open. Use snapshots and actions until it navigates.`,
       );
   }
 
-  #connectedTabs(tab: InternalTab): Set<InternalTab> {
+  #connectedTabs(tab: BrowserHostTab): Set<BrowserHostTab> {
     const connected = new Set([tab]);
     for (const current of connected) {
       for (const candidate of this.#tabs.values()) {
@@ -761,7 +697,7 @@ export class BrowserHost {
   async snapshot(tabId: string): Promise<BrowserSnapshot> {
     return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
       const revision = tab.revision + 1;
-      return (await this.#readSnapshot(tab, revision, keepQueueBlocked)).snapshot;
+      return (await readTabSnapshot(tab, revision, keepQueueBlocked)).snapshot;
     });
   }
 
@@ -807,13 +743,7 @@ export class BrowserHost {
         // answers none of them never reaches -- and re-resolving a ref fingerprints the element in
         // the frame that owns it, so a page wedged after the snapshot hangs the dispatch itself.
         const dispatchTimeout = Math.max(1, deadline - Date.now());
-        await this.#boundEngineOperation(
-          tab,
-          dispatch(),
-          dispatchTimeout,
-          "Browser action timed out.",
-          keepQueueBlocked,
-        );
+        await boundEngineOperation(tab, dispatch(), dispatchTimeout, "Browser action timed out.", keepQueueBlocked);
         const settleTimeout = Math.max(1, deadline - Date.now());
         const settleCompletion = tab.engine.settle(settleTimeout);
         try {
@@ -825,7 +755,7 @@ export class BrowserHost {
           if (!isTimeoutError(error)) throw error;
           // The action fails from here as it always did, so nothing else is using the session and the
           // unwind can start at once.
-          keepQueueBlocked(this.#unwindStalledOperation(tab, settleCompletion));
+          keepQueueBlocked(unwindStalledOperation(tab, settleCompletion));
           throw error;
         }
         tab.diagnostics.action({
@@ -843,13 +773,13 @@ export class BrowserHost {
         throw error;
       }
       const nextRevision = tab.revision + 1;
-      return (await this.#readSnapshot(tab, nextRevision, keepQueueBlocked)).snapshot;
+      return (await readTabSnapshot(tab, nextRevision, keepQueueBlocked)).snapshot;
     });
   }
 
   async screenshot(tabId: string): Promise<string> {
     return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-      const image = await this.#boundEngineOperation(
+      const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
         10_000,
@@ -862,7 +792,7 @@ export class BrowserHost {
 
   async capturePreview(tabId: string): Promise<BrowserPreview> {
     return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-      const image = await this.#boundEngineOperation(
+      const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
         10_000,
@@ -898,7 +828,7 @@ export class BrowserHost {
    * after whatever the agent is doing has finished, which is exactly the picture the still-image
    * route already gave; the point of the view is that the page moves while the agent works.
    */
-  #invalidateViews(tab: InternalTab): void {
+  #invalidateViews(tab: BrowserHostTab): void {
     tab.captureGeneration += 1;
     for (const invalidate of [...tab.viewInvalidations]) invalidate();
   }
@@ -963,7 +893,7 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: async ({ args }, params) => {
       const tab = await this.open(args.url, params.threadId, params.ownerAgentId ?? null);
-      this.#updateControlTab(params, tab.id);
+      this.#controls.updateTab(params, tab.id);
       return textResult({ tab });
     },
     list_tabs: async (_call, params) => textResult(this.#toolTabs(params)),
@@ -978,10 +908,10 @@ export class BrowserHost {
       this.#requireToolTab(params, tabId);
       const mode = args.image ?? "auto";
       const capture = await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
-        const result = await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked);
+        const result = await readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked);
         const includeImage = mode === "always" || (mode === "auto" && result.recommendImage);
         if (!includeImage) return { result, imageUrl: null };
-        const image = await this.#boundEngineOperation(
+        const image = await boundEngineOperation(
           tab,
           tab.engine.screenshot(),
           10_000,
@@ -1059,7 +989,7 @@ export class BrowserHost {
           // The engine checks this deadline between commands, which a frame that answers none of
           // them never reaches.
           const waitTimeout = remainingTime(deadline, timeoutMessage);
-          await this.#boundEngineOperation(
+          await boundEngineOperation(
             tab,
             tab.engine.waitFor(condition, waitTimeout),
             waitTimeout,
@@ -1067,7 +997,7 @@ export class BrowserHost {
             keepQueueBlocked,
           );
           return (
-            await this.#readSnapshot(
+            await readTabSnapshot(
               tab,
               tab.revision + 1,
               keepQueueBlocked,
@@ -1096,7 +1026,7 @@ export class BrowserHost {
         await this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
           const environment = resolveEnvironment(args, tab.environment, tab.view.getBounds());
           // This also bounds the engine's rollback if applying the environment fails.
-          await this.#boundEngineOperation(
+          await boundEngineOperation(
             tab,
             tab.engine.setEnvironment(environment),
             10_000,
@@ -1106,7 +1036,7 @@ export class BrowserHost {
           tab.environment = environment;
           await this.#persistState();
           this.#emitChanged();
-          return (await this.#readSnapshot(tab, tab.revision + 1, keepQueueBlocked)).snapshot;
+          return (await readTabSnapshot(tab, tab.revision + 1, keepQueueBlocked)).snapshot;
         }),
       );
     },
@@ -1163,7 +1093,7 @@ export class BrowserHost {
   ): Promise<DynamicToolResult> {
     try {
       const call = parseBrowserToolCall(params.tool, params.arguments);
-      this.#beginControl(params, call);
+      this.#controls.begin(params, call);
       return await runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks);
     } catch (error) {
       return {
@@ -1174,7 +1104,7 @@ export class BrowserHost {
         contentItems: [{ type: "inputText", text: redactText(String(error)) }],
       };
     } finally {
-      this.#finishControl(params);
+      this.#controls.finish(params);
     }
   }
 
@@ -1215,7 +1145,7 @@ export class BrowserHost {
       // This preflight scans every frame for the input, so an unresponsive one holds it open exactly
       // as it would the upload itself -- and it is queued ahead of that bounded upload, so without a
       // bound of its own the tab never reaches the operation the timeout was meant to protect.
-      this.#boundEngineOperation(
+      boundEngineOperation(
         tab,
         tab.engine.resolveUploadTarget(target),
         timeoutMs,
@@ -1248,8 +1178,7 @@ export class BrowserHost {
     const recorderDestruction = Promise.allSettled(tabDrains).then(() => this.#recorder.destroy());
     this.#tabs.clear();
     this.#listeners.clear();
-    this.clearControls();
-    this.#controlListeners.clear();
+    this.#controls.dispose();
     this.#documentListeners.clear();
     const results = await Promise.allSettled([
       this.#session.cookies.flushStore(),
@@ -1276,7 +1205,7 @@ export class BrowserHost {
     ownerAgentId: string | null,
     environment: BrowserEnvironment = defaultBrowserEnvironment(),
     popupOptions?: BrowserWindowConstructorOptions,
-  ): InternalTab {
+  ): BrowserHostTab {
     if (this.#destroyPromise) throw new Error("BrowserHost is shutting down.");
     const view = this.#createView(popupOptions);
     this.#mountView(view);
@@ -1372,7 +1301,7 @@ export class BrowserHost {
     });
   }
 
-  #bindTabEvents(tab: InternalTab): void {
+  #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
     contents.on("close", () => {
@@ -1399,7 +1328,7 @@ export class BrowserHost {
       // one stops the tab for good -- and this runs off a navigation, where no caller's deadline
       // covers it.
       void this.#enqueue(tab.id, (queuedTab, keepQueueBlocked) =>
-        this.#boundEngineOperation(
+        boundEngineOperation(
           queuedTab,
           queuedTab.engine.documentIds(),
           DOCUMENT_ENUMERATION_TIMEOUT_MS,
@@ -1563,7 +1492,7 @@ export class BrowserHost {
       }
       // Electron supplies the opener preferences and navigates the returned contents itself.
       // Reopening the URL loses WindowProxy, POST bodies, and OAuth callback messages.
-      let popup: InternalTab | undefined;
+      let popup: BrowserHostTab | undefined;
       return {
         action: "allow",
         // The host owns cleanup. Electron otherwise destroys children on opener reload too.
@@ -1643,7 +1572,7 @@ export class BrowserHost {
    * have; a preload or a permanent debugger attach would answer synchronously but weaken the
    * sandboxed view or fight the automation recorder.
    */
-  #collapseOnEscape(tab: InternalTab): void {
+  #collapseOnEscape(tab: BrowserHostTab): void {
     if (!this.#collapsesOnEscape(tab)) return;
     const frame = tab.contents.focusedFrame ?? tab.contents.mainFrame;
     if (!frame || frame.isDestroyed()) return;
@@ -1662,11 +1591,11 @@ export class BrowserHost {
   }
 
   /** Whether this tab is the page the expanded browser shows in the main window. */
-  #collapsesOnEscape(tab: InternalTab): boolean {
+  #collapsesOnEscape(tab: BrowserHostTab): boolean {
     return this.#target === "main" && this.#visible && this.#activeTabId === tab.id && this.#attachedView === tab.view;
   }
 
-  async #syncViewBackground(tab: InternalTab): Promise<void> {
+  async #syncViewBackground(tab: BrowserHostTab): Promise<void> {
     try {
       const background = await tab.contents.executeJavaScript(
         `(() => {
@@ -1682,278 +1611,6 @@ export class BrowserHost {
     } catch {
       // Navigation can replace the document before its background is read.
     }
-  }
-
-  async #readSnapshot(
-    tab: InternalTab,
-    revision: number,
-    keepQueueBlocked: KeepQueueBlocked,
-    timeoutMs = 10_000,
-    timeoutMessage = "Browser snapshot timed out.",
-  ): Promise<SnapshotReadResult> {
-    const history = tab.diagnostics.snapshot();
-    const completion = tab.engine.snapshot({
-      tabId: tab.id,
-      revision,
-      environment: tab.environment,
-      diagnostics: history.diagnostics,
-      actions: history.actions,
-    });
-    // A snapshot walks every frame, so it is one of the engine operations a single unresponsive
-    // renderer can hold open forever.
-    const result = await this.#boundEngineOperation(tab, completion, timeoutMs, timeoutMessage, keepQueueBlocked);
-    tab.revision = revision;
-    return result;
-  }
-
-  /**
-   * Bounds an engine operation in wall-clock time and unwinds what it left behind. Electron's
-   * `sendCommand` carries no timeout of its own and the engine's own deadlines are checked between
-   * commands, so a frame whose renderer never answers leaves the operation pending forever however
-   * short a deadline it was given. Returning a timeout to the caller is not enough on its own: the
-   * queue waits on every promise given to `keepQueueBlocked`, so a command left outstanding means
-   * nothing on this tab ever runs again -- navigation, takeover, close and host shutdown all queue
-   * behind that drain.
-   */
-  #boundEngineOperation<T>(
-    tab: InternalTab,
-    completion: Promise<T>,
-    timeoutMs: number,
-    timeoutMessage: string,
-    keepQueueBlocked: KeepQueueBlocked,
-  ): Promise<T> {
-    let unwound: Promise<void> | undefined;
-    const bounded = withTimeout(completion, timeoutMs, timeoutMessage).catch((error) => {
-      if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, completion);
-      throw error;
-    });
-    keepQueueBlocked(Promise.allSettled([bounded]).then(() => unwound));
-    return bounded;
-  }
-
-  /**
-   * Gives an operation that missed its deadline a moment to unwind, and detaches the debugger if it
-   * will not. Detaching is the only cancellation primitive there is, and it is a blunt one: it takes
-   * the whole session down, so a command still in flight when the next one attaches over the top of it
-   * fails with `target closed while handling command` -- one operation away from the timeout that
-   * caused it. Most timeouts do not need it at all, because a deadline shorter than the page is the
-   * ordinary case and a live renderer answers what is outstanding in a few milliseconds. So the wait
-   * comes first, the detach only if the wait expires, and a second wait after it, so the queue
-   * advances into an attached debugger rather than one being torn down. When the recorder holds the
-   * debugger there is nothing to detach and the wait stands, because the command really is still
-   * outstanding.
-   */
-  async #unwindStalledOperation(tab: InternalTab, completion: Promise<unknown>): Promise<void> {
-    const settled = Promise.allSettled([completion]);
-    if (await finishesWithin(settled, OPERATION_UNWIND_GRACE_MS)) return;
-    if (!tab.engine.cancelPendingCommands()) {
-      await settled;
-      return;
-    }
-    await finishesWithin(settled, OPERATION_UNWIND_GRACE_MS);
-  }
-
-  async #runAction(
-    tabId: string,
-    action: string,
-    target: BrowserTarget | undefined,
-    operation: (tab: InternalTab, deadline: number, markDispatched: () => void) => Promise<void>,
-    timeoutMs = 10_000,
-    onOperationStarted?: (completion: Promise<void>) => void,
-  ): Promise<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }> {
-    const tab = this.#requireTab(tabId);
-    const started = tab.queue.then(() => {
-      if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
-      const focusedContents = webContents.getFocusedWebContents();
-      const previouslyFocused =
-        focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
-          ? focusedContents
-          : null;
-      const deadline = Date.now() + timeoutMs;
-      const timeoutMessage = `Browser ${action} timed out.`;
-      const snapshotDrains: Promise<unknown>[] = [];
-      let stalledSettle: Promise<void> | undefined;
-      let actionRecorded = false;
-      let dispatched = false;
-      let cancellationConfirmed = false;
-      const operationCompletion = (async () => {
-        let highlighted = false;
-        try {
-          tab.contents.focus();
-          if (target && target.kind !== "point") {
-            highlighted = await tab.engine.highlight(target).then(
-              () => true,
-              () => false,
-            );
-          }
-          remainingTime(deadline, timeoutMessage);
-          await operation(tab, deadline, () => {
-            dispatched = true;
-          });
-        } finally {
-          if (highlighted && !cancellationConfirmed) await tab.engine.hideHighlight().catch(() => undefined);
-        }
-      })();
-      onOperationStarted?.(operationCompletion);
-      const boundedOperation = withTimeout(
-        operationCompletion,
-        Math.max(0, deadline - Date.now()) + OPERATION_DEADLINE_BACKSTOP_MS,
-        timeoutMessage,
-      ).catch(async (error) => {
-        // Only the backstop itself: an operation that failed on its own deadline has already
-        // finished, and detaching the debugger under it would only end the live view and frames.
-        if (!(error instanceof TimeoutError)) throw error;
-        cancellationConfirmed = tab.engine.cancelPendingCommands();
-        if (dispatched && !cancellationConfirmed) await operationCompletion;
-        throw error;
-      });
-      const response = boundedOperation
-        .then(async () => {
-          const settleTimeout = Math.max(1, deadline - Date.now());
-          const settleCompletion = tab.engine.settle(settleTimeout);
-          try {
-            // Settling bounds its own waiting with timers, but the commands it sends to each frame are
-            // not bounded by them, so an unresponsive frame holds the action's response open and the
-            // queue with it.
-            await withTimeout(settleCompletion, settleTimeout, timeoutMessage);
-          } catch (error) {
-            if (!isTimeoutError(error)) throw error;
-            // The settle may still be waiting on a frame that never answers, and unwinding it can go
-            // as far as detaching the debugger -- which the post-dispatch snapshot below is about to
-            // use. So the unwind is left to the drain, once the rest of the action has finished with
-            // the session.
-            stalledSettle = settleCompletion;
-            if (tab.contents.isLoading()) await tab.engine.stopLoading().catch(() => undefined);
-          }
-          tab.diagnostics.action({
-            action,
-            target: target ? describeBrowserTarget(target) : undefined,
-            outcome: "success",
-            ...(Date.now() >= deadline
-              ? { detail: "Action completed; page settling exceeded the requested timeout." }
-              : {}),
-          });
-          actionRecorded = true;
-          const snapshot = (
-            await this.#readSnapshot(
-              tab,
-              tab.revision + 1,
-              (promise) => snapshotDrains.push(promise),
-              ACTION_POST_DISPATCH_TIMEOUT_MS,
-              timeoutMessage,
-            )
-          ).snapshot;
-          return snapshot;
-        })
-        .catch((error) => {
-          if (dispatched && (tab.closing || tab.contents.isDestroyed())) {
-            return {
-              tabId: tab.id,
-              closed: true as const,
-              ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
-            };
-          }
-          if (!actionRecorded) {
-            tab.diagnostics.action({
-              action,
-              target: target ? describeBrowserTarget(target) : undefined,
-              outcome: "error",
-              detail: String(error).slice(0, 2_000),
-            });
-          }
-          throw error;
-        })
-        .finally(() => {
-          if (!tab.closing) restoreWebContentsFocus(previouslyFocused, tab.contents);
-        });
-      snapshotDrains.push(
-        Promise.allSettled([response]).then(() =>
-          stalledSettle ? this.#unwindStalledOperation(tab, stalledSettle) : undefined,
-        ),
-      );
-      const drained = Promise.allSettled([response])
-        .then(() =>
-          cancellationConfirmed ? undefined : Promise.allSettled([operationCompletion]).then(() => undefined),
-        )
-        .then(() =>
-          !tab.closing && !tab.contents.isDestroyed() && tab.contents.isLoading()
-            ? tab.engine.stopLoading().catch(() => undefined)
-            : undefined,
-        )
-        .then(() => Promise.allSettled(snapshotDrains))
-        .then(() => undefined);
-      return { drained, response };
-    });
-    const result = started.then(({ response }) => response);
-    tab.queue = started.then(
-      ({ drained }) => drained,
-      () => undefined,
-    );
-    return result;
-  }
-
-  async #runEvaluation(
-    tabId: string,
-    expression: string,
-    awaitPromise: boolean,
-    timeoutMs: number,
-  ): Promise<BrowserJsonValue> {
-    const tab = this.#requireTab(tabId);
-    const started = tab.queue.then(() => {
-      if (tab.secret) throw new Error("Browser inspection is protected during authentication. Use takeover.");
-      this.#requireNoSecretDocument(tab, "Page evaluation");
-      const deadline = Date.now() + timeoutMs;
-      const timeoutMessage = "Browser evaluate timed out.";
-      let unwound: Promise<void> | undefined;
-      const operationCompletion = tab.engine.evaluate(
-        expression,
-        awaitPromise,
-        remainingTime(deadline, timeoutMessage),
-      );
-      // `awaitPromise` is what CDP's own execution timeout does not bound: an expression evaluating
-      // to a promise the page never settles leaves the command pending forever, and `drained` waits
-      // on that promise, so the tab's queue never advances -- which would also block takeover, close
-      // and shutdown.
-      const boundedOperation = withTimeout(
-        operationCompletion,
-        remainingTime(deadline, timeoutMessage),
-        timeoutMessage,
-      ).catch((error) => {
-        if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, operationCompletion);
-        throw error;
-      });
-      const response = boundedOperation
-        .then(async (value) => {
-          const settleTimeout = remainingTime(deadline, timeoutMessage);
-          // Same unbounded commands as the action path settles through; the evaluation itself has
-          // already returned here, so unwinding this one only releases the drain sooner.
-          const settleCompletion = tab.engine.settle(settleTimeout);
-          await withTimeout(settleCompletion, settleTimeout, timeoutMessage).catch((error) => {
-            if (isTimeoutError(error)) unwound = this.#unwindStalledOperation(tab, settleCompletion);
-            throw error;
-          });
-          tab.diagnostics.action({ action: "evaluate", outcome: "success" });
-          return value;
-        })
-        .catch((error) => {
-          tab.diagnostics.action({
-            action: "evaluate",
-            outcome: "error",
-            detail: String(error).slice(0, 2_000),
-          });
-          throw error;
-        });
-      const drained = Promise.allSettled([response])
-        .then(() => unwound ?? Promise.allSettled([operationCompletion]).then(() => undefined))
-        .then(() => undefined);
-      return { drained, response };
-    });
-    const result = started.then(({ response }) => response);
-    tab.queue = started.then(
-      ({ drained }) => drained,
-      () => undefined,
-    );
-    return result;
   }
 
   #snapshotResult(result: SnapshotReadResult, mode: BrowserImageMode, imageUrl: string | null): DynamicToolResult {
@@ -2029,7 +1686,7 @@ export class BrowserHost {
     window.contentView.addChildView(overlay);
   }
 
-  #focusTab(tab: InternalTab): void {
+  #focusTab(tab: BrowserHostTab): void {
     if (
       this.#tabs.get(tab.id) !== tab ||
       this.#activeTabId !== tab.id ||
@@ -2064,7 +1721,7 @@ export class BrowserHost {
     if (this.#attachedView === view) this.#attachedView = null;
   }
 
-  #requireTab(tabId: string): InternalTab {
+  #requireTab(tabId: string): BrowserHostTab {
     const tab = this.#tabs.get(tabId);
     if (!tab) throw new Error(`Unknown browser tab: ${tabId}`);
     this.#wake(tab);
@@ -2093,82 +1750,58 @@ export class BrowserHost {
 
   #enqueue<T>(
     tabId: string,
-    operation: (tab: InternalTab, keepQueueBlocked: KeepQueueBlocked) => Promise<T>,
+    operation: (tab: BrowserHostTab, keepQueueBlocked: KeepQueueBlocked) => Promise<T>,
     allowProtected = false,
   ): Promise<T> {
-    const tab = this.#requireTab(tabId);
-    const started = tab.queue.then(() => {
-      if (tab.secret?.submitted && !allowProtected)
-        throw new Error("Browser inspection is protected during authentication. Use takeover.");
-      const drains: Promise<unknown>[] = [];
-      const result = operation(tab, (promise) => drains.push(promise));
-      const drained = result
-        .catch(() => undefined)
-        .then(() => Promise.allSettled(drains))
-        .then(() => undefined);
-      return { drained, result };
-    });
-    const result = started.then(({ result }) => result);
-    tab.queue = started.then(
-      ({ drained }) => drained,
-      () => undefined,
+    return enqueueTabOperation(this.#requireTab(tabId), operation, allowProtected);
+  }
+
+  async #runAction(
+    tabId: string,
+    action: string,
+    target: BrowserTarget | undefined,
+    operation: (tab: BrowserHostTab, deadline: number, markDispatched: () => void) => Promise<void>,
+    timeoutMs?: number,
+    onOperationStarted?: (completion: Promise<void>) => void,
+  ): Promise<BrowserSnapshot | { tabId: string; closed: true; openerTabId?: string }> {
+    return runTabAction(
+      this.#requireTab(tabId),
+      () => this.#focusedContentsOutsideTabs(),
+      action,
+      target,
+      operation,
+      timeoutMs,
+      onOperationStarted,
     );
-    return result;
+  }
+
+  async #runEvaluation(
+    tabId: string,
+    expression: string,
+    awaitPromise: boolean,
+    timeoutMs: number,
+  ): Promise<BrowserJsonValue> {
+    const tab = this.#requireTab(tabId);
+    return runTabEvaluation(
+      tab,
+      () => this.#requireNoSecretDocument(tab, "Page evaluation"),
+      expression,
+      awaitPromise,
+      timeoutMs,
+    );
+  }
+
+  /** The app contents that has focus, unless it is one of the browser's own tabs. */
+  #focusedContentsOutsideTabs(): WebContents | null {
+    const focusedContents = webContents.getFocusedWebContents();
+    return focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
+      ? focusedContents
+      : null;
   }
 
   #emitChanged(): void {
     const tabs = this.listTabs();
     for (const listener of this.#listeners) listener(tabs, this.#activeTabId);
-  }
-
-  #beginControl(params: DynamicToolCallParams, call: BrowserToolCall): void {
-    const id = controlSessionId(params.threadId, params.turnId);
-    const timer = this.#controlTimers.get(id);
-    if (timer) clearTimeout(timer);
-    this.#controlTimers.delete(id);
-    const previous = this.#controlSessions.get(id);
-    this.#controlSessions.set(id, {
-      id,
-      threadId: params.threadId,
-      turnId: params.turnId,
-      callId: params.callId,
-      tabId: "tabId" in call.args ? call.args.tabId : null,
-      action: browserControlAction(call),
-      detailAction: browserControlDetailAction(params.tool),
-      phase: "acting",
-      startedAt: previous?.startedAt ?? new Date().toISOString(),
-    });
-    this.#emitControlChanged();
-  }
-
-  #finishControl(params: DynamicToolCallParams): void {
-    const id = controlSessionId(params.threadId, params.turnId);
-    const current = this.#controlSessions.get(id);
-    if (!current || current.callId !== params.callId) return;
-    this.#controlSessions.set(id, { ...current, phase: "waiting" });
-    this.#emitControlChanged();
-    const timer = setTimeout(() => {
-      this.#controlTimers.delete(id);
-      const latest = this.#controlSessions.get(id);
-      if (!latest || latest.callId !== params.callId || latest.phase !== "waiting") return;
-      this.#controlSessions.delete(id);
-      this.#emitControlChanged();
-    }, BrowserHost.CONTROL_IDLE_GRACE_MS);
-    timer.unref();
-    this.#controlTimers.set(id, timer);
-  }
-
-  #updateControlTab(params: DynamicToolCallParams, tabId: string): void {
-    const id = controlSessionId(params.threadId, params.turnId);
-    const current = this.#controlSessions.get(id);
-    if (!current || current.callId !== params.callId) return;
-    this.#controlSessions.set(id, { ...current, tabId });
-    this.#emitControlChanged();
-  }
-
-  #emitControlChanged(): void {
-    const state = this.getControlState();
-    for (const listener of this.#controlListeners) listener(state);
   }
 
   #schedulePersist(): void {
@@ -2200,16 +1833,6 @@ export class BrowserHost {
   }
 }
 
-function restoreWebContentsFocus(previous: WebContents | null, controlled: WebContents): void {
-  const current = webContents.getFocusedWebContents();
-  if (current && current !== controlled) return;
-  if (previous && !previous.isDestroyed()) {
-    const window = BrowserWindow.fromWebContents(previous);
-    if (window && !window.isDestroyed()) window.focus();
-    previous.focus();
-  }
-}
-
 function validateBounds(bounds: BrowserBounds): BrowserBounds {
   if (!Object.values(bounds).every(Number.isFinite)) throw new Error("Invalid browser bounds.");
   return {
@@ -2217,33 +1840,6 @@ function validateBounds(bounds: BrowserBounds): BrowserBounds {
     y: Math.max(0, Math.min(INPUT_LIMITS.browserCoordinate, Math.floor(bounds.y))),
     width: Math.max(1, Math.min(INPUT_LIMITS.browserDimension, Math.ceil(bounds.width))),
     height: Math.max(1, Math.min(INPUT_LIMITS.browserDimension, Math.ceil(bounds.height))),
-  };
-}
-
-function toPublicTab(tab: InternalTab): BrowserTab {
-  const environment =
-    tab.environment.viewport.mode === "fill"
-      ? {
-          ...tab.environment,
-          viewport: {
-            ...tab.environment.viewport,
-            width: tab.view.getBounds().width,
-            height: tab.view.getBounds().height,
-          },
-        }
-      : tab.environment;
-  return {
-    id: tab.id,
-    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
-    url: tab.secret?.origin ?? currentTabUrl(tab),
-    loading: tab.contents.isLoading(),
-    ownerThreadId: tab.ownerThreadId,
-    ownerAgentId: tab.ownerAgentId,
-    environment,
-    recording: tab.recording,
-    diagnosticErrorCount: tab.diagnostics.errorCount,
-    ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
-    ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
   };
 }
 
@@ -2256,21 +1852,6 @@ function approximateSite(origin: string): string {
   const hostname = new URL(origin).hostname;
   if (isIP(hostname.replace(/^\[|\]$/gu, "")) !== 0) return hostname;
   return hostname.split(".").slice(-2).join(".");
-}
-
-/** A restored tab that has not loaded yet shows a blank page; its host name stands in for its title. */
-function restoredTabTitle(tab: InternalTab): string | null {
-  if (!tab.pendingRestore) return null;
-  try {
-    return new URL(tab.requestedUrl).hostname || null;
-  } catch {
-    return null;
-  }
-}
-
-function currentTabUrl(tab: InternalTab): string {
-  const currentUrl = tab.contents.getURL();
-  return isPersistableBrowserUrl(currentUrl) ? currentUrl : tab.requestedUrl;
 }
 
 function readConsoleMessage(args: unknown[]): BrowserConsoleMessageDetails | null {
@@ -2333,22 +1914,4 @@ function uniqueDownloadPath(root: string, name: string, reserved: Set<string>): 
     const candidate = join(root, suffix === 1 ? name : `${stem} (${suffix})${extension}`);
     if (!reserved.has(candidate) && !existsSync(candidate)) return candidate;
   }
-}
-
-/** Resolves to whether the work settled before the bound, rather than throwing when it did not. */
-async function finishesWithin(work: Promise<unknown>, milliseconds: number): Promise<boolean> {
-  return await withTimeout(work, milliseconds, "Browser operation unwind timed out.").then(
-    () => true,
-    () => false,
-  );
-}
-
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof Error && /timed out/i.test(error.message);
-}
-
-function remainingTime(deadline: number, message: string): number {
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) throw new Error(message);
-  return remaining;
 }
