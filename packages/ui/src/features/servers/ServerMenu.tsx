@@ -5,7 +5,6 @@ import {
   BellOff,
   buttonVariants,
   Check,
-  ChevronDown,
   ChevronRight,
   ChevronsUpDown,
   ContextMenu,
@@ -14,7 +13,8 @@ import {
   Plus,
   Puzzle,
 } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { SwapLabel } from "@openbot/ui/components/SwapLabel";
+import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems, ServerSettingsGlyph } from "./ServerActionItems";
 import { ServerMark, serverStatusLabels } from "./ServerRail";
@@ -52,6 +52,20 @@ function isContextMenuKey(event: KeyboardEvent): boolean {
   return event.key === "ContextMenu" || (event.shiftKey && event.key === "F10");
 }
 
+function CheckCircle(props: { checked: boolean }) {
+  return (
+    <span class="ui-menu-check" data-checked={props.checked ? "" : undefined} aria-hidden="true">
+      <Show when={props.checked}>
+        <Check />
+      </Show>
+    </span>
+  );
+}
+
+// The app mounts a new sidebar title when the active server changes. The last shown server lets
+// the new title animate from the old name and logo.
+let lastShown: { id: string | undefined; name: string } | undefined;
+
 /**
  * The server name on the sidebar title. Its menu sets the server view. In the menu view, it also
  * lists the servers, and the usage and settings of the active server. A click or Enter on a server
@@ -64,6 +78,15 @@ export function ServerMenu(props: ServerMenuProps) {
   let anchor: HTMLElement | undefined;
   let trigger: HTMLElement | undefined;
   const activeServer = () => props.servers.find((server) => server.active);
+  const activeServers = () => props.servers.filter((server) => server.active);
+  const shownBefore = lastShown;
+  let markId = shownBefore?.id;
+  createEffect(
+    () => ({ id: activeServer()?.id, name: props.serverName }),
+    (shown) => {
+      lastShown = shown;
+    },
+  );
 
   function openActions(clientX: number, clientY: number): void {
     anchor?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX, clientY }));
@@ -87,10 +110,14 @@ export function ServerMenu(props: ServerMenuProps) {
 
   return (
     <>
-      <DropdownMenu.Root open={menuOpen()} onOpenChange={setMenuOpen} placement="bottom-start" gutter={4}>
+      <DropdownMenu.Root open={menuOpen()} onOpenChange={setMenuOpen} placement="bottom-start" gutter={6}>
         <DropdownMenu.Trigger
           ref={(element) => (trigger = element)}
-          class={buttonVariants({ variant: "ghost", size: "sm", class: "sidebar-server-name no-drag" })}
+          class={buttonVariants({
+            variant: "ghost",
+            size: "sm",
+            class: "sidebar-server-name no-drag",
+          })}
           aria-label={t("server.menu.open", { name: props.serverName })}
           aria-hidden={props.compact ? "true" : undefined}
           aria-keyshortcuts="Shift+F10"
@@ -107,8 +134,25 @@ export function ServerMenu(props: ServerMenuProps) {
             openActions(bounds.left, bounds.bottom);
           }}
         >
-          <span class="sidebar-server-name-label">{props.serverName}</span>
-          <ChevronDown class="sidebar-server-name-chevron size-3" aria-hidden="true" />
+          {/* Keyed by server, so the logo of a newly selected server springs in. */}
+          <For each={activeServers()} keyed={(server) => server.id}>
+            {(server) => {
+              const id = untrack(() => server().id);
+              const entering = markId !== undefined && markId !== id;
+              markId = id;
+              return (
+                <span
+                  class="server-menu-mark sidebar-server-name-mark"
+                  data-entering={entering ? "" : undefined}
+                  aria-hidden="true"
+                >
+                  <ServerMark server={server()} />
+                </span>
+              );
+            }}
+          </For>
+          <SwapLabel class="sidebar-server-name-label" text={props.serverName} from={shownBefore?.name} />
+          <ChevronsUpDown class="sidebar-server-name-chevron" aria-hidden="true" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content class="agent-context-menu server-menu" aria-label={t("server.menu.label")}>
@@ -125,6 +169,10 @@ export function ServerMenu(props: ServerMenuProps) {
                 </Show>
               }
             >
+              {/* A heading only: each row names its server. A menu cannot hold a fieldset. */}
+              <div class="ui-menu-label" aria-hidden="true">
+                {t("server.rail.label")}
+              </div>
               <For each={props.servers} keyed={(server) => server.id}>
                 {(server) => (
                   <DropdownMenu.Sub>
@@ -135,15 +183,13 @@ export function ServerMenu(props: ServerMenuProps) {
                       onClick={() => selectServer(server())}
                       ref={(row) => selectOnKey(row, server)}
                     >
+                      <CheckCircle checked={server().active} />
                       <span class="server-menu-mark" aria-hidden="true">
                         <ServerMark server={server()} />
                       </span>
                       <span class="server-menu-name">{server().name}</span>
                       <Show when={server().notificationsMuted}>
                         <BellOff class="server-menu-muted size-3" aria-hidden="true" />
-                      </Show>
-                      <Show when={server().active}>
-                        <Check class="server-menu-muted size-4" aria-hidden="true" />
                       </Show>
                       <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
                     </DropdownMenu.SubTrigger>
@@ -152,6 +198,9 @@ export function ServerMenu(props: ServerMenuProps) {
                         class="ui-action-menu agent-context-menu"
                         aria-label={t("server.rail.actions")}
                       >
+                        <div class="ui-menu-label" aria-hidden="true">
+                          {server().name}
+                        </div>
                         <ServerActionItems
                           menu={DropdownMenu}
                           server={server()}
@@ -167,8 +216,10 @@ export function ServerMenu(props: ServerMenuProps) {
                 )}
               </For>
               <Show when={props.onAdd}>
-                <DropdownMenu.Item onSelect={() => props.onAdd?.()}>
-                  <Plus class="agent-context-icon size-4" aria-hidden="true" />
+                <DropdownMenu.Item class="server-menu-add" onSelect={() => props.onAdd?.()}>
+                  <span class="server-menu-add-circle" aria-hidden="true">
+                    <Plus />
+                  </span>
                   <span>{t("server.rail.addRemote")}</span>
                 </DropdownMenu.Item>
               </Show>
@@ -199,7 +250,11 @@ export function ServerMenu(props: ServerMenuProps) {
               <DropdownMenu.SubTrigger>
                 <AppWindow class="agent-context-icon size-4" aria-hidden="true" />
                 <span>{t("server.menu.layout")}</span>
-                <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
+                <span class="ui-menu-trailing">{t(SERVER_VIEW_LABELS[props.view])}</span>
+                <ChevronRight
+                  class="agent-context-submenu-chevron server-menu-layout-chevron size-4"
+                  aria-hidden="true"
+                />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.SubContent class="ui-action-menu agent-context-menu">
@@ -216,11 +271,9 @@ export function ServerMenu(props: ServerMenuProps) {
                         const Icon = SERVER_VIEW_ICONS[view];
                         return (
                           <DropdownMenu.RadioItem value={view}>
+                            <CheckCircle checked={props.view === view} />
                             <Icon class="agent-context-icon size-4" aria-hidden="true" />
                             <span>{t(SERVER_VIEW_LABELS[view])}</span>
-                            <Show when={props.view === view}>
-                              <Check class="agent-context-submenu-chevron size-4" aria-hidden="true" />
-                            </Show>
                           </DropdownMenu.RadioItem>
                         );
                       }}
