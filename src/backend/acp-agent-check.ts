@@ -18,7 +18,7 @@ import { OPENBOT_ACP_CLIENT_CAPABILITIES, OPENBOT_ACP_CLIENT_INFO } from "./acp-
 import { cliSpawnTarget } from "./cli";
 import { TimeoutError, withTimeout } from "./with-timeout";
 
-export const AGENT_CHECK_TIMEOUT_MS = 20_000;
+const AGENT_CHECK_TIMEOUT_MS = 20_000;
 const STOP_GRACE_MS = 2_000;
 const DETAIL_LIMIT = 300;
 const OPENBOT_ACP_PROTOCOL_VERSION = 1;
@@ -130,7 +130,7 @@ function checkResult(initialization: InitializeResponse, executable: string): Cu
  * (`image`, `audio`, `embeddedContext`), `mcp:http`, and `session:close`. What a newer agent adds
  * under these groups shows by its own name.
  */
-export function capabilityNames(capabilities: InitializeResponse["agentCapabilities"]): string[] {
+function capabilityNames(capabilities: InitializeResponse["agentCapabilities"]): string[] {
   if (!capabilities) return [];
   const names: string[] = [];
   if (capabilities.loadSession === true) names.push("loadSession");

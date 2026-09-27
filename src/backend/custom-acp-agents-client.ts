@@ -57,7 +57,7 @@ interface ClientEvents {
 type ModelEntry = ModelListResponse["data"][number];
 
 /** `<agentId>:<sessionId>`, or null for an id that no custom agent gave. */
-export function splitCustomAgentSessionId(value: string): { agentId: string; sessionId: string } | null {
+function splitCustomAgentSessionId(value: string): { agentId: string; sessionId: string } | null {
   const colon = value.indexOf(":");
   if (colon <= 0 || colon === value.length - 1) return null;
   const agentId = value.slice(0, colon);

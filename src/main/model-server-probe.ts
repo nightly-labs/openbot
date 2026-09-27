@@ -14,7 +14,7 @@ import { sourceText } from "@openbot/i18n/source";
 /** A model list is a small JSON object. A larger body is not a model list. */
 export const MODEL_LIST_BODY_LIMIT = 1024 * 1024;
 
-export interface ModelServerTarget {
+interface ModelServerTarget {
   baseUrl: string;
   apiKey: string | null;
   headers: readonly CustomProviderHeader[];

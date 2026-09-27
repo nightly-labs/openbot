@@ -15,7 +15,7 @@ import {
 import { resolveAgentCommand } from "./acp-agent-command";
 import { withTimeout } from "./with-timeout";
 
-export const AGENT_SCAN_TIMEOUT_MS = 10_000;
+const AGENT_SCAN_TIMEOUT_MS = 10_000;
 const AGENT_SCAN_CONCURRENCY = 4;
 
 export interface ScanAcpAgentsOptions {

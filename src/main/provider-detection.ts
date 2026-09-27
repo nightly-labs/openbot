@@ -24,9 +24,9 @@ import type { CustomProviderConfig } from "../backend/opencode-config";
 import type { ProbeModels } from "./model-server-probe";
 
 /** A server on this computer answers at once, so a slow address is not held for long. */
-export const SCAN_TIMEOUT_MS = 1_500;
+const SCAN_TIMEOUT_MS = 1_500;
 /** The user asked for this list, and a remote server can be slow. */
-export const DISCOVER_TIMEOUT_MS = 8_000;
+const DISCOVER_TIMEOUT_MS = 8_000;
 
 interface KnownServer {
   id: string;
@@ -53,7 +53,7 @@ export interface ProviderDetection {
  * A free endpoint id for a server: its known id, or `server-<host>-<port>`. A taken id gets `-2`,
  * `-3` and so on.
  */
-export function suggestServerId(base: string, taken: ReadonlySet<string>): string {
+function suggestServerId(base: string, taken: ReadonlySet<string>): string {
   const limit = INPUT_LIMITS.identifier - 4;
   const stem =
     base

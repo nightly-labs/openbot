@@ -2435,6 +2435,7 @@ describe.sequential("AgentService: providers", () => {
         { id: "grok", state: "not-installed", version: null },
         { id: "opencode", state: "not-installed", version: null },
         { id: "antigravity", state: "not-installed", version: null },
+        { id: "acp", state: "not-installed", version: null },
       ],
       // Unavailable because no Computer Use driver was given to this service. It no longer follows
       // from Codex being connected.

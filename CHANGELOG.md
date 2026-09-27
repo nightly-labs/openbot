@@ -5,6 +5,18 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Find local model servers, such as Ollama and LM Studio, and known ACP agents on your computer.
+  Settings shows them under "Found on this computer", where you can add or hide each one. First run
+  shows the same list. The scan sends no key and does not start a program that it finds. You can
+  turn it off, or add more addresses and folders, in Settings.
+- Add a custom ACP agent, such as Goose, Qwen Code, Cursor or GitHub Copilot CLI, as a provider.
+  "Check agent" starts the command once to make sure that it answers. Its environment variables
+  are stored encrypted on your computer.
+- Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
+  model list from the server.
+
 ## [0.23.0] - 2026-09-27
 
 ### Added

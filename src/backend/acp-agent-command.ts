@@ -18,7 +18,7 @@ import { pickWindowsExecutable } from "./mcp-provider-shapes";
 const execFileAsync = promisify(execFile);
 
 /** A command name with no path, no shell text and no option form. */
-export const AGENT_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+const AGENT_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 
 /**
  * What a `.cmd` or `.bat` argument may hold. Such a file runs only through `cmd.exe`, and
