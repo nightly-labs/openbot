@@ -5,9 +5,9 @@ import type { AgentProvider } from "../agent-client";
 import { providerLabel } from "./thread-items";
 
 export interface ModelRequest {
-  provider?: AgentProvider;
-  model?: string;
-  reasoningEffort?: AgentReasoningEffort;
+  provider?: AgentProvider | undefined;
+  model?: string | undefined;
+  reasoningEffort?: AgentReasoningEffort | undefined;
 }
 
 /** The model a request that names only `provider` starts on: the same pick as `creationModel`. */

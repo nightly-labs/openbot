@@ -341,7 +341,11 @@ export class OpenBotToolRouter {
             avatarSeed: args.avatarSeed ?? randomUUID(),
             avatarHue: hue,
             ...(requested
-              ? { provider: requested.provider, model: requested.id, reasoningEffort: args.reasoningEffort }
+              ? {
+                  provider: requested.provider,
+                  model: requested.id,
+                  ...(args.reasoningEffort ? { reasoningEffort: args.reasoningEffort } : {}),
+                }
               : {}),
           },
           async (agent) => {
@@ -354,7 +358,11 @@ export class OpenBotToolRouter {
               requireReasoningEffort(model, lateEffort);
             }
             if (args.title === undefined && lateEffort === undefined) return agent;
-            return this.#store.updateAgent({ agentId: agent.id, title: args.title, reasoningEffort: lateEffort });
+            return this.#store.updateAgent({
+              agentId: agent.id,
+              ...(args.title === undefined ? {} : { title: args.title }),
+              ...(lateEffort === undefined ? {} : { reasoningEffort: lateEffort }),
+            });
           },
         );
       const created =
