@@ -1,14 +1,15 @@
 import { decodeAgentAnalytics } from "../ipc-agent-analytics";
-import {
-  decodeAgentProfileDraft,
-  decodeSaveAgentProfileResult,
-  parseGenerateAgentProfile,
-  parseSaveAgentProfile,
-} from "../ipc-agent-profile";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
-import { isDynamicRecord } from "../runtime-values";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
+import {
+  currentProfileRoutes,
+  decodeScopedUsageRequest,
+  decodeUnreadRequest,
+  duplicateRoute,
+  readPath,
+  scopedUsageRoute,
+} from "./current-adapter-routes";
 import { toCurrentAgentKeys, toCurrentAgentKeysObjectForPath, toWireAgentKeys } from "./current-agent-keys";
 import { decodeHostAnalyticsV1Response } from "./host-analytics-v1";
 import { decodeProfileV1Request, decodeProfileV1Response } from "./profile-v1";
@@ -22,6 +23,11 @@ import {
 } from "./v1-adapter";
 import { decodeTeamProtocolV3HttpRequest, decodeTeamProtocolV3HttpResponse } from "./v3";
 
+const profile = currentProfileRoutes({
+  decodeRequest: decodeProfileV1Request,
+  decodeResponse: decodeProfileV1Response,
+});
+
 export function encodeTeamProtocolV3CurrentHttpRequest(
   method: string,
   path: string,
@@ -31,7 +37,7 @@ export function encodeTeamProtocolV3CurrentHttpRequest(
   if (isQueueEditRoute(method, path)) return JSON.stringify(decodeQueueEditRequest(value));
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path))
     return JSON.stringify(decodeScopedUsageRequest(value));
-  if (isAgentProfileRoute(method, path)) return JSON.stringify(encodeProfileRequest(path, value));
+  if (isAgentProfileRoute(method, path)) return JSON.stringify(profile.encodeRequest(path, value));
   if (isConversationUnreadRoute(method, path)) return JSON.stringify(decodeUnreadRequest(value));
   if (scopedUsageRoute(method, path)) {
     return JSON.stringify(decodeScopedUsageRequest(value));
@@ -50,8 +56,7 @@ export function decodeTeamProtocolV3CurrentHttpRequest(
 ): TeamProtocolV1JsonObject {
   if (isQueueEditRoute(method, path)) return { ...decodeQueueEditRequest(value) };
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) return decodeScopedUsageRequest(value);
-  if (isAgentProfileRoute(method, path))
-    return profileRequest(path, decodeProfileV1Request(profileGeneration(path), value));
+  if (isAgentProfileRoute(method, path)) return profile.decodeRequest(path, value);
   if (isConversationUnreadRoute(method, path)) return decodeUnreadRequest(value);
   if (scopedUsageRoute(method, path)) {
     return decodeScopedUsageRequest(value);
@@ -80,7 +85,7 @@ export function encodeTeamProtocolV3CurrentHttpResponse(
     return JSON.stringify(decodeHostAnalyticsV1Response(decodeHostAnalytics(value)));
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.stringify(decodeAnalyticsV1Response(decodeAgentAnalytics(value)));
-  if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(encodeProfileResponse(path, value));
+  if (isAgentProfileRoute(method, path) && status < 400) return JSON.stringify(profile.encodeResponse(path, value));
   if (isQueueEditRoute(method, path) && status === 204) return "{}";
   if (isQueueEditRoute(method, path))
     return encodeTeamProtocolV1CurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value, options);
@@ -107,7 +112,7 @@ export function decodeTeamProtocolV3CurrentHttpResponse(
     return JSON.parse(JSON.stringify(decodeHostAnalytics(decodeHostAnalyticsV1Response(value))));
   if (isAgentAnalyticsRoute(method, path) && status < 400)
     return JSON.parse(JSON.stringify(decodeAgentAnalytics(decodeAnalyticsV1Response(value))));
-  if (isAgentProfileRoute(method, path) && status < 400) return decodeProfileResponse(path, value);
+  if (isAgentProfileRoute(method, path) && status < 400) return profile.decodeResponse(path, value);
   if (isQueueEditRoute(method, path) && status === 204) return {};
   if (isQueueEditRoute(method, path))
     return decodeTeamProtocolV1CurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value);
@@ -118,83 +123,4 @@ export function decodeTeamProtocolV3CurrentHttpResponse(
   }
   if (!duplicateRoute(method, path)) return decodeTeamProtocolV1CurrentHttpResponse(method, path, status, value);
   return toCurrentAgentKeys(structuredClone(decodeTeamProtocolV3HttpResponse(method, path, status, value)));
-}
-
-function decodeUnreadRequest(value: unknown): TeamProtocolV1JsonObject {
-  if (value === null || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 0) {
-    throw new Error("Invalid conversation-unread request.");
-  }
-  return {};
-}
-
-function readPath(path: string): string {
-  return new URL(path, "http://openbot.invalid").pathname.replace(/\/unread$/u, "/read");
-}
-
-function scopedUsageRoute(method: string, path: string): boolean {
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  return method === "GET" && /^\/v1\/agents\/[^/]+\/usage$/u.test(pathname);
-}
-
-function decodeScopedUsageRequest(value: unknown): TeamProtocolV1JsonObject {
-  if (!isDynamicRecord(value) || Object.keys(value).length > 0) {
-    throw new Error("Invalid model-scoped usage request.");
-  }
-  return {};
-}
-
-function duplicateRoute(method: string, path: string): boolean {
-  const pathname = new URL(path, "http://openbot.invalid").pathname;
-  return method === "POST" && /^\/v1\/agents\/[^/]+\/duplicate$/u.test(pathname);
-}
-
-function profileRequest(path: string, value: unknown): TeamProtocolV1JsonObject {
-  const parsed = new URL(path, "http://openbot.invalid").pathname.endsWith("/generate")
-    ? parseGenerateAgentProfile(value)
-    : parseSaveAgentProfile(value);
-  return JSON.parse(JSON.stringify(parsed));
-}
-function profileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
-  const parsed = new URL(path, "http://openbot.invalid").pathname.endsWith("/generate")
-    ? decodeAgentProfileDraft(value)
-    : decodeSaveAgentProfileResult(value);
-  return JSON.parse(JSON.stringify(parsed));
-}
-
-// Only a saved-profile result reaches this, and both of its decoders set `agent`.
-function profileAgent(parsed: TeamProtocolV1JsonObject): TeamProtocolV1JsonValue {
-  if (parsed.agent === undefined) throw new Error("Invalid agent profile.");
-  return parsed.agent;
-}
-
-function profileGeneration(path: string): boolean {
-  return new URL(path, "http://openbot.invalid").pathname.endsWith("/generate");
-}
-function encodeProfileRequest(path: string, value: unknown): TeamProtocolV1JsonObject {
-  return decodeProfileV1Request(profileGeneration(path), profileRequest(path, value));
-}
-
-function encodeProfileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
-  const parsed = profileResponse(path, value);
-  return decodeProfileV1Response(
-    profileGeneration(path),
-    profileGeneration(path)
-      ? parsed
-      : {
-          agent: toWireAgentKeys(profileAgent(parsed)),
-          layout: parsed.layout,
-        },
-  );
-}
-function decodeProfileResponse(path: string, value: unknown): TeamProtocolV1JsonObject {
-  const parsed = decodeProfileV1Response(profileGeneration(path), value);
-  return profileResponse(
-    path,
-    profileGeneration(path)
-      ? parsed
-      : {
-          agent: toCurrentAgentKeys(profileAgent(parsed)),
-          layout: parsed.layout,
-        },
-  );
 }
