@@ -21,6 +21,15 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   imageEyebrow: "OPENBOT · COMPARE",
   articles: publishedFirst([
     {
+      slug: "hermes-agent",
+      title: "OpenBot vs Hermes Agent: A Hermes Agent Alternative",
+      description:
+        "OpenBot vs Hermes Agent: run Codex, Claude Code, Gemini and Grok as a team on your computer, with the AI plans you already pay for. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "muse",
       title: "OpenBot vs Muse: A Local Alternative to Meta's Muse",
       description:
