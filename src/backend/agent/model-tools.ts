@@ -55,7 +55,7 @@ export function listModelsPayload(
   return { preferredProvider, providers };
 }
 
-function modelList(models: AgentModelOption[], provider?: AgentProvider): string {
+export function modelList(models: AgentModelOption[], provider?: AgentProvider): string {
   if (provider !== undefined) {
     return models
       .filter((model) => model.provider === provider)

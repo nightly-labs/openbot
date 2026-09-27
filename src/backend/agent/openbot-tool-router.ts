@@ -32,7 +32,7 @@ import type { DrainScheduler } from "./drain-scheduler";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
-import { listModelsPayload, requestedToolModel, requireReasoningEffort } from "./model-tools";
+import { listModelsPayload, modelList, requestedToolModel, requireReasoningEffort } from "./model-tools";
 import { createAgentToolSchema, listModelsToolSchema, updateProfileToolSchema } from "./profile-tools";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
@@ -351,10 +351,20 @@ export class OpenBotToolRouter {
           async (agent) => {
             if (assign) await assign(agent.id);
             if (lateEffort !== undefined) {
-              const model = this.#hooks
-                .listModels()
-                .find((candidate) => candidate.provider === agent.provider && candidate.id === agent.model);
-              if (!model) throw new Error(sourceText("error.agent.modelUnavailable"));
+              const models = this.#hooks.listModels();
+              const model = models.find(
+                (candidate) => candidate.provider === agent.provider && candidate.id === agent.model,
+              );
+              // The new agent can keep a stored default that its provider does not list. The error names
+              // that model and the listed ones, so the caller can name a model and try again.
+              if (!model) {
+                throw new Error(
+                  sourceText("error.agent.modelNotListed", {
+                    model: agent.model,
+                    models: modelList(models, agent.provider),
+                  }),
+                );
+              }
               requireReasoningEffort(model, lateEffort);
             }
             if (args.title === undefined && lateEffort === undefined) return agent;
