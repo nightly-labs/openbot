@@ -71,12 +71,16 @@ export function NotFoundPage() {
         <div class="not-found-searchlight" aria-hidden="true" />
 
         <div ref={stage} class="not-found-stage" data-tracking={tracking() ? "true" : "false"} aria-hidden="true">
-          <span class="not-found-digit">4</span>
+          <span class="not-found-digit">
+            <span class="not-found-digit-glyph">4</span>
+          </span>
           <span class="not-found-bot">
             <AppLogo variant="production" animation={tracking() ? "none" : "look-around"} class="not-found-bot-logo" />
             <span class="not-found-bot-shadow" />
           </span>
-          <span class="not-found-digit">4</span>
+          <span class="not-found-digit">
+            <span class="not-found-digit-glyph">4</span>
+          </span>
         </div>
 
         <section class="not-found-copy" aria-labelledby="not-found-title">
