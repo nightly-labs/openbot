@@ -295,8 +295,10 @@ export class TurnLifecycle {
         const turnId = getString(params, "turnId");
         const plan = planFromNotification(params);
         // A plan for a turn that is not running has no row to update, so it is dropped.
-        if (!turnId || !plan || !this.#runningTurns.has(turnId)) return;
-        this.#applyPlan(agentId, threadId, turnId, plan);
+        if (!turnId || !this.#runningTurns.has(turnId)) return;
+        if (plan) this.#applyPlan(agentId, threadId, turnId, plan);
+        // An empty list removes the turn's plan: the agent deleted its last task.
+        else if (isRecord(params) && Array.isArray(params.plan)) this.#clearPlan(agentId, threadId, turnId);
         return;
       }
       case "turn/completed": {
@@ -510,6 +512,16 @@ export class TurnLifecycle {
     message.plan = plan;
     message.status = "streaming";
     this.#itemTurns.set(id, turnId);
+    this.#conversation.emitConversation(snapshot);
+  }
+
+  #clearPlan(agentId: string, threadId: string, turnId: string): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    const index = snapshot.messages.findIndex((candidate) => candidate.id === `${turnId}:plan`);
+    if (index < 0) return;
+    // The write rewrites the thread, which deletes the projection row of the removed message.
+    snapshot.messages.splice(index, 1);
+    this.#itemTurns.delete(`${turnId}:plan`);
     this.#conversation.emitConversation(snapshot);
   }
 
