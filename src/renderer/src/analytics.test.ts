@@ -234,6 +234,21 @@ describe("desktop analytics", () => {
     });
   });
 
+  it("sends only the kind of a custom agent's model, never the ID the user gave the agent", () => {
+    expect(
+      sanitizeDesktopAnalyticsEvent("message_send", {
+        provider: "acp",
+        model: "acme-internal/default",
+        reasoning_effort: "medium",
+        server_kind: "local",
+        channel: "agent",
+        attachment_count: 0,
+        is_reply: false,
+        result: "succeeded",
+      }),
+    ).toMatchObject({ provider: "acp", model: "custom" });
+  });
+
   it("sanitizes runtime payloads independently of TypeScript types", () => {
     expect(
       sanitizeDesktopAnalyticsEvent("message_send", {

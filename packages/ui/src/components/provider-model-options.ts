@@ -1,5 +1,5 @@
-import type { AgentModelOption, CustomProviderSummary } from "@openbot/contracts/ipc";
-import { isCustomProviderModelId, isFreeOpencodeModel } from "@openbot/contracts/ipc";
+import type { AgentModelOption, AgentProviderId, CustomProviderSummary } from "@openbot/contracts/ipc";
+import { CUSTOM_AGENT_DEFAULT_MODEL, isCustomProviderModelId, isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "../text";
 
@@ -14,6 +14,8 @@ const EFFORT_LABELS: Partial<Record<string, AppTextKey>> = {
 
 export interface PickerModel {
   id: string;
+  /** The wire provider: the Custom tab holds both `opencode` endpoints and `acp` agents. */
+  provider: AgentProviderId;
   name: string;
   service: string;
   free: boolean;
@@ -50,10 +52,27 @@ export function pickerModels(options: AgentModelOption[]): PickerModel[] {
   return options
     .filter((model) => !variantIds.has(model.id))
     .map((model) => {
-      const separator = model.provider === "opencode" ? model.name.indexOf("/") : -1;
+      // A custom agent that lists no models has one, named for the agent alone.
+      if (
+        model.provider === "acp" &&
+        model.id.endsWith(`/${CUSTOM_AGENT_DEFAULT_MODEL}`) &&
+        !model.name.includes("/")
+      ) {
+        return {
+          id: model.id,
+          provider: model.provider,
+          name: t("app.modelVariant.default"),
+          service: model.name,
+          free: false,
+          variants: [],
+        };
+      }
+      // OpenCode and custom agent models are named `<service>/<model>`; the service is the group.
+      const separator = model.provider === "opencode" || model.provider === "acp" ? model.name.indexOf("/") : -1;
       const name = (separator < 0 ? model.name : model.name.slice(separator + 1)).replace(/^[\s:–—-]+/, "") || model.id;
       return {
         id: model.id,
+        provider: model.provider,
         name,
         service: separator < 0 ? "" : model.name.slice(0, separator),
         // Free-tier label only; shared with catalog order so badge and default agree.
@@ -85,6 +104,7 @@ export function customProviderIds(providers: readonly CustomProviderSummary[]): 
   return new Set(providers.map((provider) => provider.id));
 }
 
+/** A model of the Custom tab: a custom endpoint's, which OpenCode serves, or a custom agent's. */
 export function isCustomModel(model: AgentModelOption, customIds: ReadonlySet<string>): boolean {
-  return model.provider === "opencode" && isCustomProviderModelId(model.id, customIds);
+  return model.provider === "acp" || (model.provider === "opencode" && isCustomProviderModelId(model.id, customIds));
 }

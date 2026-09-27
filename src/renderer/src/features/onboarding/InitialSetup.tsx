@@ -34,10 +34,10 @@ interface InitialSetupProps {
 
 type SetupRoute = "local" | "remote";
 
-const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = AGENT_PROVIDERS.map((id) => ({
-  id,
-  name: agentProviderName(id),
-}));
+// A custom agent is added in Settings after setup, so it is not a first provider.
+const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = AGENT_PROVIDERS.filter((id) => id !== "acp").map(
+  (id) => ({ id, name: agentProviderName(id) }),
+);
 
 const TEXT_MARKER = "\u0000";
 

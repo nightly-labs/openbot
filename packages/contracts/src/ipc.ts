@@ -1,3 +1,4 @@
+export * from "./acp-agent-presets";
 export * from "./agent-providers";
 export * from "./app-language";
 export * from "./ipc-agent-admin";
@@ -23,6 +24,7 @@ export * from "./ipc-conversation-events";
 export * from "./ipc-conversation-messages";
 export * from "./ipc-conversation-plan";
 export * from "./ipc-conversations";
+export * from "./ipc-custom-agents";
 export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";

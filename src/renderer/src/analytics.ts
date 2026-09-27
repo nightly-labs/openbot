@@ -386,10 +386,12 @@ export function sanitizeDesktopAnalyticsEvent(
   properties: DesktopAnalyticsEvents[AnalyticsEventName],
 ): SanitizedAnalyticsProperties {
   const allowed = EVENT_PROPERTY_ALLOWLIST[name];
+  // A custom agent's model id starts with the id the user gave it, so only the kind is sent.
+  const customAgent = "provider" in properties && properties.provider === "acp";
   return Object.fromEntries(
     Object.entries(properties).flatMap(([key, value]) => {
       if (value === undefined || !allowed.some((item) => item === key)) return [];
-      const safeValue = sanitizeDesktopProperty(name, key, value);
+      const safeValue = customAgent && key === "model" ? "custom" : sanitizeDesktopProperty(name, key, value);
       return safeValue === undefined ? [] : [[key, safeValue]];
     }),
   );

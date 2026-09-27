@@ -11,6 +11,7 @@ import {
   type AvatarHue,
   type AvatarImageInput,
   agentComputerUseEnabled,
+  type CustomAgentSummary,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
   type ProviderRuntimeStatus,
@@ -69,6 +70,8 @@ export interface AgentSettingsPanelProps {
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[];
+  /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
+  customAgents?: readonly CustomAgentSummary[];
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -789,6 +792,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 modelOptions={props.modelOptions}
                 runtimeStatuses={props.providerRuntimeStatuses}
                 customProviders={props.customProviders}
+                customAgents={props.customAgents}
                 onDownloadProvider={props.onDownloadProvider}
                 onCancelProviderDownload={props.onCancelProviderDownload}
                 onConnectProvider={props.onConnectProvider}

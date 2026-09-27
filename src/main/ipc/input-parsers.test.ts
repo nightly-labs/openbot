@@ -64,6 +64,7 @@ import {
   parseUpdatePreference,
 } from "./app-inputs";
 import { parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
+import { parseCheckCustomAgent, parseDeleteCustomAgent, parseSaveCustomAgent } from "./custom-agent-inputs";
 import {
   parseDeleteCustomProvider,
   parseSaveCustomProvider,
@@ -1180,5 +1181,77 @@ describe("remote desktop setup input", () => {
     });
     for (const input of [null, { action: "approve" }, { serverId: "server-1", action: "start" }])
       expect(() => parseRemoteDesktopTest(input)).toThrow();
+  });
+});
+
+describe("custom agent input parsing", () => {
+  const agent = {
+    id: "goose",
+    name: "Goose",
+    command: "goose",
+    args: ["acp"],
+    env: [
+      { name: "OPENAI_API_KEY", value: null },
+      { name: "GOOSE_DEBUG", value: "" },
+    ],
+  };
+
+  it("keeps a null value, which means keep the saved one, and an empty value", () => {
+    expect(parseSaveCustomAgent(agent)).toEqual(agent);
+    expect(parseSaveCustomAgent({ ...agent, args: undefined, env: undefined })).toEqual({
+      ...agent,
+      args: [],
+      env: [],
+    });
+  });
+
+  it("refuses an ID that could name a built-in provider or split a model ID", () => {
+    for (const id of ["codex", "custom", "acp", "Goose", "goose_2", "goose/2", ""]) {
+      expect(() => parseSaveCustomAgent({ ...agent, id }), id).toThrowError();
+      expect(() => parseDeleteCustomAgent({ id }), id).toThrowError();
+    }
+  });
+
+  it("refuses shell text as the command, and a line break in an argument", () => {
+    for (const command of ["goose; id", "goose acp", "$(id)", "-rf", ""]) {
+      expect(() => parseSaveCustomAgent({ ...agent, command }), command).toThrowError();
+    }
+    expect(() => parseSaveCustomAgent({ ...agent, args: ["acp\nid"] })).toThrowError();
+    expect(() => parseSaveCustomAgent({ ...agent, args: [1] })).toThrowError();
+  });
+
+  it("refuses a bad or repeated environment name, and a value that is not text", () => {
+    for (const env of [
+      [{ name: "1KEY", value: "x" }],
+      [{ name: "KEY=1", value: "x" }],
+      [
+        { name: "KEY", value: "x" },
+        { name: "KEY", value: "y" },
+      ],
+      [{ name: "KEY", value: 1 }],
+      [{ name: "KEY" }],
+    ]) {
+      expect(() => parseSaveCustomAgent({ ...agent, env }), JSON.stringify(env)).toThrowError();
+    }
+  });
+
+  it("does not quote an environment value in its error", () => {
+    const error = (() => {
+      try {
+        parseSaveCustomAgent({ ...agent, env: [{ name: "KEY", value: "sk-secret".repeat(2000) }] });
+      } catch (reason) {
+        return reason;
+      }
+      return null;
+    })();
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).not.toContain("sk-secret");
+  });
+
+  it("takes a saved agent ID for a check only in its own form", () => {
+    const check = { command: "goose", args: ["acp"], env: [] };
+    expect(parseCheckCustomAgent(check)).toEqual(check);
+    expect(parseCheckCustomAgent({ ...check, savedAgentId: "goose" })).toEqual({ ...check, savedAgentId: "goose" });
+    expect(() => parseCheckCustomAgent({ ...check, savedAgentId: "../goose" })).toThrowError();
   });
 });

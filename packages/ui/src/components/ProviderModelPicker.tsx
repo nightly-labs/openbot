@@ -6,6 +6,7 @@ import type {
   AgentProviderStatus,
   AgentReasoningEffort,
   AgentStatus,
+  CustomAgentSummary,
   CustomProviderSummary,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -71,6 +72,8 @@ interface ProviderModelPickerProps {
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
   /** Endpoints the user named; served by OpenCode, separated out only by the picker. */
   customProviders?: readonly CustomProviderSummary[];
+  /** The user's own ACP agents; provider `acp`, drawn on the Custom tab with one group each. */
+  customAgents?: readonly CustomAgentSummary[];
   onAddCustomProvider?: () => void;
   /**
    * This agent's standing approval, below Effort. Without the callback the row is absent, which is
@@ -149,9 +152,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const selectedModel = createMemo(() =>
     props.modelOptions.find((option) => option.provider === props.provider && option.id === props.value),
   );
-  /** The tab the current selection lives on, which is the Custom one when the endpoint is the user's. */
+  /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
-    props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()) ? CUSTOM_RAIL : props.provider;
+    props.provider === "acp" || (props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()))
+      ? CUSTOM_RAIL
+      : props.provider;
   const [railProvider, setRailProvider] = createSignal<RailId>(untrack(activeProvider));
   /** The provider whose mark the trigger shows, so only a changed one springs in. */
   let shownProvider = untrack(activeProvider);
@@ -167,11 +172,38 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return props.modelOptions.filter((option) => option.provider === rail);
   }
 
+  /**
+   * The agents list is this computer's. A joined server's host reports no `acp` row, because the Team
+   * API does not carry it, so its picker counts none of them.
+   */
+  const agentCount = () =>
+    props.agentStatus.providers?.some((item) => item.id === "acp") ? (props.customAgents?.length ?? 0) : 0;
   const customSummary = () => {
-    const count = props.customProviders?.length ?? 0;
-    if (count === 0) return t("provider.picker.noEndpoints");
-    return t("provider.endpointCount", { count });
+    const endpoints = props.customProviders?.length ?? 0;
+    const agents = agentCount();
+    if (agents === 0) {
+      return endpoints === 0 ? t("provider.picker.noEndpoints") : t("provider.endpointCount", { count: endpoints });
+    }
+    if (endpoints === 0) return t("provider.customAgentCount", { count: agents });
+    return t("provider.picker.customCounts", {
+      endpoints: t("provider.endpointCount", { count: endpoints }),
+      agents: t("provider.customAgentCount", { count: agents }),
+    });
   };
+  /**
+   * One provider status per tab. The Custom tab stands for OpenCode, which serves the endpoints, and
+   * for `acp`, which runs the agents: it is available when either of the saved kinds is.
+   */
+  const railStatus = (rail: RailId): AgentProviderStatus => {
+    if (rail !== CUSTOM_RAIL) return providerAvailability(props.agentStatus, props.modelOptions, rail, t);
+    const endpoints = providerAvailability(props.agentStatus, props.modelOptions, "opencode", t);
+    if (agentCount() === 0) return endpoints;
+    const agents = providerAvailability(props.agentStatus, props.modelOptions, "acp", t);
+    if (!props.customProviders?.length) return agents;
+    return endpoints.state === "available" || agents.state !== "available" ? endpoints : agents;
+  };
+  const modelAvailable = (model: PickerModel): boolean =>
+    providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
   const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
     rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
   const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
@@ -221,13 +253,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
   function selectModel(model: AgentModelId, rail: RailId): void {
     if (props.disabled || props.modelChangesDisabled) return;
-    if (providerAvailability(props.agentStatus, props.modelOptions, rail, t).state !== "available") return;
-    if (
-      !showsReasoningEffort() &&
-      !pickerModels(railModelOptions(rail)).find((option) => option.id === model)?.variants.length
-    )
-      setOpen(false);
-    props.onChange(model, wireProvider(rail));
+    const option = pickerModels(railModelOptions(rail)).find((candidate) => candidate.id === model);
+    if (!option || !modelAvailable(option)) return;
+    if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
+    props.onChange(model, option.provider);
   }
 
   function selectRailProvider(provider: RailId): void {
@@ -331,7 +360,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             <Tabs.List class="provider-model-rail" aria-label={t("provider.picker.providers")}>
               <For each={PROVIDERS}>
                 {(provider) => {
-                  const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider, t);
+                  const status = () => railStatus(provider);
                   return (
                     // The rail shows a mark alone, so hovering one names it. Focus needs no tooltip:
                     // tabs activate on focus, and the panel heading beside them names the tab.
@@ -392,7 +421,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
 
             <For each={PROVIDERS}>
               {(provider) => {
-                const status = () => providerAvailability(props.agentStatus, props.modelOptions, provider, t);
+                const status = () => railStatus(provider);
                 const models = createMemo(() => pickerModels(railModelOptions(provider)));
                 const groups = createMemo(() => groupPickerModels(models(), search()));
                 const selected = createMemo(() =>
@@ -400,9 +429,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     (model) => model.id === props.value || model.variants.some((variant) => variant.id === props.value),
                   ),
                 );
-                // Both tabs share the `opencode` wire id; the tab whose list holds it owns it.
+                // OpenCode and Custom share the `opencode` wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
-                  wireProvider(provider) === props.provider && (props.provider !== "opencode" || Boolean(selected()));
+                  provider === CUSTOM_RAIL
+                    ? selected()?.provider === props.provider
+                    : provider === props.provider && (props.provider !== "opencode" || Boolean(selected()));
                 const effortOptions = createMemo(() => {
                   if (!ownsSelection()) return [];
                   if (selected()?.variants.length) return selected()?.variants ?? [];
@@ -424,14 +455,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const effortLocked = () => !available() || props.modelChangesDisabled === true;
                 function chooseEffort(id: string): void {
                   if (props.disabled || effortLocked() || id === effortValue()) return;
-                  if (selected()?.variants.length) props.onChange(id, wireProvider(provider));
+                  const model = selected();
+                  if (model?.variants.length) props.onChange(id, model.provider);
                   else {
                     const effort = selectedModel()?.supportedReasoningEfforts.find((effort) => effort === id);
                     if (effort) props.onReasoningEffortChange?.(effort);
                   }
                 }
+                // The provider the tab's status is for: a custom agent has no runtime OpenBot downloads.
                 const runtime = () => {
-                  const value = props.runtimeStatuses?.[wireProvider(provider)];
+                  const value = props.runtimeStatuses?.[status().id];
                   if (
                     value?.phase === "not-downloaded" &&
                     (status().state === "available" || status().state === "sign-in-required")
@@ -500,7 +533,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               size="xs"
                               variant={action() === "Download" ? "default" : "outline"}
                               onClick={() => {
-                                const target = wireProvider(provider);
+                                const target = status().id;
                                 if (action() === "Cancel") void props.onCancelProviderDownload?.(target);
                                 else if (action() === "Connect") void props.onConnectProvider?.(target);
                                 else void props.onDownloadProvider?.(target);
@@ -551,7 +584,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           )}
                           optionValue="id"
                           optionTextValue={(model) => displayModelName(model.name, model.id)}
-                          optionDisabled={() => !available() || props.modelChangesDisabled === true}
+                          optionDisabled={(model) => !modelAvailable(model) || props.modelChangesDisabled === true}
                           value={[selected()?.id ?? props.value]}
                           selectionMode="single"
                           disallowEmptySelection
@@ -572,9 +605,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                       })
                                     : displayModelName(model.name, model.id)
                                 }
-                                disabled={!available() || props.modelChangesDisabled}
+                                disabled={!modelAvailable(model) || props.modelChangesDisabled}
                                 onClick={() => {
-                                  if (!isSelected() || props.provider !== provider) selectModel(model.id, provider);
+                                  if (!isSelected() || props.provider !== model.provider)
+                                    selectModel(model.id, provider);
                                 }}
                               >
                                 <span class="provider-model-option-name">
@@ -679,7 +713,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
 }
 
-/** A custom endpoint is an OpenCode endpoint on the wire, whatever tab it is drawn on. */
+/**
+ * A custom endpoint is an OpenCode endpoint on the wire, whatever tab it is drawn on. Only for what
+ * does not depend on the model: a Custom tab choice takes the provider of the model chosen.
+ */
 function wireProvider(rail: RailId): AgentProviderId {
   return rail === CUSTOM_RAIL ? "opencode" : rail;
 }

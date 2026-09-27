@@ -388,6 +388,11 @@ async function cliCandidates(
   );
 }
 
+/**
+ * `command` goes into a login shell as `command -v <command>`, so it takes a fixed provider id and
+ * nothing else. A command the user typed, as for a custom agent, is resolved by
+ * `resolveAgentCommand` in `acp-agent-command.ts`, which never gives it to a shell.
+ */
 async function collectCandidates(command: AgentProviderId, configuredPath: string | undefined): Promise<string[]> {
   const candidates: string[] = [];
   const override = configuredPath?.trim();

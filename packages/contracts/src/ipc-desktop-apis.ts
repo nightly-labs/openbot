@@ -94,6 +94,7 @@ export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]
  * Main makes each request; a scan sends no key.
  */
 export type ProviderDetectionDesktopApi = GroupApi<IpcEndpoints["providerDetection"]>;
+export type CustomAgentsDesktopApi = GroupApi<IpcEndpoints["customAgents"]>;
 
 /**
  * The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
@@ -129,6 +130,7 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
   providerDetection: ProviderDetectionDesktopApi;
+  customAgents: CustomAgentsDesktopApi;
   providerAdmin: ProviderAdminDesktopApi;
   hostAdmin: HostAdminDesktopApi;
   storage: StorageDesktopApi;

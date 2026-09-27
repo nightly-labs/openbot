@@ -37,7 +37,12 @@ import {
   decodeRecordResponse,
   type ModelListResponse,
 } from "./../protocol";
-import { BUILT_IN_PROVIDER_DRIVERS, type ProviderClientContext, requireProviderDriver } from "./../provider-drivers";
+import {
+  BUILT_IN_PROVIDER_DRIVERS,
+  type ProviderClientContext,
+  requireProviderDriver,
+  savedCustomAgents,
+} from "./../provider-drivers";
 import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { withTimeout } from "../with-timeout";
@@ -186,6 +191,7 @@ const INITIAL_STATUS: AgentStatus = {
     { id: "grok", state: "not-started", version: null, message: null },
     { id: "opencode", state: "not-started", version: null, message: null },
     { id: "antigravity", state: "not-started", version: null, message: null },
+    { id: "acp", state: "not-started", version: null, message: null },
   ],
   capabilities: {
     chat: "unavailable",
@@ -352,6 +358,10 @@ export class ProviderRuntime implements ProviderPort {
   /** Resolve a provider's binary and keep who owns it, whether or not the provider is signed in. */
   async #resolveProviderCli(provider: AgentProvider): Promise<AgentCliInfo> {
     try {
+      // The custom agents have no one CLI. With none saved there is nothing to start.
+      if (provider === "acp" && savedCustomAgents(this.#credentials).length === 0) {
+        throw new CodexCliError(sourceText("error.provider.customAgentNone"), "missing");
+      }
       const cli = await requireProviderDriver(provider).resolveCli({
         bundledExecutable: this.#bundledExecutables[provider],
       });
@@ -723,6 +733,45 @@ export class ProviderRuntime implements ProviderPort {
       return this.#hooks.isProviderBusy("opencode") ? "skipped-busy" : "restarted";
     }
     return "restarted";
+  }
+
+  /**
+   * Replaces the router of the custom agents, so a saved, changed or removed agent reaches it. The
+   * same rules as `reloadOpenCodeConfig` apply: a turn in progress wins, and it never throws. The
+   * first saved agent starts the provider; with the last one removed, the provider stops.
+   */
+  async reloadCustomAgents(): Promise<CustomProviderRestart> {
+    if (!this.#clients.has("acp")) {
+      if (this.#released.has("acp") || savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      await this.refreshProvider("acp");
+      return this.#clients.has("acp") ? "restarted" : "not-running";
+    }
+    if (this.#hooks.isProviderBusy("acp")) return "skipped-busy";
+    try {
+      await this.#runProviderConnectionCommand("acp", () => this.#reprobeProvider("acp"));
+    } catch {
+      if (this.#hooks.isProviderBusy("acp")) return "skipped-busy";
+      if (savedCustomAgents(this.#credentials).length === 0) await this.#stopProviderClient("acp");
+    }
+    return "restarted";
+  }
+
+  /** Stops a provider's shared process and every Workspace only process of it, with no restart. */
+  async #stopProviderClient(provider: AgentProvider): Promise<void> {
+    const client = this.#clients.get(provider);
+    if (!client) return;
+    // Out of the map before it stops, so #handleExit reads the exit as expected, not as a crash.
+    this.#clients.delete(provider);
+    this.#cli.delete(provider);
+    this.#accounts.delete(provider);
+    this.#conversation.unloadClientThreads(client);
+    await client.stop().catch(() => undefined);
+    this.#hooks.onClientStopped(client);
+    await Promise.all(
+      [...this.#confined]
+        .filter(([, confined]) => confined.client.provider === provider)
+        .map(([agentId, confined]) => this.#stopConfined(agentId, confined)),
+    );
   }
 
   /**

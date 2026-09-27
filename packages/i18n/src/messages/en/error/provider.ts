@@ -149,4 +149,30 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
+  "error.provider.customAgentIdInvalid":
+    "An agent ID must be lowercase letters, digits or `-`, and cannot be the ID of a built-in provider.",
+  "error.provider.customAgentEnvInvalid":
+    "A variable name must be letters, digits or `_`, and not start with a digit. Use each name once, at most 16 names.",
+  "error.provider.customAgentCommandInvalid":
+    "The command must be a full path, a path that starts with ~/, or a command name with no spaces.",
+  "error.provider.customAgentArgsInvalid": "An argument cannot contain a line break. Use at most 32 arguments.",
+  "error.provider.customAgentWindowsScript":
+    "A .cmd or .bat command can take only letters, numbers and - _ . , : = @ + / \\ in its arguments.",
+  "error.provider.customAgentNotFound": "OpenBot cannot find {command}. Enter the full path of the command.",
+  "error.provider.customAgentCheckTimedOut": "The agent did not answer in 20 seconds.",
+  "error.provider.customAgentCheckStopped": "The agent stopped before it answered.",
+  "error.provider.customAgentProtocolVersion": "The agent uses ACP version {version}. OpenBot uses version 1.",
+  "error.provider.customAgentCheckFailed": "The agent did not answer as an ACP agent.",
+  "error.provider.customAgentRemoveBusy":
+    "Wait for the active turn and queue to finish before you remove this custom agent.",
+  "error.provider.customAgentNone": "No custom agent is saved.",
+  "error.provider.customAgentMissing": "This custom agent is not saved now. Choose another model.",
+  "error.provider.customAgentSignIn": "Sign in with the agent's own command, then try again.",
+  "error.provider.customAgentsReadOnly":
+    "The saved custom agents were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.",
+  "error.provider.customAgentNoSecureStorage":
+    "This computer has no secure storage, so environment values cannot be saved. Remove them and try again.",
+  "error.provider.customAgentNotSaved": "This custom agent is not saved. Refresh the list and try again.",
+  "error.provider.customAgentTooMany": "You can save at most {count} custom agents.",
+  "error.provider.customAgentEnvValueMissing": "Enter a value for {name}.",
 });

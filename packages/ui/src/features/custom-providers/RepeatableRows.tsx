@@ -9,7 +9,8 @@ import { For, Show } from "solid-js";
 export interface RepeatableColumn<T> {
   /** The accessible name of the field in row `number`, as `Model 1 ID`. */
   label: (number: number) => string;
-  placeholder: () => string;
+  /** The row is given so that one row can differ, as a saved value that an empty field keeps. */
+  placeholder: (row: T) => string;
   maxlength: number;
   /** An identifier must not be autocorrected. A display name is prose and may be. */
   identifier?: boolean;
@@ -67,7 +68,7 @@ export function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
                     aria-label={column.label(index() + 1)}
                     value={column.read(row)}
                     onValueChange={(value) => column.write(index(), value)}
-                    placeholder={column.placeholder()}
+                    placeholder={column.placeholder(row)}
                     autocomplete={column.identifier ? "off" : undefined}
                     spellcheck={column.identifier ? false : undefined}
                     maxlength={column.maxlength}

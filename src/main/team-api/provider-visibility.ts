@@ -2,11 +2,21 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot/contracts/team-protocol/v1";
 
 /**
- * Tells if a peer on this protocol must not see the provider. Gemini (`antigravity`) stays on this
- * computer: no released Team protocol knows it, v4 included. Protocols 1 to 3 do not know OpenCode.
+ * Tells if a peer on this protocol must not see the provider. Gemini (`antigravity`) and custom ACP
+ * agents (`acp`) stay on this computer: no released Team protocol knows them, v4 included.
+ * Protocols 1 to 3 do not know OpenCode.
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
-  return value === "antigravity" || (protocol < 4 && value === "opencode");
+  return value === "antigravity" || value === "acp" || (protocol < 4 && value === "opencode");
+}
+
+/**
+ * The same test for an object `id`. `acp` counts only for a provider status row: a custom endpoint
+ * saved as `acp` before the provider existed is a peer-visible endpoint, and it must stay one.
+ */
+function isPeerHiddenId(value: unknown, protocol: number, listKey: string): boolean {
+  if (value === "acp") return listKey === "providers";
+  return isPeerHiddenProvider(value, protocol);
 }
 
 /** A protocol view never changes the host's stored agents or provider sessions. */
@@ -30,18 +40,19 @@ function project(
   hiddenIds: ReadonlySet<string>,
   protocol: number,
   key = "",
+  listKey = "",
 ): TeamProtocolV1JsonValue {
   if (Array.isArray(value)) {
     return value.flatMap((item) => {
       if ((key === "agentOrder" || key === "agentIds") && typeof item === "string" && hiddenIds.has(item)) return [];
-      const visible = project(item, hiddenIds, protocol);
+      const visible = project(item, hiddenIds, protocol, "", key);
       return visible === null && item !== null ? [] : [visible];
     });
   }
   if (value === null || typeof value !== "object") return value;
   if (
     isPeerHiddenProvider(value.provider, protocol) ||
-    isPeerHiddenProvider(value.id, protocol) ||
+    isPeerHiddenId(value.id, protocol, listKey) ||
     (typeof value.id === "string" && hiddenIds.has(value.id)) ||
     // Sender and reaction identities contain no provider-specific fields and remain valid for old peers.
     (value.kind !== "agent" && typeof value.agentId === "string" && hiddenIds.has(value.agentId))

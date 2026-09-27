@@ -1299,6 +1299,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.reloadOpenCodeConfig();
   }
 
+  /** Replaces the custom agents' router so a saved or removed agent reaches it. Reports why, if it did not. */
+  reloadCustomAgents(): Promise<CustomProviderRestart> {
+    return this.#providers.reloadCustomAgents();
+  }
+
+  /** See `CustomEndpoints.saveCustomAgent`. */
+  saveCustomAgent<T>(persist: () => Promise<T>): Promise<T> {
+    return this.#endpoints.saveCustomAgent(persist);
+  }
+
+  /** See `CustomEndpoints.removeCustomAgent`: the agents on it move to another provider first. */
+  removeCustomAgent<T>(customAgentId: string, persist: () => Promise<T>): Promise<T> {
+    return this.#endpoints.removeCustomAgent(customAgentId, persist);
+  }
+
   /** See `CustomEndpoints.save`: the exclusion of the id being saved and the caller's file write. */
   saveCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
     return this.#endpoints.save(providerId, persist);

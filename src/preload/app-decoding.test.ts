@@ -17,6 +17,7 @@ import {
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeCentralAuthState,
+  decodeCustomAgents,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
   decodeMobileConnectedDevices,
@@ -43,6 +44,15 @@ const detectedServer = {
   name: "Ollama",
   baseUrl: "http://127.0.0.1:11434/v1",
   models: [{ id: "qwen3" }],
+};
+
+const customAgent = {
+  id: "goose",
+  name: "Goose",
+  command: "goose",
+  args: ["acp"],
+  envNames: ["OPENAI_API_KEY"],
+  resolvedCommand: "/opt/homebrew/bin/goose",
 };
 
 const codeSent = {
@@ -125,6 +135,7 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     { serverId: "local", agentId: "agent-1", threadId: null } satisfies NotificationOpenedEvent,
   ],
   ["detected model servers", decodeDetectedModelServers, [detectedServer]],
+  ["custom agents", decodeCustomAgents, [customAgent, { ...customAgent, id: "qwen", resolvedCommand: null }]],
   ["a model list", decodeDiscoverModelsResult, { models: [{ id: "qwen3" }] }],
   [
     "detection settings",
@@ -165,6 +176,10 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   // A scan row never carries a credential, so one that does is refused with the whole list.
   ["a detected server with a key", decodeDetectedModelServers, [{ ...detectedServer, apiKey: "sk-x" }]],
   ["a detected server with headers", decodeDetectedModelServers, [{ ...detectedServer, headers: [] }]],
+  // A custom agent summary never carries an environment value, so one that does is refused with the whole list.
+  ["a custom agent with its environment", decodeCustomAgents, [{ ...customAgent, env: [] }]],
+  ["a custom agent with its ciphertext", decodeCustomAgents, [{ ...customAgent, secret: "c2VhbGVk" }]],
+  ["a custom agent with a value", decodeCustomAgents, [{ ...customAgent, value: "sk-x" }]],
   ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],
   [
     "detection settings without a switch",

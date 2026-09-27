@@ -101,6 +101,15 @@ const CONNECTING_STATUS: Record<AgentProviderId, AgentStatus> = {
     message: null,
     fullAccess: true,
   },
+  acp: {
+    phase: "blocked",
+    cliVersion: null,
+    auth: { kind: "unknown" },
+    providers: [{ id: "acp", state: "not-installed", connectionState: "connecting", version: null, message: null }],
+    capabilities: { chat: "unavailable", browser: "ready", computerUse: "unavailable" },
+    message: null,
+    fullAccess: true,
+  },
 };
 
 /** A fresh Mac: the driver is there and neither grant has been given yet. */
@@ -1096,6 +1105,9 @@ export function installOpenbotStub(): void {
       list: vi.fn().mockResolvedValue([]),
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
+    }),
+    customAgents: stubGroup(IPC_ENDPOINTS.customAgents, "customAgents", {
+      list: vi.fn().mockResolvedValue([]),
     }),
     providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {}),
     providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),

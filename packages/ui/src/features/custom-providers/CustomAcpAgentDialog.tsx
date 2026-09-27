@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { type AcpAgentPreset, CUSTOM_AGENT_LIMITS } from "@openbot/contracts/ipc";
 import {
   Alert,
   AlertContent,
@@ -28,7 +29,6 @@ import {
   type AcpAgentCheck,
   type CustomAcpAgentDraft,
   type CustomAcpAgentErrors,
-  type CustomAcpAgentPreset,
   customAcpAgentValue,
   emptyCustomAcpAgentDraft,
   hasCustomAcpAgentError,
@@ -42,7 +42,6 @@ const AGENT_ID_PLACEHOLDER = "my-agent";
 const COMMAND_PLACEHOLDER = "my-agent";
 const ARGS_PLACEHOLDER = "acp";
 const ENV_NAME_PLACEHOLDER = "NAME";
-const ENV_LIMIT = 16;
 
 type EnvRow = CustomAcpAgentDraft["env"][number];
 
@@ -53,8 +52,13 @@ function cloneDraft(draft: CustomAcpAgentDraft): CustomAcpAgentDraft {
 interface CustomAcpAgentDialogProps {
   open: boolean;
   draft?: CustomAcpAgentDraft;
-  /** Known agents whose command fills the form in one press. */
-  presets?: readonly CustomAcpAgentPreset[];
+  /** Known agents whose command fills the form in one press. A saved agent is not offered them. */
+  presets?: readonly AcpAgentPreset[];
+  /**
+   * The draft is a saved agent: its ID cannot change, and a saved variable with an empty value keeps
+   * the value that main holds.
+   */
+  editing?: boolean;
   /** The last trial start. The host owns it because it starts a process. */
   check?: AcpAgentCheck;
   onCheck?: (value: CustomAcpAgentDraft) => void;
@@ -119,8 +123,11 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
     },
     {
       label: (number) => t("customProvider.acp.env.value", { number }),
-      placeholder: () => t("customProvider.header.valuePlaceholder"),
-      maxlength: INPUT_LIMITS.path,
+      placeholder: (row) =>
+        row.savedName !== undefined && row.name.trim() === row.savedName
+          ? t("customProvider.acp.env.keptPlaceholder")
+          : t("customProvider.header.valuePlaceholder"),
+      maxlength: CUSTOM_AGENT_LIMITS.envValue,
       identifier: true,
       read: (row) => row.value,
       write: (index, value) =>
@@ -131,7 +138,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
     },
   ];
 
-  function applyPreset(preset: CustomAcpAgentPreset): void {
+  function applyPreset(preset: AcpAgentPreset): void {
     setDraft((state) => {
       const next = presetAcpAgentDraft(preset);
       state.agentId = next.agentId;
@@ -152,7 +159,9 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="custom-provider-backdrop">
           <Dialog.Content as="section" class="custom-provider-dialog" aria-busy={busy() ? "true" : undefined}>
-            <Dialog.Title class="sr-only">{t("customProvider.acp.title")}</Dialog.Title>
+            <Dialog.Title class="sr-only">
+              {props.editing ? t("customProvider.acp.editTitle") : t("customProvider.acp.title")}
+            </Dialog.Title>
             <Dialog.Description class="sr-only">{t("customProvider.acp.description")}</Dialog.Description>
 
             <header class="custom-provider-header">
@@ -191,7 +200,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
               }}
             >
               <div class={["custom-provider-form", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-                <Show when={props.presets?.length ? props.presets : undefined}>
+                <Show when={!props.editing && props.presets?.length ? props.presets : undefined}>
                   {(presets) => (
                     <section class="custom-provider-rows" aria-label={t("customProvider.acp.presets")}>
                       <Text variant="label-sm">{t("customProvider.acp.presets")}</Text>
@@ -231,7 +240,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
 
                 <Field
                   label={t("customProvider.acp.agentId")}
-                  description={t("customProvider.field.providerIdHint")}
+                  description={t("customProvider.acp.agentIdHint")}
                   error={shown()?.agentId}
                   required
                 >
@@ -246,7 +255,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                     autocomplete="off"
                     spellcheck={false}
                     maxlength={INPUT_LIMITS.identifier}
-                    disabled={busy()}
+                    disabled={busy() || Boolean(props.editing)}
                   />
                 </Field>
 
@@ -267,7 +276,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                     placeholder={COMMAND_PLACEHOLDER}
                     autocomplete="off"
                     spellcheck={false}
-                    maxlength={INPUT_LIMITS.path}
+                    maxlength={CUSTOM_AGENT_LIMITS.command}
                     disabled={busy()}
                   />
                 </Field>
@@ -295,7 +304,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                   addLabel={t("customProvider.acp.env.add")}
                   columns={envColumns}
                   rows={draft.env}
-                  limit={ENV_LIMIT}
+                  limit={CUSTOM_AGENT_LIMITS.env}
                   busy={busy()}
                   rowError={(index) => shown()?.envRows[index]}
                   onAdd={() =>
@@ -405,7 +414,7 @@ export function CustomAcpAgentDialog(props: CustomAcpAgentDialogProps) {
                   )}
                 </Show>
                 <Button type="submit" variant="default" loading={busy()} loadingLabel={t("common.saving")}>
-                  {t("customProvider.acp.submit")}
+                  {props.editing ? t("customProvider.acp.submitEdit") : t("customProvider.acp.submit")}
                 </Button>
               </footer>
             </form>

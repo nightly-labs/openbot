@@ -185,6 +185,8 @@ export function createProviderRuntimeStore(
   }
 
   async function downloadProviderRuntime(provider: AgentProviderId): Promise<void> {
+    // A custom agent is the user's own command: OpenBot downloads nothing for it.
+    if (!isManagedRuntimeProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const update = providerUpdate(provider);
@@ -228,6 +230,8 @@ export function createProviderRuntimeStore(
   }
 
   async function cancelProviderRuntimeDownload(provider: AgentProviderId): Promise<void> {
+    // A custom agent is the user's own command: OpenBot downloads nothing for it.
+    if (!isManagedRuntimeProvider(provider)) return;
     const source = api();
     if (!source) throw new Error(currentText().t("update.provider.downloadsUnavailable"));
     const snapshot = await source.cancel(provider);

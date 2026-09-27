@@ -5,6 +5,7 @@ import type {
   AgentProviderId,
   AgentStatus,
   AvatarHue,
+  CustomAgentSummary,
   CustomProviderSummary,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -48,6 +49,8 @@ export interface FirstAgentSetupProps {
   agentStatus?: AgentStatus;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
   customProviders?: readonly CustomProviderSummary[];
+  /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
+  customAgents?: readonly CustomAgentSummary[];
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
@@ -447,6 +450,7 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
                       agentStatus={status()}
                       runtimeStatuses={props.runtimeStatuses}
                       customProviders={props.customProviders}
+                      customAgents={props.customAgents}
                       onDownloadProvider={props.onDownloadProvider}
                       onCancelProviderDownload={props.onCancelProviderDownload}
                       onConnectProvider={props.onConnectProvider}

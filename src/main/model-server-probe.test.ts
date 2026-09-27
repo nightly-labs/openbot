@@ -140,6 +140,7 @@ describe("discoverModels", () => {
     createProviderDetection({
       settings: { get: () => ({ enabled: true, addresses: [], folders: [], hiddenIds: [] }) },
       customProviders: { configs: () => [saved(baseUrl)] },
+      customAgents: { configs: () => [] },
       probe: probeModels,
     });
 

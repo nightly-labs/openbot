@@ -18,6 +18,7 @@ export function providerDetectionIpcHandlers({
   return {
     providerDetection: {
       scanModelServers: handler(() => detection.scanModelServers()),
+      scanAgents: handler(() => detection.scanAgents()),
       discoverModels: payloadHandler(parseDiscoverModels, (input) => detection.discoverModels(input)),
       getSettings: handler(() => settings.get()),
       setSettings: payloadHandler(parseProviderDetectionSettings, (next) => settings.set(next)),

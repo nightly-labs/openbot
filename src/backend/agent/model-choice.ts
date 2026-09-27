@@ -96,6 +96,8 @@ export function startingChoice(
         })
       : null;
   if (developmentModel) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: developmentModel };
+  // `PICKER_PROVIDERS` leaves out `acp`: a custom agent is a program the user added for a purpose,
+  // so no agent moves to one unasked.
   const others = PICKER_PROVIDERS.filter((provider) => provider !== preference.provider);
   for (const provider of [preference.provider, ...others]) {
     if (provider !== preference.provider && !context.providerAvailable(provider)) continue;

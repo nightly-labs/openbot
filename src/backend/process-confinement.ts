@@ -96,6 +96,15 @@ export function antigravityStatePaths(env: NodeJS.ProcessEnv = process.env, home
   };
 }
 
+/**
+ * A custom agent keeps its state where it wants, and OpenBot cannot know where. A Workspace only
+ * custom agent gets no state folder: an agent that must write in its home folder to run needs Full
+ * access.
+ */
+export function customAgentStatePaths(): ProviderStatePaths {
+  return { writable: [], protected: [] };
+}
+
 /** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
 export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
 

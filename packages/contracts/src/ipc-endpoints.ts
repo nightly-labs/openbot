@@ -133,6 +133,15 @@ import type {
   SetMessageReactionInput,
 } from "./ipc-conversations";
 import type {
+  CheckCustomAgentInput,
+  CustomAgentCheckResult,
+  CustomAgentResult,
+  CustomAgentSummary,
+  DeleteCustomAgentInput,
+  DetectedAcpAgent,
+  SaveCustomAgentInput,
+} from "./ipc-custom-agents";
+import type {
   CustomProviderResult,
   CustomProviderSummary,
   DeleteCustomProviderInput,
@@ -480,6 +489,16 @@ export const IPC_ENDPOINTS = {
     discoverModels: request<DiscoverModelsInput, DiscoverModelsResult>()("provider-detection:discover-models"),
     getSettings: request<undefined, ProviderDetectionSettings>()("provider-detection:get-settings"),
     setSettings: request<ProviderDetectionSettings, ProviderDetectionSettings>()("provider-detection:set-settings"),
+    // Looks for known agent command names only. It starts no file.
+    scanAgents: request<undefined, DetectedAcpAgent[]>()("provider-detection:scan-agents"),
+  },
+  // The user's own ACP agents, on this computer only: no Team API route and no `providerAdmin` entry.
+  // Environment values travel only towards main.
+  customAgents: {
+    list: request<undefined, CustomAgentSummary[]>()("custom-agents:list"),
+    save: request<SaveCustomAgentInput, CustomAgentResult>()("custom-agents:save"),
+    delete: request<DeleteCustomAgentInput, CustomAgentResult>()("custom-agents:delete"),
+    check: request<CheckCustomAgentInput, CustomAgentCheckResult>()("custom-agents:check"),
   },
   // The providers of the computer that runs the agents. `providers`, `providerRuntimes` and
   // `customProviders` reach this computer only; these take the server, so a remote admin reaches the

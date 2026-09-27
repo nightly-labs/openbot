@@ -375,3 +375,7 @@
 [data-provider="antigravity"] {
   --openbot-provider-current: var(--openbot-provider-antigravity);
 }
+
+[data-provider="acp"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}

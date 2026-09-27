@@ -28,6 +28,7 @@ import {
   Text,
   UserRound,
 } from "@openbot/ui";
+import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import {
   ProviderDetectionSettings,
@@ -85,6 +86,8 @@ export interface SettingsModalProps {
   /** Local model servers and ACP agents found on this computer. Omitted on a remote server. */
   providerDetection?: ProviderDetection;
   detectedProviderApi?: DetectedProviderApi;
+  /** The user's own ACP agents. Only the local host passes it. */
+  customAgents?: CustomAgentSettingsApi;
   /** Where the scan looks. Without it the tab has no detection settings. */
   detectionSettings?: ProviderDetectionSettingsValue;
   onDetectionSettingsChange?: (value: ProviderDetectionSettingsValue) => void;
@@ -361,6 +364,7 @@ export function SettingsModal(props: SettingsModalProps) {
             // With detection off there is no list, not an empty one.
             providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
             detectedProviderApi={props.detectedProviderApi}
+            customAgents={props.customAgents}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
           />

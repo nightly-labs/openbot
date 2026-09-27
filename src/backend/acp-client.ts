@@ -171,8 +171,39 @@ interface AcpProviderAccount {
   planType: string | null;
 }
 
+/**
+ * What OpenBot offers every ACP agent in `initialize`. One value, so the trial start that "Check
+ * agent" makes (`acp-agent-check.ts`) and the real client cannot differ.
+ */
+export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
+  fs: { readTextFile: false, writeTextFile: false },
+  terminal: false,
+  elicitation: { form: {} },
+  session: { configOptions: { boolean: {} } },
+} as const;
+
+export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", version: "0.1.0" } as const;
+
 export interface AcpProviderOptions {
   provider: AgentProvider;
+  /** The name in error text. The provider name when absent; a custom agent gives its own. */
+  label?: string;
+  /**
+   * An agent that lists no model is ready, not signed out. A custom agent can have one model that
+   * it does not name, and it then runs on that model.
+   */
+  allowNoModels?: boolean;
+  /**
+   * The folder of the session that model discovery opens and closes. The app's own working folder
+   * when absent. A custom agent gets an empty folder, because an unknown agent can write where its
+   * session starts.
+   */
+  discoveryCwd?: () => string;
+  /**
+   * Values to mask in every diagnostic and error this client emits, read at each use: the custom
+   * agent's environment values, which have no secret name that `redactText` could know them by.
+   */
+  redactValues?: () => readonly string[];
   profileGeneration?: boolean;
   argv: readonly string[];
   env: Record<string, string>;
@@ -269,6 +300,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#requestTimeoutMs = requestTimeoutMs;
   }
 
+  get #label(): string {
+    return this.options.label ?? agentProviderName(this.provider);
+  }
+
+  /** `redactText`, and then the values this agent was started with. */
+  #redact(text: string): string {
+    let result = redactText(text);
+    for (const value of this.options.redactValues?.() ?? []) {
+      if (value.length < 4) continue;
+      result = result.split(value).join("[redacted]");
+    }
+    return result;
+  }
+
   get running(): boolean {
     return this.#process !== null && this.#process.exitCode === null && !this.#stopping;
   }
@@ -304,7 +349,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // record read in halves keeps the credential in its second half.
     let lastDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
-      redact: redactText,
+      redact: (text) => this.#redact(text),
       emit: (message) => {
         lastDiagnostic = message;
         this.emit("diagnostic", message);
@@ -314,7 +359,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // Read at `close`, not `exit`: only then is stderr read to its end, and a CLI that fails at start
     // writes the reason as its last line.
     this.#ended = new Promise((resolve) => {
-      child.once("error", (error) => resolve({ ending: "it could not start", detail: redactText(error.message) }));
+      child.once("error", (error) => resolve({ ending: "it could not start", detail: this.#redact(error.message) }));
       child.once("close", (code, signal) => {
         diagnostics.flush();
         resolve({ ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`, detail: lastDiagnostic });
@@ -396,11 +441,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }),
     ]).finally(() => clearTimeout(timer));
     if (ending === null) return error;
-    return new AgentProcessExitError(
-      `${agentProviderName(this.provider)} stopped before it answered (${ending.ending}).`,
-      ending.detail,
-      { cause: error },
-    );
+    return new AgentProcessExitError(`${this.#label} stopped before it answered (${ending.ending}).`, ending.detail, {
+      cause: error,
+    });
   }
 
   async #request<T>(method: string, params: unknown, decoder: ResponseDecoder<T>, timeoutMs?: number): Promise<T> {
@@ -425,7 +468,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             ? await withTimeout(
                 this.options.readRateLimits(this.#requireConnection()),
                 timeoutMs ?? this.#requestTimeoutMs,
-                `${agentProviderName(this.provider)} request timed out: account/rateLimits/read`,
+                `${this.#label} request timed out: account/rateLimits/read`,
               )
             : { rateLimits: null, rateLimitsByLimitId: null },
         );
@@ -498,7 +541,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const account = await withTimeout(
         this.options.readAccount(this.#requireConnection()),
         timeoutMs ?? this.#requestTimeoutMs,
-        `${agentProviderName(this.provider)} request timed out: account/read`,
+        `${this.#label} request timed out: account/read`,
       );
       return { email: account.email ?? null, planType: account.planType ?? null };
     } catch {
@@ -511,13 +554,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#initialization = await withTimeout(
       connection.initialize({
         protocolVersion: 1,
-        clientCapabilities: {
-          fs: { readTextFile: false, writeTextFile: false },
-          terminal: false,
-          elicitation: { form: {} },
-          session: { configOptions: { boolean: {} } },
-        },
-        clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
+        clientCapabilities: OPENBOT_ACP_CLIENT_CAPABILITIES,
+        clientInfo: OPENBOT_ACP_CLIENT_INFO,
       }),
       this.#requestTimeoutMs,
       "ACP initialization timed out.",
@@ -525,7 +563,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     try {
       await this.options.authenticate?.(connection, this.#initialization);
       this.#models = await this.#discoverModels();
-      if (this.#models.length === 0) {
+      if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
       }
       this.#signedIn = true;
@@ -546,7 +584,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const deadline = Date.now() + timeoutMs - MODEL_DISCOVERY_RETURN_MS;
     return withTimeout(
       (async () => {
-        const probe = await connection.newSession({ cwd: process.cwd(), mcpServers: [] });
+        const cwd = this.options.discoveryCwd?.() ?? process.cwd();
+        const probe = await connection.newSession({ cwd, mcpServers: [] });
         try {
           return await this.#modelReasoningEfforts(connection, probe, modelsFromSessionSetup(probe), deadline);
         } finally {
@@ -560,7 +599,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
       })(),
       timeoutMs,
-      `${agentProviderName(this.provider)} request timed out: model/list`,
+      `${this.#label} request timed out: model/list`,
     );
   }
 
@@ -574,9 +613,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   async #requestBefore<T>(request: () => Promise<T>, until: number, method: string): Promise<T | null> {
     const remaining = until - Date.now();
     if (remaining <= 0) return null;
-    return withTimeout(request(), remaining, `${agentProviderName(this.provider)} request timed out: ${method}`).catch(
-      () => null,
-    );
+    return withTimeout(request(), remaining, `${this.#label} request timed out: ${method}`).catch(() => null);
   }
 
   /**
@@ -663,7 +700,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!this.#loadsSessions) return null;
       await this.#startThread(params, true);
     } catch (error) {
-      this.emit("diagnostic", redactText(`ACP session load for a read failed: ${String(error)}`));
+      this.emit("diagnostic", this.#redact(`ACP session load for a read failed: ${String(error)}`));
       return null;
     }
     const thread = this.#threads.get(id) ?? null;
@@ -877,7 +914,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       void this.#requireConnection()
         .prompt({ sessionId: thread.id, prompt: blocks })
         .catch((error) => {
-          this.emit("diagnostic", redactText(`ACP steer failed: ${String(error)}`));
+          this.emit("diagnostic", this.#redact(`ACP steer failed: ${String(error)}`));
         });
       return { turn: { id: turnId, status: "inProgress" }, turnId };
     }
@@ -1046,7 +1083,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeThought(thread, turn);
     this.#completeMessage(thread, turn, "final_answer");
     if (status === "failed" && error) {
-      const detail = redactText(String(error));
+      const detail = this.#redact(String(error));
       const message =
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)

@@ -36,8 +36,11 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    // A joined server's host serves only the providers that the Team API carries.
-    AGENT_PROVIDERS.filter((provider) => !props.providerHostName || !isLocalOnlyProvider(provider)).map((provider) => {
+    // A joined server's host serves only the providers that the Team API carries. Custom agents have
+    // their own list, because one row cannot stand for several commands.
+    AGENT_PROVIDERS.filter(
+      (provider) => provider !== "acp" && (!props.providerHostName || !isLocalOnlyProvider(provider)),
+    ).map((provider) => {
       const agent = props.agentStatus?.providers?.find((candidate) => candidate.id === provider);
       const runtime = props.providerRuntimeStatuses?.[provider];
       return {

@@ -304,7 +304,7 @@ const V12_REACTIONS_TABLE_SQL = `  CREATE TABLE IF NOT EXISTS projection_reactio
     PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)
   );`;
 
-// Migrations 17 and 22 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
+// Migrations 17, 22 and 23 widen the provider CHECK, so the fresh schema is no longer the v8 baseline here either.
 // One line rather than the whole table: the substitution then survives any later baseline edit that does
 // not touch this constraint, and `substituteOnce` still shouts if the line ever stops being unique.
 const BASELINE_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),`;
@@ -314,6 +314,9 @@ const V17_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider I
 // Migration 22 adds the Antigravity provider. This list is frozen with the migration: do not derive it
 // from `AGENT_PROVIDERS`, because a later provider must get its own migration.
 const V22_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),`;
+
+// Migration 23 adds `acp`, the one provider of every custom ACP agent. Frozen with the migration, like V22.
+const V23_PROVIDER_SESSIONS_CHECK_SQL = `provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp')),`;
 
 // IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
 // schema. A database built from the latest schema and then replayed forward - which is how a
@@ -371,7 +374,7 @@ const LATEST_SCHEMA_SQL =
   substituteOnce(
     substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL),
     BASELINE_PROVIDER_SESSIONS_CHECK_SQL,
-    V22_PROVIDER_SESSIONS_CHECK_SQL,
+    V23_PROVIDER_SESSIONS_CHECK_SQL,
   ) +
   ANALYTICS_SCHEMA_SQL +
   ANALYTICS_DATE_INDEX_SQL +
@@ -476,6 +479,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // on, the DROP would set `projection_turns.provider_session_id` to NULL on every turn.
     disableForeignKeys: true,
     up: migrateProviderSessionsForAntigravity,
+  },
+  {
+    version: 23,
+    // The same rebuild as migrations 17 and 22, with foreign keys off for the same reason.
+    disableForeignKeys: true,
+    up: migrateProviderSessionsForCustomAgents,
   },
 ];
 
@@ -739,7 +748,12 @@ function migrateProviderSessionsForAntigravity(db: DatabaseSync): void {
   widenProviderSessionsCheck(db, "'antigravity'", V22_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v22");
 }
 
-// Migrations 17 and 22 share this SQL. Each migration gives its own CHECK line and staging table name, so the
+// Migration 23 adds the custom ACP agent provider with the same rebuild and the same skip.
+function migrateProviderSessionsForCustomAgents(db: DatabaseSync): void {
+  widenProviderSessionsCheck(db, "'acp'", V23_PROVIDER_SESSIONS_CHECK_SQL, "projection_provider_sessions_v23");
+}
+
+// Migrations 17, 22 and 23 share this SQL. Each migration gives its own CHECK line and staging table name, so the
 // SQL that migration 17 runs is the same text as before this function was shared.
 function widenProviderSessionsCheck(
   db: DatabaseSync,

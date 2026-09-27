@@ -1,19 +1,11 @@
+import { ACP_AGENT_PRESETS } from "@openbot/contracts/ipc";
 import { CustomAcpAgentDialog } from "@openbot/ui/features/custom-providers/CustomAcpAgentDialog";
-import type {
-  CustomAcpAgentDraft,
-  CustomAcpAgentPreset,
+import {
+  type CustomAcpAgentDraft,
+  savedAcpAgentDraft,
 } from "@openbot/ui/features/custom-providers/custom-acp-agent-form";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-
-// The ACP launch commands from each agent's documentation and the curated-acp-agents list, read
-// 2026-09-27. OpenBot has not started any of them yet, so a real host must confirm each one.
-const presets: readonly CustomAcpAgentPreset[] = [
-  { id: "cursor", name: "Cursor", command: "cursor-agent", args: "acp" },
-  { id: "copilot", name: "Copilot CLI", command: "copilot", args: "--acp" },
-  { id: "qwen", name: "Qwen Code", command: "qwen", args: "--acp" },
-  { id: "goose", name: "Goose", command: "goose", args: "acp" },
-];
 
 const goose: CustomAcpAgentDraft = {
   agentId: "goose",
@@ -25,7 +17,7 @@ const goose: CustomAcpAgentDraft = {
 
 const args: Parameters<typeof CustomAcpAgentDialog>[0] = {
   open: true,
-  presets,
+  presets: ACP_AGENT_PRESETS,
   onCheck: fn(),
   onSubmit: fn(),
   onCancel: fn(),
@@ -45,6 +37,21 @@ export const AgentBlank: Story = {};
 
 export const AgentFilled: Story = {
   args: { draft: goose, onBack: fn() },
+};
+
+/** A saved agent: the ID is locked, and the saved key shows as kept. */
+export const AgentEdit: Story = {
+  args: {
+    editing: true,
+    draft: savedAcpAgentDraft({
+      id: "goose",
+      name: "Goose",
+      command: "/opt/homebrew/bin/goose",
+      args: ["acp"],
+      envNames: ["GOOSE_PROVIDER", "OPENAI_API_KEY"],
+      resolvedCommand: "/opt/homebrew/bin/goose",
+    }),
+  },
 };
 
 export const AgentChecking: Story = {

@@ -9,6 +9,7 @@ export const messages = defineMessages("provider", {
   "provider.custom.addLabel": "Add custom provider",
   "provider.custom.installLabel": "Install custom provider",
   "provider.endpointCount": { one: "1 endpoint", other: "{count} endpoints" },
+  "provider.customAgentCount": { one: "1 custom agent", other: "{count} custom agents" },
   "provider.manageEndpoints": { one: "Manage 1 endpoint", other: "Manage {count} endpoints" },
   "provider.refresh": "Refresh",
   "provider.refreshLabel": "Refresh providers",
@@ -70,6 +71,7 @@ export const messages = defineMessages("provider", {
 
   // The agent model picker.
   "provider.picker.noEndpoints": "No endpoints yet",
+  "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "Agent model",
   "provider.picker.model": "Model",
   "provider.picker.title": "Choose agent model",

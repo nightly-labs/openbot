@@ -76,6 +76,8 @@ import {
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
 import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import { type CustomAgentChanges, createCustomAgentChanges } from "./custom-agent-changes";
+import { CUSTOM_AGENTS_FILE, CustomAgentStore } from "./custom-agent-store";
 import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
 import { CustomProviderStore } from "./custom-provider-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
@@ -258,6 +260,7 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
+  customAgentChanges: CustomAgentChanges;
   providerDetection: ProviderDetection;
   providerDetectionSettings: ProviderDetectionSettingsStore;
   marketplaceAgents: AgentMarketplaceService;
@@ -515,6 +518,13 @@ export async function createApplicationServices({
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   await customProviders.load();
+  // The same reasons as the endpoints: before the service, and a file this build cannot read only
+  // refuses the writes.
+  const customAgents = new CustomAgentStore({
+    path: join(app.getPath("userData"), CUSTOM_AGENTS_FILE),
+    cipher: secretCipher,
+  });
+  await customAgents.load();
   const providerDetectionSettings = new ProviderDetectionSettingsStore(
     join(app.getPath("userData"), PROVIDER_DETECTION_SETTINGS_FILE),
   );
@@ -522,6 +532,7 @@ export async function createApplicationServices({
   const providerDetection = createProviderDetection({
     settings: providerDetectionSettings,
     customProviders,
+    customAgents,
     probe: probeModels,
   });
   /*
@@ -719,6 +730,8 @@ export async function createApplicationServices({
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
       customProviders: () => customProviders.configs(),
+      // The same rule: `configs()`, with the environment values, goes to the agent process only.
+      customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
       // into the object being constructed; nothing calls it before the constructor returns.
       mcpServers: () => service.enabledMcpServers(),
@@ -879,6 +892,7 @@ export async function createApplicationServices({
   });
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const customProviderChanges = createCustomProviderChanges({ service, customProviders });
+  const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -1236,6 +1250,7 @@ export async function createApplicationServices({
     hostedSites,
     customProviders,
     customProviderChanges,
+    customAgentChanges,
     providerDetection,
     providerDetectionSettings,
     marketplaceAgents,

@@ -13,7 +13,10 @@ export function isArchivedThreadError(error: unknown): boolean {
 }
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
-  if ((provider !== "grok" && provider !== "opencode" && provider !== "antigravity") || !(error instanceof Error)) {
+  if (
+    (provider !== "grok" && provider !== "opencode" && provider !== "antigravity" && provider !== "acp") ||
+    !(error instanceof Error)
+  ) {
     return false;
   }
   return (

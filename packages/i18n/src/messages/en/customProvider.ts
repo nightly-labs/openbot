@@ -143,6 +143,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.presets": "Start from",
   "customProvider.acp.displayNamePlaceholder": "My Agent",
   "customProvider.acp.agentId": "Agent ID",
+  "customProvider.acp.agentIdHint": "Lowercase letters, numbers, or hyphens. You cannot change it later.",
   "customProvider.acp.command": "Command",
   "customProvider.acp.commandHint": "The program to start. OpenBot looks for it on your PATH.",
   "customProvider.acp.args": "Arguments",
@@ -164,11 +165,37 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.trustDescription":
     "OpenBot starts it with your user account. The agent can read and change files and run commands. Add only an agent that you trust.",
   "customProvider.acp.submit": "Add agent",
+  "customProvider.acp.editTitle": "Edit a custom ACP agent",
+  "customProvider.acp.submitEdit": "Save agent",
+  "customProvider.acp.env.keptPlaceholder": "Saved. Leave empty to keep it.",
   "customProvider.acp.error.agentIdRequired": "Enter an agent ID.",
   "customProvider.acp.error.agentIdTaken": "An agent called {id} already exists. Choose another ID.",
   "customProvider.acp.error.commandRequired": "Enter the command that starts the agent.",
   "customProvider.acp.error.envNameInvalid": "Use letters, numbers and underscores, starting with a letter.",
   "customProvider.acp.error.envDuplicate": "This agent already sets {name}.",
+  "customProvider.acp.error.envValueRequired": "Enter a value for this variable.",
+  "customProvider.acp.error.envValueLength": "Keep the value under {max} characters.",
+  "customProvider.acp.error.agentIdPattern":
+    "Use lowercase letters, numbers or hyphens, starting with a letter or number. Use at most 40 characters.",
+
+  // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
+  "customProvider.agents.title": "Custom agents",
+  "customProvider.agents.description": "ACP agents that OpenBot starts on this computer.",
+  "customProvider.agents.empty": "No custom agents yet.",
+  "customProvider.agents.add": "Add agent",
+  "customProvider.agents.commandMissing": "{command} · Command not found",
+  "customProvider.agents.envCount": { one: "1 variable", other: "{count} variables" },
+  "customProvider.agents.editLabel": "Edit {name}",
+  "customProvider.agents.deleteLabel": "Delete {name}",
+  "customProvider.agents.confirmDescription":
+    "Its saved variables are discarded, and each agent that uses it moves to a default model.",
+  "customProvider.agents.saveFailed": "OpenBot could not save this agent.",
+  "customProvider.agents.saved.restarted": "Saved. OpenBot restarted the custom agents.",
+  "customProvider.agents.saved.skippedBusy": "Saved. The custom agents restart after the current task stops.",
+  "customProvider.agents.saved.notRunning": "Saved. The custom agents read it when they next start.",
+  "customProvider.agents.removed.restarted": "Removed. OpenBot restarted the custom agents.",
+  "customProvider.agents.removed.skippedBusy": "Removed. The custom agents restart after the current task stops.",
+  "customProvider.agents.removed.notRunning": "Removed. The custom agents read it when they next start.",
 
   // The list of saved endpoints.
   "customProvider.list.title": "Custom providers",

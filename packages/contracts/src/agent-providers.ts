@@ -19,7 +19,7 @@ import { isOneOf } from "./runtime-values";
  * the per-provider argv, palette tokens and runtime-lock schemas, which belong to the driver, the
  * stylesheet and the lock file.
  */
-export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity"] as const;
+export const AGENT_PROVIDERS = ["codex", "claude", "grok", "opencode", "antigravity", "acp"] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
 export function isAgentProvider(value: unknown): value is AgentProviderId {
@@ -156,6 +156,24 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     skillFolders: [".gemini/skills", ".agents/skills"],
     workspaceEnforcement: "confined-process",
   },
+  // One provider for every Agent Client Protocol agent the user adds by command. The model id names
+  // the agent (`<customAgentId>/<agentModel>`), so one provider row serves them all and the shipped
+  // provider CHECK lists grow by one word only once.
+  acp: {
+    id: "acp",
+    displayName: "Custom agent",
+    cliName: "ACP agent",
+    onboardingDescription: "An agent you run by command",
+    signInMessage: "Sign in with the agent's own command, then try again.",
+    installGuideLink: null,
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "acp",
+    pickerOrder: 5,
+    codeSignIn: false,
+    skillFolders: [".agents/skills"],
+    workspaceEnforcement: "confined-process",
+  },
 } as const satisfies Record<AgentProviderId, AgentProviderDescriptor>;
 
 export const AGENT_PROVIDER_DESCRIPTORS: readonly AgentProviderDescriptor[] = AGENT_PROVIDERS.map(
@@ -176,8 +194,13 @@ export function agentProviderCliName(provider: AgentProviderId): string {
   return AGENT_PROVIDER_DESCRIPTOR_TABLE[provider].cliName;
 }
 
-/** Picker and onboarding order, which is not `AGENT_PROVIDERS` order. */
-export const PICKER_PROVIDERS: readonly AgentProviderId[] = AGENT_PROVIDER_DESCRIPTORS.slice()
+/**
+ * Picker and onboarding order, which is not `AGENT_PROVIDERS` order. `acp` is not in it: a custom
+ * agent is the user's own command, listed in the picker's Custom tab and never offered as a default.
+ */
+export const PICKER_PROVIDERS: readonly AgentProviderId[] = AGENT_PROVIDER_DESCRIPTORS.filter(
+  (descriptor) => descriptor.id !== "acp",
+)
   .sort((left, right) => left.pickerOrder - right.pickerOrder)
   .map((descriptor) => descriptor.id);
 
@@ -204,10 +227,32 @@ export function isManagedRuntimeProvider(provider: AgentProviderId): provider is
  * The providers that stay on the computer that runs OpenBot. The Team API does not carry them, so a
  * joined server's settings do not list them.
  */
-export const LOCAL_ONLY_PROVIDERS = ["antigravity"] as const satisfies readonly AgentProviderId[];
+export const LOCAL_ONLY_PROVIDERS = ["antigravity", "acp"] as const satisfies readonly AgentProviderId[];
 
 export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
   return isOneOf(LOCAL_ONLY_PROVIDERS, provider);
+}
+
+/**
+ * A custom agent id: the first segment of its model ids. No `_`, which `isAgentModel` refuses, and
+ * no `/`, which separates the agent from its model.
+ */
+export const CUSTOM_AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/** Ids a custom agent may not take: a provider id or `custom` would read as another provider's model. */
+export function isCustomAgentId(value: string): boolean {
+  return CUSTOM_AGENT_ID_PATTERN.test(value) && value !== "custom" && !isAgentProvider(value);
+}
+
+/** The model a custom agent with no model list runs on. The agent is given no model. */
+export const CUSTOM_AGENT_DEFAULT_MODEL = "default";
+
+/** The custom agent a model id belongs to, or null for an id with no agent segment. */
+export function customAgentIdOfModel(model: string): string | null {
+  const slash = model.indexOf("/");
+  if (slash <= 0) return null;
+  const id = model.slice(0, slash);
+  return isCustomAgentId(id) ? id : null;
 }
 
 /**

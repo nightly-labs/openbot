@@ -7,12 +7,14 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  DetectedAcpAgent,
   DetectedModelServer,
   DiscoverModelsInput,
   DiscoverModelsResult,
   ProviderDetectionSettings,
 } from "@openbot/contracts/ipc";
 import { customProviderEndpointKey, isNewCustomProviderId, sameCustomProviderOrigin } from "@openbot/contracts/ipc";
+import { scanAcpAgents } from "../backend/acp-agent-scan";
 import type { CustomProviderConfig } from "../backend/opencode-config";
 import type { ProbeModels } from "./model-server-probe";
 
@@ -36,11 +38,15 @@ export const DEFAULT_MODEL_SERVERS: readonly KnownServer[] = [
 export interface ProviderDetectionDependencies {
   settings: { get(): ProviderDetectionSettings };
   customProviders: { configs(): readonly CustomProviderConfig[] };
+  customAgents: { configs(): readonly { id: string }[] };
   probe: ProbeModels;
+  scanAgents?: typeof scanAcpAgents;
 }
 
 export interface ProviderDetection {
   scanModelServers(): Promise<DetectedModelServer[]>;
+  /** The known ACP agent commands on this computer. None is started. */
+  scanAgents(): Promise<DetectedAcpAgent[]>;
   discoverModels(input: DiscoverModelsInput): Promise<DiscoverModelsResult>;
 }
 
@@ -94,10 +100,13 @@ function scanTargets(addresses: readonly string[]): KnownServer[] {
 export function createProviderDetection({
   settings,
   customProviders,
+  customAgents,
   probe,
+  scanAgents = scanAcpAgents,
 }: ProviderDetectionDependencies): ProviderDetection {
   /** Two windows, or a Settings tab and onboarding, that scan at once share one scan. */
   let inFlight: Promise<DetectedModelServer[]> | null = null;
+  let agentsInFlight: Promise<DetectedAcpAgent[]> | null = null;
 
   async function scan(): Promise<DetectedModelServer[]> {
     const current = settings.get();
@@ -126,6 +135,22 @@ export function createProviderDetection({
         });
       }
       return inFlight;
+    },
+    scanAgents() {
+      if (!agentsInFlight) {
+        const current = settings.get();
+        agentsInFlight = (
+          current.enabled
+            ? scanAgents({
+                folders: current.folders,
+                takenIds: new Set(customAgents.configs().map((config) => config.id)),
+              })
+            : Promise.resolve([])
+        ).finally(() => {
+          agentsInFlight = null;
+        });
+      }
+      return agentsInFlight;
     },
     async discoverModels(input) {
       let apiKey = input.apiKey;

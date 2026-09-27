@@ -80,9 +80,14 @@ export interface OnboardingFlowProps {
 type OnboardingStep = "meet" | "computer" | "jobs";
 type StepDirection = "forward" | "back";
 
-const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> = AGENT_PROVIDER_DESCRIPTORS.map(
-  (descriptor) => ({ id: descriptor.id, name: descriptor.displayName, description: descriptor.onboardingDescription }),
-);
+// A custom agent is not a first provider: it is added from the detected list or in Settings.
+const PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> = AGENT_PROVIDER_DESCRIPTORS.filter(
+  (descriptor) => descriptor.id !== "acp",
+).map((descriptor) => ({
+  id: descriptor.id,
+  name: descriptor.displayName,
+  description: descriptor.onboardingDescription,
+}));
 
 /**
  * The provider registry carries its onboarding line in English. A line that has no key here, such

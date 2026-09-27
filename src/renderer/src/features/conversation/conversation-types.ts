@@ -8,6 +8,7 @@ import type {
   AvatarImageInput,
   BrowserControlState,
   BrowserTab,
+  CustomAgentSummary,
   CustomProviderSummary,
   DraftAttachment,
   FilePreview,
@@ -59,6 +60,8 @@ export interface ConversationProps {
    * its provider - the same path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[];
+  /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
+  customAgents?: readonly CustomAgentSummary[];
   onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
   onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
   onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;

@@ -1,5 +1,5 @@
 import type { AgentModelOption, AgentSummary, UpdateAgentInput } from "@openbot/contracts/ipc";
-import { defaultProviderModel } from "@openbot/contracts/ipc";
+import { customAgentIdOfModel, defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { type AgentStore, DEFAULT_AGENT_PROVIDER } from "../agent-store";
@@ -88,7 +88,8 @@ export class CustomEndpoints {
    */
   available(): AgentModelOption[] {
     if (this.#released.size === 0) return this.#providers.listModels();
-    return this.#providers.listModels().filter((option) => this.serves(option.id));
+    // A custom agent id can be the same text as an endpoint id. Its models are not the endpoint's.
+    return this.#providers.listModels().filter((option) => option.provider === "acp" || this.serves(option.id));
   }
 
   /**
@@ -260,6 +261,62 @@ export class CustomEndpoints {
   }
 
   /**
+   * Saves one custom agent: `persist`, the caller's file write, inside the chain. No agent moves: an
+   * agent on a model the changed agent no longer lists moves to another model of the same agent when
+   * the new process lists its models (`moveAgentsOffUnlistedModels`).
+   */
+  saveCustomAgent<T>(persist: () => Promise<T>): Promise<T> {
+    return this.runExclusive(async () => {
+      // A profile client is a process of its own, started with the agent as it was.
+      this.#hooks.stopProfileClients();
+      return persist();
+    });
+  }
+
+  /**
+   * Removes one custom agent: the agents on it move to another provider, then `persist` writes the
+   * file. The move comes first, as for an endpoint, so no agent is left on a program that is gone.
+   * With nothing to move to, the removal still goes ahead, and those agents ask for a model at their
+   * next turn.
+   */
+  removeCustomAgent<T>(customAgentId: string, persist: () => Promise<T>): Promise<T> {
+    return this.runExclusive(async () => {
+      this.#hooks.stopProfileClients();
+      const affected = this.#store
+        .list()
+        .filter((agent) => providerForAgent(agent) === "acp" && customAgentIdOfModel(agent.model) === customAgentId);
+      const fallback = affected.length > 0 ? this.#builtInFallback() : null;
+      if (fallback) {
+        if (affected.some((agent) => this.#hasWorkInFlight(agent))) {
+          throw new Error(sourceText("error.provider.customAgentRemoveBusy"));
+        }
+        for (const agent of affected) {
+          await this.#hooks.applyAgentUpdate({
+            agentId: agent.id,
+            provider: fallback.provider,
+            model: fallback.id,
+            reasoningEffort: fallback.defaultReasoningEffort,
+          });
+        }
+      }
+      return persist();
+    });
+  }
+
+  /** The model an agent moves to when its custom agent goes: the preferred provider's, then the others'. */
+  #builtInFallback(): AgentModelOption | null {
+    const remaining = this.available();
+    const preference = this.#hooks.preference();
+    const providers = [preference.provider, ...PICKER_PROVIDERS.filter((provider) => provider !== preference.provider)];
+    for (const provider of providers) {
+      if (provider === "acp" || !this.#hooks.providerAvailable(provider)) continue;
+      const model = startingModel(provider, remaining, preference);
+      if (model) return model;
+    }
+    return null;
+  }
+
+  /**
    * A fresh OpenCode process is the one the app uses now, and it read the endpoint files as they are,
    * so what it lists is the truth and nothing has to be masked any more.
    *
@@ -341,12 +398,17 @@ export class CustomEndpoints {
    */
   async moveAgentsOffUnlistedModels(provider: AgentProvider): Promise<void> {
     const models = this.available().filter((model) => model.provider === provider);
-    const fallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
-    if (!fallback) return;
+    const providerFallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
+    if (!providerFallback) return;
     const affected = this.#store
       .list()
       .filter((agent) => providerForAgent(agent) === provider && !models.some((model) => model.id === agent.model));
     for (const agent of affected) {
+      // A custom agent is a program of its own, not a model: an agent moves only to another model of
+      // the same custom agent. One that listed nothing, or did not answer, keeps its model.
+      const fallback =
+        provider === "acp" ? models.find((model) => sameCustomAgent(model.id, agent.model)) : providerFallback;
+      if (!fallback) continue;
       try {
         await this.#hooks.applyAgentUpdate({
           agentId: agent.id,
@@ -371,4 +433,9 @@ export class CustomEndpoints {
       (agent.threadId ? this.#store.database.readConversation(agent.id, agent.threadId).activeTurnId : null);
     return Boolean(active);
   }
+}
+
+function sameCustomAgent(model: string, agentModel: string): boolean {
+  const id = customAgentIdOfModel(model);
+  return id !== null && id === customAgentIdOfModel(agentModel);
 }
