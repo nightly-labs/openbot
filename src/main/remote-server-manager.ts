@@ -1002,7 +1002,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return { bytes, mimeType };
   }
 
-  downloadAttachment(attachmentId: string, serverId = this.#store.activeServerId): Promise<RemoteAttachment> {
+  async downloadAttachment(attachmentId: string, serverId = this.#store.activeServerId): Promise<RemoteAttachment> {
     const server = this.#store.require(serverId);
     return this.#attachments.get(server.id, attachmentId, async () => {
       const response = await this.#client.fetch(

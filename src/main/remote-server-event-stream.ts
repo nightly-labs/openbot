@@ -224,8 +224,10 @@ export class RemoteEventStream {
 
   /**
    * The computer woke from sleep. A socket from before the sleep can be dead with no close event,
-   * and the backoff was earned on a network that is gone, so each host connects again at once. A
-   * host whose credentials were rejected stays paused.
+   * and the backoff was earned on a network that is gone, so each HTTPS host opens a new socket and
+   * each waiting WebRTC host connects at once. A WebRTC host that still shows as connected keeps its
+   * channel: the transport finds a dead one itself. A host whose credentials were rejected stays
+   * paused.
    */
   wake(): void {
     if (!this.#enabled) return;

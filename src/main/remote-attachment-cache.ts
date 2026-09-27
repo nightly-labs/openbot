@@ -36,15 +36,14 @@ export class RemoteAttachmentCache {
   }
 
   get(serverId: string, attachmentId: string, download: () => Promise<RemoteAttachment>): Promise<RemoteAttachment> {
+    this.#removeExpired();
     const key = JSON.stringify([serverId, attachmentId]);
     const entry = this.#entries.get(key);
     if (entry) {
       this.#delete(key, entry);
-      if (this.#now() - entry.storedAt < REMOTE_ATTACHMENT_CACHE_TTL_MS) {
-        this.#entries.set(key, entry);
-        this.#bytes += entry.attachment.bytes.byteLength;
-        return Promise.resolve(entry.attachment);
-      }
+      this.#entries.set(key, entry);
+      this.#bytes += entry.attachment.bytes.byteLength;
+      return Promise.resolve(entry.attachment);
     }
     const pending = this.#pending.get(key);
     if (pending) return pending.request;
@@ -78,9 +77,17 @@ export class RemoteAttachmentCache {
     return `${this.#epoch}:${this.#generations.get(serverId) ?? 0}`;
   }
 
+  // A use moves an entry to the end without a new `storedAt`, so an expired entry can be anywhere.
+  #removeExpired(): void {
+    const now = this.#now();
+    for (const [key, entry] of this.#entries)
+      if (now - entry.storedAt >= REMOTE_ATTACHMENT_CACHE_TTL_MS) this.#delete(key, entry);
+  }
+
   #store(key: string, serverId: string, attachment: RemoteAttachment): void {
     const size = attachment.bytes.byteLength;
     if (size > REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES) return;
+    this.#removeExpired();
     const previous = this.#entries.get(key);
     if (previous) this.#delete(key, previous);
     for (const [oldestKey, oldest] of this.#entries) {
