@@ -1,4 +1,27 @@
-.ui-action-menu,
+/* The menu panel sits on the same color as the sidebar and the conversation panel. A light edge, a
+ * top highlight and a deep shadow lift it from them. */
+:root {
+  --ui-menu-radius: var(--openbot-radius-card);
+  --ui-menu-padding: var(--openbot-space-1-5);
+  --ui-menu-item-radius: calc(var(--ui-menu-radius) - var(--ui-menu-padding) + var(--openbot-space-0-5));
+  --ui-menu-inset: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+  --ui-menu-bg: var(--openbot-bg-sheet);
+  --ui-menu-edge: color-mix(in srgb, var(--openbot-text-primary) 11%, transparent);
+  --ui-menu-highlight: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
+  --ui-menu-shadow: color-mix(in srgb, var(--openbot-bg-notch) 45%, transparent);
+  --ui-menu-item-hover: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+  /* The highlighted row as one opaque color, for the parts of an icon that are cut out of its fill. */
+  --ui-menu-row-highlight: color-mix(in srgb, var(--openbot-text-primary) 6%, var(--ui-menu-bg));
+  --ui-menu-panel-shadow:
+    inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge), 0 4px 6px -1px var(--ui-menu-shadow),
+    0 2px 4px -2px var(--ui-menu-shadow);
+  --ui-menu-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui-menu-duration: 150ms;
+  /* A submenu opens and closes slower than the root menu, on a softer curve. */
+  --ui-submenu-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ui-submenu-duration: var(--openbot-duration-slow);
+}
+
 .ui-popover-menu-surface {
   border: 0;
   border-radius: var(--openbot-radius-md);
@@ -15,12 +38,30 @@
   position: relative;
   z-index: var(--openbot-layer-popover);
   width: max-content;
-  min-width: 160px;
-  max-width: min(240px, calc(100vw - var(--openbot-space-4)));
+  min-width: 192px;
+  max-width: min(288px, calc(100vw - var(--openbot-space-4)));
   overflow: hidden;
-  padding: var(--openbot-space-1);
+  border: 0;
+  border-radius: var(--ui-menu-radius);
+  outline: 0;
+  background: var(--ui-menu-bg);
+  box-shadow: var(--ui-menu-panel-shadow);
+  padding: var(--ui-menu-padding);
+  color: var(--openbot-text-primary);
   transform-origin: var(--kb-menu-content-transform-origin, var(--kb-popover-content-transform-origin));
-  animation: ui-action-menu-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
+  animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+/* Kobalte removes a closed menu at once. The copy that menu-motion.tsx leaves in its place has no
+ * data-expanded, and plays this exit. */
+.ui-action-menu:not([data-expanded]) {
+  animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+/* Kobalte labels a submenu with the id of its sub-trigger. The exit copy keeps the label. */
+.ui-action-menu[aria-labelledby*="sub-trigger"] {
+  animation-duration: var(--ui-submenu-duration);
+  animation-timing-function: var(--ui-submenu-ease);
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
@@ -33,10 +74,10 @@
   justify-content: flex-start;
   gap: var(--openbot-space-2);
   border: 0;
-  border-radius: var(--openbot-radius-sm);
+  border-radius: var(--ui-menu-item-radius);
   outline: 0;
   background: transparent;
-  padding: var(--openbot-space-1-5) var(--openbot-space-2);
+  padding: var(--openbot-space-1-5) var(--ui-menu-inset);
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-lg);
   font-weight: var(--openbot-weight-regular);
@@ -55,7 +96,7 @@
     [data-highlighted],
     [aria-expanded="true"]
   ) {
-  background: var(--openbot-bg-control-hover);
+  background: var(--ui-menu-item-hover);
   color: var(--openbot-text-primary);
 }
 
@@ -93,12 +134,13 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* The separator runs to both edges of the panel. */
 .ui-action-menu > hr,
 .ui-action-menu [role="separator"] {
   height: 1px;
-  margin: var(--openbot-space-1) 0;
+  margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1);
   border: 0;
-  background: var(--openbot-shadow-ring);
+  background: var(--openbot-border);
 }
 
 .ui-action-menu:not([data-menu-layout="grid"])
@@ -119,14 +161,129 @@
   color: var(--openbot-danger);
 }
 
-@keyframes ui-action-menu-in {
+/* A heading inside a menu. Each item still names itself, so the heading is aria-hidden. */
+.ui-menu-label {
+  padding: var(--openbot-space-1-5) var(--ui-menu-inset);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+/* The check of a selected item: a filled circle on the left, an empty ring when not selected. */
+.ui-menu-check {
+  display: grid;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--openbot-text-primary) 22%, transparent);
+  border-radius: var(--openbot-radius-pill);
+  transition:
+    background-color var(--ui-menu-duration) ease-out,
+    border-color var(--ui-menu-duration) ease-out;
+}
+
+.ui-menu-check[data-checked] {
+  border-color: transparent;
+  background: var(--openbot-text-primary);
+}
+
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
+  > .ui-menu-check
+  > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke: var(--ui-menu-bg);
+  stroke-width: 2.5;
+}
+
+/* A value or a shortcut at the end of an item. */
+.ui-menu-trailing {
+  margin-left: auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.ui-action-menu:not([data-menu-layout="grid"])
+  :is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"])
+  > svg.ui-menu-trailing {
+  color: var(--openbot-text-muted);
+}
+
+/* Item icons are muted outlines at rest. On the highlighted row they take the text color and fill in.
+ * The swap has no transition. Only the closed shapes fill: open lines stay outlines, and details
+ * take the row color, so they are cut out of the fill as in a solid icon set. */
+.ui-action-menu .agent-context-icon {
+  color: var(--openbot-text-muted);
+}
+
+.ui-action-menu .agent-context-icon > * {
+  fill: currentColor;
+  fill-opacity: 0;
+}
+
+.ui-action-menu [class~="lucide-chart-area"] > path:first-child,
+.ui-action-menu [class~="lucide-bell-off"] > path:nth-child(3),
+.ui-action-menu [class~="lucide-app-window"] > path {
+  fill: none;
+}
+
+.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon {
+  color: var(--openbot-text-primary);
+}
+
+.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > .agent-context-icon > * {
+  fill-opacity: 1;
+}
+
+/* Cut-outs: the window bar, and the lights on the server racks. */
+.ui-action-menu :is(:hover, [data-highlighted], [aria-expanded="true"]) > [class~="lucide-app-window"] > path,
+.ui-action-menu
+  :is(:hover, [data-highlighted], [aria-expanded="true"])
+  > .ui-glyph-20:has(> rect + rect + circle)
+  > circle {
+  fill: var(--ui-menu-row-highlight);
+  stroke: var(--ui-menu-row-highlight);
+}
+
+/* States that menu-motion.tsx sets while a copy waits for the next submenu, or while one submenu
+ * moves to the place of the next one. */
+.ui-action-menu:is([data-menu-hold], [data-menu-swap-in], [data-menu-swap-out]) {
+  animation: none;
+}
+
+.ui-action-menu[data-menu-handoff] {
+  animation: none;
+  opacity: 0;
+}
+
+.ui-action-menu[data-menu-swap-out] {
+  background: transparent;
+  box-shadow: none;
+}
+
+@keyframes ui-menu-in {
   from {
-    transform: translateY(var(--openbot-space-0-5));
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes ui-menu-out {
+  to {
+    opacity: 0;
+    transform: scale(0.95);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui-action-menu {
+  .ui-action-menu,
+  .ui-action-menu:not([data-expanded]) {
     animation: none;
+  }
+
+  .ui-menu-check {
+    transition: none;
   }
 }
