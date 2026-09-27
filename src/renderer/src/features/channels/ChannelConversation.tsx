@@ -647,6 +647,7 @@ export function ChannelConversation() {
                               );
                             }}
                             onAttachmentAction={channelAttachmentAction}
+                            onDownload={(attachment) => channelAttachmentAction(attachment, "download")}
                             actions={
                               <MessageActions
                                 message={entry()?.message ?? initialEntry.message}
