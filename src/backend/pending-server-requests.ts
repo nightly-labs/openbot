@@ -41,7 +41,7 @@ export class PendingServerRequests {
           reject(error);
         },
       });
-      this.#send({ id, method, params, signal });
+      this.#send({ id, method, params, ...(signal ? { signal } : {}) });
     });
   }
 
