@@ -24,8 +24,9 @@ All notable changes to OpenBot will be documented here. The project follows
   download the image.
 - Read the changelog on openbot.run/changelog. It shows the changes of each release, and the steps
   to do after an upgrade. The Releases link in the footer now opens this page.
-- Compare OpenBot with Grok Bot, Muse, Hermes Agent and OpenClaw on openbot.run/compare. The Grok
-  Bot article moved from News to this section. The old link opens the new page.
+- Compare OpenBot with Grok Bot, Muse, Hermes Agent, OpenClaw, Manus, Claude Cowork and Devin on
+  openbot.run/compare. The Grok Bot article moved from News to this section. The old link opens the
+  new page.
 - Open News, Guides and Plugins on openbot.run from a navigation menu that shows the latest
   articles. On a narrow screen, a menu button opens the same sections.
 - Show the reading progress of each section on news, guides and comparison pages on openbot.run.
