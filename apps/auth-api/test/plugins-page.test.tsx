@@ -1,5 +1,5 @@
 import { createOpenBotPluginUrl } from "@openbot/contracts/plugin-links";
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, within } from "@solidjs/testing-library";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, isNotFound, RouterContextProvider } from "@tanstack/solid-router";
 import { flush } from "solid-js";
@@ -34,6 +34,9 @@ function renderPage(page: () => JSX.Element) {
   return render(() => <RouterContextProvider router={router}>{page}</RouterContextProvider>);
 }
 
+/** The page without its header: the header menu lists featured plugins on every page. */
+const pageBody = () => within(screen.getByRole("main"));
+
 const firstPlugin = () => {
   const plugin = SITE_PLUGINS[0];
   if (!plugin) throw new Error("The catalog must hold at least one plugin.");
@@ -47,7 +50,9 @@ describe("plugins index", () => {
   it("offers every plugin in the catalog as a link to its own page", () => {
     renderPage(() => <PluginsIndexPage />);
 
-    const cards = screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/plugins/"));
+    const cards = pageBody()
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href")?.startsWith("/plugins/"));
 
     expect(cards.map((card) => card.getAttribute("href"))).toEqual(
       SITE_PLUGINS.map((plugin) => pluginPath(plugin.slug)),
@@ -68,16 +73,16 @@ describe("plugins index", () => {
     flush();
 
     expect(design).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("link", { name: (name) => name.includes("Canva") })).toHaveAttribute(
+    expect(pageBody().getByRole("link", { name: (name) => name.includes("Canva") })).toHaveAttribute(
       "href",
       "/plugins/canva",
     );
-    expect(screen.queryByRole("link", { name: (name) => name.includes("Aave") })).not.toBeInTheDocument();
+    expect(pageBody().queryByRole("link", { name: (name) => name.includes("Aave") })).not.toBeInTheDocument();
 
     fireEvent.click(design);
     flush();
 
-    expect(screen.getByRole("link", { name: (name) => name.includes("Aave") })).toHaveAttribute(
+    expect(pageBody().getByRole("link", { name: (name) => name.includes("Aave") })).toHaveAttribute(
       "href",
       "/plugins/aave",
     );
@@ -113,7 +118,7 @@ describe("plugin page", () => {
     renderPage(() => <PluginPage plugin={plugin} />);
 
     expect(screen.getByRole("heading", { level: 1, name: plugin.name })).toBeInTheDocument();
-    expect(screen.getByText(plugin.tagline)).toBeInTheDocument();
+    expect(pageBody().getByText(plugin.tagline)).toBeInTheDocument();
     expect(screen.getByText(plugin.description)).toBeInTheDocument();
     for (const prompt of plugin.prompts) {
       expect(screen.getByText(prompt.text)).toBeInTheDocument();

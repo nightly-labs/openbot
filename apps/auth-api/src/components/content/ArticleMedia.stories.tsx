@@ -1,6 +1,5 @@
 import { AppLogo } from "@openbot/brand";
 import type { JSX } from "@solidjs/web";
-import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 // The site's stylesheet, not the desktop app's. It is imported here rather than in
 // .storybook/preview.tsx because it carries `html`, `body` and `a` rules of its
@@ -11,11 +10,9 @@ import "./ArticleMedia.stories.css";
 import aChannel from "../../content/guides/media/openbot-101/a-channel.webp";
 import aThread from "../../content/guides/media/openbot-101/a-thread.webp";
 import pickAModel from "../../content/guides/media/openbot-101/pick-a-model.webp";
-import { CONTENT_COLLECTIONS } from "../../lib/content";
 import { formatArticleDate } from "../../lib/content-collection";
 import { GUIDES_COLLECTION } from "../../lib/guides";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
-import { PLUGIN_INDEX_ROUTE } from "../../lib/plugins";
 import { Button } from "../ui/button";
 import { ArticleGradient } from "./ArticleGradient";
 import { ArticleImage } from "./ArticleMedia";
@@ -41,17 +38,7 @@ function StoryHeader() {
         <AppLogo variant="production" class="landing-brand-logo" />
         <span>OpenBot</span>
       </a>
-      <nav class="landing-navigation" aria-label="Primary navigation">
-        <For each={CONTENT_COLLECTIONS}>
-          {(collection) => (
-            <a class="landing-header-link" href={collection.indexRoute}>
-              {collection.name}
-            </a>
-          )}
-        </For>
-        <a class="landing-header-link" href={PLUGIN_INDEX_ROUTE}>
-          Plugins
-        </a>
+      <div class="site-header-actions">
         <Button
           href={OPENBOT_LINKS.contact}
           target="_blank"
@@ -59,14 +46,14 @@ function StoryHeader() {
           variant="secondary"
           size="sm"
           icon="contact"
-          class="landing-header-contact"
+          class="site-header-secondary"
         >
           Contact
         </Button>
         <Button href="/" variant="primary" size="sm" icon="download">
           Download
         </Button>
-      </nav>
+      </div>
     </header>
   );
 }

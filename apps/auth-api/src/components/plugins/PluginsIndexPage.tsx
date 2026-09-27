@@ -1,9 +1,9 @@
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { matchesPluginTags, PLUGIN_INDEX_ROUTE, SITE_PLUGINS } from "../../lib/plugins";
-import { ContentHeader } from "../content/ContentHeader";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
+import { SiteHeader } from "../landing/SiteHeader";
 import { PluginCard } from "./PluginCard";
 import { PluginTagFilters } from "./PluginTagFilters";
 
@@ -28,7 +28,7 @@ export function PluginsIndexPage() {
 
   return (
     <div class="landing-page plugin-index">
-      <ContentHeader />
+      <SiteHeader page="content" />
 
       <main class="post-main">
         <div class="post-container">

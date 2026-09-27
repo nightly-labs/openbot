@@ -3,9 +3,9 @@ import { landingAnalytics } from "../../lib/analytics";
 import type { ContentCollection } from "../../lib/content-collection";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
+import { SiteHeader } from "../landing/SiteHeader";
 import { ArticleCard } from "./ArticleCard";
 import { ContentCallToAction } from "./ContentCallToAction";
-import { ContentHeader } from "./ContentHeader";
 import { FeaturedArticle } from "./FeaturedArticle";
 
 export interface CollectionIndexPageProps {
@@ -29,7 +29,7 @@ export function CollectionIndexPage(props: CollectionIndexPageProps) {
 
   return (
     <div class="landing-page post-index">
-      <ContentHeader />
+      <SiteHeader page="content" />
 
       <main class="post-main">
         <div class="post-container">

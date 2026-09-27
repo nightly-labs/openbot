@@ -13,9 +13,9 @@ import {
   type SitePlugin,
 } from "../../lib/plugins";
 import { ArticleGradient } from "../content/ArticleGradient";
-import { ContentHeader } from "../content/ContentHeader";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon, type LandingIconName } from "../landing/LandingIcon";
+import { SiteHeader } from "../landing/SiteHeader";
 import { PluginIcon } from "./PluginIcon";
 import { PluginLogo } from "./PluginLogo";
 import { PluginOpenButtons } from "./PluginOpenButtons";
@@ -86,7 +86,7 @@ export function PluginPage(props: PluginPageProps) {
 
   return (
     <div class="landing-page post-article">
-      <ContentHeader />
+      <SiteHeader page="content" />
 
       <main class="post-main">
         <article class="post-container post-article-body">

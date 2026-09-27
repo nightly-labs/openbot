@@ -136,12 +136,18 @@ a {
   overflow: clip;
 }
 
+/* Three columns with the outer two equal, so the menu sits at the true centre
+   of the page whatever the brand and the buttons measure. The header is its own
+   stacking context: the menu panels and the mobile sheet have to cover whatever
+   the page draws under it. */
 .landing-header {
+  position: relative;
+  z-index: 40;
   width: min(100%, 1280px);
   min-height: 76px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
   margin: 0 auto;
   padding: 18px clamp(20px, 4vw, 48px);
@@ -149,6 +155,7 @@ a {
 
 .landing-brand {
   min-width: 0;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -169,32 +176,660 @@ a {
   flex: 0 0 auto;
 }
 
-.landing-navigation,
+/* Header menu ---------------------------------------------------------------
+   SiteNavigationMenu.tsx says what moves and why. The pill slides behind the
+   trigger under the pointer, and the surface is one frosted card behind every
+   panel that morphs to the size of the one that is open. */
+
+.site-nav {
+  /* A long, soft settle: fast out of the gate, then a slow glide into place. */
+  --site-nav-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --site-nav-duration: 460ms;
+  --site-nav-quick: 300ms;
+  --site-nav-blur: 8px;
+  --site-nav-offset: 10px;
+  --site-nav-radius: 18px;
+  --site-nav-hairline: rgba(255, 255, 255, 0.07);
+  --site-nav-hover: rgba(255, 255, 255, 0.05);
+  /* The one containing block for the pill, the panels and the surface. The menu
+     places a panel and the surface with the same numbers, so they must share it:
+     a positioned track or list moved the panel 4px off its frame. */
+  position: relative;
+}
+
+.site-nav-track {
+  display: flex;
+  padding: 4px;
+  border-radius: var(--openbot-radius-pill);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow:
+    0 0 0 1px var(--site-nav-hairline),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.site-nav-list {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav-pill {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: var(--site-nav-pill-width, 0);
+  height: calc(100% - 8px);
+  border-radius: var(--openbot-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--site-nav-pill-x, 0));
+  transition:
+    transform var(--site-nav-quick) var(--site-nav-ease),
+    width var(--site-nav-quick) var(--site-nav-ease),
+    opacity var(--openbot-duration-normal) ease;
+}
+
+.site-nav-pill[data-shown] {
+  opacity: 1;
+}
+
+.site-nav-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 11px 0 14px;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.site-nav-trigger[aria-expanded="true"] {
+  color: var(--openbot-text-primary);
+}
+
+.site-nav-trigger:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--openbot-accent-strong);
+}
+
+.site-nav-chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
+  transition:
+    transform var(--site-nav-duration) var(--site-nav-ease),
+    opacity var(--openbot-duration-normal) ease;
+}
+
+.site-nav-trigger[aria-expanded="true"] .site-nav-chevron {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+.site-nav-surface {
+  position: absolute;
+  top: calc(100% + var(--site-nav-offset));
+  left: 0;
+  width: var(--site-nav-surface-width, 0);
+  height: var(--site-nav-surface-height, 0);
+  border-radius: var(--site-nav-radius);
+  background: rgba(22, 22, 22, 0.8);
+  box-shadow:
+    0 0 0 1px var(--site-nav-hairline),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 16px -8px rgba(0, 0, 0, 0.5),
+    0 28px 56px -16px rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(40px) saturate(180%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--site-nav-surface-x, 0)) translateY(-6px) scale(0.96);
+  transform-origin: var(--site-nav-surface-origin, 50%) top;
+  transition:
+    opacity 200ms ease,
+    transform 240ms var(--site-nav-ease),
+    width var(--site-nav-duration) var(--site-nav-ease),
+    height var(--site-nav-duration) var(--site-nav-ease);
+}
+
+.site-nav[data-state="open"] .site-nav-surface {
+  opacity: 1;
+  transform: translateX(var(--site-nav-surface-x, 0)) translateY(0) scale(1);
+  transition:
+    opacity 240ms ease,
+    transform var(--site-nav-duration) var(--site-nav-ease),
+    width var(--site-nav-duration) var(--site-nav-ease),
+    height var(--site-nav-duration) var(--site-nav-ease);
+}
+
+.site-nav-pill[data-instant],
+.site-nav-surface[data-instant] {
+  transition: none;
+}
+
+/* Every panel is laid out all the time, so the menu can measure one before it
+   opens it; a closed one is only invisible and inert. */
+.site-nav-panel {
+  --site-nav-shift: 0px;
+  --site-nav-rise: 0px;
+  position: absolute;
+  top: calc(100% + var(--site-nav-offset));
+  left: 0;
+  z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.site-nav-panel[data-state="open"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* A bridge over the gap under the trigger, so a pointer moving down to the panel
+   never leaves the menu on the way. */
+.site-nav-panel[data-state="open"]::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: calc(var(--site-nav-offset) + 6px);
+}
+
+/* Contents come in and go out through a blur, so a change of section reads as one
+   picture dissolving into the next rather than two sliding past each other. */
+.site-nav-panel[data-motion] {
+  will-change: opacity, transform, filter;
+}
+
+.site-nav-panel[data-motion="from-start"],
+.site-nav-panel[data-motion="to-start"] {
+  --site-nav-shift: -40px;
+}
+
+.site-nav-panel[data-motion="from-end"],
+.site-nav-panel[data-motion="to-end"] {
+  --site-nav-shift: 40px;
+}
+
+.site-nav-panel[data-motion="enter"] {
+  --site-nav-rise: -6px;
+  animation: site-nav-panel-enter 420ms var(--site-nav-ease) 30ms both;
+}
+
+.site-nav-panel[data-motion="exit"] {
+  --site-nav-rise: -4px;
+  animation: site-nav-panel-leave 200ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.site-nav-panel[data-motion="from-start"],
+.site-nav-panel[data-motion="from-end"] {
+  animation: site-nav-panel-enter var(--site-nav-duration) var(--site-nav-ease) both;
+}
+
+.site-nav-panel[data-motion="to-start"],
+.site-nav-panel[data-motion="to-end"] {
+  animation: site-nav-panel-leave var(--site-nav-quick) var(--site-nav-ease) both;
+}
+
+@keyframes site-nav-panel-enter {
+  from {
+    opacity: 0;
+    filter: blur(var(--site-nav-blur));
+    transform: translate(var(--site-nav-shift), var(--site-nav-rise));
+  }
+}
+
+@keyframes site-nav-panel-leave {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  to {
+    opacity: 0;
+    visibility: hidden;
+    filter: blur(var(--site-nav-blur));
+    transform: translate(var(--site-nav-shift), var(--site-nav-rise));
+  }
+}
+
+/* Panel contents: the same markup in the desktop panel and the mobile sheet. */
+
+.site-panel {
+  width: 580px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.site-panel[data-kind="plugins"] {
+  width: 540px;
+}
+
+.site-panel a:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--openbot-accent-strong);
+}
+
+.site-panel-body {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.site-panel-feature {
+  position: relative;
+  min-height: 204px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  padding: 14px;
+  border-radius: 12px;
+  isolation: isolate;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.site-panel-feature-art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--site-panel-art);
+  transition: transform 700ms var(--site-nav-ease, var(--openbot-ease-out));
+  /* Firefox on a GPU drew the live shader canvas with square corners here, past the
+     host's own clip and the card's, and even past a clip-path. Only while the zoom
+     below made the host a layer of its own were the corners round, so it is one
+     at all times. */
+  will-change: transform;
+}
+
+.site-panel-feature::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0) 70%);
+}
+
+.site-panel-feature-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 8px;
+  border-radius: var(--openbot-radius-pill);
+  /* Solid, not frosted. Chromium does not paint a backdrop filter while an
+     ancestor fades or blurs on the compositor, so a frosted badge appeared only
+     after the panel had finished coming in. */
+  background: rgba(0, 0, 0, 0.44);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  color: var(--openbot-text-primary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.site-panel-feature-copy,
+.site-panel-row-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.site-panel-feature-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.site-panel-meta {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-panel-feature .site-panel-meta {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.site-panel-list,
+.site-panel-plugins {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.site-panel-plugins {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.site-panel-row,
+.site-panel-plugin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+.site-panel-row-art,
+.site-panel-plugin-mark {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: var(--site-panel-art);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: transform var(--site-nav-duration, 340ms) var(--site-nav-ease, var(--openbot-ease-out));
+}
+
+.site-panel-plugin-mark {
+  display: grid;
+  place-items: center;
+  color: var(--openbot-text-primary);
+}
+
+.site-panel-plugin-logo {
+  width: 20px;
+  height: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+.site-panel-plugin-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.site-panel-row-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.site-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px -8px -8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--site-nav-hairline, rgba(255, 255, 255, 0.07));
+  border-radius: 0 0 var(--site-nav-radius, 18px) var(--site-nav-radius, 18px);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.site-panel-summary {
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  font-size: 12px;
+}
+
+.site-panel-index {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin: -6px -10px;
+  padding: 6px 10px;
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background-color var(--openbot-duration-normal) ease;
+}
+
+.site-panel-index svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+.site-header-actions {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-menu-button,
+.site-sheet {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .site-nav-trigger:hover {
+    color: var(--openbot-text-primary);
+  }
+
+  .site-panel-row:hover,
+  .site-panel-plugin:hover,
+  .site-panel-index:hover {
+    background: var(--site-nav-hover, rgba(255, 255, 255, 0.05));
+  }
+
+  .site-panel-feature:hover .site-panel-feature-art {
+    transform: scale(1.06);
+  }
+
+  .site-panel-row:hover .site-panel-row-art,
+  .site-panel-plugin:hover .site-panel-plugin-mark {
+    transform: scale(1.06);
+  }
+
+  .site-panel-index:hover svg {
+    transform: translateX(3px);
+  }
+}
+
+/* The header on a narrow screen: the brand, the download button and a menu
+   button that opens the sheet. 900px is MOBILE_HEADER_QUERY in SiteMobileMenu. */
+@media (max-width: 900px) {
+  .landing-header {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .site-nav,
+  .site-header-actions > .site-header-secondary {
+    display: none;
+  }
+
+  .site-menu-button {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--openbot-radius-pill);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    color: var(--openbot-text-primary);
+    cursor: pointer;
+  }
+
+  .site-menu-button:focus-visible {
+    outline: 0;
+    box-shadow: 0 0 0 3px var(--openbot-accent-strong);
+  }
+
+  .site-menu-button-line {
+    position: absolute;
+    width: 15px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: currentColor;
+    transform: translateY(-3.5px);
+    transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .site-menu-button-line + .site-menu-button-line {
+    transform: translateY(3.5px);
+  }
+
+  .site-menu-button[aria-expanded="true"] .site-menu-button-line {
+    transform: rotate(45deg);
+  }
+
+  .site-menu-button[aria-expanded="true"] .site-menu-button-line + .site-menu-button-line {
+    transform: rotate(-45deg);
+  }
+
+  /* Fixed to the window, and under the header row inside the header's own
+     stacking context, so the brand and the close button stay on top of it. */
+  .site-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 84px 16px 32px;
+    background: rgba(20, 20, 20, 0.88);
+    opacity: 0;
+    visibility: hidden;
+    backdrop-filter: blur(32px) saturate(160%);
+    transition:
+      opacity 220ms ease,
+      visibility 0s linear 220ms;
+  }
+
+  .site-sheet[data-state="open"] {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 260ms ease;
+  }
+
+  .site-sheet-content {
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    margin: 0 auto;
+  }
+
+  .site-sheet-section,
+  .site-sheet-actions {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(-12px);
+    transition:
+      opacity 200ms ease,
+      filter 200ms ease,
+      transform 200ms ease;
+  }
+
+  .site-sheet[data-state="open"] .site-sheet-section,
+  .site-sheet[data-state="open"] .site-sheet-actions {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition:
+      opacity 380ms ease,
+      filter 460ms cubic-bezier(0.32, 0.72, 0, 1),
+      transform 560ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition-delay: calc(var(--site-sheet-index) * 50ms + 40ms);
+  }
+
+  .site-sheet-heading {
+    margin: 0 0 8px 6px;
+    color: var(--openbot-text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .site-sheet .site-panel {
+    width: auto;
+    padding: 6px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  }
+
+  .site-sheet .site-panel-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .site-sheet .site-panel-feature {
+    min-height: 132px;
+  }
+
+  .site-sheet .site-panel-footer {
+    margin: 6px -6px -6px;
+  }
+
+  .site-sheet-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Keep the scrollbar's space, so the header does not jump sideways when the page locks. */
+  html[data-site-sheet-open] {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (max-width: 480px) {
+  .site-sheet .site-panel-plugins {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .landing-actions {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-}
-
-/* A quiet text link among the buttons. It keeps their height and pill radius so
-   the row stays on one baseline and the focus ring matches theirs. */
-.landing-header-link {
-  display: inline-flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 12px;
-  border-radius: var(--openbot-radius-pill);
-  color: var(--openbot-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  transition: color 160ms ease;
-}
-
-.landing-header-link:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
 .landing-button {
@@ -1358,8 +1993,12 @@ a {
   animation: landing-enter var(--openbot-duration-overlay) var(--openbot-ease-out) both;
 }
 
+/* Backwards, not both: a transform left on the header after it has arrived
+   would make it the containing block of the mobile sheet, which is fixed to the
+   window. */
 [data-enter="header"] {
   animation-name: landing-header-enter;
+  animation-fill-mode: backwards;
 }
 
 [data-enter="preview"] {
@@ -1403,10 +2042,6 @@ a {
 @media (hover: hover) and (pointer: fine) {
   .landing-button {
     cursor: pointer;
-  }
-
-  .landing-header-link:hover {
-    color: var(--openbot-text-primary);
   }
 
   .landing-button-primary:hover {
@@ -1467,6 +2102,46 @@ a {
   }
 }
 
+/* After the button rules, which it resizes. The sheet shows only below the header breakpoint. */
+@media (max-width: 900px) {
+  .site-sheet-actions > .landing-button {
+    flex: 1 1 0;
+    height: 44px;
+  }
+}
+
+/* The header menu still fades, but nothing slides, grows, turns or staggers. */
+@media (prefers-reduced-motion: reduce) {
+  .site-nav-pill,
+  .site-nav-chevron,
+  .site-panel-feature-art,
+  .site-panel-plugin-mark,
+  .site-panel-index svg,
+  .site-menu-button-line {
+    transition: none;
+  }
+
+  .site-nav-surface,
+  .site-nav[data-state="open"] .site-nav-surface {
+    transform: translateX(var(--site-nav-surface-x, 0));
+    transition: opacity 160ms ease;
+  }
+
+  .site-nav-panel[data-motion] {
+    --site-nav-shift: 0px;
+    --site-nav-rise: 0px;
+  }
+
+  .site-sheet .site-sheet-section,
+  .site-sheet .site-sheet-actions,
+  .site-sheet[data-state="open"] .site-sheet-section,
+  .site-sheet[data-state="open"] .site-sheet-actions {
+    filter: none;
+    transform: none;
+    transition: opacity 200ms ease;
+  }
+}
+
 @media (max-width: 959px) {
   .landing-preview {
     aspect-ratio: auto;
@@ -1517,24 +2192,6 @@ a {
   .landing-brand-logo {
     width: 25px;
     height: 25px;
-  }
-
-  .landing-navigation {
-    flex-wrap: wrap;
-    gap: 7px;
-    row-gap: 7px;
-  }
-
-  .landing-navigation .landing-button-sm {
-    height: 36px;
-    padding-inline: 13px;
-    font-size: 12px;
-  }
-
-  .landing-header-link {
-    height: 36px;
-    padding-inline: 9px;
-    font-size: 12px;
   }
 
   .landing-hero {
@@ -1659,12 +2316,6 @@ a {
 
   .landing-glow {
     min-height: 300px;
-  }
-}
-
-@media (max-width: 420px) {
-  .landing-header-contact {
-    display: none;
   }
 }
 

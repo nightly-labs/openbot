@@ -1,15 +1,15 @@
 import { AppLogo, PlatformLogo, ProviderLogo } from "@openbot/brand";
-import { Link } from "@tanstack/solid-router";
 import { onSettled } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
-import { Button, ButtonLink } from "../ui/button";
+import { Button } from "../ui/button";
 import { DownloadSection } from "./DownloadSection";
 import { HeroDownloadSelector } from "./HeroDownloadSelector";
 import { LandingAppPreview } from "./LandingAppPreview";
 import { LandingFooter } from "./LandingFooter";
 import { LandingGlow } from "./LandingGlow";
 import { PricingSection } from "./PricingSection";
+import { SiteHeader } from "./SiteHeader";
 
 export function LandingPage() {
   let hero: HTMLDivElement | undefined;
@@ -27,41 +27,7 @@ export function LandingPage() {
 
   return (
     <div class="landing-page">
-      <header class="landing-header" data-enter="header">
-        <a class="landing-brand" href="/" aria-label="OpenBot home">
-          <AppLogo variant="production" class="landing-brand-logo" />
-          <span>OpenBot</span>
-        </a>
-
-        <nav class="landing-navigation" aria-label="Primary navigation">
-          <Link class="landing-header-link" to="/news">
-            News
-          </Link>
-          <Link class="landing-header-link" to="/guides">
-            Guides
-          </Link>
-          <Link class="landing-header-link" to="/plugins">
-            Plugins
-          </Link>
-          <Button
-            href={OPENBOT_LINKS.contact}
-            target="_blank"
-            rel={EXTERNAL_LINK_REL}
-            variant="secondary"
-            size="sm"
-            icon="contact"
-            class="landing-header-contact"
-          >
-            Contact
-          </Button>
-          <ButtonLink to="/app" variant="secondary" size="sm" icon="arrow-right">
-            App
-          </ButtonLink>
-          <Button href={OPENBOT_LINKS.download} variant="primary" size="sm" icon="download">
-            Download
-          </Button>
-        </nav>
-      </header>
+      <SiteHeader page="landing" />
 
       <main>
         <section class="landing-hero" aria-labelledby="landing-title">

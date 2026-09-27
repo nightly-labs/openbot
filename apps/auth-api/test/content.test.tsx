@@ -161,11 +161,13 @@ describe.each(CONTENT_COLLECTIONS.map((collection) => [collection.name, collecti
       const article = firstArticle(collection);
       renderPage(() => <ArticlePage collection={collection} article={article} />);
 
+      // Scoped to the page body: the header menu lists the latest articles on every page.
+      const body = within(screen.getByRole("main"));
       for (const other of collection.articles.filter((entry) => entry.slug !== article.slug)) {
-        const links = screen.getAllByRole("link", { name: (name) => name.includes(other.title) });
+        const links = body.getAllByRole("link", { name: (name) => name.includes(other.title) });
         expect(links.map((link) => link.getAttribute("href"))).toContain(articlePath(collection, other.slug));
       }
-      expect(screen.queryAllByRole("link", { name: (name) => name.includes(article.title) })).toHaveLength(0);
+      expect(body.queryAllByRole("link", { name: (name) => name.includes(article.title) })).toHaveLength(0);
     });
   },
 );
@@ -177,10 +179,23 @@ describe("landing header", () => {
     // Scoped to the header: the footer links to the same places, and the point of
     // this assertion is the entry points at the top of the page.
     const navigation = within(screen.getByRole("navigation", { name: "Primary navigation" }));
-    for (const collection of CONTENT_COLLECTIONS) {
-      expect(navigation.getByRole("link", { name: collection.name })).toHaveAttribute("href", collection.indexRoute);
+    const sections = [
+      ...CONTENT_COLLECTIONS.map((collection) => ({ name: collection.name, index: collection.indexRoute })),
+      { name: "Plugins", index: PLUGIN_INDEX_ROUTE },
+    ];
+    for (const section of sections) {
+      const trigger = navigation.getByRole("button", { name: section.name });
+      fireEvent.click(trigger);
+      flush();
+
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      const panel = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
+      if (!panel) throw new Error(`The ${section.name} trigger must control a panel.`);
+      const indexLinks = within(panel)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href"));
+      expect(indexLinks).toContain(section.index);
     }
-    expect(navigation.getByRole("link", { name: "Plugins" })).toHaveAttribute("href", PLUGIN_INDEX_ROUTE);
   });
 });
 

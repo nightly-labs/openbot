@@ -11,10 +11,10 @@ import {
 } from "../../lib/content-collection";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
+import { SiteHeader } from "../landing/SiteHeader";
 import { ArticleCard } from "./ArticleCard";
 import { ArticleGradient } from "./ArticleGradient";
 import { ContentCallToAction } from "./ContentCallToAction";
-import { ContentHeader } from "./ContentHeader";
 import { createArticleReadDepth } from "./createArticleReadDepth";
 
 export interface ArticlePageProps {
@@ -55,7 +55,7 @@ export function ArticlePage(props: ArticlePageProps) {
 
   return (
     <div class="landing-page post-article">
-      <ContentHeader />
+      <SiteHeader page="content" />
 
       <main class="post-main">
         <article ref={articleBody} class="post-container post-article-body">
