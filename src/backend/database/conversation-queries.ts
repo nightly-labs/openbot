@@ -111,6 +111,7 @@ export class ConversationQueries {
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'commentary'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'question_prompt'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'agent_attachment'
+                     AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'plan'
                    ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
                    LIMIT 1) AS latest_message_json
            FROM projection_threads thread

@@ -1,6 +1,7 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
+import { agentAwaitingReplies } from "../../../awaiting-replies";
 import { activeQueueDeliveries, presentQueueDeliveries, queuedDeliveriesInOrder } from "../../../queue-reconciliation";
 import type { ConversationProps } from "../conversation-types";
 
@@ -16,6 +17,16 @@ export function createQueueStore(deps: QueueStoreDeps) {
       snapshot: deps.props.queue,
       activeTurnId: deps.props.activeTurnId,
       renderedMessageIds: new Set(deps.props.messages.map((message) => message.id)),
+    }),
+  );
+  // The agents this agent asked, and the answers that wait for it. A queue of another agent, which
+  // the view holds for a moment while it switches, answers nothing here.
+  const awaitingReplies = createMemo(() =>
+    agentAwaitingReplies({
+      messages: deps.props.messages,
+      queue: deps.props.queue?.agentId === deps.props.agent?.id ? deps.props.queue : undefined,
+      agents: deps.props.agents,
+      self: deps.props.agent,
     }),
   );
   const [renderedQueueDeliveries, setRenderedQueueDeliveries] = createSignal<QueueDelivery[]>([]);
@@ -45,6 +56,7 @@ export function createQueueStore(deps: QueueStoreDeps) {
 
   return {
     activeDeliveries,
+    awaitingReplies,
     orderedQueuedDeliveries,
     presentedQueueDeliveries,
     renderedQueueDeliveries,

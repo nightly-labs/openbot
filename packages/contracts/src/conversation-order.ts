@@ -7,7 +7,7 @@ import type { ConversationMessage } from "./ipc-conversation-messages";
 
 /**
  * Sorts `messages` in place and returns the same array. Turns go by their earliest message, and
- * inside one turn the user's message comes first, then commentary, then the answer. A message with
+ * inside one turn the user's message comes first, then commentary and the plan, then the answer. A message with
  * no valid `createdAt` goes last.
  */
 export function sortConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
@@ -54,7 +54,7 @@ function messageTime(message: ConversationMessage): number {
 
 function turnMessageRank(message: ConversationMessage): 0 | 1 | 2 | 3 {
   if (message.exchange?.direction === "incoming" || message.author === "user") return 0;
-  if (message.author === "assistant" && message.itemType === "commentary") return 1;
+  if (message.author === "assistant" && (message.itemType === "commentary" || message.itemType === "plan")) return 1;
   if (message.exchange?.direction === "outgoing") return 2;
   if (message.author === "assistant") return 3;
   return 2;

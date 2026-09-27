@@ -18,6 +18,7 @@ import type { AgentMessage } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -34,6 +35,7 @@ import {
   type NewMessageTally,
   tallyNewMessages,
 } from "@openbot/ui/features/conversation/new-message-tally";
+import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import {
   scrollToUnreadBoundary,
   UnreadMessagesBanner,
@@ -53,7 +55,9 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { planItems, planTitle } from "../../app-message-projection";
 import { appPort } from "../../app-port";
+import { channelAwaitingReplies } from "../../awaiting-replies";
 import { writeClipboardText } from "../../clipboard";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { useNavigation } from "../../navigation";
@@ -438,6 +442,12 @@ export function ChannelConversation() {
     }
     return [...roots.values()];
   });
+  // The sub-tasks that an owner waits for, above the composer, as the agent chat shows its questions.
+  const awaitingSubtasks = createMemo(() => {
+    const page = channels.state.page;
+    if (!page || page.channel.archived) return [];
+    return channelAwaitingReplies({ tasks: page.tasks, agents: agentList(), name });
+  });
   const resumeTask = (taskId: string, recipientAgentId: string | null) =>
     channels.command({
       type: recipientAgentId ? "reassign" : "resume",
@@ -621,6 +631,18 @@ export function ChannelConversation() {
                               }}
                             />
                           </article>
+                        ) : initialEntry.message.plan ? (
+                          <article class={{ "message-entry-animated": animate }}>
+                            <Show when={entry()?.message.plan ?? initialEntry.message.plan}>
+                              {(plan) => (
+                                <TaskList
+                                  items={planItems(plan(), entry()?.message.streaming === true)}
+                                  title={planTitle(plan())}
+                                  defaultOpen={initialEntry.message.streaming === true}
+                                />
+                              )}
+                            </Show>
+                          </article>
                         ) : (
                           <ChatMessageRow
                             message={entry()?.message ?? initialEntry.message}
@@ -797,6 +819,7 @@ export function ChannelConversation() {
             </Show>
             <Show when={!page().channel.archived}>
               <div class="composer-wrap">
+                <AwaitingReplies items={awaitingSubtasks()} title={t("chat.awaiting.subtasks")} />
                 <ChannelStoppedTasks
                   tasks={pausedTasks()}
                   members={page().channel.members}

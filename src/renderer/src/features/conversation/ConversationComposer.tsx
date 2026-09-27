@@ -19,6 +19,7 @@ import {
 } from "@openbot/ui";
 import { fileBadge } from "@openbot/ui/features/conversation/AttachmentCards";
 import { attachmentReferenceTone } from "@openbot/ui/features/conversation/AttachmentReference";
+import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerErrorBanner } from "@openbot/ui/features/conversation/ComposerErrorBanner";
 import { ComposerSignInNotice, ComposerUsageLimitNotice } from "@openbot/ui/features/conversation/ComposerNotice";
@@ -35,6 +36,7 @@ export function ConversationComposer() {
     agentReady,
     attachmentAction,
     attachmentBusy,
+    awaitingReplies,
     composerFocusRequest,
     composerHasContent,
     currentChatConversationKey,
@@ -83,6 +85,8 @@ export function ConversationComposer() {
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
   // The mention picker grows out of the same edge as the queue, so only one of them holds it.
   const queueVisible = () => queuePanelVisible() && !pickerOpen();
+  const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
+  const slotOpen = () => queueVisible() || awaitingVisible();
   const voiceAvailable = () => !props.runtime && voiceSupported(props.platform);
   /**
    * The provider status is the only source of truth for a signed-out provider, so the notice and the
@@ -146,11 +150,14 @@ export function ConversationComposer() {
       <div class="composer-wrap">
         <div
           class="agent-queue-slot"
-          data-open={queueVisible() ? "true" : "false"}
-          aria-hidden={queueVisible() ? undefined : "true"}
-          inert={queueVisible() ? undefined : true}
+          data-open={slotOpen() ? "true" : "false"}
+          aria-hidden={slotOpen() ? undefined : "true"}
+          inert={slotOpen() ? undefined : true}
         >
           <div class="agent-queue-slot-inner">
+            <Show when={awaitingVisible()}>
+              <AwaitingReplies items={awaitingReplies()} />
+            </Show>
             <Show when={queueVisible()}>
               <Loading>
                 <QueuePanel

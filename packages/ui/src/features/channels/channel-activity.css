@@ -31,6 +31,13 @@
   color: var(--openbot-accent-text);
 }
 
+/* Under the waiting block, the panel covers that block's lower edge, as the queue does, instead of
+   the transcript's padding. */
+.awaiting-replies + .channel-paused-tasks {
+  z-index: 10;
+  margin-top: 0;
+}
+
 .channel-paused-task {
   display: flex;
   flex-wrap: wrap;

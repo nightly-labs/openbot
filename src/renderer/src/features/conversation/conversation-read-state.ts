@@ -49,6 +49,7 @@ function isIncoming(message: { itemType?: string }, fromUser: boolean): boolean 
     !fromUser &&
     message.itemType !== "commentary" &&
     message.itemType !== "agent_attachment" &&
+    message.itemType !== "plan" &&
     !isRoutineEventItem(message)
   );
 }

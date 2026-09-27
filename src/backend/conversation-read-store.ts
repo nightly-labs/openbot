@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { AgentSummary, ConversationReadState, ConversationSnapshot } from "@openbot/contracts/ipc";
 import {
+  type AgentSummary,
+  CONVERSATION_PLAN_ITEM_TYPE,
+  type ConversationReadState,
+  type ConversationSnapshot,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
@@ -193,6 +196,7 @@ export class ConversationReadStore {
     const parameters = boundaryKey ? [threadId, ...boundaryKey, throughMessageId] : [threadId];
     const unreadFilter = `author != 'user'
       AND COALESCE(item_type, '') != 'commentary'
+      AND COALESCE(item_type, '') != 'plan'
       AND COALESCE(item_type, '') != 'agent_attachment'
       AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
@@ -297,6 +301,7 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
       (message) =>
         message.author !== "user" &&
         message.itemType !== "commentary" &&
+        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
         message.itemType !== "agent_attachment" &&
         !message.itemType?.startsWith(SKILL_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&

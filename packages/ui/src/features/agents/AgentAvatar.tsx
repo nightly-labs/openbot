@@ -55,8 +55,8 @@ function slowerBlock(state: ShapeSafeStateId): Block {
 }
 
 interface AgentAvatarProps {
-  agent?: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl">;
-  seed?: string;
+  agent?: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl"> | undefined;
+  seed?: string | undefined;
   hue?: AvatarHue | null;
   url?: string | null;
   motion?: AvatarMotion;
