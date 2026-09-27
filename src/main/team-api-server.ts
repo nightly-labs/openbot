@@ -61,6 +61,7 @@ import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-pr
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
+import { duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { McpServerError } from "../backend/mcp-server-store";
 import type { TeamChatStore } from "../backend/team-chat-store";
 import { LifecycleGate } from "./lifecycle-gate";
@@ -1050,32 +1051,16 @@ export class TeamApiServer {
       }
       return pending.result;
     }
-    const result = this.#performAgentDuplication(sourceAgentId, operationId).finally(() => {
+    const result = duplicateAgentIntoLayout(
+      this.#options.agents,
+      this.#options.sidebarLayout,
+      sourceAgentId,
+      operationId,
+    ).finally(() => {
       this.#duplicateRequests.delete(operationId);
     });
     this.#duplicateRequests.set(operationId, { sourceAgentId, result });
     return result;
-  }
-
-  async #performAgentDuplication(sourceAgentId: string, operationId: string): Promise<DuplicateAgentResult> {
-    const agent = await this.#options.agents.duplicateAgent(sourceAgentId, operationId);
-    try {
-      const layout = await this.#options.sidebarLayout.placeDuplicateAfter(sourceAgentId, agent.id, [
-        ...this.#options.agents.sidebarChatIds(),
-        agent.id,
-      ]);
-      return await this.#options.agents.commitAgentDuplication(agent.id, layout);
-    } catch (error) {
-      const rollbackResults = await Promise.allSettled([
-        this.#options.agents.deleteAgent(agent.id),
-        this.#options.sidebarLayout.removeAgent(agent.id),
-      ]);
-      const rollbackErrors = rollbackResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
-      if (rollbackErrors.length > 0) {
-        throw new AggregateError([error, ...rollbackErrors], sourceText("error.agent.duplicateCleanupFailed"));
-      }
-      throw error;
-    }
   }
 
   #requireDirectRecipient(senderMemberId: string, recipientMemberId: string): TeamMemberSummary {
