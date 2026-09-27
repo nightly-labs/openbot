@@ -27,5 +27,5 @@ export const PresetChecking: Story = {
 
 /** Ollama answers at its default address; LM Studio does not. */
 export const PresetProbed: Story = {
-  args: { probes: { ollama: { status: "running", models: 4 }, lmstudio: { status: "missing" } } },
+  args: { probes: { ollama: { status: "running", models: 4 } } },
 };

@@ -268,6 +268,8 @@ export class ProviderRuntime implements ProviderPort {
    * account and models, so every view reads it as connected; `ensureProvider` starts it again.
    */
   readonly #released = new Set<AgentProvider>();
+  /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
+  #customAgentsReloadPending = false;
   readonly #lastUsed = new Map<AgentProvider, number>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
@@ -409,6 +411,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   async #releaseIdleProviders(): Promise<void> {
     if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    if (this.#customAgentsReloadPending && !this.#hooks.isProviderBusy("acp")) void this.reloadCustomAgents();
     const now = Date.now();
     for (const [provider, client] of this.#clients) {
       if (
@@ -738,9 +741,17 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Replaces the router of the custom agents, so a saved, changed or removed agent reaches it. The
    * same rules as `reloadOpenCodeConfig` apply: a turn in progress wins, and it never throws. The
-   * first saved agent starts the provider; with the last one removed, the provider stops.
+   * first saved agent starts the provider; with the last one removed, the provider stops. A change
+   * that a turn delays is applied by the idle check after the turn stops, as the saved message says.
    */
   async reloadCustomAgents(): Promise<CustomProviderRestart> {
+    this.#customAgentsReloadPending = false;
+    const result = await this.#reloadCustomAgents();
+    if (result === "skipped-busy") this.#customAgentsReloadPending = true;
+    return result;
+  }
+
+  async #reloadCustomAgents(): Promise<CustomProviderRestart> {
     if (!this.#clients.has("acp")) {
       if (this.#released.has("acp") || savedCustomAgents(this.#credentials).length === 0) return "not-running";
       await this.refreshProvider("acp");

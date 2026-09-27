@@ -251,12 +251,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     setOpen(next);
   }
 
-  function selectModel(model: AgentModelId, rail: RailId): void {
-    if (props.disabled || props.modelChangesDisabled) return;
-    const option = pickerModels(railModelOptions(rail)).find((candidate) => candidate.id === model);
-    if (!option || !modelAvailable(option)) return;
+  function selectModel(option: PickerModel): void {
+    if (props.disabled || props.modelChangesDisabled || !modelAvailable(option)) return;
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
-    props.onChange(model, option.provider);
+    props.onChange(option.id, option.provider);
   }
 
   function selectRailProvider(provider: RailId): void {
@@ -424,11 +422,18 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const status = () => railStatus(provider);
                 const models = createMemo(() => pickerModels(railModelOptions(provider)));
                 const groups = createMemo(() => groupPickerModels(models(), search()));
+                // An endpoint and a custom agent can both list `goose/default`: match the provider too.
                 const selected = createMemo(() =>
                   models().find(
-                    (model) => model.id === props.value || model.variants.some((variant) => variant.id === props.value),
+                    (model) =>
+                      model.provider === props.provider &&
+                      (model.id === props.value || model.variants.some((variant) => variant.id === props.value)),
                   ),
                 );
+                const selectedKey = () => {
+                  const model = selected();
+                  return model ? pickerModelKey(model) : props.value;
+                };
                 // OpenCode and Custom share the `opencode` wire id; the tab whose list holds it owns it.
                 const ownsSelection = () =>
                   provider === CUSTOM_RAIL
@@ -582,16 +587,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               <Listbox.Section class="provider-model-group">{section.rawValue.name}</Listbox.Section>
                             </Show>
                           )}
-                          optionValue="id"
+                          optionValue={pickerModelKey}
                           optionTextValue={(model) => displayModelName(model.name, model.id)}
                           optionDisabled={(model) => !modelAvailable(model) || props.modelChangesDisabled === true}
-                          value={[selected()?.id ?? props.value]}
+                          value={[selectedKey()]}
                           selectionMode="single"
                           disallowEmptySelection
                           shouldFocusWrap
                           renderItem={(item) => {
                             const model = item.rawValue;
-                            const isSelected = () => selected()?.id === model.id;
+                            const isSelected = () => selectedKey() === pickerModelKey(model);
                             return (
                               <Listbox.Item
                                 as="button"
@@ -607,8 +612,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 }
                                 disabled={!modelAvailable(model) || props.modelChangesDisabled}
                                 onClick={() => {
-                                  if (!isSelected() || props.provider !== model.provider)
-                                    selectModel(model.id, provider);
+                                  if (!isSelected()) selectModel(model);
                                 }}
                               >
                                 <span class="provider-model-option-name">
@@ -717,6 +721,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
  * A custom endpoint is an OpenCode endpoint on the wire, whatever tab it is drawn on. Only for what
  * does not depend on the model: a Custom tab choice takes the provider of the model chosen.
  */
+/** The list key: a model id alone can repeat across the endpoints and agents of the Custom tab. */
+function pickerModelKey(model: PickerModel): string {
+  return `${model.provider}:${model.id}`;
+}
+
 function wireProvider(rail: RailId): AgentProviderId {
   return rail === CUSTOM_RAIL ? "opencode" : rail;
 }
