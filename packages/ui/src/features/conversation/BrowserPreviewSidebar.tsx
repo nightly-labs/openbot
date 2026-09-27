@@ -169,6 +169,11 @@ export function BrowserPreviewCard(props: {
     const id = props.tab.id;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // A page that is still loading often cannot be captured yet. Keep the skeleton until the load
+    // ends; the end of the load starts a new capture.
+    const failed = () => {
+      if (!disposed && !(props.tab.loading && !state.preview)) setState(() => ({ preview: null, failed: true }));
+    };
     const refresh = () => {
       if (disposed) return;
       if (pending) {
@@ -180,15 +185,13 @@ export function BrowserPreviewCard(props: {
           .then((preview) => {
             if (!disposed) setState(() => ({ preview, failed: false }));
           })
-          .catch(() => {
-            if (!disposed) setState(() => ({ preview: null, failed: true }));
-          })
+          .catch(failed)
           .finally(() => {
             pending = undefined;
             if (!disposed) timer = setTimeout(refresh, 3000);
           });
       } catch {
-        if (!disposed) setState(() => ({ preview: null, failed: true }));
+        failed();
         if (!disposed) timer = setTimeout(refresh, 3000);
       }
     };

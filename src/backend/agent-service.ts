@@ -703,6 +703,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         listAgents: () => this.listAgents(),
+        redactMcp: (text) => this.#mcp.redact(text),
       },
     });
     this.#removal = new AgentRemoval({

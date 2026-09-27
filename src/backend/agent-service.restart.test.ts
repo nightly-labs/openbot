@@ -232,6 +232,51 @@ describe.sequential("AgentService: restart", () => {
     expect((await service.readConversation("chief")).messages).toEqual([expect.objectContaining(local)]);
   });
 
+  it("keeps the provider's reason on a failed delivery after a restart", async () => {
+    const reason = "The selected model is not available on this endpoint.";
+    const { store, mailbox } = stores(root);
+    let client: FakeAgentClient | undefined;
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        client = new FakeAgentClient(provider, "", false);
+        return client;
+      },
+    });
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Say hi" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    const started = events.find((event) => event.type === "turn-started");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (started?.type !== "turn-started" || !client || !threadId) throw new Error("The fake Codex turn did not start.");
+    client.emit("notification", notification("error", { threadId, turnId: started.turnId, message: reason }));
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId, turn: { id: started.turnId, status: "failed" } }),
+    );
+    await waitForQueue(service, "chief", (queue) => queue.deliveries.some((delivery) => delivery.status === "failed"));
+    await service.stop();
+    service = null;
+    store.database.close();
+
+    // The banner that showed the reason lives in the window. After a restart the delivery is all that is left.
+    const restored = stores(root);
+    service = createTestService({
+      store: restored.store,
+      mailbox: restored.mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
+    await service.initialize();
+    expect(service.listQueue("chief").deliveries).toEqual([
+      expect.objectContaining({ status: "failed", turnId: started.turnId, error: reason }),
+    ]);
+  });
+
   it("recovers history from sessions retired by an upgrade and retries failed reads without losing local messages", async () => {
     const { store } = stores(root);
     await store.initialize();
