@@ -12,15 +12,14 @@ const OPENCLAW_DOCS = "https://docs.openclaw.ai";
 export const OPENCLAW_COMPARISON: Comparison = {
   rival: { name: "OpenClaw", mark: "openclaw" },
   answer:
-    "OpenBot and OpenClaw are close: both run AI agents on your own computer, use the AI plans you already pay for, and have apps for desktop, iPhone and Android. Choose OpenBot if you want Codex, Claude Code, Gemini and Grok CLI to work as a team, and to reach them from your phone anywhere with no VPN. Choose OpenClaw if you want one personal assistant that talks to you in WhatsApp, Telegram or Slack, under the MIT license.",
+    "OpenBot and OpenClaw are close: both run AI agents on your own computer, use the AI plans you already pay for, and have apps for desktop, iPhone and Android. Choose OpenBot if you want Codex, Claude Code, Gemini and Grok CLI to work as a team of separate agents, and to reach them from your phone anywhere with no VPN. Choose OpenClaw if you want one personal assistant that talks to you in WhatsApp, Telegram or Slack, under the MIT license.",
   chooseOpenBot: [
-    "You want Codex, Claude Code, Gemini and Grok CLI as agents in one team, each with its own job.",
-    "You want your phone to reach your agents from anywhere, with no VPN, tailnet or SSH tunnel.",
+    "You want Codex, Claude Code, Gemini and Grok CLI as separate agents in one team, each with its own job.",
+    "You want your phone to reach your agents from anywhere, with no VPN, tunnel or public address to set up.",
     "You pay for Google AI Pro or Ultra and want your agents to use that plan.",
-    "You want one desktop app that sets up everything, with no separate gateway to run.",
   ],
   rivalPlans:
-    "OpenClaw signs in with ChatGPT or Codex, a Claude Code login, SuperGrok or X Premium, and GitHub Copilot, or uses API keys and local models. Gemini needs an API key: OpenClaw does not offer a new Google sign-in.",
+    "OpenClaw signs in with ChatGPT or Codex, a Claude Code login, SuperGrok or X Premium, and GitHub Copilot, or uses API keys and local models. Gemini needs an API key or Vertex AI: OpenClaw does not offer a new Google sign-in.",
   chooseRival: [
     "You want to talk to your assistant in WhatsApp, Telegram, Slack, Signal, iMessage or Discord.",
     "You need the MIT license, for example for commercial use.",
@@ -33,7 +32,7 @@ export const OPENCLAW_COMPARISON: Comparison = {
       openbot:
         "Use the plans you already have: ChatGPT, Claude, Gemini or Grok. Or run free models and your own model through OpenCode. Choose one for each agent, and change it later.",
       rival:
-        "Sign in with ChatGPT, a Claude Code login, SuperGrok or X Premium, or GitHub Copilot. Or use API keys and local models. Gemini needs an API key; a consumer Gemini plan does not work.",
+        "Sign in with ChatGPT, a Claude Code login, SuperGrok or X Premium, or GitHub Copilot. Or use API keys and local models. Gemini needs an API key or Vertex AI; a consumer Gemini plan does not work.",
     },
     {
       icon: "laptop",
@@ -55,7 +54,7 @@ export const OPENCLAW_COMPARISON: Comparison = {
       openbot:
         "Apps for iPhone and Android connect from anywhere. Chats and files go over an encrypted connection between your devices, with no VPN, and no cloud stores them.",
       rival:
-        "Apps for iPhone and Android connect to the Gateway over your local network, a tailnet such as Tailscale, or an SSH tunnel. Messaging apps such as WhatsApp and Telegram also work, and carry your messages.",
+        "Apps for iPhone and Android connect to the Gateway over your local network, a tailnet such as Tailscale, an SSH tunnel, or a public HTTPS address that you set up. Messaging apps such as WhatsApp and Telegram also work, and carry your messages.",
       better: "openbot",
     },
     {
@@ -64,15 +63,16 @@ export const OPENCLAW_COMPARISON: Comparison = {
       openbot:
         "Each agent is a full coding agent with its own job. They give work to each other in shared channels, and coworkers can join one team host.",
       rival:
-        "Several isolated agents in one Gateway, each with its own workspace, and subagents for parallel work. A team can share one Gateway, with shared sessions and roles.",
+        "Several isolated agents in one Gateway, each with its own workspace, and subagents for parallel work. Agents can run through Codex, Claude Code or Gemini CLI. A team can share one Gateway, with shared sessions and roles.",
     },
     {
       icon: "lock",
       topic: "Your data",
       openbot:
-        "Workspaces, chats and files stay in a database on your computer. The provider you choose gets the requests you send. Product analytics, with no chat content, are on by default; you can turn them off.",
+        "Workspaces, chats and files stay in a database on your computer. The provider you choose gets the requests you send. Product analytics, with no chat content, are on by default and linked to your account when you sign in; you can turn them off.",
       rival:
         "Sessions, memory and settings stay in ~/.openclaw on the computer that runs the Gateway. A daily update check is on by default; anonymous feature statistics are opt-in.",
+      better: "rival",
     },
     {
       icon: "tag",
@@ -97,14 +97,14 @@ export const OPENCLAW_COMPARISON: Comparison = {
     },
   ],
   intro:
-    "OpenClaw was first called Clawdbot, then Moltbot, and took its current name in January 2026. Like OpenBot, it runs AI agents on a computer that you choose, keeps your data there, works with the AI plans you pay for, and has apps for desktop and phone. The difference is what an agent is and how you reach it. In OpenBot, each agent is a coding tool from the provider whose plan you pay for, the agents work as a team, and your phone connects from anywhere. OpenClaw is a personal assistant that runs in a Gateway and talks to you through messaging apps.",
+    "OpenClaw started as Warelay, a WhatsApp gateway, then was called Clawdbot and Moltbot, and took its current name in January 2026. Like OpenBot, it runs AI agents on a computer that you choose, keeps your data there, works with the AI plans you pay for, and has apps for desktop and phone. The difference is how the agents are organised and how you reach them. In OpenBot, each provider's coding tool is its own agent in a team, and your phone connects from anywhere. OpenClaw is a personal assistant that runs in a Gateway: it can run its turns through Codex, Claude Code or Gemini CLI, and it talks to you through messaging apps.",
   sections: [
     {
       title: "Models and the plans you pay for",
       openbot:
         "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, and Grok CLI with your Grok account or an xAI API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. You choose the provider, the model and the reasoning effort for each agent. When you move an agent to a different provider, it keeps its role, workspace and conversation.",
       rival:
-        "OpenClaw signs in with a ChatGPT account or a Codex login, reuses a Claude Code login on the same computer, and recommends Grok sign-in with a SuperGrok or X Premium subscription. It also works with GitHub Copilot, API keys from many providers, and local models through Ollama, LM Studio, vLLM or llama.cpp. Gemini needs a Google API key: OpenClaw does not offer a new Gemini CLI or Antigravity sign-in, because Google ended that sign-in for consumer Gemini CLI and the Antigravity terms prohibit third-party tools.",
+        "OpenClaw signs in with a ChatGPT account or a Codex login, reuses a Claude Code login on the same computer, and recommends Grok sign-in with a SuperGrok or X Premium subscription. It also works with GitHub Copilot, API keys from many providers, and local models through Ollama, LM Studio, vLLM or llama.cpp. Gemini needs a Google API key or Vertex AI: OpenClaw does not offer a new Gemini CLI or Antigravity sign-in, because Google ended that sign-in for consumer Gemini CLI and the Antigravity terms prohibit third-party tools.",
     },
     {
       title: "Where the work happens",
@@ -118,7 +118,7 @@ export const OPENCLAW_COMPARISON: Comparison = {
       openbot:
         "The OpenBot apps for iPhone and Android connect to the computer that runs your agents. From anywhere, you chat with them, follow their progress and send files. The connection goes directly between your devices when it can, it is encrypted, and no cloud stores your chats or files. You set up no VPN or tunnel. Remote access needs an OpenBot account.",
       rival:
-        "The OpenClaw apps for iPhone and Android connect to the Gateway over your local network or a tailnet. The Gateway listens only on the computer itself by default; to reach it from outside, OpenClaw recommends Tailscale, or an SSH tunnel. You can also talk to OpenClaw in WhatsApp, Telegram, Slack, Discord, Signal, iMessage and many more; your messages then go through the messaging service that you choose.",
+        "The OpenClaw apps for iPhone and Android connect to the Gateway over your local network or a tailnet. The Gateway listens only on the computer itself by default; to reach it from outside, OpenClaw recommends Tailscale, an SSH tunnel, or a public HTTPS address that you set up. You can also talk to OpenClaw in WhatsApp, Telegram, Slack, Discord, Signal, iMessage and many more; your messages then go through the messaging service that you choose.",
       better: "openbot",
     },
     {
@@ -126,14 +126,14 @@ export const OPENCLAW_COMPARISON: Comparison = {
       openbot:
         "In OpenBot, each agent is a full coding agent: Codex, Claude Code, Gemini, Grok CLI or OpenCode, each with its own job and workspace. A lead agent can give parts of a task to other agents in a shared channel. You follow their work and step in when a decision needs you. For a team of people, one computer runs the host and the others join it; the chats and files stay on the host.",
       rival:
-        "One OpenClaw Gateway can run several isolated agents, each with its own workspace and session history, and messages go to the right agent by rules. An agent can start subagents, 5 at a time by default. Through ACP, it can also give work to Claude Code, Codex, Cursor, Gemini CLI and others. A team can share one Gateway, with shared sessions and roles; OpenClaw says a Gateway is one trust domain, for people who already trust each other.",
+        "One OpenClaw Gateway can run several isolated agents, each with its own workspace and session history, and messages go to the right agent by rules. An agent can run its turns through Codex, Claude Code or Gemini CLI, and it can start subagents, 5 active in each session by default. Through ACP, it can also give work to Claude Code, Codex, Cursor, Gemini CLI and others. A team can share one Gateway, with shared sessions and roles; OpenClaw says a Gateway is one trust domain, for people who already trust each other.",
     },
     {
       title: "Data and privacy",
       openbot:
-        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds only your profile, team memberships, invitations, sign-in sessions and the settings that let devices find each other. Product analytics, which never include chat content, are on by default; you can turn them off in Settings.",
+        "OpenBot keeps workspaces, conversations, attachments and browser data in a SQLite database on the computer that runs it. There is no copy on OpenBot's side. An account holds your profile, team memberships, invitations, sign-in sessions, the settings that let devices find each other, and any agent templates that you publish. Product analytics, which never include chat content, are on by default and linked to your account when you sign in; you can turn them off in Settings.",
       rival:
-        "OpenClaw keeps settings, sessions and memory under ~/.openclaw on the computer that runs the Gateway, with session history in SQLite and memory in Markdown files. A daily update check is on by default and sends the version and platform; anonymous feature statistics are off until you turn them on. OpenClaw says that third-party skills and inbound messages are untrusted input.",
+        "OpenClaw keeps settings, sessions and memory under ~/.openclaw on the computer that runs the Gateway, with session history in SQLite and memory in Markdown files. A daily update check is on by default and sends the app version and system details; anonymous feature statistics are off until you turn them on. OpenClaw says that third-party skills and inbound messages are untrusted input.",
     },
   ],
   faq: [
@@ -145,12 +145,12 @@ export const OPENCLAW_COMPARISON: Comparison = {
     {
       question: "Is OpenClaw the same as Clawdbot or ClawBot?",
       answer:
-        "OpenClaw was first called Clawdbot. It became Moltbot in January 2026 and OpenClaw a few days later. ClawBot by Ipsion AI is a different, hosted product, and it says it is not part of the OpenClaw project.",
+        "OpenClaw started as Warelay and was then called Clawdbot. It became Moltbot in January 2026 and OpenClaw a few days later. ClawBot by Ipsion AI is a different, hosted product, and it says it is not part of the OpenClaw project.",
     },
     {
       question: "What is the main difference between OpenBot and OpenClaw?",
       answer:
-        "What an agent is and how you reach it. An OpenBot agent is a provider's own coding tool, such as Codex with your ChatGPT plan or Claude Code with your Claude plan, and several agents work as a team. OpenClaw is one assistant runtime over many model providers, and you reach it through messaging apps or its own apps on your network.",
+        "How the agents are organised and how you reach them. In OpenBot, each provider's coding tool, such as Codex with your ChatGPT plan or Claude Code with your Claude plan, is its own agent, and the agents work as a team. OpenClaw is one assistant that can run its turns through Codex, Claude Code or Gemini CLI, and you reach it through messaging apps or its own apps on your network.",
     },
     {
       question: "Can I use my ChatGPT, Claude or Gemini subscription with OpenBot?",
@@ -160,12 +160,12 @@ export const OPENCLAW_COMPARISON: Comparison = {
     {
       question: "Can I use my Claude or Gemini subscription with OpenClaw?",
       answer:
-        "Claude, yes: OpenClaw can reuse a Claude Code login on the same computer, and that use comes from your plan's limits. Gemini, no: OpenClaw needs a Google API key, and it does not offer a new Google account sign-in.",
+        "Claude, yes: OpenClaw can reuse a Claude Code login on the same computer, and that use comes from your plan's limits. Gemini, no: OpenClaw needs a Google API key or Vertex AI, and it does not offer a new Google account sign-in.",
     },
     {
       question: "Can I reach my agents from my phone?",
       answer:
-        "Yes, with both. The OpenBot apps connect from anywhere over an encrypted connection between your devices, with no VPN. The OpenClaw apps connect over your local network, a tailnet or an SSH tunnel, and you can also talk to OpenClaw in messaging apps such as WhatsApp or Telegram.",
+        "Yes, with both. The OpenBot apps connect from anywhere over an encrypted connection between your devices, with no VPN. The OpenClaw apps connect over your local network, a tailnet, an SSH tunnel or a public HTTPS address that you set up, and you can also talk to OpenClaw in messaging apps such as WhatsApp or Telegram.",
     },
     {
       question: "Is OpenClaw open source?",
@@ -200,10 +200,17 @@ export const OPENCLAW_COMPARISON: Comparison = {
     { label: "OpenClaw iOS app", url: `${OPENCLAW_DOCS}/platforms/ios` },
     { label: "OpenClaw Android app", url: `${OPENCLAW_DOCS}/platforms/android` },
     { label: "OpenClaw remote access", url: `${OPENCLAW_DOCS}/gateway/remote` },
+    { label: "OpenClaw agent runtimes", url: `${OPENCLAW_DOCS}/concepts/agent-runtimes` },
+    { label: "OpenClaw ACP agents", url: `${OPENCLAW_DOCS}/tools/acp-agents` },
+    { label: "OpenClaw subagents", url: `${OPENCLAW_DOCS}/tools/subagents/operations` },
+    { label: "OpenClaw channels", url: `${OPENCLAW_DOCS}/channels` },
+    { label: "OpenClaw scheduled jobs", url: `${OPENCLAW_DOCS}/automation/cron-jobs` },
+    { label: "OpenClaw files on disk", url: `${OPENCLAW_DOCS}/help/faq/where-things-live-on-disk` },
     { label: "OpenClaw multi-agent routing", url: `${OPENCLAW_DOCS}/concepts/multi-agent` },
     { label: "OpenClaw for teams", url: `${OPENCLAW_DOCS}/start/teams` },
     { label: "OpenClaw telemetry", url: `${OPENCLAW_DOCS}/gateway/telemetry` },
     { label: "OpenClaw hosting FAQ", url: `${OPENCLAW_DOCS}/help/faq-first-run/providers-and-hosting` },
+    { label: "ClawBot by Ipsion AI", url: "https://clawbot-ai.app" },
     { label: "OpenBot privacy notes", url: OPENBOT_LINKS.privacy },
     { label: "OpenBot source code", url: OPENBOT_LINKS.repository },
   ],
