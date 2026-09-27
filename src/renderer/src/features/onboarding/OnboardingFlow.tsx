@@ -22,7 +22,18 @@ import { DetectedProviders } from "@openbot/ui/features/custom-providers/Detecte
 import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
@@ -75,6 +86,10 @@ export interface OnboardingFlowProps {
   providerDetection?: ProviderDetection;
   /** Saves, hides and checks what the scan found. Without it the step shows no such list. */
   detectedProviderApi?: DetectedProviderApi;
+  /** Saved custom agent IDs, so a found agent's ID is checked before the round trip. */
+  takenAgentIds?: readonly string[];
+  /** Runs when the provider step is shown. First run scans once, so the host ignores a repeat. */
+  onProviderStepShown?: () => void;
 }
 
 type OnboardingStep = "meet" | "computer" | "jobs";
@@ -236,15 +251,7 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
-    onSaved: (value) => {
-      // The endpoint the user just described is what they came here to use, so the step selects the
-      // custom row rather than leaving the choice on whichever provider connected first, and its
-      // first model becomes the one a new agent starts on. OpenCode names a custom model by its
-      // endpoint, so the id is composed here rather than looked up in a catalog it has yet to list.
-      selectCustomProvider();
-      const [firstModel] = value.models;
-      if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
-    },
+    onSaved: selectSavedEndpoint,
     onRemoved: (id) => {
       // `onSave` reads these two to decide whether to send a model, so a model of an endpoint that is
       // gone would be stored on the first agent. The remaining endpoints keep the row selected.
@@ -273,6 +280,39 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
   }
 
   /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
+  /**
+   * The endpoint the user just described is what they came here to use, so the step selects the
+   * custom row rather than leaving the choice on whichever provider connected first, and its first
+   * model becomes the one a new agent starts on. OpenCode names a custom model by its endpoint, so
+   * the id is composed here rather than looked up in a catalog it has yet to list.
+   */
+  function selectSavedEndpoint(value: SaveCustomProviderInput): void {
+    selectCustomProvider();
+    const [firstModel] = value.models;
+    if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
+  }
+
+  /** A found server that the user saves is selected like one added with the form. */
+  const detectedApi = createMemo((): DetectedProviderApi | undefined => {
+    const api = props.detectedProviderApi;
+    if (!api) return undefined;
+    return {
+      ...api,
+      save: async (provider, value) => {
+        const restart = await api.save(provider, value);
+        if (value.kind === "models") selectSavedEndpoint(value.value);
+        return restart;
+      },
+    };
+  });
+
+  createEffect(
+    () => step() === "meet",
+    (shown) => {
+      if (shown) untrack(() => props.onProviderStepShown?.());
+    },
+  );
+
   function selectCustomProvider(): void {
     keepProviderRows();
     setProviderSelectedByUser(true);
@@ -683,12 +723,13 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                         }
                       >
                         {(detection) => (
-                          <Show when={props.detectedProviderApi}>
+                          <Show when={detectedApi()}>
                             {(api) => (
                               <DetectedProviders
                                 detection={detection()}
                                 api={api()}
                                 takenProviderIds={(props.customProviders ?? []).map((provider) => provider.id)}
+                                takenAgentIds={props.takenAgentIds}
                                 disabled={saving()}
                               />
                             )}

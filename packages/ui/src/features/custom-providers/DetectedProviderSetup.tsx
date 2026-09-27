@@ -53,7 +53,12 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
       setSaving(false);
       setSubmitError(null);
       setCheck({ status: "idle" });
-      setDiscovery(provider?.kind === "models" ? { status: "found", models: provider.models } : { status: "idle" });
+      // A preset with no scan result has no list yet, not an empty one.
+      setDiscovery(
+        provider?.kind === "models" && provider.models.length > 0
+          ? { status: "found", models: provider.models }
+          : { status: "idle" },
+      );
     },
   );
 
@@ -89,8 +94,9 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
     const checkAgent = props.api.checkAgent;
     if (!checkAgent) return;
     setCheck({ status: "checking" });
+    const saved = agent();
     try {
-      setCheck(await checkAgent(value));
+      setCheck(await checkAgent(value, saved?.added ? saved.id : undefined));
     } catch (error) {
       setCheck({ status: "failed", message: errorMessage(error, t("customProvider.acp.checkFailed")) });
     }
@@ -119,6 +125,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         busy={saving()}
         submitError={submitError()}
         takenAgentIds={taken(props.takenAgentIds)}
+        editing={Boolean(agent()?.added)}
         onSubmit={(value) => void save({ kind: "agent", value })}
         onCancel={props.onClose}
       />

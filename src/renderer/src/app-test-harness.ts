@@ -1109,7 +1109,12 @@ export function installOpenbotStub(): void {
     customAgents: stubGroup(IPC_ENDPOINTS.customAgents, "customAgents", {
       list: vi.fn().mockResolvedValue([]),
     }),
-    providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {}),
+    // Onboarding and the AI providers tab scan on their own, so a scan finds nothing by default.
+    providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {
+      getSettings: vi.fn().mockResolvedValue({ enabled: true, addresses: [], folders: [], hiddenIds: [] }),
+      scanModelServers: vi.fn().mockResolvedValue([]),
+      scanAgents: vi.fn().mockResolvedValue([]),
+    }),
     providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),
     hostAdmin: stubGroup(IPC_ENDPOINTS.hostAdmin, "hostAdmin", {}),
     // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is

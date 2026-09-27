@@ -35,6 +35,8 @@ export type DetectedProvider =
       command: string;
       args: string;
       version?: string;
+      /** For a saved agent: the names of its values, which Edit keeps unless the user types new ones. */
+      envNames?: readonly string[];
     });
 
 /** `found` can grow while `scanning` is true. */
@@ -61,7 +63,8 @@ export interface DetectedProviderApi {
   /** Without it there is no scan-again control, as on a first run that scans once. */
   scan?: () => void;
   discoverModels?: (endpoint: CustomProviderEndpoint) => Promise<readonly DiscoveredModel[]>;
-  checkAgent?: (value: CustomAcpAgentDraft) => Promise<AcpAgentCheck>;
+  /** `savedAgentId` names the saved agent whose kept values the check uses. */
+  checkAgent?: (value: CustomAcpAgentDraft, savedAgentId?: string) => Promise<AcpAgentCheck>;
 }
 
 /** Where the provider is: a host and port for a server, the command for an agent. */
@@ -93,12 +96,14 @@ export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: 
   };
 }
 
+/** A saved agent opens with its value names, each kept until the user types a new value. */
 export function detectedAgentDraft(provider: Extract<DetectedProvider, { kind: "agent" }>): CustomAcpAgentDraft {
+  const names = provider.added ? (provider.envNames ?? []) : [];
   return {
     agentId: provider.id,
     displayName: provider.name,
     command: provider.command,
     args: provider.args,
-    env: [{ name: "", value: "" }],
+    env: names.length > 0 ? names.map((name) => ({ name, value: "", savedName: name })) : [{ name: "", value: "" }],
   };
 }

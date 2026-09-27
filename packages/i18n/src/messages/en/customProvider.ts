@@ -121,6 +121,7 @@ export const messages = defineMessages("customProvider", {
 
   // Where the scan looks. The default addresses and PATH are always part of it.
   "customProvider.detection.title": "Local detection",
+  "customProvider.detection.saveFailed": "Could not save the detection settings.",
   "customProvider.detection.description": "Where OpenBot looks for local model servers and ACP agents.",
   "customProvider.detection.enabled": "Look for local models and agents",
   "customProvider.detection.enabledDescription":

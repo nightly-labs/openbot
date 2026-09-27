@@ -120,6 +120,7 @@
     "./features/custom-providers/CustomAcpAgentDialog": "./src/features/custom-providers/CustomAcpAgentDialog.tsx",
     "./features/custom-providers/CustomAgentSettings": "./src/features/custom-providers/CustomAgentSettings.tsx",
     "./features/custom-providers/CustomProviderPresetDialog": "./src/features/custom-providers/CustomProviderPresetDialog.tsx",
+    "./features/custom-providers/DetectedProviderSetup": "./src/features/custom-providers/DetectedProviderSetup.tsx",
     "./features/custom-providers/DetectedProviders": "./src/features/custom-providers/DetectedProviders.tsx",
     "./features/custom-providers/detected-providers": "./src/features/custom-providers/detected-providers.ts",
     "./features/custom-providers/ProviderDetectionSettings": "./src/features/custom-providers/ProviderDetectionSettings.tsx",

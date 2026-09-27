@@ -43,7 +43,7 @@ import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdate
 import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
-import { createSignal, Show, untrack } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
@@ -86,11 +86,17 @@ export interface SettingsModalProps {
   /** Local model servers and ACP agents found on this computer. Omitted on a remote server. */
   providerDetection?: ProviderDetection;
   detectedProviderApi?: DetectedProviderApi;
+  /** Saved custom agent IDs, so a found agent's ID is checked before the round trip. */
+  takenAgentIds?: readonly string[];
   /** The user's own ACP agents. Only the local host passes it. */
   customAgents?: CustomAgentSettingsApi;
   /** Where the scan looks. Without it the tab has no detection settings. */
   detectionSettings?: ProviderDetectionSettingsValue;
   onDetectionSettingsChange?: (value: ProviderDetectionSettingsValue) => void;
+  /** The last detection settings save failed. The section keeps the rows the user typed. */
+  detectionSettingsError?: string | null;
+  /** Runs each time the AI providers tab is shown, so the found list is current. */
+  onProvidersShown?: () => void;
   /**
    * Reads and writes the optional provider keys of the computer the providers run on. Absent when
    * this window cannot manage them, which is also what takes the row's sign-in button away.
@@ -226,6 +232,12 @@ export function SettingsModal(props: SettingsModalProps) {
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
   const updates = createSettingsUpdatesStore(props);
   const hostedSites = createSettingsHostedSitesStore(props, () => activeTab() === "hosted-sites");
+  createEffect(
+    () => props.open && activeTab() === "providers",
+    (shown) => {
+      if (shown) untrack(() => props.onProvidersShown?.());
+    },
+  );
 
   // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
   const isMac = () => props.appInfo?.platform === "darwin";
@@ -364,13 +376,18 @@ export function SettingsModal(props: SettingsModalProps) {
             // With detection off there is no list, not an empty one.
             providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
             detectedProviderApi={props.detectedProviderApi}
+            takenAgentIds={props.takenAgentIds}
             customAgents={props.customAgents}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
           />
           <Show when={props.detectionSettings}>
             {(value) => (
-              <ProviderDetectionSettings value={value()} onChange={(next) => props.onDetectionSettingsChange?.(next)} />
+              <ProviderDetectionSettings
+                value={value()}
+                error={props.detectionSettingsError}
+                onChange={(next) => props.onDetectionSettingsChange?.(next)}
+              />
             )}
           </Show>
         </Tabs.Content>

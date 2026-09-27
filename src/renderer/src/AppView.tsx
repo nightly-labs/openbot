@@ -3,6 +3,7 @@ import { Loading, Show } from "solid-js";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useServerSelection } from "./features/servers/server-selection";
 import { providerKeyApi } from "./features/settings/provider-key-api";
@@ -54,6 +55,7 @@ export function AppAccessGate() {
   // Onboarding is ungated: it only ever runs against this computer, so there is no remote server to
   // hide the endpoints from. Settings gates on `activeServer()`; see `WorkspaceOverlays.tsx`.
   const { customProviders, saveCustomProvider, deleteCustomProvider } = useCustomProviders();
+  const detection = useProviderDetection();
   const { joinRemoteDuringSetup } = useServerSelection();
 
   return (
@@ -111,6 +113,10 @@ export function AppAccessGate() {
                       customProviders={customProviders()}
                       onAddCustomProvider={saveCustomProvider}
                       onDeleteCustomProvider={deleteCustomProvider}
+                      providerDetection={detection.detection()}
+                      detectedProviderApi={detection.api}
+                      takenAgentIds={detection.takenAgentIds()}
+                      onProviderStepShown={detection.scanOnce}
                     />
                   </Loading>
                 }
