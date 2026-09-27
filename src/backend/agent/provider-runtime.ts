@@ -23,13 +23,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { startAcpAuthentication } from "./../acp-sign-in";
 import { type AgentClient, AgentProcessExitError, type AgentProvider } from "./../agent-client";
 import { CodexAppServerClient } from "./../app-server-client";
-import {
-  type AgentCliInfo,
-  type BundledProviderExecutables,
-  CodexCliError,
-  type CodexCliInfo,
-  resolveCodexCli,
-} from "./../cli";
+import { type AgentCliInfo, type BundledProviderExecutables, CodexCliError } from "./../cli";
 import { McpHandoffLog } from "./../mcp-handoff-log";
 import { openCodeSignInMessage } from "./../opencode-config";
 import { readOpenCodeGoUsage } from "./../opencode-usage";
@@ -37,8 +31,6 @@ import type { ProcessConfinement } from "../process-confinement";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
-  decodeAccountDeviceCodeLoginStartResult,
-  decodeAccountLoginStartResult,
   decodeAccountRateLimitsReadResult,
   decodeAccountReadResult,
   decodeModelListResponse,
@@ -50,6 +42,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
+import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   isBackgroundRefreshDiagnostic,
@@ -78,7 +71,6 @@ import { workspaceWritableRoots } from "./workspace-sandbox";
 
 const logger = createOpenBotLogger("provider-runtime");
 
-const CODEX_LOGIN_TIMEOUT_MS = 10 * 60_000;
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
 /** How long a provider CLI stays running with nothing to do before its process is stopped. */
 export const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
@@ -96,14 +88,6 @@ const PROVIDER_IDLE_CHECK_MS = 60_000;
 function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   const now = Date.now() / 1_000;
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
-}
-
-interface PendingCodexLogin {
-  client: AgentClient;
-  cli: CodexCliInfo;
-  loginId: string;
-  timer: NodeJS.Timeout;
-  completing: boolean;
 }
 
 /** A sign-in that is a CLI process the user completes in a browser the CLI opened. */
@@ -284,7 +268,7 @@ export class ProviderRuntime implements ProviderPort {
   #idleCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
-  #codexLogin: PendingCodexLogin | null = null;
+  readonly #codexLogin: CodexLoginFlow;
   readonly #cliLogins = new Map<AgentProvider, PendingCliLogin>();
   #providerActivation = Promise.resolve();
   #preferredProvider: AgentProvider;
@@ -327,6 +311,24 @@ export class ProviderRuntime implements ProviderPort {
     this.#credentials = options.credentials;
     this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
     this.#redactMcp = options.redactMcp;
+    this.#codexLogin = new CodexLoginFlow({
+      bundledExecutable: () => this.#bundledExecutables.codex,
+      createClient: (cli) => {
+        const client = this.#clientFactory
+          ? this.#clientFactory("codex", cli)
+          : new CodexAppServerClient(cli.executable, this.#requestTimeoutMs);
+        this.#bindClient(client);
+        return client;
+      },
+      hasActiveClient: (client) => (client ? this.#clients.get("codex") === client : this.#clients.has("codex")),
+      activate: (client, cli, account, activateOptions) =>
+        this.#activateProviderClient("codex", client, cli, account, activateOptions),
+      setConnecting: () => this.#setProviderConnectionState("codex", "connecting"),
+      isConnecting: () =>
+        this.#status.providers?.find((provider) => provider.id === "codex")?.connectionState === "connecting",
+      clearConnectionState: () => this.#clearProviderConnectionState("codex"),
+      setFailure: (error, version) => this.#setProviderConnectionFailure("codex", error, version),
+    });
   }
 
   /**
@@ -379,7 +381,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#providerStarts.size +
       this.#providerConnectionCommands.size +
       this.#replacingCli.size +
-      (this.#codexLogin === null ? 0 : 1)
+      (this.#codexLogin.pending ? 1 : 0)
     );
   }
 
@@ -405,7 +407,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#providerConnectionCommands.has(provider) ||
         this.#replacingCli.has(provider) ||
         this.#cliLogins.has(provider) ||
-        (provider === "codex" && this.#codexLogin !== null)
+        (provider === "codex" && this.#codexLogin.pending)
       ) {
         this.#lastUsed.set(provider, now);
         continue;
@@ -616,8 +618,9 @@ export class ProviderRuntime implements ProviderPort {
     return this.#runProviderConnectionCommand(provider, async () => {
       switch (signIn.kind) {
         case "browser":
-          await this.#cancelCodexLogin(null);
-          return this.#startCodexLogin(openExternal);
+          await this.#codexLogin.cancel(null);
+          await this.#codexLogin.startBrowser(openExternal);
+          return this.status();
         case "cli-command":
           await this.#cancelCliLogin(provider, null);
           return this.#startCliLogin(provider, (cli) => {
@@ -664,8 +667,8 @@ export class ProviderRuntime implements ProviderPort {
     const start = this.#providerStarts.get(provider);
     if (start) await start;
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#cancelCodexLogin(null);
-      return this.#startCodexDeviceLogin();
+      await this.#codexLogin.cancel(null);
+      return this.#codexLogin.startDevice();
     });
   }
 
@@ -673,7 +676,7 @@ export class ProviderRuntime implements ProviderPort {
   async cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
     if (!agentProviderDescriptor(provider).codeSignIn) return this.status();
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#cancelCodexLogin(null);
+      await this.#codexLogin.cancel(null);
       return this.status();
     });
   }
@@ -755,7 +758,7 @@ export class ProviderRuntime implements ProviderPort {
   async updateProviderCli(provider: AgentProvider, install: () => Promise<string>): Promise<AgentStatus> {
     return this.#runProviderConnectionCommand(provider, async () => {
       await this.#providerStarts.get(provider);
-      if ((provider === "codex" && this.#codexLogin) || this.#cliLogins.has(provider)) {
+      if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogins.has(provider)) {
         throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
       }
       if (this.#hooks.isProviderBusy(provider)) {
@@ -945,12 +948,11 @@ export class ProviderRuntime implements ProviderPort {
     try {
       const completion = decode(params);
       void this.#runProviderConnectionCommand("codex", async () => {
-        await this.#completeCodexLogin(completion, source);
+        await this.#codexLogin.complete(completion, source);
         return this.status();
       });
     } catch {
-      const pending = this.#codexLogin;
-      if (pending) void this.#failCodexLogin(pending, "OpenBot could not verify the ChatGPT connection. Try again.");
+      void this.#codexLogin.failUnverified();
     }
   }
 
@@ -997,19 +999,17 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#idleCheck) clearInterval(this.#idleCheck);
     this.#idleCheck = null;
     this.#released.clear();
-    const pendingLogin = this.#codexLogin;
-    this.#codexLogin = null;
+    const loginClient = this.#codexLogin.dispose();
     const cliLogins = [...this.#cliLogins.values()];
     this.#cliLogins.clear();
     this.#providerConnectionCommands.clear();
     for (const login of cliLogins) {
       if (login.child.exitCode === null) login.child.kill("SIGTERM");
     }
-    if (pendingLogin) clearTimeout(pendingLogin.timer);
     const clients = [
       ...this.#clients.values(),
       ...[...this.#confined.values()].map((confined) => confined.client),
-      ...(pendingLogin ? [pendingLogin.client] : []),
+      ...(loginClient ? [loginClient] : []),
     ];
     this.#clients.clear();
     this.#confined.clear();
@@ -1047,7 +1047,8 @@ export class ProviderRuntime implements ProviderPort {
         this.#runProviderConnectionCommand(driver.id, async () => {
           switch (driver.signIn.kind) {
             case "browser":
-              return this.#settleCodexLoginForRefresh();
+              await this.#codexLogin.settleForRefresh();
+              return this.status();
             case "cli-command":
             case "acp-authenticate":
             case "external":
@@ -1127,31 +1128,6 @@ export class ProviderRuntime implements ProviderPort {
       BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id),
       { preserveCheckErrors: true, refreshRuntimeInBackground: true },
     );
-    return this.status();
-  }
-
-  async #settleCodexLoginForRefresh(): Promise<AgentStatus> {
-    const pending = this.#codexLogin;
-    if (!pending) {
-      this.#clearProviderConnectionState("codex");
-      return this.status();
-    }
-    this.#codexLogin = null;
-    clearTimeout(pending.timer);
-    try {
-      const account = await pending.client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
-      if (account.account?.type === "chatgpt") {
-        await this.#activateProviderClient("codex", pending.client, pending.cli, account.account);
-        return this.status();
-      }
-    } catch {
-      // Fall through to cancellation and a fresh provider probe.
-    }
-    await pending.client
-      .request("account/login/cancel", { loginId: pending.loginId }, decodeRecordResponse)
-      .catch(() => undefined);
-    await pending.client.stop().catch(() => undefined);
-    this.#clearProviderConnectionState("codex");
     return this.status();
   }
 
@@ -1455,177 +1431,6 @@ export class ProviderRuntime implements ProviderPort {
     await pending.task?.catch(() => undefined);
     if (message) this.#setProviderConnectionFailure(provider, new Error(message), pending.cli.version);
     else this.#clearProviderConnectionState(provider);
-  }
-
-  /**
-   * Brings a Codex client up to the point where a sign-in can start, and hands it to `run`.
-   *
-   * Returns null when the client turned out to be signed in already: the account was activated and
-   * there is no login to start. Both sign-in shapes share this because everything before the
-   * `account/login/start` call - the CLI, the handshake, the account already on this computer - and
-   * everything the failure path has to undo is the same for a browser hand-off and for a code.
-   */
-  async #withCodexLoginClient<T>(run: (client: AgentClient, cli: CodexCliInfo) => Promise<T>): Promise<T | null> {
-    let client: AgentClient | null = null;
-    let cli: CodexCliInfo | null = null;
-    this.#setProviderConnectionState("codex", "connecting");
-
-    try {
-      cli = await resolveCodexCli({ bundledExecutable: this.#bundledExecutables.codex });
-      client = this.#clientFactory
-        ? this.#clientFactory("codex", cli)
-        : new CodexAppServerClient(cli.executable, this.#requestTimeoutMs);
-      this.#bindClient(client);
-      client.start();
-      await client.request(
-        "initialize",
-        {
-          clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
-          capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true },
-        },
-        decodeRecordResponse,
-      );
-      client.notify("initialized");
-
-      if (!this.#clients.has("codex")) {
-        const existingAccount = await client.request("account/read", { refreshToken: false }, decodeAccountReadResult);
-        if (existingAccount.account?.type === "chatgpt") {
-          await this.#activateProviderClient("codex", client, cli, existingAccount.account);
-          return null;
-        }
-      }
-
-      return await run(client, cli);
-    } catch (error) {
-      if (client && this.#codexLogin?.client !== client && this.#clients.get("codex") !== client) {
-        await client.stop().catch(() => undefined);
-      }
-      const status = this.#status.providers?.find((provider) => provider.id === "codex");
-      if (!this.#codexLogin && status?.connectionState === "connecting") {
-        this.#setProviderConnectionFailure("codex", error, cli?.version);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Holds a started login open until the provider reports it finished, or until it times out.
-   *
-   * The deadline is OpenBot's, not the provider's. The code flow counts down to the same moment on
-   * screen, so the number the user reads is the one this timer acts on.
-   */
-  #trackCodexLogin(client: AgentClient, cli: CodexCliInfo, loginId: string): PendingCodexLogin {
-    let pending: PendingCodexLogin;
-    const timer = setTimeout(() => {
-      void this.#cancelCodexLogin("ChatGPT connection timed out. Try again.", pending);
-    }, CODEX_LOGIN_TIMEOUT_MS);
-    timer.unref?.();
-    pending = { client, cli, loginId, timer, completing: false };
-    this.#codexLogin = pending;
-    recordRestartActivity();
-    client.once("exit", () => {
-      if (this.#codexLogin?.client === client) {
-        void this.#failCodexLogin(this.#codexLogin, "ChatGPT connection stopped. Try again.");
-      }
-    });
-    return pending;
-  }
-
-  async #startCodexLogin(openExternal: (url: string) => Promise<void>): Promise<AgentStatus> {
-    await this.#withCodexLoginClient(async (client, cli) => {
-      const login = await client.request(
-        "account/login/start",
-        {
-          type: "chatgpt",
-          appBrand: "chatgpt",
-          codexStreamlinedLogin: true,
-          useHostedLoginSuccessPage: true,
-        },
-        decodeAccountLoginStartResult,
-      );
-      this.#trackCodexLogin(client, cli, login.loginId);
-      try {
-        await openExternal(login.authUrl);
-      } catch {
-        await this.#cancelCodexLogin("OpenBot could not open the ChatGPT connection page.");
-        throw new Error(sourceText("error.provider.chatgptPageFailed"));
-      }
-    });
-    return this.status();
-  }
-
-  /**
-   * Starts the sign-in the user finishes on another device, and reports the code to show.
-   *
-   * Only the code and the page it is typed on cross back: the token the provider issues for that
-   * code stays with the Codex client this method leaves running, exactly as it does for the browser
-   * sign-in. How this one ends reaches the renderer the same way too, through the provider's status.
-   */
-  async #startCodexDeviceLogin(): Promise<ProviderCodeLoginStart> {
-    const started = await this.#withCodexLoginClient(async (client, cli) => {
-      const login = await client.request(
-        "account/login/start",
-        { type: "chatgptDeviceCode" },
-        decodeAccountDeviceCodeLoginStartResult,
-      );
-      this.#trackCodexLogin(client, cli, login.loginId);
-      return {
-        kind: "code" as const,
-        userCode: login.userCode,
-        verificationUrl: login.verificationUrl,
-        expiresAt: Date.now() + CODEX_LOGIN_TIMEOUT_MS,
-      };
-    });
-    return started ?? { kind: "connected" };
-  }
-
-  async #completeCodexLogin(completion: AccountLoginCompletedResult, source: AgentClient): Promise<void> {
-    const pending = this.#codexLogin;
-    if (!pending || pending.completing) return;
-    if (pending.client !== source) return;
-    if (completion.loginId !== null && completion.loginId !== pending.loginId) return;
-    pending.completing = true;
-    clearTimeout(pending.timer);
-
-    if (!completion.success) {
-      await this.#failCodexLogin(pending, "ChatGPT connection was not completed. Try again.");
-      return;
-    }
-
-    try {
-      const account = await pending.client.request("account/read", { refreshToken: true }, decodeAccountReadResult);
-      if (account.account?.type !== "chatgpt") {
-        throw new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" }));
-      }
-      if (this.#codexLogin !== pending) return;
-      await this.#activateProviderClient("codex", pending.client, pending.cli, account.account, {
-        isCurrent: () => this.#codexLogin === pending,
-      });
-      if (this.#codexLogin === pending) this.#codexLogin = null;
-    } catch {
-      await this.#failCodexLogin(pending, "OpenBot could not verify the ChatGPT connection. Try again.");
-    }
-  }
-
-  async #cancelCodexLogin(message: string | null, expected?: PendingCodexLogin): Promise<void> {
-    const pending = this.#codexLogin;
-    if (!pending || (expected && pending !== expected)) return;
-    this.#codexLogin = null;
-    clearTimeout(pending.timer);
-    await pending.client
-      .request("account/login/cancel", { loginId: pending.loginId }, decodeRecordResponse)
-      .catch(() => undefined);
-    await pending.client.stop().catch(() => undefined);
-    if (message) this.#setProviderConnectionFailure("codex", new Error(message), pending.cli.version);
-    else this.#clearProviderConnectionState("codex");
-  }
-
-  async #failCodexLogin(pending: PendingCodexLogin, message: string): Promise<void> {
-    if (this.#codexLogin !== pending) return;
-    clearTimeout(pending.timer);
-    this.#codexLogin = null;
-    await pending.client.stop().catch(() => undefined);
-    this.#setProviderConnectionFailure("codex", new Error(message), pending.cli.version);
   }
 
   async #connect(
