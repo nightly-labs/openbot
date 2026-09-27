@@ -113,6 +113,14 @@ export class BootRecovery {
     for (const id of this.#orphanedDeliveryIds) {
       if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
     }
+    // An agent starts one turn at a time, so its unconfirmed deliveries are one batch. The turn names
+    // only the first of them as its client id, and the others ran in that same turn.
+    const unconfirmedStarts = new Map<string, Set<string>>();
+    for (const { delivery } of unresolved) {
+      if (delivery.status !== "starting" || delivery.turnId) continue;
+      const ids = unconfirmedStarts.get(delivery.recipientAgentId) ?? new Set<string>();
+      unconfirmedStarts.set(delivery.recipientAgentId, ids.add(delivery.id));
+    }
     for (const context of unresolved) {
       const { delivery } = context;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
@@ -129,10 +137,16 @@ export class BootRecovery {
             { ...(await this.#threads.threadParams(agent, client, session.externalSessionId)), includeTurns: true },
             decodeThreadResponse,
           );
+          const batchIds = delivery.turnId ? null : unconfirmedStarts.get(delivery.recipientAgentId);
           const turn = response.thread.turns?.find(
             (candidate) =>
               candidate.id === delivery.turnId ||
-              candidate.items?.some((item) => item.type === "userMessage" && item.clientId === delivery.id),
+              candidate.items?.some(
+                (item) =>
+                  item.type === "userMessage" &&
+                  !!item.clientId &&
+                  (item.clientId === delivery.id || batchIds?.has(item.clientId) === true),
+              ),
           );
           if (turn && !delivery.turnId) {
             await this.#mailbox.markRunning(delivery.id, turn.id);

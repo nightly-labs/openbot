@@ -105,7 +105,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "interrupt_agent",
     description:
-      "Stop another agent's current turn when that turn works on your message, and cancel your messages still queued for it. The agent receives a notice from you with the reason. You cannot stop work that the user, a routine, a channel, or another agent started. To give new work, call send_message after this tool.",
+      "Stop another agent's current turn when that turn works on your message, and cancel your requests still queued for it. The agent receives a notice from you with the reason. You cannot stop work that the user, a routine, a channel, or another agent started. To give new work, call send_message after this tool.",
     shape: interruptAgentToolSchema.shape,
   },
   {

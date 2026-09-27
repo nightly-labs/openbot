@@ -204,7 +204,7 @@ export class DrainScheduler {
     // The teammate answers that start in this turn too. A channel task always runs alone. The
     // person's message goes last, so the turn answers it with the answers already read.
     const companions = channelDelivery ? [] : this.#mailbox.repliesToStartWith(delivery.id);
-    const batch = delivery.sender.kind === "user" ? [...companions, context] : [context, ...companions];
+    let batch = delivery.sender.kind === "user" ? [...companions, context] : [context, ...companions];
     let confirmedTurnId: string | null = null;
     const claimed = this.#deliveryProviders(delivery.recipientAgentId);
     for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) + 1);
@@ -216,7 +216,22 @@ export class DrainScheduler {
     try {
       for (const item of batch) await this.#mailbox.markStarting(item.delivery.id);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      for (const item of batch) await this.#mailbox.verifyDeliveryAttachments(item.delivery.id);
+      await this.#mailbox.verifyDeliveryAttachments(delivery.id);
+      // An answer whose attachment changed fails alone. The message that starts the turn still runs.
+      const failedCompanions = new Set<string>();
+      for (const { delivery: companion } of companions) {
+        try {
+          await this.#mailbox.verifyDeliveryAttachments(companion.id);
+        } catch (error) {
+          const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
+          await this.#mailbox.markTerminal(companion.id, "failed", reason);
+          failedCompanions.add(companion.id);
+        }
+      }
+      if (failedCompanions.size > 0) {
+        batch = batch.filter((item) => !failedCompanions.has(item.delivery.id));
+        this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      }
       const agent = await this.#store.getOrCreate(delivery.recipientAgentId);
       // The endpoint was removed while this agent was busy, so no other model could be given to it
       // then. The old process would still answer on the removed endpoint, with the credentials it
@@ -226,7 +241,7 @@ export class DrainScheduler {
         if (!this.#hooks.servesModel(agent.model)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
       };
       requireServedModel();
-      this.#threads.applyPendingRuntimeRefresh(agent, delivery.id);
+      this.#threads.applyPendingRuntimeRefresh(agent, new Set(batch.map((item) => item.delivery.id)));
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id);
       const client = await this.#providers.ensureAgentClient(agent);
       const execution = this.#channels ? await this.#channels.prepare(context) : null;
