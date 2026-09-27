@@ -172,7 +172,7 @@ export function BrowserPreviewCard(props: {
     // A page that is still loading often cannot be captured yet. Keep the skeleton until the load
     // ends; the end of the load starts a new capture.
     const failed = () => {
-      if (!disposed && !(props.tab.loading && !state.preview)) setState(() => ({ preview: null, failed: true }));
+      if (!disposed) setState(() => ({ preview: null, failed: !(props.tab.loading && !state.preview) }));
     };
     const refresh = () => {
       if (disposed) return;
