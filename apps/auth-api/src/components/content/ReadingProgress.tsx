@@ -110,11 +110,16 @@ export function ReadingProgress(props: ReadingProgressProps) {
     frame = requestAnimationFrame(() => {
       frame = 0;
       headings = Array.from(article.querySelectorAll<HTMLElement>("h2"));
+      // A shared section link can name a heading that has no id in the served page. The browser
+      // found nothing to open, so open it once the heading has its id.
+      const fragment = window.location.hash.slice(1);
+      const unopened = fragment !== "" && !document.getElementById(fragment);
       const taken = new Set<string>();
       setSections([
         { id: "top", label: props.title },
         ...headings.map((heading) => ({ id: headingId(heading, taken), label: heading.textContent?.trim() ?? "" })),
       ]);
+      if (unopened) document.getElementById(fragment)?.scrollIntoView({ behavior: "instant" });
       layout();
       update();
     });
