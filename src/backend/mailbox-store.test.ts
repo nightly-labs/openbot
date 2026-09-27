@@ -780,6 +780,14 @@ describe("MailboxStore", () => {
       store.repliesToStartWith(required(note.deliveries[0]).id).map((context) => context.delivery.messageId),
     ).toEqual([first.messageId, second.messageId]);
 
+    // A linked question is not an answer, so the requester still hears that launch did not answer.
+    const launchQuestion = await store.enqueue({
+      sender: { kind: "agent", agentId: "launch" },
+      recipientAgentIds: ["chief"],
+      text: "Which launch?",
+      replyToMessageId: request.messageId,
+    });
+    store.cancelNow("chief", required(launchQuestion.deliveries[0]).id);
     store.cancelNow("launch", required(launch));
     expect(store.unansweredRecipients(request.messageId)).toEqual(["launch"]);
     const next = required(store.nextQueued("chief"));

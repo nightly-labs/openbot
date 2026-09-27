@@ -716,7 +716,13 @@ export class MailboxStore {
         (delivery) =>
           delivery.messageId === requestId &&
           (delivery.status === "failed" || delivery.status === "interrupted" || delivery.status === "cancelled") &&
-          !this.hasReplyFrom(delivery.recipientAgentId, requestId),
+          // A linked question from this agent is not an answer.
+          !this.#state.messages.some(
+            (message) =>
+              isAnswer(message) &&
+              message.sender.agentId === delivery.recipientAgentId &&
+              message.replyToMessageId === requestId,
+          ),
       )
       .map((delivery) => delivery.recipientAgentId);
   }
