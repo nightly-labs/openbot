@@ -1,5 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import {
@@ -91,8 +92,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "list_agents",
-    description: "List local OpenBot agents with their name, title, description, and current status.",
+    description:
+      "List local OpenBot agents with their name, title, description, and progress: status (working, queued, or ready), queuedMessages, turnStartedAt while working, and lastActivityAt. OpenBot does not track which files an agent changed.",
     shape: {},
+  },
+  {
+    name: "interrupt_agent",
+    description:
+      "Stop another agent's current turn when that turn works on your message, and cancel your messages still queued for it. The agent receives a notice from you with the reason. You cannot stop work that the user, a routine, a channel, or another agent started. To give new work, call send_message after this tool.",
+    shape: interruptAgentToolSchema.shape,
   },
   {
     name: "create_agent",

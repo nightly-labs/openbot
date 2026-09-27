@@ -123,6 +123,13 @@ export const messages = {
     "このルーティンの実行はまだ開始中です。ターンが始まってからもう一度お試しください。",
   "error.backend.routineRunNoSession":
     "プロバイダーのセッションを使用できないため、OpenBot は実行中のルーティンを中断できません。",
+  "error.backend.interruptSelf": "エージェントは自分自身を中断できません。",
+  "error.backend.interruptOtherWork":
+    "このエージェントは、あなたのメッセージで開始されていないタスクを実行中です。そのタスクを停止できるのは、ユーザーまたはそのタスクの送信者だけです。",
+  "error.backend.interruptStarting":
+    "このエージェントはまだターンを開始中です。ターンが始まってからもう一度お試しください。",
+  "error.backend.interruptNoSession":
+    "プロバイダーのセッションを使用できないため、OpenBot はこのエージェントを中断できません。",
   "error.backend.memoryTextRequired": "メモリーのテキストが必要です。",
   "error.backend.memoryTextTooLong": "メモリーのテキストが長すぎます。",
   "error.backend.mcpServerGone": "この MCP サーバーはもう存在しません。",

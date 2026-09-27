@@ -94,8 +94,16 @@ export class TurnLifecycle {
   readonly #failedTurns = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   readonly #turnAssociations = new Map<string, Promise<void>>();
-  /** The client and provider thread of each running turn, from its `turn/started`. */
-  readonly #runningTurns = new Map<string, { client: AgentClient; agentId: string; threadId: string }>();
+  /** The client, provider thread and start time of each running turn, from its `turn/started`. */
+  readonly #runningTurns = new Map<
+    string,
+    { client: AgentClient; agentId: string; threadId: string; startedAt: number }
+  >();
+  /**
+   * The time of the last provider notification for each agent: a delta, a tool item, a usage
+   * update. It is the only clock that moves while a turn works, and it is lost on restart.
+   */
+  readonly #lastEventAt = new Map<string, number>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -118,6 +126,17 @@ export class TurnLifecycle {
 
   forgetAgent(agentId: string): void {
     this.#failedTurns.delete(agentId);
+    this.#lastEventAt.delete(agentId);
+  }
+
+  /** When this running turn sent `turn/started`, in epoch milliseconds. Null for a turn that is not running. */
+  turnStartedAt(turnId: string): number | null {
+    return this.#runningTurns.get(turnId)?.startedAt ?? null;
+  }
+
+  /** When the provider last reported anything for this agent since OpenBot started. */
+  lastEventAt(agentId: string): number | null {
+    return this.#lastEventAt.get(agentId) ?? null;
   }
 
   trackItem(itemId: string, turnId: string): void {
@@ -134,6 +153,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#runningTurns.clear();
+    this.#lastEventAt.clear();
   }
 
   /**
@@ -157,6 +177,7 @@ export class TurnLifecycle {
     const params = notification.params;
     const threadId = getString(params, "threadId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
+    if (agentId) this.#lastEventAt.set(agentId, Date.now());
 
     if (
       threadId &&
@@ -189,7 +210,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
-        this.#runningTurns.set(turnId, { client: source, agentId, threadId });
+        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now() });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;

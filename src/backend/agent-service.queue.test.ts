@@ -992,6 +992,94 @@ describe.sequential("AgentService: queue", () => {
     }
   });
 
+  it("lets an agent stop the turn its own message started and drops its queued follow-up", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await Promise.all([store.getOrCreate("chief"), store.getOrCreate("worker")]);
+    await service.sendMessage({ agentId: "chief", text: "Coordinate the report." });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(chiefThreadId);
+
+    await callOpenBotTool(client, chiefThreadId, "send_message", {
+      recipientAgentIds: ["worker"],
+      text: "Draft the report.",
+    });
+    await waitForQueue(service, "worker", (queue) => queue.deliveries[0]?.status === "running");
+    await callOpenBotTool(client, chiefThreadId, "send_message", { recipientAgentIds: ["worker"], text: "Send it." });
+    const workerTurnId = service.listQueue("worker").deliveries[0]?.turnId;
+    const workerThreadId = store.activeProviderSession("worker")?.externalSessionId;
+    assert(workerTurnId && workerThreadId);
+
+    const listed = openBotToolPayload((await callOpenBotTool(client, chiefThreadId, "list_agents", {})).result);
+    expect(listed.agents).toContainEqual(
+      expect.objectContaining({
+        id: "worker",
+        status: "working",
+        queuedMessages: 1,
+        turnStartedAt: expect.any(String),
+        lastActivityAt: expect.any(String),
+      }),
+    );
+
+    const interrupted = await callOpenBotTool(client, chiefThreadId, "interrupt_agent", {
+      agentId: "worker",
+      reason: "The plan changed.",
+    });
+    expect(openBotToolPayload(interrupted.result)).toEqual({ interruptedTurnId: workerTurnId, cancelledMessages: 1 });
+    expect(client.requests).toContainEqual({
+      method: "turn/interrupt",
+      params: { threadId: workerThreadId, turnId: workerTurnId },
+    });
+    client.emit(
+      "notification",
+      notification("turn/completed", { threadId: workerThreadId, turn: { id: workerTurnId, status: "interrupted" } }),
+    );
+
+    // The follow-up never starts; the next turn is the notice that tells the worker why it stopped.
+    await waitForQueue(service, "worker", (queue) => queue.deliveries[2]?.status === "running");
+    expect(service.listQueue("worker").deliveries).toMatchObject([
+      { text: "Draft the report.", status: "interrupted" },
+      { text: "Send it.", status: "cancelled" },
+      { sender: { kind: "agent", agentId: "chief" }, expectsReply: false, status: "running" },
+    ]);
+    const workerStarts = client.requests.filter(
+      (request) => request.method === "turn/start" && getString(request.params, "threadId") === workerThreadId,
+    );
+    expect(workerStarts).toHaveLength(2);
+    expect(firstInputText(workerStarts[1]?.params)).toContain("Reason: The plan changed.");
+  });
+
+  it("refuses to let an agent stop a turn that the user started", async () => {
+    const {
+      service: agentService,
+      client,
+      store,
+    } = await startService(root, { provider: "codex", autoComplete: false });
+    service = agentService;
+    await Promise.all([store.getOrCreate("chief"), store.getOrCreate("worker")]);
+    await service.sendMessage({ agentId: "chief", text: "Coordinate the report." });
+    await service.sendMessage({ agentId: "worker", text: "Draft my report." });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "running");
+    await waitForQueue(service, "worker", (queue) => queue.deliveries[0]?.status === "running");
+    const chiefThreadId = store.activeProviderSession("chief")?.externalSessionId;
+    assert(chiefThreadId);
+
+    for (const [agentId, error] of [
+      ["worker", "This agent works on a task that your message did not start."],
+      ["chief", "An agent cannot interrupt itself."],
+    ]) {
+      const refused = await callOpenBotTool(client, chiefThreadId, "interrupt_agent", { agentId });
+      expect(openBotToolPayload(refused.result).error).toContain(error);
+    }
+    expect(client.requests.some((request) => request.method === "turn/interrupt")).toBe(false);
+    expect(service.listQueue("worker").deliveries.map((delivery) => delivery.status)).toEqual(["running"]);
+  });
+
   it("steers a queued delivery into the active turn and completes it with that turn", async () => {
     const clients = new Map<AgentProvider, FakeAgentClient>();
     const { store, mailbox } = stores(root);

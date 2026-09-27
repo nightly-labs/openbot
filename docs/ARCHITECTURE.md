@@ -459,6 +459,19 @@ and required user input or approval. Delegated work still needs an explicit repl
 teammate; acknowledgements must not become loops. Relevant findings belong in the task result, and
 the user can ask for a detailed coordination report.
 
+An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
+`status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
+(channel work excluded), `turnStartedAt`, and `lastActivityAt`. The last two come from the provider
+notifications that `TurnLifecycle` sees; they are in memory only, so after a restart
+`lastActivityAt` falls back to the newest message for the agent. OpenBot does not record which
+files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)
+refuses the caller itself, a channel turn, and a turn that any delivery other than the caller's
+started, so an agent cannot stop work from the user, a routine, or another agent. It cancels the
+caller's queued messages to the target before it sends `turn/interrupt`, because the interrupted
+turn drains the queue as it completes. Then it queues a notice from the caller with `expectsReply`
+false. The notice starts one short turn on an idle target, so the provider thread records why the
+work stopped.
+
 This policy lives in `src/backend/agent/developer-instructions.ts` and is supplied on both thread
 start and resume. Codex receives `developerInstructions`; Claude appends them to its system prompt;
 Grok receives them as a tagged instruction block in normal turn input. There is no model-specific

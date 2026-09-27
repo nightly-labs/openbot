@@ -737,6 +737,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         updateAgent: (input) => this.updateAgent(input),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        runsTurn: (agentId) => this.#runsTurn(agentId),
+        interrupt: (agentId, turnId) => this.interrupt(agentId, turnId),
+        turnActivity: (agentId, turnId) => ({
+          startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
+          lastEventAt: this.#turn.lastEventAt(agentId),
+        }),
       },
     });
   }
