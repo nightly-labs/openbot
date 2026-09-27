@@ -382,7 +382,11 @@ export class DrainScheduler {
         return;
       }
       const reason = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
-      for (const item of batch) await this.#mailbox.markTerminal(item.delivery.id, "failed", reason);
+      await this.#mailbox.markTerminal(delivery.id, "failed", reason);
+      // The provider did not read the answers that were to start with it, so they wait for the next turn.
+      for (const { delivery: companion } of batch) {
+        if (companion.id !== delivery.id) await this.#mailbox.restoreQueued(companion.id);
+      }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
       this.#channels?.deliveryFailed(delivery.id, "The provider could not start this assignment. Resume to try again.");
       this.#hooks.emitError("delivery_start_failed", error, delivery.recipientAgentId);
