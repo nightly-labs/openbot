@@ -23,7 +23,7 @@ import {
 export interface ImageLightboxOpening {
   images: AttachmentSummary[];
   index: number;
-  origin?: HTMLElement;
+  origin?: HTMLElement | undefined;
 }
 
 export function isLightboxImage(attachment: AttachmentSummary): boolean {
@@ -43,7 +43,7 @@ export function ImageGallery(props: {
   images: AttachmentSummary[];
   onOpen: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   /** A tile whose preview fails downloads the file, so the file stays reachable. */
-  onDownload?: (attachment: AttachmentSummary) => void;
+  onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
 }) {
   const { t } = useText();
   const [ratios, setRatios] = createStore<Record<string, number>>({});
@@ -197,7 +197,7 @@ export function ImageLightbox(props: {
   opening: ImageLightboxOpening;
   /** Finds the thumbnail of an image, so the viewer closes back into the one it shows. */
   thumbnail?: (attachment: AttachmentSummary) => HTMLElement | undefined;
-  onDownload?: (attachment: AttachmentSummary) => void;
+  onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   onClose: () => void;
 }) {
   const { t } = useText();
