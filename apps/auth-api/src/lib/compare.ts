@@ -21,6 +21,15 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   imageEyebrow: "OPENBOT · COMPARE",
   articles: publishedFirst([
     {
+      slug: "openclaw",
+      title: "OpenBot vs OpenClaw: An OpenClaw Alternative",
+      description:
+        "OpenBot vs OpenClaw (formerly Clawdbot and Moltbot): run Codex, Claude Code, Gemini and Grok as a team on your computer, and reach them from your phone. Compare the two.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "hermes-agent",
       title: "OpenBot vs Hermes Agent: A Hermes Agent Alternative",
       description:

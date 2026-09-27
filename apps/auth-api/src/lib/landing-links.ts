@@ -80,6 +80,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "OpenBot vs Grok Bot", external: false, to: "/compare/$slug", slug: "grok-bot" },
       { label: "OpenBot vs Muse", external: false, to: "/compare/$slug", slug: "muse" },
       { label: "OpenBot vs Hermes Agent", external: false, to: "/compare/$slug", slug: "hermes-agent" },
+      { label: "OpenBot vs OpenClaw", external: false, to: "/compare/$slug", slug: "openclaw" },
       { label: "All comparisons", external: false, to: "/compare" },
     ],
   },
