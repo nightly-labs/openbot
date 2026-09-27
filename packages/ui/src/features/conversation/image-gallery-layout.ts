@@ -9,7 +9,7 @@ export interface ImageGalleryLayoutOptions {
   minPerRow: number;
 }
 
-export interface ImageGalleryTileBox {
+interface ImageGalleryTileBox {
   left: number;
   top: number;
   width: number;

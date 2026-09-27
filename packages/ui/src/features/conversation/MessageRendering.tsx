@@ -445,7 +445,7 @@ export function MessageBody(props: {
       </Show>
       <Switch>
         <Match when={standaloneImageAttachments().length > 1}>
-          <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} />
+          <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
         </Match>
         <Match when={standaloneImageAttachments().length === 1}>
           <div class="message-image-attachments">

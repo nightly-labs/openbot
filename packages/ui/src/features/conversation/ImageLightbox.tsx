@@ -42,6 +42,8 @@ const SWIPE_DISTANCE = 48;
 export function ImageGallery(props: {
   images: AttachmentSummary[];
   onOpen: (attachment: AttachmentSummary, origin: HTMLElement) => void;
+  /** A tile whose preview fails downloads the file, so the file stays reachable. */
+  onDownload?: (attachment: AttachmentSummary) => void;
 }) {
   const { t } = useText();
   const [ratios, setRatios] = createStore<Record<string, number>>({});
@@ -98,11 +100,20 @@ export function ImageGallery(props: {
                 type="button"
                 class={["image-gallery-tile", { "image-gallery-tile-missing": isMissing() }]}
                 data-attachment-id={image.id}
-                disabled={isMissing()}
-                aria-label={isMissing() ? t("chat.image.unavailable") : t("chat.image.preview", { name: image.name })}
-                onClick={(event) => props.onOpen(image, event.currentTarget)}
+                disabled={isMissing() && !props.onDownload}
+                aria-label={
+                  !isMissing()
+                    ? t("chat.image.preview", { name: image.name })
+                    : props.onDownload
+                      ? t("chat.image.download", { name: image.name })
+                      : t("chat.image.unavailable")
+                }
+                onClick={(event) => {
+                  if (!isMissing()) props.onOpen(image, event.currentTarget);
+                  else props.onDownload?.(image);
+                }}
               >
-                <Show when={!isMissing()} fallback={<X aria-hidden="true" />}>
+                <Show when={!isMissing()} fallback={props.onDownload ? <DownloadIcon /> : <X aria-hidden="true" />}>
                   <img
                     src={image.previewUrl ?? ""}
                     alt=""
