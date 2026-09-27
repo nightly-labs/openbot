@@ -24,6 +24,7 @@ import {
   Plus,
   Popover,
   Progress,
+  RadioGroup,
   Select,
   SelectContent,
   SelectItem,
@@ -35,7 +36,7 @@ import {
   Tooltip,
 } from "@openbot/ui";
 import { cx } from "@openbot/ui/utils";
-import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, type TextValue, useText } from "../text";
 import { createScrollFades } from "./createScrollFades";
 import {
@@ -47,6 +48,7 @@ import {
   pickerModels,
 } from "./provider-model-options";
 import { StandingApprovalConfirmation } from "./StandingApprovalConfirmation";
+import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
 interface ProviderModelPickerProps {
   provider: AgentProviderId;
@@ -111,6 +113,26 @@ const REASONING_LABEL = {
   max: "provider.effort.max",
 } as const satisfies Record<AgentReasoningEffort, AppTextKey>;
 
+/**
+ * The trigger text changes mostly by a blur: a short slide, so the old and new text cross in place,
+ * and a gentle curve, so the new text stays soft long enough to see.
+ */
+const TRIGGER_SWAP: SwapMotion = {
+  distance: 6,
+  blur: 6,
+  enter: { duration: 320, easing: "cubic-bezier(0.33, 1, 0.68, 1)" },
+  // The old text fades early: the box already eases to the new width and does not clip it.
+  leave: { duration: 180, easing: "ease" },
+};
+
+/** More effort options than this keep the list: a row of segments gets too narrow. */
+const MAX_EFFORT_SEGMENTS = 5;
+/**
+ * The labels of one segment row, in characters. The five English levels are 26 and just fit the
+ * panel width; the five French levels, at 29, do not.
+ */
+const MAX_EFFORT_SEGMENT_CHARACTERS = 26;
+
 export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const text = useText();
   const { t, format } = text;
@@ -129,6 +151,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const activeProvider = (): RailId =>
     props.provider === "opencode" && isCustomProviderModelId(props.value, customIds()) ? CUSTOM_RAIL : props.provider;
   const [railProvider, setRailProvider] = createSignal<RailId>(untrack(activeProvider));
+  /** The provider whose mark the trigger shows, so only a changed one springs in. */
+  let shownProvider = untrack(activeProvider);
 
   /** OpenCode and Custom tabs split one wire provider so each model appears once. */
   function railModelOptions(rail: RailId): AgentModelOption[] {
@@ -212,6 +236,24 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerModelName = () => displayModelName(selectedModel()?.name, props.value);
   const field = () => props.variant === "field";
   const showsReasoningEffort = () => props.reasoningEffort !== undefined && props.onReasoningEffortChange !== undefined;
+  /** An OpenCode model with variants: the chosen variant is its effort, and its name says so. */
+  const selectedHasVariants = createMemo(
+    () =>
+      props.provider === "opencode" &&
+      pickerModels(railModelOptions(activeProvider())).some(
+        (model) =>
+          model.variants.length > 0 &&
+          (model.id === props.value || model.variants.some((variant) => variant.id === props.value)),
+      ),
+  );
+  /** Only an effort that the model can use. */
+  const triggerEffort = () => {
+    const effort = props.reasoningEffort;
+    if (!showsReasoningEffort() || !effort || selectedHasVariants()) return;
+    if (!selectedModel()?.supportedReasoningEfforts.includes(effort)) return;
+    return reasoningLabel(effort, t);
+  };
+  const triggerSummary = () => [triggerModelName(), triggerEffort()].filter(Boolean).join(" · ");
 
   return (
     <div
@@ -223,12 +265,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
           ref={trigger}
           type="button"
           class={["provider-model-trigger", { "provider-model-trigger-field": field() }]}
-          aria-label={`${props.ariaLabel ?? t("provider.picker.agentModel")}: ${triggerModelName()}`}
+          aria-label={`${props.ariaLabel ?? t("provider.picker.agentModel")}: ${triggerSummary()}`}
           disabled={props.disabled}
           title={
             props.disabled || props.modelChangesDisabled
               ? props.disabledReason
-              : `${railName(activeProvider(), t)} · ${triggerModelName()}`
+              : `${railName(activeProvider(), t)} · ${triggerSummary()}`
           }
           onKeyDown={(event: KeyboardEvent) => {
             if (event.key !== "ArrowDown") return;
@@ -240,8 +282,26 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
             <span class="provider-model-field-label">{props.label ?? t("provider.picker.model")}</span>
           </Show>
           <span class="provider-model-trigger-value">
-            <ProviderMark provider={activeProvider()} />
-            <span class="provider-model-trigger-name">{triggerModelName()}</span>
+            {/* Keyed by provider, so the mark of a newly chosen provider springs in. */}
+            <For each={[activeProvider()]} keyed={(provider) => provider}>
+              {(provider) => {
+                const entering = untrack(provider) !== shownProvider;
+                shownProvider = untrack(provider);
+                return (
+                  <span class="provider-model-trigger-mark" data-entering={entering ? "" : undefined}>
+                    <ProviderMark provider={provider()} />
+                  </span>
+                );
+              }}
+            </For>
+            <SwapLabel class="provider-model-trigger-name" text={triggerModelName()} motion={TRIGGER_SWAP} />
+            <Show when={triggerEffort()}>
+              {(effort) => (
+                <span class="provider-model-trigger-effort">
+                  <SwapLabel text={effort()} motion={TRIGGER_SWAP} />
+                </span>
+              )}
+            </Show>
           </span>
           <ChevronDownIcon />
         </Popover.Trigger>
@@ -291,6 +351,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               "provider-model-rail-button-unavailable": status().state !== "available",
                             },
                           ]}
+                          data-state={status().state}
                           aria-label={`${railName(provider, t)}: ${railSummary(provider, status())}`}
                           onClick={(event) => {
                             const target = event.currentTarget;
@@ -356,6 +417,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   () => fades.remeasure(),
                 );
                 const available = () => status().state === "available";
+                const effortLocked = () => !available() || props.modelChangesDisabled === true;
+                function chooseEffort(id: string): void {
+                  if (props.disabled || effortLocked() || id === effortValue()) return;
+                  if (selected()?.variants.length) props.onChange(id, wireProvider(provider));
+                  else {
+                    const effort = selectedModel()?.supportedReasoningEfforts.find((effort) => effort === id);
+                    if (effort) props.onReasoningEffortChange?.(effort);
+                  }
+                }
                 const runtime = () => {
                   const value = props.runtimeStatuses?.[wireProvider(provider)];
                   if (
@@ -524,42 +594,45 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.effort")}</span>
-                        <Select<{ id: string; name: string }>
-                          class="provider-model-effort-select"
-                          options={effortOptions()}
-                          optionValue="id"
-                          optionTextValue="name"
-                          value={effortOptions().find((option) => option.id === effortValue())}
-                          onChange={(option) => {
-                            if (
-                              props.disabled ||
-                              props.modelChangesDisabled ||
-                              !available() ||
-                              !option ||
-                              option.id === effortValue()
-                            )
-                              return;
-                            if (selected()?.variants.length) props.onChange(option.id, wireProvider(provider));
-                            else {
-                              const effort = selectedModel()?.supportedReasoningEfforts.find(
-                                (effort) => effort === option.id,
-                              );
-                              if (effort) props.onReasoningEffortChange?.(effort);
-                            }
-                          }}
-                          itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+                        <Show
+                          when={
+                            effortOptions().length <= MAX_EFFORT_SEGMENTS &&
+                            effortOptions().reduce((length, option) => length + option.name.length, 0) <=
+                              MAX_EFFORT_SEGMENT_CHARACTERS
+                          }
+                          fallback={
+                            <Select<{ id: string; name: string }>
+                              class="provider-model-effort-select"
+                              options={effortOptions()}
+                              optionValue="id"
+                              optionTextValue="name"
+                              value={effortOptions().find((option) => option.id === effortValue())}
+                              onChange={(option) => option && chooseEffort(option.id)}
+                              itemComponent={(item) => (
+                                <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>
+                              )}
+                            >
+                              <SelectTrigger
+                                size="sm"
+                                aria-label={t("provider.picker.effortLabel")}
+                                disabled={effortLocked()}
+                              >
+                                <SelectValue<{ id: string; name: string }>>
+                                  {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent class="provider-model-effort-content" />
+                            </Select>
+                          }
                         >
-                          <SelectTrigger
-                            size="sm"
-                            aria-label={t("provider.picker.effortLabel")}
-                            disabled={!available() || props.modelChangesDisabled}
-                          >
-                            <SelectValue<{ id: string; name: string }>>
-                              {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent class="provider-model-effort-content" />
-                        </Select>
+                          <EffortSegments
+                            label={t("provider.picker.effortLabel")}
+                            options={effortOptions()}
+                            value={effortValue()}
+                            disabled={effortLocked()}
+                            onChange={chooseEffort}
+                          />
+                        </Show>
                       </div>
                     </Show>
                     <Show when={props.onAutoApproveChange}>
@@ -567,7 +640,6 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         <div class="provider-model-effort">
                           <span>{t("provider.picker.autoApprove")}</span>
                           <Switch
-                            size="sm"
                             aria-label={t("provider.picker.autoApproveLabel")}
                             checked={props.autoApprove === true}
                             disabled={props.autoApproveLocked === true}
@@ -666,6 +738,84 @@ function displayModelName(name: string | undefined, fallback: string): string {
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
   return t(REASONING_LABEL[effort]);
+}
+
+interface EffortOption {
+  id: string;
+  name: string;
+}
+
+/**
+ * Effort as a radio group of segments. The chosen segment has a pill under it that slides to a new
+ * choice, with the SlidingTabs timing. SlidingTabs itself is a tab list; this is a choice of value.
+ */
+function EffortSegments(props: {
+  label: string;
+  options: readonly EffortOption[];
+  value: string | undefined;
+  disabled: boolean;
+  onChange: (id: string) => void;
+}) {
+  let group: HTMLElement | undefined;
+  let pill: HTMLSpanElement | undefined;
+  let chosen = -1;
+  let placed = false;
+
+  /** The first placement and a resize put the pill in place at once; a new choice slides it. */
+  function placePill(slide: boolean): void {
+    if (!group || !pill) return;
+    const control = group.querySelectorAll<HTMLElement>(".provider-model-effort-segment-control")[chosen];
+    pill.hidden = !control;
+    if (!control) return;
+    const still = !slide || !placed;
+    if (still) pill.dataset.initializing = "";
+    pill.style.width = `${control.offsetWidth}px`;
+    pill.style.transform = `translateX(${control.offsetLeft}px)`;
+    if (still) {
+      pill.getBoundingClientRect();
+      delete pill.dataset.initializing;
+    }
+    placed = true;
+  }
+
+  createEffect(
+    () => props.options.findIndex((option) => option.id === props.value),
+    (index) => {
+      chosen = index;
+      placePill(true);
+    },
+  );
+  const resize = new ResizeObserver(() => placePill(false));
+  onCleanup(() => resize.disconnect());
+
+  return (
+    <RadioGroup.Root
+      ref={(element: HTMLElement) => {
+        group = element;
+        resize.observe(element);
+      }}
+      class="provider-model-effort-segments"
+      aria-label={props.label}
+      orientation="horizontal"
+      value={props.value ?? ""}
+      disabled={props.disabled}
+      onChange={props.onChange}
+    >
+      <span ref={pill} class="provider-model-effort-pill" aria-hidden="true" />
+      {/* Keyed by id: the options are new objects when the effort changes, and a new radio would
+          take the keyboard focus away. */}
+      <For each={props.options} keyed={(option) => option.id}>
+        {(option) => (
+          <RadioGroup.Item class="provider-model-effort-segment" value={option().id}>
+            <RadioGroup.ItemInput />
+            <RadioGroup.ItemControl class="provider-model-effort-segment-control">
+              <RadioGroup.ItemLabel>{option().name}</RadioGroup.ItemLabel>
+            </RadioGroup.ItemControl>
+          </RadioGroup.Item>
+        )}
+      </For>
+    </RadioGroup.Root>
+  );
 }
 
 /** A custom endpoint has no brand mark and must not borrow one, so the rail draws sliders instead. */

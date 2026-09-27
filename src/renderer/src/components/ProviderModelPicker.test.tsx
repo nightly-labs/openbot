@@ -61,22 +61,21 @@ describe("ProviderModelPicker", () => {
       />
     ));
 
-    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna" }));
+    await fireEvent.click(view.getByRole("button", { name: "Agent model: GPT-5.6 Luna · Medium" }));
     const dialog = view.getByRole("dialog", { name: "Choose agent model" });
     await fireEvent.click(within(dialog).getByRole("option", { name: "GPT-5.6 Sol" }));
 
     expect(onChange).toHaveBeenCalledWith("gpt-5.6-sol", "codex");
     expect(dialog).toBeInTheDocument();
-    const effortSelect = within(dialog).getByRole("button", { name: /Agent reasoning effort/ });
-    await fireEvent.pointerDown(effortSelect, { pointerType: "mouse", button: 0 });
-    const page = within(document.body);
-    expect(await page.findByRole("option", { name: "Medium" })).toBeInTheDocument();
-    expect(page.getByRole("option", { name: "High" })).toBeInTheDocument();
-    expect(page.queryByRole("option", { name: "Low" })).not.toBeInTheDocument();
+    const efforts = within(within(dialog).getByRole("radiogroup", { name: "Agent reasoning effort" }));
+    expect(efforts.getByRole("radio", { name: "Medium" })).toBeChecked();
+    expect(efforts.getByRole("radio", { name: "High" })).toBeInTheDocument();
+    expect(efforts.queryByRole("radio", { name: "Low" })).not.toBeInTheDocument();
 
-    await fireEvent.click(page.getByRole("option", { name: "Extra high" }));
+    await fireEvent.click(efforts.getByRole("radio", { name: "Extra high" }));
     expect(onReasoningEffortChange).toHaveBeenCalledWith("xhigh");
-    expect(effortSelect).toHaveTextContent("Extra high");
+    expect(efforts.getByRole("radio", { name: "Extra high" })).toBeChecked();
+    expect(view.getByRole("button", { name: "Agent model: GPT-5.6 Sol · Extra high" })).toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
   });
 
@@ -290,13 +289,11 @@ it("searches by service or model and restores the list when search is cleared", 
 
 it("selects OpenCode reasoning model IDs and can return to the default model", async () => {
   const { dialog, onChange } = await openOpenCodePicker();
-  const effort = dialog.getByRole("button", { name: /Agent reasoning effort/ });
-  expect(effort).toHaveTextContent("Low");
-  await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-  await fireEvent.click(await within(document.body).findByRole("option", { name: "High" }));
+  const effort = within(dialog.getByRole("radiogroup", { name: "Agent reasoning effort" }));
+  expect(effort.getByRole("radio", { name: "Low" })).toBeChecked();
+  await fireEvent.click(effort.getByRole("radio", { name: "High" }));
   expect(onChange).toHaveBeenLastCalledWith("opencode/free/high", "opencode");
-  await fireEvent.pointerDown(effort, { pointerType: "mouse", button: 0 });
-  await fireEvent.click(await within(document.body).findByRole("option", { name: "Default" }));
+  await fireEvent.click(effort.getByRole("radio", { name: "Default" }));
   expect(onChange).toHaveBeenLastCalledWith("opencode/free", "opencode");
 });
 
