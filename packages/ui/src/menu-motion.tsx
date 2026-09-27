@@ -27,6 +27,23 @@ interface HeldSubmenu {
 
 let held: HeldSubmenu | undefined;
 
+/** The scroll offsets of a copy, by the index of the element in the copy. A clone does not keep them. */
+const scrollOffsets = new WeakMap<HTMLElement, Array<[index: number, top: number, left: number]>>();
+
+/** Puts a copy on the page, and gives back the scroll offsets that the insertion resets. */
+function insertCopy(copy: HTMLElement, parent: Node): void {
+  parent.appendChild(copy);
+  const offsets = scrollOffsets.get(copy);
+  if (!offsets) return;
+  const elements = copy.querySelectorAll("*");
+  for (const [index, top, left] of offsets) {
+    const element = elements[index];
+    if (!element) continue;
+    element.scrollTop = top;
+    element.scrollLeft = left;
+  }
+}
+
 function motionAllowed(element: HTMLElement): boolean {
   return typeof element.animate === "function" && !prefersReducedMotion();
 }
@@ -77,6 +94,12 @@ function leave(panel: HTMLElement, place: Node | null): void {
   // The copy is made now, while the content is still whole.
   const copy = positioner.cloneNode(true);
   if (!(copy instanceof HTMLElement)) return;
+  const offsets: Array<[number, number, number]> = [];
+  for (const [index, element] of Array.from(positioner.querySelectorAll("*")).entries()) {
+    if (element.scrollTop !== 0 || element.scrollLeft !== 0)
+      offsets.push([index, element.scrollTop, element.scrollLeft]);
+  }
+  if (offsets.length > 0) scrollOffsets.set(copy, offsets);
   const copyPanel = panel.id ? copy.querySelector<HTMLElement>(`#${CSS.escape(panel.id)}`) : null;
   if (!copyPanel) return;
   copy.inert = true;
@@ -109,11 +132,11 @@ function leave(panel: HTMLElement, place: Node | null): void {
       return;
     }
     if (held?.copy === copy) {
-      document.body.append(copy);
+      insertCopy(copy, document.body);
       return;
     }
     // Content without a portal goes back into its parent, so that its position stays right.
-    (place?.isConnected ? place : document.body).appendChild(copy);
+    insertCopy(copy, place?.isConnected ? place : document.body);
     playExit(copy, copyPanel);
   });
 }
@@ -150,7 +173,7 @@ function handOff(from: HeldSubmenu, panel: HTMLElement): void {
     const size = (rect: DOMRect) => ({ width: `${rect.width}px`, height: `${rect.height}px` });
 
     // The old copy stays on top: its items leave over the new panel.
-    document.body.append(from.copy);
+    insertCopy(from.copy, document.body);
     from.panel.dataset.menuSwapOut = "";
 
     panel.animate(
