@@ -27,7 +27,7 @@ import { join } from "node:path";
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { expect, vi } from "vitest";
-import type { RemoteHostSummary } from "./central-auth-manager";
+import type { RemoteHostSummary } from "./central-auth-records";
 import { RemoteServerManager } from "./remote-server-manager";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";

@@ -19,7 +19,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
-import type { RemoteInviteRecord, RemoteMemberRecord } from "./central-auth-manager";
+import type { RemoteInviteRecord, RemoteMemberRecord } from "./central-auth-records";
 import { decodeVoid } from "./remote-host-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import type { RemoteServerDirectory } from "./remote-server-store";
