@@ -45,7 +45,8 @@ before the push.
 
 For a UI change, run the `smoke` skill and take before and after
 screenshots. Upload them with `gh pr create --attach` or
-`gh pr edit --attach`. Do not commit them.
+`gh pr edit --attach` (gh 2.101 or later; run `gh --version`). Do not
+commit them.
 
 ## Gate 2 — Open the pull request
 
