@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { parseHostedSiteUploadRequest } from "../../../server/hosted-site-contract";
+import { HOSTED_SITE_LIMITS, parseHostedSiteUploadRequest } from "../../../server/hosted-site-contract";
 import { readJsonObject } from "../../../server/json-body";
 import {
   apiError,
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/v1/sites/")({
         try {
           const user = await requestUser(request);
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json({ sites: await requestHostedSiteService().list(user.id), limit: 10 });
+          return json({ sites: await requestHostedSiteService().list(user.id), limit: HOSTED_SITE_LIMITS.activeSites });
         } catch (error) {
           return hostedSiteErrorResponse(error);
         }

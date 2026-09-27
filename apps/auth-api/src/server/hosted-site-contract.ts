@@ -1,5 +1,6 @@
 import {
   checkHostedSitePath,
+  HOSTED_SITE_ACTIVE_LIMIT,
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UPLOAD_LIMITS,
   type HostedSitePathProblem,
@@ -8,7 +9,7 @@ import type { HostedSiteFramework } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
 export const HOSTED_SITE_LIMITS = {
-  activeSites: 10,
+  activeSites: HOSTED_SITE_ACTIVE_LIMIT,
   concurrentUploads: 2,
   concurrentFileUploads: 2,
   uploadAttemptMultiplier: 2,

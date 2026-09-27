@@ -1,4 +1,4 @@
-import type { HostedSiteStatus } from "./ipc-hosted-sites";
+import type { HostedSiteStatus, HostedSiteSummary } from "./ipc-hosted-sites";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 /**
@@ -12,6 +12,9 @@ export const HOSTED_SITE_UPLOAD_LIMITS = {
   pathLength: 240,
   uploadLifetimeMs: 15 * 60_000,
 } as const;
+
+/** The number of sites that one account can keep active. */
+export const HOSTED_SITE_ACTIVE_LIMIT = 10;
 
 /** The MIME types allowed for each file extension. The desktop sends the first one. */
 export const HOSTED_SITE_MIME_TYPES: Readonly<Record<string, readonly [string, ...string[]]>> = {
@@ -60,6 +63,39 @@ export function checkHostedSitePath(value: string): { path: string } | { problem
 
 export function isHostedSiteStatus(value: unknown): value is HostedSiteStatus {
   return value === "active" || value === "deleted" || value === "expired" || value === "blocked";
+}
+
+/** Returns null for a value that is not a site summary in the desktop shape. */
+export function parseHostedSiteSummary(value: unknown): HostedSiteSummary | null {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.id) ||
+    !isString(value.hostname) ||
+    !isString(value.url) ||
+    !isString(value.title) ||
+    !isString(value.description) ||
+    (value.framework !== "vanilla" && value.framework !== "astro") ||
+    !isHostedSiteStatus(value.status) ||
+    !isNumber(value.fileCount) ||
+    !isNumber(value.size) ||
+    (value.expiresAt !== null && !isString(value.expiresAt)) ||
+    !isString(value.updatedAt)
+  ) {
+    return null;
+  }
+  return {
+    id: value.id,
+    hostname: value.hostname,
+    url: value.url,
+    title: value.title,
+    description: value.description,
+    framework: value.framework,
+    status: value.status,
+    fileCount: value.fileCount,
+    size: value.size,
+    expiresAt: value.expiresAt,
+    updatedAt: value.updatedAt,
+  };
 }
 
 export interface HostedSiteRouteFile {

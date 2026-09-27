@@ -290,7 +290,11 @@ export class HostedSiteService {
         throw new HostedSiteInputError(429, "upload_session_limit", "Finish or wait for an existing upload first.");
       }
       await this.enforceCreationRate(userId, now);
-      throw new HostedSiteInputError(409, "site_limit", "This account already has 10 active sites.");
+      throw new HostedSiteInputError(
+        409,
+        "site_limit",
+        `This account already has ${HOSTED_SITE_LIMITS.activeSites} active sites.`,
+      );
     }
     return this.uploadSession(await this.requireDeployment(userId, deploymentId));
   }
@@ -905,7 +909,11 @@ export class HostedSiteService {
           throw inactiveSiteError("expired");
         }
         if ((await this.activeSiteSlotCount(userId, site.id, now)) >= HOSTED_SITE_LIMITS.activeSites) {
-          throw new HostedSiteInputError(409, "site_limit", "This account already has 10 active sites.");
+          throw new HostedSiteInputError(
+            409,
+            "site_limit",
+            `This account already has ${HOSTED_SITE_LIMITS.activeSites} active sites.`,
+          );
         }
         throw new HostedSiteInputError(409, "activation_superseded", "A newer site deployment is active.");
       }

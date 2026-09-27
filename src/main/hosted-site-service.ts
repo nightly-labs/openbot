@@ -7,7 +7,7 @@ import {
   HOSTED_SITE_MIME_TYPES,
   HOSTED_SITE_UPLOAD_LIMITS,
   type HostedSitePathProblem,
-  isHostedSiteStatus,
+  parseHostedSiteSummary,
 } from "@openbot/contracts/hosted-sites";
 import type {
   HostedSiteFramework,
@@ -15,7 +15,7 @@ import type {
   PublishHostedSiteInput,
   ReplaceHostedSiteInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { isMissingFileError } from "../backend/file-errors";
 
@@ -310,34 +310,9 @@ function decodeSiteList(value: unknown): { sites: HostedSiteSummary[] } {
 }
 
 function decodeSite(value: unknown): HostedSiteSummary {
-  if (
-    !isDynamicRecord(value) ||
-    !isString(value.id) ||
-    !isString(value.hostname) ||
-    !isString(value.url) ||
-    !isString(value.title) ||
-    !isString(value.description) ||
-    (value.framework !== "vanilla" && value.framework !== "astro") ||
-    !isNumber(value.fileCount) ||
-    !isNumber(value.size) ||
-    (value.expiresAt !== null && !isString(value.expiresAt)) ||
-    !isString(value.updatedAt)
-  ) {
-    throw new Error("The site response is invalid.");
-  }
-  return {
-    id: value.id,
-    hostname: value.hostname,
-    url: value.url,
-    title: value.title,
-    description: value.description,
-    framework: value.framework,
-    status: decodeSiteStatus(value.status),
-    fileCount: value.fileCount,
-    size: value.size,
-    expiresAt: value.expiresAt,
-    updatedAt: value.updatedAt,
-  };
+  const site = parseHostedSiteSummary(value);
+  if (!site) throw new Error("The site response is invalid.");
+  return site;
 }
 
 function decodeUploadSession(value: unknown): UploadSession {
@@ -397,11 +372,6 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy.buffer;
-}
-
-function decodeSiteStatus(value: unknown): HostedSiteSummary["status"] {
-  if (isHostedSiteStatus(value)) return value;
-  throw new Error("The hosted site status is invalid.");
 }
 
 function isInside(root: string, target: string): boolean {

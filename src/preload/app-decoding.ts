@@ -5,7 +5,7 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
-import { isHostedSiteStatus } from "@openbot/contracts/hosted-sites";
+import { parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
   type AnalyticsPreference,
@@ -247,35 +247,9 @@ export function decodeAgentImportSkill(value: unknown): string {
 export const decodeVoid = emptyDecoder("IPC returned unexpected data.");
 
 export function decodeHostedSite(value: unknown): HostedSiteSummary {
-  const site = decodeRecord(value, "hosted site");
-  if (
-    !isString(site.id) ||
-    !isString(site.hostname) ||
-    !isString(site.url) ||
-    !isString(site.title) ||
-    !isString(site.description) ||
-    (site.framework !== "vanilla" && site.framework !== "astro") ||
-    !isHostedSiteStatus(site.status) ||
-    !isNumber(site.fileCount) ||
-    !isNumber(site.size) ||
-    (site.expiresAt !== null && !isString(site.expiresAt)) ||
-    !isString(site.updatedAt)
-  ) {
-    throw new Error("Invalid hosted site response.");
-  }
-  return {
-    id: site.id,
-    hostname: site.hostname,
-    url: site.url,
-    title: site.title,
-    description: site.description,
-    framework: site.framework,
-    status: site.status,
-    fileCount: site.fileCount,
-    size: site.size,
-    expiresAt: site.expiresAt,
-    updatedAt: site.updatedAt,
-  };
+  const site = parseHostedSiteSummary(value);
+  if (!site) throw new Error("Invalid hosted site response.");
+  return site;
 }
 
 export function decodeHostedSites(value: unknown): HostedSiteSummary[] {
