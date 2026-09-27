@@ -15,7 +15,7 @@ import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/Cust
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { createCustomProviderHostState } from "../custom-providers/custom-provider-host-state";
 import { FREE_PROVIDER, onboardingProviderRows } from "./onboarding-provider-rows";
@@ -58,11 +58,14 @@ export interface SetupProviderProps {
 /** The choice a screen opens with. A review opens with the saved one; the first run with none. */
 export interface SetupProviderChoice {
   provider: AgentProviderId | null;
-  /** Set when the saved model is one of a custom endpoint, so the custom row holds the check. */
-  customModel: AgentModelId | null;
+  /**
+   * Set when the saved model is one of a custom endpoint, so the custom row holds the check. The
+   * endpoint list loads after the screen opens, so the value can arrive late.
+   */
+  customModel: () => AgentModelId | null;
 }
 
-export const SETUP_PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> =
+const SETUP_PROVIDERS: Array<{ id: AgentProviderId; name: string; description: string }> =
   AGENT_PROVIDER_DESCRIPTORS.map((descriptor) => ({
     id: descriptor.id,
     name: descriptor.displayName,
@@ -83,7 +86,7 @@ const PROVIDER_DESCRIPTION_KEYS: Readonly<Record<string, AppTextKey>> = {
  * Whether setup can continue with this provider. A signed-in provider can; so can a downloaded
  * provider that runs free models, because it has no sign-in to wait for.
  */
-export function providerReady(option: ProviderPickerOption): boolean {
+function providerReady(option: ProviderPickerOption): boolean {
   return option.state === "available" || freeModelsReady(option);
 }
 
@@ -97,7 +100,7 @@ export function savedCustomModel(
   return (customProviders ?? []).some((endpoint) => model.startsWith(`${endpoint.id}/`)) ? model : null;
 }
 
-export type SetupProviders = ReturnType<typeof createSetupProviders>;
+type SetupProviders = ReturnType<typeof createSetupProviders>;
 
 /**
  * The provider step of setup: its rows, its choice, the actions on a row, and the errors those
@@ -112,15 +115,19 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
    * stays `opencode` beside it, because that is the provider setup records: which endpoint an agent
    * uses is a model choice, which comes later than this step.
    */
-  const [customSelected, setCustomSelected] = createSignal(Boolean(initial?.customModel));
+  const [customSelected, setCustomSelected] = createSignal(Boolean(untrack(() => initial?.customModel())));
   /**
    * The model a new agent starts on while the custom row holds the choice. Only an endpoint saved
    * here names one: the user listed its models in the dialog a moment ago, and nothing else on this
    * screen chooses a model. Without one the provider falls back to the first model it lists.
    */
-  const [customModel, setCustomModel] = createSignal<AgentModelId | null>(initial?.customModel ?? null);
+  const [customModel, setCustomModel] = createSignal<AgentModelId | null>(
+    untrack(() => initial?.customModel()) ?? null,
+  );
   // A saved choice is the user's own, so the automatic choice below does not replace it.
   const [providerSelectedByUser, setProviderSelectedByUser] = createSignal(Boolean(initial?.provider));
+  /** The user chose a row on this screen, so a late saved choice does not replace it. */
+  let choiceChanged = false;
   const [openCodeKeyOpen, setOpenCodeKeyOpen] = createSignal(false);
   const [error, setError] = createSignal("");
   const [providerErrors, setProviderErrors] = createSignal<Partial<Record<AgentProviderId, string>>>({});
@@ -191,6 +198,7 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
   /** Chooses a row, or a provider in "More providers", which then becomes a row. */
   function chooseProvider(provider: AgentProviderId): void {
     keepProviderRows(provider);
+    choiceChanged = true;
     setProviderSelectedByUser(true);
     setSelectedProvider(provider);
     setCustomSelected(false);
@@ -251,10 +259,20 @@ export function createSetupProviders(props: SetupProviderProps, initial?: SetupP
   /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
   function selectCustomProvider(): void {
     keepProviderRows();
+    choiceChanged = true;
     setProviderSelectedByUser(true);
     setSelectedProvider("opencode");
     setCustomSelected(true);
   }
+
+  createEffect(
+    () => initial?.customModel() ?? null,
+    (model) => {
+      if (!model || choiceChanged || customSelected()) return;
+      setCustomSelected(true);
+      setCustomModel(model);
+    },
+  );
 
   const selectedProviderConnected = createMemo(() => {
     const selected = selectedProvider();

@@ -12,7 +12,7 @@ import {
 import { Button, Dialog, Textarea } from "@openbot/ui";
 import { InvitePreviewCard } from "@openbot/ui/features/servers/JoinServerDialog";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import {
   createSetupProviders,
@@ -53,13 +53,17 @@ export function InitialSetup(props: InitialSetupProps) {
   const [route, setRoute] = createSignal<SetupRoute | null>(
     untrack(() => (props.reviewing ? "local" : initialInviteUrl ? "remote" : null)),
   );
-  /** The saved endpoint model, when the saved choice is the custom row. */
-  const initialCustomModel = untrack(() =>
-    savedCustomModel(props.state.preferredProvider, props.state.preferredModel, props.customProviders),
+  /**
+   * The saved endpoint model, when the saved choice is the custom row. The state is the one saved
+   * when the screen opened; the endpoint list can load later.
+   */
+  const savedState = untrack(() => props.state);
+  const savedEndpointModel = createMemo(() =>
+    savedCustomModel(savedState.preferredProvider, savedState.preferredModel, props.customProviders),
   );
   const providers = createSetupProviders(props, {
-    provider: untrack(() => props.state.preferredProvider),
-    customModel: initialCustomModel,
+    provider: savedState.preferredProvider,
+    customModel: savedEndpointModel,
   });
   const selectedProvider = providers.selectedProvider;
   const setError = providers.setError;
@@ -99,7 +103,7 @@ export function InitialSetup(props: InitialSetupProps) {
       // model was the custom row's: the user chose another row, so that model must go.
       await props.onSave(
         provider,
-        providers.customSelected() ? providers.customModel() : initialCustomModel ? null : undefined,
+        providers.customSelected() ? providers.customModel() : savedEndpointModel() ? null : undefined,
       );
     } catch (cause) {
       setError(errorMessage(cause, t("onboarding.setup.saveFailed")));
