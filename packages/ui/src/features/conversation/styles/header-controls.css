@@ -148,6 +148,12 @@
   overflow: visible;
 }
 
+/* A name without SwapLabel, such as a static copy of the trigger, clips itself. */
+.provider-model-trigger-name:not(.ui-swap) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .provider-model-trigger-name > span:not(.ui-swap-leaving) {
   display: block;
   overflow: hidden;
@@ -517,7 +523,7 @@
   cursor: inherit;
 }
 
-.provider-model-effort-segment-control:hover,
+.provider-model-effort-segment-control:hover:not([data-disabled]),
 .provider-model-effort-segment-control[data-checked] {
   color: var(--openbot-text-primary);
 }

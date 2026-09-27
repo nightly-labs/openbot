@@ -805,14 +805,25 @@ function EffortSegments(props: {
       {/* Keyed by id: the options are new objects when the effort changes, and a new radio would
           take the keyboard focus away. */}
       <For each={props.options} keyed={(option) => option.id}>
-        {(option) => (
-          <RadioGroup.Item class="provider-model-effort-segment" value={option().id}>
-            <RadioGroup.ItemInput />
-            <RadioGroup.ItemControl class="provider-model-effort-segment-control">
-              <RadioGroup.ItemLabel>{option().name}</RadioGroup.ItemLabel>
-            </RadioGroup.ItemControl>
-          </RadioGroup.Item>
-        )}
+        {(option) => {
+          // A new label changes the segment widths without a new choice, so each segment is watched.
+          let control: HTMLElement | undefined;
+          onCleanup(() => control && resize.unobserve(control));
+          return (
+            <RadioGroup.Item class="provider-model-effort-segment" value={option().id}>
+              <RadioGroup.ItemInput />
+              <RadioGroup.ItemControl
+                ref={(element: HTMLElement) => {
+                  control = element;
+                  resize.observe(element);
+                }}
+                class="provider-model-effort-segment-control"
+              >
+                <RadioGroup.ItemLabel>{option().name}</RadioGroup.ItemLabel>
+              </RadioGroup.ItemControl>
+            </RadioGroup.Item>
+          );
+        }}
       </For>
     </RadioGroup.Root>
   );

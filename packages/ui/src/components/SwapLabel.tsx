@@ -1,10 +1,11 @@
+import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, untrack } from "solid-js";
 
 const COUNT_LABEL = /^(\d+)(\D.*)$/;
 
-/** No motion when the user asks for less, or where the page cannot animate an element. */
+/** No motion when the user asks for less, or where the page cannot animate an element (jsdom). */
 function motionAllowed(element: HTMLElement): boolean {
-  return "animate" in element && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === false;
+  return "animate" in element && !prefersReducedMotion();
 }
 
 function fillLabel(target: HTMLElement, text: string): HTMLElement | undefined {
@@ -61,6 +62,8 @@ export function SwapLabel(props: { text: string; from?: string | undefined; clas
       });
       const leaving = document.createElement("span");
       leaving.className = "ui-swap-leaving";
+      // The old text is only a picture of the change; assistive technology reads the new text once.
+      leaving.setAttribute("aria-hidden", "true");
       box.append(leaving);
       if (fromCount && toCount && digits && fromCount[2] === toCount[2]) {
         const direction = Number(toCount[1]) > Number(fromCount[1]) ? 1 : -1;
