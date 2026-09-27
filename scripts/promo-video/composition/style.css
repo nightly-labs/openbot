@@ -1,0 +1,268 @@
+@import "@fontsource-variable/inter";
+@import "@openbot/brand/tokens.css";
+
+/* Every color is a brand token. The video only mixes them. */
+:root {
+  --promo-black: var(--openbot-bg-notch);
+  --promo-lilac: var(--openbot-logo-production);
+  --promo-eye: var(--openbot-logo-eye);
+  --promo-white: var(--openbot-text-primary);
+  --promo-grid: var(--openbot-hero-grid-line);
+  --promo-grid-bright: color-mix(in srgb, var(--openbot-logo-production) 60%, transparent);
+  --promo-glow: color-mix(in srgb, var(--openbot-logo-production) 30%, transparent);
+  --promo-split-warm: color-mix(in srgb, var(--openbot-badge-new) 70%, transparent);
+  --promo-split-cool: color-mix(in srgb, var(--openbot-accent-text) 70%, transparent);
+}
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--promo-black);
+}
+
+#stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  transform-origin: 0 0;
+  background: var(--promo-black);
+  color: var(--promo-white);
+  font-family: var(--openbot-font-sans);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+}
+
+.camera {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.backdrop {
+  position: absolute;
+  inset: -8%;
+}
+
+.grid {
+  position: absolute;
+  inset: -20%;
+  background-image:
+    linear-gradient(90deg, var(--promo-grid) 2px, var(--openbot-transparent) 2px),
+    linear-gradient(180deg, var(--promo-grid) 2px, var(--openbot-transparent) 2px);
+  background-size: 96px 96px;
+  background-position: center;
+  mask-image: radial-gradient(60% 60% at 50% 45%, var(--openbot-mask-solid) 30%, var(--openbot-transparent) 100%);
+}
+
+.grid-bright {
+  background-image:
+    linear-gradient(90deg, var(--promo-grid-bright) 2px, var(--openbot-transparent) 2px),
+    linear-gradient(180deg, var(--promo-grid-bright) 2px, var(--openbot-transparent) 2px);
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(50% 55% at 50% 0%, var(--promo-glow), var(--openbot-transparent) 70%);
+}
+
+.spot {
+  position: absolute;
+  width: 1400px;
+  height: 1000px;
+  left: 50%;
+  top: 50%;
+  margin: -500px 0 0 -700px;
+  border-radius: 50%;
+  filter: blur(120px);
+}
+
+canvas.fx {
+  position: absolute;
+  inset: 0;
+  width: 1920px;
+  height: 1080px;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  background: var(--promo-white);
+  opacity: 0;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% 50%,
+    var(--openbot-transparent) 55%,
+    color-mix(in srgb, var(--promo-black) 70%, transparent) 100%
+  );
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: overlay;
+  opacity: 0.1;
+}
+
+.logo {
+  position: absolute;
+  overflow: visible;
+}
+
+.logo-eye {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 9.5px;
+}
+
+.center {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1920px;
+  height: 1080px;
+}
+
+.word,
+.text,
+.price,
+.price-glow,
+.avatar,
+.glass {
+  top: 0;
+  left: 0;
+}
+
+.word {
+  position: absolute;
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.outline {
+  color: var(--openbot-transparent);
+  -webkit-text-stroke: 3px var(--promo-lilac);
+}
+
+.glass {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--openbot-glass-surface);
+  border: 2px solid var(--openbot-glass-border);
+  box-shadow:
+    inset 0 2px 0 var(--openbot-glass-highlight),
+    0 40px 120px var(--openbot-glass-shadow);
+  backdrop-filter: blur(28px) saturate(140%);
+}
+
+.text {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.muted {
+  color: var(--openbot-text-muted);
+}
+
+.secondary {
+  color: var(--openbot-text-secondary);
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-radius: 999px;
+}
+
+.avatar {
+  position: absolute;
+  overflow: visible;
+}
+
+.price {
+  position: absolute;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+  white-space: nowrap;
+  color: var(--openbot-transparent);
+  background-image:
+    linear-gradient(
+      180deg,
+      var(--openbot-price-sheen-cool-clear) 36%,
+      var(--openbot-price-sheen-cool-soft) 44%,
+      var(--openbot-price-sheen-cool) 47.5%,
+      var(--openbot-price-sheen-light) 50%,
+      var(--openbot-price-sheen-warm) 52.5%,
+      var(--openbot-price-sheen-warm-soft) 56%,
+      var(--openbot-price-sheen-warm-clear) 64%
+    ),
+    /* The landing page metal, lifted toward white so that it reads on a dark frame. */
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--promo-white) 92%, var(--openbot-price-metal-high)) 0%,
+      color-mix(in srgb, var(--promo-white) 70%, var(--openbot-price-metal-core)) 44%,
+      color-mix(in srgb, var(--promo-white) 34%, var(--openbot-price-metal-core)) 58%,
+      color-mix(in srgb, var(--promo-white) 82%, var(--openbot-price-metal-low)) 100%
+    );
+  background-repeat: no-repeat;
+  background-size:
+    100% 200%,
+    100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.price-glow {
+  position: absolute;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+  white-space: nowrap;
+  color: var(--openbot-price-glow);
+  filter: blur(56px);
+}
+
+.player {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--openbot-bg-overlay);
+  color: var(--openbot-text-secondary);
+  font: 13px var(--openbot-font-mono);
+}
+
+.player input {
+  flex: 1;
+}
+
+.hero {
+  font-weight: 500;
+  letter-spacing: -0.065em;
+}

@@ -11,7 +11,8 @@
     "./tokens.css": "./src/tokens.css",
     "./tokens-native.css": "./src/tokens-native.css",
     "./article-gradient": "./src/article-gradient.ts",
-    "./app-logo-shape": "./src/app-logo-shape.ts"
+    "./app-logo-shape": "./src/app-logo-shape.ts",
+    "./provider-logo-shape": "./src/provider-logo-shape.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
