@@ -7,11 +7,11 @@ always a `*-store.ts`, and `central-auth-manager.ts`, `main-window-state.ts` and
 `skill-marketplace-service.ts` are three that are not:
 
 ```bash
-git grep -lE 'version *(!==|===) *[0-9]|version: *z\.literal' <tag> HEAD -- \
+git grep -liE 'version *(!==|===) *[0-9]|version: *z\.literal' <tag> HEAD -- \
   'src/main/*.ts' 'src/backend/*.ts' ':(exclude)*.test.ts' | sed 's/^[^:]*://' | sort -u
 ```
 
-The gate fires if the release diff touches any file that prints. Three deliberate details:
+The gate fires if the release diff touches any file that prints. Four deliberate details:
 
 - **Both revisions, unioned.** Searching `HEAD` alone means *removing* a version guard removes the
   file from the result, hiding the change most worth auditing. The tag alone misses an owner the
@@ -20,6 +20,8 @@ The gate fires if the release diff touches any file that prints. Three deliberat
   and matches no comparison operator. Widen the pattern when you meet a third spelling rather than
   trusting this one.
 - **No `\b`** — `git grep -E` is POSIX ERE, where it matches nothing and the list comes back empty.
+- **`-i`** — a prefixed field such as `layoutVersion !== 2` (`sidebar-layout-store.ts`) has a
+  capital `V`, and a case-sensitive search skips it.
 
 The list is still only a starting point, and it is short enough to eyeball: if it prints nothing, or
 far less than the file inventory in `references/surfaces.md`, the pattern is broken rather than the
