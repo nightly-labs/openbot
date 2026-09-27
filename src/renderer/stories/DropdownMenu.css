@@ -1,0 +1,102 @@
+/* Parts that only the DropdownMenu story draws. The menu look comes from @openbot/ui. */
+
+:root {
+  --story-cluster-move: var(--openbot-duration-overlay) var(--ui-menu-ease);
+  --story-cluster-spring: 420ms cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+
+.dropdown-story-avatar {
+  position: relative;
+  display: block;
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--story-avatar-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 12%, transparent);
+}
+
+.dropdown-story-avatar > svg {
+  position: absolute;
+  inset: 18%;
+  width: 64%;
+  height: 64%;
+  fill: var(--story-avatar-fg, var(--openbot-text-primary));
+}
+
+.dropdown-story-trigger {
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  padding-inline: var(--openbot-space-2) calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+}
+
+.dropdown-story-trigger > .ui-menu-trailing {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+/* The story sets the place of each avatar; the transitions move it there. */
+.dropdown-story-cluster {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  transition:
+    width var(--story-cluster-move),
+    margin var(--story-cluster-move),
+    opacity var(--story-cluster-move);
+}
+
+.dropdown-story-cluster[data-empty] {
+  width: 0;
+  margin-right: calc(var(--openbot-space-2) * -1);
+  opacity: 0;
+}
+
+.dropdown-story-cluster > * {
+  position: absolute;
+  transition:
+    left var(--story-cluster-move),
+    top var(--story-cluster-move),
+    width var(--story-cluster-move),
+    height var(--story-cluster-move),
+    opacity var(--story-cluster-spring),
+    scale var(--story-cluster-spring),
+    filter var(--story-cluster-spring);
+}
+
+.dropdown-story-cluster > [data-hidden] {
+  opacity: 0;
+  scale: 0.9;
+  filter: blur(2px);
+  transition-duration:
+    var(--openbot-duration-overlay), var(--openbot-duration-overlay), var(--openbot-duration-overlay),
+    var(--openbot-duration-overlay), 140ms, 140ms, 140ms;
+  transition-timing-function:
+    var(--ui-menu-ease), var(--ui-menu-ease), var(--ui-menu-ease), var(--ui-menu-ease), cubic-bezier(0.4, 0, 1, 1),
+    cubic-bezier(0.4, 0, 1, 1), cubic-bezier(0.4, 0, 1, 1);
+}
+
+.dropdown-story-cluster > .dropdown-story-avatar {
+  outline: 1px solid var(--openbot-bg-canvas);
+}
+
+.dropdown-story-cluster-spare {
+  left: 12.5px;
+  top: 12.5px;
+  width: 11.5px;
+  height: 11.5px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+}
+
+.ui-action-menu[data-painting] {
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-story-cluster,
+  .dropdown-story-cluster > * {
+    transition: none;
+  }
+}

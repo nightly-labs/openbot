@@ -684,10 +684,75 @@ export class MailboxStore {
     ) {
       return null;
     }
-    const delivery = this.#state.deliveries
+    const delivery = this.#queuedFor(agentId).find((candidate) => !this.#isHeldReply(candidate));
+    return delivery && this.#mayStart(delivery) ? this.#context(delivery) : null;
+  }
+
+  /**
+   * The teammate answers that start in the same turn as this delivery. For an answer, these are the
+   * other answers to the same request. For a message from the person, these are the answers that
+   * wait for a slow teammate: the person writes before all answers are in, so they are read now.
+   */
+  repliesToStartWith(deliveryId: string): DeliveryContext[] {
+    const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!next) return [];
+    const message = this.#requireMessage(next.messageId);
+    const requestId = isAnswer(message) ? message.replyToMessageId : null;
+    if (message.sender.kind !== "user" && !requestId) return [];
+    return this.#queuedFor(next.recipientAgentId)
+      .filter((candidate) => {
+        if (candidate.id === next.id || !this.#mayStart(candidate)) return false;
+        if (!requestId) return this.#isHeldReply(candidate);
+        const reply = this.#requireMessage(candidate.messageId);
+        return isAnswer(reply) && reply.replyToMessageId === requestId;
+      })
+      .map((delivery) => this.#context(delivery));
+  }
+
+  /** The agents that were sent a request and whose delivery ended with no answer. */
+  unansweredRecipients(requestId: string): string[] {
+    return this.#state.deliveries
+      .filter(
+        (delivery) =>
+          delivery.messageId === requestId &&
+          (delivery.status === "failed" || delivery.status === "interrupted" || delivery.status === "cancelled") &&
+          !this.hasReplyFrom(delivery.recipientAgentId, requestId),
+      )
+      .map((delivery) => delivery.recipientAgentId);
+  }
+
+  #queuedFor(agentId: string): StoredDelivery[] {
+    return this.#state.deliveries
       .filter((candidate) => candidate.recipientAgentId === agentId && candidate.status === "queued")
-      .sort(compareQueueOrder)[0];
-    return delivery && !delivery.editId && !this.#queueUpdates.has(delivery.id) ? this.#context(delivery) : null;
+      .sort(compareQueueOrder);
+  }
+
+  #mayStart(delivery: StoredDelivery): boolean {
+    return !delivery.editId && !this.#queueUpdates.has(delivery.id);
+  }
+
+  /**
+   * An answer to a request that its recipient sent to several teammates waits while another of them
+   * has the request still queued or running. So the requester reads all the answers in one turn,
+   * not one turn for each answer.
+   */
+  #isHeldReply(delivery: StoredDelivery): boolean {
+    const reply = this.#requireMessage(delivery.messageId);
+    if (!isAnswer(reply)) return false;
+    const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
+    if (
+      request?.sender.kind !== "agent" ||
+      request.sender.agentId !== delivery.recipientAgentId ||
+      request.expectsReply === false
+    )
+      return false;
+    const answeredBy = reply.sender.agentId;
+    return this.#state.deliveries.some(
+      (candidate) =>
+        candidate.messageId === request.id &&
+        candidate.recipientAgentId !== answeredBy &&
+        (candidate.status === "queued" || candidate.status === "starting" || candidate.status === "running"),
+    );
   }
 
   queuedDeliveryIds(agentId: string): string[] {
@@ -724,6 +789,16 @@ export class MailboxStore {
         candidate.recipientAgentId === agentId && candidate.status === "starting" && candidate.turnId === null,
     );
     return delivery ? this.#context(delivery) : null;
+  }
+
+  /** Every delivery that starts the next turn of this agent: one, or several teammate answers. */
+  startingDeliveriesForAgent(agentId: string): DeliveryContext[] {
+    return this.#state.deliveries
+      .filter(
+        (candidate) =>
+          candidate.recipientAgentId === agentId && candidate.status === "starting" && candidate.turnId === null,
+      )
+      .map((delivery) => this.#context(delivery));
   }
 
   /**
@@ -1802,4 +1877,11 @@ function queueSaveHash(text: string, keepAttachmentIds: string[], attachmentDraf
  */
 function recordFinishedQueueEdit(delivery: StoredDelivery, editId: string, outcome: StoredFinishedEdit): void {
   delivery.finishedEditOutcomes = { ...(delivery.finishedEditOutcomes ?? {}), [editId]: outcome };
+}
+
+/** An agent's answer to a request. A linked message that asks for a reply is a new request. */
+function isAnswer(
+  message: StoredMessage,
+): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
+  return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
 }

@@ -844,9 +844,10 @@ textarea {
   overflow: hidden;
   flex: 0 1 auto;
   justify-content: flex-start;
+  gap: var(--openbot-space-1-5);
   margin-right: auto;
-  border-radius: var(--openbot-radius-sm);
-  padding: 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-pill);
+  padding: 0 var(--openbot-space-2) 0 var(--openbot-space-1);
   color: var(--openbot-text-primary);
   cursor: pointer;
   font-size: var(--openbot-text-md);
@@ -862,17 +863,52 @@ textarea {
     opacity var(--openbot-duration-fast) ease;
 }
 
+.sidebar-server-name[aria-expanded="true"] {
+  background: var(--ui-menu-item-hover);
+}
+
+.sidebar-server-name > .sidebar-server-name-mark {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+/* The logo of a newly selected server springs in. */
+.sidebar-server-name-mark[data-entering] {
+  animation: sidebar-server-mark-in 420ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+
+/* No overflow clip here: the old name blurs out past the box. The name itself ends in an ellipsis. */
 .sidebar-server-name-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 1 auto;
   white-space: nowrap;
 }
 
-.sidebar-server-name-chevron {
+.sidebar-server-name-label > span:not(.ui-swap-leaving) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-server-name > .sidebar-server-name-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   flex: 0 0 auto;
-  margin-left: var(--openbot-space-1);
-  color: var(--openbot-text-secondary);
+  color: var(--openbot-text-muted);
+}
+
+@keyframes sidebar-server-mark-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+    filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-server-name-mark[data-entering] {
+    animation: none;
+  }
 }
 
 /* The server menu view has no rail, so the server name moves right of the macOS traffic lights. */
@@ -904,7 +940,7 @@ textarea {
 }
 
 .server-menu {
-  min-width: 220px;
+  min-width: 240px;
   max-width: 300px;
   max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
   overflow-y: auto;
@@ -915,13 +951,22 @@ textarea {
 }
 
 .server-menu-mark {
+  position: relative;
   display: grid;
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
   overflow: hidden;
   place-items: center;
-  border-radius: var(--openbot-radius-sm);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.server-menu-mark::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 12%, transparent);
+  content: "";
 }
 
 .server-menu-mark > * {
@@ -940,6 +985,44 @@ textarea {
 .server-menu-muted {
   flex: 0 0 auto;
   color: var(--openbot-text-secondary);
+}
+
+.server-menu .server-menu-layout-chevron {
+  margin-left: 0;
+}
+
+/* The add item: a dashed circle that fills in on the highlighted row, with the plus cut out of it. */
+.ui-action-menu .server-menu-add {
+  color: var(--openbot-text-secondary);
+}
+
+.ui-action-menu .server-menu-add:is(:hover, [data-highlighted]) {
+  color: var(--openbot-text-primary);
+}
+
+.server-menu-add-circle {
+  display: grid;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--openbot-text-primary) 30%, transparent);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.ui-action-menu .server-menu-add-circle > svg {
+  width: var(--ui-menu-inset);
+  height: var(--ui-menu-inset);
+  stroke-width: 2.5;
+}
+
+.ui-action-menu .server-menu-add:is(:hover, [data-highlighted]) .server-menu-add-circle {
+  border-color: transparent;
+  background: var(--openbot-text-primary);
+}
+
+.ui-action-menu .server-menu-add:is(:hover, [data-highlighted]) .server-menu-add-circle > svg {
+  color: var(--ui-menu-bg);
 }
 
 .sidebar-topbar-actions {

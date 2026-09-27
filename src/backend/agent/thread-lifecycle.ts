@@ -599,10 +599,10 @@ export class ThreadLifecycle {
   /**
    * Spends this agent's refresh mark on the sessions that can take it, and keeps it otherwise.
    *
-   * `startingDeliveryId` names the delivery whose start is calling this, which is the one delivery
-   * whose unconfirmed state must not hold the mark back: it is about to be given the new set.
+   * `startingDeliveryIds` names the deliveries whose start is calling this, which are the ones
+   * whose unconfirmed state must not hold the mark back: they are about to be given the new set.
    */
-  applyPendingRuntimeRefresh(agent: AgentSummary, startingDeliveryId?: string): void {
+  applyPendingRuntimeRefresh(agent: AgentSummary, startingDeliveryIds: ReadonlySet<string> = new Set()): void {
     if (!this.#pendingRuntimeRefreshes.has(agent.id)) return;
     // A compaction is a provider turn that deliberately keeps no conversation turn id, so the busy
     // check below reads its thread as idle. Its completion arrives on the routing this refresh
@@ -619,8 +619,8 @@ export class ThreadLifecycle {
     // it: a `turn/start` that timed out is deliberately left waiting for the lifecycle events
     // instead of being retried on work that may already run. Those events arrive on the routing
     // this refresh removes, so the mark waits for that delivery too.
-    const unconfirmed = this.#mailbox.startingDeliveryForAgent(agent.id);
-    if (unconfirmed && unconfirmed.delivery.id !== startingDeliveryId) return;
+    const unconfirmed = this.#mailbox.startingDeliveriesForAgent(agent.id);
+    if (unconfirmed.some(({ delivery }) => !startingDeliveryIds.has(delivery.id))) return;
     let deferred = false;
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.

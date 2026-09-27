@@ -250,18 +250,25 @@
 }
 
 .provider-model-popover {
+  --provider-model-rail-bg: color-mix(in srgb, var(--openbot-bg-notch) 22%, var(--ui-menu-bg));
+  --provider-model-segment-radius: calc(var(--ui-menu-item-radius) - var(--openbot-space-0-5));
   position: relative;
   z-index: 40;
   width: min(360px, calc(100vw - 24px));
   min-height: 226px;
   overflow: hidden;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-control);
+  border: 0;
+  border-radius: var(--ui-menu-radius);
+  background: var(--ui-menu-bg);
   color: var(--openbot-text-primary);
-  box-shadow:
-    0 22px 60px var(--openbot-bg-overlay),
-    0 3px 12px var(--openbot-shadow-popover-ambient);
+  box-shadow: var(--ui-menu-panel-shadow);
+  transform-origin: var(--kb-popover-content-transform-origin);
+  animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+/* The copy that ContentExitMotion leaves in the place of the closed popover plays the exit. */
+.provider-model-popover:not([data-expanded]) {
+  animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
 
 .provider-model-layout {
@@ -277,9 +284,9 @@
   flex: 0 0 52px;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: var(--openbot-space-1);
   border-right: 1px solid var(--openbot-border);
-  background: var(--openbot-bg-sidebar);
+  background: var(--provider-model-rail-bg);
   padding: 9px 7px;
 }
 
@@ -320,7 +327,7 @@
   flex: 0 0 36px;
   place-items: center;
   border: 0;
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--ui-menu-item-radius);
   background: transparent;
   padding: 0;
   cursor: pointer;
@@ -329,13 +336,22 @@
     opacity var(--openbot-duration-hover) ease;
 }
 
-.provider-model-rail-button:hover,
+.provider-model-rail-button:hover {
+  background: var(--ui-menu-item-hover);
+}
+
 .provider-model-rail-button-selected {
-  background: var(--openbot-bg-surface);
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ui-menu-edge);
 }
 
 .provider-model-rail-button .provider-model-mark {
   opacity: 0.48;
+}
+
+.provider-model-rail-button:not(.provider-model-rail-button-selected, .provider-model-rail-button-unavailable):hover
+  .provider-model-mark {
+  opacity: 0.8;
 }
 
 .provider-model-rail-button-selected .provider-model-mark {
@@ -366,7 +382,7 @@
   height: 6px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-text-muted);
-  box-shadow: 0 0 0 2px var(--openbot-bg-sidebar);
+  box-shadow: 0 0 0 2px var(--provider-model-rail-bg);
   content: "";
 }
 
@@ -380,7 +396,7 @@
   min-height: 0;
   min-width: 0;
   flex: 1;
-  padding: 10px 10px 11px;
+  padding: var(--ui-menu-padding);
 }
 
 .provider-model-panel:not([data-selected]) {
@@ -392,10 +408,9 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--openbot-space-2);
-  min-height: 54px;
   /* The right inset lives on the text, not the row, so the action button can line its right edge up
    * with the search field and the model rows below it. */
-  padding: 3px 0 8px 4px;
+  padding: var(--openbot-space-1-5) 0 var(--openbot-space-2) var(--ui-menu-inset);
 }
 
 .provider-model-heading-text {
@@ -406,6 +421,20 @@
 
 /* The icons are raw lucide exports with no intrinsic size, and only the icon-only button sizes
  * carry a rule, so an icon beside a label needs one here to match every other button. */
+.provider-model-heading .ui-button,
+.provider-model-empty .ui-button-variant-outline {
+  border-color: transparent;
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+}
+
+.provider-model-heading .ui-button:hover,
+.provider-model-empty .ui-button-variant-outline:hover {
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+}
+
 .provider-model-heading .ui-button svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -420,11 +449,16 @@
   white-space: nowrap;
 }
 
+/* The runtime status: a filled block with no border, as the search field. */
 .provider-model-empty {
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-bg-sidebar);
-  padding: 10px 11px;
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--ui-menu-padding);
+  border: 0;
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
+  padding: var(--openbot-space-2) var(--ui-menu-inset);
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   line-height: 18px;
@@ -444,9 +478,13 @@
   line-height: 16px;
 }
 
+.provider-model-empty > .ui-progress {
+  justify-self: stretch;
+}
+
 .provider-model-list {
   display: grid;
-  gap: 3px;
+  gap: 0;
 }
 
 .provider-model-effort {
@@ -457,12 +495,20 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-1) 12px;
-  margin: 9px 4px 0;
+  /* The separator runs to both edges of the panel, as in the menus. */
+  margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1) 0;
   border-top: 1px solid var(--openbot-border);
-  padding-top: 10px;
-  color: var(--openbot-text-secondary);
+  padding: var(--ui-menu-padding) var(--ui-menu-padding) 0 calc(var(--ui-menu-padding) + var(--ui-menu-inset));
+  color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: 17px;
+}
+
+/* The effort and auto-approve rows are one group under one separator. */
+.provider-model-effort + .provider-model-effort {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: var(--openbot-space-1);
 }
 
 /* Each row is as high as the effort control, so the switch and the segments have room. */
@@ -486,9 +532,8 @@
   flex: 1 1 auto;
   min-width: 0;
   gap: var(--openbot-space-0-5);
-  border-radius: var(--openbot-radius-md);
-  background: var(--openbot-tabs-bar-bg);
-  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
   padding: var(--openbot-space-0-5);
 }
 
@@ -504,10 +549,10 @@
   display: flex;
   flex: 1;
   min-width: 0;
-  height: var(--openbot-control-sm);
+  height: calc(var(--openbot-control-md) - 2 * var(--openbot-space-0-5));
   align-items: center;
   justify-content: center;
-  border-radius: var(--openbot-radius-sm);
+  border-radius: var(--provider-model-segment-radius);
   padding-inline: var(--openbot-space-2);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -529,7 +574,7 @@
 }
 
 .provider-model-effort-segment:has(:focus-visible) .provider-model-effort-segment-control {
-  box-shadow: var(--openbot-focus-ring);
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }
 
 .provider-model-effort-segment-control[data-disabled] {
@@ -544,9 +589,10 @@
   left: 0;
   z-index: 0;
   width: 0;
-  height: var(--openbot-control-sm);
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-tabs-pill-bg);
+  height: calc(var(--openbot-control-md) - 2 * var(--openbot-space-0-5));
+  border-radius: var(--provider-model-segment-radius);
+  background: color-mix(in srgb, var(--openbot-text-primary) 12%, transparent);
+  box-shadow: inset 0 1px 0 var(--ui-menu-highlight);
   pointer-events: none;
   transition:
     transform var(--provider-model-effort-duration) var(--provider-model-effort-ease),
@@ -562,20 +608,51 @@
 }
 
 .provider-model-effort-select .ui-select-trigger {
-  background: var(--openbot-bg-sidebar);
+  border-color: transparent;
+  border-radius: var(--ui-menu-item-radius);
+  background: var(--ui-menu-item-hover);
+  box-shadow: none;
 }
 
+.provider-model-effort-select .ui-select-trigger:is(:hover, [data-expanded]) {
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+}
+
+.provider-model-effort-content {
+  border-radius: var(--ui-menu-radius);
+  background: var(--ui-menu-bg);
+  box-shadow: var(--ui-menu-panel-shadow);
+  animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
+}
+
+.provider-model-effort-content .ui-select-listbox {
+  padding: var(--ui-menu-padding);
+}
+
+.provider-model-effort-content .ui-select-item {
+  border-radius: var(--ui-menu-item-radius);
+  padding-block: var(--openbot-space-1-5);
+  padding-left: var(--ui-menu-inset);
+  font-size: var(--openbot-text-md);
+}
+
+.provider-model-effort-content .ui-select-item[data-highlighted] {
+  background: var(--ui-menu-item-hover);
+}
+
+/* The check of the selected model is a filled circle on the left, as in the menus. */
 .provider-model-option {
+  position: relative;
   display: flex;
   width: 100%;
-  min-height: 38px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   border: 0;
-  border-radius: var(--openbot-radius-md);
+  border-radius: var(--ui-menu-item-radius);
   background: transparent;
-  padding: 7px 9px;
+  padding: var(--openbot-space-1-5) var(--ui-menu-inset) var(--openbot-space-1-5)
+    calc(var(--ui-menu-inset) + var(--openbot-icon-md) + var(--openbot-space-2));
   color: var(--openbot-text-primary);
   cursor: pointer;
   text-align: left;
@@ -584,18 +661,30 @@
     color var(--openbot-duration-hover) ease;
 }
 
+.provider-model-option::before {
+  position: absolute;
+  top: 50%;
+  left: var(--ui-menu-inset);
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--openbot-text-primary) 22%, transparent);
+  border-radius: var(--openbot-radius-pill);
+  content: "";
+  translate: 0 -50%;
+  transition:
+    background-color var(--ui-menu-duration) ease-out,
+    border-color var(--ui-menu-duration) ease-out;
+}
+
+.provider-model-option-selected::before {
+  border-color: transparent;
+  background: var(--openbot-text-primary);
+}
+
 .provider-model-option:hover:not(:disabled),
 .provider-model-option:focus-visible {
-  background: var(--openbot-bg-control-hover);
-}
-
-.provider-model-option-selected {
-  background: var(--openbot-hover);
-}
-
-.provider-model-option-selected:hover:not(:disabled),
-.provider-model-option-selected:focus-visible {
-  background: var(--openbot-bg-control-active);
+  background: var(--ui-menu-item-hover);
 }
 
 .provider-model-option:disabled {
@@ -620,26 +709,28 @@
 
 .provider-model-option-name small {
   flex: 0 0 auto;
-  border-radius: var(--openbot-radius-xs);
-  background: var(--openbot-bg-sidebar);
-  padding: 1px 5px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 7%, transparent);
+  padding: 1px var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-weight: 500;
   line-height: 15px;
 }
 
+/* The tick sits in the filled circle, cut out of it in the panel color. */
 .provider-model-check {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
+  position: absolute;
+  top: 50%;
+  left: calc(var(--ui-menu-inset) + (var(--openbot-icon-md) - var(--openbot-icon-sm)) / 2);
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
   fill: none;
-  stroke: var(--openbot-accent);
+  stroke: var(--ui-menu-bg);
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* Off the shared glyph scale on purpose, like the badge tick in primitives.css: a
-   * selected-state check is an indicator, and the scale value paints it too fine here. */
-  stroke-width: 1.75;
+  stroke-width: 2.5;
+  translate: 0 -50%;
 }
 
 @media (max-width: 720px) {
@@ -658,9 +749,16 @@
   .provider-model-trigger,
   .provider-model-rail-button,
   .provider-model-option,
+  .provider-model-option::before,
   .provider-model-effort-segment-control,
   .provider-model-effort-pill {
     transition: none;
+  }
+
+  .provider-model-popover,
+  .provider-model-popover:not([data-expanded]),
+  .provider-model-effort-content {
+    animation: none;
   }
 
   .provider-model-trigger-mark[data-entering] {

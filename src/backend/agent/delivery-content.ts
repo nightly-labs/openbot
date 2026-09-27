@@ -135,6 +135,33 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   ];
 }
 
+/**
+ * The provider input for a turn that starts with several deliveries: all the answers to one request,
+ * or the answers that wait when the person writes. The texts become one text item, so a history
+ * handoff goes in front of all of them. `unanswered` names the teammates whose request ended with no
+ * answer, so the agent does not wait for them.
+ */
+export function combinedPromptInput(
+  inputs: readonly DeliveryInputItem[][],
+  unanswered: readonly string[],
+  agentNames: ReadonlyMap<string, string>,
+): DeliveryInputItem[] {
+  const [only] = inputs;
+  if (inputs.length === 1 && only && unanswered.length === 0) return only;
+  const texts = inputs.flatMap((items) => items.flatMap((item) => (item.type === "text" ? [item.text] : [])));
+  const names = unanswered.map((agentId) => agentNames.get(agentId) ?? agentId);
+  const text = [
+    inputs.length > 1 ? `This turn starts with ${inputs.length} messages. Read all of them before you answer.` : null,
+    ...texts,
+    names.length
+      ? `No answer comes from ${names.join(", ")}: the request to them ended before they answered. Do not wait for them.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return [{ type: "text", text }, ...inputs.flatMap((items) => items.filter((item) => item.type !== "text"))];
+}
+
 export function displayMessageReferences(
   text: string,
   attachments: Array<{ id: string; name: string }>,

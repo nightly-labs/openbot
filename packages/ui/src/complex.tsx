@@ -11,6 +11,7 @@ import * as KobalteSelect from "@kobalte/core/select";
 import * as TabsPrimitive from "@kobalte/core/tabs";
 import * as TooltipPrimitive from "@kobalte/core/tooltip";
 import type { ValidComponent } from "@solidjs/web";
+import { useMenuMotion } from "./menu-motion";
 
 type OpenChangeHandler = (open: boolean) => void;
 
@@ -145,10 +146,22 @@ export const DropdownMenu: DropdownMenuApi = {
   ),
   Portal: (props) => <DropdownMenuPrimitive.Portal {...props} />,
   Trigger: (props) => <DropdownMenuPrimitive.Trigger {...props} />,
-  Content: (props) => <DropdownMenuPrimitive.Content {...props} class={withBaseClass("ui-action-menu", props.class)} />,
+  Content: (props) => {
+    const motion = useMenuMotion();
+    return (
+      <DropdownMenuPrimitive.Content
+        {...props}
+        ref={[props.ref, motion]}
+        class={withBaseClass("ui-action-menu", props.class)}
+      />
+    );
+  },
   Sub: DropdownMenuPrimitive.Sub,
   SubTrigger: DropdownMenuPrimitive.SubTrigger,
-  SubContent: DropdownMenuPrimitive.SubContent,
+  SubContent: (props) => {
+    const motion = useMenuMotion();
+    return <DropdownMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
+  },
   Item: (props) => <DropdownMenuPrimitive.Item {...props} />,
   CheckboxItem: (props) => <DropdownMenuPrimitive.CheckboxItem {...props} />,
   RadioGroup: (props) => <DropdownMenuPrimitive.RadioGroup {...props} />,
@@ -176,10 +189,22 @@ export const ContextMenu: ContextMenuApi = {
   ),
   Portal: (props) => <ContextMenuPrimitive.Portal {...props} />,
   Trigger: (props) => <ContextMenuPrimitive.Trigger {...props} />,
-  Content: (props) => <ContextMenuPrimitive.Content {...props} class={withBaseClass("ui-action-menu", props.class)} />,
+  Content: (props) => {
+    const motion = useMenuMotion();
+    return (
+      <ContextMenuPrimitive.Content
+        {...props}
+        ref={[props.ref, motion]}
+        class={withBaseClass("ui-action-menu", props.class)}
+      />
+    );
+  },
   Sub: ContextMenuPrimitive.Sub,
   SubTrigger: ContextMenuPrimitive.SubTrigger,
-  SubContent: ContextMenuPrimitive.SubContent,
+  SubContent: (props) => {
+    const motion = useMenuMotion();
+    return <ContextMenuPrimitive.SubContent {...props} ref={[props.ref, motion]} />;
+  },
   Item: (props) => <ContextMenuPrimitive.Item {...props} />,
   RadioGroup: (props) => <ContextMenuPrimitive.RadioGroup {...props} />,
   RadioItem: (props) => <ContextMenuPrimitive.RadioItem {...props} />,

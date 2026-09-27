@@ -35,6 +35,7 @@ import {
   Tabs,
   Tooltip,
 } from "@openbot/ui";
+import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { cx } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { currentText, type TextValue, useText } from "../text";
@@ -142,6 +143,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let trigger: HTMLButtonElement | undefined;
   const providerButtons = new Map<RailId, HTMLButtonElement>();
   let root: HTMLDivElement | undefined;
+  let popover: HTMLElement | undefined;
 
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const selectedModel = createMemo(() =>
@@ -307,12 +309,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
         </Popover.Trigger>
 
         <Popover.Content
+          ref={(element) => (popover = element)}
           class="provider-model-popover"
           aria-hidden={open() ? undefined : "true"}
           onKeyDown={(event) => {
             if (event.key === "Escape") setOpen(false);
           }}
         >
+          <ContentExitMotion panel={() => popover} />
           <Popover.Title class="sr-only">{t("provider.picker.title")}</Popover.Title>
           <Tabs.Root
             value={railProvider()}

@@ -467,10 +467,16 @@ notifications that `TurnLifecycle` sees; they are in memory only, so after a res
 files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)
 refuses the caller itself, a channel turn, and a turn that any delivery other than the caller's
 started, so an agent cannot stop work from the user, a routine, or another agent. It cancels the
-caller's queued messages to the target before it sends `turn/interrupt`, because the interrupted
-turn drains the queue as it completes. Then it queues a notice from the caller with `expectsReply`
-false. The notice starts one short turn on an idle target, so the provider thread records why the
-work stopped.
+caller's queued requests to the target before it sends `turn/interrupt`, because the interrupted
+turn drains the queue as it completes. It keeps the caller's answers, because the target can hold
+them (see below). Then it queues a notice from the caller with `expectsReply` false. The notice
+starts one short turn on an idle target, so the provider thread records why the work stopped.
+
+An answer to a request that went to two or more teammates waits in the requester's queue while
+another teammate's copy of that request is queued, starting or running (`MailboxStore.nextQueued`).
+When the last copy ends, the waiting answers start in one turn, and the prompt names each teammate
+whose copy ended with no answer. A message from the person does not wait: it starts at once and
+takes the answers that are already in. Each end of a copy schedules a drain for the requester.
 
 This policy lives in `src/backend/agent/developer-instructions.ts` and is supplied on both thread
 start and resume. Codex receives `developerInstructions`; Claude appends them to its system prompt;
