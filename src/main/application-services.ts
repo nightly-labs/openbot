@@ -277,6 +277,20 @@ export interface ApplicationServices {
 }
 
 /** How the driver's own state reads as the capability the Team API projects. */
+/** The Electron secret storage cipher that every encrypted file in userData uses. */
+function safeStorageCipher(
+  unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
+) {
+  return {
+    canPersist: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (value: string) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText(unavailableKey));
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value: Buffer) => safeStorage.decryptString(value),
+  };
+}
+
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
   if (state.status === "permissions-required") return "setup-required";
@@ -328,14 +342,7 @@ export async function createApplicationServices({
     apiUrl: centralAuthApiUrl,
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
-    canPersist: () => safeStorage.isEncryptionAvailable(),
-    encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error(sourceText("error.app.macSecureStorageUnavailable"));
-      }
-      return safeStorage.encryptString(value);
-    },
-    decrypt: (value) => safeStorage.decryptString(value),
+    ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
   });
   // Registered before `initialize()`, which publishes `{ status: "loading" }` synchronously: the
   // listener therefore runs on the next line with most of this function's services still unbuilt.
@@ -495,16 +502,10 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.providerRuntimes, "the provider runtimes", () => providerRuntimes.stop());
   // Before `new AgentService`, which reads every `executablePath` eagerly.
   await providerRuntimes.initialize();
+  const secretCipher = safeStorageCipher("error.app.secretStorageUnavailable");
   const customProviders = new CustomProviderStore({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
-    cipher: {
-      canPersist: () => safeStorage.isEncryptionAvailable(),
-      encrypt: (value) => {
-        if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
-        return safeStorage.encryptString(value);
-      },
-      decrypt: (value) => safeStorage.decryptString(value),
-    },
+    cipher: secretCipher,
   });
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
@@ -514,13 +515,10 @@ export async function createApplicationServices({
    * the decrypted map has to already exist by the time any client is built. A machine with no
    * secret storage keeps working on the free tier -- only saving a key needs the cipher.
    */
-  const providerCredentials = new ProviderCredentialStore(join(app.getPath("userData"), PROVIDER_CREDENTIAL_FILE), {
-    encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
-      return safeStorage.encryptString(value);
-    },
-    decrypt: (value) => safeStorage.decryptString(value),
-  });
+  const providerCredentials = new ProviderCredentialStore(
+    join(app.getPath("userData"), PROVIDER_CREDENTIAL_FILE),
+    secretCipher,
+  );
   // An unreadable key file is reported, not fatal: the app starts, OpenCode runs on the free models,
   // and Settings tells the user to save the key again. Only the error's class is logged, because a
   // parse message quotes the file.
@@ -535,13 +533,7 @@ export async function createApplicationServices({
    * Unreadable is not fatal, for the same reason as the keys above: every signed-in server asks for
    * a sign-in again, and nothing else on this machine stops working.
    */
-  const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), {
-    encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
-      return safeStorage.encryptString(value);
-    },
-    decrypt: (value) => safeStorage.decryptString(value),
-  });
+  const mcpOAuthStore = new McpOAuthStore(join(app.getPath("userData"), MCP_OAUTH_FILE), secretCipher);
   const mcpOAuthLoadError = await mcpOAuthStore.load();
   if (mcpOAuthLoadError) {
     logger.warn(`OpenBot could not read the MCP sign-in file (${mcpOAuthLoadError.name}). It was left unchanged.`);
@@ -946,10 +938,10 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => {
       if (!safeStorage.isEncryptionAvailable()) throw new Error(sourceText("error.app.secretStorageUnavailable"));
-      return loadOrCreateRemoteDesktopCredentials(join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE), {
-        encrypt: (value) => safeStorage.encryptString(value),
-        decrypt: (value) => safeStorage.decryptString(value),
-      });
+      return loadOrCreateRemoteDesktopCredentials(
+        join(app.getPath("userData"), REMOTE_DESKTOP_RUNTIME_SECRET_FILE),
+        secretCipher,
+      );
     },
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
@@ -1021,15 +1013,7 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.trace, "the trace file", () => trace.flush());
   const remoteServers = new RemoteServerManager(
     join(app.getPath("userData"), REMOTE_SERVERS_FILE),
-    {
-      encrypt: (value) => {
-        if (!safeStorage.isEncryptionAvailable()) {
-          throw new Error(sourceText("error.app.macSecureStorageUnavailable"));
-        }
-        return safeStorage.encryptString(value);
-      },
-      decrypt: (value) => safeStorage.decryptString(value),
-    },
+    safeStorageCipher("error.app.macSecureStorageUnavailable"),
     {
       createTeamAuthTicket: (serverId) => centralAuth.createTeamAuthTicket(serverId),
       getEmail: () => centralAuth.getSignedInUser().email,
