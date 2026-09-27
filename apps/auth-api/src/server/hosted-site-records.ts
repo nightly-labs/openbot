@@ -110,7 +110,7 @@ export async function readUploadBody(body: ReadableStream<Uint8Array>, expectedS
   return combined;
 }
 
-export function isStoredManifestFile(value: unknown): value is HostedSiteFileManifest {
+function isStoredManifestFile(value: unknown): value is HostedSiteFileManifest {
   return isDynamicRecord(value) && isString(value.path) && isNumber(value.size) && isString(value.mimeType);
 }
 
@@ -177,7 +177,7 @@ export function parseStoredSiteSummary(value: string): HostedSiteSummary {
   };
 }
 
-export function parseSiteStatus(value: unknown): SiteRow["status"] {
+function parseSiteStatus(value: unknown): SiteRow["status"] {
   if (value === "uploading" || isHostedSiteStatus(value)) return value;
   throw new Error("The stored site status is invalid.");
 }
@@ -201,7 +201,7 @@ export function mapSite(
   };
 }
 
-export function siteUrl(hostname: string, localSiteOrigin?: string): string {
+function siteUrl(hostname: string, localSiteOrigin?: string): string {
   if (!localSiteOrigin) return `https://${hostname}`;
   const origin = new URL(localSiteOrigin);
   const label = hostname.slice(0, -".openbot.site".length);
