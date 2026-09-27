@@ -22,7 +22,7 @@
 // user has not seen before are appended in directory order. The user drags this list.
 
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
-import type { RemoteHostSummary } from "./central-auth-manager";
+import type { RemoteHostSummary } from "./central-auth-records";
 import type { PreservedHostIdentity, StoredRemoteServerView } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import { fingerprint } from "./team-store";

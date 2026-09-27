@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import type { RemoteHostSummary } from "./central-auth-manager";
+import type { RemoteHostSummary } from "./central-auth-records";
 import { reconcileWebRtcHosts, watchRemoteHostDirectory } from "./remote-server-host-directory";
 import type { PreservedHostIdentity } from "./remote-server-store";
 import type { StoredRemoteServer } from "./remote-server-stored-shape";
