@@ -84,7 +84,7 @@ cycle. Keys here are dot-separated, not colon-separated like the renderer's.
 The middle two are built with a template literal, so **no key-literal query returns them** — they are
 the standing reason gate B reads owner files as well as keys.
 
-The paired-phones note under `## [Unreleased]` in `CHANGELOG.md` is what this surface looks like when
+The paired-phones note under `## [0.5.0]` in `CHANGELOG.md` is what this surface looks like when
 it breaks: agent identifiers changed, the phone still held the old ones, and the only remedy was for
 the user to re-pair. Gate B is what should catch the next one before gate G has to apologise for it.
 

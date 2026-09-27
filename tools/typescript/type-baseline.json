@@ -91,7 +91,7 @@
     "src/backend/browser-cdp-input.ts": 1,
     "src/backend/browser-cdp-snapshot.ts": 2,
     "src/backend/browser-cdp.ts": 8,
-    "src/backend/browser-host.ts": 19,
+    "src/backend/browser-host.ts": 10,
     "src/backend/browser-tool-actions.ts": 18,
     "src/backend/channel-service.ts": 1,
     "src/backend/claude-client.ts": 3,
