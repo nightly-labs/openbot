@@ -61,6 +61,14 @@ export function InitialSetup(props: InitialSetupProps) {
   const savedEndpointModel = createMemo(() =>
     savedCustomModel(savedState.preferredProvider, savedState.preferredModel, props.customProviders),
   );
+  /**
+   * Stays true once the saved model is known to be an endpoint's. A removal of that endpoint then
+   * empties `savedEndpointModel`, but the save must still clear the model.
+   */
+  let savedModelIsEndpoint = false;
+  createEffect(savedEndpointModel, (model) => {
+    if (model) savedModelIsEndpoint = true;
+  });
   const providers = createSetupProviders(props, {
     provider: savedState.preferredProvider,
     customModel: savedEndpointModel,
@@ -103,7 +111,7 @@ export function InitialSetup(props: InitialSetupProps) {
       // model was the custom row's: the user chose another row, so that model must go.
       await props.onSave(
         provider,
-        providers.customSelected() ? providers.customModel() : savedEndpointModel() ? null : undefined,
+        providers.customSelected() ? providers.customModel() : savedModelIsEndpoint ? null : undefined,
       );
     } catch (cause) {
       setError(errorMessage(cause, t("onboarding.setup.saveFailed")));
