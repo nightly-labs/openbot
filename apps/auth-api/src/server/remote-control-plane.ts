@@ -1,5 +1,6 @@
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
 import {
   REMOTE_TICKET_AUDIENCE,
   REMOTE_TICKET_PROTOCOL_VERSION,
@@ -82,15 +83,6 @@ interface TicketSignerConfig {
 }
 
 type RemoteFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-type RemoteAuthEvent =
-  | { type: "remote-auth-changed"; hostId: string; authEpoch: number }
-  | { type: "remote-session-ended"; hostId: string; sessionId: string }
-  // Addressed to an account rather than to a host: the device that accepted an invitation already
-  // knows, and the user's other devices are the ones with a stale server list. Signal forwards it
-  // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
-  | { type: "account-servers-changed"; userId: string }
-  // Addressed to an account: its other devices re-read the account profile.
-  | { type: "account-profile-changed"; userId: string };
 
 interface RemoteAuthEventRow {
   event_id: string;
