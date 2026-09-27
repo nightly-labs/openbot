@@ -5,8 +5,10 @@
 // Workers have no WebGL, so the card artwork cannot be produced at request time.
 // This is the one place that turns the shared gradient description into pixels.
 
+import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
-import type { ContentImageJob } from "./content-images";
+import type { ContentImageJob, ContentImageLockup } from "./content-images";
+import { RIVAL_MARK_SHAPES } from "./src/components/compare/rival-mark-shapes";
 import { articleGradient, articleGradientUniforms } from "./src/lib/article-gradient";
 
 declare global {
@@ -18,6 +20,12 @@ declare global {
 /** `--openbot-bg-canvas`, as the RGB channels of the scrim. */
 const SCRIM_COLOR = "26, 26, 26";
 const TITLE_MAX_LINES = 3;
+/** Under a lockup there is room for two lines. */
+const TITLE_MAX_LINES_WITH_LOCKUP = 2;
+/** `--openbot-logo-production` and `--openbot-logo-eye`. */
+const LOGO_BACKGROUND = "#d6adf2";
+const LOGO_EYE = "#040007";
+const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
 
@@ -56,7 +64,11 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     // The shader canvas is rendered at twice the output size, so this draw is a
     // supersample rather than a stretch.
     context.drawImage(mount.canvasElement, 0, 0, job.width, job.height);
-    if (job.title && job.withTitle) drawTitle(context, job);
+    if (job.title && job.withTitle) {
+      drawScrim(context, job);
+      if (job.lockup) drawLockup(context, job, job.lockup);
+      drawTitle(context, job);
+    }
 
     return canvas.toDataURL("image/png");
   } finally {
@@ -77,25 +89,28 @@ async function waitForCanvas(canvas: HTMLCanvasElement): Promise<void> {
   }
 }
 
-function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): void {
-  const { width, height } = job;
-  const padding = Math.round(width * 0.06);
-
-  // A scrim only over the lower half. The gradient stays readable as artwork and
-  // the text keeps its contrast whatever colours the title happened to draw.
-  const scrim = context.createLinearGradient(0, height * 0.3, 0, height);
+/**
+ * A scrim only over the lower half. The gradient stays readable as artwork and
+ * the text keeps its contrast whatever colours the title happened to draw.
+ */
+function drawScrim(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+  const scrim = context.createLinearGradient(0, job.height * 0.3, 0, job.height);
   scrim.addColorStop(0, `rgba(${SCRIM_COLOR}, 0)`);
   scrim.addColorStop(1, `rgba(${SCRIM_COLOR}, 0.88)`);
   context.fillStyle = scrim;
-  context.fillRect(0, 0, width, height);
+  context.fillRect(0, 0, job.width, job.height);
+}
 
-  const fontFamily = '"Inter Variable", Inter, system-ui, sans-serif';
+function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): void {
+  const { width, height } = job;
+  const padding = Math.round(width * 0.06);
   const titleSize = Math.round(width * 0.052);
   const lineHeight = Math.round(titleSize * 1.14);
 
   context.textBaseline = "alphabetic";
-  context.font = `600 ${titleSize}px ${fontFamily}`;
-  const lines = wrapText(context, job.title, width - padding * 2, TITLE_MAX_LINES);
+  context.font = `600 ${titleSize}px ${FONT_FAMILY}`;
+  const maxLines = job.lockup ? TITLE_MAX_LINES_WITH_LOCKUP : TITLE_MAX_LINES;
+  const lines = wrapText(context, job.title, width - padding * 2, maxLines);
 
   // The block is anchored to the bottom, so a one-line and a three-line title
   // both sit on the same baseline and the set reads as one series.
@@ -108,9 +123,141 @@ function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): voi
   });
 
   const eyebrowSize = Math.round(width * 0.017);
-  context.font = `600 ${eyebrowSize}px ${fontFamily}`;
+  context.font = `600 ${eyebrowSize}px ${FONT_FAMILY}`;
   context.fillStyle = "rgba(255, 255, 255, 0.62)";
   context.fillText(job.eyebrow, padding, firstBaseline - lineHeight);
+}
+
+/**
+ * The lockup from the top of a comparison page: one frosted plate with both marks,
+ * split by a hairline with "vs" on it. It sits at the top left, over the title,
+ * on the same left edge.
+ */
+function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, lockup: ContentImageLockup): void {
+  const unit = job.width / 1200;
+  const logoSize = 128 * unit;
+  const column = 180 * unit;
+  const padX = 40 * unit;
+  const padY = 36 * unit;
+  const nameGap = 16 * unit;
+  const nameSize = 26 * unit;
+  const vsWidth = 24 * unit;
+  const vsMargin = 36 * unit;
+  const plateWidth = padX * 2 + column * 2 + vsMargin * 2 + vsWidth;
+  const plateHeight = padY * 2 + logoSize + nameGap + nameSize * 1.2;
+  const x = Math.round(job.width * 0.06);
+  const y = 64 * unit;
+  const radius = 24 * unit;
+
+  // The frost: what is under the plate, blurred. A copy, because a canvas that
+  // draws itself through a filter reads the pixels it is writing.
+  const under = document.createElement("canvas");
+  under.width = job.width;
+  under.height = job.height;
+  under.getContext("2d")?.drawImage(context.canvas, 0, 0);
+  context.save();
+  roundedRect(context, x, y, plateWidth, plateHeight, radius);
+  context.clip();
+  context.filter = `blur(${24 * unit}px) saturate(1.4)`;
+  context.drawImage(under, 0, 0);
+  context.filter = "none";
+  context.fillStyle = "rgba(14, 14, 18, 0.26)";
+  context.fillRect(x, y, plateWidth, plateHeight);
+  context.restore();
+
+  context.save();
+  roundedRect(context, x + 0.75, y + 0.75, plateWidth - 1.5, plateHeight - 1.5, radius);
+  context.strokeStyle = "rgba(255, 255, 255, 0.14)";
+  context.lineWidth = 1.5;
+  context.stroke();
+  context.restore();
+
+  const logoTop = y + padY;
+  const left = x + padX + (column - logoSize) / 2;
+  const right = x + padX + column + vsMargin * 2 + vsWidth + (column - logoSize) / 2;
+  drawOpenBotMark(context, left, logoTop, logoSize);
+  drawRivalMark(context, lockup, right, logoTop, logoSize);
+
+  context.font = `500 ${nameSize}px ${FONT_FAMILY}`;
+  context.fillStyle = "rgba(255, 255, 255, 0.86)";
+  context.textAlign = "center";
+  const nameBaseline = logoTop + logoSize + nameGap + nameSize * 0.9;
+  context.fillText("OpenBot", left + logoSize / 2, nameBaseline);
+  context.fillText(lockup.rivalName, right + logoSize / 2, nameBaseline);
+
+  // The hairline, broken around "vs".
+  const center = x + padX + column + vsMargin + vsWidth / 2;
+  const middle = y + plateHeight / 2;
+  const vsSize = 20 * unit;
+  const gap = vsSize * 0.9;
+  context.strokeStyle = "rgba(255, 255, 255, 0.2)";
+  context.lineWidth = unit;
+  context.beginPath();
+  context.moveTo(center, y + padY);
+  context.lineTo(center, middle - gap);
+  context.moveTo(center, middle + gap);
+  context.lineTo(center, y + plateHeight - padY);
+  context.stroke();
+  context.font = `500 ${vsSize}px ${FONT_FAMILY}`;
+  context.fillStyle = "rgba(255, 255, 255, 0.62)";
+  context.textBaseline = "middle";
+  context.fillText("vs", center, middle);
+  context.textAlign = "start";
+  context.textBaseline = "alphabetic";
+}
+
+/** `AppLogo`: the rounded square and the two scribbled eyes. */
+function drawOpenBotMark(context: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  context.save();
+  context.translate(x, y);
+  context.scale(size / APP_LOGO_SIZE, size / APP_LOGO_SIZE);
+  roundedRect(context, 0, 0, APP_LOGO_SIZE, APP_LOGO_SIZE, APP_LOGO_CORNER);
+  context.fillStyle = LOGO_BACKGROUND;
+  context.fill();
+  context.clip();
+  context.strokeStyle = LOGO_EYE;
+  context.lineWidth = 9.5;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  for (const points of [APP_LOGO_EYE_POINTS.left, APP_LOGO_EYE_POINTS.right]) {
+    const values = points.split(/\s+/u).map(Number);
+    context.beginPath();
+    for (let index = 0; index + 1 < values.length; index += 2) {
+      context.lineTo(values[index] ?? 0, values[index + 1] ?? 0);
+    }
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawRivalMark(
+  context: CanvasRenderingContext2D,
+  lockup: ContentImageLockup,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const shape = RIVAL_MARK_SHAPES[lockup.rivalMark];
+  const [minX, minY, boxWidth, boxHeight] = shape.viewBox;
+  context.save();
+  context.translate(x, y);
+  context.scale(size / boxWidth, size / boxHeight);
+  context.translate(-minX, -minY);
+  context.fillStyle = "#ffffff";
+  context.fill(new Path2D(shape.path), "evenodd");
+  context.restore();
+}
+
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  context.beginPath();
+  context.roundRect(x, y, width, height, radius);
 }
 
 /**

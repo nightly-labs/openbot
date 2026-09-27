@@ -78,7 +78,13 @@ type CollectionIndexRoute = ContentCollection["indexRoute"];
  */
 export type LandingScreenPath = "/" | "/join" | CollectionIndexRoute | `${CollectionIndexRoute}/${string}`;
 
-const FIXED_SCREEN_PATHS = ["/", "/join", "/news", "/guides"] as const satisfies readonly LandingScreenPath[];
+const FIXED_SCREEN_PATHS = [
+  "/",
+  "/join",
+  "/news",
+  "/guides",
+  "/compare",
+] as const satisfies readonly LandingScreenPath[];
 
 /**
  * Any path that is not a fixed screen or a published article reports the landing page instead. A
@@ -374,7 +380,7 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
   if (key === "action") return isOneOf(["view", "open_app", "download"] as const, value);
   if (key === "valid_invite") return name === "join_page_action" && isBoolean(value);
   if (key === "detected") return name === "landing_download_selected" && isBoolean(value);
-  if (key === "collection") return isOneOf(["news", "guides"] as const, value);
+  if (key === "collection") return isOneOf(["news", "guides", "compare"] as const, value);
   if (key === "slug") return typeof value === "string" && PUBLISHED_SLUGS.has(value);
   if (key === "depth") return isOneOf(["start", "half", "end"] as const, value);
   // The invitation page only ever offers the two platforms it can detect; the download events cover

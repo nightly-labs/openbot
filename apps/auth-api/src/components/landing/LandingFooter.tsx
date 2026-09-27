@@ -6,7 +6,7 @@ import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
 
 const FOOTER_DESCRIPTION =
-  "Persistent AI teammates for real work. Run Codex, Claude, and Grok side by side, each with its own workspace, queue, and context.";
+  "Persistent AI teammates on your own computer. Run Codex, Claude, Gemini, Grok or your own model with the plans you already pay for.";
 
 const SOCIALS = [
   {
@@ -90,7 +90,7 @@ export function LandingFooter() {
           <div class="landing-footer-meta">
             <Link to="/" hash="download">
               <span class="landing-footer-availability" aria-hidden="true" />
-              Available for macOS and Windows
+              Available for macOS, Windows and Linux
             </Link>
             <p class="landing-footer-made">
               Made with
@@ -108,7 +108,8 @@ export function LandingFooter() {
 // the page is not fetched and parsed again. An external one stays a plain anchor.
 function FooterNavLink(props: { link: FooterLink }) {
   const external = () => (props.link.external ? props.link : undefined);
-  const internal = () => (props.link.external ? undefined : props.link);
+  const page = () => (props.link.external || props.link.to === "/compare/$slug" ? undefined : props.link);
+  const article = () => (!props.link.external && props.link.to === "/compare/$slug" ? props.link : undefined);
 
   return (
     <>
@@ -119,9 +120,16 @@ function FooterNavLink(props: { link: FooterLink }) {
           </a>
         )}
       </Show>
-      <Show when={internal()}>
+      <Show when={page()}>
         {(link) => (
           <Link to={link().to} hash={link().hash}>
+            {link().label}
+          </Link>
+        )}
+      </Show>
+      <Show when={article()}>
+        {(link) => (
+          <Link to={link().to} params={{ slug: link().slug }}>
             {link().label}
           </Link>
         )}

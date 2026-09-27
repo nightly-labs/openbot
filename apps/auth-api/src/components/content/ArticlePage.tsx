@@ -7,6 +7,7 @@ import {
   type CollectionArticle,
   type ContentCollection,
   formatArticleDate,
+  type ProseCollectionId,
   reportedArticlePath,
 } from "../../lib/content-collection";
 import { createLandingReveal } from "../landing/createLandingReveal";
@@ -18,7 +19,8 @@ import { ContentCallToAction } from "./ContentCallToAction";
 import { createArticleReadDepth } from "./createArticleReadDepth";
 
 export interface ArticlePageProps {
-  collection: ContentCollection;
+  /** Only collections with prose bodies. A comparison has its own page. */
+  collection: ContentCollection<ProseCollectionId>;
   article: CollectionArticle;
 }
 

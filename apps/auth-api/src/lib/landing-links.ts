@@ -24,7 +24,6 @@ export const OPENBOT_LINKS = {
   contributing: "https://github.com/nightly-labs/openbot/blob/main/CONTRIBUTING.md",
   codex: "https://learn.chatgpt.com/docs/app-server",
   claude: "https://code.claude.com/docs/en/overview",
-  grokBotOverview: "https://docs.x.ai/grok-bot/overview",
   anthropicAgents: "https://www.anthropic.com/engineering/building-effective-agents",
 } as const;
 
@@ -39,9 +38,10 @@ export type FooterLink =
   | {
       readonly label: string;
       readonly external: false;
-      readonly to: "/" | "/news" | "/guides" | "/plugins";
+      readonly to: "/" | "/news" | "/guides" | "/plugins" | "/compare";
       readonly hash?: string;
-    };
+    }
+  | { readonly label: string; readonly external: false; readonly to: "/compare/$slug"; readonly slug: string };
 
 export interface FooterColumn {
   readonly title: string;
@@ -71,6 +71,13 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: "Contributing", external: true, href: OPENBOT_LINKS.contributing },
       { label: "Codex", external: true, href: OPENBOT_LINKS.codex },
       { label: "Claude Code", external: true, href: OPENBOT_LINKS.claude },
+    ],
+  },
+  {
+    title: "Compare",
+    links: [
+      { label: "OpenBot vs Grok Bot", external: false, to: "/compare/$slug", slug: "grok-bot" },
+      { label: "All comparisons", external: false, to: "/compare" },
     ],
   },
 ];

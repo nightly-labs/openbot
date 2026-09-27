@@ -38,8 +38,13 @@ function nameContent(meta: readonly HeadMeta[], name: string): string | undefine
 
 type ArticleStructuredData = ReturnType<typeof articleStructuredData>;
 
+// An article also carries its breadcrumb trail; `headline` tells the Article apart.
 function structuredData(meta: readonly HeadMeta[]): ArticleStructuredData | undefined {
-  return meta.flatMap((item) => ("script:ld+json" in item ? [item["script:ld+json"]] : []))[0];
+  return meta.flatMap((item) => {
+    if (!("script:ld+json" in item)) return [];
+    const data = item["script:ld+json"];
+    return data && "headline" in data ? [data] : [];
+  })[0];
 }
 
 function occurrences(haystack: string, needle: string): number {

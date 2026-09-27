@@ -108,7 +108,7 @@ export function contentRssXml(collection: ContentCollection): string {
 }
 
 /** One hour at the edge, one day while a redeploy is in flight. */
-const FEED_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
+export const FEED_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400";
 
 export function contentSitemapResponse(): Response {
   return new Response(contentSitemapXml(), {

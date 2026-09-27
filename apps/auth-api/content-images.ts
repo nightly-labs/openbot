@@ -14,6 +14,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import type { Plugin } from "vite";
+import type { RivalMarkName } from "./src/components/compare/rival-mark-shapes";
+import { COMPARISONS } from "./src/content/compare";
 import { articleGradient } from "./src/lib/article-gradient";
 import { CONTENT_COLLECTIONS } from "./src/lib/content";
 import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./src/lib/content-collection";
@@ -52,6 +54,13 @@ export interface ContentImageJob {
   height: number;
   /** Draw the title into the image. False for the card, which has live text over it. */
   withTitle: boolean;
+  /** The two marks side by side, over the title. Only on the social card of a comparison. */
+  lockup?: ContentImageLockup;
+}
+
+export interface ContentImageLockup {
+  rivalMark: RivalMarkName;
+  rivalName: string;
 }
 
 export type ContentArtManifest = Record<string, string>;
@@ -92,6 +101,7 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       width: OG_WIDTH,
       height: OG_HEIGHT,
       withTitle: true,
+      lockup: comparisonLockup(collection, article.slug),
     },
     ...CONTENT_ART_SHAPES.map((shape) => ({
       // The one path builder, so the file written here and the file the page
@@ -105,6 +115,11 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       withTitle: false,
     })),
   ]);
+}
+
+function comparisonLockup(collection: ContentCollection, slug: string): ContentImageLockup | undefined {
+  const comparison = collection.id === "compare" ? COMPARISONS[slug] : undefined;
+  return comparison && { rivalMark: comparison.rival.mark, rivalName: comparison.rival.name };
 }
 
 /**

@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/solid-router";
+
 export function WtfIsOpenBot() {
   return (
     <>
@@ -148,7 +150,17 @@ export function WtfIsOpenBot() {
         chat each time.
       </p>
       <p>That is the idea behind OpenBot: turning separate AI tools into persistent teammates for real work.</p>
-      <p>If you want to see how it works in practice, start with OpenBot 101.</p>
+      <p>
+        If you want to see how it works in practice, start with{" "}
+        <Link to="/guides/$slug" params={{ slug: "openbot-101" }}>
+          OpenBot 101
+        </Link>
+        . To see how it differs from an agent app that runs in the cloud, read{" "}
+        <Link to="/compare/$slug" params={{ slug: "grok-bot" }}>
+          OpenBot vs Grok Bot
+        </Link>
+        .
+      </p>
     </>
   );
 }

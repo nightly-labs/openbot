@@ -13,11 +13,15 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
 import { Route as JoinRouteImport } from './routes/join'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './routes/[.]well-known/apple-app-site-association'
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
 import { Route as AgentsTemplateIdRouteImport } from './routes/agents/$templateId'
+import { Route as CompareIndexRouteImport } from './routes/compare/index'
+import { Route as CompareSlugRouteImport } from './routes/compare/$slug'
+import { Route as CompareRssDotxmlRouteImport } from './routes/compare/rss[.]xml'
 import { Route as DownloadLinuxRouteImport } from './routes/download/linux'
 import { Route as DownloadMacosRouteImport } from './routes/download/macos'
 import { Route as DownloadWindowsRouteImport } from './routes/download/windows'
@@ -28,11 +32,13 @@ import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
+import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
 import { Route as NewsRssDotxmlRouteImport } from './routes/news/rss[.]xml'
 import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
 import { Route as PluginsSlugRouteImport } from './routes/plugins/$slug'
 import { Route as V1MeRouteImport } from './routes/v1/me'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
+import { Route as NewsOgOpenbotVsGrokbotDotpngRouteImport } from './routes/news/og/openbot-vs-grokbot[.]png'
 import { Route as PluginsIconSlugRouteImport } from './routes/plugins/icon/$slug'
 import { Route as V1AgentTemplatesIndexRouteImport } from './routes/v1/agent-templates/index'
 import { Route as V1AgentTemplatesTemplateIdRouteImport } from './routes/v1/agent-templates/$templateId'
@@ -115,6 +121,11 @@ const JoinRoute = JoinRouteImport.update({
   path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportSiteRoute = ReportSiteRouteImport.update({
   id: '/report-site',
   path: '/report-site',
@@ -139,6 +150,21 @@ const DotwellKnownJwksDotjsonRoute = DotwellKnownJwksDotjsonRouteImport.update({
 const AgentsTemplateIdRoute = AgentsTemplateIdRouteImport.update({
   id: '/agents/$templateId',
   path: '/agents/$templateId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareIndexRoute = CompareIndexRouteImport.update({
+  id: '/compare/',
+  path: '/compare/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareSlugRoute = CompareSlugRouteImport.update({
+  id: '/compare/$slug',
+  path: '/compare/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRssDotxmlRoute = CompareRssDotxmlRouteImport.update({
+  id: '/compare/rss.xml',
+  path: '/compare/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadLinuxRoute = DownloadLinuxRouteImport.update({
@@ -191,6 +217,11 @@ const NewsSlugRoute = NewsSlugRouteImport.update({
   path: '/news/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NewsOpenbotVsGrokbotRoute = NewsOpenbotVsGrokbotRouteImport.update({
+  id: '/news/openbot-vs-grokbot',
+  path: '/news/openbot-vs-grokbot',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewsRssDotxmlRoute = NewsRssDotxmlRouteImport.update({
   id: '/news/rss.xml',
   path: '/news/rss.xml',
@@ -216,6 +247,12 @@ const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
   path: '/api/browser/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NewsOgOpenbotVsGrokbotDotpngRoute =
+  NewsOgOpenbotVsGrokbotDotpngRouteImport.update({
+    id: '/news/og/openbot-vs-grokbot.png',
+    path: '/news/og/openbot-vs-grokbot.png',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PluginsIconSlugRoute = PluginsIconSlugRouteImport.update({
   id: '/plugins/icon/$slug',
   path: '/plugins/icon/$slug',
@@ -551,11 +588,14 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
+  '/compare/$slug': typeof CompareSlugRoute
+  '/compare/rss.xml': typeof CompareRssDotxmlRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -564,13 +604,16 @@ export interface FileRoutesByFullPath {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
+  '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/compare/': typeof CompareIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
@@ -638,11 +681,14 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
+  '/compare/$slug': typeof CompareSlugRoute
+  '/compare/rss.xml': typeof CompareRssDotxmlRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -651,13 +697,16 @@ export interface FileRoutesByTo {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
+  '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/compare': typeof CompareIndexRoute
   '/guides': typeof GuidesIndexRoute
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
@@ -726,11 +775,14 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
   '/join': typeof JoinRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
+  '/compare/$slug': typeof CompareSlugRoute
+  '/compare/rss.xml': typeof CompareRssDotxmlRoute
   '/download/linux': typeof DownloadLinuxRoute
   '/download/macos': typeof DownloadMacosRoute
   '/download/windows': typeof DownloadWindowsRoute
@@ -739,13 +791,16 @@ export interface FileRoutesById {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/news/$slug': typeof NewsSlugRoute
+  '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
   '/plugins/$slug': typeof PluginsSlugRoute
   '/v1/me': typeof V1MeRouteWithChildren
+  '/compare/': typeof CompareIndexRoute
   '/guides/': typeof GuidesIndexRoute
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
+  '/news/og/openbot-vs-grokbot.png': typeof NewsOgOpenbotVsGrokbotDotpngRoute
   '/plugins/icon/$slug': typeof PluginsIconSlugRoute
   '/v1/agent-templates/$templateId': typeof V1AgentTemplatesTemplateIdRouteWithChildren
   '/v1/agent-templates/mine': typeof V1AgentTemplatesMineRoute
@@ -815,11 +870,14 @@ export interface FileRouteTypes {
     | '/app'
     | '/app-preview'
     | '/join'
+    | '/llms.txt'
     | '/report-site'
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/agents/$templateId'
+    | '/compare/$slug'
+    | '/compare/rss.xml'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -828,13 +886,16 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
+    | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
     | '/v1/me'
+    | '/compare/'
     | '/guides/'
     | '/news/'
     | '/plugins/'
     | '/api/browser/$'
+    | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
@@ -902,11 +963,14 @@ export interface FileRouteTypes {
     | '/app'
     | '/app-preview'
     | '/join'
+    | '/llms.txt'
     | '/report-site'
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/agents/$templateId'
+    | '/compare/$slug'
+    | '/compare/rss.xml'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -915,13 +979,16 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
+    | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
     | '/v1/me'
+    | '/compare'
     | '/guides'
     | '/news'
     | '/plugins'
     | '/api/browser/$'
+    | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
@@ -989,11 +1056,14 @@ export interface FileRouteTypes {
     | '/app'
     | '/app-preview'
     | '/join'
+    | '/llms.txt'
     | '/report-site'
     | '/sitemap.xml'
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/agents/$templateId'
+    | '/compare/$slug'
+    | '/compare/rss.xml'
     | '/download/linux'
     | '/download/macos'
     | '/download/windows'
@@ -1002,13 +1072,16 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/news/$slug'
+    | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
     | '/plugins/$slug'
     | '/v1/me'
+    | '/compare/'
     | '/guides/'
     | '/news/'
     | '/plugins/'
     | '/api/browser/$'
+    | '/news/og/openbot-vs-grokbot.png'
     | '/plugins/icon/$slug'
     | '/v1/agent-templates/$templateId'
     | '/v1/agent-templates/mine'
@@ -1077,11 +1150,14 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   AppPreviewRoute: typeof AppPreviewRoute
   JoinRoute: typeof JoinRoute
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   ReportSiteRoute: typeof ReportSiteRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DotwellKnownAppleAppSiteAssociationRoute: typeof DotwellKnownAppleAppSiteAssociationRoute
   DotwellKnownJwksDotjsonRoute: typeof DotwellKnownJwksDotjsonRoute
   AgentsTemplateIdRoute: typeof AgentsTemplateIdRoute
+  CompareSlugRoute: typeof CompareSlugRoute
+  CompareRssDotxmlRoute: typeof CompareRssDotxmlRoute
   DownloadLinuxRoute: typeof DownloadLinuxRoute
   DownloadMacosRoute: typeof DownloadMacosRoute
   DownloadWindowsRoute: typeof DownloadWindowsRoute
@@ -1090,13 +1166,16 @@ export interface RootRouteChildren {
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   NewsSlugRoute: typeof NewsSlugRoute
+  NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
   PluginsSlugRoute: typeof PluginsSlugRoute
   V1MeRoute: typeof V1MeRouteWithChildren
+  CompareIndexRoute: typeof CompareIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
   NewsIndexRoute: typeof NewsIndexRoute
   PluginsIndexRoute: typeof PluginsIndexRoute
   ApiBrowserSplatRoute: typeof ApiBrowserSplatRoute
+  NewsOgOpenbotVsGrokbotDotpngRoute: typeof NewsOgOpenbotVsGrokbotDotpngRoute
   PluginsIconSlugRoute: typeof PluginsIconSlugRoute
   V1AgentTemplatesTemplateIdRoute: typeof V1AgentTemplatesTemplateIdRouteWithChildren
   V1AgentTemplatesMineRoute: typeof V1AgentTemplatesMineRoute
@@ -1176,6 +1255,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/report-site': {
       id: '/report-site'
       path: '/report-site'
@@ -1209,6 +1295,27 @@ declare module '@tanstack/solid-router' {
       path: '/agents/$templateId'
       fullPath: '/agents/$templateId'
       preLoaderRoute: typeof AgentsTemplateIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/': {
+      id: '/compare/'
+      path: '/compare'
+      fullPath: '/compare/'
+      preLoaderRoute: typeof CompareIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/$slug': {
+      id: '/compare/$slug'
+      path: '/compare/$slug'
+      fullPath: '/compare/$slug'
+      preLoaderRoute: typeof CompareSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/rss.xml': {
+      id: '/compare/rss.xml'
+      path: '/compare/rss.xml'
+      fullPath: '/compare/rss.xml'
+      preLoaderRoute: typeof CompareRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download/linux': {
@@ -1281,6 +1388,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof NewsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/news/openbot-vs-grokbot': {
+      id: '/news/openbot-vs-grokbot'
+      path: '/news/openbot-vs-grokbot'
+      fullPath: '/news/openbot-vs-grokbot'
+      preLoaderRoute: typeof NewsOpenbotVsGrokbotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/news/rss.xml': {
       id: '/news/rss.xml'
       path: '/news/rss.xml'
@@ -1314,6 +1428,13 @@ declare module '@tanstack/solid-router' {
       path: '/api/browser/$'
       fullPath: '/api/browser/$'
       preLoaderRoute: typeof ApiBrowserSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news/og/openbot-vs-grokbot.png': {
+      id: '/news/og/openbot-vs-grokbot.png'
+      path: '/news/og/openbot-vs-grokbot.png'
+      fullPath: '/news/og/openbot-vs-grokbot.png'
+      preLoaderRoute: typeof NewsOgOpenbotVsGrokbotDotpngRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plugins/icon/$slug': {
@@ -1873,12 +1994,15 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   AppPreviewRoute: AppPreviewRoute,
   JoinRoute: JoinRoute,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   ReportSiteRoute: ReportSiteRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   DotwellKnownAppleAppSiteAssociationRoute:
     DotwellKnownAppleAppSiteAssociationRoute,
   DotwellKnownJwksDotjsonRoute: DotwellKnownJwksDotjsonRoute,
   AgentsTemplateIdRoute: AgentsTemplateIdRoute,
+  CompareSlugRoute: CompareSlugRoute,
+  CompareRssDotxmlRoute: CompareRssDotxmlRoute,
   DownloadLinuxRoute: DownloadLinuxRoute,
   DownloadMacosRoute: DownloadMacosRoute,
   DownloadWindowsRoute: DownloadWindowsRoute,
@@ -1887,13 +2011,16 @@ const rootRouteChildren: RootRouteChildren = {
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   NewsSlugRoute: NewsSlugRoute,
+  NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
   PluginsSlugRoute: PluginsSlugRoute,
   V1MeRoute: V1MeRouteWithChildren,
+  CompareIndexRoute: CompareIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,
   NewsIndexRoute: NewsIndexRoute,
   PluginsIndexRoute: PluginsIndexRoute,
   ApiBrowserSplatRoute: ApiBrowserSplatRoute,
+  NewsOgOpenbotVsGrokbotDotpngRoute: NewsOgOpenbotVsGrokbotDotpngRoute,
   PluginsIconSlugRoute: PluginsIconSlugRoute,
   V1AgentTemplatesTemplateIdRoute: V1AgentTemplatesTemplateIdRouteWithChildren,
   V1AgentTemplatesMineRoute: V1AgentTemplatesMineRoute,

@@ -47,6 +47,13 @@ export function LandingPage() {
                 <PlatformLogo platform="windows" />
                 Windows
               </span>
+              <span class="landing-availability-separator" aria-hidden="true">
+                ·
+              </span>
+              <span class="landing-availability-platform">
+                <PlatformLogo platform="linux" />
+                Linux
+              </span>
             </p>
 
             <h1 id="landing-title" class="landing-title t-stagger-line t-stagger-line--2">
@@ -56,22 +63,31 @@ export function LandingPage() {
             </h1>
 
             <p class="landing-description t-stagger-line t-stagger-line--3">
-              Persistent AI teammates for real work. Run{" "}
+              Persistent AI teammates on your own computer. Run{" "}
+              <span class="landing-provider-item">
+                <span class="landing-provider">
+                  <ProviderLogo provider="codex" class="landing-provider-logo" />
+                  Codex
+                </span>
+                ,
+              </span>{" "}
+              <span class="landing-provider-item">
+                <span class="landing-provider">
+                  <ProviderLogo provider="claude" class="landing-provider-logo" />
+                  Claude
+                </span>
+                ,
+              </span>{" "}
               <span class="landing-provider">
-                <ProviderLogo provider="codex" class="landing-provider-logo" />
-                Codex
-              </span>
-              ,{" "}
-              <span class="landing-provider">
-                <ProviderLogo provider="claude" class="landing-provider-logo" />
-                Claude
+                <ProviderLogo provider="antigravity" class="landing-provider-logo" />
+                Gemini
               </span>{" "}
               and{" "}
               <span class="landing-provider">
                 <ProviderLogo provider="grok" class="landing-provider-logo" />
                 Grok
               </span>{" "}
-              side by side, each with its own workspace, queue, and context.
+              with the plans you already pay for, or your own model.
             </p>
 
             <div class="landing-actions t-stagger-line t-stagger-line--4">

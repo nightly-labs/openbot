@@ -10,7 +10,7 @@ import { type ContentCollection, publishedFirst } from "./content-collection";
 
 export const NEWS_AUTHOR = "Norbert Bodziony";
 
-export const NEWS_COLLECTION: ContentCollection = {
+export const NEWS_COLLECTION: ContentCollection<"news"> = {
   id: "news",
   indexRoute: "/news",
   articleRoute: "/news/$slug",
@@ -23,14 +23,6 @@ export const NEWS_COLLECTION: ContentCollection = {
   moreTitle: "More from OpenBot",
   imageEyebrow: "OPENBOT · NEWS",
   articles: publishedFirst([
-    {
-      slug: "openbot-vs-grokbot",
-      title: "OpenBot vs GrokBot: Local or Cloud Teammates?",
-      description:
-        "A practical comparison of OpenBot and Grok Bot: where agents work, which providers they use, and how their teams coordinate.",
-      publishedAt: "2026-09-24",
-      author: NEWS_AUTHOR,
-    },
     {
       slug: "introducing-openbot",
       title: "Introducing OpenBot: A Shared Workspace for AI Agents",

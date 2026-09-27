@@ -4,10 +4,14 @@
 // from the root route instead of as an import here.
 
 export const OPENBOT_SITE_URL = "https://openbot.run/";
-export const OPENBOT_SITE_TITLE = "OpenBot: AI teammates for real work";
-const OPENBOT_SITE_DESCRIPTION =
-  "Run Codex and Claude side by side as persistent AI teammates, each with its own workspace, queue, and context.";
+export const OPENBOT_SITE_TITLE = "OpenBot: Run a team of AI agents on your computer";
+export const OPENBOT_SITE_DESCRIPTION =
+  "A free desktop app that runs AI agents as a team on your own computer, with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or your own model.";
 export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
+/** The account `OPENBOT_LINKS.contact` opens, which a shared card names. */
+export const OPENBOT_X_HANDLE = "@OpenBot_";
+/** Square, as schema.org wants for a publisher logo. */
+export const OPENBOT_LOGO_URL = `${OPENBOT_SITE_URL}icon-512x512.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
 
 // The hosts production answers on. Both serve the same pages, and those pages go by
@@ -33,8 +37,23 @@ const OPENBOT_SOFTWARE_APPLICATION = {
   image: OPENBOT_SOCIAL_IMAGE_URL,
   description: OPENBOT_SITE_DESCRIPTION,
   applicationCategory: "DeveloperApplication",
-  operatingSystem: ["macOS 13 or later", "Windows 10 or later"],
-  downloadUrl: [`${OPENBOT_SITE_URL}download/macos`, `${OPENBOT_SITE_URL}download/windows`],
+  applicationSubCategory: "AI agent app",
+  operatingSystem: ["macOS 13 or later (Apple silicon)", "Windows 10 or later", "Linux"],
+  downloadUrl: [
+    `${OPENBOT_SITE_URL}download/macos`,
+    `${OPENBOT_SITE_URL}download/windows`,
+    `${OPENBOT_SITE_URL}download/linux`,
+  ],
+  // What people ask an assistant for. Keep it to what the released app does.
+  featureList: [
+    "Runs Codex, Claude Code, Gemini (Antigravity), Grok and OpenCode agents",
+    "Uses your ChatGPT, Claude, Google AI Pro or Ultra, or Grok plan",
+    "Any OpenAI-compatible model server, also one on your own computer",
+    "Agents that work as a team and keep their workspace and history",
+    "Chats, files and workspaces stay on your computer",
+    "iPhone and Android apps that connect to your own computer",
+    "Free for noncommercial use, with no account needed",
+  ],
   isAccessibleForFree: true,
   offers: {
     "@type": "Offer",
@@ -103,6 +122,7 @@ export function openBotHomeHead() {
       { property: "og:image:height", content: "900" },
       { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: OPENBOT_SITE_TITLE },
       { name: "twitter:description", content: OPENBOT_SITE_DESCRIPTION },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
