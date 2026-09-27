@@ -5,8 +5,47 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-27
+
+### Added
+
+- Show the plan of an agent as a task list in the chat. The list changes while the agent works and
+  stays in the history. Codex, Claude, OpenCode and Grok agents send plans. On mobile, the plan
+  shows as a text checklist.
+- Show a "Waiting for replies" block above the message box when an agent asks its teammates. Each
+  row shows a teammate and its status: asked, working, replied or failed.
+- Let an agent see the progress of other agents, and stop work that it gave to another agent. An
+  agent can stop only a turn that its own messages started. It cannot stop work from you, a
+  routine, a channel or another agent.
+- Let an agent create a new agent with the provider, model and reasoning effort that you ask for.
+  An agent can also read the models and reasoning efforts of each provider.
+- Show the images of an agent message in a gallery when the message has two or more images. Click
+  an image in a chat to open it in a viewer. In the viewer, you can go to the next image and
+  download the image.
+- Read the changelog on openbot.run/changelog. It shows the changes of each release, and the steps
+  to do after an upgrade. The Releases link in the footer now opens this page.
+- Compare OpenBot with Grok Bot, Muse, Hermes Agent and OpenClaw on openbot.run/compare. The Grok
+  Bot article moved from News to this section. The old link opens the new page.
+- Open News, Guides and Plugins on openbot.run from a navigation menu that shows the latest
+  articles. On a narrow screen, a menu button opens the same sections.
+- Show the reading progress of each section on news, guides and comparison pages on openbot.run.
+  You can share a link to one section.
+- Show an animated 404 page on openbot.run, with links to the main sections.
+
 ### Changed
 
+- Let an agent read all the replies of its teammates in one turn. Before, an agent that asked two
+  or more teammates started one turn for each reply, and answered you again after each teammate. A
+  message from you does not wait for the replies.
+- Show the replies of teammates in the "Waiting for replies" block, not in the message queue.
+- Move the AI providers to their own Settings tab, after General.
+- Use the onboarding provider list in the Providers & permissions dialog and in the first setup
+  after an invitation. You can add and manage a custom provider there. On a joined server, the
+  dialog shows only the list.
+- Show the reasoning efforts as a row of segments in the model picker. The header shows the effort
+  after the model name. A provider that is not available is dim and shows a status dot.
+- Give the action menus and the model picker a new look. Menus now close with a motion, and a
+  submenu moves in from the menu before it.
 - Check a hosted-site file path before the upload starts, with the same rule as the account server.
   A path such as `api/…`, `server/…` or `node_modules/…`, or a path longer than 240 characters,
   now shows a translated error.
@@ -18,6 +57,18 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Keep a question from an OpenCode agent open until you answer it. Before, the question failed
+  after 60 seconds with "Request timed out", and a later answer went to nobody. When a provider
+  stops waiting for a question, the question now closes.
+- Start a new agent on another signed-in provider when the default provider has no model. Before,
+  an agent that created a new agent got the error "Grok has no available model." When no provider
+  has a model, the error now tells you where to change the default provider.
+- Give an OpenCode agent the full result of a Computer Use action. Before, the agent got only a
+  summary, such as the number of windows, and could not select a window or an element.
+- Show a teammate message that needs no reply as done when an OpenCode agent does not reply.
+  Before, the message showed as failed, and the chat showed an OpenCode error.
+- Show the cost of the default Codex model in agent usage. Before, the usage panel showed no cost
+  for this model.
 - Show the new server logo in server settings before you save it. Before, the settings showed the
   server initials.
 - Keep the focus in the server name menu. A click outside the menu now only closes it. Before, the
