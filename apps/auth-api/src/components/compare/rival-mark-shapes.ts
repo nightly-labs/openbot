@@ -6,8 +6,8 @@
 // not the Meta logo. Hermes Agent is the portrait from its app icon, not the Nous
 // Research logo. OpenClaw is its lobster mascot, not the OpenClaw Foundation logo.
 // Manus is the glyph from its brand page (manus.im/brand), without the word mark.
-// Claude Cowork has no mark of its own: since September 2026 it is part of Claude,
-// so it is the Claude mark. Devin is the mark from devin.ai, not the Cognition logo.
+// Claude Cowork has no mark of its own: from September 2026 it rolls out inside
+// Claude, so it is the Claude mark. Devin is the mark from devin.ai, not the Cognition logo.
 
 import { CLAUDE_PATH } from "@openbot/brand/provider-logo-shape";
 
