@@ -40,6 +40,7 @@ import {
   browserTakeoverResult,
   commandText,
   dynamicPromptResult,
+  expiredPromptResult,
   mcpElicitationQuestions,
   mcpElicitationResult,
   promptQuestions,
@@ -75,6 +76,8 @@ interface PendingApproval {
 
 interface PendingBrowserTakeover {
   client: AgentClient;
+  /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
+  providerRequestId: RequestId;
   secret?: PreparedBrowserSecret;
   submitting?: boolean;
   params: DynamicToolCallParams;
@@ -390,7 +393,8 @@ export class AttentionRegistry {
     tool: HostedSiteMutationTool,
   ): Promise<void> {
     const prepared = await this.#hostedSites.prepareApproval(client, request, params, tool);
-    if (!prepared) return;
+    // A request the provider abandoned during the preparation has nobody to report the decision to.
+    if (!prepared || request.signal?.aborted) return;
     if (shouldAutoApprove(this.#approvalAutomation, prepared.approval) && this.#approvalAutomation.turboEnabled()) {
       await this.#hostedSites.resolveApproval(
         prepared.mutation,
@@ -477,7 +481,13 @@ export class AttentionRegistry {
       tabId,
     };
     return new Promise((resolve) => {
-      const pending: PendingBrowserTakeover = { client, params, request: takeover, resolve };
+      const pending: PendingBrowserTakeover = {
+        client,
+        providerRequestId: request.id,
+        params,
+        request: takeover,
+        resolve,
+      };
       this.#takeovers.set(requestId, pending);
       // The card is only shown once the tab has actually been handed over -- references invalidated,
       // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
@@ -676,12 +686,52 @@ export class AttentionRegistry {
   }
 
   /**
+   * The provider stopped waiting for this request, such as an MCP client whose tool call timed out.
+   * An answer now reaches nobody, so the question expires and the approval or takeover closes. The
+   * turn continues without it.
+   */
+  cancelRequest(client: AgentClient, requestId: RequestId): void {
+    let changed = false;
+    const prompt = this.#prompts.get(requestId);
+    if (prompt?.client === client) {
+      this.#routines.markRunningForTurn(prompt.turnId);
+      this.#expirePrompt(requestId, prompt);
+      changed = true;
+    }
+    const approval = this.#approvals.get(requestId);
+    if (approval?.client === client) {
+      this.#routines.markRunningForTurn(approval.approval.turnId);
+      this.#approvals.delete(requestId);
+      this.#emitInputResolved("approval", requestId, approval.approval.agentId);
+      changed = true;
+    }
+    for (const [key, takeover] of this.#takeovers) {
+      // Resolving emits its own runtime snapshot.
+      if (takeover.client === client && takeover.providerRequestId === requestId) {
+        this.#resolveBrowserTakeover(key, takeover, "cancel");
+      }
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
    * A failed write must not stop the clear: the remaining requests would stay, and the provider
    * paths that clear a stopped client would fail after the client is gone.
+   *
+   * A client that still runs can still wait for the answer, for example an ACP turn that ended while
+   * its MCP tool call stayed open. It gets a refusal, so its request does not wait forever. A client
+   * that forgot the request ignores the answer.
    */
   #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
     this.#prompts.delete(requestId);
     this.#emitInputResolved("prompt", requestId, pending.agentId);
+    if (pending.client.running) {
+      try {
+        pending.client.respond(pending.id, expiredPromptResult(pending.responseKind));
+      } catch (error) {
+        logger.warn("Unable to answer an expired prompt", { error: toLogValue(error) });
+      }
+    }
     try {
       this.#resolvePersistedPrompt(pending, { status: "expired" });
     } catch (error) {

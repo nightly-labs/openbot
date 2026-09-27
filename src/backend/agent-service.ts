@@ -1048,19 +1048,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               : requested.model.defaultReasoningEffort,
         });
       } else {
-        const starting = startingChoice(this.#endpoints.available(), this.#preference(), {
-          enabled: this.#developmentDefaults,
+        const preference = this.#preference();
+        const starting = startingChoice(this.#endpoints.available(), preference, {
+          developmentDefaults: this.#developmentDefaults,
           providerAvailable: (provider) => this.#providerAvailable(provider),
         });
-        // The provider a start lands on, even when it lists no model: the throw below names the
-        // provider the developer expected, and a preferred provider that equals the record's own is
-        // still the no-op it always was.
-        const startingProvider = starting?.provider ?? this.#providers.preferredProvider();
+        // No provider lists a model, the preferred one included, so the agent could never answer.
+        // The error names the provider the user chose, because that is the one they expected.
+        if (!starting) {
+          throw new Error(sourceText("error.agent.noStartingModel", { provider: providerLabel(preference.provider) }));
+        }
         // A new record starts on the built-in default provider, so this is the one place a preferred
         // provider lands on a new agent -- and with it the model setup chose, which is how a custom
-        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider.
-        if (startingProvider !== agent.provider) {
-          if (!starting) throw new Error(`${providerLabel(startingProvider)} has no available model.`);
+        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider. A
+        // fallback from the preferred provider always lands: the record's own provider can be the
+        // fallback, and the model the record holds need not be one that provider lists.
+        if (starting.provider !== agent.provider || starting.provider !== preference.provider) {
           agent = await this.#store.updateAgent({
             agentId: agent.id,
             provider: starting.provider,

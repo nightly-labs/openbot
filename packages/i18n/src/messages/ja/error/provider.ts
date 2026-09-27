@@ -80,6 +80,7 @@ export const messages = {
   "error.provider.keyRequired": "プロバイダーキーが必要です。",
   "error.provider.keyTooLong": "プロバイダーキーが長すぎます。",
   "error.provider.noModel": "選択したプロバイダーに使用できるモデルがありません。",
+  "error.provider.noModelNamed": "{provider} に使用できるモデルがありません。",
   "error.provider.acpNoModels": "ACP CLI が ACP モデルを通知しませんでした。OpenBot は代替モデルを推測しません。",
   "error.provider.endpointRemoveBusy":
     "このエンドポイントを削除する前に、実行中のターンとキューが終わるまでお待ちください。",

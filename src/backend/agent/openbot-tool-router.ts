@@ -121,6 +121,9 @@ export class OpenBotToolRouter {
   }
 
   async handle(client: AgentClient, request: AppServerRequest): Promise<void> {
+    request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
+      once: true,
+    });
     try {
       switch (request.method) {
         case "item/commandExecution/requestApproval":

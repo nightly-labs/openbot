@@ -52,6 +52,11 @@ export interface AppServerRequest {
   method: string;
   id: RequestId;
   params: unknown;
+  /**
+   * In process only, never on the wire. Aborts when the provider stops waiting for the answer, such
+   * as an MCP client whose tool call timed out. An answer after that reaches nobody.
+   */
+  signal?: AbortSignal;
 }
 
 export interface AccountReadResult {

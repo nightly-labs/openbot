@@ -28,6 +28,8 @@ export const messages = {
     "Aucun modèle {provider} n’est disponible pour le moment. Appelez list_models pour voir les modèles disponibles.",
   "error.agent.reasoningEffortUnsupported":
     "Le modèle « {model} » ne prend pas en charge l’effort de raisonnement « {effort} ». Efforts pris en charge : {efforts}.",
+  "error.agent.noStartingModel":
+    "{provider} n’a aucun modèle disponible, et aucun autre fournisseur connecté n’en a. Connectez-vous à un fournisseur, ou changez le fournisseur par défaut dans Fournisseurs et autorisations.",
   "error.agent.waitBeforeProviderChange":
     "Attendez la fin du tour actif et de la file d’attente avant de changer de fournisseur.",
   "error.agent.unknown": "Agent inconnu : {id}",

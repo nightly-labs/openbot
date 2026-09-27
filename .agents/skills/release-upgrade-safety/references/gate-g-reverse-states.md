@@ -6,6 +6,6 @@ Always triggered. There is no path that exempts a release from these.
   needs unsnooze, pause resume, revoke reconnect, mute unmute. Walk the new user-facing states in
   the diff and name the exit for each.
 - **Anything requiring a user action after upgrade goes in the `CHANGELOG.md` entry in bold.** The
-  precedent is the paired-phones note currently under `## [Unreleased]`: it states the action, why
+  precedent is the paired-phones note under `## [0.5.0]`: it states the action, why
   the upgrade forced it, and what is *not* lost. Copy that shape. A user who has to act and is not
   told files a data-loss bug.
