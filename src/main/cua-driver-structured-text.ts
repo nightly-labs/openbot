@@ -36,14 +36,6 @@ const REPEATED_TEXT_MIN_CHARS = 256;
  */
 const BINARY_TEXT_MIN_CHARS = 1_024;
 const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
-/**
- * An integer literal JavaScript cannot hold exactly.
- *
- * A rewritten answer is parsed and serialized again, which would round such a number. No field the
- * driver sends is that large today, but an answer that has one is passed on unchanged rather than
- * changed in a way nobody asked for.
- */
-const UNSAFE_INTEGER = /[:,[]\s*-?\d{16,}/u;
 
 /**
  * One daemon answer line with the copy added, or `null` to pass the line on unchanged.
@@ -53,14 +45,21 @@ const UNSAFE_INTEGER = /[:,[]\s*-?\d{16,}/u;
  * that is not JSON - is `null`.
  */
 export function rewriteCallAnswer(line: string): string | null {
-  if (UNSAFE_INTEGER.test(line)) return null;
+  // A rewritten answer is parsed and serialized again, which would round an integer that JavaScript
+  // cannot hold exactly. No field the driver sends is that large today, but an answer that has one
+  // is passed on unchanged rather than changed in a way nobody asked for. Only parsed numbers
+  // count: digits inside a string, such as a window title, are kept as they are.
+  let unsafeInteger = false;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(line);
+    parsed = JSON.parse(line, (_key, value: unknown) => {
+      if (typeof value === "number" && Number.isInteger(value) && !Number.isSafeInteger(value)) unsafeInteger = true;
+      return value;
+    });
   } catch {
     return null;
   }
-  if (!isDynamicRecord(parsed) || parsed.ok !== true) return null;
+  if (unsafeInteger || !isDynamicRecord(parsed) || parsed.ok !== true) return null;
   const result = withStructuredText(parsed.result);
   return result ? JSON.stringify({ ...parsed, result }) : null;
 }
