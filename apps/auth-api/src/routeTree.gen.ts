@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AppPreviewRouteImport } from './routes/app-preview'
+import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as ReportSiteRouteImport } from './routes/report-site'
@@ -116,6 +117,11 @@ const AppPreviewRoute = AppPreviewRouteImport.update({
   path: '/app-preview',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/app-preview.lazy').then((d) => d.Route))
+const ChangelogRoute = ChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JoinRoute = JoinRouteImport.update({
   id: '/join',
   path: '/join',
@@ -587,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
+  '/changelog': typeof ChangelogRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
@@ -680,6 +687,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
+  '/changelog': typeof ChangelogRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
@@ -774,6 +782,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/app-preview': typeof AppPreviewRoute
+  '/changelog': typeof ChangelogRoute
   '/join': typeof JoinRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/report-site': typeof ReportSiteRoute
@@ -869,6 +878,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app-preview'
+    | '/changelog'
     | '/join'
     | '/llms.txt'
     | '/report-site'
@@ -962,6 +972,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app-preview'
+    | '/changelog'
     | '/join'
     | '/llms.txt'
     | '/report-site'
@@ -1055,6 +1066,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app-preview'
+    | '/changelog'
     | '/join'
     | '/llms.txt'
     | '/report-site'
@@ -1149,6 +1161,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
   AppPreviewRoute: typeof AppPreviewRoute
+  ChangelogRoute: typeof ChangelogRoute
   JoinRoute: typeof JoinRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   ReportSiteRoute: typeof ReportSiteRoute
@@ -1246,6 +1259,13 @@ declare module '@tanstack/solid-router' {
       path: '/app-preview'
       fullPath: '/app-preview'
       preLoaderRoute: typeof AppPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/changelog': {
+      id: '/changelog'
+      path: '/changelog'
+      fullPath: '/changelog'
+      preLoaderRoute: typeof ChangelogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/join': {
@@ -1993,6 +2013,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
   AppPreviewRoute: AppPreviewRoute,
+  ChangelogRoute: ChangelogRoute,
   JoinRoute: JoinRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
   ReportSiteRoute: ReportSiteRoute,

@@ -1,6 +1,8 @@
 import type { JSX } from "@solidjs/web";
+import { Link } from "@tanstack/solid-router";
 import { createSignal, createUniqueId, For, onSettled } from "solid-js";
-import { SITE_NAVIGATION_SECTIONS } from "../../lib/site-navigation";
+import { SITE_NAVIGATION_LINKS, SITE_NAVIGATION_SECTIONS } from "../../lib/site-navigation";
+import { LandingIcon } from "./LandingIcon";
 import { SiteNavigationPanel } from "./SiteNavigationPanel";
 
 /** The width under which the header folds into the menu button. Matches the stylesheet. */
@@ -108,7 +110,23 @@ export function SiteMobileMenu(props: SiteMobileMenuProps) {
               </section>
             )}
           </For>
-          <div class="site-sheet-actions" style={{ "--site-sheet-index": SITE_NAVIGATION_SECTIONS.length }}>
+          <For each={SITE_NAVIGATION_LINKS}>
+            {(link, index) => (
+              <div
+                class="site-sheet-section"
+                style={{ "--site-sheet-index": SITE_NAVIGATION_SECTIONS.length + index() }}
+              >
+                <Link class="site-sheet-link" to={link.to}>
+                  {link.label}
+                  <LandingIcon name="arrow-right" />
+                </Link>
+              </div>
+            )}
+          </For>
+          <div
+            class="site-sheet-actions"
+            style={{ "--site-sheet-index": SITE_NAVIGATION_SECTIONS.length + SITE_NAVIGATION_LINKS.length }}
+          >
             {props.actions()}
           </div>
         </nav>
