@@ -20,6 +20,7 @@ import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { ContentCallToAction } from "../content/ContentCallToAction";
 import { createArticleReadDepth } from "../content/createArticleReadDepth";
+import { ReadingProgress } from "../content/ReadingProgress";
 import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
@@ -239,6 +240,8 @@ export function ComparisonPage(props: ComparisonPageProps) {
             </ul>
           </RevealSection>
         </article>
+
+        <ReadingProgress article={() => articleBody} title={props.article.title} slug={props.article.slug} />
 
         <ContentCallToAction />
       </main>

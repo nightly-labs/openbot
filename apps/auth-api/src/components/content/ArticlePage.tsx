@@ -17,6 +17,7 @@ import { ArticleCard } from "./ArticleCard";
 import { ArticleGradient } from "./ArticleGradient";
 import { ContentCallToAction } from "./ContentCallToAction";
 import { createArticleReadDepth } from "./createArticleReadDepth";
+import { ReadingProgress } from "./ReadingProgress";
 
 export interface ArticlePageProps {
   /** Only collections with prose bodies. A comparison has its own page. */
@@ -104,6 +105,8 @@ export function ArticlePage(props: ArticlePageProps) {
             <Show when={body()}>{(Body) => <Dynamic component={Body()} />}</Show>
           </div>
         </article>
+
+        <ReadingProgress article={() => articleBody} title={props.article.title} slug={props.article.slug} />
 
         <Show when={others().length > 0}>
           <section

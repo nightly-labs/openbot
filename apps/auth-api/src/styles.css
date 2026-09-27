@@ -3175,6 +3175,276 @@ a {
 }
 
 /* ---------------------------------------------------------------------------
+   Reading progress, on news, guides and comparisons.
+
+   One segment per section, as long as the section. The part the reader has
+   passed is OpenBot's lilac, and the segment they are in glows at the point
+   they have reached. Pointing at the rail brings in the titles through the
+   same blur as the header menu, over a scrim with no edge.
+   ------------------------------------------------------------------------- */
+
+.reading-progress {
+  --reading-accent: var(--openbot-logo-production);
+  --reading-track: rgba(255, 255, 255, 0.1);
+  --reading-glow: color-mix(in srgb, var(--reading-accent) 60%, transparent);
+}
+
+/* Narrow screens: a line across the top of the viewport. */
+.reading-progress-line {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 60;
+  height: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--reading-accent) 25%, transparent), var(--reading-accent));
+  box-shadow: 0 0 12px var(--reading-glow);
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(var(--reading-progress, 0));
+  transform-origin: left center;
+  transition: opacity 240ms ease;
+}
+
+.reading-progress[data-visible="true"] .reading-progress-line {
+  opacity: 1;
+}
+
+.reading-progress-rail {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .reading-progress-line {
+    display: none;
+  }
+
+  /* Only the bars take the pointer until the rail opens, so the text beside it
+     stays selectable. */
+  .reading-progress-rail {
+    position: fixed;
+    top: 50%;
+    right: 12px;
+    z-index: 30;
+    width: 280px;
+    height: min(64vh, 600px);
+    display: flex;
+    flex-direction: column;
+    padding: 14px 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(8px, -50%);
+    transition:
+      opacity 300ms ease,
+      transform var(--site-nav-duration) var(--site-nav-ease);
+  }
+
+  .reading-progress[data-visible="true"] .reading-progress-rail,
+  .reading-progress-rail:focus-within {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+
+  .reading-progress-rail:hover,
+  .reading-progress-rail:focus-within {
+    pointer-events: auto;
+  }
+
+  /* A scrim in the page colour, with no edge of its own. It darkens only where
+     the titles are, so they stay legible over wide content such as the
+     comparison cards, and on plain text it does not show at all. */
+  .reading-progress-surface {
+    position: absolute;
+    inset: -64px -12px -64px -64px;
+    background: linear-gradient(
+      to left,
+      var(--openbot-bg-canvas) 0%,
+      color-mix(in srgb, var(--openbot-bg-canvas) 92%, transparent) 55%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(to bottom, transparent, #000 64px, #000 calc(100% - 64px), transparent);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .reading-progress-eyebrow {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 12px;
+    padding: 0 20px 0 18px;
+    color: var(--openbot-text-dim);
+    font-family: var(--openbot-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .reading-progress-count {
+    color: var(--reading-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .reading-progress-list {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .reading-progress-item {
+    flex-basis: 0;
+    min-height: 22px;
+    display: flex;
+  }
+
+  .reading-progress-link {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 14px;
+    padding-left: 18px;
+    color: var(--openbot-text-muted);
+    text-decoration: none;
+    outline: none;
+  }
+
+  .reading-progress-item[data-state="read"] .reading-progress-link {
+    color: var(--openbot-text-secondary);
+  }
+
+  .reading-progress-item[data-state="active"] .reading-progress-link,
+  .reading-progress-link:hover,
+  .reading-progress-link:focus-visible {
+    color: var(--openbot-text-primary);
+  }
+
+  .reading-progress-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    margin-top: -3px;
+    font-size: 12.5px;
+    line-height: 18px;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0;
+    filter: blur(var(--site-nav-blur));
+    transform: translateX(8px);
+    transition:
+      color 200ms ease,
+      opacity 200ms ease,
+      filter 200ms ease,
+      transform 240ms var(--site-nav-ease);
+  }
+
+  .reading-progress-link:focus-visible .reading-progress-label {
+    text-decoration: underline;
+    text-decoration-color: var(--reading-accent);
+    text-underline-offset: 4px;
+  }
+
+  /* A hit area wider than the 2px bar it holds. */
+  .reading-progress-bar {
+    position: relative;
+    width: 20px;
+    flex: none;
+    padding-bottom: 4px;
+  }
+
+  .reading-progress[data-visible="true"] .reading-progress-bar {
+    pointer-events: auto;
+  }
+
+  .reading-progress-bar::before,
+  .reading-progress-fill {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 9px;
+    bottom: 4px;
+    width: 2px;
+    border-radius: 2px;
+    transition:
+      width 300ms var(--site-nav-ease),
+      right 300ms var(--site-nav-ease),
+      background-color 300ms ease;
+  }
+
+  .reading-progress-bar::before {
+    background: var(--reading-track);
+  }
+
+  .reading-progress-fill {
+    background: var(--reading-accent);
+    transform: scaleY(var(--reading-fill, 0));
+    transform-origin: top center;
+  }
+
+  .reading-progress-item[data-state="active"] .reading-progress-bar::before,
+  .reading-progress-item[data-state="active"] .reading-progress-fill {
+    right: 8.5px;
+    width: 3px;
+  }
+
+  .reading-progress-item[data-state="active"] .reading-progress-fill {
+    box-shadow: 0 0 10px var(--reading-glow);
+  }
+
+  /* The reading head: where the reader is inside the current section. */
+  .reading-progress-item[data-state="active"] .reading-progress-bar::after {
+    content: "";
+    position: absolute;
+    top: calc((100% - 4px) * var(--reading-fill, 0));
+    right: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--reading-accent);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--reading-accent) 18%, transparent),
+      0 0 12px var(--reading-glow);
+    transform: translateY(-50%);
+  }
+
+  .reading-progress-rail:hover .reading-progress-surface,
+  .reading-progress-rail:focus-within .reading-progress-surface {
+    opacity: 1;
+    transition: opacity 240ms ease;
+  }
+
+  .reading-progress-rail:hover .reading-progress-eyebrow,
+  .reading-progress-rail:focus-within .reading-progress-eyebrow {
+    opacity: 1;
+  }
+
+  .reading-progress-rail:hover .reading-progress-label,
+  .reading-progress-rail:focus-within .reading-progress-label {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+    transition:
+      color 200ms ease,
+      opacity var(--site-nav-quick) ease calc(var(--reading-index, 0) * 18ms),
+      filter var(--site-nav-quick) ease calc(var(--reading-index, 0) * 18ms),
+      transform var(--site-nav-duration) var(--site-nav-ease) calc(var(--reading-index, 0) * 18ms);
+  }
+}
+
+/* A heading that a section link opens sits clear of the top edge. */
+.post-article-body h2,
+.compare-article h2 {
+  scroll-margin-top: 32px;
+}
+
+/* ---------------------------------------------------------------------------
    /compare and /compare/<slug>.
 
    A comparison is read as a set of answers, so the page is built from blocks
