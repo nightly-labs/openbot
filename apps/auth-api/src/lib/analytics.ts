@@ -153,6 +153,8 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contact, "contact"],
   [OPENBOT_LINKS.repository, "repository"],
   [OPENBOT_LINKS.releases, "releases"],
+  // The same destination on this site: the release notes, reported under the name they had.
+  [OPENBOT_LINKS.changelog, "releases"],
   [OPENBOT_LINKS.license, "license"],
   [OPENBOT_LINKS.privacy, "privacy"],
   [OPENBOT_LINKS.documentation, "documentation"],

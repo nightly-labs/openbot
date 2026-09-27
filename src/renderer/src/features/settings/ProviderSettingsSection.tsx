@@ -8,7 +8,7 @@ import type {
   SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { agentProviderDescriptor } from "@openbot/contracts/ipc";
-import { SettingsSection, Text } from "@openbot/ui";
+import { Text } from "@openbot/ui";
 import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLoginDialog";
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
@@ -65,7 +65,8 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   });
 
   return (
-    <SettingsSection title={i18n.t("settings.providers.title")}>
+    // The tab title already names this list, so it has no heading of its own.
+    <div class="settings-provider-section">
       <ProviderPicker
         value={props.store.selectedProvider()}
         options={props.store.providerOptions()}
@@ -117,7 +118,7 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           onClose={host.closeList}
         />
       </Show>
-    </SettingsSection>
+    </div>
   );
 }
 

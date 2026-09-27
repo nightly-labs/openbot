@@ -2,6 +2,8 @@
 // registries. They live here rather than inside the route files so that the
 // tests can assert on the XML without standing up a router.
 
+import { changelogUrl } from "../lib/changelog";
+import { CHANGELOG_UPDATED_AT } from "../lib/changelog-releases";
 import { CONTENT_COLLECTIONS } from "../lib/content";
 import {
   articleOgImageUrl,
@@ -56,6 +58,7 @@ export function contentSitemapXml(): string {
       lastmod: PLUGINS_UPDATED_AT,
       priority: "0.7",
     })),
+    { loc: changelogUrl(), lastmod: CHANGELOG_UPDATED_AT, priority: "0.6" },
   ];
 
   const urls = entries

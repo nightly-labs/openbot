@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
+import { releaseNotesProblems } from "./release-notes";
 
 const logger = createOpenBotLogger("release-preflight");
 
@@ -13,9 +14,7 @@ const changelog = await readFile("CHANGELOG.md", "utf8");
 const failures: string[] = [];
 
 if (!/^\d+\.\d+\.\d+$/.test(packageJson.version)) failures.push("package version is not semver");
-if (!changelog.includes(`## [${packageJson.version}]`)) {
-  failures.push(`CHANGELOG.md has no ${packageJson.version} release heading`);
-}
+failures.push(...releaseNotesProblems(changelog, packageJson.version));
 if (run("git", ["status", "--porcelain"])) failures.push("working tree is not clean");
 if (run("git", ["rev-list", "--left-right", "--count", "origin/main...HEAD"]) !== "0\t0") {
   failures.push("main is not synchronized with origin/main");

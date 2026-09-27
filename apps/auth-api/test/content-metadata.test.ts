@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { contentImageJobs } from "../content-images";
 import { ARTICLE_GRADIENT_BRAND_HEXES, articleGradient } from "../src/lib/article-gradient";
+import { changelogUrl } from "../src/lib/changelog";
 import { CONTENT_COLLECTIONS } from "../src/lib/content";
 import {
   articleArtPath,
@@ -140,7 +141,7 @@ describe("plugin pages", () => {
 });
 
 describe("sitemap", () => {
-  it("lists the home page, every index, every article and every plugin once", () => {
+  it("lists the home page, every index, every article, every plugin and the changelog once", () => {
     const xml = contentSitemapXml();
     const urls = [
       OPENBOT_SITE_URL,
@@ -150,6 +151,7 @@ describe("sitemap", () => {
       ]),
       pluginIndexUrl(),
       ...SITE_PLUGINS.map((plugin) => pluginUrl(plugin.slug)),
+      changelogUrl(),
     ];
 
     for (const url of urls) {

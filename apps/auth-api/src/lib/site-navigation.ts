@@ -6,6 +6,7 @@
 // collections that the header offers. No JSX here, for the same reason
 // `content-collection.ts` holds none.
 
+import { CHANGELOG_ROUTE } from "./changelog";
 import { HEADER_COLLECTIONS } from "./content";
 import type { CollectionArticle, ContentCollection } from "./content-collection";
 import { PLUGIN_INDEX_ROUTE, SITE_PLUGINS, type SitePlugin } from "./plugins";
@@ -72,3 +73,12 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     pluginCount: SITE_PLUGINS.length,
   },
 ];
+
+/** A header entry with no panel: one page, reached in one press. */
+export interface SiteNavigationLink {
+  label: string;
+  to: typeof CHANGELOG_ROUTE;
+}
+
+/** After the sections, in both the desktop menu and the mobile sheet. */
+export const SITE_NAVIGATION_LINKS: readonly SiteNavigationLink[] = [{ label: "Changelog", to: CHANGELOG_ROUTE }];
