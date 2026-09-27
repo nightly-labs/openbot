@@ -4,6 +4,7 @@
 
 import { COMPARISONS } from "../content/compare";
 import { OPENBOT_PLANS } from "../content/compare/comparison";
+import { CHANGELOG_DESCRIPTION, changelogUrl } from "../lib/changelog";
 import { CONTENT_COLLECTIONS } from "../lib/content";
 import { articleUrl, collectionIndexUrl } from "../lib/content-collection";
 import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "../lib/landing-links";
@@ -52,7 +53,13 @@ function llmsTxt(): string {
     lines.push("");
   }
 
-  lines.push("## Optional", "", `- [Plugins](${pluginIndexUrl()}): ${PLUGINS_DESCRIPTION}`, "");
+  lines.push(
+    "## Optional",
+    "",
+    `- [Plugins](${pluginIndexUrl()}): ${PLUGINS_DESCRIPTION}`,
+    `- [Changelog](${changelogUrl()}): ${CHANGELOG_DESCRIPTION}`,
+    "",
+  );
   return lines.join("\n");
 }
 

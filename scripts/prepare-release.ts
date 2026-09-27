@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
+import { releaseNotesProblems, UNRELEASED } from "./release-notes";
 
 const logger = createOpenBotLogger("prepare-release");
 
@@ -19,8 +20,16 @@ const changelog = await readFile("CHANGELOG.md", "utf8");
 const nextVersion = bumpVersion(packageJson.version, increment);
 const releaseHeading = `## [${nextVersion}] - ${new Date().toISOString().slice(0, 10)}`;
 
-if (!changelog.includes("## [Unreleased]")) {
-  throw new Error("CHANGELOG.md has no Unreleased heading");
+// The bump moves everything under Unreleased into the new release, so that section is the release.
+const problems = releaseNotesProblems(changelog, UNRELEASED);
+if (problems.length > 0) {
+  throw new Error(
+    [
+      `Write the release notes for ${nextVersion} under "## [Unreleased]" first:`,
+      ...problems.map((problem) => `- ${problem}`),
+      "See docs/RELEASING.md#release-notes.",
+    ].join("\n"),
+  );
 }
 if (changelog.includes(`## [${nextVersion}]`)) {
   throw new Error(`CHANGELOG.md already contains ${nextVersion}`);

@@ -1,5 +1,6 @@
+import { Link } from "@tanstack/solid-router";
 import { createSignal, createUniqueId, For, flush, onSettled } from "solid-js";
-import { SITE_NAVIGATION_SECTIONS, type SiteNavigationSection } from "../../lib/site-navigation";
+import { SITE_NAVIGATION_LINKS, SITE_NAVIGATION_SECTIONS, type SiteNavigationSection } from "../../lib/site-navigation";
 import { LandingIcon } from "./LandingIcon";
 import { SiteNavigationPanel } from "./SiteNavigationPanel";
 
@@ -193,6 +194,13 @@ export function SiteNavigationMenu() {
     openTimer = setTimeout(() => open(id), OPEN_DELAY_MS);
   }
 
+  /** A plain link has no panel, so reaching it closes the one that is open. */
+  function reachLink(link: HTMLElement): void {
+    clearTimeout(openTimer);
+    if (current !== null) close();
+    movePill(link);
+  }
+
   function handleTriggerClick(id: SectionId): void {
     if (current === id && performance.now() - openedAt > HOVER_CLICK_GRACE_MS) {
       close();
@@ -222,7 +230,9 @@ export function SiteNavigationMenu() {
 
   function handleFocusIn(event: FocusEvent): void {
     const target = event.target;
-    if (triggerSection(target) && target instanceof HTMLElement && target.matches(":focus-visible")) movePill(target);
+    if (!(target instanceof HTMLElement) || !target.matches(":focus-visible")) return;
+    if (triggerSection(target)) movePill(target);
+    else if (target.matches(".site-nav-link")) reachLink(target);
   }
 
   function handleFocusOut(event: FocusEvent): void {
@@ -307,6 +317,21 @@ export function SiteNavigationMenu() {
                 >
                   <SiteNavigationPanel section={section} live={shown().includes(section.id)} />
                 </div>
+              </li>
+            )}
+          </For>
+          <For each={SITE_NAVIGATION_LINKS}>
+            {(link) => (
+              <li class="site-nav-item">
+                <Link
+                  class="site-nav-trigger site-nav-link"
+                  to={link.to}
+                  onPointerEnter={(event) => {
+                    if (event.pointerType === "mouse") reachLink(event.currentTarget);
+                  }}
+                >
+                  {link.label}
+                </Link>
               </li>
             )}
           </For>

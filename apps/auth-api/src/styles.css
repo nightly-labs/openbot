@@ -267,6 +267,16 @@ a {
   box-shadow: 0 0 0 2px var(--openbot-accent-strong);
 }
 
+/* A link with no panel: no chevron, so the padding is even on both sides. */
+.site-nav-link {
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.site-nav-link[aria-current="page"] {
+  color: var(--openbot-text-primary);
+}
+
 .site-nav-chevron {
   width: 12px;
   height: 12px;
@@ -805,6 +815,32 @@ a {
 
   .site-sheet .site-panel-footer {
     margin: 6px -6px -6px;
+  }
+
+  /* A page with no panel, drawn as one row in the same frame the panels use. */
+  .site-sheet-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--openbot-text-primary) 3%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 7%, transparent);
+    color: var(--openbot-text-primary);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .site-sheet-link svg {
+    width: 16px;
+    height: 16px;
+    color: var(--openbot-text-muted);
+  }
+
+  .site-sheet-link:focus-visible {
+    outline: 2px solid var(--openbot-border-focus);
+    outline-offset: 2px;
   }
 
   .site-sheet-actions {
@@ -5804,5 +5840,680 @@ a {
 
   .not-found-link {
     transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   /changelog.
+
+   The release notes from CHANGELOG.md, one block per release under a hero that
+   dissolves into the page. On a wide screen the index of releases stays beside
+   the notes and marks the one being read; on a narrow one it becomes a strip of
+   versions that stays at the top. Colour belongs to the kind of change, so a
+   reader scanning for fixes finds the green groups without reading headings. */
+
+.changelog-page {
+  --changelog-hairline: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  --changelog-scroll-offset: 24px;
+}
+
+.changelog-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-items: end;
+  min-height: clamp(320px, 38vw, 460px);
+  margin-top: clamp(4px, 1vw, 12px);
+}
+
+/* The picture fades out at the bottom rather than ending on an edge, so the
+   title reads as standing in the page and the notes start where the colour stops. */
+.changelog-hero-art {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) 40%, transparent 100%);
+  mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) 40%, transparent 100%);
+}
+
+/* A shade on the reading side, so white type keeps its contrast over the lightest
+   colours the shader draws. */
+.changelog-hero-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--openbot-bg-canvas) 62%, transparent) 0%,
+    color-mix(in srgb, var(--openbot-bg-canvas) 18%, transparent) 55%,
+    transparent 80%
+  );
+}
+
+.changelog-hero-copy {
+  max-width: 760px;
+  padding: clamp(40px, 6vw, 72px) clamp(24px, 4vw, 56px) clamp(40px, 5vw, 64px);
+}
+
+.changelog-eyebrow {
+  margin: 0;
+  color: color-mix(in srgb, var(--openbot-text-primary) 76%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.changelog-title {
+  margin: 12px 0 0;
+  color: var(--openbot-text-primary);
+  font-size: clamp(38px, 5.6vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.changelog-lede {
+  max-width: 54ch;
+  margin: 18px 0 0;
+  color: color-mix(in srgb, var(--openbot-text-primary) 80%, transparent);
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.changelog-latest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 0 clamp(24px, 4vw, 56px) 20px;
+  border-bottom: 1px solid var(--changelog-hairline);
+}
+
+.changelog-latest-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+}
+
+.changelog-latest-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success);
+}
+
+/* A ring that grows out of the dot and fades: the release is live, and the dot says so
+   without blinking. */
+.changelog-latest-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--openbot-success);
+  animation: changelog-pulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes changelog-pulse {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+.changelog-latest-version {
+  border-radius: var(--openbot-radius-xs);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.changelog-latest-version:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.changelog-latest-date {
+  color: var(--openbot-text-dim);
+}
+
+.changelog-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(40px, 6vw, 96px);
+  margin-top: clamp(36px, 4.5vw, 64px);
+}
+
+/* The index -------------------------------------------------------------- */
+
+.changelog-index {
+  position: sticky;
+  top: var(--changelog-scroll-offset);
+}
+
+.changelog-index-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--openbot-text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.changelog-index-count {
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* Scrolls on its own, inside the window, and fades at both ends so a row cut by the
+   edge reads as more to come rather than as a clipped line. */
+.changelog-index-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: calc(100dvh - var(--changelog-scroll-offset) * 2 - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 24px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-mask-solid) 12px,
+    var(--openbot-mask-solid) calc(100% - 32px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--openbot-mask-solid) 12px,
+    var(--openbot-mask-solid) calc(100% - 32px),
+    transparent
+  );
+}
+
+.changelog-index-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.changelog-index-month-label {
+  margin: 0 0 6px 14px;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.changelog-index-list {
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--changelog-hairline);
+  list-style: none;
+}
+
+.changelog-index-link {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 0 var(--openbot-radius-sm) var(--openbot-radius-sm) 0;
+  color: var(--openbot-text-dim);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+/* The current row's mark sits on the rail, so the rail reads as a track the reader
+   moves along. */
+.changelog-index-link::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: -1px;
+  width: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
+  opacity: 0;
+  transform: scaleY(0.3);
+  transition:
+    opacity var(--openbot-duration-normal) ease,
+    transform 320ms var(--openbot-ease-out);
+}
+
+.changelog-index-link[aria-current="true"] {
+  color: var(--openbot-text-primary);
+}
+
+.changelog-index-link[aria-current="true"]::before {
+  opacity: 1;
+  transform: none;
+}
+
+.changelog-index-link:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: -2px;
+}
+
+.changelog-index-version {
+  font-family: var(--openbot-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-index-date {
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A release ---------------------------------------------------------------- */
+
+.changelog-releases {
+  min-width: 0;
+  max-width: 780px;
+}
+
+.changelog-release {
+  padding: clamp(36px, 4.5vw, 56px) 0;
+  border-top: 1px solid var(--changelog-hairline);
+  scroll-margin-top: var(--changelog-scroll-offset);
+}
+
+.changelog-release:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.changelog-release[data-revealed="false"] {
+  opacity: 0;
+}
+
+.changelog-release[data-revealed="true"] {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.changelog-release-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--openbot-text-dim);
+  font-size: 13px;
+}
+
+.changelog-release-badge {
+  padding: 2px 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.changelog-release-title {
+  margin: 8px 0 0;
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.changelog-release-anchor {
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-primary);
+  text-decoration: none;
+}
+
+/* The link to this release, shown under a pointer so a reader knows the title can
+   be copied as one. */
+.changelog-release-anchor::after {
+  content: "#";
+  margin-left: 10px;
+  color: var(--openbot-text-dim);
+  font-weight: 400;
+  opacity: 0;
+  transition: opacity var(--openbot-duration-normal) ease;
+}
+
+.changelog-release-anchor:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 4px;
+}
+
+.changelog-release-version {
+  color: var(--openbot-text-muted);
+  font-weight: 500;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.changelog-release-intro {
+  max-width: 68ch;
+  margin: 16px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.changelog-code {
+  padding: 1px 6px;
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface);
+  box-shadow: inset 0 0 0 1px var(--changelog-hairline);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+.changelog-strong {
+  color: var(--openbot-text-primary);
+  font-weight: 600;
+}
+
+.changelog-link {
+  border-radius: var(--openbot-radius-xs);
+  color: var(--openbot-accent-text);
+  text-decoration: none;
+}
+
+.changelog-link:focus-visible {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.changelog-notice {
+  margin-top: 24px;
+  padding: 16px 18px 18px;
+  border-radius: var(--openbot-radius-card);
+  background-image: linear-gradient(
+    180deg,
+    var(--openbot-warning-soft),
+    color-mix(in srgb, var(--openbot-warning) 3%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 26%, transparent);
+}
+
+.changelog-notice-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--openbot-warning-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.changelog-notice-mark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-warning);
+  color: var(--openbot-text-on-light);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.changelog-notice-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0 0 0 28px;
+  list-style: none;
+}
+
+.changelog-notice-item {
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Most notices are bold from end to end in the file. Inside a box that already says
+   "act on this", full weight on every word is only harder to read. */
+.changelog-notice .changelog-strong {
+  color: var(--openbot-text-primary);
+  font-weight: 500;
+}
+
+.changelog-group {
+  --changelog-tone: var(--openbot-text-muted);
+  margin-top: 28px;
+}
+
+.changelog-group[data-type="added"] {
+  --changelog-tone: var(--openbot-logo-production);
+}
+
+.changelog-group[data-type="changed"] {
+  --changelog-tone: var(--openbot-accent-text);
+}
+
+.changelog-group[data-type="fixed"] {
+  --changelog-tone: var(--openbot-success-text);
+}
+
+.changelog-group[data-type="removed"],
+.changelog-group[data-type="security"],
+.changelog-group[data-type="deprecated"] {
+  --changelog-tone: var(--openbot-warning-text);
+}
+
+.changelog-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--changelog-tone);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.changelog-group-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--changelog-tone);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--changelog-tone) 70%, transparent);
+}
+
+.changelog-group-count {
+  padding: 1px 7px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--changelog-tone) 12%, transparent);
+  font-family: var(--openbot-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.changelog-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A hanging mark in the group's colour, so a long item wraps under its own text and
+   not under the mark. */
+.changelog-item {
+  position: relative;
+  padding-left: 22px;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.changelog-item::before {
+  content: "";
+  position: absolute;
+  top: 0.8em;
+  left: 4px;
+  width: 8px;
+  height: 1px;
+  background: color-mix(in srgb, var(--changelog-tone) 70%, transparent);
+}
+
+/* Narrow screens: the index becomes a strip of versions that stays at the top of the
+   window, over the notes, and scrolls sideways to keep the current one in sight. */
+@media (max-width: 959px) {
+  .changelog-page {
+    --changelog-scroll-offset: 72px;
+  }
+
+  .changelog-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    margin-top: 0;
+  }
+
+  .changelog-index {
+    z-index: 5;
+    top: 0;
+    margin: 0 calc(clamp(20px, 4vw, 48px) * -1);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--changelog-hairline);
+    background: color-mix(in srgb, var(--openbot-bg-canvas) 86%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
+
+  .changelog-index-title,
+  .changelog-index-month-label {
+    display: none;
+  }
+
+  .changelog-index-scroll {
+    flex-direction: row;
+    gap: 6px;
+    max-height: none;
+    overflow: auto hidden;
+    padding: 0 clamp(20px, 4vw, 48px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      var(--openbot-mask-solid) 16px,
+      var(--openbot-mask-solid) calc(100% - 32px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      var(--openbot-mask-solid) 16px,
+      var(--openbot-mask-solid) calc(100% - 32px),
+      transparent
+    );
+  }
+
+  .changelog-index-month,
+  .changelog-index-list {
+    display: contents;
+  }
+
+  .changelog-index-item {
+    flex: 0 0 auto;
+  }
+
+  .changelog-index-link {
+    padding: 6px 12px;
+    border-radius: var(--openbot-radius-pill);
+    box-shadow: inset 0 0 0 1px var(--changelog-hairline);
+    transition:
+      color var(--openbot-duration-normal) ease,
+      background-color var(--openbot-duration-normal) ease;
+  }
+
+  .changelog-index-link::before,
+  .changelog-index-date {
+    display: none;
+  }
+
+  .changelog-index-link[aria-current="true"] {
+    background: var(--openbot-action);
+    color: var(--openbot-action-foreground);
+  }
+
+  .changelog-latest {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .changelog-hero-copy {
+    padding-right: clamp(20px, 4vw, 32px);
+    padding-left: clamp(20px, 4vw, 32px);
+  }
+
+  .changelog-hero-art {
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changelog-latest-dot::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .changelog-release[data-revealed="true"] {
+    animation: none;
+  }
+
+  .changelog-index-link,
+  .changelog-index-link::before,
+  .changelog-release-anchor::after,
+  .changelog-release-version {
+    transition: none;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .changelog-index-link:hover {
+    color: var(--openbot-text-secondary);
+  }
+
+  .changelog-release-anchor:hover .changelog-release-version {
+    color: var(--openbot-text-secondary);
+  }
+
+  .changelog-release-anchor:hover::after {
+    opacity: 1;
+  }
+
+  .changelog-latest-version:hover,
+  .changelog-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }
