@@ -176,7 +176,7 @@
     "src/renderer/src/features/onboarding/OnboardingFlow.tsx": 2,
     "src/renderer/src/features/servers/RemoteDesktopSetup.tsx": 1,
     "src/renderer/src/features/servers/ServerMcpPanel.tsx": 2,
-    "src/renderer/src/features/servers/ServerSettingsModal.tsx": 4,
+    "src/renderer/src/features/servers/ServerSettingsModal.tsx": 3,
     "src/renderer/src/features/settings/SettingsGeneralTab.tsx": 2,
     "src/renderer/src/features/settings/SettingsModal.test.tsx": 1,
     "src/renderer/src/features/settings/SettingsModal.tsx": 3,
