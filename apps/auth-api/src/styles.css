@@ -5202,12 +5202,16 @@ a {
     not-found-float 6s ease-in-out 900ms infinite;
 }
 
-.not-found-digit {
+/* The gradient text sits on an inner span. WebKit paints the whole box when
+   an element with text-clipped background also animates transform or opacity. */
+.not-found-digit-glyph {
+  display: block;
   background: linear-gradient(
     180deg,
     var(--openbot-text-primary) 25%,
     color-mix(in srgb, var(--openbot-logo-production) 70%, var(--openbot-transparent))
   );
+  -webkit-background-clip: text;
   background-clip: text;
   color: var(--openbot-transparent);
 }
