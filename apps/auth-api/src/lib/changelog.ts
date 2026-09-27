@@ -16,7 +16,7 @@ import {
 } from "./site-metadata";
 
 export const CHANGELOG_ROUTE = "/changelog";
-export const CHANGELOG_TITLE = "Changelog — OpenBot";
+const CHANGELOG_TITLE = "Changelog — OpenBot";
 export const CHANGELOG_DESCRIPTION =
   "Every OpenBot release, newest first: new features, improvements and fixes, with what to do after you upgrade.";
 
@@ -62,7 +62,7 @@ const GROUP_TYPES: Partial<Record<string, ChangelogGroupType>> = {
 /** A bold run that ends a sentence is an instruction; a bold word such as a tab name is not. */
 const NOTICE = /\*\*[^*]+[.!]\*\*/;
 
-export function releaseAnchor(version: string): string {
+function releaseAnchor(version: string): string {
   return `v${version.replace(/[^0-9a-z]+/gi, "-").toLowerCase()}`;
 }
 
