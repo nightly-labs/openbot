@@ -18,6 +18,8 @@ import { freeModelsReady, ProviderPicker, type ProviderPickerOption } from "@ope
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import { DetectedProviders } from "@openbot/ui/features/custom-providers/DetectedProviders";
+import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
@@ -66,6 +68,13 @@ export interface OnboardingFlowProps {
    * choice beside the built-in providers, and a duplicate ID is a field error before the round trip.
    */
   customProviders?: readonly CustomProviderSummary[];
+  /**
+   * Local model servers and ACP agents that the host found. Without it, or when a scan finds
+   * nothing, the step shows no such list. First run scans once, so there is no scan-again control.
+   */
+  providerDetection?: ProviderDetection;
+  /** Saves, hides and checks what the scan found. Without it the step shows no such list. */
+  detectedProviderApi?: DetectedProviderApi;
 }
 
 type OnboardingStep = "meet" | "computer" | "jobs";
@@ -659,6 +668,29 @@ export function OnboardingFlow(props: OnboardingFlowProps) {
                     }}
                     onChooseMoreProvider={chooseMoreProvider}
                     onChooseMoreCustom={chooseMoreCustom}
+                    detected={
+                      // On first run a scan that found nothing is noise, so the list goes away.
+                      <Show
+                        when={
+                          props.providerDetection?.scanning || props.providerDetection?.found.length
+                            ? props.providerDetection
+                            : undefined
+                        }
+                      >
+                        {(detection) => (
+                          <Show when={props.detectedProviderApi}>
+                            {(api) => (
+                              <DetectedProviders
+                                detection={detection()}
+                                api={api()}
+                                takenProviderIds={(props.customProviders ?? []).map((provider) => provider.id)}
+                                disabled={saving()}
+                              />
+                            )}
+                          </Show>
+                        )}
+                      </Show>
+                    }
                     onChange={(provider) => {
                       keepProviderRows();
                       setProviderSelectedByUser(true);

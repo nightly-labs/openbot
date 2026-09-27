@@ -154,6 +154,77 @@ export class CustomEndpoints {
   }
 
   /**
+   * Changes one saved endpoint: the agents on a model it no longer lists, the exclusion of its id,
+   * and `persist`, which is the caller's file write, as one change nothing else can interleave with.
+   *
+   * The agents move first, while the kept models are still served, so an agent on a removed model
+   * moves to a kept model of the same endpoint and keeps its provider and thread. The id is then
+   * excluded as for a save: the running process still has the old address and credentials, and
+   * only a process that read this write may serve the endpoint again.
+   */
+  update<T>(providerId: string, removedModelIds: readonly string[], persist: () => Promise<T>): Promise<T> {
+    return this.runExclusive(async () => {
+      await this.#moveOffRemovedModels(providerId, new Set(removedModelIds));
+      const previous = this.#released.get(providerId);
+      this.#revision += 1;
+      const revision = this.#revision;
+      this.#released.set(providerId, revision);
+      this.#hooks.modelsChanged();
+      this.#hooks.stopProfileClients();
+      try {
+        const persisted = await persist();
+        this.#committedRevision = revision;
+        return persisted;
+      } catch (error) {
+        if (previous !== undefined) this.#released.set(providerId, previous);
+        else this.#released.delete(providerId);
+        this.#hooks.modelsChanged();
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * The agents on `providerId/<removed>` go to a kept model of the same endpoint when the catalogue
+   * lists one, then to the fallback a removal uses. Busy agents stop the change only when the move
+   * is a provider switch.
+   */
+  async #moveOffRemovedModels(providerId: string, removed: ReadonlySet<string>): Promise<void> {
+    if (removed.size === 0) return;
+    const prefix = `${providerId}/`;
+    const affected = this.#store
+      .list()
+      .filter(
+        (agent) =>
+          providerForAgent(agent) === "opencode" &&
+          agent.model.startsWith(prefix) &&
+          removed.has(agent.model.slice(prefix.length)),
+      );
+    if (affected.length === 0) return;
+    const remaining = this.available().filter(
+      (option) => !(option.id.startsWith(prefix) && removed.has(option.id.slice(prefix.length))),
+    );
+    const fallback =
+      remaining.find((option) => option.provider === "opencode" && option.id.startsWith(prefix)) ??
+      startingModel("opencode", remaining, this.#hooks.preference()) ??
+      (this.#hooks.providerAvailable(DEFAULT_AGENT_PROVIDER)
+        ? startingModel(DEFAULT_AGENT_PROVIDER, remaining, this.#hooks.preference())
+        : null);
+    if (!fallback) return;
+    if (fallback.provider !== "opencode" && affected.some((agent) => this.#hasWorkInFlight(agent))) {
+      throw new Error(sourceText("error.provider.endpointRemoveBusy"));
+    }
+    for (const agent of affected) {
+      await this.#hooks.applyAgentUpdate({
+        agentId: agent.id,
+        provider: fallback.provider,
+        model: fallback.id,
+        reasoningEffort: fallback.defaultReasoningEffort,
+      });
+    }
+  }
+
+  /**
    * Removes one endpoint: the exclusion, the agents that were on it, and `persist`, which is the
    * caller's file write, as one change nothing else can interleave with.
    *

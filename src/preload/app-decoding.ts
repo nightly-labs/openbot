@@ -18,6 +18,8 @@ import {
   type CentralAuthUser,
   type CustomProviderResult,
   type CustomProviderSummary,
+  type DetectedModelServer,
+  type DiscoverModelsResult,
   type ExportResult,
   type HostedSiteSummary,
   isAgentModel,
@@ -26,12 +28,16 @@ import {
   isApprovalAutomationPreference,
   isCustomProviderResult,
   isCustomProviderSummary,
+  isDetectedModelServer,
+  isDiscoverModelsResult,
+  isProviderDetectionSettings,
   isRemoteDesktopSetupStatus,
   isRemoteDesktopTestStatus,
   type MobileConnectedDevice,
   type MobileConnectTicket,
   type NotificationOpenedEvent,
   type NotificationPreference,
+  type ProviderDetectionSettings,
   type RemoteDesktopSetupStatus,
   type RemoteDesktopTestStatus,
   UPDATE_PHASES,
@@ -271,6 +277,24 @@ export function decodeCustomProviders(value: unknown): CustomProviderSummary[] {
 
 export function decodeCustomProviderResult(value: unknown): CustomProviderResult {
   if (!isCustomProviderResult(value)) throw new Error("Invalid custom provider response.");
+  return value;
+}
+
+/** Fails closed on the whole list, like `decodeCustomProviders`: a scan row never carries a key. */
+export function decodeDetectedModelServers(value: unknown): DetectedModelServer[] {
+  if (!Array.isArray(value) || !value.every(isDetectedModelServer)) {
+    throw new Error("Invalid model server list response.");
+  }
+  return value;
+}
+
+export function decodeDiscoverModelsResult(value: unknown): DiscoverModelsResult {
+  if (!isDiscoverModelsResult(value)) throw new Error("Invalid model list response.");
+  return value;
+}
+
+export function decodeProviderDetectionSettings(value: unknown): ProviderDetectionSettings {
+  if (!isProviderDetectionSettings(value)) throw new Error("Invalid detection settings response.");
   return value;
 }
 

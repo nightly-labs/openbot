@@ -28,6 +28,11 @@ import {
   Text,
   UserRound,
 } from "@openbot/ui";
+import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
+import {
+  ProviderDetectionSettings,
+  type ProviderDetectionSettingsValue,
+} from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
@@ -77,6 +82,12 @@ export interface SettingsModalProps {
   onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
   customProviders?: readonly CustomProviderSummary[];
   onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
+  /** Local model servers and ACP agents found on this computer. Omitted on a remote server. */
+  providerDetection?: ProviderDetection;
+  detectedProviderApi?: DetectedProviderApi;
+  /** Where the scan looks. Without it the tab has no detection settings. */
+  detectionSettings?: ProviderDetectionSettingsValue;
+  onDetectionSettingsChange?: (value: ProviderDetectionSettingsValue) => void;
   /**
    * Reads and writes the optional provider keys of the computer the providers run on. Absent when
    * this window cannot manage them, which is also what takes the row's sign-in button away.
@@ -347,9 +358,17 @@ export function SettingsModal(props: SettingsModalProps) {
             onAddCustomProvider={props.onAddCustomProvider}
             customProviders={props.customProviders}
             onDeleteCustomProvider={props.onDeleteCustomProvider}
+            // With detection off there is no list, not an empty one.
+            providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
+            detectedProviderApi={props.detectedProviderApi}
             onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
             onSignInWithCodeProvider={props.codeLogin?.start}
           />
+          <Show when={props.detectionSettings}>
+            {(value) => (
+              <ProviderDetectionSettings value={value()} onChange={(next) => props.onDetectionSettingsChange?.(next)} />
+            )}
+          </Show>
         </Tabs.Content>
 
         <Show when={isMac()}>

@@ -42,8 +42,8 @@ export interface CustomProviderHeader {
  * Renderer to main. This is the one renderer-to-main payload that carries a secret, so nothing on
  * this path may log it.
  *
- * `apiKey: null` means "this endpoint needs no key". It never means "keep the one you have": there is
- * no edit path, and a save always replaces the stored secret bundle outright.
+ * `apiKey: null` means "this endpoint needs no key". It never means "keep the one you have": a save
+ * adds a new endpoint. `UpdateCustomProviderInput` is the edit path.
  */
 export interface SaveCustomProviderInput {
   id: string;
@@ -52,6 +52,21 @@ export interface SaveCustomProviderInput {
   apiKey: string | null;
   models: CustomProviderModel[];
   headers: CustomProviderHeader[];
+}
+
+/**
+ * Renderer to main, on this computer only: the Team API has no edit route. The id names a saved
+ * endpoint and does not change. A field that is absent keeps its stored value, so the form can send
+ * a blank key and no headers without discarding the credentials that the user does not type again.
+ * There is no way to clear a stored key here: remove the endpoint and add it again for that.
+ */
+export interface UpdateCustomProviderInput {
+  id: string;
+  name: string;
+  baseUrl: string;
+  models: CustomProviderModel[];
+  apiKey?: string;
+  headers?: CustomProviderHeader[];
 }
 
 export interface DeleteCustomProviderInput {

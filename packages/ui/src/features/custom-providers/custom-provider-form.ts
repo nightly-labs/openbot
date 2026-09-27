@@ -161,6 +161,11 @@ function parseUrl(value: string): URL | null {
   }
 }
 
+/** The base URL rules on their own, for an address that is not part of a full endpoint form. */
+export function endpointUrlError(url: string, t: AppTranslate = currentText().t): string | undefined {
+  return baseUrlError(url.trim(), t);
+}
+
 function baseUrlError(baseUrl: string, t: AppTranslate): string | undefined {
   if (!baseUrl) return t("customProvider.error.baseUrlRequired");
   if (baseUrl.length > CUSTOM_PROVIDER_LIMITS.baseUrl) {
@@ -207,4 +212,30 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
       .filter((header) => !blankHeader(header))
       .map((header) => ({ name: header.name.trim(), value: header.value.trim() })),
   };
+}
+
+/** The address and credentials that a model list request needs. The form does not send it itself. */
+export interface CustomProviderEndpoint {
+  baseUrl: string;
+  apiKey: string | null;
+  headers: CustomHeaderDraft[];
+  /** The saved endpoint that the form edits, so main can use its stored key for the same origin. */
+  savedProviderId?: string;
+}
+
+export interface DiscoveredModel {
+  id: string;
+  name?: string;
+}
+
+/** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */
+export type ModelDiscovery =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "found"; models: readonly DiscoveredModel[] }
+  | { status: "failed"; message: string };
+
+export function customProviderEndpoint(draft: CustomProviderDraft): CustomProviderEndpoint {
+  const value = customProviderValue(draft);
+  return { baseUrl: value.baseUrl, apiKey: value.apiKey, headers: value.headers };
 }

@@ -21,6 +21,7 @@ import {
   Smartphone,
   Spinner,
 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 import { providerUpdateAvailable, providerVersionLabel } from "../features/provider-updates/provider-update";
 import { useText } from "../text";
@@ -115,6 +116,8 @@ export interface ProviderPickerProps {
   moreCallout?: { title: string; detail: string } | null;
   onChooseMoreProvider?: ((provider: AgentProviderId) => void) | undefined;
   onChooseMoreCustom?: (() => void) | undefined;
+  /** What the host found on this computer, below the list. It is not a row in the radio group. */
+  detected?: JSX.Element;
   onChange: (provider: AgentProviderId) => void;
 }
 
@@ -621,6 +624,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           {(engine) => customRow(engine)}
         </Show>
       </div>
+      {props.detected}
       <Show
         when={moreOffered()}
         fallback={<Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>}

@@ -17,10 +17,13 @@ import {
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
   decodeCentralAuthState,
+  decodeDetectedModelServers,
+  decodeDiscoverModelsResult,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
   decodeNotificationPreference,
+  decodeProviderDetectionSettings,
   decodeUpdatePreference,
   decodeUpdateStatus,
 } from "./app-decoding";
@@ -34,6 +37,13 @@ const updateStatus = {
   message: null,
   errorCode: null,
 } satisfies UpdateStatus;
+
+const detectedServer = {
+  id: "ollama",
+  name: "Ollama",
+  baseUrl: "http://127.0.0.1:11434/v1",
+  models: [{ id: "qwen3" }],
+};
 
 const codeSent = {
   status: "code_sent",
@@ -114,6 +124,13 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null } satisfies NotificationOpenedEvent,
   ],
+  ["detected model servers", decodeDetectedModelServers, [detectedServer]],
+  ["a model list", decodeDiscoverModelsResult, { models: [{ id: "qwen3" }] }],
+  [
+    "detection settings",
+    decodeProviderDetectionSettings,
+    { enabled: true, addresses: ["http://192.168.1.20:11434/v1"], folders: ["~/bin"], hiddenIds: [] },
+  ],
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
@@ -145,6 +162,15 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],
+  // A scan row never carries a credential, so one that does is refused with the whole list.
+  ["a detected server with a key", decodeDetectedModelServers, [{ ...detectedServer, apiKey: "sk-x" }]],
+  ["a detected server with headers", decodeDetectedModelServers, [{ ...detectedServer, headers: [] }]],
+  ["a model list with an empty id", decodeDiscoverModelsResult, { models: [{ id: "" }] }],
+  [
+    "detection settings without a switch",
+    decodeProviderDetectionSettings,
+    { addresses: [], folders: [], hiddenIds: [] },
+  ],
 ];
 
 describe("app decoding", () => {

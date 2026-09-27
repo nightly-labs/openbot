@@ -5,21 +5,31 @@
 // This module owns the order of the two writes, so the backend never has to know that a store
 // exists: it is given a getter, and reads it again at every provider spawn.
 
-import type { CustomProviderResult, CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import type {
+  CustomProviderResult,
+  CustomProviderSummary,
+  SaveCustomProviderInput,
+  UpdateCustomProviderInput,
+} from "@openbot/contracts/ipc";
 import type { AgentService } from "../backend/agent-service";
 import type { CustomProviderStore } from "./custom-provider-store";
 
 export interface CustomProviderChangeDependencies {
-  // Only the four endpoint-change methods, so the order of writes can be checked without a running
+  // Only the endpoint-change methods, so the order of writes can be checked without a running
   // backend.
-  service: Pick<AgentService, "saveCustomProvider" | "removeCustomProvider" | "reloadOpenCodeConfig">;
-  customProviders: Pick<CustomProviderStore, "list" | "save" | "remove">;
+  service: Pick<
+    AgentService,
+    "saveCustomProvider" | "updateCustomProvider" | "removeCustomProvider" | "reloadOpenCodeConfig"
+  >;
+  customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
 }
 
 export interface CustomProviderChanges {
   /** The endpoints without their keys or header values. */
   list(): CustomProviderSummary[];
   save(input: SaveCustomProviderInput): Promise<CustomProviderResult>;
+  /** This computer only: the Team API routes take `PeerCustomProviderChanges`. */
+  update(input: UpdateCustomProviderInput): Promise<CustomProviderResult>;
   remove(id: string): Promise<CustomProviderResult>;
 }
 
@@ -62,6 +72,19 @@ export function createCustomProviderChanges({
         return { providers, restart: await service.reloadOpenCodeConfig() };
       }),
     /**
+     * Like `save`, and the agents on a model that the edit takes out move first. The store checks
+     * the edit before that, so an edit it refuses moves no agent.
+     */
+    update: (input) =>
+      serialize(async () => {
+        customProviders.checkUpdate(input);
+        const saved = customProviders.list().find((provider) => provider.id === input.id);
+        const kept = new Set(input.models.map((model) => model.id));
+        const removed = (saved?.models ?? []).filter((model) => !kept.has(model.id)).map((model) => model.id);
+        const providers = await service.updateCustomProvider(input.id, removed, () => customProviders.update(input));
+        return { providers, restart: await service.reloadOpenCodeConfig() };
+      }),
+    /**
      * Agents move off the endpoint's models *before* it is removed, so no agent is left naming a
      * model the restarted CLI does not list.
      */
@@ -75,3 +98,6 @@ export function createCustomProviderChanges({
       }),
   };
 }
+
+/** What a joined admin may change through the Team API. There is no edit route. */
+export type PeerCustomProviderChanges = Pick<CustomProviderChanges, "list" | "save" | "remove">;

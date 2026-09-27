@@ -8,7 +8,8 @@
 // Electron-free, with the cipher injected, so its tests need neither a keychain nor a display.
 
 import { readFile } from "node:fs/promises";
-import type { CustomProviderSummary, SaveCustomProviderInput } from "@openbot/contracts/ipc";
+import type { CustomProviderSummary, SaveCustomProviderInput, UpdateCustomProviderInput } from "@openbot/contracts/ipc";
+import { sameCustomProviderOrigin } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
@@ -61,6 +62,8 @@ interface Entry {
 const READ_ONLY_MESSAGE = sourceText("error.provider.endpointsReadOnly");
 const NO_SECURE_STORAGE_MESSAGE = sourceText("error.provider.endpointNoSecureStorage");
 const DUPLICATE_MESSAGE = sourceText("error.provider.endpointDuplicate");
+const NOT_SAVED_MESSAGE = sourceText("error.provider.endpointNotSaved");
+const KEY_FOR_NEW_ADDRESS_MESSAGE = sourceText("error.provider.endpointKeyForNewAddress");
 
 export class CustomProviderStore {
   readonly #path: string;
@@ -150,6 +153,74 @@ export class CustomProviderStore {
         },
       ];
     });
+  }
+
+  /**
+   * Changes one saved endpoint. An absent `apiKey` or `headers` keeps the stored part.
+   *
+   * A kept part may not follow the endpoint to another origin: the user typed the key for one server,
+   * and an edit of the address alone must not send it to another one. When nothing secret changes,
+   * the stored ciphertext is kept byte for byte, so an edit on a computer whose keychain is gone does
+   * not lose a key that a later keychain could still open.
+   */
+  async update(input: UpdateCustomProviderInput): Promise<CustomProviderSummary[]> {
+    return this.#mutate(() => {
+      const { index, current } = this.#checkUpdate(input);
+      const keepKey = input.apiKey === undefined;
+      const keepHeaders = input.headers === undefined;
+      let sealed = current.stored.secret ?? null;
+      let secret = current.secret;
+      if (!keepKey || !keepHeaders) {
+        const apiKey = keepKey ? (current.secret?.apiKey ?? null) : input.apiKey || null;
+        const headers = keepHeaders ? (current.secret?.headers ?? []) : (input.headers ?? []);
+        secret = apiKey || headers.length > 0 ? { apiKey, headers } : null;
+        if (secret && !this.#cipher.canPersist()) throw new Error(NO_SECURE_STORAGE_MESSAGE);
+        sealed = secret ? this.#cipher.encrypt(JSON.stringify(secret)).toString("base64") : null;
+      }
+      const next: Entry = {
+        stored: {
+          id: current.stored.id,
+          name: input.name,
+          baseUrl: input.baseUrl,
+          models: input.models.map((model) => ({ id: model.id, name: model.name })),
+          secret: sealed,
+        },
+        secret,
+      };
+      return this.#entries.map((entry, position) => (position === index ? next : entry));
+    });
+  }
+
+  /**
+   * Throws what `update` would refuse for this input, and writes nothing. The caller moves agents
+   * off removed models before the write, so a refused edit must fail before that.
+   */
+  checkUpdate(input: UpdateCustomProviderInput): void {
+    if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
+    const { current } = this.#checkUpdate(input);
+    const replacesSecret = input.apiKey !== undefined || input.headers !== undefined;
+    if (replacesSecret && !this.#cipher.canPersist()) {
+      const apiKey = input.apiKey ?? current.secret?.apiKey ?? null;
+      const headers = input.headers ?? current.secret?.headers ?? [];
+      if (apiKey || headers.length > 0) throw new Error(NO_SECURE_STORAGE_MESSAGE);
+    }
+  }
+
+  #checkUpdate(input: UpdateCustomProviderInput): { index: number; current: Entry } {
+    const index = this.#entries.findIndex((entry) => entry.stored.id === input.id);
+    const current = this.#entries[index];
+    if (!current) throw new Error(NOT_SAVED_MESSAGE);
+    const keepKey = input.apiKey === undefined;
+    const keepHeaders = input.headers === undefined;
+    const keptSecret =
+      (keepKey && Boolean(current.secret?.apiKey)) ||
+      (keepHeaders && (current.secret?.headers.length ?? 0) > 0) ||
+      // A ciphertext that this computer cannot open still holds something the user saved.
+      (keepKey && keepHeaders && Boolean(current.stored.secret) && !current.secret);
+    if (keptSecret && !sameCustomProviderOrigin(current.stored.baseUrl, input.baseUrl)) {
+      throw new Error(KEY_FOR_NEW_ADDRESS_MESSAGE);
+    }
+    return { index, current };
   }
 
   /** Removes one endpoint and its credentials. An id that is not saved writes nothing. */

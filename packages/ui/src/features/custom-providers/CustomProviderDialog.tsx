@@ -4,28 +4,45 @@ import { CUSTOM_PROVIDER_LIMITS } from "@openbot/contracts/ipc";
 import {
   ArrowLeft,
   Button,
+  Checkbox,
   Dialog,
   Field,
   Heading,
   IconButton,
   Input,
-  Plus,
+  RefreshCw,
   SlidersHorizontal,
+  Spinner,
   Text,
-  Trash2,
   X,
 } from "@openbot/ui";
-import { createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  createStore,
+  createUniqueId,
+  For,
+  Match,
+  onSettled,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import {
   type CustomProviderDraft,
+  type CustomProviderEndpoint,
   type CustomProviderErrors,
+  customProviderEndpoint,
   customProviderValue,
+  type DiscoveredModel,
   emptyCustomProviderDraft,
   hasCustomProviderError,
+  type ModelDiscovery,
   validateCustomProvider,
 } from "./custom-provider-form";
+import { type RepeatableColumn, RepeatableRows } from "./RepeatableRows";
 
 // Examples of identifiers and addresses. They are not words, so they are the same in each language.
 const PROVIDER_ID_PLACEHOLDER = "my-provider";
@@ -48,105 +65,6 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
   };
 }
 
-/**
- * One column of a repeatable row. `read` and `write` stay with the caller that knows the row shape,
- * so the shared markup below reaches a field without an index signature or a cast.
- */
-interface RepeatableColumn<T> {
-  /** The accessible name of the field in row `number`, as `Model 1 ID`. */
-  label: (number: number) => string;
-  placeholder: () => string;
-  maxlength: number;
-  /** An identifier must not be autocorrected. A display name is prose and may be. */
-  identifier?: boolean;
-  read: (row: T) => string;
-  write: (index: number, value: string) => void;
-}
-
-interface RepeatableRowsProps<T> {
-  /** Names the section, as `Models`. */
-  label: string;
-  /** Names the remove control of row `number`, as `Remove model 1`. */
-  removeLabel: (number: number) => string;
-  addLabel: string;
-  columns: readonly [RepeatableColumn<T>, RepeatableColumn<T>];
-  rows: readonly T[];
-  limit: number;
-  busy: boolean;
-  sectionError?: string;
-  rowError: (index: number) => string | undefined;
-  onAdd: () => void;
-  onRemove: (index: number) => void;
-}
-
-/**
- * The models list and the headers list differ only in their two columns and their limit, so they
- * share one row, error and add-button shape instead of keeping two copies that drift apart.
- */
-function RepeatableRows<T>(props: RepeatableRowsProps<T>) {
-  return (
-    <section class="custom-provider-rows" aria-label={props.label}>
-      <div class="custom-provider-rows-heading">
-        <Text variant="label-sm">{props.label}</Text>
-        <Show when={props.sectionError}>
-          {(message) => (
-            <Text class="custom-provider-rows-error" tone="danger" variant="caption" role="alert">
-              {message()}
-            </Text>
-          )}
-        </Show>
-      </div>
-      <For each={props.rows}>
-        {(row, index) => (
-          <div class="custom-provider-row">
-            <div class="custom-provider-row-inputs">
-              <For each={props.columns}>
-                {(column) => (
-                  <Input
-                    aria-label={column.label(index() + 1)}
-                    value={column.read(row)}
-                    onValueChange={(value) => column.write(index(), value)}
-                    placeholder={column.placeholder()}
-                    autocomplete={column.identifier ? "off" : undefined}
-                    spellcheck={column.identifier ? false : undefined}
-                    maxlength={column.maxlength}
-                    disabled={props.busy}
-                  />
-                )}
-              </For>
-              <IconButton
-                label={props.removeLabel(index() + 1)}
-                variant="ghost"
-                disabled={props.busy || props.rows.length < 2}
-                onClick={() => props.onRemove(index())}
-              >
-                <Trash2 />
-              </IconButton>
-            </div>
-            <Show when={props.rowError(index())}>
-              {(message) => (
-                <Text class="custom-provider-row-error" tone="danger" variant="caption" role="alert">
-                  {message()}
-                </Text>
-              )}
-            </Show>
-          </div>
-        )}
-      </For>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={props.busy || props.rows.length >= props.limit}
-        onClick={() => props.onAdd()}
-      >
-        <Plus />
-        {props.addLabel}
-      </Button>
-    </section>
-  );
-}
-
 interface CustomProviderDialogProps {
   open: boolean;
   /** Prefilled fields, for editing a provider or for a story. Defaults to a blank form. */
@@ -160,6 +78,16 @@ interface CustomProviderDialogProps {
    * one as well, because this list is only as fresh as the last list the renderer was given.
    */
   takenProviderIds?: readonly string[];
+  /** Edit of a saved endpoint: the ID names it, so it cannot change. */
+  providerIdLocked?: boolean;
+  /** Main holds a key or headers for this endpoint. A blank key field keeps them. */
+  apiKeyKept?: boolean;
+  /**
+   * The last model list request. The host owns it because the request leaves the renderer. Without
+   * `onDiscoverModels` the dialog has no find control and only the typed rows.
+   */
+  discovery?: ModelDiscovery;
+  onDiscoverModels?: (endpoint: CustomProviderEndpoint) => void;
   onSubmit: (value: SaveCustomProviderInput) => void;
   onCancel: () => void;
   onBack?: () => void;
@@ -193,13 +121,19 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const errors = () => validateCustomProvider(draft, props.takenProviderIds, t);
   const shown = (): CustomProviderErrors | null => (submitted() ? errors() : null);
   const busy = () => Boolean(props.busy);
+  const discovery = (): ModelDiscovery => props.discovery ?? { status: "idle" };
 
   // The form itself scrolls, and its own box keeps the same size when a row is added, so the
   // helper's ResizeObserver never fires for new content. Remeasure on what changes the height.
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   createEffect(
-    () => ({ models: draft.models.length, headers: draft.headers.length, errors: shown() }),
+    () => ({
+      models: draft.models.length,
+      headers: draft.headers.length,
+      errors: shown(),
+      discovery: discovery().status,
+    }),
     () => fades.remeasure(),
   );
 
@@ -255,6 +189,35 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         }),
     },
   ];
+
+  const discoveryFailed = () => {
+    const state = discovery();
+    return state.status === "failed" ? state.message : undefined;
+  };
+  const discovered = () => {
+    const state = discovery();
+    return state.status === "found" ? state.models : undefined;
+  };
+  const discoveryId = createUniqueId();
+  const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
+
+  /** A found model is a row in the same list the user types into, so submit has one source. */
+  function toggleModel(model: DiscoveredModel, checked: boolean): void {
+    setDraft((state) => {
+      if (!checked) {
+        const index = state.models.findIndex((row) => row.id.trim() === model.id);
+        if (index >= 0) state.models.splice(index, 1);
+        if (state.models.length === 0) state.models.push({ id: "", name: "" });
+        return;
+      }
+      if (state.models.some((row) => row.id.trim() === model.id)) return;
+      const row = { id: model.id, name: model.name ?? model.id };
+      // The blank row that a new form opens with is a placeholder, not a model the user added.
+      const blank = state.models.findIndex((entry) => !entry.id.trim() && !entry.name.trim());
+      if (blank >= 0) state.models[blank] = row;
+      else state.models.push(row);
+    });
+  }
 
   function submit(): void {
     setSubmitted(true);
@@ -328,7 +291,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     autocomplete="off"
                     spellcheck={false}
                     maxlength={INPUT_LIMITS.identifier}
-                    disabled={busy()}
+                    disabled={busy() || Boolean(props.providerIdLocked)}
                   />
                 </Field>
 
@@ -365,7 +328,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
 
                 <Field
                   label={t("customProvider.field.apiKey")}
-                  description={t("customProvider.field.apiKeyHint")}
+                  description={
+                    props.apiKeyKept ? t("customProvider.field.apiKeyKeptHint") : t("customProvider.field.apiKeyHint")
+                  }
                   error={shown()?.apiKey}
                 >
                   <Input
@@ -403,7 +368,79 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                       state.models.splice(index, 1);
                     })
                   }
-                />
+                  action={
+                    <Show when={props.onDiscoverModels}>
+                      {(discover) => (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          class="custom-provider-discover"
+                          disabled={busy() || !draft.baseUrl.trim() || discovery().status === "loading"}
+                          onClick={() => discover()(customProviderEndpoint(draft))}
+                        >
+                          <RefreshCw />
+                          {discovery().status === "idle"
+                            ? t("customProvider.discovery.find")
+                            : t("customProvider.discovery.refresh")}
+                        </Button>
+                      )}
+                    </Show>
+                  }
+                >
+                  <Switch>
+                    <Match when={discovery().status === "loading"}>
+                      <div class="custom-provider-discovery-status" role="status">
+                        <Spinner size="sm" />
+                        <Text tone="muted" variant="caption">
+                          {t("customProvider.discovery.loading", { url: draft.baseUrl.trim() })}
+                        </Text>
+                      </div>
+                    </Match>
+                    <Match when={discoveryFailed()}>
+                      {(message) => (
+                        <Text class="custom-provider-rows-error" tone="danger" variant="caption" role="alert">
+                          {message()}
+                        </Text>
+                      )}
+                    </Match>
+                    <Match when={discovered()}>
+                      {(models) => (
+                        <Show
+                          when={models().length > 0}
+                          fallback={
+                            <Text tone="muted" variant="caption" role="status">
+                              {t("customProvider.discovery.empty")}
+                            </Text>
+                          }
+                        >
+                          <Text tone="muted" variant="caption" role="status">
+                            {t("customProvider.discovery.found", { count: models().length })}
+                          </Text>
+                          <ul class="custom-provider-discovered" aria-label={t("customProvider.discovery.label")}>
+                            <For each={models()}>
+                              {(model, index) => (
+                                <li>
+                                  <label class="custom-provider-discovered-row" for={`${discoveryId}-${index()}`}>
+                                    <Checkbox
+                                      id={`${discoveryId}-${index()}`}
+                                      checked={listed(model.id)}
+                                      disabled={busy()}
+                                      onChange={(event) => toggleModel(model, event.currentTarget.checked)}
+                                    />
+                                    <Text variant="body-sm" class="custom-provider-discovered-id">
+                                      {model.id}
+                                    </Text>
+                                  </label>
+                                </li>
+                              )}
+                            </For>
+                          </ul>
+                        </Show>
+                      )}
+                    </Match>
+                  </Switch>
+                </RepeatableRows>
 
                 <RepeatableRows
                   label={t("customProvider.headers")}

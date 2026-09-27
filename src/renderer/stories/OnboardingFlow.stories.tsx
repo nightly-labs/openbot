@@ -7,12 +7,14 @@ import type {
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { Toaster, toast } from "@openbot/ui";
-import { createSignal, onCleanup } from "solid-js";
+import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
+import { createSignal, onCleanup, onSettled } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { OnboardingFlow } from "../src/features/onboarding/OnboardingFlow";
 import { providerKeyApi } from "../src/features/settings/provider-key-api";
 import { createFakeCodeLogin } from "./code-login-fixture";
+import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -321,6 +323,27 @@ function LazyProviderDownloadsFlow(props: {
   );
 }
 
+/** The provider step with a fake scan. `scan` starts one when the story opens, as first run would. */
+function DetectingOnboardingFlow(props: {
+  args: Parameters<typeof OnboardingFlow>[0];
+  initial: ProviderDetection;
+  scan?: boolean;
+}) {
+  const story = createStoryDetection(props.initial);
+  onSettled(() => {
+    if (props.scan) story.scan();
+  });
+  return (
+    <MockedOnboardingFlow
+      args={{
+        ...props.args,
+        providerDetection: story.detection(),
+        detectedProviderApi: story.api,
+      }}
+    />
+  );
+}
+
 const args: Parameters<typeof OnboardingFlow>[0] = {
   state: setupState,
   agentStatus: STORY_AGENT_STATUS,
@@ -376,6 +399,32 @@ export const CustomProviderSaveFails: Story = {
       throw new Error("House Router refused the API key.");
     }),
   },
+};
+
+/**
+ * First run looks for local model servers and ACP agents while the user reads the list. Rows appear
+ * one by one; the provider rows above them do not move.
+ */
+export const DetectingLocalProviders: Story = {
+  args: { agentStatus: openCodeInstalledAgentStatus },
+  render: (storyArgs) => <DetectingOnboardingFlow args={storyArgs} initial={{ scanning: true, found: [] }} scan />,
+};
+
+/**
+ * The scan is done. Add opens the form of its kind, filled from the scan: the endpoint form for a
+ * server, the ACP agent form for an agent. X hides a row that the user does not want.
+ */
+export const DetectedLocalProviders: Story = {
+  args: { agentStatus: openCodeInstalledAgentStatus },
+  render: (storyArgs) => (
+    <DetectingOnboardingFlow args={storyArgs} initial={{ scanning: false, found: STORY_DETECTED_PROVIDERS }} />
+  ),
+};
+
+/** The same result on a narrow window. */
+export const DetectedLocalProvidersNarrow: Story = {
+  ...DetectedLocalProviders,
+  globals: { viewport: "onboardingNarrow" },
 };
 
 export const NarrowProviderVersions: Story = {

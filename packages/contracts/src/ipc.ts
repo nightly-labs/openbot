@@ -33,6 +33,7 @@ export * from "./ipc-marketplace-agents";
 export * from "./ipc-mcp-servers";
 export * from "./ipc-notifications";
 export * from "./ipc-provider-admin";
+export * from "./ipc-provider-detection";
 export * from "./ipc-queue";
 export * from "./ipc-remote-desktop-setup";
 export * from "./ipc-routines";

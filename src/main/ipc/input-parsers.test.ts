@@ -64,7 +64,12 @@ import {
   parseUpdatePreference,
 } from "./app-inputs";
 import { parseBrowserNavigate, parseBrowserOpen, parseVisibility } from "./browser-inputs";
-import { parseDeleteCustomProvider, parseSaveCustomProvider } from "./custom-provider-inputs";
+import {
+  parseDeleteCustomProvider,
+  parseSaveCustomProvider,
+  parseUpdateCustomProvider,
+} from "./custom-provider-inputs";
+import { parseDiscoverModels, parseProviderDetectionSettings } from "./provider-detection-inputs";
 import {
   parseCreateTeamInvite,
   parseHostConfig,
@@ -1034,6 +1039,70 @@ describe("custom provider input parsing", () => {
         ],
       }),
     ).toThrowError("Two headers have the same name.");
+  });
+});
+
+describe("custom provider update and detection input parsing", () => {
+  const edit = {
+    id: "studio-local",
+    name: "Studio Local",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    models: [{ id: "glm-5-air", name: "GLM 5 Air" }],
+  };
+
+  it("leaves out a blank or absent key and absent headers, which means keep them", () => {
+    expect(parseUpdateCustomProvider(edit)).toEqual(edit);
+    expect(parseUpdateCustomProvider({ ...edit, apiKey: "  " })).toEqual(edit);
+    expect(parseUpdateCustomProvider({ ...edit, apiKey: "sk-new", headers: [] })).toEqual({
+      ...edit,
+      apiKey: "sk-new",
+      headers: [],
+    });
+  });
+
+  it("refuses a null key, because an update cannot clear it", () => {
+    expect(() => parseUpdateCustomProvider({ ...edit, apiKey: null })).toThrowError();
+  });
+
+  it("accepts a saved endpoint ID only in its own form", () => {
+    const input = { baseUrl: edit.baseUrl, apiKey: null, headers: [] };
+    expect(parseDiscoverModels({ ...input, savedProviderId: "studio-local" })).toEqual({
+      ...input,
+      savedProviderId: "studio-local",
+    });
+    expect(() => parseDiscoverModels({ ...input, savedProviderId: "Studio/Local" })).toThrowError(
+      "A provider ID must be",
+    );
+    expect(() => parseDiscoverModels({ ...input, baseUrl: "file:///etc/passwd" })).toThrowError();
+  });
+
+  it("drops blank and repeated detection rows and refuses unsafe ones", () => {
+    const settings = { enabled: true, addresses: [], folders: [], hiddenIds: [] };
+    expect(
+      parseProviderDetectionSettings({
+        ...settings,
+        addresses: [" http://192.168.1.20:11434/v1 ", "", "http://192.168.1.20:11434/v1"],
+        folders: ["~/bin", "  "],
+        hiddenIds: ["models:http://127.0.0.1:1234/v1"],
+      }),
+    ).toEqual({
+      ...settings,
+      addresses: ["http://192.168.1.20:11434/v1"],
+      folders: ["~/bin"],
+      hiddenIds: ["models:http://127.0.0.1:1234/v1"],
+    });
+    for (const unsafe of [
+      { addresses: ["https://user:secret@example.com/v1"] },
+      { addresses: ["file:///etc/passwd"] },
+      { folders: ["bin"] },
+      { folders: ["/bin\u0000x"] },
+      { hiddenIds: ["other:thing"] },
+    ]) {
+      expect(() => parseProviderDetectionSettings({ ...settings, ...unsafe })).toThrowError();
+    }
+    expect(() =>
+      parseProviderDetectionSettings({ ...settings, folders: Array.from({ length: 17 }, (_, index) => `/f${index}`) }),
+    ).toThrowError();
   });
 });
 

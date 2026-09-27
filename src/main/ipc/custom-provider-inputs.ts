@@ -7,6 +7,7 @@ import type {
   CustomProviderModel,
   DeleteCustomProviderInput,
   SaveCustomProviderInput,
+  UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import {
   CUSTOM_PROVIDER_LIMITS,
@@ -33,7 +34,7 @@ function parseSavedProviderId(value: unknown): string {
   return value;
 }
 
-function parseBaseUrl(value: unknown): string {
+export function parseBaseUrl(value: unknown): string {
   const text = requireString(value, "Base URL", CUSTOM_PROVIDER_LIMITS.baseUrl);
   let url: URL;
   try {
@@ -76,7 +77,7 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
   return models;
 }
 
-function parseHeaders(value: unknown): CustomProviderHeader[] {
+export function parseHeaders(value: unknown): CustomProviderHeader[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error("The headers are not a list.");
   if (value.length > CUSTOM_PROVIDER_LIMITS.headers) throw new Error(sourceText("error.provider.headersTooMany"));
@@ -102,7 +103,7 @@ function parseHeaders(value: unknown): CustomProviderHeader[] {
  * `apiKey: null` is accepted and kept as null: a local endpoint that needs no key is the common case,
  * and an empty string would be sent as a blank Authorization header.
  */
-function parseApiKey(value: unknown): string | null {
+export function parseApiKey(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (!isString(value)) throw new Error("The API key is not text.");
   const trimmed = value.trim();
@@ -121,6 +122,25 @@ export function parseSaveCustomProvider(input: unknown): SaveCustomProviderInput
     apiKey: parseApiKey(input.apiKey),
     models: parseModels(id, input.models),
     headers: parseHeaders(input.headers),
+  };
+}
+
+/**
+ * An edit. The id names a saved endpoint. An absent key or header list keeps the stored one; `null`
+ * is refused, because an edit cannot say "no key" without discarding one that the user did not see.
+ */
+export function parseUpdateCustomProvider(input: unknown): UpdateCustomProviderInput {
+  if (!isObject(input)) throw new Error("Invalid endpoint.");
+  const id = parseSavedProviderId(input.id);
+  if (input.apiKey === null) throw new Error("The API key is not text.");
+  const apiKey = input.apiKey === undefined ? null : parseApiKey(input.apiKey);
+  return {
+    id,
+    name: requireString(input.name, "Display name", INPUT_LIMITS.agentName),
+    baseUrl: parseBaseUrl(input.baseUrl),
+    models: parseModels(id, input.models),
+    ...(apiKey ? { apiKey } : {}),
+    ...(input.headers === undefined ? {} : { headers: parseHeaders(input.headers) }),
   };
 }
 

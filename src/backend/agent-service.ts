@@ -1304,6 +1304,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints.save(providerId, persist);
   }
 
+  /** See `CustomEndpoints.update`: the agents on removed models, the exclusion, and the file write. */
+  updateCustomProvider<T>(
+    providerId: string,
+    removedModelIds: readonly string[],
+    persist: () => Promise<T>,
+  ): Promise<T> {
+    return this.#endpoints.update(providerId, removedModelIds, persist);
+  }
+
   /** See `CustomEndpoints.remove`: the exclusion, the agents that were on it, and the file write. */
   removeCustomProvider<T>(providerId: string, persist: () => Promise<T>): Promise<T> {
     return this.#endpoints.remove(providerId, persist);

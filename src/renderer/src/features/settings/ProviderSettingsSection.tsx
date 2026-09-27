@@ -13,6 +13,8 @@ import { ProviderCodeLoginDialog } from "@openbot/ui/components/ProviderCodeLogi
 import { ProviderPicker } from "@openbot/ui/components/ProviderPicker";
 import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
+import { DetectedProviders } from "@openbot/ui/features/custom-providers/DetectedProviders";
+import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
@@ -42,6 +44,9 @@ export interface ProviderSettingsSectionProps {
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
   onSignInWithCodeProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /** Local model servers and ACP agents that the host found. Without it the section shows no such list. */
+  providerDetection?: ProviderDetection | undefined;
+  detectedProviderApi?: DetectedProviderApi | undefined;
 }
 
 /** The provider list of the computer the agents run on, with its custom endpoint dialogs. */
@@ -89,6 +94,21 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onSignInProvider={props.onSignInProvider}
         onSignInWithCodeProvider={props.onSignInWithCodeProvider}
         menuMount={props.selectMount}
+        detected={
+          <Show when={props.providerDetection}>
+            {(detection) => (
+              <Show when={props.detectedProviderApi}>
+                {(api) => (
+                  <DetectedProviders
+                    detection={detection()}
+                    api={api()}
+                    takenProviderIds={customProviders().map((provider) => provider.id)}
+                  />
+                )}
+              </Show>
+            )}
+          </Show>
+        }
       />
       {/* The outcome is shown where the user is looking. While the list is open the section behind
           it is hidden from assistive technology, so a status left here could not be read. */}

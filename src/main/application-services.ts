@@ -106,8 +106,11 @@ import {
 import { ManagedSkillService } from "./managed-skill-service";
 import { startMcpOAuthRedirectServer } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
+import { probeModels } from "./model-server-probe";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
+import { createProviderDetection, type ProviderDetection } from "./provider-detection";
+import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "./provider-runtime-manager";
 import { RemoteDesktopManager } from "./remote-desktop-manager";
 import { resolveRemoteDesktopRuntime } from "./remote-desktop-runtime-artifact";
@@ -255,6 +258,8 @@ export interface ApplicationServices {
   hostedSites: HostedSiteDesktopService;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
+  providerDetection: ProviderDetection;
+  providerDetectionSettings: ProviderDetectionSettingsStore;
   marketplaceAgents: AgentMarketplaceService;
   agentTemplates: AgentTemplateService;
   agentImport: AgentImportService;
@@ -510,6 +515,15 @@ export async function createApplicationServices({
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   await customProviders.load();
+  const providerDetectionSettings = new ProviderDetectionSettingsStore(
+    join(app.getPath("userData"), PROVIDER_DETECTION_SETTINGS_FILE),
+  );
+  await providerDetectionSettings.load();
+  const providerDetection = createProviderDetection({
+    settings: providerDetectionSettings,
+    customProviders,
+    probe: probeModels,
+  });
   /*
    * Loaded before the service, not on first use: a provider spawn reads its key synchronously, so
    * the decrypted map has to already exist by the time any client is built. A machine with no
@@ -1222,6 +1236,8 @@ export async function createApplicationServices({
     hostedSites,
     customProviders,
     customProviderChanges,
+    providerDetection,
+    providerDetectionSettings,
     marketplaceAgents,
     agentTemplates,
     agentImport,

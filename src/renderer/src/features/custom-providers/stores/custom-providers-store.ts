@@ -1,11 +1,12 @@
 import type {
   CustomProviderRestart,
   CustomProviderSummary,
-  CustomProvidersDesktopApi,
   SaveCustomProviderInput,
+  UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
+import type { CustomProvidersEndpointApi } from "../custom-providers-port";
 
 interface CustomProvidersState {
   providers: CustomProviderSummary[];
@@ -24,7 +25,7 @@ interface CustomProvidersState {
  * `busy` and `submitError` are deliberately absent: both hosts of the dialog keep them locally, so
  * they stay prop-driven for Storybook, and two hosts never share one submit state.
  */
-export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi | undefined) {
+export function createCustomProvidersStore(api: () => CustomProvidersEndpointApi | undefined) {
   const [state, setState] = createStore<CustomProvidersState>({ providers: [], loaded: false });
 
   function apply(providers: CustomProviderSummary[]): void {
@@ -49,7 +50,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
   }
 
   /**
-   * Both mutations write the list main returned and then re-throw, so the button that started the
+   * The mutations write the list main returned and then re-throw, so the button that started the
    * call owns the message. They return the restart outcome, which is the only honest answer to "are
    * the models there yet": the save resolves on the durable write, not on model discovery.
    */
@@ -57,6 +58,15 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
     const group = api();
     if (!group) throw new Error(currentText().t("customProvider.saveUnavailable"));
     const result = await group.save(input);
+    apply(result.providers);
+    return result.restart;
+  }
+
+  /** Only this computer's endpoints have `update`. */
+  async function updateCustomProvider(input: UpdateCustomProviderInput): Promise<CustomProviderRestart> {
+    const group = api();
+    if (!group?.update) throw new Error(currentText().t("customProvider.saveUnavailable"));
+    const result = await group.update(input);
     apply(result.providers);
     return result.restart;
   }
@@ -74,6 +84,7 @@ export function createCustomProvidersStore(api: () => CustomProvidersDesktopApi 
     customProvidersLoaded,
     refreshCustomProviders,
     saveCustomProvider,
+    updateCustomProvider,
     deleteCustomProvider,
   };
 }

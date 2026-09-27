@@ -125,6 +125,10 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
+.custom-provider-row-inputs.custom-provider-row-single {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .custom-provider-rows-error,
 .custom-provider-row-error,
 .custom-provider-submit-error {
@@ -151,4 +155,193 @@
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   stroke-width: var(--openbot-icon-stroke);
+}
+
+/* The label sits first and a find control follows it; a section error keeps the far end. */
+.custom-provider-rows-heading > .custom-provider-discover {
+  margin-inline-start: auto;
+}
+
+.custom-provider-rows-heading > .custom-provider-discover + .custom-provider-rows-error {
+  display: none;
+}
+
+.custom-provider-rows-heading > .custom-provider-discover svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.custom-provider-discovery-status {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.custom-provider-discovered {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  list-style: none;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+}
+
+.custom-provider-discovered-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  border-radius: var(--openbot-radius-sm);
+  cursor: pointer;
+}
+
+.custom-provider-discovered-row:hover {
+  background: var(--openbot-bg-control-hover);
+}
+
+.custom-provider-discovered-id {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--openbot-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The preset chooser: two short groups of full-width rows. */
+.custom-provider-preset-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.custom-provider-presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.custom-provider-preset.ui-button {
+  display: flex;
+  width: 100%;
+  height: auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  text-align: start;
+  white-space: normal;
+}
+
+.custom-provider-preset-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-secondary);
+}
+
+.custom-provider-preset > .custom-provider-preset-icon svg,
+.custom-provider-preset-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.custom-provider-preset-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.custom-provider-preset-title {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.custom-provider-preset-description {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.custom-provider-preset-chevron {
+  flex-shrink: 0;
+  color: var(--openbot-text-muted);
+}
+
+/* The custom ACP agent form. */
+.custom-acp-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.custom-acp-code input,
+input.custom-acp-code {
+  font-family: var(--openbot-font-mono);
+}
+
+/* Local model servers and ACP agents that the host found, below the provider list. */
+.detected-providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-4);
+}
+
+.detected-providers-heading {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.detected-providers-scanning {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.ui-button.detected-providers-scan {
+  gap: var(--openbot-space-1-5);
+  margin-inline-start: auto;
+  margin-inline-end: calc(var(--openbot-space-2) * -1);
+}
+
+.detected-providers-heading > .detected-providers-scan svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.detected-providers-icon {
+  color: var(--openbot-text-secondary);
+}
+
+.detected-providers .detected-providers-icon > svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.ui-button.detected-providers-show-hidden {
+  align-self: flex-start;
+  margin-inline-start: calc(var(--openbot-space-2) * -1);
+}
+
+/* The lists in the detection settings, below the switch card. */
+.detected-providers-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  margin-top: var(--openbot-space-3);
 }

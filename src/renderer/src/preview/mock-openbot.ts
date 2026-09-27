@@ -25,6 +25,7 @@ import {
   DEFAULT_AGENT_ACCESS,
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  DEFAULT_PROVIDER_DETECTION_SETTINGS,
   type DirectConversationSnapshot,
   type DirectMessageRealtimeEvent,
   type DirectTypingRealtimeEvent,
@@ -39,6 +40,7 @@ import {
   type OpenBotDesktopApi,
   type OpenSharedFileInput,
   type OpenWorkspaceFileInput,
+  type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
   type RemoteDesktopSession,
@@ -55,6 +57,7 @@ import {
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
   type SteerQueuedMessageInput,
+  sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
   type UpdateQueuedMessageInput,
@@ -215,6 +218,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const usage = clone(options.usage ?? STORY_USAGE);
   let agentCounter = agents.length;
   let hostedSites = clone(STORY_HOSTED_SITES);
+  let detectionSettings: ProviderDetectionSettings = clone(DEFAULT_PROVIDER_DETECTION_SETTINGS);
   // The same two endpoints the model-picker stories invent, so preview shows one list everywhere.
   let customProviders = clone(
     options.customProviders ?? [
@@ -568,6 +572,38 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         customProviders = customProviders.filter((provider) => provider.id !== id);
         emitAgentEvent({ type: "status", status: clone(agentStatus) });
         return { providers: clone(customProviders), restart: "restarted" };
+      },
+      /** The same keep rule as the real store: a key that is not sent stays, but not for a new origin. */
+      update: async (input) => {
+        const stored = customProviders.find((provider) => provider.id === input.id);
+        if (!stored) throw new Error("This endpoint is not saved.");
+        const keepsKey = input.apiKey === undefined && stored.hasApiKey;
+        if (keepsKey && !sameCustomProviderOrigin(stored.baseUrl, input.baseUrl)) {
+          throw new Error("Enter the API key again for the new address.");
+        }
+        customProviders = customProviders.map((provider) =>
+          provider.id === input.id
+            ? {
+                id: input.id,
+                name: input.name,
+                baseUrl: input.baseUrl,
+                hasApiKey: input.apiKey !== undefined || keepsKey,
+                models: input.models.map((model) => ({ id: model.id, name: model.name })),
+              }
+            : provider,
+        );
+        emitAgentEvent({ type: "status", status: clone(agentStatus) });
+        return { providers: clone(customProviders), restart: "restarted" };
+      },
+    },
+    // Preview reaches no local server, so a scan finds nothing and a model list is empty.
+    providerDetection: {
+      scanModelServers: async () => [],
+      discoverModels: async () => ({ models: [] }),
+      getSettings: async () => clone(detectionSettings),
+      setSettings: async (settings) => {
+        detectionSettings = clone(settings);
+        return clone(detectionSettings);
       },
     },
     // Preview has one host, so every server answers from the same providers as this computer.

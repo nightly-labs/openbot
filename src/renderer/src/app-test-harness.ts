@@ -1097,6 +1097,7 @@ export function installOpenbotStub(): void {
       save: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
       delete: vi.fn().mockResolvedValue({ providers: [], restart: "not-running" }),
     }),
+    providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {}),
     providerAdmin: stubGroup(IPC_ENDPOINTS.providerAdmin, "providerAdmin", {}),
     hostAdmin: stubGroup(IPC_ENDPOINTS.hostAdmin, "hostAdmin", {}),
     // `providerRuntimes` stays out: the renderer shows the sign-in and Refresh flow when it is

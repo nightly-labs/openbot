@@ -40,6 +40,7 @@ import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
+import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -347,6 +348,8 @@ function registerIpcHandlers({
   skills,
   hostedSites,
   customProviderChanges,
+  providerDetection,
+  providerDetectionSettings,
   marketplaceAgents,
   agentTemplates,
   agentImport,
@@ -393,6 +396,7 @@ function registerIpcHandlers({
     ...skillIpcHandlers({ skills, getMainWindow, translate: language.translate }),
     ...hostedSiteIpcHandlers({ hostedSites, getMainWindow, translate: language.translate }),
     ...customProviderIpcHandlers(customProviderChanges),
+    ...providerDetectionIpcHandlers({ detection: providerDetection, settings: providerDetectionSettings }),
     ...marketplaceAgentIpcHandlers({ marketplaceAgents }),
     ...agentTemplateIpcHandlers({
       agentTemplates,

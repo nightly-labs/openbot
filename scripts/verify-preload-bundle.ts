@@ -27,6 +27,7 @@ const GROUP_PATHS: Readonly<Record<IpcGroupName, string | null>> = {
   computerUse: "computerUse",
   skills: "skills",
   customProviders: "customProviders",
+  providerDetection: "providerDetection",
   providerAdmin: "providerAdmin",
   hostAdmin: "hostAdmin",
   hostedSites: "hostedSites",

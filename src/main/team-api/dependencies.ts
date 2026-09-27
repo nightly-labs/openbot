@@ -2,7 +2,7 @@ import type { ChannelService } from "../../backend/channel-service";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentMarketplaceService } from "../agent-marketplace-service";
 import type { AgentTemplateService } from "../agent-template-service";
-import type { CustomProviderChanges } from "../custom-provider-changes";
+import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
@@ -155,7 +155,7 @@ interface TeamApiProviders {
   service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
-  customProviders: CustomProviderChanges;
+  customProviders: PeerCustomProviderChanges;
 }
 
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;

@@ -79,3 +79,44 @@ export const DialogScrolls: Story = {
     },
   },
 };
+
+const ollama: CustomProviderDraft = {
+  providerId: "ollama",
+  displayName: "Ollama",
+  baseUrl: "http://127.0.0.1:11434/v1",
+  apiKey: "",
+  models: [{ id: "", name: "" }],
+  headers: [{ name: "", value: "" }],
+};
+
+const discovered = [{ id: "qwen3-coder:30b" }, { id: "gpt-oss:120b" }, { id: "devstral:24b" }, { id: "llama3.3:70b" }];
+
+/** The find control appears only when the host can ask the endpoint for its models. */
+export const DiscoveryIdle: Story = {
+  args: { draft: ollama, onDiscoverModels: fn() },
+};
+
+export const DiscoveryLoading: Story = {
+  args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "loading" } },
+};
+
+/** Two of the four models are already rows, so their boxes open selected. */
+export const DiscoveryFound: Story = {
+  args: {
+    draft: { ...ollama, models: localEndpoint.models },
+    onDiscoverModels: fn(),
+    discovery: { status: "found", models: discovered },
+  },
+};
+
+export const DiscoveryEmpty: Story = {
+  args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "found", models: [] } },
+};
+
+export const DiscoveryFailed: Story = {
+  args: {
+    draft: ollama,
+    onDiscoverModels: fn(),
+    discovery: { status: "failed", message: "OpenBot could not reach http://127.0.0.1:11434/v1/models." },
+  },
+};

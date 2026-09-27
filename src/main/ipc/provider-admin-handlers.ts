@@ -16,7 +16,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
-import type { CustomProviderChanges } from "../custom-provider-changes";
+import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { decodeAgentStatusFromHost } from "../remote-agent-decoding";
@@ -37,7 +37,7 @@ interface ProviderAdminIpcDependencies {
   service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
-  customProviders: CustomProviderChanges;
+  customProviders: PeerCustomProviderChanges;
   remoteServers: ProviderAdminRemoteServers;
 }
 

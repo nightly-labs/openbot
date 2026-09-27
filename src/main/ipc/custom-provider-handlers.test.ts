@@ -39,11 +39,14 @@ describe("custom provider endpoint changes", () => {
         steps.push(`save:${id}`);
         return persist();
       },
+      updateCustomProvider: <T>(_id: string, _removed: readonly string[], persist: () => Promise<T>) => persist(),
       reloadOpenCodeConfig: async () => "restarted",
     };
     const customProviders: CustomProviderChangeDependencies["customProviders"] = {
       list: () => [],
       save: async () => [],
+      checkUpdate: () => undefined,
+      update: async () => [],
       remove: async (id: string) => {
         steps.push(`removed:${id}`);
         return [];

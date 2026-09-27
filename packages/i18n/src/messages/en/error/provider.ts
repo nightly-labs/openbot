@@ -8,6 +8,21 @@ export const messages = defineMessages("error.provider", {
     "This computer has no secure storage, so an API key or a header cannot be saved. Remove them, or use an endpoint that needs no credentials.",
   "error.provider.endpointDuplicate":
     "An endpoint with this provider ID is already saved. Remove it first, or use another ID.",
+  "error.provider.endpointNotSaved": "This endpoint is not saved. Refresh the list and try again.",
+  "error.provider.endpointKeyForNewAddress":
+    "The address has a new host or port. Enter the API key and the headers again, so the saved ones do not go to it.",
+  "error.provider.discoveryTimeout": "{host} did not answer in time.",
+  "error.provider.discoveryUnreachable": "OpenBot could not connect to {host}.",
+  "error.provider.discoveryRedirect": "{host} sent a redirect. Enter the final address of the server.",
+  "error.provider.discoveryRefused": "{host} refused the request. Check the API key and the headers.",
+  "error.provider.discoveryHttp": "{host} answered with HTTP {status}.",
+  "error.provider.discoveryTooLarge": "The model list from {host} is too large.",
+  "error.provider.discoveryInvalid": "{host} did not send an OpenAI-compatible model list.",
+  "error.provider.detectionSettingsReadOnly":
+    "The detection settings were written by a newer version of OpenBot, or the file cannot be read. Update OpenBot to change them.",
+  "error.provider.detectionEntryInvalid":
+    "An address must be an http:// or https:// URL with no password, and a folder must be an absolute path.",
+  "error.provider.detectionEntriesTooMany": "There are too many addresses or folders.",
   "error.provider.credentialFileUnreadable": "The provider credential file is unreadable.",
   "error.provider.credentialFileTooLarge": "The provider credential file is too large.",
   "error.provider.archiveSpecialFile": "The runtime archive contains a link or special file.",

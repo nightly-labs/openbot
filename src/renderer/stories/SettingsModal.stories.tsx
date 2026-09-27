@@ -9,6 +9,8 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { Button, Heading, Text, Toaster, toast } from "@openbot/ui";
+import type { ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
+import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { DEFAULT_GENERAL_SETTINGS } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
 import { fn } from "storybook/test";
@@ -16,6 +18,7 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createProviderRuntimeStore } from "../src/features/provider-updates/provider-runtime-store";
 import { SettingsModal, type SettingsTab } from "../src/features/settings/SettingsModal";
 import { createFakeCodeLogin } from "./code-login-fixture";
+import { createStoryDetection, STORY_DETECTED_PROVIDERS } from "./detected-providers-fixture";
 import { createMockOpenBot } from "./mock-openbot";
 
 const storyAppInfo = { name: "OpenBot", version: "0.2.1", platform: "darwin", variant: "dev" } as const;
@@ -117,6 +120,12 @@ function SettingsModalStory(props: {
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   codeSignIn?: boolean;
+  /** The first result of a fake scan. Scan again runs the whole scan. */
+  detection?: ProviderDetection;
+  /** Detected IDs that the user hid in an earlier run. */
+  hiddenDetected?: readonly string[];
+  /** Where the scan looks. Without it the tab has no detection settings. */
+  detectionSettings?: ProviderDetectionSettingsValue;
   initialTab?: SettingsTab;
 }) {
   const previousApi = window.openbot;
@@ -154,6 +163,22 @@ function SettingsModalStory(props: {
   const [customProviders, setCustomProviders] = createSignal<CustomProviderSummary[]>(
     props.customProviderList ? [...STORY_CUSTOM_PROVIDERS] : [],
   );
+  const [detectionSettings, setDetectionSettings] = createSignal(props.detectionSettings);
+  const detection = props.detection
+    ? createStoryDetection(props.detection, {
+        hidden: props.hiddenDetected,
+        rescan: true,
+        // A saved server joins the saved endpoints, as the host's list would report it.
+        onSaved: (saved) => {
+          if (saved.kind !== "models") return;
+          const { id, name, baseUrl, apiKey, models } = saved.value;
+          setCustomProviders((current) => [
+            ...current.filter((provider) => provider.id !== id),
+            { id, name, baseUrl, models, hasApiKey: Boolean(apiKey) },
+          ]);
+        },
+      })
+    : undefined;
 
   async function addCustomProvider(): Promise<CustomProviderRestart> {
     return "restarted";
@@ -247,6 +272,10 @@ function SettingsModalStory(props: {
           onAddCustomProvider={addCustomProvider}
           onDeleteCustomProvider={deleteCustomProvider}
           customProviders={customProviders()}
+          providerDetection={detection?.detection()}
+          detectedProviderApi={detection?.api}
+          detectionSettings={detectionSettings()}
+          onDetectionSettingsChange={setDetectionSettings}
         />
       </main>
       <Toaster />
@@ -306,6 +335,80 @@ export const Open: Story = {
 /** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
 export const AddCustomProvider: Story = {
   render: () => <SettingsModalStory initialOpen openCodeInstalled initialTab="providers" />,
+};
+
+/** The AI providers tab looks for local model servers and ACP agents each time it opens. */
+export const DetectingProviders: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      openCodeInstalled
+      initialTab="providers"
+      detection={{ scanning: true, found: STORY_DETECTED_PROVIDERS.slice(0, 1) }}
+    />
+  ),
+};
+
+/** The scan is done and Ollama is already added, so its row offers Edit. Scan again runs it once more. */
+export const DetectedProviders: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      openCodeInstalled
+      initialTab="providers"
+      detection={{
+        scanning: false,
+        found: STORY_DETECTED_PROVIDERS.map((provider) =>
+          provider.id === "ollama" ? { ...provider, added: true } : provider,
+        ),
+      }}
+    />
+  ),
+};
+
+/** The user hid LM Studio in an earlier run. Show hidden puts it back in the list. */
+export const HiddenDetectedProviders: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      openCodeInstalled
+      initialTab="providers"
+      detection={{ scanning: false, found: STORY_DETECTED_PROVIDERS }}
+      hiddenDetected={["models:http://127.0.0.1:1234/v1"]}
+    />
+  ),
+};
+
+/**
+ * Where the scan looks: a server on another computer and a folder that is not on the PATH. With the
+ * switch off, the tab shows no detected list.
+ */
+export const DetectionSettings: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      openCodeInstalled
+      initialTab="providers"
+      detection={{ scanning: false, found: STORY_DETECTED_PROVIDERS }}
+      detectionSettings={{
+        enabled: true,
+        addresses: ["http://192.168.1.20:11434/v1"],
+        folders: ["~/tools/bin"],
+      }}
+    />
+  ),
+};
+
+/** Nothing runs at the default addresses and no known agent is on the PATH. */
+export const NothingDetected: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      openCodeInstalled
+      initialTab="providers"
+      detection={{ scanning: false, found: [] }}
+    />
+  ),
 };
 
 /**

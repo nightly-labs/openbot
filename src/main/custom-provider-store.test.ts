@@ -238,4 +238,75 @@ describe("CustomProviderStore", () => {
     await store.remove("house-router");
     expect((await readdir(join(root, "nested"))).filter((name) => name.includes(".tmp"))).toEqual([]);
   });
+
+  describe("update", () => {
+    const edit = {
+      id: "studio-local",
+      name: "Studio",
+      baseUrl: "http://localhost:11434/v1",
+      models: [{ id: "a", name: "A" }],
+    };
+
+    it("keeps the stored ciphertext byte for byte when no credential is sent", async () => {
+      let sealed = 0;
+      const cipher = testCipher({
+        encrypt: (value) => {
+          sealed += 1;
+          return Buffer.from(`sealed:${value}`, "utf8");
+        },
+      });
+      const store = await loaded(cipher);
+      await store.save(input());
+      const before = JSON.parse(await readFile(path, "utf8")).providers[0].secret;
+      sealed = 0;
+
+      await store.update({ ...edit });
+
+      expect(sealed).toBe(0);
+      expect(JSON.parse(await readFile(path, "utf8")).providers[0].secret).toBe(before);
+      expect((await loaded()).configs()[0]).toMatchObject({
+        name: "Studio",
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "sk-secret-key",
+        headers: [{ name: "X-Tenant", value: "tenant-secret" }],
+        models: [{ id: "a", name: "A" }],
+      });
+    });
+
+    it("refuses a new origin that would keep the stored credentials, and changes nothing", async () => {
+      const store = await loaded();
+      await store.save(input());
+      const before = await readFile(path, "utf8");
+
+      await expect(store.update({ ...edit, baseUrl: "https://attacker.example/v1" })).rejects.toThrow();
+      await expect(store.update({ ...edit, baseUrl: "http://127.0.0.1:9999/v1", apiKey: "sk-new" })).rejects.toThrow();
+
+      expect(await readFile(path, "utf8")).toBe(before);
+      expect(store.configs()[0]?.baseUrl).toBe("http://127.0.0.1:11434/v1");
+    });
+
+    it("moves to a new origin when the key and the headers are both sent again", async () => {
+      const store = await loaded();
+      await store.save(input());
+
+      await store.update({
+        ...edit,
+        baseUrl: "https://models.example.com/v1",
+        apiKey: "sk-new",
+        headers: [],
+      });
+
+      expect((await loaded()).configs()[0]).toMatchObject({
+        baseUrl: "https://models.example.com/v1",
+        apiKey: "sk-new",
+        headers: [],
+      });
+    });
+
+    it("refuses an endpoint that is not saved", async () => {
+      const store = await loaded();
+      await expect(store.update({ ...edit })).rejects.toThrow();
+      expect(store.list()).toEqual([]);
+    });
+  });
 });

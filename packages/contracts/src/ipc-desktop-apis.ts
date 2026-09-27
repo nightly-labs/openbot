@@ -90,6 +90,12 @@ export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
 export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]>;
 
 /**
+ * Local model servers on this computer, the model list of one endpoint, and where the scan looks.
+ * Main makes each request; a scan sends no key.
+ */
+export type ProviderDetectionDesktopApi = GroupApi<IpcEndpoints["providerDetection"]>;
+
+/**
  * The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
  * endpoints. Every method names its server. A remote host answers only an owner or admin, and only
  * when it advertises `providers-v1`.
@@ -122,6 +128,7 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   voice: VoiceDesktopApi;
   skills: SkillsDesktopApi;
   customProviders: CustomProvidersDesktopApi;
+  providerDetection: ProviderDetectionDesktopApi;
   providerAdmin: ProviderAdminDesktopApi;
   hostAdmin: HostAdminDesktopApi;
   storage: StorageDesktopApi;
