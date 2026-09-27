@@ -9,7 +9,6 @@ import {
   assertHostAnalyticsScope,
   BROWSER_SECRET_RESPONSE_PATH,
   CHANNEL_DELETE_CAPABILITY,
-  type DuplicateAgentResult,
   decodeAgentProfileDraft,
   decodeChannel,
   decodeChannelPage,
@@ -27,6 +26,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { HostService } from "../host-service";
@@ -208,7 +208,7 @@ export function agentIpcHandlers({
           }),
       }),
       duplicateAgent: scopedHandler(parseAgentId, {
-        local: (agentId) => duplicateAgentLocally(service, sidebarLayout, agentId),
+        local: (agentId) => duplicateAgentIntoLayout(service, sidebarLayout, agentId),
         remote: (agentId, serverId) => remoteServers.duplicateAgent(agentId, serverId),
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
@@ -382,28 +382,4 @@ export function agentIpcHandlers({
       }),
     },
   };
-}
-
-// The local copy is a two-store transaction: the agent, then its place in the sidebar. If placing it
-// fails the half-made copy has to go, or the user is left with an agent they never asked for.
-async function duplicateAgentLocally(
-  service: AgentService,
-  sidebarLayout: SidebarLayoutStore,
-  agentId: string,
-): Promise<DuplicateAgentResult> {
-  const agent = await service.duplicateAgent(agentId);
-  try {
-    const layout = await sidebarLayout.placeDuplicateAfter(agentId, agent.id, [...service.sidebarChatIds(), agent.id]);
-    return service.commitAgentDuplication(agent.id, layout);
-  } catch (error) {
-    const rollbackResults = await Promise.allSettled([
-      service.deleteAgent(agent.id),
-      sidebarLayout.removeAgent(agent.id),
-    ]);
-    const rollbackErrors = rollbackResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
-    if (rollbackErrors.length > 0) {
-      throw new AggregateError([error, ...rollbackErrors], sourceText("error.agent.duplicateCleanupFailed"));
-    }
-    throw error;
-  }
 }

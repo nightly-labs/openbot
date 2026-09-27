@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { AgentEvent, AgentSummary, DuplicateAgentResult, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import type { AgentService } from "../agent-service";
 import { type AgentStore, duplicationProfileSignature } from "../agent-store";
 import type { MailboxStore } from "../mailbox-store";
+import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import type { AgentMemories } from "./agent-memories";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
@@ -244,5 +246,36 @@ export class DuplicationGate {
     if (this.#sourceSignature(agentId) !== signature) {
       throw new Error(sourceText("error.agent.changedWhileDuplicating"));
     }
+  }
+}
+
+type DuplicatingAgents = Pick<
+  AgentService,
+  "duplicateAgent" | "commitAgentDuplication" | "deleteAgent" | "sidebarChatIds"
+>;
+type DuplicateSidebar = Pick<SidebarLayoutStore, "placeDuplicateAfter" | "removeAgent">;
+
+/**
+ * Copies an agent and places the copy after its source in the sidebar. This is a two-store transaction:
+ * if placing or committing fails, the half-made copy has to go, or the user keeps an agent they never
+ * asked for.
+ */
+export async function duplicateAgentIntoLayout(
+  agents: DuplicatingAgents,
+  sidebar: DuplicateSidebar,
+  sourceAgentId: string,
+  operationId?: string,
+): Promise<DuplicateAgentResult> {
+  const agent = await agents.duplicateAgent(sourceAgentId, operationId);
+  try {
+    const layout = await sidebar.placeDuplicateAfter(sourceAgentId, agent.id, [...agents.sidebarChatIds(), agent.id]);
+    return await agents.commitAgentDuplication(agent.id, layout);
+  } catch (error) {
+    const rollbackResults = await Promise.allSettled([agents.deleteAgent(agent.id), sidebar.removeAgent(agent.id)]);
+    const rollbackErrors = rollbackResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
+    if (rollbackErrors.length > 0) {
+      throw new AggregateError([error, ...rollbackErrors], sourceText("error.agent.duplicateCleanupFailed"));
+    }
+    throw error;
   }
 }
