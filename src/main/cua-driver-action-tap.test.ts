@@ -2,18 +2,21 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { afterEach, describe, expect, it } from "vitest";
 import { CuaDriverActionTap, readRequest } from "./cua-driver-action-tap";
+import { STRUCTURED_TEXT_LABEL } from "./cua-driver-structured-text";
 
 /** A stand-in daemon that records what reaches it and answers whatever the test tells it to. */
-function fakeDaemon(address: string, answer: string) {
+function fakeDaemon(address: string, answer: string | ((request: string) => string)) {
   const received: string[] = [];
   const sockets: Socket[] = [];
   const server = createServer((socket) => {
     sockets.push(socket);
     socket.on("data", (chunk: Buffer) => {
-      received.push(chunk.toString("utf8"));
-      socket.write(answer);
+      const request = chunk.toString("utf8");
+      received.push(request);
+      socket.write(typeof answer === "string" ? answer : answer(request));
     });
     socket.on("error", () => undefined);
   });
@@ -34,6 +37,29 @@ function nextChunk(socket: Socket): Promise<string> {
   return new Promise((resolve) => socket.once("data", (chunk: Buffer) => resolve(chunk.toString("utf8"))));
 }
 
+/** One whole answer line, which a long answer delivers over many chunks. */
+function nextLine(socket: Socket): Promise<string> {
+  return new Promise((resolve) => {
+    let text = "";
+    const read = (chunk: Buffer) => {
+      text += chunk.toString("utf8");
+      const newline = text.indexOf("\n");
+      if (newline < 0) return;
+      socket.off("data", read);
+      resolve(text.slice(0, newline));
+    };
+    socket.on("data", read);
+  });
+}
+
+/** The JSON below the label of the copy the tap adds. */
+function copiedJson(text: string): DynamicRecord {
+  expect(text.startsWith(`${STRUCTURED_TEXT_LABEL}\n`)).toBe(true);
+  const copy = JSON.parse(text.slice(STRUCTURED_TEXT_LABEL.length + 1));
+  if (!isDynamicRecord(copy)) throw new Error("The copy is not a JSON object.");
+  return copy;
+}
+
 describe("CuaDriverActionTap", () => {
   const cleanUp: Array<() => Promise<unknown>> = [];
 
@@ -41,14 +67,17 @@ describe("CuaDriverActionTap", () => {
     for (const close of cleanUp.splice(0).reverse()) await close().catch(() => undefined);
   });
 
-  async function taps(now: () => number = () => 1_000) {
+  async function taps(
+    now: () => number = () => 1_000,
+    answer: string | ((request: string) => string) = '{"ok":true}\n',
+  ) {
     // The short system temporary directory, because a Unix socket path has a hard length limit and
     // the test's own working directory is deep.
     const directory = await mkdtemp(join(tmpdir(), "tap-"));
     cleanUp.push(() => rm(directory, { recursive: true, force: true }));
     const upstream = join(directory, "d.sock");
     const address = join(directory, "t.sock");
-    const daemon = fakeDaemon(upstream, '{"ok":true}\n');
+    const daemon = fakeDaemon(upstream, answer);
     await daemon.listen();
     cleanUp.push(daemon.close);
     const tap = new CuaDriverActionTap(now);
@@ -111,6 +140,67 @@ describe("CuaDriverActionTap", () => {
     now = 1_000 + 60_001;
 
     expect(tap.lastAction(60_000)).toBeNull();
+  });
+
+  it("adds a JSON copy of a tool call's structured result to its text and changes nothing else", async () => {
+    // Long enough to cross many socket chunks, which is how a real screenshot arrives.
+    const screenshot = "iVBORw0KGgo".padEnd(300_000, "A");
+    const windowList = {
+      content: [{ type: "text", text: "Found 1 window(s)." }],
+      isError: false,
+      structuredContent: {
+        windows: [
+          { window_id: 7, pid: 22, title: "Inbox", bounds: { x: 0, y: 0, width: 800, height: 600 }, z_index: 0 },
+        ],
+      },
+    };
+    const windowState = {
+      content: [
+        { type: "image", data: screenshot, mimeType: "image/png" },
+        { type: "text", text: 'window_id=7 pid=22 size=800x600 elements=1\n\n- [0] AXButton "Send"' },
+      ],
+      isError: false,
+      structuredContent: {
+        _note: "Prefer `elements`.",
+        elements: [{ element_index: 0, role: "AXButton", depth: 1, element_token: "s0000002a:0", label: "Send" }],
+        pid: 22,
+        screenshot_height: 600,
+        screenshot_width: 800,
+        snapshot_id: "s0000002a",
+        tree_markdown: '- [0] AXButton "Send"',
+        window_id: 7,
+      },
+    };
+    const { client } = await taps(
+      () => 1_000,
+      (request) => {
+        const result = JSON.parse(request).name === "list_windows" ? windowList : windowState;
+        return `${JSON.stringify({ ok: true, result })}\n`;
+      },
+    );
+
+    client.write('{"method":"call","name":"list_windows","args":{}}\n');
+    const listed = JSON.parse(await nextLine(client)).result;
+    client.write('{"method":"call","name":"get_window_state","args":{"pid":22,"window_id":7}}\n');
+    const state = JSON.parse(await nextLine(client)).result;
+
+    expect(listed.structuredContent).toEqual(windowList.structuredContent);
+    expect(listed.content).toHaveLength(2);
+    expect(listed.content[0]).toEqual(windowList.content[0]);
+    expect(copiedJson(listed.content[1].text)).toEqual(windowList.structuredContent);
+
+    expect(state.structuredContent).toEqual(windowState.structuredContent);
+    expect(state.content).toHaveLength(3);
+    expect(state.content.slice(0, 2)).toEqual(windowState.content);
+    expect(copiedJson(state.content[2].text)).toEqual({
+      pid: 22,
+      screenshot_height: 600,
+      screenshot_width: 800,
+      snapshot_id: "s0000002a",
+      tree_markdown: '- [0] AXButton "Send"',
+      window_id: 7,
+      element_tokens: { "0": "s0000002a:0" },
+    });
   });
 });
 

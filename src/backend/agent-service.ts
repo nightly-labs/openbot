@@ -733,10 +733,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       localSkillTools: this.#localSkillTools,
       hooks: {
         listAgents: () => this.listAgents(),
+        listModels: () => this.listModels(),
+        preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) => this.createAgent(input, configure),
         updateAgent: (input) => this.updateAgent(input),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        runsTurn: (agentId) => this.#runsTurn(agentId),
+        interrupt: (agentId, turnId, mayStop) => this.#interruptTurn(agentId, turnId, undefined, mayStop),
+        turnActivity: (agentId, turnId) => ({
+          startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
+          lastEventAt: this.#turn.lastEventAt(agentId),
+        }),
       },
     });
   }
@@ -1485,18 +1493,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   async interrupt(agentId: string, turnId: string, executionThreadId?: string): Promise<void> {
+    await this.#interruptTurn(agentId, turnId, executionThreadId);
+  }
+
+  /**
+   * `mayStop` is for `interrupt_agent`, whose checks run before the await below. In that time the
+   * turn can end, and the next one, which another sender can own, starts: ACP and Claude stop
+   * whatever turn runs, not `turnId`. Or the user can steer a message into the turn. So the turn
+   * must still run, and `mayStop` is asked again, just before the stop is sent. `false` means no
+   * stop was sent.
+   */
+  async #interruptTurn(
+    agentId: string,
+    turnId: string,
+    executionThreadId?: string,
+    mayStop?: () => boolean,
+  ): Promise<boolean> {
     const agent = await this.#store.getOrCreate(agentId);
     const client = this.#providers.requireReadyClientForAgent(agent);
     const snapshot = [...this.#conversation.activeSnapshots()].find(
       ([id, snapshot]) => id === agentId && snapshot.activeTurnId === turnId,
     )?.[1];
+    if (mayStop && (!snapshot || !mayStop())) return false;
     const targetThreadId = executionThreadId ?? snapshot?.threadId;
     const session = targetThreadId
       ? this.#store.database.activeProviderSession(targetThreadId, agent.provider)
       : this.#store.activeProviderSession(agentId);
-    if (!session) return;
+    if (!session) return false;
     this.#images.interrupt(agentId, session.externalSessionId, turnId);
     await client.request("turn/interrupt", { threadId: session.externalSessionId, turnId }, decodeRecordResponse);
+    return true;
   }
 
   async interruptAll(): Promise<void> {

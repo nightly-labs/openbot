@@ -290,6 +290,10 @@ export class DrainScheduler {
             model: agent.model,
             effort: agent.reasoningEffort,
             clientUserMessageId: delivery.id,
+            // A teammate message that wants no answer tells the model to write nothing, so an empty
+            // turn is the expected result and not a provider that swallowed its error.
+            answerOptional:
+              delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
             input: inputForThread(providerThreadId),
             cwd: agent.workspacePath,
             runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),

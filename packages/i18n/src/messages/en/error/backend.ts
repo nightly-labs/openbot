@@ -118,6 +118,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.routineRunStarting": "This routine run is still starting. Try again after its turn starts.",
   "error.backend.routineRunNoSession":
     "OpenBot cannot interrupt the active routine run because its provider session is unavailable.",
+  "error.backend.interruptSelf": "An agent cannot interrupt itself.",
+  "error.backend.interruptOtherWork":
+    "This agent works on a task that your message did not start. Only the user or the sender of that task can stop it.",
+  "error.backend.interruptStarting": "This agent is still starting a turn. Try again after the turn starts.",
+  "error.backend.interruptNoSession":
+    "OpenBot cannot interrupt this agent because its provider session is unavailable.",
   "error.backend.memoryTextRequired": "Memory text is required.",
   "error.backend.memoryTextTooLong": "Memory text is too long.",
   "error.backend.mcpServerGone": "This MCP server no longer exists.",

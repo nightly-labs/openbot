@@ -110,6 +110,8 @@ interface AcpTurn {
   thought: string;
   thoughtStarted: boolean;
   receivedOutput: boolean;
+  /** The prompt told the model not to answer, so an empty turn is a success. */
+  answerOptional: boolean;
   messages: ThreadItem[];
   toolNames: Map<string, string>;
   task: Promise<void>;
@@ -869,6 +871,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     this.#requireServedModel(thread);
     if (steer) {
+      // A steered message can want an answer, so an empty turn is again a failure to report.
+      if (activeTurn) activeTurn.answerOptional = false;
       void this.#requireConnection()
         .prompt({ sessionId: thread.id, prompt: blocks })
         .catch((error) => {
@@ -884,6 +888,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       thought: "",
       thoughtStarted: false,
       receivedOutput: false,
+      answerOptional: isRecord(params) && params.answerOptional === true,
       messages: [],
       toolNames: new Map(),
       task: Promise.resolve(),
@@ -916,8 +921,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           params: { threadId: thread.id, turnId: turn.id, usage: response.usage },
         });
       // OpenCode can swallow provider errors and report a successful, empty ACP turn.
-      // Do not invent the upstream cause or report that turn as a successful reply.
-      if (this.provider === "opencode" && response.stopReason === "end_turn" && !turn.receivedOutput) {
+      // Do not invent the upstream cause or report that turn as a successful reply. A turn told not
+      // to answer ends empty on purpose, and an error there costs no answer the user waits for.
+      if (
+        this.provider === "opencode" &&
+        response.stopReason === "end_turn" &&
+        !turn.receivedOutput &&
+        !turn.answerOptional
+      ) {
         this.#completeTurn(
           thread,
           turn,

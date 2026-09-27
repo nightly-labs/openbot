@@ -23,6 +23,11 @@ export const messages = {
     "La configuration de l’agent a échoué et l’agent incomplet n’a pas pu être supprimé.",
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
   "error.agent.modelProviderMismatch": "Le modèle sélectionné n’appartient pas à ce fournisseur.",
+  "error.agent.modelNotListed": "Le modèle « {model} » n’est pas disponible. Modèles disponibles : {models}.",
+  "error.agent.providerNotListed":
+    "Aucun modèle {provider} n’est disponible pour le moment. Appelez list_models pour voir les modèles disponibles.",
+  "error.agent.reasoningEffortUnsupported":
+    "Le modèle « {model} » ne prend pas en charge l’effort de raisonnement « {effort} ». Efforts pris en charge : {efforts}.",
   "error.agent.noStartingModel":
     "{provider} n’a aucun modèle disponible, et aucun autre fournisseur connecté n’en a. Connectez-vous à un fournisseur, ou changez le fournisseur par défaut dans Fournisseurs et autorisations.",
   "error.agent.waitBeforeProviderChange":

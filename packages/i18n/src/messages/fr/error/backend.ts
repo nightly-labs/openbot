@@ -128,6 +128,12 @@ export const messages = {
     "Cette exécution de routine est encore en cours de démarrage. Réessayez après le début de son tour.",
   "error.backend.routineRunNoSession":
     "OpenBot ne peut pas interrompre l’exécution de routine active, car sa session de fournisseur est indisponible.",
+  "error.backend.interruptSelf": "Un agent ne peut pas s’interrompre lui-même.",
+  "error.backend.interruptOtherWork":
+    "Cet agent travaille sur une tâche que votre message n’a pas lancée. Seul l’utilisateur ou l’expéditeur de cette tâche peut l’arrêter.",
+  "error.backend.interruptStarting": "Cet agent démarre encore un tour. Réessayez après le début du tour.",
+  "error.backend.interruptNoSession":
+    "OpenBot ne peut pas interrompre cet agent, car sa session de fournisseur est indisponible.",
   "error.backend.memoryTextRequired": "Le texte du souvenir est requis.",
   "error.backend.memoryTextTooLong": "Le texte du souvenir est trop long.",
   "error.backend.mcpServerGone": "Ce serveur MCP n’existe plus.",
