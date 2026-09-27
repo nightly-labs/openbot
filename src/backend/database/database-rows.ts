@@ -40,6 +40,12 @@ export function optionalStringColumn(row: DynamicRecord, key: string): string | 
   throw new Error(`Invalid SQLite column ${key}.`);
 }
 
+export function optionalNumberColumn(row: DynamicRecord, key: string): number | null {
+  const value = row[key];
+  if (value === null || isNumber(value)) return value;
+  throw new Error(`Invalid SQLite column ${key}.`);
+}
+
 export function decodeConversationThreadRow(
   value: unknown,
 ): { active_turn_id: string | null; last_event_sequence: number } | null {

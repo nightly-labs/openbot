@@ -125,6 +125,51 @@ async function stageBunx(binary: string, bunx: string): Promise<void> {
   }
 }
 
+interface NpmPackageCheck {
+  name: string;
+  version: string;
+  archivePathError: string;
+  mismatchError: string;
+}
+
+/**
+ * Unpacks an npm platform tarball beside `staging`, checks that its `package.json` names the pinned
+ * package and version, and gives `fill` the package root. The unpacked copy is removed after `fill`,
+ * so only what `fill` copies into `staging` is installed.
+ */
+async function withNpmPackage(
+  downloadedPath: string,
+  staging: string,
+  expected: NpmPackageCheck,
+  fill: (packageRoot: string) => Promise<void>,
+): Promise<void> {
+  const extracted = `${staging}.extracted`;
+  await rm(extracted, { recursive: true, force: true });
+  await mkdir(extracted, { recursive: true });
+  try {
+    await assertSafeArchive(downloadedPath, ["package"], expected.archivePathError);
+    await extractArchive(downloadedPath, extracted);
+    await rejectNonRegularFiles(extracted);
+    const packageRoot = join(extracted, "package");
+    const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
+    if (
+      !isDynamicRecord(packageManifest) ||
+      packageManifest.name !== expected.name ||
+      packageManifest.version !== expected.version
+    ) {
+      throw new Error(expected.mismatchError);
+    }
+    await fill(packageRoot);
+  } finally {
+    await rm(extracted, { recursive: true, force: true });
+  }
+}
+
+/** The `<runtime>-package.json` text that each install writes beside its files. */
+function layoutManifest(fields: Record<string, string>): string {
+  return `${JSON.stringify({ layoutVersion: 1, ...fields })}\n`;
+}
+
 const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDescriptor> = {
   codex: {
     runtime: "codex",
@@ -183,42 +228,34 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       };
     },
     stage: async ({ spec, downloadedPath, staging, lock }) => {
-      const extracted = `${staging}.extracted`;
-      await rm(extracted, { recursive: true, force: true });
-      await mkdir(extracted, { recursive: true });
-      try {
-        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.claudeArchivePath"));
-        await extractArchive(downloadedPath, extracted);
-        await rejectNonRegularFiles(extracted);
-        const packageRoot = join(extracted, "package");
-        const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
-        const artifact = lock.claude.artifacts[spec.target];
-        if (
-          !isDynamicRecord(packageManifest) ||
-          packageManifest.name !== artifact.package ||
-          packageManifest.version !== spec.packageVersion
-        ) {
-          throw new Error(sourceText("error.provider.claudePackageMismatch"));
-        }
-        await mkdir(join(staging, "bin"), { recursive: true });
-        await Promise.all([
-          copyFile(join(packageRoot, artifact.executable), join(staging, "bin", artifact.executable)),
-          copyFile(join(packageRoot, "LICENSE.md"), join(staging, "LICENSE.md")),
-          writeFile(
-            join(staging, "claude-package.json"),
-            `${JSON.stringify({
-              layoutVersion: 1,
-              version: spec.version,
-              sdkVersion: spec.packageVersion,
-              target: spec.target,
-              executable: `bin/${artifact.executable}`,
-            })}\n`,
-          ),
-        ]);
-        if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
-      } finally {
-        await rm(extracted, { recursive: true, force: true });
-      }
+      const artifact = lock.claude.artifacts[spec.target];
+      await withNpmPackage(
+        downloadedPath,
+        staging,
+        {
+          name: artifact.package,
+          version: spec.packageVersion,
+          archivePathError: sourceText("error.provider.claudeArchivePath"),
+          mismatchError: sourceText("error.provider.claudePackageMismatch"),
+        },
+        async (packageRoot) => {
+          await mkdir(join(staging, "bin"), { recursive: true });
+          await Promise.all([
+            copyFile(join(packageRoot, artifact.executable), join(staging, "bin", artifact.executable)),
+            copyFile(join(packageRoot, "LICENSE.md"), join(staging, "LICENSE.md")),
+            writeFile(
+              join(staging, "claude-package.json"),
+              layoutManifest({
+                version: spec.version,
+                sdkVersion: spec.packageVersion,
+                target: spec.target,
+                executable: `bin/${artifact.executable}`,
+              }),
+            ),
+          ]);
+          if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
+        },
+      );
     },
     verify: async (root, spec, lock) => {
       const artifact = lock.claude.artifacts[spec.target];
@@ -249,46 +286,34 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       };
     },
     stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
-      const extracted = `${staging}.extracted`;
-      await rm(extracted, { recursive: true, force: true });
-      await mkdir(extracted, { recursive: true });
-      try {
-        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.opencodeArchivePath"));
-        await extractArchive(downloadedPath, extracted);
-        await rejectNonRegularFiles(extracted);
-        const packageRoot = join(extracted, "package");
-        const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
-        const artifact = lock.opencode.artifacts[spec.target];
-        if (
-          !isDynamicRecord(packageManifest) ||
-          packageManifest.name !== artifact.package ||
-          packageManifest.version !== spec.packageVersion
-        ) {
-          throw new Error(sourceText("error.provider.opencodePackageMismatch"));
-        }
-        // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
-        const license = await downloadSmallFile(
-          `${lock.opencode.repository}/raw/v${spec.version}/LICENSE`,
-          pinnedHash(spec, lock.opencode.licenseSha256),
-        );
-        await mkdir(join(staging, "bin"), { recursive: true });
-        await Promise.all([
-          copyFile(join(packageRoot, "bin", artifact.executable), join(staging, "bin", artifact.executable)),
-          writeFile(join(staging, "LICENSE"), license),
-          writeFile(
-            join(staging, "opencode-package.json"),
-            `${JSON.stringify({
-              layoutVersion: 1,
-              version: spec.version,
-              target: spec.target,
-              executable: `bin/${artifact.executable}`,
-            })}\n`,
-          ),
-        ]);
-        if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
-      } finally {
-        await rm(extracted, { recursive: true, force: true });
-      }
+      const artifact = lock.opencode.artifacts[spec.target];
+      await withNpmPackage(
+        downloadedPath,
+        staging,
+        {
+          name: artifact.package,
+          version: spec.packageVersion,
+          archivePathError: sourceText("error.provider.opencodeArchivePath"),
+          mismatchError: sourceText("error.provider.opencodePackageMismatch"),
+        },
+        async (packageRoot) => {
+          // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
+          const license = await downloadSmallFile(
+            `${lock.opencode.repository}/raw/v${spec.version}/LICENSE`,
+            pinnedHash(spec, lock.opencode.licenseSha256),
+          );
+          await mkdir(join(staging, "bin"), { recursive: true });
+          await Promise.all([
+            copyFile(join(packageRoot, "bin", artifact.executable), join(staging, "bin", artifact.executable)),
+            writeFile(join(staging, "LICENSE"), license),
+            writeFile(
+              join(staging, "opencode-package.json"),
+              layoutManifest({ version: spec.version, target: spec.target, executable: `bin/${artifact.executable}` }),
+            ),
+          ]);
+          if (spec.target !== "win32-x64") await chmod(join(staging, "bin", artifact.executable), 0o755);
+        },
+      );
     },
     verify: async (root, spec, lock) => {
       const artifact = lock.opencode.artifacts[spec.target];
@@ -332,12 +357,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
         writeFile(join(staging, "THIRD-PARTY-NOTICES"), notices),
         writeFile(
           join(staging, "grok-package.json"),
-          `${JSON.stringify({
-            layoutVersion: 1,
-            version: spec.version,
-            target: spec.target,
-            executable: `bin/${spec.executableName}`,
-          })}\n`,
+          layoutManifest({ version: spec.version, target: spec.target, executable: `bin/${spec.executableName}` }),
         ),
       ]);
       if (spec.target !== "win32-x64") await chmod(join(staging, "bin", spec.executableName), 0o755);
@@ -387,14 +407,13 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       );
       await writeFile(
         join(staging, ANTIGRAVITY_MANIFEST),
-        `${JSON.stringify({
-          layoutVersion: 1,
+        layoutManifest({
           version: spec.version,
           target: spec.target,
           executable: `bin/${spec.executableName}`,
           harness: `bin/${harness}`,
           licenseUrl: lock.antigravity.licenseUrl,
-        })}\n`,
+        }),
       );
       if (spec.target !== "win32-x64") {
         await Promise.all([chmod(join(bin, spec.executableName), 0o755), chmod(join(bin, harness), 0o755)]);
@@ -434,48 +453,40 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
       };
     },
     stage: async ({ spec, downloadedPath, staging, lock, downloadSmallFile }) => {
-      const extracted = `${staging}.extracted`;
-      await rm(extracted, { recursive: true, force: true });
-      await mkdir(extracted, { recursive: true });
-      try {
-        await assertSafeArchive(downloadedPath, ["package"], sourceText("error.provider.bunArchivePath"));
-        await extractArchive(downloadedPath, extracted);
-        await rejectNonRegularFiles(extracted);
-        const packageRoot = join(extracted, "package");
-        const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
-        const artifact = lock.bun.artifacts[spec.target];
-        if (
-          !isDynamicRecord(packageManifest) ||
-          packageManifest.name !== artifact.package ||
-          packageManifest.version !== lock.bun.version
-        ) {
-          throw new Error(sourceText("error.provider.bunPackageMismatch"));
-        }
-        // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
-        const license = await downloadSmallFile(
-          `${lock.bun.repository}/raw/${encodeURIComponent(lock.bun.tag)}/LICENSE.md`,
-          lock.bun.licenseSha256,
-        );
-        const binary = join(staging, "bin", artifact.executable);
-        await mkdir(join(staging, "bin"), { recursive: true });
-        await Promise.all([
-          copyFile(join(packageRoot, "bin", artifact.executable), binary),
-          writeFile(join(staging, "LICENSE.md"), license),
-          writeFile(
-            join(staging, "bun-package.json"),
-            `${JSON.stringify({
-              layoutVersion: 1,
-              version: lock.bun.version,
-              target: spec.target,
-              executable: `bin/${artifact.executable}`,
-            })}\n`,
-          ),
-        ]);
-        if (spec.target !== "win32-x64") await chmod(binary, 0o755);
-        await stageBunx(binary, join(staging, "bin", bunxExecutableName(spec.target)));
-      } finally {
-        await rm(extracted, { recursive: true, force: true });
-      }
+      const artifact = lock.bun.artifacts[spec.target];
+      await withNpmPackage(
+        downloadedPath,
+        staging,
+        {
+          name: artifact.package,
+          version: lock.bun.version,
+          archivePathError: sourceText("error.provider.bunArchivePath"),
+          mismatchError: sourceText("error.provider.bunPackageMismatch"),
+        },
+        async (packageRoot) => {
+          // The platform tarball carries no licence, so it comes from the tagged source like Codex's.
+          const license = await downloadSmallFile(
+            `${lock.bun.repository}/raw/${encodeURIComponent(lock.bun.tag)}/LICENSE.md`,
+            lock.bun.licenseSha256,
+          );
+          const binary = join(staging, "bin", artifact.executable);
+          await mkdir(join(staging, "bin"), { recursive: true });
+          await Promise.all([
+            copyFile(join(packageRoot, "bin", artifact.executable), binary),
+            writeFile(join(staging, "LICENSE.md"), license),
+            writeFile(
+              join(staging, "bun-package.json"),
+              layoutManifest({
+                version: lock.bun.version,
+                target: spec.target,
+                executable: `bin/${artifact.executable}`,
+              }),
+            ),
+          ]);
+          if (spec.target !== "win32-x64") await chmod(binary, 0o755);
+          await stageBunx(binary, join(staging, "bin", bunxExecutableName(spec.target)));
+        },
+      );
     },
     verify: async (root, spec, lock) => {
       const artifact = lock.bun.artifacts[spec.target];
