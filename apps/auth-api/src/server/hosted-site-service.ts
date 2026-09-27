@@ -1,3 +1,10 @@
+import {
+  type HostedSiteRouteManifest,
+  hostedSiteBlockKey,
+  hostedSiteDeploymentPrefix,
+  hostedSiteRouteKey,
+  isHostedSiteStatus,
+} from "@openbot/contracts/hosted-sites";
 import type {
   HostedSiteSummary as HostedSiteClientSummary,
   HostedSiteFramework,
@@ -60,16 +67,6 @@ export interface HostedSiteUploadSession {
   uploadId: string;
   site: HostedSiteSummary;
   expiresAt: string;
-}
-
-interface RouteManifest {
-  version: 1;
-  status: "active" | "deleted" | "expired" | "blocked";
-  siteId: string;
-  deploymentId: string | null;
-  expiresAt: number | null;
-  spaFallback: boolean;
-  files: Record<string, { key: string; size: number; mimeType: string }>;
 }
 
 type OperationClaim = { status: "pending"; token: string } | { status: "completed"; response: string };
@@ -588,7 +585,9 @@ export class HostedSiteService {
     if (!site) throw new HostedSiteInputError(409, "site_not_found", "The site was not found.");
     const now = this.now();
     if (blocked) {
-      await this.bucket.put(blockKey(site.hostname), "blocked", { httpMetadata: { contentType: "text/plain" } });
+      await this.bucket.put(hostedSiteBlockKey(site.hostname), "blocked", {
+        httpMetadata: { contentType: "text/plain" },
+      });
     }
     let status: SiteRow["status"];
     let allowedStatuses: string;
@@ -632,11 +631,11 @@ export class HostedSiteService {
           .bind(crypto.randomUUID(), site.id, blocked ? "block" : "unblock", now, site.id, status, now),
       ]);
     } catch (error) {
-      if (blocked) await this.bucket.delete(blockKey(site.hostname)).catch(() => undefined);
+      if (blocked) await this.bucket.delete(hostedSiteBlockKey(site.hostname)).catch(() => undefined);
       throw error;
     }
     if (batchResult(results[0]).meta.changes !== 1) {
-      if (blocked) await this.bucket.delete(blockKey(site.hostname)).catch(() => undefined);
+      if (blocked) await this.bucket.delete(hostedSiteBlockKey(site.hostname)).catch(() => undefined);
       const current = await this.siteById(site.id);
       if (current?.status === "deleted" || current?.status === "expired") throw inactiveSiteError(current.status);
       if (current?.expires_at != null && current.expires_at <= now) throw inactiveSiteError("expired");
@@ -767,7 +766,7 @@ export class HostedSiteService {
       const processedTombstones: { id: string }[] = [];
       for (const site of tombstones.results) {
         if (performance.now() >= deadline) break;
-        await this.bucket.delete([routeKey(site.hostname), blockKey(site.hostname)]);
+        await this.bucket.delete([hostedSiteRouteKey(site.hostname), hostedSiteBlockKey(site.hostname)]);
         processedTombstones.push(site);
       }
       if (processedTombstones.length) {
@@ -951,7 +950,7 @@ export class HostedSiteService {
       const before = await this.siteById(siteId);
       if (!before) throw new HostedSiteInputError(409, "site_not_found", "The site was not found.");
       const route = await this.routeForSite(before);
-      await this.bucket.put(routeKey(before.hostname), JSON.stringify(route), {
+      await this.bucket.put(hostedSiteRouteKey(before.hostname), JSON.stringify(route), {
         httpMetadata: { contentType: "application/json" },
       });
       const after = await this.siteById(siteId);
@@ -969,7 +968,7 @@ export class HostedSiteService {
     throw new Error("The site route changed too often during publication.");
   }
 
-  private async routeForSite(site: SiteRow): Promise<RouteManifest> {
+  private async routeForSite(site: SiteRow): Promise<HostedSiteRouteManifest> {
     if (site.status !== "active") {
       if (site.status === "uploading") throw new Error("An uploading site does not have a public route.");
       return {
@@ -1328,7 +1327,7 @@ export class HostedSiteService {
   private async deleteDeployment(siteId: string, deploymentId: string): Promise<void> {
     let cursor: string | undefined;
     do {
-      const listed = await this.bucket.list({ prefix: `sites/${siteId}/deployments/${deploymentId}/`, cursor });
+      const listed = await this.bucket.list({ prefix: hostedSiteDeploymentPrefix(siteId, deploymentId), cursor });
       if (listed.objects.length) await this.bucket.delete(listed.objects.map((object) => object.key));
       cursor = listed.truncated ? listed.cursor : undefined;
     } while (cursor);
@@ -1340,7 +1339,7 @@ export class HostedSiteService {
 
   private async deleteBlockMarker(siteId: string, hostname: string): Promise<void> {
     try {
-      await this.bucket.delete(blockKey(hostname));
+      await this.bucket.delete(hostedSiteBlockKey(hostname));
     } catch (error) {
       await this.markRouteUnsynced(siteId);
       throw error;
@@ -1349,7 +1348,7 @@ export class HostedSiteService {
 
   private async putBlockMarkerForSyncedRoute(siteId: string, hostname: string): Promise<void> {
     try {
-      await this.bucket.put(blockKey(hostname), "blocked", { httpMetadata: { contentType: "text/plain" } });
+      await this.bucket.put(hostedSiteBlockKey(hostname), "blocked", { httpMetadata: { contentType: "text/plain" } });
     } catch (error) {
       await this.markRouteUnsynced(siteId);
       throw error;
@@ -1365,7 +1364,9 @@ export class HostedSiteService {
       const before = await this.siteById(siteId);
       if (!before) return;
       if (before.status === "blocked") {
-        await this.bucket.put(blockKey(before.hostname), "blocked", { httpMetadata: { contentType: "text/plain" } });
+        await this.bucket.put(hostedSiteBlockKey(before.hostname), "blocked", {
+          httpMetadata: { contentType: "text/plain" },
+        });
       }
       await this.publishAuthoritativeRoute(siteId);
       const published = await this.siteById(siteId);
@@ -1511,15 +1512,7 @@ function parseStoredSiteSummary(value: string): HostedSiteSummary {
 }
 
 function parseSiteStatus(value: unknown): SiteRow["status"] {
-  if (
-    value === "uploading" ||
-    value === "active" ||
-    value === "deleted" ||
-    value === "expired" ||
-    value === "blocked"
-  ) {
-    return value;
-  }
+  if (value === "uploading" || isHostedSiteStatus(value)) return value;
   throw new Error("The stored site status is invalid.");
 }
 
@@ -1554,15 +1547,7 @@ function siteUrl(hostname: string, localSiteOrigin?: string): string {
 }
 
 function assetKey(siteId: string, deploymentId: string, path: string): string {
-  return `sites/${siteId}/deployments/${deploymentId}/${path}`;
-}
-
-function routeKey(hostname: string): string {
-  return `routes/${hostname}.json`;
-}
-
-function blockKey(hostname: string): string {
-  return `blocks/${hostname}`;
+  return `${hostedSiteDeploymentPrefix(siteId, deploymentId)}${path}`;
 }
 
 const RESERVED_PREFIXES = new Set([

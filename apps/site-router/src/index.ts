@@ -1,20 +1,10 @@
-import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-
-interface RouteFile {
-  key: string;
-  size: number;
-  mimeType: string;
-}
-
-interface RouteManifest {
-  version: 1;
-  status: "active" | "deleted" | "expired" | "blocked";
-  siteId: string;
-  deploymentId: string | null;
-  expiresAt: number | null;
-  spaFallback: boolean;
-  files: Record<string, RouteFile>;
-}
+import {
+  decodeHostedSiteRouteManifest,
+  type HostedSiteRouteFile,
+  type HostedSiteRouteManifest,
+  hostedSiteBlockKey,
+  hostedSiteRouteKey,
+} from "@openbot/contracts/hosted-sites";
 
 interface SiteBucket {
   get(key: string, options?: R2GetOptions): Promise<R2ObjectBody | R2Object | null>;
@@ -75,10 +65,10 @@ export async function routeRequest(
       headers: secureHeaders({ Location: report.toString(), "Cache-Control": "no-store" }),
     });
   }
-  const blockMarker = await env.SITES.get(`blocks/${hostname}`);
+  const blockMarker = await env.SITES.get(hostedSiteBlockKey(hostname));
   if (blockMarker) return errorResponse(451, "Site unavailable");
 
-  const routeObject = await env.SITES.get(`routes/${hostname}.json`);
+  const routeObject = await env.SITES.get(hostedSiteRouteKey(hostname));
   if (!routeObject) return errorResponse(404, "Site not found");
   if (!hasBody(routeObject)) return errorResponse(500, "Site unavailable");
   const route = await readRouteManifest(routeObject);
@@ -121,7 +111,7 @@ export async function routeRequest(
 
 async function readCachedAsset(
   request: Request,
-  file: RouteFile,
+  file: HostedSiteRouteFile,
   cache: Pick<Cache, "match">,
 ): Promise<Response | undefined> {
   try {
@@ -135,7 +125,7 @@ async function readCachedAsset(
   }
 }
 
-function assetCacheRequest(request: Request, file: RouteFile): Request {
+function assetCacheRequest(request: Request, file: HostedSiteRouteFile): Request {
   const url = new URL(request.url);
   url.pathname = `/_openbot/asset-cache/${encodeURIComponent(file.key)}`;
   url.search = "";
@@ -144,7 +134,7 @@ function assetCacheRequest(request: Request, file: RouteFile): Request {
 
 function assetResponse(
   request: Request,
-  file: RouteFile,
+  file: HostedSiteRouteFile,
   body: ReadableStream | null,
   etag: string | null,
   status = 200,
@@ -202,7 +192,7 @@ function requestPath(pathname: string): string | null {
   }
 }
 
-function resolveFile(route: RouteManifest, path: string): RouteFile | null {
+function resolveFile(route: HostedSiteRouteManifest, path: string): HostedSiteRouteFile | null {
   const candidates = path ? [path, path.endsWith("/") ? `${path}index.html` : `${path}/index.html`] : ["index.html"];
   for (const candidate of candidates) {
     const file = route.files[candidate];
@@ -211,57 +201,13 @@ function resolveFile(route: RouteManifest, path: string): RouteFile | null {
   return route.spaFallback ? (route.files["index.html"] ?? null) : null;
 }
 
-async function readRouteManifest(object: R2ObjectBody): Promise<RouteManifest | null> {
+async function readRouteManifest(object: R2ObjectBody): Promise<HostedSiteRouteManifest | null> {
   if (object.size > 64 * 1024) return null;
   try {
-    const value = await object.json();
-    if (
-      !isDynamicRecord(value) ||
-      value.version !== 1 ||
-      !["active", "deleted", "expired", "blocked"].includes(String(value.status)) ||
-      !isString(value.siteId) ||
-      (value.deploymentId !== null && !isString(value.deploymentId)) ||
-      (value.expiresAt !== null && !isNumber(value.expiresAt)) ||
-      !isBoolean(value.spaFallback) ||
-      !isDynamicRecord(value.files)
-    ) {
-      return null;
-    }
-    const files: Record<string, RouteFile> = {};
-    for (const file of Object.values(value.files)) {
-      if (
-        !isDynamicRecord(file) ||
-        !isString(file.key) ||
-        !isNumber(file.size) ||
-        !isString(file.mimeType) ||
-        !file.key.startsWith(`sites/${value.siteId}/deployments/${value.deploymentId}/`)
-      ) {
-        return null;
-      }
-    }
-    for (const [path, file] of Object.entries(value.files)) {
-      if (!isDynamicRecord(file) || !isString(file.key) || !isNumber(file.size) || !isString(file.mimeType)) {
-        return null;
-      }
-      files[path] = { key: file.key, size: file.size, mimeType: file.mimeType };
-    }
-    return {
-      version: 1,
-      status: parseRouteStatus(value.status),
-      siteId: value.siteId,
-      deploymentId: value.deploymentId,
-      expiresAt: value.expiresAt,
-      spaFallback: value.spaFallback,
-      files,
-    };
+    return decodeHostedSiteRouteManifest(await object.json());
   } catch {
     return null;
   }
-}
-
-function parseRouteStatus(value: unknown): RouteManifest["status"] {
-  if (value === "active" || value === "deleted" || value === "expired" || value === "blocked") return value;
-  throw new Error("The route status is invalid.");
 }
 
 function errorResponse(status: number, message: string): Response {

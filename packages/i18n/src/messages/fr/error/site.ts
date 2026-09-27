@@ -23,6 +23,7 @@ export const messages = {
   "error.site.unsupportedEntry": "Élément de site non pris en charge : {name}",
   "error.site.tooManyFiles": "Un site peut contenir au maximum {limit} fichiers.",
   "error.site.hiddenFile": "Les fichiers masqués ne sont pas autorisés : {path}",
+  "error.site.unsafePath": "Ce chemin de fichier n’est pas autorisé : {path}",
   "error.site.secretFile":
     "Les identifiants, les clés privées et le code source serveur ne sont pas autorisés : {path}",
   "error.site.fileType": "Ce type de fichier n’est pas autorisé : {path}",

@@ -23,6 +23,7 @@ export const messages = {
   "error.site.unsupportedEntry": "対応していないサイトの項目です: {name}",
   "error.site.tooManyFiles": "サイトに含められるファイルは {limit} 個までです。",
   "error.site.hiddenFile": "隠しファイルは使用できません: {path}",
+  "error.site.unsafePath": "このファイルパスは使用できません: {path}",
   "error.site.secretFile": "認証情報、秘密鍵、サーバーのソースは使用できません: {path}",
   "error.site.fileType": "この種類のファイルは使用できません: {path}",
   "error.site.fileOutsideRoot": "サイトのファイルはソースのルート内にある必要があります: {path}",

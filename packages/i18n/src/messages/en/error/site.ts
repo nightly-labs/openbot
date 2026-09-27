@@ -21,6 +21,7 @@ export const messages = defineMessages("error.site", {
   "error.site.unsupportedEntry": "Unsupported site entry: {name}",
   "error.site.tooManyFiles": "A site can contain at most {limit} files.",
   "error.site.hiddenFile": "Hidden files are not allowed: {path}",
+  "error.site.unsafePath": "This file path is not allowed: {path}",
   "error.site.secretFile": "Credentials, private keys, and server source are not allowed: {path}",
   "error.site.fileType": "This file type is not allowed: {path}",
   "error.site.fileOutsideRoot": "Site files must stay inside the source root: {path}",

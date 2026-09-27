@@ -5,6 +5,7 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
+import { isHostedSiteStatus } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
   type AnalyticsPreference,
@@ -254,7 +255,7 @@ export function decodeHostedSite(value: unknown): HostedSiteSummary {
     !isString(site.title) ||
     !isString(site.description) ||
     (site.framework !== "vanilla" && site.framework !== "astro") ||
-    (site.status !== "active" && site.status !== "deleted" && site.status !== "expired" && site.status !== "blocked") ||
+    !isHostedSiteStatus(site.status) ||
     !isNumber(site.fileCount) ||
     !isNumber(site.size) ||
     (site.expiresAt !== null && !isString(site.expiresAt)) ||
@@ -269,17 +270,12 @@ export function decodeHostedSite(value: unknown): HostedSiteSummary {
     title: site.title,
     description: site.description,
     framework: site.framework,
-    status: decodeHostedSiteStatus(site.status),
+    status: site.status,
     fileCount: site.fileCount,
     size: site.size,
     expiresAt: site.expiresAt,
     updatedAt: site.updatedAt,
   };
-}
-
-function decodeHostedSiteStatus(value: unknown): HostedSiteSummary["status"] {
-  if (value === "active" || value === "deleted" || value === "expired" || value === "blocked") return value;
-  throw new Error("Invalid hosted site status.");
 }
 
 export function decodeHostedSites(value: unknown): HostedSiteSummary[] {

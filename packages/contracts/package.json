@@ -12,6 +12,7 @@
     "./avatar-images": "./src/avatar-images.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
     "./conversation-order": "./src/conversation-order.ts",
+    "./hosted-sites": "./src/hosted-sites.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
     "./landing-preview-messages": "./src/landing-preview-messages.ts",

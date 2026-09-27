@@ -2,6 +2,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, readdir, readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+  checkHostedSitePath,
+  HOSTED_SITE_MIME_TYPES,
+  HOSTED_SITE_UPLOAD_LIMITS,
+  type HostedSitePathProblem,
+  isHostedSiteStatus,
+} from "@openbot/contracts/hosted-sites";
 import type {
   HostedSiteFramework,
   HostedSiteSummary,
@@ -9,14 +16,16 @@ import type {
   ReplaceHostedSiteInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { sourceText } from "@openbot/i18n/source";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { isMissingFileError } from "../backend/file-errors";
 
-const MAX_FILES = 20;
-const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
-const MAX_FILE_BYTES = 1024 * 1024;
-const UNSAFE_FILE_NAME = /(?:^|[-_.])(?:credentials?|private[-_]?key|secret|service[-_]?account)(?:[-_.]|$)/iu;
-const SERVER_SOURCE_NAME = /^(?:server|worker)\.[cm]?[jt]s$/iu;
+const PATH_PROBLEM_KEYS = {
+  invalid: "error.site.unsafePath",
+  hidden: "error.site.hiddenFile",
+  unsafe: "error.site.unsafePath",
+  secret: "error.site.secretFile",
+  archive: "error.site.fileType",
+} as const satisfies Record<HostedSitePathProblem, keyof SourceMessages>;
 
 interface PreparedFile {
   path: string;
@@ -47,25 +56,6 @@ interface PendingUpload {
 export interface HostedSiteAuthClient {
   requestAuthorized<T>(path: string, init: RequestInit, decoder: (value: unknown) => T, timeoutMs?: number): Promise<T>;
 }
-
-const UPLOAD_SESSION_TTL_MS = 15 * 60 * 1_000;
-
-const MIME_TYPES: Readonly<Record<string, string>> = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "text/javascript",
-  ".mjs": "text/javascript",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".webp": "image/webp",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".ico": "image/x-icon",
-  ".woff2": "font/woff2",
-  ".txt": "text/plain",
-  ".webmanifest": "application/manifest+json",
-};
 
 export class HostedSiteDesktopService {
   readonly #pendingUploads = new Map<string, PendingUpload>();
@@ -186,7 +176,9 @@ export class HostedSiteDesktopService {
     const now = Date.now();
     for (const [signature, pending] of this.#pendingUploads) {
       const serverExpiry = pending.session ? Date.parse(pending.session.expiresAt) : Number.NaN;
-      const expiresAt = Number.isFinite(serverExpiry) ? serverExpiry : pending.createdAt + UPLOAD_SESSION_TTL_MS;
+      const expiresAt = Number.isFinite(serverExpiry)
+        ? serverExpiry
+        : pending.createdAt + HOSTED_SITE_UPLOAD_LIMITS.uploadLifetimeMs;
       if (pending.inFlight === null && expiresAt <= now) this.#pendingUploads.delete(signature);
     }
   }
@@ -282,16 +274,13 @@ async function collectFiles(root: string): Promise<PreparedFile[]> {
         continue;
       }
       if (!stats.isFile()) throw new Error(sourceText("error.site.unsupportedEntry", { name: entry.name }));
-      if (files.length >= MAX_FILES) throw new Error(sourceText("error.site.tooManyFiles", { limit: MAX_FILES }));
+      if (files.length >= HOSTED_SITE_UPLOAD_LIMITS.files) {
+        throw new Error(sourceText("error.site.tooManyFiles", { limit: HOSTED_SITE_UPLOAD_LIMITS.files }));
+      }
       const path = relative(root, absolute).split("\\").join("/");
-      if (path.split("/").some((segment) => segment.startsWith("."))) {
-        throw new Error(sourceText("error.site.hiddenFile", { path }));
-      }
-      if (UNSAFE_FILE_NAME.test(entry.name) || SERVER_SOURCE_NAME.test(entry.name)) {
-        throw new Error(sourceText("error.site.secretFile", { path }));
-      }
-      const extension = extname(path).toLowerCase();
-      const mimeType = MIME_TYPES[extension];
+      const checked = checkHostedSitePath(path);
+      if ("problem" in checked) throw new Error(sourceText(PATH_PROBLEM_KEYS[checked.problem], { path }));
+      const mimeType = HOSTED_SITE_MIME_TYPES[extname(path).slice(1).toLowerCase()]?.[0];
       if (!mimeType) throw new Error(sourceText("error.site.fileType", { path }));
       const handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
@@ -300,9 +289,10 @@ async function collectFiles(root: string): Promise<PreparedFile[]> {
         if (!openedStats.isFile() || !isInside(root, canonicalFile) || canonicalFile !== absolute) {
           throw new Error(sourceText("error.site.fileOutsideRoot", { path }));
         }
-        if (openedStats.size > MAX_FILE_BYTES) throw new Error(sourceText("error.site.fileTooLarge", { path }));
+        if (openedStats.size > HOSTED_SITE_UPLOAD_LIMITS.fileBytes)
+          throw new Error(sourceText("error.site.fileTooLarge", { path }));
         total += openedStats.size;
-        if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.site.siteTooLarge"));
+        if (total > HOSTED_SITE_UPLOAD_LIMITS.totalBytes) throw new Error(sourceText("error.site.siteTooLarge"));
         files.push({ path, size: openedStats.size, mimeType, bytes: new Uint8Array(await handle.readFile()) });
       } finally {
         await handle.close();
@@ -410,7 +400,7 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 function decodeSiteStatus(value: unknown): HostedSiteSummary["status"] {
-  if (value === "active" || value === "deleted" || value === "expired" || value === "blocked") return value;
+  if (isHostedSiteStatus(value)) return value;
   throw new Error("The hosted site status is invalid.");
 }
 

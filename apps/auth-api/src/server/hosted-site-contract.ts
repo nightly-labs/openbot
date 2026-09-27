@@ -1,3 +1,9 @@
+import {
+  checkHostedSitePath,
+  HOSTED_SITE_MIME_TYPES,
+  HOSTED_SITE_UPLOAD_LIMITS,
+  type HostedSitePathProblem,
+} from "@openbot/contracts/hosted-sites";
 import type { HostedSiteFramework } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
@@ -8,10 +14,7 @@ export const HOSTED_SITE_LIMITS = {
   uploadAttemptMultiplier: 2,
   creationsPerHour: 20,
   creationsPerDay: 100,
-  files: 20,
-  totalBytes: 2 * 1024 * 1024,
-  fileBytes: 1024 * 1024,
-  uploadLifetimeMs: 15 * 60_000,
+  ...HOSTED_SITE_UPLOAD_LIMITS,
   siteLifetimeMs: 30 * 24 * 60 * 60_000,
   tombstoneLifetimeMs: 90 * 24 * 60 * 60_000,
 } as const;
@@ -31,26 +34,13 @@ export interface HostedSiteUploadRequest {
   files: HostedSiteFileManifest[];
 }
 
-const ALLOWED_MIME_BY_EXTENSION: Readonly<Record<string, readonly string[]>> = {
-  html: ["text/html"],
-  css: ["text/css"],
-  js: ["text/javascript", "application/javascript"],
-  mjs: ["text/javascript", "application/javascript"],
-  json: ["application/json"],
-  svg: ["image/svg+xml"],
-  webp: ["image/webp"],
-  png: ["image/png"],
-  jpg: ["image/jpeg"],
-  jpeg: ["image/jpeg"],
-  ico: ["image/x-icon", "image/vnd.microsoft.icon"],
-  woff2: ["font/woff2"],
-  txt: ["text/plain"],
-  webmanifest: ["application/manifest+json"],
-};
-
-const UNSAFE_SEGMENTS = new Set([".env", ".git", "node_modules", "server", "api"]);
-const UNSAFE_FILE_NAME = /(?:^|[-_.])(?:credentials?|private[-_]?key|secret|service[-_]?account)(?:[-_.]|$)/iu;
-const SERVER_SOURCE_NAME = /^(?:server|worker)\.[cm]?[jt]s$/iu;
+const PATH_PROBLEM_MESSAGES = {
+  invalid: "A file path is invalid.",
+  hidden: "A file path is unsafe.",
+  unsafe: "A file path is unsafe.",
+  secret: "Credentials, private keys, and server source are not allowed.",
+  archive: "Archives and source maps are not allowed.",
+} as const satisfies Record<HostedSitePathProblem, string>;
 
 export class HostedSiteInputError extends Error {
   constructor(
@@ -116,7 +106,7 @@ function parseFile(value: unknown, seen: Set<string>): HostedSiteFileManifest {
     throw new HostedSiteInputError(413, "file_too_large", "A file exceeds the 1 MB limit.");
   }
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
-  const allowed = ALLOWED_MIME_BY_EXTENSION[extension];
+  const allowed = HOSTED_SITE_MIME_TYPES[extension];
   if (!allowed?.includes(value.mimeType.toLowerCase())) {
     throw invalid(`The file type for ${path} is not allowed.`);
   }
@@ -124,32 +114,9 @@ function parseFile(value: unknown, seen: Set<string>): HostedSiteFileManifest {
 }
 
 function normalizeHostedSitePath(value: string): string {
-  const path = value.replaceAll("\\", "/").replace(/^\.\//u, "");
-  if (!path || path.length > 240 || path.startsWith("/") || path.endsWith("/") || path.includes("//")) {
-    throw invalid("A file path is invalid.");
-  }
-  const segments = path.split("/");
-  if (
-    segments.some(
-      (segment) =>
-        !segment ||
-        segment === "." ||
-        segment === ".." ||
-        segment.startsWith(".") ||
-        UNSAFE_SEGMENTS.has(segment.toLowerCase()),
-    )
-  ) {
-    throw invalid("A file path is unsafe.");
-  }
-  const lower = path.toLowerCase();
-  const fileName = segments.at(-1) ?? "";
-  if (UNSAFE_FILE_NAME.test(fileName) || SERVER_SOURCE_NAME.test(fileName)) {
-    throw invalid("Credentials, private keys, and server source are not allowed.");
-  }
-  if (lower.endsWith(".map") || lower.endsWith(".zip") || lower.endsWith(".tar") || lower.endsWith(".gz")) {
-    throw invalid("Archives and source maps are not allowed.");
-  }
-  return path;
+  const checked = checkHostedSitePath(value);
+  if ("problem" in checked) throw invalid(PATH_PROBLEM_MESSAGES[checked.problem]);
+  return checked.path;
 }
 
 function limitedText(value: unknown, label: string, limit: number): string {
