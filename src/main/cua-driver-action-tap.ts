@@ -7,16 +7,23 @@
 // the order alone, and because the user's own clicks move it.
 //
 // OpenBot does own one thing: the address it hands the providers. This listens on an address of its
-// own, forwards every byte to the daemon unchanged, and reads the few fields it needs out of the
-// request line - which application, which window, and which point the agent asked the daemon to
-// act on.
+// own, forwards every request byte to the daemon unchanged, and reads the few fields it needs out
+// of the request line - which application, which window, and which point the agent asked the
+// daemon to act on.
 //
-// It carries no policy. It refuses nothing, rewrites nothing and delays nothing: a tap that could
-// change an action would be a second, quieter place where Computer Use is decided.
+// It carries no policy. It refuses nothing and delays no request: a tap that could change an
+// action would be a second, quieter place where Computer Use is decided.
+//
+// It changes one thing on the way back. The answer to a tool call gets one more text item, a JSON
+// copy of its `structuredContent`, because some providers show the model only the text and the
+// driver's text is a summary with nothing in it to act on. `cua-driver-structured-text.ts` says
+// what the copy holds. Every other answer, and every other byte of a changed one, passes unchanged.
 
 import { chmod } from "node:fs/promises";
 import { connect, createServer, type Server, type Socket } from "node:net";
+import { Transform, type TransformCallback } from "node:stream";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { rewriteCallAnswer } from "./cua-driver-structured-text";
 
 /**
  * A line longer than this is not a request the tap understands, so it stops reading that line.
@@ -26,6 +33,16 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
  * cap is what keeps a client that never sends a newline from growing the buffer without end.
  */
 const MAX_REQUEST_LINE_BYTES = 1_048_576;
+
+/**
+ * An answer line longer than this is passed on unchanged rather than held whole to be read.
+ *
+ * A tool answer must be held to its end before a text item can be added to it, and a window state
+ * with a screenshot is several megabytes. The cap keeps a daemon that never sends a newline from
+ * growing the held answer without end; an answer past it reaches the agent as the daemon sent it.
+ */
+const MAX_ANSWER_LINE_BYTES = 33_554_432;
+const NEWLINE = 0x0a;
 
 /**
  * Where an agent last asked the daemon to act.
@@ -62,13 +79,15 @@ export interface ObservedPointer {
   at: number;
 }
 
-/** What one request line says about where the agent works, which is at most these two answers. */
+/** What one request line says: whether it is a tool call, and at most two answers about where the agent works. */
 export interface ObservedRequest {
+  /** Whether the line is a tool call, whose answer gets the text copy of its structured result. */
+  call: boolean;
   action: ObservedAction | null;
   pointer: ObservedPointer | null;
 }
 
-const NOTHING: ObservedRequest = { action: null, pointer: null };
+const NOTHING: ObservedRequest = { call: false, action: null, pointer: null };
 
 /**
  * The tools that aim the pointer at a point on the desktop.
@@ -98,7 +117,7 @@ export function readRequest(line: string, at: number): ObservedRequest {
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
-  return { action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
+  return { call: true, action: readTarget(tool, args, at), pointer: readPointer(tool, args, at) };
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -130,7 +149,79 @@ export interface ActionTapAddresses {
   tap: string;
 }
 
-/** Keeps the last action an agent asked for, and forwards everything unchanged. */
+/**
+ * The daemon's answers, one line at a time, with the text copy added to each tool call's answer.
+ *
+ * The protocol carries no request id: the daemon answers in the order it was asked, so the answer
+ * lines are matched to the request lines in order. `expect` is told about each request before the
+ * daemon can answer it. A line that is not a tool call's answer is passed on as it arrives; a tool
+ * call's answer is held to its newline, because a text item can only be added to a whole answer.
+ * The stream's own back pressure holds the daemon while the agent reads slower than it writes.
+ */
+class CallAnswerLines extends Transform {
+  /** One entry per request not yet answered: whether it was a tool call. */
+  readonly #expected: boolean[] = [];
+  /** How the current line is handled, or `null` before its first byte. */
+  #line: "pass" | "hold" | null = null;
+  #held: Buffer[] = [];
+  #heldBytes = 0;
+
+  expect(call: boolean): void {
+    this.#expected.push(call);
+  }
+
+  override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
+    let start = 0;
+    while (start < chunk.length) {
+      // An answer that arrives with no request to match reads as not a call. The copy also checks
+      // the structure of the answer, so a line out of step is at worst left unchanged.
+      this.#line ??= this.#expected.shift() ? "hold" : "pass";
+      const newline = chunk.indexOf(NEWLINE, start);
+      const end = newline < 0 ? chunk.length : newline + 1;
+      const piece = chunk.subarray(start, end);
+      start = end;
+      if (this.#line === "pass") {
+        this.push(piece);
+      } else {
+        this.#held.push(piece);
+        this.#heldBytes += piece.length;
+        if (this.#heldBytes > MAX_ANSWER_LINE_BYTES) {
+          this.#release(false);
+          this.#line = "pass";
+        }
+      }
+      if (newline >= 0) {
+        if (this.#line === "hold") this.#release(true);
+        this.#line = null;
+      }
+    }
+    callback();
+  }
+
+  override _flush(callback: TransformCallback): void {
+    // A last answer with no newline is not a whole line, so it goes on as the daemon sent it.
+    this.#release(false);
+    callback();
+  }
+
+  #release(whole: boolean): void {
+    if (this.#heldBytes === 0) return;
+    const line = Buffer.concat(this.#held, this.#heldBytes);
+    this.#held = [];
+    this.#heldBytes = 0;
+    this.push(whole ? withCopy(line) : line);
+  }
+}
+
+/** One whole answer line, ending in its newline, with the copy added when there is one to add. */
+function withCopy(line: Buffer): Buffer {
+  // Most answers have no structured result, and this search costs far less than the parse.
+  if (!line.includes('"structuredContent"')) return line;
+  const rewritten = rewriteCallAnswer(line.toString("utf8", 0, line.length - 1));
+  return rewritten === null ? line : Buffer.from(`${rewritten}\n`, "utf8");
+}
+
+/** Keeps the last action an agent asked for, and forwards everything else unchanged. */
 export class CuaDriverActionTap {
   #server: Server | null = null;
   #sockets = new Set<Socket>();
@@ -211,6 +302,7 @@ export class CuaDriverActionTap {
     const daemon = connect(upstream);
     this.#sockets.add(client);
     this.#sockets.add(daemon);
+    const answers = new CallAnswerLines();
     const end = () => {
       this.#sockets.delete(client);
       this.#sockets.delete(daemon);
@@ -220,10 +312,15 @@ export class CuaDriverActionTap {
     client.on("error", end);
     daemon.on("error", end);
     client.on("close", end);
-    daemon.on("close", end);
-    // The answers are read by nobody, so they are piped: the stream keeps the back pressure of a
-    // screenshot that the agent reads slower than the daemon writes it.
-    daemon.pipe(client);
+    // A daemon that closes cleanly can still have its last answer inside `answers`, held while the
+    // agent reads slowly. The pipe ends the client after that answer, and the client's own close
+    // then ends both; destroying the client here would cut the answer off.
+    daemon.on("close", (hadError: boolean) => {
+      if (hadError) end();
+    });
+    // Piped, so the stream keeps the back pressure of a screenshot that the agent reads slower than
+    // the daemon writes it.
+    daemon.pipe(answers).pipe(client);
     let pending = "";
     let skipping = false;
     client.on("data", (chunk: Buffer) => {
@@ -233,8 +330,12 @@ export class CuaDriverActionTap {
       while (newline >= 0) {
         const line = pending.slice(0, newline);
         pending = pending.slice(newline + 1);
-        if (!skipping) {
-          const { action, pointer } = readRequest(line, this.#now());
+        // Told before the daemon can answer, because this runs in the same turn as the write above.
+        if (skipping) {
+          answers.expect(false);
+        } else {
+          const { call, action, pointer } = readRequest(line, this.#now());
+          answers.expect(call);
           if (action) this.#action = action;
           if (pointer) this.#pointer = pointer;
         }
