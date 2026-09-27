@@ -8,6 +8,21 @@ export const messages = {
     "Cet ordinateur n’a pas de stockage sécurisé : impossible d’enregistrer une clé d’API ou un en-tête. Supprimez-les, ou utilisez un point de terminaison sans identifiants.",
   "error.provider.endpointDuplicate":
     "Un point de terminaison avec cet ID de fournisseur est déjà enregistré. Supprimez-le d’abord, ou utilisez un autre ID.",
+  "error.provider.endpointNotSaved": "Ce point de terminaison n’est pas enregistré. Actualisez la liste et réessayez.",
+  "error.provider.endpointKeyForNewAddress":
+    "L’adresse a un nouvel hôte ou un nouveau port. Saisissez de nouveau la clé d’API et les en-têtes, pour que ceux enregistrés ne lui soient pas envoyés.",
+  "error.provider.discoveryTimeout": "{host} n’a pas répondu à temps.",
+  "error.provider.discoveryUnreachable": "OpenBot n’a pas pu se connecter à {host}.",
+  "error.provider.discoveryRedirect": "{host} a envoyé une redirection. Saisissez l’adresse finale du serveur.",
+  "error.provider.discoveryRefused": "{host} a refusé la requête. Vérifiez la clé d’API et les en-têtes.",
+  "error.provider.discoveryHttp": "{host} a répondu avec HTTP {status}.",
+  "error.provider.discoveryTooLarge": "La liste des modèles de {host} est trop volumineuse.",
+  "error.provider.discoveryInvalid": "{host} n’a pas envoyé de liste de modèles compatible OpenAI.",
+  "error.provider.detectionSettingsReadOnly":
+    "Les réglages de détection ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
+  "error.provider.detectionEntryInvalid":
+    "Une adresse doit être une URL http:// ou https:// sans mot de passe, et un dossier doit être un chemin absolu.",
+  "error.provider.detectionEntriesTooMany": "Il y a trop d’adresses ou de dossiers.",
   "error.provider.credentialFileUnreadable": "Le fichier d’identifiants du fournisseur est illisible.",
   "error.provider.credentialFileTooLarge": "Le fichier d’identifiants du fournisseur est trop volumineux.",
   "error.provider.archiveSpecialFile":
@@ -154,4 +169,33 @@ export const messages = {
   "error.provider.acpSignInTimedOut": "La connexion a expiré.",
   "error.provider.acpSignInStopped": "La connexion s’est arrêtée avant la fin.",
   "error.provider.acpSignInFailed": "La connexion n’a pas abouti.",
+  "error.provider.customAgentIdInvalid":
+    "Un ID d’agent ne peut contenir que des lettres minuscules, des chiffres ou `-`, et ne peut pas être l’ID d’un fournisseur intégré.",
+  "error.provider.customAgentEnvInvalid":
+    "Un nom de variable ne peut contenir que des lettres, des chiffres ou `_`, et ne doit pas commencer par un chiffre. Utilisez chaque nom une seule fois, 16 noms au plus.",
+  "error.provider.customAgentCommandInvalid":
+    "La commande doit être un chemin complet, un chemin qui commence par ~/, ou un nom de commande sans espaces.",
+  "error.provider.customAgentArgsInvalid":
+    "Un argument ne peut pas contenir de saut de ligne. Utilisez au plus 32 arguments.",
+  "error.provider.customAgentWindowsScript":
+    "Une commande .cmd ou .bat n’accepte que des lettres, des chiffres et - _ . , : = @ + / \\ dans ses arguments.",
+  "error.provider.customAgentNotFound": "OpenBot ne trouve pas {command}. Saisissez le chemin complet de la commande.",
+  "error.provider.customAgentCheckTimedOut": "L’agent n’a pas répondu en 20 secondes.",
+  "error.provider.customAgentCheckStopped": "L’agent s’est arrêté avant de répondre.",
+  "error.provider.customAgentProtocolVersion":
+    "L’agent utilise la version {version} d’ACP. OpenBot utilise la version 1.",
+  "error.provider.customAgentCheckFailed": "L’agent n’a pas répondu comme un agent ACP.",
+  "error.provider.customAgentRemoveBusy":
+    "Attendez la fin du tour actif et de la file d’attente avant de supprimer cet agent personnalisé.",
+  "error.provider.customAgentNone": "Aucun agent personnalisé n’est enregistré.",
+  "error.provider.customAgentMissing": "Cet agent personnalisé n’est plus enregistré. Choisissez un autre modèle.",
+  "error.provider.customAgentSignIn": "Connectez-vous avec la commande propre à l’agent, puis réessayez.",
+  "error.provider.customAgentsReadOnly":
+    "Les agents personnalisés enregistrés ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
+  "error.provider.customAgentNoSecureStorage":
+    "Cet ordinateur n’a pas de stockage sécurisé : impossible d’enregistrer les valeurs d’environnement. Supprimez-les et réessayez.",
+  "error.provider.customAgentNotSaved":
+    "Cet agent personnalisé n’est pas enregistré. Actualisez la liste et réessayez.",
+  "error.provider.customAgentTooMany": "Vous pouvez enregistrer au plus {count} agents personnalisés.",
+  "error.provider.customAgentEnvValueMissing": "Saisissez une valeur pour {name}.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,6 +10,7 @@ export const messages = {
   "provider.custom.addLabel": "Ajouter un fournisseur personnalisé",
   "provider.custom.installLabel": "Installer un fournisseur personnalisé",
   "provider.endpointCount": { one: "{count} point de terminaison", other: "{count} points de terminaison" },
+  "provider.customAgentCount": { one: "{count} agent personnalisé", other: "{count} agents personnalisés" },
   "provider.manageEndpoints": {
     one: "Gérer {count} point de terminaison",
     other: "Gérer {count} points de terminaison",
@@ -72,6 +73,7 @@ export const messages = {
   "provider.codeLogin.closeLabel": "Fermer la connexion à {name}",
 
   "provider.picker.noEndpoints": "Aucun point de terminaison pour l’instant",
+  "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "Modèle de l’agent",
   "provider.picker.model": "Modèle",
   "provider.picker.title": "Choisir le modèle de l’agent",

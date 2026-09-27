@@ -10,6 +10,7 @@ export const messages = {
   "provider.custom.installLabel": "カスタムプロバイダーをインストール",
   // 日本語に単数複数の区別はないので、どの個数でも同じ形です。
   "provider.endpointCount": { other: "エンドポイント {count} 件" },
+  "provider.customAgentCount": { other: "カスタムエージェント {count} 件" },
   "provider.manageEndpoints": { other: "エンドポイント {count} 件を管理" },
   "provider.refresh": "再確認",
   "provider.refreshLabel": "プロバイダーを再確認",
@@ -63,6 +64,7 @@ export const messages = {
   "provider.codeLogin.closeLabel": "{name} へのログインを閉じる",
 
   "provider.picker.noEndpoints": "エンドポイントはまだありません",
+  "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "エージェントのモデル",
   "provider.picker.model": "モデル",
   "provider.picker.title": "エージェントのモデルを選択",

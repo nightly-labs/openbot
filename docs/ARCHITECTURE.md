@@ -1120,6 +1120,38 @@ sidebar references, and runtime events before encoding an older client's respons
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
 
+### Custom agents
+
+The provider `acp` runs ACP programs that the user saves. The model id names the agent:
+`<agentId>/<model>`, or `<agentId>/default` for an agent that lists no models. So `agent_json` does
+not change, and the agent id pattern (`CUSTOM_AGENT_ID_PATTERN`) has no `_`, which `isAgentModel`
+refuses. `src/backend/custom-acp-agents-client.ts` is one `AgentClient` over one `AcpAgentClient`
+for each agent, which it starts when a thread first needs it. It adds the prefix `<agentId>:` to
+session ids and to the ids of requests that an agent sends, and removes it on the way back, so two
+agents that give the same session id stay apart. A thread on another agent than its model reads as
+a missing session, and the runtime hands the conversation over as for a provider switch. When a
+process that serves a thread exits, the router exits, and every custom agent restarts.
+
+`src/main/custom-agent-store.ts` keeps `custom-agents.json`: env names in plain text and all env
+values in one `safeStorage` ciphertext. `list()` returns summaries; only the backend gets the
+values. `customAgents.check` starts the program in a temporary folder, sends `initialize` only, and
+stops its process group. The scan (`src/backend/acp-agent-scan.ts`) looks up the preset names on the
+login-shell `PATH` and in the user's folders, and never starts a file. The agents run confined with
+no state paths. Migration 23 adds `acp` to `projection_provider_sessions`. The host hides `acp`
+agents, models, status, and sign-in state from peers on every protocol, and the `customAgents` IPC
+group is local only.
+
+### Local detection and endpoint edit
+
+The `providerDetection` IPC group scans local model servers and custom agents, loads the models of
+an address, and reads and writes the Local detection settings
+(`src/main/provider-detection-settings-store.ts`). `customProviders.update` edits a saved endpoint:
+a key or headers that the renderer does not send stay as stored, and a new origin with a kept key is
+refused. Both are local only: `providerAdmin` and the Team API take `PeerCustomProviderChanges`
+(`list`, `save` and `remove`), so a peer cannot reach them. The renderer
+store (`features/custom-providers/stores/provider-detection-store.ts`) marks the found rows that are
+saved, and a joined host gets no detection and no Edit.
+
 ## Desktop server notifications
 
 Each desktop profile stores muted server IDs in `servers.json`. `RemoteServerStore` saves a

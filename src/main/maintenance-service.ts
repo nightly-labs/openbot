@@ -59,6 +59,7 @@ export async function exportOpenBotData(
           "Codex credentials",
           "OpenCode Go key",
           "custom provider API keys",
+          "custom agent environment values",
           "browser cookies",
           "agent workspace files",
         ],

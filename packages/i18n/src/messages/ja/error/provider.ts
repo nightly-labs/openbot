@@ -8,6 +8,22 @@ export const messages = {
     "このコンピューターには安全なストレージがないため、API キーやヘッダーを保存できません。それらを削除するか、認証情報が不要なエンドポイントを使用してください。",
   "error.provider.endpointDuplicate":
     "このプロバイダー ID のエンドポイントはすでに保存されています。先に削除するか、別の ID を使用してください。",
+  "error.provider.endpointNotSaved": "このエンドポイントは保存されていません。一覧を更新して、もう一度お試しください。",
+  "error.provider.endpointKeyForNewAddress":
+    "アドレスのホストまたはポートが変わりました。保存済みの API キーとヘッダーが新しいアドレスに送られないように、もう一度入力してください。",
+  "error.provider.discoveryTimeout": "{host} から時間内に応答がありませんでした。",
+  "error.provider.discoveryUnreachable": "OpenBot は {host} に接続できませんでした。",
+  "error.provider.discoveryRedirect":
+    "{host} がリダイレクトを返しました。サーバーの最終的なアドレスを入力してください。",
+  "error.provider.discoveryRefused": "{host} がリクエストを拒否しました。API キーとヘッダーを確認してください。",
+  "error.provider.discoveryHttp": "{host} が HTTP {status} で応答しました。",
+  "error.provider.discoveryTooLarge": "{host} のモデル一覧が大きすぎます。",
+  "error.provider.discoveryInvalid": "{host} は OpenAI 互換のモデル一覧を返しませんでした。",
+  "error.provider.detectionSettingsReadOnly":
+    "検出の設定は新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
+  "error.provider.detectionEntryInvalid":
+    "アドレスはパスワードを含まない http:// または https:// の URL に、フォルダーは絶対パスにしてください。",
+  "error.provider.detectionEntriesTooMany": "アドレスまたはフォルダーが多すぎます。",
   "error.provider.credentialFileUnreadable": "プロバイダーの認証情報ファイルを読み取れません。",
   "error.provider.credentialFileTooLarge": "プロバイダーの認証情報ファイルが大きすぎます。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
@@ -143,4 +159,33 @@ export const messages = {
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
+  "error.provider.customAgentIdInvalid":
+    "エージェント ID には英小文字、数字、`-` のみを使用してください。組み込みプロバイダーの ID は使用できません。",
+  "error.provider.customAgentEnvInvalid":
+    "変数名には英字、数字、`_` のみを使用し、数字で始めないでください。各名前は 1 回だけ、最大 16 個まで使用できます。",
+  "error.provider.customAgentCommandInvalid":
+    "コマンドは完全なパス、~/ で始まるパス、またはスペースを含まないコマンド名にしてください。",
+  "error.provider.customAgentArgsInvalid": "引数に改行は使用できません。引数は最大 32 個までです。",
+  "error.provider.customAgentWindowsScript":
+    ".cmd または .bat のコマンドの引数には、英字、数字、および - _ . , : = @ + / \\ のみを使用できます。",
+  "error.provider.customAgentNotFound":
+    "OpenBot は {command} を見つけられません。コマンドの完全なパスを入力してください。",
+  "error.provider.customAgentCheckTimedOut": "エージェントは 20 秒以内に応答しませんでした。",
+  "error.provider.customAgentCheckStopped": "エージェントは応答する前に停止しました。",
+  "error.provider.customAgentProtocolVersion":
+    "このエージェントは ACP バージョン {version} を使用しています。OpenBot はバージョン 1 を使用します。",
+  "error.provider.customAgentCheckFailed": "エージェントは ACP エージェントとして応答しませんでした。",
+  "error.provider.customAgentRemoveBusy":
+    "このカスタムエージェントを削除する前に、実行中のターンとキューが終わるまでお待ちください。",
+  "error.provider.customAgentNone": "保存されたカスタムエージェントはありません。",
+  "error.provider.customAgentMissing": "このカスタムエージェントは現在保存されていません。別のモデルを選んでください。",
+  "error.provider.customAgentSignIn": "エージェント自身のコマンドでサインインしてから、もう一度お試しください。",
+  "error.provider.customAgentsReadOnly":
+    "保存されたカスタムエージェントは新しいバージョンの OpenBot で書き込まれたか、ファイルを読み取れません。変更するには OpenBot を更新してください。",
+  "error.provider.customAgentNoSecureStorage":
+    "このコンピューターには安全なストレージがないため、環境変数の値を保存できません。値を削除して、もう一度お試しください。",
+  "error.provider.customAgentNotSaved":
+    "このカスタムエージェントは保存されていません。一覧を更新して、もう一度お試しください。",
+  "error.provider.customAgentTooMany": "保存できるカスタムエージェントは最大 {count} 個です。",
+  "error.provider.customAgentEnvValueMissing": "{name} の値を入力してください。",
 } as const satisfies PartialTranslation<typeof source>;

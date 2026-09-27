@@ -421,6 +421,33 @@ server keeps its login and session files in `~/.gemini`, or in `$GEMINI_HOME`. O
 read, copy, or upload these files. Google's terms apply: <https://antigravity.google/terms>.
 Gemini agents stay on this computer: OpenBot does not show them to team members.
 
+### Local model servers
+
+When Settings shows the AI providers tab, and once on the onboarding provider step, OpenBot looks
+for model servers on this computer. It sends `GET <address>/models` to
+`http://127.0.0.1:11434/v1` (Ollama), `http://127.0.0.1:1234/v1` (LM Studio), and each address you
+add under Local detection. These requests
+contain no key, header, conversation or file data, and OpenBot does not follow a redirect. A found
+server is only listed; OpenBot saves nothing until you select Add.
+
+When you add or edit an endpoint, Load models sends the key and headers you typed to that address.
+For a saved endpoint, OpenBot sends the stored key and headers only to the same origin as the saved
+address. Local detection can be turned off in Settings. Its switch, addresses, folders and hidden
+rows are in `openbot-provider-detection-v1.json` in the app profile.
+
+### Custom agents
+
+A custom agent is an ACP program that you name. OpenBot starts it as a local process, and prompts, attachments, and tool results go to that process. What the program sends
+to the network is its own choice. Check agent starts it once, sends only `initialize`, and stops it.
+To find agents, OpenBot looks up the names of known agents on your `PATH` and in the folders you
+add under Local detection. It does not start a file that it finds.
+
+The command, arguments, and environment names are in `custom-agents.json` in the app profile. The
+environment values are encrypted with the operating system's secret storage, go only to that
+process, and are not in a screen, log, data export, or diagnostics report; the data export lists
+them under `scope.excludes`. Custom agents stay on this computer: OpenBot does not show them to
+team members.
+
 ## Shared desktop channels
 
 Channel names, purposes, participating agents, linked conversation references, messages, tasks,
