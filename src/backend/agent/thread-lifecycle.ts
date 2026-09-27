@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   type AgentSummary,
   agentComputerUseEnabled,
+  agentProviderDescriptor,
   type McpServerConfig,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -316,6 +317,7 @@ export class ThreadLifecycle {
         runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
         approvalPolicy: "on-request",
         sandbox: codexSandboxMode(agent),
+        ...this.#workspaceOnlyParam(agent, client),
         ...this.#computerUseParam(agent, client),
         developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
         ephemeral: false,
@@ -476,6 +478,17 @@ export class ThreadLifecycle {
     return agentMcpServers(this.#mcpServers(), agentComputerUseEnabled(agent));
   }
 
+  /**
+   * A `tool-sandbox` provider (Claude) applies its own Workspace only sandbox, so it is told directly.
+   * Codex reads `sandbox`, and `ProviderRuntime` confines a `confined-process` provider.
+   */
+  #workspaceOnlyParam(agent: AgentSummary, client: AgentClient): { workspaceOnly?: true } {
+    return agentProviderDescriptor(client.provider).workspaceEnforcement === "tool-sandbox" &&
+      workspaceAccessEnforced(agent)
+      ? { workspaceOnly: true }
+      : {};
+  }
+
   /** Claude and the ACP clients read the servers themselves, so they are told to leave Computer Use out. */
   #computerUseParam(agent: AgentSummary, client: AgentClient): { computerUse?: false } {
     return client.provider === "codex" || agentComputerUseEnabled(agent) ? {} : { computerUse: false };
@@ -513,6 +526,7 @@ export class ThreadLifecycle {
       runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
       approvalPolicy: "on-request",
       sandbox: codexSandboxMode(agent),
+      ...this.#workspaceOnlyParam(agent, client),
       ...this.#computerUseParam(agent, client),
       developerInstructions: developerInstructions(agent, this.#store.sharedRoot, this.#memories.listFor(agent.id)),
       ...(client.provider === "codex" ? {} : { dynamicTools: [...BROWSER_DYNAMIC_TOOLS, OPENBOT_DYNAMIC_TOOLS] }),

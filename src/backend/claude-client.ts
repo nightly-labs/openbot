@@ -1254,7 +1254,7 @@ function readThreadConfig(params: unknown): ThreadConfig {
     persistSession: !isRecord(params) || params.persistSession !== false,
     profileGeneration: isRecord(params) && params.profileGeneration === true,
     computerUse: computerUseParam(params),
-    workspaceOnly: isRecord(params) && params.sandbox === "workspace-write",
+    workspaceOnly: isRecord(params) && params.workspaceOnly === true,
   };
 }
 
