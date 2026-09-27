@@ -3187,6 +3187,11 @@ a {
   --reading-accent: var(--openbot-logo-production);
   --reading-track: rgba(255, 255, 255, 0.1);
   --reading-glow: color-mix(in srgb, var(--reading-accent) 60%, transparent);
+  /* The header menu's motion. Its tokens live on .site-nav, out of reach here. */
+  --reading-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --reading-duration: 460ms;
+  --reading-quick: 300ms;
+  --reading-blur: 8px;
 }
 
 /* Narrow screens: a line across the top of the viewport. */
@@ -3236,7 +3241,7 @@ a {
     transform: translate(8px, -50%);
     transition:
       opacity 300ms ease,
-      transform var(--site-nav-duration) var(--site-nav-ease);
+      transform var(--reading-duration) var(--reading-ease);
   }
 
   .reading-progress[data-visible="true"] .reading-progress-rail,
@@ -3336,13 +3341,13 @@ a {
     text-overflow: ellipsis;
     white-space: nowrap;
     opacity: 0;
-    filter: blur(var(--site-nav-blur));
+    filter: blur(var(--reading-blur));
     transform: translateX(8px);
     transition:
       color 200ms ease,
       opacity 200ms ease,
       filter 200ms ease,
-      transform 240ms var(--site-nav-ease);
+      transform 240ms var(--reading-ease);
   }
 
   .reading-progress-link:focus-visible .reading-progress-label {
@@ -3373,8 +3378,8 @@ a {
     width: 2px;
     border-radius: 2px;
     transition:
-      width 300ms var(--site-nav-ease),
-      right 300ms var(--site-nav-ease),
+      width 300ms var(--reading-ease),
+      right 300ms var(--reading-ease),
       background-color 300ms ease;
   }
 
@@ -3432,9 +3437,21 @@ a {
     transform: none;
     transition:
       color 200ms ease,
-      opacity var(--site-nav-quick) ease calc(var(--reading-index, 0) * 18ms),
-      filter var(--site-nav-quick) ease calc(var(--reading-index, 0) * 18ms),
-      transform var(--site-nav-duration) var(--site-nav-ease) calc(var(--reading-index, 0) * 18ms);
+      opacity var(--reading-quick) ease calc(var(--reading-index, 0) * 18ms),
+      filter var(--reading-quick) ease calc(var(--reading-index, 0) * 18ms),
+      transform var(--reading-duration) var(--reading-ease) calc(var(--reading-index, 0) * 18ms);
+  }
+}
+
+/* The rules above name their own transitions, which outrank the global
+   reduced-motion rule, so the titles would still slide and blur in. */
+@media (prefers-reduced-motion: reduce) {
+  .reading-progress[data-visible] .reading-progress-line,
+  .reading-progress[data-visible] .reading-progress-rail,
+  .reading-progress[data-visible] .reading-progress-rail *,
+  .reading-progress[data-visible] .reading-progress-rail *::before,
+  .reading-progress[data-visible] .reading-progress-rail *::after {
+    transition: none;
   }
 }
 
