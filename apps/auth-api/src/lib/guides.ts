@@ -10,7 +10,7 @@
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 
-export const GUIDES_COLLECTION: ContentCollection = {
+export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   id: "guides",
   indexRoute: "/guides",
   articleRoute: "/guides/$slug",

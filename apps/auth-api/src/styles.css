@@ -1179,6 +1179,11 @@ a {
   vertical-align: -0.04em;
 }
 
+/* A provider and the comma after it, so that a line never starts with the comma. */
+.landing-provider-item {
+  white-space: nowrap;
+}
+
 .landing-provider-logo {
   width: 0.84em;
   height: 0.84em;
@@ -1662,17 +1667,52 @@ a {
   text-wrap: balance;
 }
 
+.landing-pricing-compare {
+  margin: 20px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.landing-pricing-compare a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--openbot-text-secondary);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.landing-pricing-compare a:hover,
+.landing-pricing-compare a:focus-visible {
+  color: var(--openbot-text-primary);
+}
+
+.landing-pricing-compare-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 160ms ease;
+}
+
+.landing-pricing-compare a:hover .landing-pricing-compare-arrow {
+  transform: translateX(2px);
+}
+
 .landing-pricing [data-revealed="false"] {
   opacity: 0;
 }
 
 .landing-pricing-eyebrow[data-revealed="true"],
-.landing-pricing-note[data-revealed="true"] {
+.landing-pricing-note[data-revealed="true"],
+.landing-pricing-compare[data-revealed="true"] {
   animation: landing-download-reveal 760ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .landing-pricing-note[data-revealed="true"] {
   animation-delay: 320ms;
+}
+
+.landing-pricing-compare[data-revealed="true"] {
+  animation-delay: 440ms;
 }
 
 /* The figure does not use the shared card reveal: the light arriving is the
@@ -1791,8 +1831,8 @@ a {
 
 .landing-footer-columns {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(40px, 6vw, 88px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(32px, 4vw, 56px);
   padding-top: 7px;
 }
 
@@ -2165,7 +2205,7 @@ a {
   }
 
   .landing-footer-columns {
-    max-width: 520px;
+    max-width: 680px;
   }
 
   .landing-footer-bottom {
@@ -2301,6 +2341,7 @@ a {
   }
 
   .landing-footer-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 32px;
   }
 
@@ -3130,6 +3171,979 @@ a {
   .post-media-toggle {
     transition: none;
     transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   /compare and /compare/<slug>.
+
+   A comparison is read as a set of answers, so the page is built from blocks
+   rather than prose: the two marks side by side over the artwork, the short
+   answer, a table, a pair of cards per topic, the questions, and the sources.
+   Each side keeps one accent the whole way down (`--compare-accent`), so a reader
+   can tell which column is which without reading the label again. OpenBot's is
+   its own lilac and the rival's is a quiet grey, so OpenBot is the side the eye
+   goes to. Where one side is better, the page marks it in green
+   (`--openbot-success`), with a check and a word, never with colour alone.
+   ------------------------------------------------------------------------- */
+
+.compare-page [data-side="openbot"] {
+  --compare-accent: var(--openbot-logo-production);
+}
+
+.compare-page [data-side="rival"] {
+  --compare-accent: var(--openbot-text-muted);
+}
+
+/* One centred column for the hero and every section under it. */
+.compare-article {
+  width: min(100%, 1160px);
+}
+
+.compare-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: clamp(28px, 4vw, 64px);
+  margin-top: clamp(20px, 3vw, 36px);
+}
+
+.compare-hero-copy {
+  min-width: 0;
+}
+
+.compare-eyebrow {
+  margin: 22px 0 0;
+  color: var(--openbot-text-dim);
+  font-family: var(--openbot-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.compare-title {
+  margin: 12px 0 0;
+  font-size: clamp(32px, 4vw, 54px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.compare-nowrap {
+  white-space: nowrap;
+}
+
+.compare-standfirst {
+  max-width: 48ch;
+  margin: 18px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.5vw, 18px);
+  line-height: 1.55;
+}
+
+.compare-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 7px;
+  margin-top: 20px;
+}
+
+.compare-meta a,
+.compare-sources-note a {
+  color: var(--openbot-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+/* The artwork frame, the same shape as the featured article on /news. The
+   gradient host inside carries the Firefox corner fix (see `.post-gradient`).
+
+   The frame itself only rises; the artwork and the plate fade on their own. The
+   plate is frosted, and Chromium paints no backdrop filter while an ancestor
+   fades or blurs (see `.site-panel-feature-badge`), so nothing that holds the
+   plate may animate its opacity or a filter. */
+.compare-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 19 / 10;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: 16px;
+  pointer-events: none;
+  animation: compare-rise 720ms cubic-bezier(0.22, 1, 0.36, 1) 160ms backwards;
+}
+
+.compare-stage-art {
+  animation: compare-fade 900ms cubic-bezier(0.22, 1, 0.36, 1) 160ms backwards;
+}
+
+/* One frosted plate holds both marks, split by a hairline with "vs" on it: two
+   brands side by side, not a scoreboard. The table below gives the score. */
+.compare-marks {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: clamp(20px, 2.4vw, 32px) clamp(22px, 3vw, 40px);
+  border-radius: 20px;
+  background: rgba(14, 14, 18, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  animation: compare-plate-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 320ms backwards;
+}
+
+.compare-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: clamp(96px, 9vw, 128px);
+  color: var(--openbot-text-primary);
+  animation: compare-mark-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 420ms backwards;
+}
+
+.compare-mark[data-side="rival"] {
+  --compare-from: 10px;
+}
+
+.compare-mark-logo {
+  width: clamp(44px, 5vw, 68px);
+  height: clamp(44px, 5vw, 68px);
+}
+
+.compare-mark-rival {
+  color: var(--openbot-text-primary);
+}
+
+.compare-mark-name {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: clamp(13px, 1.1vw, 15px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.compare-vs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  gap: 8px;
+  margin-inline: clamp(14px, 2.2vw, 32px);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.compare-vs::before,
+.compare-vs::after {
+  flex: 1;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  content: "";
+}
+
+/* Each mark moves in a little from its own side. No blur: a filter under the
+   plate would take its frosted backdrop away. */
+@keyframes compare-plate-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+}
+
+@keyframes compare-mark-in {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--compare-from, -10px), 0, 0);
+  }
+}
+
+@keyframes compare-rise {
+  from {
+    border-color: var(--openbot-transparent);
+    transform: translate3d(0, 16px, 0);
+  }
+}
+
+@keyframes compare-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.compare-section {
+  margin-top: clamp(56px, 7vw, 96px);
+}
+
+.compare-heading {
+  margin: 0;
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.compare-answer-text {
+  max-width: 62ch;
+  margin: 16px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(17px, 1.6vw, 20px);
+  line-height: 1.55;
+}
+
+.compare-glance-summary {
+  margin: 10px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 15px;
+}
+
+/* The plans an agent can run on, each with its provider's logo in its own colour
+   (`--openbot-provider-current`, from `data-provider` on the logo). Plain cards:
+   the logos are the colour on this part of the page. */
+.compare-plans-lead {
+  max-width: 62ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.4vw, 18px);
+  line-height: 1.6;
+}
+
+.compare-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-plan {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  column-gap: 14px;
+  row-gap: 3px;
+  padding: 16px 18px;
+  border: 1px solid var(--openbot-border);
+  border-radius: 14px;
+  background: var(--openbot-bg-surface);
+}
+
+.compare-plan-logo-frame {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.compare-plan-logo {
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+  fill: var(--openbot-provider-current);
+}
+
+.compare-plan-logo-custom {
+  fill: none;
+  color: var(--openbot-text-primary);
+}
+
+.compare-plan-name {
+  align-self: end;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.compare-plan-text {
+  color: var(--openbot-text-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.compare-plans-rival {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.compare-plans-rival strong {
+  color: var(--openbot-text-secondary);
+  font-weight: 600;
+}
+
+.compare-plans-rival-logo {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 0.12em;
+}
+
+/* What the two share, set apart between the table and the details. */
+.compare-intro {
+  max-width: 62ch;
+  margin: clamp(56px, 7vw, 96px) auto 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(17px, 1.6vw, 19px);
+  line-height: 1.7;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.compare-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 20px);
+  margin-top: 22px;
+}
+
+/* A card per side. The accent is a soft light from the top corner and a short
+   line on the top edge: enough to tell the sides apart, not enough to shout. */
+.compare-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(20px, 2.2vw, 28px);
+  border: 1px solid var(--openbot-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in srgb, var(--compare-accent) 9%, var(--openbot-transparent)),
+      var(--openbot-transparent) 60%
+    ),
+    var(--openbot-bg-surface);
+}
+
+.compare-card[data-better] {
+  border-color: color-mix(in srgb, var(--compare-accent) 34%, var(--openbot-border));
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--compare-accent) 16%, var(--openbot-transparent)),
+      var(--openbot-transparent) 62%
+    ),
+    var(--openbot-bg-surface);
+}
+
+.compare-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: clamp(20px, 2.2vw, 28px);
+  width: 44px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--compare-accent);
+  opacity: 0.8;
+}
+
+.compare-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+}
+
+.compare-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.compare-side-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-side-logo {
+  width: 22px;
+  height: 22px;
+}
+
+.compare-card-text {
+  margin: 14px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.compare-choice-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.compare-choice-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.compare-choice-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.15em;
+  color: var(--openbot-success);
+  stroke-width: 2.6;
+}
+
+.compare-choice-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0.6em 5px 0;
+  border-radius: 50%;
+  background: var(--openbot-text-dim);
+}
+
+.compare-better-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-success) 14%, var(--openbot-transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-success) 30%, var(--openbot-transparent));
+  color: var(--openbot-success-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.compare-better-badge-icon {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.8;
+}
+
+.compare-table-frame {
+  margin-top: 22px;
+  overflow-x: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: 16px;
+  background: var(--openbot-bg-surface);
+}
+
+.compare-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 16px clamp(14px, 1.8vw, 22px);
+  vertical-align: top;
+}
+
+.compare-table thead th {
+  border-bottom: 1px solid var(--openbot-border-strong);
+  background: var(--openbot-bg-surface-raised);
+  color: var(--openbot-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compare-table thead th:first-child {
+  width: 24%;
+}
+
+.compare-table-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compare-table-logo {
+  width: 22px;
+  height: 22px;
+}
+
+/* OpenBot's column is lit the whole way down, the way a pricing table marks the
+   plan it recommends. */
+.compare-table thead th[data-side="openbot"] {
+  box-shadow: inset 0 2px 0 var(--compare-accent);
+}
+
+.compare-table [data-side="openbot"] {
+  background: color-mix(in srgb, var(--compare-accent) 5%, var(--openbot-transparent));
+}
+
+.compare-table td[data-better] {
+  color: var(--openbot-text-primary);
+}
+
+.compare-better-mark {
+  display: grid;
+  float: left;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 1px 9px 0 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--openbot-success) 18%, var(--openbot-transparent));
+  color: var(--openbot-success);
+}
+
+.compare-better-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+}
+
+.compare-table tbody tr + tr {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.compare-table tbody th {
+  color: var(--openbot-text-primary);
+  font-weight: 500;
+}
+
+.compare-table td {
+  color: var(--openbot-text-secondary);
+}
+
+.compare-topic {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.compare-topic-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--openbot-text-muted);
+}
+
+.compare-faq-list {
+  interpolate-size: allow-keywords;
+  margin-top: 18px;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.compare-faq-item {
+  border-bottom: 1px solid var(--openbot-border);
+}
+
+/* The panel grows to its own height where the browser can animate to `auto`;
+   elsewhere it opens at once, which is what a `details` does anyway. */
+.compare-faq-item::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--openbot-duration-normal) var(--openbot-ease-out),
+    content-visibility var(--openbot-duration-normal) allow-discrete;
+}
+
+.compare-faq-item[open]::details-content {
+  block-size: auto;
+}
+
+.compare-faq-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 2px;
+  cursor: pointer;
+  color: var(--openbot-text-primary);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  list-style: none;
+}
+
+.compare-faq-question::-webkit-details-marker {
+  display: none;
+}
+
+.compare-faq-question:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.compare-faq-chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--openbot-text-muted);
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.compare-faq-item[open] .compare-faq-chevron {
+  transform: rotate(180deg);
+}
+
+.compare-faq-answer {
+  max-width: 70ch;
+  margin: 0;
+  padding: 0 2px 20px;
+  color: var(--openbot-text-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.compare-sources-note {
+  max-width: 68ch;
+  margin: 14px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.compare-sources-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.compare-sources-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.compare-sources-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--openbot-text-dim);
+}
+
+/* Scroll reveals. The heading leads; the parts under it follow in reading order,
+   and the table rows and questions sweep in one by one. */
+.compare-section[data-revealed="false"] > *,
+.compare-section[data-revealed="false"] .compare-table tbody tr,
+.compare-section[data-revealed="false"] .compare-plan,
+.compare-section[data-revealed="false"] .compare-faq-item {
+  opacity: 0;
+}
+
+.compare-section[data-revealed="true"] > * {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.compare-section[data-revealed="true"] > :nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.compare-section[data-revealed="true"] > :nth-child(n + 3) {
+  animation-delay: 180ms;
+}
+
+.compare-section[data-revealed="true"] .compare-pair > :nth-child(2) {
+  animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: 200ms;
+}
+
+.compare-section[data-revealed="true"] .compare-table tbody tr,
+.compare-section[data-revealed="true"] .compare-plan,
+.compare-section[data-revealed="true"] .compare-faq-item {
+  animation: landing-download-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(160ms + var(--compare-index, 0) * 70ms);
+}
+
+/* /compare */
+.compare-index-hero {
+  position: relative;
+  isolation: isolate;
+  padding: clamp(28px, 5vw, 72px) 0 clamp(8px, 2vw, 24px);
+  text-align: center;
+}
+
+.compare-index-hero .landing-hero-grid {
+  z-index: -1;
+}
+
+.compare-index-hero .compare-eyebrow {
+  margin-top: 0;
+}
+
+.compare-index-title {
+  margin: 12px 0 0;
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+}
+
+.compare-index-description {
+  max-width: 56ch;
+  margin: 18px auto 0;
+  color: var(--openbot-text-secondary);
+  font-size: clamp(16px, 1.5vw, 18px);
+  line-height: 1.55;
+}
+
+/* Cards keep one width and the row is centred, so one comparison sits in the
+   middle of the page rather than in the left half of it. */
+.compare-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 560px));
+  justify-content: center;
+  gap: clamp(18px, 2vw, 26px);
+  margin-top: clamp(32px, 4vw, 56px);
+}
+
+.compare-index-card {
+  display: block;
+  min-width: 0;
+}
+
+.compare-index-card:focus-visible {
+  border-radius: 20px;
+  outline: 3px solid var(--openbot-border-focus);
+  outline-offset: 4px;
+}
+
+.compare-index-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 19 / 10;
+  overflow: hidden;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+.compare-marks-small {
+  padding: clamp(16px, 1.8vw, 24px) clamp(18px, 2.2vw, 28px);
+  border-radius: 16px;
+}
+
+.compare-marks-small .compare-mark {
+  min-width: clamp(56px, 6vw, 80px);
+}
+
+.compare-marks-small .compare-vs {
+  margin-inline: clamp(10px, 1.6vw, 22px);
+}
+
+.compare-marks-small .compare-mark-logo {
+  width: clamp(32px, 3.4vw, 44px);
+  height: clamp(32px, 3.4vw, 44px);
+}
+
+.compare-index-copy {
+  padding: 16px 2px 0;
+}
+
+.compare-index-card-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: clamp(18px, 1.7vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.compare-index-card-description {
+  margin: 8px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.compare-index-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--openbot-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.compare-index-card-arrow {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* The card only rises, and its parts fade one by one, for the reason given at
+   `.compare-stage`: the card holds a frosted plate. */
+.compare-index-grid[data-revealed="false"] .compare-index-card :is(.post-gradient, .compare-marks),
+.compare-index-grid[data-revealed="false"] .compare-index-copy {
+  opacity: 0;
+}
+
+.compare-index-grid[data-revealed="true"] .compare-index-card {
+  --compare-delay: calc(160ms + var(--compare-index, 0) * 80ms);
+  animation: compare-rise 720ms cubic-bezier(0.22, 1, 0.36, 1) var(--compare-delay) backwards;
+}
+
+.compare-index-grid[data-revealed="true"] .compare-index-card :is(.post-gradient, .compare-marks),
+.compare-index-grid[data-revealed="true"] .compare-index-copy {
+  animation: compare-fade 720ms cubic-bezier(0.22, 1, 0.36, 1) var(--compare-delay) backwards;
+}
+
+@media (max-width: 900px) {
+  .compare-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compare-plans-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  /* Two narrow columns: the logo goes over the name. */
+  .compare-plans-grid {
+    gap: 10px;
+  }
+
+  .compare-plan {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .compare-plan-logo-frame {
+    grid-row: auto;
+    margin-bottom: 10px;
+  }
+
+  .compare-pair,
+  .compare-sources-list,
+  .compare-index-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Too narrow for three columns: each topic takes its own line, and the two
+     values sit side by side under it, below the two brand headers. The elements
+     stay a table, so a screen reader still reads a topic with its two cells. */
+  .compare-table {
+    display: block;
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .compare-table thead,
+  .compare-table tbody {
+    display: block;
+  }
+
+  .compare-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Out of the grid but still in the table, so the brand headers keep their
+     columns: removed, "OpenBot" would head the topic column. */
+  .compare-table thead th:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    padding: 0;
+  }
+
+  .compare-table th,
+  .compare-table td {
+    padding: 12px 14px;
+  }
+
+  .compare-table tbody th {
+    grid-column: 1 / -1;
+    padding-bottom: 2px;
+  }
+
+  .compare-table td {
+    padding-top: 6px;
+  }
+
+  .compare-mark {
+    min-width: 0;
+    gap: 8px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .compare-meta a:hover,
+  .compare-sources-note a:hover,
+  .compare-sources-list a:hover {
+    color: var(--openbot-text-primary);
+  }
+
+  .compare-faq-question:hover .compare-faq-chevron {
+    color: var(--openbot-text-primary);
+  }
+
+  .compare-index-card:hover .compare-index-card-arrow {
+    transform: translateX(3px);
+  }
+
+  .compare-index-card:hover .compare-index-card-title {
+    color: var(--openbot-text-secondary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Named one by one for the reason given in the post block above: an attribute
+     selector outranks the global `*` escape. */
+  .compare-stage,
+  .compare-stage-art,
+  .compare-marks,
+  .compare-mark,
+  .compare-section[data-revealed] > *,
+  .compare-section[data-revealed] .compare-pair > :nth-child(n),
+  .compare-section[data-revealed] .compare-table tbody tr,
+  .compare-section[data-revealed] .compare-plan,
+  .compare-section[data-revealed] .compare-faq-item,
+  .compare-index-grid[data-revealed] .compare-index-card,
+  .compare-index-grid[data-revealed] .compare-index-card :is(.post-gradient, .compare-marks),
+  .compare-index-grid[data-revealed] .compare-index-copy {
+    opacity: 1;
+    animation: none;
+  }
+
+  .compare-faq-item::details-content,
+  .compare-faq-chevron,
+  .compare-index-card-arrow {
+    transition: none;
   }
 }
 

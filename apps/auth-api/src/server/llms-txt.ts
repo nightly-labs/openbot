@@ -1,0 +1,67 @@
+// `/llms.txt` (llmstxt.org): the site as one short Markdown file, for an assistant
+// that answers a question about OpenBot. Built from the same registries as the
+// sitemap, so a new article or comparison is in it with no edit here.
+
+import { COMPARISONS } from "../content/compare";
+import { OPENBOT_PLANS } from "../content/compare/comparison";
+import { CONTENT_COLLECTIONS } from "../lib/content";
+import { articleUrl, collectionIndexUrl } from "../lib/content-collection";
+import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "../lib/landing-links";
+import { PLUGINS_DESCRIPTION, pluginIndexUrl } from "../lib/plugins";
+import { OPENBOT_SITE_DESCRIPTION, OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { FEED_CACHE_CONTROL } from "./content-feed";
+
+function absolute(path: string): string {
+  return new URL(path, OPENBOT_SITE_URL).href;
+}
+
+function llmsTxt(): string {
+  const lines = [
+    "# OpenBot",
+    "",
+    `> ${OPENBOT_SITE_DESCRIPTION}`,
+    "",
+    "OpenBot is a desktop app for macOS, Windows and Linux. Each agent has its own workspace, thread and history, and keeps them when you change its provider or restart the app. Agents can give work to other agents. Chats, files and workspaces stay on your computer; OpenBot has no server that holds them. The app is free for noncommercial use, and it works with no account. iPhone and Android apps connect to OpenBot on your own computer.",
+    "",
+    "## Models and plans",
+    "",
+    "OpenBot sells no model. Each agent uses a plan or a key you already have:",
+    "",
+    ...OPENBOT_PLANS.map((plan) => `- ${plan.name}: ${plan.plan}`),
+    "",
+    "## Download",
+    "",
+    `- [macOS](${absolute(OPENBOT_DOWNLOAD_LINKS.macos)}): macOS 13 or later, Apple silicon`,
+    `- [Windows](${absolute(OPENBOT_DOWNLOAD_LINKS.windows)}): Windows 10 or later`,
+    `- [Linux](${absolute(OPENBOT_DOWNLOAD_LINKS.linux)}): x64 AppImage`,
+    `- [Source code](${OPENBOT_LINKS.repository}): PolyForm Noncommercial 1.0.0`,
+    "",
+  ];
+
+  for (const collection of CONTENT_COLLECTIONS) {
+    lines.push(
+      `## ${collection.name}`,
+      "",
+      `${collection.indexDescription} [All](${collectionIndexUrl(collection)})`,
+      "",
+    );
+    for (const article of collection.articles) {
+      const answer = collection.id === "compare" ? COMPARISONS[article.slug]?.answer : undefined;
+      lines.push(`- [${article.title}](${articleUrl(collection, article.slug)}): ${answer ?? article.description}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Optional", "", `- [Plugins](${pluginIndexUrl()}): ${PLUGINS_DESCRIPTION}`, "");
+  return lines.join("\n");
+}
+
+export function llmsTxtResponse(): Response {
+  return new Response(llmsTxt(), {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": FEED_CACHE_CONTROL,
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}

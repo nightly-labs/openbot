@@ -1,7 +1,7 @@
 // The shape every writing section of the site shares: a list of articles, the
-// routes they sit on, and the words that wrap them. /news and /guides are two
-// values of this type, so the index page, the article page, the feed, the sitemap
-// entries and the baked artwork are written once and read twice.
+// routes they sit on, and the words that wrap them. /news, /guides and /compare
+// are values of this type, so the feed, the sitemap entries, the head tags and the
+// baked artwork are written once and read for each.
 //
 // This module deliberately holds no JSX and imports nothing from solid-js: the
 // build-time image generator runs in plain Bun, and pulling a renderer into that
@@ -10,7 +10,9 @@
 
 import { OPENBOT_SITE_URL } from "./site-metadata";
 
-export type CollectionId = "news" | "guides";
+export type CollectionId = "news" | "guides" | "compare";
+/** The collections whose articles are prose, drawn by the article page. */
+export type ProseCollectionId = Exclude<CollectionId, "compare">;
 
 export interface CollectionArticle {
   /** URL segment. Lowercase, hyphenated, never changed after publication. */
@@ -25,15 +27,15 @@ export interface CollectionArticle {
   author: string;
 }
 
-export interface ContentCollection {
-  id: CollectionId;
+export interface ContentCollection<Id extends CollectionId = CollectionId> {
+  id: Id;
   /**
    * The routes, spelled out rather than built from the id. A route the generated
    * tree does not hold is then a type error here, instead of a link that answers
    * 404 once someone clicks it.
    */
-  indexRoute: "/news" | "/guides";
-  articleRoute: "/news/$slug" | "/guides/$slug";
+  indexRoute: `/${Id}`;
+  articleRoute: `/${Id}/$slug`;
   /** Navigation label, and the index page's own heading. */
   name: string;
   /** The `<title>` of the index page. */

@@ -2,11 +2,11 @@
 // the mobile sheet shows the same sections in the same order, so the two can not
 // disagree about what the site holds.
 //
-// The collections come from the one list of collections, so a section that is
-// added reaches the header without it being edited. No JSX here, for the same
-// reason `content-collection.ts` holds none.
+// The collections come from `HEADER_COLLECTIONS`, the part of the one list of
+// collections that the header offers. No JSX here, for the same reason
+// `content-collection.ts` holds none.
 
-import { CONTENT_COLLECTIONS } from "./content";
+import { HEADER_COLLECTIONS } from "./content";
 import type { CollectionArticle, ContentCollection } from "./content-collection";
 import { PLUGIN_INDEX_ROUTE, SITE_PLUGINS, type SitePlugin } from "./plugins";
 
@@ -15,9 +15,11 @@ const PANEL_ARTICLE_COUNT = 4;
 /** Two columns of three. */
 const PANEL_PLUGIN_COUNT = 6;
 
+type HeaderCollectionId = (typeof HEADER_COLLECTIONS)[number]["id"];
+
 export interface ArticleNavigationSection {
   kind: "articles";
-  id: ContentCollection["id"];
+  id: HeaderCollectionId;
   label: string;
   /** One line under the panel, next to the link to the index. */
   summary: string;
@@ -39,13 +41,13 @@ export interface PluginNavigationSection {
 
 export type SiteNavigationSection = ArticleNavigationSection | PluginNavigationSection;
 
-const COLLECTION_COPY: Record<ContentCollection["id"], { summary: string; indexLabel: string }> = {
+const COLLECTION_COPY: Record<HeaderCollectionId, { summary: string; indexLabel: string }> = {
   news: { summary: "What shipped, and why it matters.", indexLabel: "All news" },
   guides: { summary: "Learn OpenBot one step at a time.", indexLabel: "All guides" },
 };
 
 export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
-  ...CONTENT_COLLECTIONS.map(
+  ...HEADER_COLLECTIONS.map(
     (collection): ArticleNavigationSection => ({
       kind: "articles",
       id: collection.id,

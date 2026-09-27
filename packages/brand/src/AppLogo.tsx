@@ -1,4 +1,5 @@
 import { createSignal, flush, onCleanup } from "solid-js";
+import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "./app-logo-shape";
 
 export type AppLogoAnimation = "none" | "blink" | "look-around" | "surprised";
 export type AppLogoVariant = "production" | "dev" | "preview";
@@ -91,7 +92,7 @@ export function AppLogo(props: AppLogoProps) {
       data-easter-egg={easterEgg() ? "party" : undefined}
       data-interactive={props.interactive ? "true" : undefined}
       data-variant={props.variant}
-      viewBox="0 0 240 240"
+      viewBox={`0 0 ${APP_LOGO_SIZE} ${APP_LOGO_SIZE}`}
       aria-hidden={props.interactive ? undefined : "true"}
       aria-label={props.interactive ? "Animate OpenBot logo" : undefined}
       role={props.interactive ? "button" : undefined}
@@ -101,18 +102,18 @@ export function AppLogo(props: AppLogoProps) {
       onPointerLeave={resetEyePosition}
       onPointerMove={handlePointerMove}
     >
-      <rect class="app-logo-background" width="240" height="240" rx="50" ry="50" />
+      <rect
+        class="app-logo-background"
+        width={APP_LOGO_SIZE}
+        height={APP_LOGO_SIZE}
+        rx={APP_LOGO_CORNER}
+        ry={APP_LOGO_CORNER}
+      />
       <g class="app-logo-eye-motion">
-        <polyline
-          class="app-logo-eye app-logo-eye-left"
-          points="43.55 93.61 64.69 81.41 36.48 108.04 79.67 83.11 35.93 122.88 91.58 90.74 38.9 132.69 97.66 98.76 42.44 138.88 100.43 105.4 46.9 143.83 101.97 112.04 55.08 149.51 101.83 122.52 73.01 152.43 94.14 140.23"
-        />
+        <polyline class="app-logo-eye app-logo-eye-left" points={APP_LOGO_EYE_POINTS.left} />
       </g>
       <g class="app-logo-eye-motion">
-        <polyline
-          class="app-logo-eye app-logo-eye-right"
-          points="145.65 93.61 166.79 81.41 140.83 101.52 175.58 81.46 138.3 109.53 183.18 83.63 137.55 117.43 189.67 87.33 139.67 129.39 197.88 95.78 142.92 136.32 201.52 102.48 149.03 143.86 204.07 112.08 159.14 150.37 203.51 124.75 169.28 152.61 199.82 134.98"
-        />
+        <polyline class="app-logo-eye app-logo-eye-right" points={APP_LOGO_EYE_POINTS.right} />
       </g>
     </svg>
   );

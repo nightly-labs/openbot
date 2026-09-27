@@ -25,8 +25,8 @@ export function ContentCallToAction() {
         Meet your first teammate
       </h2>
       <p class="post-cta-description">
-        Run Codex, Claude, and Grok side by side, each with its own workspace and context. Your work stays on your
-        computer.
+        Run Codex, Claude, Gemini, Grok or your own model with the plans you already pay for, each with its own
+        workspace and context. Your work stays on your computer.
       </p>
       <div class="post-cta-actions">
         <ButtonLink to="/" hash="download" variant="primary" size="lg" icon="download">

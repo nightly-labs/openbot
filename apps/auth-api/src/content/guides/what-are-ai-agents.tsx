@@ -116,6 +116,10 @@ export function WhatAreAIAgents() {
         <Link to="/guides/$slug" params={{ slug: "openbot-101" }}>
           OpenBot 101
         </Link>
+        . To see how this differs from an agent app that runs in the cloud, read{" "}
+        <Link to="/compare/$slug" params={{ slug: "grok-bot" }}>
+          OpenBot vs Grok Bot
+        </Link>
         .
       </p>
     </>

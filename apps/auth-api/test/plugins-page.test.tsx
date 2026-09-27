@@ -29,6 +29,8 @@ function renderPage(page: () => JSX.Element) {
     createRoute({ getParentRoute: () => rootRoute, path: "/guides" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/plugins" }),
     createRoute({ getParentRoute: () => rootRoute, path: "/plugins/$slug" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/compare" }),
+    createRoute({ getParentRoute: () => rootRoute, path: "/compare/$slug" }),
   ]);
   const router = createRouter({ routeTree: rootRoute });
   return render(() => <RouterContextProvider router={router}>{page}</RouterContextProvider>);

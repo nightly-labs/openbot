@@ -11,16 +11,19 @@ import {
   articleOgImageUrl,
   articleUrl,
   type CollectionArticle,
+  type ContentArtShape,
   type ContentCollection,
   collectionFeedUrl,
   collectionIndexUrl,
 } from "./content-collection";
 import { PLUGINS_DESCRIPTION, PLUGINS_TITLE, pluginIndexUrl, pluginUrl, type SitePlugin } from "./plugins";
 import {
+  OPENBOT_LOGO_URL,
   OPENBOT_SITE_TITLE,
   OPENBOT_SITE_URL,
   OPENBOT_SOCIAL_IMAGE_ALT,
   OPENBOT_SOCIAL_IMAGE_URL,
+  OPENBOT_X_HANDLE,
 } from "./site-metadata";
 
 /** The generated social cards. Matches what `content-images.ts` writes. */
@@ -52,6 +55,7 @@ export function collectionIndexHead(collection: ContentCollection, siteUrl: stri
       { property: "og:image:height", content: "900" },
       { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: collection.indexTitle },
       { name: "twitter:description", content: collection.indexDescription },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
@@ -77,7 +81,13 @@ function featuredArtworkPreload(collection: ContentCollection) {
   return [{ rel: "preload", as: "image" as const, href: articleArtPath(collection, featured.slug, "featured") }];
 }
 
-export function articleHead(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
+/** `artShape` is the frame under the title: a comparison draws its hero in the featured frame. */
+export function articleHead(
+  collection: ContentCollection,
+  article: CollectionArticle,
+  siteUrl: string,
+  artShape: ContentArtShape = "article",
+) {
   const url = articleUrl(collection, article.slug, siteUrl);
   const image = articleOgImageUrl(collection, article.slug, siteUrl);
   const alt = articleOgImageAlt(article.title);
@@ -89,6 +99,7 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
       { name: "description", content: article.description },
       { name: "author", content: article.author },
       { "script:ld+json": articleStructuredData(collection, article, siteUrl) },
+      { "script:ld+json": articleBreadcrumbData(collection, article, siteUrl) },
       { property: "og:type", content: "article" },
       { property: "og:site_name", content: "OpenBot" },
       { property: "og:locale", content: "en_US" },
@@ -105,6 +116,7 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
       { property: "article:author", content: article.author },
       { property: "article:section", content: collection.name },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: article.description },
       { name: "twitter:image", content: image },
@@ -120,7 +132,7 @@ export function articleHead(collection: ContentCollection, article: CollectionAr
       },
       // The same reason as on the index: this article's artwork is the first
       // thing under the title and it is a background, not an <img>.
-      { rel: "preload", as: "image" as const, href: articleArtPath(collection, article.slug, "article") },
+      { rel: "preload", as: "image" as const, href: articleArtPath(collection, article.slug, artShape) },
     ],
   };
 }
@@ -143,11 +155,30 @@ export function articleStructuredData(collection: ContentCollection, article: Co
       "@type": "Organization",
       name: "OpenBot",
       url: OPENBOT_SITE_URL,
-      logo: { "@type": "ImageObject", url: OPENBOT_SOCIAL_IMAGE_URL },
+      logo: { "@type": "ImageObject", url: OPENBOT_LOGO_URL, width: 512, height: 512 },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     isAccessibleForFree: true,
     url,
+  };
+}
+
+/** Home › collection › article, which search results show in place of the bare URL. */
+function articleBreadcrumbData(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
+  const trail = [
+    { name: "OpenBot", url: siteUrl },
+    { name: collection.name, url: collectionIndexUrl(collection, siteUrl) },
+    { name: article.title, url: articleUrl(collection, article.slug, siteUrl) },
+  ];
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
   };
 }
 
@@ -190,6 +221,7 @@ export function pluginsIndexHead(siteUrl: string) {
       { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
       { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: PLUGINS_TITLE },
       { name: "twitter:description", content: PLUGINS_DESCRIPTION },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
@@ -217,6 +249,7 @@ export function pluginHead(plugin: SitePlugin, siteUrl: string) {
       { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
       { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: OPENBOT_X_HANDLE },
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: plugin.tagline },
       { name: "twitter:image", content: OPENBOT_SOCIAL_IMAGE_URL },
