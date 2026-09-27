@@ -737,6 +737,45 @@ describe("MailboxStore", () => {
     expect(store.hasAgentMessageFromTurnTo("weather", "turn-weather", "other-agent")).toBe(false);
   });
 
+  it("holds teammate answers until every recipient of the request is done", async () => {
+    const request = await store.enqueue({
+      sender: { kind: "agent", agentId: "chief" },
+      recipientAgentIds: ["research", "builder", "launch"],
+      text: "One launch risk each.",
+    });
+    const [research, builder, launch] = request.deliveries.map((delivery) => delivery.id);
+    const answer = (agentId: string, text: string) =>
+      store.enqueue({
+        sender: { kind: "agent", agentId },
+        recipientAgentIds: ["chief"],
+        text,
+        replyToMessageId: request.messageId,
+      });
+    await store.markStarting(required(research));
+    await store.markRunning(required(research), "turn-research");
+    // An answer sent during the teammate's own turn is not held by that same turn.
+    const first = await answer("research", "Risk: stale docs.");
+    await store.markTerminal(required(research), "completed");
+    await store.markStarting(required(builder));
+    const second = await answer("builder", "Risk: no rollback.");
+    expect(store.nextQueued("chief")).toBeNull();
+
+    await store.markTerminal(required(builder), "completed");
+    expect(store.nextQueued("chief")).toBeNull();
+    const note = await store.enqueue({ sender: { kind: "user" }, recipientAgentIds: ["chief"], text: "Status?" });
+    // The person writes first: the answers that are in start with that message.
+    expect(store.nextQueued("chief")?.delivery.id).toBe(required(note.deliveries[0]).id);
+    expect(
+      store.repliesToStartWith(required(note.deliveries[0]).id).map((context) => context.delivery.messageId),
+    ).toEqual([first.messageId, second.messageId]);
+
+    store.cancelNow("launch", required(launch));
+    expect(store.unansweredRecipients(request.messageId)).toEqual(["launch"]);
+    const next = required(store.nextQueued("chief"));
+    const replyIds = [next, ...store.repliesToStartWith(next.delivery.id)].map((context) => context.delivery.messageId);
+    expect(replyIds).toEqual([first.messageId, second.messageId]);
+  });
+
   it("keeps a message that asks for no answer marked as one after a restart", async () => {
     const notice = await store.enqueue({
       sender: { kind: "agent", agentId: "weather" },

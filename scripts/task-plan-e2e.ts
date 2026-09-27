@@ -105,6 +105,11 @@ try {
   const research = waitingBlock.getByRole("listitem").filter({ hasText: "Research" });
   assert.match((await research.textContent()) ?? "", new RegExp(t("chat.awaiting.state.replied")));
   assert.match((await research.textContent()) ?? "", /All four sources check out/u);
+  // Chief reads the answers only when Sales Outbound is done too.
+  assert.doesNotMatch(
+    (await research.textContent()) ?? "",
+    new RegExp(t("chat.awaiting.readsNext", { name: "Chief" })),
+  );
   const sales = waitingBlock.getByRole("listitem").filter({ hasText: "Sales Outbound" });
   assert.match((await sales.textContent()) ?? "", new RegExp(t("chat.awaiting.state.working")));
 
