@@ -2,7 +2,9 @@
 
 import type { Comparison } from "./comparison";
 import { GROK_BOT_COMPARISON } from "./grok-bot";
+import { MUSE_COMPARISON } from "./muse";
 
 export const COMPARISONS: Readonly<Record<string, Comparison>> = {
   "grok-bot": GROK_BOT_COMPARISON,
+  muse: MUSE_COMPARISON,
 };

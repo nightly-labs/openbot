@@ -77,6 +77,7 @@ export const FOOTER_COLUMNS: readonly FooterColumn[] = [
     title: "Compare",
     links: [
       { label: "OpenBot vs Grok Bot", external: false, to: "/compare/$slug", slug: "grok-bot" },
+      { label: "OpenBot vs Muse", external: false, to: "/compare/$slug", slug: "muse" },
       { label: "All comparisons", external: false, to: "/compare" },
     ],
   },

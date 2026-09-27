@@ -21,6 +21,15 @@ export const COMPARE_COLLECTION: ContentCollection<"compare"> = {
   imageEyebrow: "OPENBOT · COMPARE",
   articles: publishedFirst([
     {
+      slug: "muse",
+      title: "OpenBot vs Muse: A Local Alternative to Meta's Muse",
+      description:
+        "OpenBot is a free, local alternative to Meta's Muse: run a team of AI agents on your own computer with the ChatGPT, Claude, Gemini or Grok plan you already pay for.",
+      publishedAt: "2026-09-27",
+      updatedAt: "2026-09-27",
+      author: NEWS_AUTHOR,
+    },
+    {
       // Published first in /news, as openbot-vs-grokbot. That URL answers with a
       // permanent redirect here (routes/news/openbot-vs-grokbot.ts).
       slug: "grok-bot",
