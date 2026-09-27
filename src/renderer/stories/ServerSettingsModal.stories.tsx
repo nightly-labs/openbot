@@ -1,5 +1,5 @@
 import type { HostStatus } from "@openbot/contracts/ipc";
-import { createSignal, onSettled } from "solid-js";
+import { createSignal, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
@@ -157,7 +157,9 @@ export const RemoteMember: Story = {
 
 function RemoteSetupStory(props: { settings: ServerSettingsModalProps }) {
   const previous = window.openbot;
-  const mock = createMockOpenBot({ hostStatus: props.settings.hostStatus ?? undefined });
+  // Storybook passes the args as a store, and the mock copies its options with `structuredClone`.
+  const hostStatus = props.settings.hostStatus;
+  const mock = createMockOpenBot(hostStatus ? { hostStatus: snapshot(hostStatus) } : {});
   window.openbot = mock.api;
   onSettled(() => () => {
     mock.dispose();
