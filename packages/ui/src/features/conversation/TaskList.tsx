@@ -12,7 +12,7 @@ export interface TaskListItem {
   label: string;
   state: TaskListItemState;
   /** The part of an active task that is complete, from 0 to 1. Other states ignore it. */
-  progress?: number;
+  progress?: number | undefined;
 }
 
 export interface TaskListProps {
@@ -97,7 +97,7 @@ export interface TaskListHeaderProps {
   total: number;
   title: string;
   /** The work that runs now. A closed list names it in place of the title. */
-  active?: { id: string; label: string };
+  active?: { id: string; label: string } | undefined;
   /** The count for assistive technology, such as "2 of 5 tasks done". */
   summary: string;
   /** The count that shows. The default is "{done}/{total}". */

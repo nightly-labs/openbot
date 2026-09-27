@@ -9,13 +9,13 @@ export type AwaitingReplyState = "asked" | "working" | "replied" | "failed";
 export interface AwaitingReplyItem {
   id: string;
   /** The agent that owes the reply. A remote or removed agent has no profile. */
-  agent?: AgentProfile;
+  agent?: AgentProfile | undefined;
   name: string;
   state: AwaitingReplyState;
   /** A line under the name, such as the start of a reply that waits in the queue. */
   preview?: string;
   /** A short note after the state, such as who reads the reply next. */
-  detail?: string;
+  detail?: string | undefined;
 }
 
 export interface AwaitingReplyListProps {
