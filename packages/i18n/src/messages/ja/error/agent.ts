@@ -22,6 +22,13 @@ export const messages = {
   "error.agent.setupCleanupFailed": "エージェントのセットアップに失敗し、不完全なエージェントを削除できませんでした。",
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderMismatch": "選択したモデルはそのプロバイダーのものではありません。",
+  "error.agent.modelNotListed": "モデル「{model}」は使用できません。使用できるモデル: {models}。",
+  "error.agent.providerNotListed":
+    "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
+  "error.agent.reasoningEffortUnsupported":
+    "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
+  "error.agent.noStartingModel":
+    "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、「プロバイダーと権限」でデフォルトのプロバイダーを変更してください。",
   "error.agent.waitBeforeProviderChange":
     "プロバイダーを変更する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.unknown": "不明なエージェントです: {id}",

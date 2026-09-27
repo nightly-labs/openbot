@@ -91,6 +91,7 @@ export const messages = {
   "error.provider.keyRequired": "Une clé de fournisseur est requise.",
   "error.provider.keyTooLong": "La clé de fournisseur est trop longue.",
   "error.provider.noModel": "Le fournisseur sélectionné n’a aucun modèle disponible.",
+  "error.provider.noModelNamed": "{provider} n’a aucun modèle disponible.",
   "error.provider.acpNoModels":
     "La CLI ACP n’a annoncé aucun modèle ACP. OpenBot ne choisira pas de modèle de secours au hasard.",
   "error.provider.endpointRemoveBusy":

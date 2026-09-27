@@ -1,5 +1,5 @@
 import type { AgentModelId, AgentModelOption, CreateAgentInput } from "@openbot/contracts/ipc";
-import { defaultProviderModel } from "@openbot/contracts/ipc";
+import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
@@ -60,13 +60,12 @@ export function creationModel(input: CreateAgentInput, models: AgentModelOption[
     models.find((candidate) => candidate.provider === provider && candidate.id === defaultProviderModel(provider)) ??
     models.find((candidate) => candidate.provider === provider) ??
     null;
-  if (!model) throw new Error(`${providerLabel(provider)} has no available model.`);
+  if (!model) throw new Error(sourceText("error.provider.noModelNamed", { provider: providerLabel(provider) }));
   return { provider, model };
 }
 
 /**
- * The provider and model a new agent starts on, or `null` when the preferred provider lists
- * nothing at all.
+ * The provider and model a new agent starts on, or `null` when no provider lists a model it can use.
  *
  * `startingModel` answers for one provider; this one chooses the provider too, which is what a
  * development default needs: the model it names belongs to OpenCode, and a preferred provider of
@@ -75,21 +74,33 @@ export function creationModel(input: CreateAgentInput, models: AgentModelOption[
  * That default stands in for the built-in one and nothing else. A preferred provider that is not
  * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
  * it is.
+ *
+ * A preferred provider that lists nothing -- Grok, which has no built-in list, before its CLI
+ * answers, or a CLI that answered with an empty catalog -- is not a reason to refuse the agent
+ * while another provider can run it. The others are tried in picker order, the same order the
+ * new-agent form uses, but only while they are installed, current and signed in: Codex and Claude
+ * list built-in models before any CLI answers, and an agent moved onto a provider that cannot
+ * start would not answer either.
  */
 export function startingChoice(
   models: AgentModelOption[],
   preference: ProviderPreference,
-  development: { enabled: boolean; providerAvailable: (provider: AgentProvider) => boolean },
+  context: { developmentDefaults: boolean; providerAvailable: (provider: AgentProvider) => boolean },
 ): ModelChoice | null {
   const developmentModel =
     preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null
       ? developmentStartingModel({
-          enabled: development.enabled,
+          enabled: context.developmentDefaults,
           models,
-          providerAvailable: development.providerAvailable,
+          providerAvailable: context.providerAvailable,
         })
       : null;
   if (developmentModel) return { provider: DEVELOPMENT_DEFAULT_PROVIDER, model: developmentModel };
-  const model = startingModel(preference.provider, models, preference);
-  return model ? { provider: preference.provider, model } : null;
+  const others = PICKER_PROVIDERS.filter((provider) => provider !== preference.provider);
+  for (const provider of [preference.provider, ...others]) {
+    if (provider !== preference.provider && !context.providerAvailable(provider)) continue;
+    const model = startingModel(provider, models, preference);
+    if (model) return { provider, model };
+  }
+  return null;
 }

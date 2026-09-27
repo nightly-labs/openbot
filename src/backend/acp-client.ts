@@ -731,7 +731,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       requestedThreadId ?? randomUUID(),
       dynamicTools,
       () => threadRef?.activeTurn?.id ?? null,
-      (call) => this.#callDynamicTool(call),
+      (call, signal) => this.#callDynamicTool(call, signal),
     );
     try {
       const connection = this.#requireConnection();
@@ -1154,15 +1154,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Object.keys(content).length > 0 ? { action: "accept", content } : { action: "decline" };
   }
 
-  async #callDynamicTool(params: {
-    threadId: string;
-    turnId: string;
-    callId: string;
-    namespace: string;
-    tool: string;
-    arguments: unknown;
-  }): Promise<DynamicToolResult> {
-    const result = await this.#serverRequests.call("item/tool/call", params);
+  async #callDynamicTool(
+    params: {
+      threadId: string;
+      turnId: string;
+      callId: string;
+      namespace: string;
+      tool: string;
+      arguments: unknown;
+    },
+    signal: AbortSignal,
+  ): Promise<DynamicToolResult> {
+    const result = await this.#serverRequests.call("item/tool/call", params, signal);
     if (!isDynamicToolResult(result)) throw new Error("OpenBot returned an invalid dynamic tool result.");
     return result;
   }

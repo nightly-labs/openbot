@@ -377,6 +377,24 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it("starts a new agent on another signed-in provider when the preferred one lists no model", async () => {
+    // Grok has no built-in model list, so a Grok CLI that is not ready lists nothing. Codex and
+    // Claude are not installed either, but still list their built-in models.
+    process.env.OPENBOT_CODEX_PATH = join(root, "missing-codex");
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { service: agentService } = await startService(root, {
+      preferredProvider: "grok",
+      client: (provider) => new FakeAgentClient(provider),
+    });
+    service = agentService;
+    await service.ensureProvider("opencode");
+
+    await expect(service.createAgent(CREATE_AGENT_INPUT)).resolves.toMatchObject({
+      provider: "opencode",
+      model: "opencode/example-model",
+    });
+  });
+
   it("detects a newly installed provider without disconnecting an available one", async () => {
     const codexPath = process.env.OPENBOT_CODEX_PATH;
     if (!codexPath) throw new Error("The fake Codex path is missing.");
@@ -1781,6 +1799,79 @@ describe.sequential("AgentService: queue", () => {
       created: context !== "rollback",
       deliveries: context === "rollback" ? 0 : 1,
     });
+  });
+
+  it("creates a teammate on a listed model and effort, and rejects the rest before it exists", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      hostedSites: null,
+    });
+    await service.initialize();
+    await service.sendMessage({ agentId: "chief", text: "Create a research teammate." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+
+    const listed = openBotToolPayload((await callOpenBotTool(client, threadId, "list_models", {})).result);
+    expect(listed).toMatchObject({
+      preferredProvider: "codex",
+      providers: expect.arrayContaining([
+        expect.objectContaining({
+          provider: "codex",
+          models: expect.arrayContaining([
+            expect.objectContaining({ id: "gpt-5.5", supportedReasoningEfforts: ["medium"] }),
+          ]),
+        }),
+      ]),
+    });
+
+    const created = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Terra",
+      description: "",
+      initialMessage: "Start.",
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "high",
+    });
+    expect(created.error).toBeUndefined();
+    expect(service.listAgents().find((agent) => agent.name === "Terra")).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "high",
+    });
+
+    const unknownModel = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Unknown model",
+      description: "",
+      initialMessage: "Start.",
+      provider: "codex",
+      model: "gpt-missing",
+    });
+    expect(unknownModel.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
+    expect(unknownModel.error?.message).toContain("gpt-5.6-terra");
+    const unsupportedEffort = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Unsupported effort",
+      description: "",
+      initialMessage: "Start.",
+      model: "gpt-5.5",
+      reasoningEffort: "high",
+    });
+    expect(unsupportedEffort.error?.message).toContain(
+      'Model "gpt-5.5" does not support reasoning effort "high". Supported efforts: medium.',
+    );
+    expect(
+      service.listAgents().filter((agent) => agent.name === "Unknown model" || agent.name === "Unsupported effort"),
+    ).toEqual([]);
   });
 
   it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {

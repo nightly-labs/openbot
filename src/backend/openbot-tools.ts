@@ -2,7 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
-import { createAgentToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
+import { createAgentToolSchema, listModelsToolSchema, updateProfileToolSchema } from "./agent/profile-tools";
 import {
   assignAgentSectionToolSchema,
   createSectionToolSchema,
@@ -97,6 +97,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: {},
   },
   {
+    name: "list_models",
+    description:
+      "List the models each provider offers for a new agent: id, name, reasoning efforts, and the default model that create_agent uses when you give only a provider. Read-only.",
+    shape: listModelsToolSchema.shape,
+  },
+  {
     name: "interrupt_agent",
     description:
       "Stop another agent's current turn when that turn works on your message, and cancel your messages still queued for it. The agent receives a notice from you with the reason. You cannot stop work that the user, a routine, a channel, or another agent started. To give new work, call send_message after this tool.",
@@ -105,7 +111,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_agent",
     description:
-      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. Use update_profile for an existing agent.",
+      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. Set provider, model, or reasoningEffort only when the user asks for them; call list_models first. Use update_profile for an existing agent.",
     shape: createAgentToolSchema.shape,
   },
   {

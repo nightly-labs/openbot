@@ -5,6 +5,26 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+### Changed
+
+- Check a hosted-site file path before the upload starts, with the same rule as the account server.
+  A path such as `api/…`, `server/…` or `node_modules/…`, or a path longer than 240 characters,
+  now shows a translated error.
+- Show the Grok sign-in text and the skill folder warning in French and Japanese.
+
+### Fixed
+
+- Show the new server logo in server settings before you save it. Before, the settings showed the
+  server initials.
+- Keep the focus in the server name menu. A click outside the menu now only closes it. Before, the
+  click also went to the page below.
+- Generate the profile of a Gemini agent without its MCP servers and tools, as for OpenCode and
+  Grok.
+- Remove the incomplete copy when a copy of a local agent fails. Before, the incomplete agent
+  stayed.
+- Keep cached remote attachments in their cache folder. Before, some attachment IDs could write a
+  file outside it.
+
 ## [0.22.0] - 2026-09-26
 
 ### Added

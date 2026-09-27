@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AVATAR_HUES, AVATAR_SEED_PATTERN } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, AGENT_REASONING_EFFORTS, AVATAR_HUES, AVATAR_SEED_PATTERN } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
 const profileFields = {
@@ -17,6 +17,27 @@ export const createAgentToolSchema = z
     avatarSeed: profileFields.avatarSeed.optional(),
     avatarHue: profileFields.avatarHue.optional(),
     initialMessage: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+    provider: z
+      .enum(AGENT_PROVIDERS)
+      .describe("Provider for the new agent. Omit to use the user's default. See list_models.")
+      .optional(),
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(INPUT_LIMITS.modelName)
+      .describe("Model id from list_models. Omit to use the provider's default model.")
+      .optional(),
+    reasoningEffort: z
+      .enum(AGENT_REASONING_EFFORTS)
+      .describe("Reasoning effort that the model supports, from list_models. Omit to use the model's default.")
+      .optional(),
+  })
+  .strict();
+
+export const listModelsToolSchema = z
+  .object({
+    provider: z.enum(AGENT_PROVIDERS).describe("Show only the models of this provider.").optional(),
   })
   .strict();
 

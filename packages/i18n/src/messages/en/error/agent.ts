@@ -20,6 +20,13 @@ export const messages = defineMessages("error.agent", {
   "error.agent.setupCleanupFailed": "Agent setup failed and the incomplete agent could not be removed.",
   "error.agent.modelUnavailable": "The selected agent model is unavailable.",
   "error.agent.modelProviderMismatch": "The selected model does not belong to that provider.",
+  "error.agent.modelNotListed": 'Model "{model}" is not available. Available models: {models}.',
+  "error.agent.providerNotListed":
+    "No {provider} model is available now. Call list_models to see the available models.",
+  "error.agent.reasoningEffortUnsupported":
+    'Model "{model}" does not support reasoning effort "{effort}". Supported efforts: {efforts}.',
+  "error.agent.noStartingModel":
+    "{provider} has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Providers & permissions.",
   "error.agent.waitBeforeProviderChange": "Wait for the active turn and queue to finish before changing provider.",
   "error.agent.unknown": "Unknown agent: {id}",
   "error.agent.queuedMessageCreateFailed": "Unable to create queued message.",
