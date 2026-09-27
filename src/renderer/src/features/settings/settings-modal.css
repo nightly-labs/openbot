@@ -275,6 +275,11 @@
   display: none;
 }
 
+.settings-provider-section {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
 .settings-modal-card:is(.ui-card, .ui-item-group) {
   width: 100%;
   display: grid;
