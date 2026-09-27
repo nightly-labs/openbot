@@ -8,8 +8,8 @@ type SandboxedAgent = Pick<AgentSummary, "access" | "provider" | "workspacePath"
  * shared folder and the temporary folders. Reads and the network stay open, as the Access setting
  * says. A write outside asks for approval, and `AttentionRegistry` always shows that approval.
  *
- * Codex takes the mode itself. The Claude client reads `workspace-write` and applies its own
- * sandbox (`claude-workspace-sandbox.ts`). A provider whose `workspaceEnforcement` is
+ * Codex takes the mode itself. Claude gets an explicit `workspaceOnly` flag instead and applies its
+ * own sandbox (`claude-workspace-sandbox.ts`). A provider whose `workspaceEnforcement` is
  * `confined-process` ignores it: `ProviderRuntime` runs such an agent in a sandboxed process of its
  * own (`process-confinement.ts`).
  */

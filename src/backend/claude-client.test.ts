@@ -1700,7 +1700,7 @@ it("keeps the workspace settings out of a Workspace only thread and still loads 
   );
   client.start();
   try {
-    await client.request("thread/start", { cwd, sandbox: "workspace-write" }, decodeThreadResponse);
+    await client.request("thread/start", { cwd, workspaceOnly: true }, decodeThreadResponse);
     const started = spawned.at(-1);
     expect(started?.settingSources).toEqual(["user"]);
     expect(started?.managedSettings).toEqual({ allowManagedHooksOnly: true });
