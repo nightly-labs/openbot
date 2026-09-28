@@ -18,6 +18,7 @@ describe("update preference store", () => {
     await expect(readUpdatePreference(join(root, "update.json"))).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
+      autoInstall: false,
     });
   });
 
@@ -25,14 +26,22 @@ describe("update preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, '{"version":1,"autoDownload":"yes"}\n');
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: true, allowRemoteUpdates: true });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: true,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
   });
 
   it("falls back to the default when the stored preference is not valid JSON", async () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, "{ truncated");
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: true, allowRemoteUpdates: true });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: true,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
   });
 
   it("persists the last of several overlapping writes", async () => {
@@ -48,8 +57,12 @@ describe("update preference store", () => {
       writeUpdatePreference(path, { autoDownload: false }),
     ]);
 
-    expect(results.at(-1)).toEqual({ autoDownload: false, allowRemoteUpdates: true });
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: false, allowRemoteUpdates: true });
+    expect(results.at(-1)).toEqual({ autoDownload: false, allowRemoteUpdates: true, autoInstall: false });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: false,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
     expect((await readdir(root)).filter((entry) => entry.endsWith(".tmp"))).toEqual([]);
   });
 
@@ -57,9 +70,17 @@ describe("update preference store", () => {
     const root = await temporaryRoot();
     const path = join(root, "update.json");
     await writeFile(path, '{"version":1,"autoDownload":false}\n');
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: false, allowRemoteUpdates: true });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: false,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
     await writeUpdatePreference(path, { allowRemoteUpdates: false });
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: false, allowRemoteUpdates: false });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: false,
+      allowRemoteUpdates: false,
+      autoInstall: false,
+    });
   });
 
   it("persists an opt-in over a stored opt-out", async () => {
@@ -69,8 +90,13 @@ describe("update preference store", () => {
     await expect(writeUpdatePreference(path, { autoDownload: true })).resolves.toEqual({
       autoDownload: true,
       allowRemoteUpdates: true,
+      autoInstall: false,
     });
-    await expect(readUpdatePreference(path)).resolves.toEqual({ autoDownload: true, allowRemoteUpdates: true });
+    await expect(readUpdatePreference(path)).resolves.toEqual({
+      autoDownload: true,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
   });
 });
 
