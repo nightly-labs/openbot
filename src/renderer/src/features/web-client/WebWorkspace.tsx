@@ -207,6 +207,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const compact = () => !phone() && layout.leftPanelCompact();
   /** The usage report of the connected host. As on desktop, it follows a host switch. */
   const [usage, setUsage] = createSignal<{ trigger: HTMLElement | null } | null>(null);
+  // The compatibility screen wins over the report, so its Retry stays in reach.
+  const usageOpen = () => usage() !== null && server() !== undefined && !blockedServer();
   /** Only the connected host answers, so another host is connected first, as for its settings. */
   async function openUsage(serverId: string, trigger: HTMLElement | null): Promise<void> {
     if (server()?.id !== serverId) {
@@ -266,13 +268,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return () => window.removeEventListener("keydown", toggleSearch);
   });
   async function searchAllMessages(query: string) {
+    if (workspace.state.status !== "online") return [];
     const page = await workspace.runtime.search(undefined, query);
     return page.results.map((result) => ({
       agentId: result.agentId,
       message: toAgentMessage(result.message, result.agentId),
     }));
   }
-  async function openSearchResult(agentId: string, messageId: string) {
+  /** Opens an agent at one message, for a global search result and a stored file's message. */
+  async function openMessage(agentId: string, messageId: string) {
     setMobilePane("conversation");
     await workspace.run(async () => {
       await select(agentId);
@@ -409,6 +413,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     beforeOpen: () => {
       setCreating(false);
       setUsage(null);
+      setMessageFocusRequest(null);
     },
     // On a small screen the sidebar pane covers the channel, and a covered message was not seen.
     canMarkRead: () => document.hasFocus() && mobilePane() === "conversation",
@@ -564,6 +569,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   async function select(id: string) {
     setCreating(false);
     setUsage(null);
+    // A remounted conversation must not scroll again to a message that was picked before.
+    setMessageFocusRequest(null);
     channels.close();
     await workspace.select(id);
   }
@@ -591,7 +598,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               if (host) await workspace.connect(host);
             })
           }
-          usageOpen={usage() !== null && server() !== undefined}
+          usageOpen={usageOpen()}
           usage={
             <Show when={server()}>
               {(target) => (
@@ -846,11 +853,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               },
                               onShowMessage: (agentId, messageId) => {
                                 serverSettings.setOpen(false);
-                                setMobilePane("conversation");
-                                void workspace.run(async () => {
-                                  await select(agentId);
-                                  await workspace.openSearchMessage(messageId);
-                                });
+                                void openMessage(agentId, messageId);
                               },
                             }
                           : undefined
@@ -868,13 +871,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   <GlobalSearch
                     open={true}
                     agents={workspace.profiles()}
-                    onSearchMessages={workspace.state.status === "online" ? searchAllMessages : undefined}
+                    onSearchMessages={searchAllMessages}
                     onOpenChange={setSearchOpen}
                     onSelectAgent={(id) => {
                       setMobilePane("conversation");
                       void select(id);
                     }}
-                    onSelectMessage={(agentId, messageId) => void openSearchResult(agentId, messageId)}
+                    onSelectMessage={(agentId, messageId) => void openMessage(agentId, messageId)}
                   />
                 </Loading>
               </Show>
@@ -1009,7 +1012,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               browserRuntime={workspace.runtime.browser}
               browserTabs={workspace.state.browserTabs}
               activeBrowserTabId={workspace.state.activeBrowserTabId}
-              browserVisibilitySuspended={workspace.state.status !== "online"}
+              browserVisibilitySuspended={workspace.state.status !== "online" || usageOpen()}
+              workspaceCovered={usageOpen()}
               browserControlState={workspace.state.browserControlState}
               server={server()}
               presence={workspace.state.presence ?? { serverId: server()?.id ?? null, members: [], updatedAt: "" }}

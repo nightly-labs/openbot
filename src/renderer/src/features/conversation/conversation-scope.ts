@@ -677,12 +677,16 @@ export function createConversationViewScope(props: ConversationProps) {
         lastHandledMessageFocusNonce = request.nonce;
         stickToLatest = false;
         // A page that loaded just before the request queued a scroll to the latest message. That scroll
-        // must not move the transcript away from the message the user picked.
+        // must not move the transcript away from the message the user picked, so it is cancelled and
+        // its other updates run here.
         if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
         if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
         latestScrollFrame = undefined;
         latestScrollSettleFrame = undefined;
+        updateVirtualScrollMargin();
         target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+        updateScrollFade();
+        updateUnreadDividerVisibility();
       });
     },
   );

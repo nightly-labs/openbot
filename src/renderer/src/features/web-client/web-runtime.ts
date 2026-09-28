@@ -160,11 +160,9 @@ export class WebHostIncompatibleError extends Error {
   readonly hostAppVersion: string;
   readonly hostProtocol: TeamProtocolSupportV1["protocol"];
 
-  constructor(support: TeamProtocolSupportV1) {
+  constructor(support: TeamProtocolSupportV1, code: WebHostIncompatibleError["code"]) {
     super(currentText().t("webClient.error.incompatible"));
-    this.code =
-      teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol) ??
-      "host_update_required";
+    this.code = code;
     this.hostAppVersion = support.appVersion;
     this.hostProtocol = support.protocol;
   }
@@ -519,8 +517,11 @@ export function createWebWorkspaceRuntime(
         if (!result.ok || disposed || current !== generation)
           throw new Error(currentText().t("webClient.error.connectionUnavailable"));
         const support = decodeTeamProtocolSupportV1(await request("GET", TEAM_API_ROUTES.compatibility));
-        if (support.protocol.minimum > TEAM_PROTOCOL_V3 || support.protocol.maximum < TEAM_PROTOCOL_V3)
-          throw new WebHostIncompatibleError(support);
+        const updateDirection = teamProtocolUpdateDirection(
+          { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
+          support.protocol,
+        );
+        if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
         capabilities = support.capabilities;
         if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
         return capabilities;

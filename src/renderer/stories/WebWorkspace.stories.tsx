@@ -51,11 +51,10 @@ const otherTabRuntime: WebRuntimeFactory = (...args) => ({
 const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
   ...createMockWebRuntime(...args),
   connect: async () => {
-    throw new WebHostIncompatibleError({
-      appVersion: "0.40.0",
-      protocol: { minimum: 1, maximum: 2 },
-      capabilities: [],
-    });
+    throw new WebHostIncompatibleError(
+      { appVersion: "0.40.0", protocol: { minimum: 1, maximum: 2 }, capabilities: [] },
+      "host_update_required",
+    );
   },
 });
 
