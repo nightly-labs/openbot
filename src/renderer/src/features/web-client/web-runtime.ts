@@ -17,6 +17,7 @@ import type {
   BrowserPreview,
   BrowserTab,
   ConversationPage,
+  ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
   DuplicateAgentResult,
@@ -39,7 +40,8 @@ import {
   isAgentStatus,
   isAgentSummary,
   isConversationMessage,
-  isConversationSnapshot,
+  isConversationReadState,
+  isConversationWithReadState,
   isQueuedMessageReceipt,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
@@ -98,6 +100,12 @@ export interface WebAdminRuntime {
   team: ServerAdminPort;
 }
 
+export interface WebFile {
+  name: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   browser: BrowserViewRuntime;
@@ -122,6 +130,8 @@ export interface WebWorkspaceRuntime {
   disconnect(): Promise<void>;
   listAgents(): Promise<AgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
+  /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
+  markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
   stop(agentId: string, turnId: string): Promise<void>;
   approve(input: RespondToApprovalInput): Promise<void>;
@@ -129,7 +139,11 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<{ name: string; mimeType: string; base64: string }>;
+  download(attachmentId: string): Promise<WebFile>;
+  /** A file under the host's shared folder. */
+  sharedFile(path: string): Promise<WebFile>;
+  /** A file in one agent's workspace on the host. */
+  workspaceFile(agentId: string, path: string): Promise<WebFile>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -566,6 +580,11 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
+    async markRead(id, throughMessageId) {
+      const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
+      if (!isConversationReadState(value)) throw new Error("The host returned an invalid read state.");
+      return value;
+    },
     async react(input) {
       await request("POST", TEAM_API_ROUTES.agent.reactions(input.agentId), {
         messageId: input.messageId,
@@ -625,7 +644,8 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      return value;
+      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
+      return { ...value, previewUrl: null };
     },
     async cancelUpload() {
       uploadGeneration += 1;
@@ -636,18 +656,16 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
     },
     async download(id) {
-      const value = await request("GET", TEAM_API_ROUTES.attachment(id));
-      if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
-      const base64 = requiredString(value, "base64");
-      if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      return {
-        name: requiredString(value, "name"),
-        mimeType: requiredString(value, "mimeType"),
-        base64,
-      };
+      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
+    },
+    async sharedFile(path) {
+      const query = new URLSearchParams({ path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`));
+    },
+    async workspaceFile(agentId, path) {
+      // The released URL spells the agent `botId`.
+      const query = new URLSearchParams({ botId: agentId, path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
     },
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));
@@ -727,6 +745,20 @@ export function createWebWorkspaceRuntime(
   };
 }
 
+function decodeWebFile(value: unknown): WebFile {
+  if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
+  const base64 = requiredString(value, "base64");
+  if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  return {
+    name: requiredString(value, "name"),
+    mimeType: requiredString(value, "mimeType"),
+    base64,
+  };
+}
+
 /** The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. */
 function hostRefusal(status: number | undefined, body: unknown): string | null {
   if (status === undefined || status < 400 || status >= 500) return null;
@@ -798,13 +830,13 @@ function decodeWebBrowserPreview(value: unknown): BrowserPreview {
 }
 
 function decodeWebConversationSnapshot(value: unknown): ConversationPage {
-  if (!isConversationSnapshot(value)) throw new Error("The host returned an invalid conversation.");
+  if (!isConversationWithReadState(value)) throw new Error("The host returned an invalid conversation.");
   return { ...value, references: {}, pageInfo: { hasOlder: false, olderCursor: null } };
 }
 
 export function decodeWebConversationPage(value: unknown): ConversationPage {
   if (
-    !isConversationSnapshot(value) ||
+    !isConversationWithReadState(value) ||
     !isDynamicRecord(value) ||
     !isDynamicRecord(value.pageInfo) ||
     typeof value.pageInfo.hasOlder !== "boolean" ||

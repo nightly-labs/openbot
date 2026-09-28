@@ -326,6 +326,8 @@ export function createServerConversationState() {
   const [activeChatSearchIndex, setActiveChatSearchIndex] = createSignal(-1);
   const [chatSearchMessageIds, setChatSearchMessageIds] = createSignal<string[]>([]);
   const [chatSearchTotal, setChatSearchTotal] = createSignal(0);
+  // The rows of the waiting block that the person closed. Row ids name the question message.
+  const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
 
   return {
     showComposerActions,
@@ -374,6 +376,8 @@ export function createServerConversationState() {
     setChatSearchMessageIds,
     chatSearchTotal,
     setChatSearchTotal,
+    hiddenAwaitingReplyIds,
+    setHiddenAwaitingReplyIds,
   };
 }
 

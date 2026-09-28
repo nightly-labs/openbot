@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
@@ -28,7 +29,9 @@ export function SheetSaveAction({
         icon={isIOS ? "checkmark" : undefined}
         accessibilityLabel={pending ? pendingLabel : label}
         onPress={() => {
-          if (dirty && canSave && !pending) onSave();
+          if (!dirty || !canSave || pending) return;
+          void haptics.impact("light");
+          onSave();
         }}
       >
         {isIOS ? label : "✓"}

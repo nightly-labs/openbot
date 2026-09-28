@@ -1,3 +1,8 @@
+import {
+  createAgentTemplateShareUrl,
+  OPENBOT_AGENT_TEMPLATE_PATH_PREFIX,
+  parseAgentTemplateUrl,
+} from "@openbot/contracts/agent-template-links";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import { parseMobileConnectUrl } from "@openbot/contracts/mobile-connect";
 import { createPluginShareUrl, parsePluginUrl } from "@openbot/contracts/plugin-links";
@@ -6,6 +11,7 @@ export type IncomingLink =
   | { kind: "invite"; url: string }
   | { kind: "pairing"; url: string }
   | { kind: "plugin"; url: string }
+  | { kind: "template"; url: string; templateId: string }
   | { kind: "invalid" };
 
 export function parseIncomingLink(value: string): IncomingLink {
@@ -14,6 +20,12 @@ export function parseIncomingLink(value: string): IncomingLink {
     return { kind: "invite", url: value };
   } catch {
     // The other link kinds have separate parsers and cannot weaken invitation validation.
+  }
+  try {
+    const templateId = parseAgentTemplateUrl(value);
+    return { kind: "template", url: createAgentTemplateShareUrl(templateId), templateId };
+  } catch {
+    // Not an agent link.
   }
   try {
     const url = new URL(value);
@@ -54,8 +66,9 @@ export function forgetIncomingLink(id: string | undefined): void {
   if (id) requests.delete(id);
 }
 
-export function pendingInvitationId(): string | undefined {
-  return [...requests].reverse().find(([, link]) => link.kind === "invite")?.[0];
+/** The newest invitation or agent link, which the screen opens again after sign-in. */
+export function pendingSignInLinkId(): string | undefined {
+  return [...requests].reverse().find(([, link]) => link.kind === "invite" || link.kind === "template")?.[0];
 }
 
 export function redirectIncomingLink(path: string): string {
@@ -64,7 +77,12 @@ export function redirectIncomingLink(path: string): string {
   if (/^exps?:\/\//u.test(path)) return path;
   if (path.startsWith("/") && !path.startsWith("//")) {
     const url = new URL(path, "https://openbot.run");
-    if (url.pathname !== "/join" && !url.pathname.startsWith("/plugins/")) return path;
+    if (
+      url.pathname !== "/join" &&
+      !url.pathname.startsWith("/plugins/") &&
+      !url.pathname.startsWith(OPENBOT_AGENT_TEMPLATE_PATH_PREFIX)
+    )
+      return path;
     path = url.toString();
   }
   return `/incoming-link?request=${rememberIncomingLink(parseIncomingLink(path))}`;

@@ -6,6 +6,7 @@ import { Pressable, View } from "react-native";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function AgentChatScreen() {
@@ -35,7 +36,11 @@ export function AgentChatScreen() {
       <Pressable
         accessibilityRole="button"
         className="min-h-12 flex-row items-center gap-2 rounded-full bg-control px-5"
-        onPress={() => (router.canGoBack() ? router.back() : router.replace("/connected"))}
+        onPress={() => {
+          void haptics.impact("soft");
+          if (router.canGoBack()) router.back();
+          else router.replace("/connected");
+        }}
       >
         <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
         <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>

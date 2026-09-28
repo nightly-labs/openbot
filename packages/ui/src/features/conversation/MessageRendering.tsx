@@ -239,26 +239,34 @@ export function MessageBody(props: {
       ? parseSelectionInstruction(props.message.body)
       : null,
   );
+  /* A finished image with no `previewUrl` (the web client) shows as a file card instead. */
+  const generatedImageShown = createMemo(() => {
+    if (!props.message.imageGeneration) return false;
+    const attachment = props.message.attachments?.[0];
+    return (
+      !attachment ||
+      Boolean(attachment.previewUrl) ||
+      imageGenerationStatus(props.message.streaming, props.message.status) !== "completed"
+    );
+  });
   const standaloneAttachments = createMemo(() => {
     const referencedIds = new Set(
       messageFileReferences(props.message.body, props.message.attachments ?? [])
         .filter((reference) => reference.kind === "attachment")
         .map((reference) => reference.attachment.id),
     );
-    const generatedAttachmentId = props.message.imageGeneration ? props.message.attachments?.[0]?.id : undefined;
+    const generatedAttachmentId = generatedImageShown() ? props.message.attachments?.[0]?.id : undefined;
     return (props.message.attachments ?? []).filter(
       (attachment) => !referencedIds.has(attachment.id) && attachment.id !== generatedAttachmentId,
     );
   });
   const [downloadingAttachments, setDownloadingAttachments] = createSignal(false);
   const standaloneImageAttachments = createMemo(() =>
-    props.message.author === "agent"
-      ? standaloneAttachments().filter((attachment) => attachment.previewKind === "image")
-      : [],
+    props.message.author === "agent" ? standaloneAttachments().filter(isLightboxImage) : [],
   );
   const standaloneFileAttachments = createMemo(() =>
     props.message.author === "agent"
-      ? standaloneAttachments().filter((attachment) => attachment.previewKind !== "image")
+      ? standaloneAttachments().filter((attachment) => !isLightboxImage(attachment))
       : standaloneAttachments(),
   );
   const contentBlocks = createMemo<MessageContentBlock[]>((previous) =>
@@ -442,7 +450,7 @@ export function MessageBody(props: {
           </StreamingRevealContext>
         </div>
       </div>
-      <Show when={props.message.imageGeneration}>
+      <Show when={generatedImageShown() && props.message.imageGeneration}>
         {(imageGeneration) => (
           <ImageGeneration
             status={imageGenerationStatus(props.message.streaming, props.message.status)}

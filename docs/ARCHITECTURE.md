@@ -86,7 +86,12 @@ Signal recovery, file transfers, and browser-view streams. The stream codec live
 the old main-process import re-exports that codec without changing its wire format. Account
 requests use a closed list of `/api/browser/*` operations. They cannot carry chat requests.
 Browser tickets and session termination require the same account-session hash that created the
-remote session. Existing bearer-token endpoints retain their behavior.
+remote session. Existing bearer-token endpoints retain their behavior. The browser edits the
+account's name, avatar, and sessions through `v1/me/profile`, `v1/me/avatar`, and `v1/me/sessions`,
+which call the same `AuthService` methods and avatar storage (`avatar-storage.ts`) as the bearer
+routes. The avatar upload is the one write that is not JSON; the origin and `X-OpenBot-Browser`
+checks still apply. `web-account.ts` makes these calls, and the shared `AccountProfilePanel` shows
+them in the conversation's right panel.
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives
@@ -469,6 +474,37 @@ and required user input or approval. Delegated work still needs an explicit repl
 teammate; acknowledgements must not become loops. Relevant findings belong in the task result, and
 the user can ask for a detailed coordination report.
 
+An agent does not refuse a task, or say that it has no access to a service, before it tries each
+path. When the task is outside its profile, or names a service that a teammate may own, it calls
+`openbot.list_agents` first and delegates to a teammate whose name, title or description covers
+the work. In a channel task it delegates only to a channel member. MCP servers are host-global, so
+a specialist teammate differs only by its profile, skills and memories. Otherwise the agent uses its
+connected MCP servers, its skills, the embedded browser and Computer Use.
+
+A sign-in page does not stop it: it calls `openbot_browser.request_takeover`. The request shows in
+the agent's conversation, and in the dynamic island when the agent's notifications are on, also for
+delegated work. A routine run reports the sign-in instead, because nobody may answer; a requester in
+a routine run says so in the delegated message. The tool returns only after the user answers, which
+can take minutes. The end of the turn cancels the request, so the agent keeps waiting for the result,
+also when the provider returns control while the call runs. In the smoke runs, Codex `exec` did this
+about every 30 seconds. After an error or a cancel, the agent does not point to a takeover window.
+When the agent reaches a service in the browser and the plugin for it is not in its tools, the answer
+ends with a fixed sentence: install the plugin in Marketplace, on the Plugins tab, or enable it in MCP
+servers. The sentence names both actions because `read_agent` and the agent's tools show only enabled
+servers, so an agent cannot tell a disabled plugin from a missing one.
+
+When its own tools fail, the agent checks its teammates. When a teammate reports that it is blocked
+or waits for the user, the requester does not repeat that work or send the same request again; it
+gives the user the blocker and the unblock action. A blocked task reply adds a fourth line,
+`Unblock:`, after Status, Result and Evidence. The delivery text of that reply
+(`src/backend/agent/delivery-content.ts`) repeats the report rules, because the requester reads it
+at the moment it answers. An earlier failure does not stop the agent from asking that teammate for
+a new request. It never sends a task back to the teammate that gave it. The answer that gives a
+delegated result starts with the teammate's name, and the agent does not say that a service was
+checked unless a tool result or a reply shows it. When nothing works, the agent says what was tried
+and the one action that unblocks it; for a service with a plugin, that action is to install or
+enable the plugin. It can offer to create a specialist teammate, but it creates one only after the user agrees.
+
 An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
 (channel work excluded), `turnStartedAt`, and `lastActivityAt`. The last two come from the provider
@@ -512,6 +548,8 @@ These are manual model evaluations, separate from the fake-provider lifecycle re
 | Include a step that requires approval or clarification. | The existing approval/question flow remains visible and the agent waits for the answer. |
 | Restart the app, then ask the agent to continue the same task. | Work continues with the same policy and no context-loading recap. |
 | Ask explicitly for a detailed account of teammate coordination. | The agent provides the requested detail. |
+| Make a teammate whose description owns Notion, then ask a general agent about a Notion page. | The general agent delegates to the Notion teammate. Its answer starts with the teammate's name. |
+| Ask the same question with no Notion plugin installed. | The Notion teammate opens Notion in the browser and requests a takeover for sign-in. When sign-in fails, the answer says what was tried and to install the Notion plugin. |
 
 ## Change rules
 

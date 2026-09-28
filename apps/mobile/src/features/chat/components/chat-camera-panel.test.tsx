@@ -8,6 +8,9 @@ const native = vi.hoisted(() => ({
   capture: vi.fn(),
   ready: () => {},
 }));
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { selection: vi.fn(async () => {}), impact: vi.fn(async () => {}), notification: vi.fn(async () => {}) },
+}));
 vi.mock("expo-camera", () => ({
   CameraView: ({ ref, onCameraReady }: { ref: Ref<object>; onCameraReady: () => void }) => {
     useImperativeHandle(ref, () => ({ takePictureAsync: native.capture }));

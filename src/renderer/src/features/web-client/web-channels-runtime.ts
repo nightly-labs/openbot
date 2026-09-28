@@ -24,7 +24,8 @@ function chooseFiles(): Promise<File[]> {
 
 /**
  * The channels runtime of the browser client: the same channel UI as the desktop, sent over the host
- * connection instead of preload. Files are chosen with the browser's chooser and uploaded as drafts.
+ * connection instead of preload. Files are chosen with the browser's chooser, dropped, or pasted, and
+ * uploaded as drafts.
  */
 export function createWebChannelsPort(
   remote: WebWorkspaceRuntime,
@@ -33,6 +34,20 @@ export function createWebChannelsPort(
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote);
   const channels = remote.channels;
+  async function importAttachments(chosen: File[]): Promise<AttachmentSummary[]> {
+    if (chosen.length > INPUT_LIMITS.attachments)
+      throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+    const serverId = hostId();
+    const uploaded: AttachmentSummary[] = [];
+    try {
+      for (const file of chosen) uploaded.push(await remote.upload(file));
+    } catch (error) {
+      // After a host switch the drafts belong to the previous host, and the runtime discards them there.
+      if (hostId() === serverId) await Promise.allSettled(uploaded.map((attachment) => remote.discard(attachment.id)));
+      throw error;
+    }
+    return uploaded;
+  }
   return {
     agent: {
       listChannels: channels?.listChannels ?? unavailable,
@@ -53,22 +68,7 @@ export function createWebChannelsPort(
         onHostEvent((event) => {
           if (event.type === "channel-memories-changed" || event.type === "channel-routines-changed") listener(event);
         }),
-      async chooseAttachments() {
-        const chosen = await chooseFiles();
-        if (chosen.length > INPUT_LIMITS.attachments)
-          throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
-        const serverId = hostId();
-        const uploaded: AttachmentSummary[] = [];
-        try {
-          for (const file of chosen) uploaded.push(await remote.upload(file));
-        } catch (error) {
-          // After a host switch the drafts belong to the previous host, and the runtime discards them there.
-          if (hostId() === serverId)
-            await Promise.allSettled(uploaded.map((attachment) => remote.discard(attachment.id)));
-          throw error;
-        }
-        return uploaded;
-      },
+      chooseAttachments: async () => importAttachments(await chooseFiles()),
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
       respondToApproval: (input) => remote.approve(input),
       respondToPrompt: (input) => remote.answer(input),
@@ -79,5 +79,6 @@ export function createWebChannelsPort(
     openUrl: openWebLink,
     fileActions: "browser",
     previewAttachment: files.preview,
+    importAttachments,
   };
 }

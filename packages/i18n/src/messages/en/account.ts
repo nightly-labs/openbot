@@ -12,6 +12,7 @@ export const messages = defineMessages("account", {
   "account.dock.updateBadge": "Update",
   "account.dock.updateAvailable": "OpenBot update available",
   "account.menu.account": "Account",
+  "account.menu.profile": "Profile",
   "account.menu.settings": "Settings",
   "account.menu.marketplace": "Marketplace",
   "account.menu.providersPermissions": "Providers & permissions",

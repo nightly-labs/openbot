@@ -4,6 +4,7 @@ import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
 export function useChatSectionMenu(serverId: string, chatId: string) {
@@ -29,7 +30,9 @@ export function useChatSectionMenu(serverId: string, chatId: string) {
         agentId: chatId,
         sectionId: sectionId === SIDEBAR_UNASSIGNED_SECTION_ID ? null : sectionId,
       });
+      void haptics.notification("success");
     } catch (error) {
+      void haptics.notification("error");
       const text = currentText();
       Alert.alert(
         text.t("mobile.agent.section.moveFailed"),

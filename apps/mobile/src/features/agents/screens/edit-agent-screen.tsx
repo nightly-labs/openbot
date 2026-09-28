@@ -22,6 +22,7 @@ import {
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 type AgentEdits = Pick<
@@ -181,7 +182,9 @@ function AgentForm({
         await setAgentAvatar(agent.id, photo ?? null, agent.serverId);
         setPhoto(undefined);
       }
+      void haptics.notification("success");
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.edit.failed")));
     } finally {
       pending.current = false;
@@ -203,12 +206,13 @@ function AgentForm({
               className="self-center"
               accessibilityRole="button"
               accessibilityLabel={t("mobile.agent.edit.appearance")}
-              onPress={() =>
+              onPress={() => {
+                void haptics.impact("soft");
                 router.push({
                   pathname: "/agent-info/[agentId]/appearance",
                   params: { agentId: agent.id, serverId: agent.serverId },
-                })
-              }
+                });
+              }}
             >
               <BloubAvatarPreview
                 agentId={agent.id}

@@ -14,6 +14,9 @@ const native = vi.hoisted(() => ({
   size: 5,
   base64Impl: async (_uri: string) => btoa("hello"),
 }));
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { selection: vi.fn(async () => {}), impact: vi.fn(async () => {}), notification: vi.fn(async () => {}) },
+}));
 vi.mock("react-native", () => ({ Alert: { alert: native.alert }, Keyboard: { dismiss: () => {} } }));
 vi.mock("expo-document-picker", () => ({ getDocumentAsync: native.documents }));
 vi.mock("expo-image-picker", () => ({

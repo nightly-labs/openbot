@@ -6,6 +6,7 @@ import { Check, Copy } from "lucide-react-native";
 import { memo, useEffect, useRef, useState } from "react";
 import { Alert, type ColorValue, ScrollView, useWindowDimensions, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { type CodeToken, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 
@@ -78,7 +79,9 @@ export const ChatCodeBlock = memo(function ChatCodeBlock({
     try {
       await Clipboard.setStringAsync(text);
       setCopiedText(text);
+      void haptics.notification("success");
     } catch {
+      void haptics.notification("error");
       Alert.alert(t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
     }
   }

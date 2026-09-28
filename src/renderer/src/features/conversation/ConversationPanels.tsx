@@ -1,6 +1,7 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
+import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { serverCanAdministerAgents } from "../agents/remote-agent-admin";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
@@ -63,6 +64,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     handleRoutineSettingsRequest,
     sidebarFilePreview,
     settingsOpen,
+    profileOpen,
     skillSettingsRequest,
     routineSettingsRequest,
     settingsModel,
@@ -72,6 +74,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   let browserPreviewTrigger: HTMLButtonElement | undefined;
+  const settingsMaxWidth = () =>
+    Math.min(
+      SETTINGS_PANEL_MAX,
+      Math.max(
+        SETTINGS_PANEL_MIN,
+        (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
+      ),
+    );
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
     // The web client reaches a host through `runtime`, which has no storage methods.
@@ -144,7 +154,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onOpenWorkspaceFile={openWorkspaceFile}
                 sourceUrl={attached()?.previewUrl ?? null}
                 onOpenExternally={openSidebarFileExternally}
-                onDownload={attached() ? downloadSidebarFile : undefined}
+                /* In the browser, "open" saves a shared or workspace file, so it is the download. */
+                onDownload={attached() ? downloadSidebarFile : props.runtime ? openSidebarFileExternally : undefined}
                 onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
                 onClose={closeSidebarFilePreview}
               />
@@ -308,15 +319,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               onConnectProvider={props.onConnectProvider}
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
-              maxWidth={() =>
-                Math.min(
-                  SETTINGS_PANEL_MAX,
-                  Math.max(
-                    SETTINGS_PANEL_MIN,
-                    (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-                  ),
-                )
-              }
+              maxWidth={settingsMaxWidth}
               onClose={() => setActiveRightPanel("none")}
               onWidthChange={setSettingsPanelWidth}
               onUpdateAgent={props.onUpdateAgent}
@@ -333,11 +336,39 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
           </Loading>
         )}
       </Show>
+
+      <Show when={profileOpen() && props.accountProfile}>
+        {(profile) => {
+          // Read on each open, as the agent settings panel does, so the two share the last saved width
+          // and the layout reserves this panel's width.
+          const [width, setWidth] = createSettingsPanelWidth();
+          createEffect(width, (value) => {
+            setSettingsPanelWidth(value);
+          });
+          return (
+            <Loading>
+              <AccountProfilePanel
+                account={profile().account}
+                onUpdateAccountName={profile().onUpdateAccountName}
+                onUpdateAccountAvatar={profile().onUpdateAccountAvatar}
+                onListAccountSessions={profile().onListAccountSessions}
+                onRevokeAccountSession={profile().onRevokeAccountSession}
+                width={width()}
+                maxWidth={settingsMaxWidth}
+                onResize={setWidth}
+                onResizeEnd={saveSettingsPanelWidth}
+                onClose={() => setActiveRightPanel("none")}
+              />
+            </Loading>
+          );
+        }}
+      </Show>
     </>
   );
 }
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
+const AccountProfilePanel = lazy(() => import("@openbot/ui/features/settings/AccountProfilePanel"));
 const BrowserPanel = lazy(() => import("@openbot/ui/features/browser/BrowserPanel"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
 const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));

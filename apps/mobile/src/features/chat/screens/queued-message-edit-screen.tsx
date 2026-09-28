@@ -97,6 +97,7 @@ export function QueuedMessageEditScreen() {
     const go = () => navigation.dispatch(data.action);
     const release = () =>
       releaseThenExit(go, () => {
+        void haptics.notification("error");
         Alert.alert(t("mobile.chat.queue.stillHoldingTitle"), t("mobile.chat.queue.stillHoldingMessage"), [
           { text: t("mobile.chat.queue.keepEditing"), style: "cancel" },
           { text: t("mobile.chat.queue.leaveAnyway"), onPress: () => exitAfter(null, go) },
@@ -106,6 +107,7 @@ export function QueuedMessageEditScreen() {
       release();
       return;
     }
+    void haptics.notification("warning");
     Alert.alert(t("mobile.chat.queue.discardTitle"), t("mobile.chat.queue.discardMessage"), [
       { text: t("mobile.chat.queue.keepEditing"), style: "cancel" },
       { text: t("mobile.chat.queue.discard"), style: "destructive", onPress: release },
@@ -236,7 +238,16 @@ function AttachmentRemoveButton({
 }) {
   const muted = useThemeColor("muted");
   return (
-    <Button isIconOnly variant="ghost" isDisabled={disabled} accessibilityLabel={label} onPress={onPress}>
+    <Button
+      isIconOnly
+      variant="ghost"
+      isDisabled={disabled}
+      accessibilityLabel={label}
+      onPress={() => {
+        void haptics.selection();
+        onPress();
+      }}
+    >
       <X color={String(muted)} size={18} />
     </Button>
   );

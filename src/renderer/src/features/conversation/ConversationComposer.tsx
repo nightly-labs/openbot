@@ -37,6 +37,7 @@ export function ConversationComposer() {
     attachmentAction,
     attachmentBusy,
     awaitingReplies,
+    dismissAwaitingReplies,
     composerFocusRequest,
     composerHasContent,
     currentChatConversationKey,
@@ -156,7 +157,7 @@ export function ConversationComposer() {
         >
           <div class="agent-queue-slot-inner">
             <Show when={awaitingVisible()}>
-              <AwaitingReplies items={awaitingReplies()} />
+              <AwaitingReplies items={awaitingReplies()} onDismiss={dismissAwaitingReplies} />
             </Show>
             <Show when={queueVisible()}>
               <Loading>
@@ -248,29 +249,33 @@ export function ConversationComposer() {
           <Show when={unreferencedDraftAttachments().length > 0}>
             <div class="composer-attachments">
               <For each={unreferencedDraftAttachments()}>
-                {(attachment) => (
-                  <div class="composer-attachment ui-removable-image" data-kind={attachment.kind}>
-                    <span
-                      class="composer-attachment-preview"
-                      data-file-tone={attachment.kind === "file" ? attachmentReferenceTone(attachment.name) : undefined}
-                    >
-                      <Show when={attachment.kind === "image"} fallback={fileBadge(attachment)}>
-                        <img src={attachment.previewUrl ?? ""} alt="" />
-                      </Show>
-                    </span>
-                    <Show when={attachment.kind === "file"}>
-                      <span class="composer-attachment-copy">
-                        <strong title={attachment.name}>{attachment.name}</strong>
-                        <small>{format.fileSize(attachment.size)}</small>
+                {(attachment) => {
+                  // An image with no preview (the web client) shows as a file, with its name.
+                  const chip = () => (attachment.kind === "image" && attachment.previewUrl ? "image" : "file");
+                  return (
+                    <div class="composer-attachment ui-removable-image" data-kind={chip()}>
+                      <span
+                        class="composer-attachment-preview"
+                        data-file-tone={chip() === "file" ? attachmentReferenceTone(attachment.name) : undefined}
+                      >
+                        <Show when={chip() === "image"} fallback={fileBadge(attachment)}>
+                          <img src={attachment.previewUrl ?? ""} alt="" />
+                        </Show>
                       </span>
-                    </Show>
-                    <ImageRemoveButton
-                      label={t("composer.attachment.remove", { name: attachment.name })}
-                      disabled={voicePhase() === "transcribing" || savePending()}
-                      onClick={() => removeAttachment(attachment.id)}
-                    />
-                  </div>
-                )}
+                      <Show when={chip() === "file"}>
+                        <span class="composer-attachment-copy">
+                          <strong title={attachment.name}>{attachment.name}</strong>
+                          <small>{format.fileSize(attachment.size)}</small>
+                        </span>
+                      </Show>
+                      <ImageRemoveButton
+                        label={t("composer.attachment.remove", { name: attachment.name })}
+                        disabled={voicePhase() === "transcribing" || savePending()}
+                        onClick={() => removeAttachment(attachment.id)}
+                      />
+                    </div>
+                  );
+                }}
               </For>
             </div>
           </Show>
@@ -304,6 +309,9 @@ export function ConversationComposer() {
               }}
               onSubmit={submitComposer}
               onPickerOpenChange={setPickerOpen}
+              onPasteFiles={(files) => {
+                if (props.runtime?.importFiles) void props.runtime.importFiles(files);
+              }}
               onOpenAttachment={(attachment) =>
                 canPreviewAttachment(attachment)
                   ? void previewAttachment(attachment)

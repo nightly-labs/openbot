@@ -10,7 +10,9 @@ and attachment data travel through the existing encrypted host connection, not t
 account Worker. The browser keeps chat pages, drafts, search results, and file previews in memory;
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
 their browser. The host must stay online. An owner or admin can manage members and invitations from
-the browser; these requests go to the account Worker, as they do from the desktop app. Host settings,
+the browser; these requests go to the account Worker, as they do from the desktop app. A signed-in
+user can also change the display name and avatar and disconnect account sessions from the browser;
+these requests and the avatar image go to the same account Worker as from the desktop app. Host settings,
 such as MCP servers, travel through the encrypted host connection.
 
 Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSite=Lax` cookie.

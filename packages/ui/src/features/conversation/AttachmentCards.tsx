@@ -92,7 +92,7 @@ export function AttachmentCards(props: {
                 onClick={(event) => props.onPreview(attachment, event.currentTarget)}
               >
                 <Show
-                  when={attachment.previewKind === "image" && !isMissing(attachment)}
+                  when={attachment.previewKind === "image" && attachment.previewUrl && !isMissing(attachment)}
                   fallback={
                     <span
                       class="attachment-file-visual"

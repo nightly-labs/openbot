@@ -14,6 +14,7 @@ import { SERVER_ROLE_KEYS } from "@/features/servers/model/server-role";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
 const INVITE_PLACEHOLDER = "https://openbot.run/join?…";
@@ -112,8 +113,10 @@ export function AddServerScreen({
     try {
       const serverId = await addRemoteServer({ inviteUrl: reviewedInvite });
       setJoinedId(serverId);
+      void haptics.notification("success");
     } catch (cause) {
       setError(errorMessage(cause, t("mobile.server.invite.joinFailed")));
+      void haptics.notification("error");
       joinInFlight.current = false;
     }
     setJoining(false);
@@ -156,6 +159,7 @@ export function AddServerScreen({
         <Button
           size="lg"
           onPress={() => {
+            void haptics.impact("soft");
             if (onJoined) onJoined();
             else router.back();
           }}
@@ -176,6 +180,7 @@ export function AddServerScreen({
                 isDisabled={joining}
                 onPress={() => {
                   Keyboard.dismiss();
+                  void haptics.impact("soft");
                   router.push("/add-server/scan");
                 }}
               >
@@ -235,7 +240,10 @@ export function AddServerScreen({
             accessibilityRole="button"
             className="min-h-11 items-center justify-center"
             disabled={joining}
-            onPress={() => router.back()}
+            onPress={() => {
+              void haptics.impact("soft");
+              router.back();
+            }}
           >
             <Typography.Paragraph weight="semibold" className="text-text-secondary">
               {t("common.cancel")}

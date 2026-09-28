@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   forgetIncomingLink,
   parseIncomingLink,
-  pendingInvitationId,
+  pendingSignInLinkId,
   readIncomingLink,
   redirectIncomingLink,
 } from "./incoming-links";
@@ -15,6 +15,8 @@ const payload = {
   fingerprint: "f".repeat(43),
   token: "t".repeat(32),
 };
+
+const templateId = "AbCdEfGhIjKlMnOpQrSt_-";
 
 function requestId(path: string): string {
   return new URL(path, "https://openbot.run").searchParams.get("request") ?? "";
@@ -29,7 +31,7 @@ describe("incoming mobile links", () => {
       expect(path).not.toContain(payload.token);
       const id = requestId(path);
       expect(readIncomingLink(id)).toEqual({ kind: "invite", url });
-      expect(pendingInvitationId()).toBe(id);
+      expect(pendingSignInLinkId()).toBe(id);
       forgetIncomingLink(id);
       expect(readIncomingLink(id)).toEqual({ kind: "invalid" });
     },
@@ -45,7 +47,7 @@ describe("incoming mobile links", () => {
     const pairingId = requestId(redirectIncomingLink(url));
     expect(readIncomingLink(pairingId)).toEqual({ kind: "pairing", url });
     forgetIncomingLink(pairingId);
-    expect(pendingInvitationId()).toBe(id);
+    expect(pendingSignInLinkId()).toBe(id);
     forgetIncomingLink(id);
   });
 
@@ -58,6 +60,32 @@ describe("incoming mobile links", () => {
       kind: "plugin",
       url: "https://openbot.run/plugins/my-plugin",
     });
+  });
+
+  it.each([`openbot://agents/${templateId}`, `https://openbot.run/agents/${templateId}`, `/agents/${templateId}`])(
+    "routes an agent link in each form to one preview request",
+    (url) => {
+      const id = requestId(redirectIncomingLink(url));
+      expect(readIncomingLink(id)).toEqual({
+        kind: "template",
+        url: `https://openbot.run/agents/${templateId}`,
+        templateId,
+      });
+      expect(pendingSignInLinkId()).toBe(id);
+      forgetIncomingLink(id);
+    },
+  );
+
+  it.each([
+    `openbot://agents/${templateId}?install=1`,
+    `https://openbot.run/agents/${templateId}#install`,
+    `https://openbot.run.evil.test/agents/${templateId}`,
+    `https://openbot.run/agents/${templateId}/extra`,
+    "openbot://agents/short",
+    `openbot://user:pass@agents/${templateId}`,
+    `/agents/${templateId}?install=1`,
+  ])("rejects a malformed agent link: %s", (url) => {
+    expect(readIncomingLink(requestId(redirectIncomingLink(url)))).toEqual({ kind: "invalid" });
   });
 
   it.each([

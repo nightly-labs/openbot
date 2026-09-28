@@ -16,6 +16,9 @@ export function WebAgentSettings(props: {
   capabilities: string[];
   /** The host's endpoints, so the picker lists their models on its Custom tab. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
+  /** The draft the form starts from. */
+  initialDraft?: FirstAgentDraft;
+  onDraftChange?: (draft: FirstAgentDraft) => void;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -27,7 +30,14 @@ export function WebAgentSettings(props: {
     busy: boolean;
     error: string | null;
     uncertain: boolean;
-  }>({ draft: createFirstAgentDraft(), models: [], status: null, busy: false, error: null, uncertain: false });
+  }>({
+    draft: props.initialDraft ?? createFirstAgentDraft(),
+    models: [],
+    status: null,
+    busy: false,
+    error: null,
+    uncertain: false,
+  });
   let disposed = false;
   let modelRequestGeneration = 0;
 
@@ -133,11 +143,12 @@ export function WebAgentSettings(props: {
       modelOptions={supportsModelSelection() && state.models.length > 0 ? state.models : undefined}
       agentStatus={state.status ?? undefined}
       customProviders={props.customProviders}
-      onChange={(value) =>
+      onChange={(value) => {
         setState((draft) => {
           draft.draft = value;
-        })
-      }
+        });
+        props.onDraftChange?.(value);
+      }}
       onSubmit={save}
       onCancel={props.onClose}
     />

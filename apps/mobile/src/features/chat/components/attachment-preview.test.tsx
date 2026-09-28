@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { AttachmentThumbnail, localAttachmentPreview } from "./attachment-preview";
 
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { selection: vi.fn(async () => {}), impact: vi.fn(async () => {}), notification: vi.fn(async () => {}) },
+}));
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({
   useMobileWorkspace: () => ({ downloadAttachment: vi.fn() }),
 }));
