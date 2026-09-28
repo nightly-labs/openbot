@@ -71,12 +71,14 @@ export interface SidebarProps {
   footer?: JSX.Element;
   onExpand: () => void;
   onOpenMarketplace: () => void;
-  emptyAction?: {
-    label: string;
-    avatarSeed: string;
-    avatarHue: AvatarHue | null;
-    onSelect: () => void;
-  };
+  emptyAction?:
+    | {
+        label: string;
+        avatarSeed: string;
+        avatarHue: AvatarHue | null;
+        onSelect: () => void;
+      }
+    | undefined;
 }
 
 export type SidebarRoutinePhase = "running" | "queued" | "needs-attention" | "failed";
