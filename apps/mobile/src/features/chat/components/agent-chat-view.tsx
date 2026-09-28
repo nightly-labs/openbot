@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { latestReadableMessage, projectChatMessages } from "../model/chat-messages";
+import { latestReadableMessage, projectChatMessages, withFailureReasons } from "../model/chat-messages";
 import { uploadChatAttachments } from "../model/upload-chat-attachments";
 import { ChatView } from "./chat-view";
 import { useChatQueue } from "./use-chat-queue";
@@ -42,7 +42,7 @@ export function MobileChatView({
     [agents, agent.serverId],
   );
   const mentionAgents = useMemo(() => serverAgents.filter((item) => item.id !== agent.id), [serverAgents, agent.id]);
-  const messages = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
+  const projected = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
   const references = useMemo(
     () => projectChatMessages(Object.values(conversation?.references ?? {})),
     [conversation?.references],
@@ -56,6 +56,7 @@ export function MobileChatView({
     conversation?.activeTurnId ?? null,
     conversation?.messages,
   );
+  const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const request = useRef(0);
   const fetchHistory = useCallback(() => {

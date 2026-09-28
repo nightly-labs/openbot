@@ -602,9 +602,30 @@ const MessageRow = memo(function MessageRow({
       ) : (
         rendered
       )}
+      {message.author === "user" && message.status === "failed" ? <TurnFailure reason={message.failureReason} /> : null}
     </View>
   );
 });
+
+/** Under a user message whose turn failed. A reason that is missing or not safe to show uses the fallback. */
+function TurnFailure({ reason }: { reason: string | undefined }) {
+  const { t, errorMessage } = useText();
+  const [danger] = useCSSVariable(["--openbot-danger-text"]);
+  const text = errorMessage(reason, t("mobile.chat.failure.fallback"));
+  return (
+    <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel={`${t("mobile.chat.failure.title")}. ${text}`}
+      className="flex-row items-start gap-1.5 self-end px-1"
+    >
+      <CircleX size={14} color={String(danger)} strokeWidth={2} style={{ marginTop: 2 }} />
+      <Typography.Paragraph type="body-xs" numberOfLines={6} className="shrink text-danger-text">
+        {text}
+      </Typography.Paragraph>
+    </View>
+  );
+}
 
 export function ChatMessageList({
   upload,

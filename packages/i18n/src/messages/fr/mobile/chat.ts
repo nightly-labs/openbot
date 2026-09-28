@@ -188,6 +188,9 @@ export const messages = {
   "mobile.chat.upload.cancelled": "Envoi de la pièce jointe annulé.",
   "mobile.chat.upload.uploaded": "Envoyé",
   "mobile.chat.upload.uploadingLabel": "Envoi en cours",
+  "mobile.chat.failure.title": "Sans réponse",
+  "mobile.chat.failure.fallback":
+    "L’agent s’est arrêté avant de répondre. Envoyez de nouveau le message pour réessayer.",
   "mobile.chat.reply.to": "Réponse à : {text}",
   "mobile.chat.reply.attachment": "Pièce jointe",
   "mobile.chat.reply.unavailable": "Message non disponible",

@@ -7,6 +7,7 @@ import type {
   ConversationMessage,
   ConversationQuestionPrompt,
   ImageGenerationInfo,
+  QueueDelivery,
   RoutineConversationEventAction,
   RoutineRunStatus,
 } from "@openbot/contracts/ipc";
@@ -52,6 +53,8 @@ export type ChatMessage =
       attachments?: AttachmentSummary[];
       /** An image the agent is generating or generated. Its first attachment is the image. */
       imageGeneration?: ImageGenerationInfo;
+      /** Why the turn of a failed user message stopped, as the host reported it. */
+      failureReason?: string;
     }
   /** The task list of an agent plan. The header is `heading` when set, else a catalog title. */
   | {
@@ -321,6 +324,31 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
     }
   }
   return result;
+}
+
+const failedBubbles = new WeakMap<ChatMessage, ChatMessage>();
+
+/**
+ * Adds the reason the host keeps on each failed delivery to its user bubble. The conversation has
+ * only the status; the reason comes with the queue. A user bubble has the ID of its delivery.
+ */
+export function withFailureReasons(messages: ChatMessage[], deliveries: readonly QueueDelivery[]): ChatMessage[] {
+  const reasons = new Map<string, string>();
+  for (const delivery of deliveries) {
+    if (delivery.status === "failed" && delivery.error) reasons.set(delivery.id, delivery.error);
+  }
+  if (reasons.size === 0) return messages;
+  return messages.map((message) => {
+    if (message.kind !== "message" || message.author !== "user" || message.status !== "failed") return message;
+    const failureReason = reasons.get(message.id);
+    if (!failureReason) return message;
+    let failed = failedBubbles.get(message);
+    if (failed?.kind !== "message" || failed.failureReason !== failureReason) {
+      failed = { ...message, failureReason };
+      failedBubbles.set(message, failed);
+    }
+    return failed;
+  });
 }
 
 /** Like the host read state, a plan is not a readable message. */
