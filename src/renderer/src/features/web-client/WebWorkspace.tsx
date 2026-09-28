@@ -44,6 +44,7 @@ import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabi
 import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
+import { WebHostOffline } from "./WebHostOffline";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
@@ -99,6 +100,7 @@ export function WebWorkspace(props: {
   const controller = createConversationController({ onTypingChange: () => {} }, false);
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
+  const hostOffline = () => !noHost() && workspace.state.status !== "online";
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
     () => {
@@ -606,81 +608,71 @@ export function WebWorkspace(props: {
                 onRefresh={() => void workspace.run(workspace.refreshHosts)}
               />
             </Show>
-            <Show when={!creating() && !channelOpen() && !noHost()}>
+            <Show when={!creating() && !channelOpen() && hostOffline()}>
+              <WebHostOffline
+                title={
+                  workspace.state.host
+                    ? workspace.state.status === "connecting"
+                      ? t("webClient.notice.connecting")
+                      : t("webClient.notice.disconnected")
+                    : t("webClient.notice.findingHosts")
+                }
+                description={
+                  workspace.state.host
+                    ? workspace.state.error
+                      ? sourceText(workspace.state.error)
+                      : t("webClient.notice.keepOpen")
+                    : undefined
+                }
+                reconnectable={Boolean(workspace.state.host)}
+                connecting={workspace.state.status === "connecting"}
+                disabled={workspace.state.hostsLoading}
+                onReconnect={() =>
+                  void workspace.run(async () => {
+                    if (workspace.state.host) await workspace.connect(workspace.state.host);
+                  })
+                }
+              />
+            </Show>
+            <Show when={!creating() && !channelOpen() && !noHost() && !hostOffline()}>
               <Conversation
                 runtime={runtime}
                 onOpenMarketplace={() => setMarketplaceOpen(true)}
                 notice={
-                  <>
-                    <Show when={workspace.state.status !== "online"}>
-                      <Alert class="web-connection-notice" role="status">
-                        <AlertContent>
-                          <AlertTitle>
-                            {workspace.state.host
-                              ? workspace.state.status === "connecting"
-                                ? t("webClient.notice.connecting")
-                                : t("webClient.notice.disconnected")
-                              : t("webClient.notice.findingHosts")}
-                          </AlertTitle>
-                          <Show when={workspace.state.host}>
-                            <AlertDescription>
-                              {workspace.state.error
-                                ? sourceText(workspace.state.error)
-                                : t("webClient.notice.keepOpen")}
-                            </AlertDescription>
-                            <AlertActions>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={workspace.state.hostsLoading || workspace.state.status === "connecting"}
-                                onClick={() =>
-                                  void workspace.run(async () => {
-                                    if (workspace.state.host) await workspace.connect(workspace.state.host);
-                                  })
-                                }
-                              >
-                                {t("webClient.notice.reconnect")}
-                              </Button>
-                            </AlertActions>
-                          </Show>
-                        </AlertContent>
-                      </Alert>
-                    </Show>
-                    <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
-                      <Alert class="web-connection-notice" tone="warning" role="status">
-                        <AlertContent>
-                          <AlertTitle>{t("webClient.uncertain.title")}</AlertTitle>
-                          <AlertDescription>{t("webClient.uncertain.description")}</AlertDescription>
-                          <AlertActions>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={workspace.state.busy}
-                              onClick={() => void workspace.run(workspace.refresh)}
-                            >
-                              {t("webClient.uncertain.refresh")}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={workspace.state.busy}
-                              onClick={() => {
-                                workspace.acknowledgeSend();
-                                const key = `${server()?.id}:${workspace.state.selectedId}`;
-                                controller.setComposerErrors((current) => {
-                                  const next = { ...current };
-                                  delete next[key];
-                                  return next;
-                                });
-                              }}
-                            >
-                              {t("webClient.uncertain.checked")}
-                            </Button>
-                          </AlertActions>
-                        </AlertContent>
-                      </Alert>
-                    </Show>
-                  </>
+                  <Show when={workspace.state.status === "online" && workspace.conversation()?.uncertain}>
+                    <Alert class="web-connection-notice" tone="warning" role="status">
+                      <AlertContent>
+                        <AlertTitle>{t("webClient.uncertain.title")}</AlertTitle>
+                        <AlertDescription>{t("webClient.uncertain.description")}</AlertDescription>
+                        <AlertActions>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={workspace.state.busy}
+                            onClick={() => void workspace.run(workspace.refresh)}
+                          >
+                            {t("webClient.uncertain.refresh")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={workspace.state.busy}
+                            onClick={() => {
+                              workspace.acknowledgeSend();
+                              const key = `${server()?.id}:${workspace.state.selectedId}`;
+                              controller.setComposerErrors((current) => {
+                                const next = { ...current };
+                                delete next[key];
+                                return next;
+                              });
+                            }}
+                          >
+                            {t("webClient.uncertain.checked")}
+                          </Button>
+                        </AlertActions>
+                      </AlertContent>
+                    </Alert>
+                  </Show>
                 }
                 agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
                 agent={conversationAgent()}

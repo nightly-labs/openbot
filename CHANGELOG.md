@@ -26,6 +26,9 @@ All notable changes to OpenBot will be documented here. The project follows
   three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
   small notice showed above an empty conversation. When the computers cannot load, an error message
   now shows at the bottom of the screen.
+- Show a centered screen with the same design when your computer is disconnected or connecting. It
+  gives the reason and a Reconnect button. Before, a small notice showed above the conversation.
+  Your draft stays when you reconnect.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
 
