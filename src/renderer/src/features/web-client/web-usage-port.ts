@@ -1,7 +1,7 @@
 import type { AgentEvent, AgentSummary, ServerSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { readHostAnalytics } from "@openbot/team-client";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import { createEffect } from "solid-js";
+import { createEffect, untrack } from "solid-js";
 import type { UsagePort } from "../usage/usage-port";
 
 /** The usage report of the opened host, read through this tab's connection to it. */
@@ -15,9 +15,15 @@ export function createWebUsagePort(options: {
   servers(): ServerSummary[];
 }): UsagePort {
   const serverListeners = new Set<(servers: ServerSummary[]) => void>();
-  createEffect(options.servers, (servers) => {
-    for (const listener of serverListeners) listener(servers);
-  });
+  // Only the opened host coming online makes the report stale. Another host's state does not.
+  createEffect(
+    () => options.servers().find((server) => server.active && server.state === "online")?.id ?? null,
+    (onlineHostId) => {
+      if (!onlineHostId) return;
+      const servers = untrack(options.servers);
+      for (const listener of serverListeners) listener(servers);
+    },
+  );
   return {
     agent: {
       getHostAnalytics: (input, serverId) =>

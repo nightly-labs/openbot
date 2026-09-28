@@ -137,6 +137,8 @@ export function WebWorkspace(props: {
   function hostState(hostId: string): ServerConnectionState {
     if (hostId === workspace.state.host?.hostId) return workspace.state.status;
     const state = workspace.state.hostStates[hostId];
+    // Without status connections (no BroadcastChannel), nothing will report this host.
+    if (!workspace.runtime.hosts) return "offline";
     return !state || state === "unknown" ? "connecting" : state;
   }
   const servers = createMemo<ServerSummary[]>(() =>

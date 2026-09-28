@@ -111,7 +111,8 @@ describe("browser host ownership", () => {
     await vi.waitFor(() => expect(held.size).toBe(0));
   });
   it("hands a status connection to the tab that opens its host, and keeps an opened host", async () => {
-    vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    // The locks themselves are the fake below; the handoff only checks that the browser has a lock manager.
+    vi.stubGlobal("navigator", { locks: {} });
     const acquire = createLocks();
     let endSession: () => void = () => {};
     const sessionEnded = new Promise<void>((resolve) => {

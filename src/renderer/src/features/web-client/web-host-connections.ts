@@ -31,9 +31,10 @@ export interface WebHostConnections {
   setHosts(hosts: readonly RemoteTeamHost[]): void;
   /** The host this tab opens, or null. Resolves when its status connection has ended. */
   select(hostId: string | null): Promise<void>;
+  /** Whether this tab holds the lock of the opened host. Only then does it speak for that host. */
+  holdSelected(hostId: string, held: boolean): void;
   /** The state of the opened host, for the other tabs. */
   reportSelected(hostId: string, state: WebHostState): void;
-  setActive(active: boolean): void;
   refresh(): void;
   dispose(): Promise<void>;
 }
@@ -61,8 +62,7 @@ export function createWebHostConnections(options: {
   const restingUntil = new Map<string, number>();
   const restTimers = new Set<ReturnType<typeof setTimeout>>();
   let hosts: readonly RemoteTeamHost[] = [];
-  let selected: { hostId: string; state: WebHostState } | null = null;
-  let active = document.visibilityState === "visible";
+  let selected: { hostId: string; state: WebHostState; held: boolean } | null = null;
   let disposed = false;
 
   function post(message: WebHostTabMessage): void {
@@ -79,7 +79,7 @@ export function createWebHostConnections(options: {
     if (local) post({ type: "state", hostId, state });
   }
   function holds(hostId: string): boolean {
-    return Boolean(entries.get(hostId)?.releaseLock) || selected?.hostId === hostId;
+    return Boolean(entries.get(hostId)?.releaseLock) || (selected?.hostId === hostId && selected.held);
   }
 
   function start(host: RemoteTeamHost): void {
@@ -171,8 +171,8 @@ export function createWebHostConnections(options: {
       },
     );
     entry.recovery = recovery;
-    peer.setActive(active);
-    recovery.setActive(active);
+    // Unlike mobile, a hidden tab keeps retrying: it holds the lock, so no other tab can take its place.
+    recovery.setActive(true);
   }
 
   async function stop(hostId: string): Promise<void> {
@@ -213,7 +213,7 @@ export function createWebHostConnections(options: {
         const state = states.get(hostId);
         if (entry.releaseLock && state) post({ type: "state", hostId, state });
       }
-      if (selected) post({ type: "state", hostId: selected.hostId, state: selected.state });
+      if (selected?.held) post({ type: "state", hostId: selected.hostId, state: selected.state });
     } else if (message.type === "state") {
       if (!holds(message.hostId)) setState(message.hostId, message.state, false);
     } else if (message.type === "release" && entries.has(message.hostId)) {
@@ -240,7 +240,7 @@ export function createWebHostConnections(options: {
     },
     async select(hostId) {
       const previous = selected?.hostId ?? null;
-      selected = hostId === null ? null : { hostId, state: "connecting" };
+      selected = hostId === null ? null : { hostId, state: "connecting", held: false };
       if (hostId !== null) await stop(hostId);
       if (previous !== hostId) {
         // Its status connection reports again once it holds the lock.
@@ -251,18 +251,16 @@ export function createWebHostConnections(options: {
         sync();
       }
     },
+    holdSelected(hostId, held) {
+      if (selected?.hostId !== hostId || selected.held === held) return;
+      selected.held = held;
+      if (held) post({ type: "state", hostId, state: selected.state });
+    },
     reportSelected(hostId, state) {
       if (selected?.hostId !== hostId || selected.state === state) return;
       selected.state = state;
-      post({ type: "state", hostId, state });
-    },
-    setActive(value) {
-      if (active === value) return;
-      active = value;
-      for (const entry of entries.values()) {
-        entry.peer?.setActive(value);
-        entry.recovery?.setActive(value);
-      }
+      // A tab whose open failed does not hold the host, so another tab speaks for it.
+      if (selected.held) post({ type: "state", hostId, state });
     },
     refresh() {
       for (const entry of entries.values()) entry.recovery?.refresh();

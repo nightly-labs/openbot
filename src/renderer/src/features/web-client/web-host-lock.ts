@@ -81,12 +81,13 @@ export async function acquireOpenedWebHostLock(
   hostId: string,
   channel: BroadcastChannel | null,
   acquire: typeof acquireWebHostLock = acquireWebHostLock,
-  timeoutMs = 5_000,
+  // The other tab ends its session before it gives up the lock, which is a request to the account service.
+  timeoutMs = 15_000,
 ): Promise<() => void> {
   try {
     return await acquire(accountId, hostId);
   } catch (error) {
-    if (!channel) throw error;
+    if (!channel || !navigator.locks) throw error;
   }
   const requestId = crypto.randomUUID();
   const stop = new AbortController();
@@ -99,7 +100,8 @@ export async function acquireOpenedWebHostLock(
   try {
     channel.postMessage({ type: "release", hostId, requestId } satisfies WebHostTabMessage);
     return await acquire(accountId, hostId, { wait: stop.signal });
-  } catch {
+  } catch (error) {
+    if (!stop.signal.aborted) throw error;
     throw new Error(currentText().t("webClient.error.otherTab"));
   } finally {
     clearTimeout(timer);

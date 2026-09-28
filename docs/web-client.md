@@ -54,9 +54,10 @@ mock. The separate web preview implements the browser runtime with that same moc
   gets a status connection (connect and compatibility read, no events) in one tab, which holds that
   host's lock. The other tabs learn its state on a `BroadcastChannel`. A tab that opens the host
   asks for it on the channel: the status connection ends its session, then gives up the lock, and
-  that tab waits 30 seconds before it asks for the lock again. A hidden tab keeps its connections
-  but does not retry them. Each status connection uses one Signal socket, and the host shows the
-  user as present.
+  that tab waits 30 seconds before it asks for the lock again. Only a tab that holds the lock of the
+  host it has open reports that host's state. A hidden tab keeps retrying, unlike mobile, because it
+  holds the lock and no other tab can take its place. Each status connection uses one Signal socket,
+  and the host shows the user as present.
 - The rail order is kept in this browser, per account. The server menu has Usage and Settings.
   Mute and notification level are desktop only, because they control desktop notifications.
 - Capability checks hide unavailable browser-view and creation-model controls. Hosts without

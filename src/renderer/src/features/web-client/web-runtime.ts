@@ -542,6 +542,7 @@ export function createWebWorkspaceRuntime(
           }
           releaseHostLock = release;
           lockedHostId = host.hostId;
+          hosts?.holdSelected(host.hostId, true);
         }
         const current = ++generation;
         connectedHost = host;
@@ -569,6 +570,7 @@ export function createWebWorkspaceRuntime(
           releaseHostLock?.();
           releaseHostLock = null;
           lockedHostId = null;
+          hosts?.holdSelected(host.hostId, false);
         }
         throw error;
       } finally {

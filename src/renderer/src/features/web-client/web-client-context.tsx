@@ -410,6 +410,8 @@ export function createWebWorkspace(
             draft.status = "offline";
             draft.error = currentText().t("webClient.error.accessEnded");
           });
+          // First, so the host that left does not get a status connection when it stops being open.
+          runtime.hosts?.setHosts(hosts);
           await runtime.disconnect().catch(() => undefined);
         }
         const connected = hosts.find((host) => host.hostId === hostId);
@@ -731,16 +733,12 @@ export function createWebWorkspace(
         .then(() => refresh())
         .catch(report);
     };
-    // As on mobile: a hidden tab keeps its status connections but does not retry them.
-    const visibility = () => runtime.hosts?.setActive(document.visibilityState === "visible");
     window.addEventListener("focus", focus);
-    document.addEventListener("visibilitychange", visibility);
     return () => {
       disposed = true;
       generation += 1;
       acceptedInvite = null;
       window.removeEventListener("focus", focus);
-      document.removeEventListener("visibilitychange", visibility);
       void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
     };
   });
