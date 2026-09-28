@@ -184,6 +184,7 @@ function server(id: string, name: string, role: MobileServer["role"]): MobileSer
     accent: "blue",
     publicKey: "key",
     membershipId: `membership-${id}`,
+    logoKey: null,
     role,
   };
 }
