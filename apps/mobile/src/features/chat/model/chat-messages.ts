@@ -11,13 +11,17 @@ import type {
   RoutineRunStatus,
 } from "@openbot/contracts/ipc";
 import {
+  CONVERSATION_PLAN_ITEM_TYPE,
   channelRoutingConversationEvent,
+  parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 
 export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStatus;
+
+export type ChatPlanStepState = "pending" | "active" | "done";
 
 export type ChatMessage =
   | {
@@ -48,6 +52,16 @@ export type ChatMessage =
       attachments?: AttachmentSummary[];
       /** An image the agent is generating or generated. Its first attachment is the image. */
       imageGeneration?: ImageGenerationInfo;
+    }
+  /** The task list of an agent plan. The header is `heading` when set, else a catalog title. */
+  | {
+      id: string;
+      kind: "plan";
+      heading: string | null;
+      /** An explanation too long for the header. */
+      explanation: string | null;
+      stopped: boolean;
+      steps: { id: string; text: string; state: ChatPlanStepState }[];
     }
   | { id: string; kind: "thinking"; turnId: string | undefined; steps: { id: string; text: string }[] };
 
@@ -164,6 +178,40 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 
+const PLAN_HEADING_LIMIT = 80;
+
+/**
+ * The task list of a `plan` message, as desktop shows it. A released host sends only the checklist
+ * text, so the plan is read back from it. The last line of a streaming text can be incomplete, so
+ * it is left out. Returns null when the text is not a checklist; the message then shows as text.
+ */
+function projectPlan(message: ConversationMessage): ChatMessage | null {
+  if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
+  const streaming = message.status === "streaming";
+  const lastLine = message.text.lastIndexOf("\n");
+  const plan =
+    message.plan ??
+    parseConversationPlanText(message.text) ??
+    (streaming && lastLine > 0 ? parseConversationPlanText(message.text.slice(0, lastLine)) : null);
+  if (!plan?.steps.length) return null;
+  // A step runs only while its turn runs. After the turn ends, an unfinished step is not started.
+  const steps = plan.steps.map((step) => {
+    const state: ChatPlanStepState =
+      step.status === "completed" ? "done" : step.status === "inProgress" && streaming ? "active" : "pending";
+    return { id: step.id, text: state === "active" ? (step.activeText ?? step.text) : step.text, state };
+  });
+  const short = plan.explanation !== null && plan.explanation.length <= PLAN_HEADING_LIMIT;
+  return {
+    id: message.id,
+    kind: "plan",
+    heading: short ? plan.explanation : null,
+    explanation: short ? null : plan.explanation,
+    stopped:
+      (message.status === "interrupted" || message.status === "failed") && steps.some((step) => step.state !== "done"),
+    steps,
+  };
+}
+
 /** Reuse the item projected from the same host message, so memoized rows skip unchanged items. */
 function projectedMarker(
   cache: WeakMap<ConversationMessage, ChatMessage>,
@@ -256,7 +304,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
     } else {
       let bubble = projectedBubbles.get(message);
       if (!bubble) {
-        bubble = {
+        bubble = projectPlan(message) ?? {
           id: message.id,
           kind: "message",
           author: message.author === "user" ? "user" : "agent",
@@ -275,11 +323,13 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   return result;
 }
 
+/** Like the host read state, a plan is not a readable message. */
 export function latestReadableMessage(messages: ConversationMessage[]) {
   return messages.findLast(
     (message) =>
       Boolean(message.questionPrompt) ||
       (message.author !== "system" &&
+        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
         (message.text.trim().length > 0 || Boolean(message.attachments?.length) || Boolean(message.imageGeneration))),
   );
 }

@@ -85,6 +85,8 @@ interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
   agentName: string;
+  /** Replaces "Ask {name}", such as while the composer answers a question. */
+  placeholder?: string;
   mentionAgents: MobileAgent[];
   bottomInset: number;
   disabled: boolean;
@@ -118,6 +120,7 @@ export function ChatComposer({
   action,
   actionForeground,
   agentName,
+  placeholder,
   mentionAgents,
   bottomInset,
   disabled,
@@ -552,7 +555,7 @@ export function ChatComposer({
             )
           }
         >
-          {t("mobile.chat.composer.ask", { name: agentName })}
+          {placeholder ?? t("mobile.chat.composer.ask", { name: agentName })}
         </NativeText>
         <GestureDetector gesture={pan}>
           <AnimatedGlassView
@@ -770,7 +773,7 @@ export function ChatComposer({
                       className="font-sans"
                       style={{ color: String(muted), fontSize: 16, lineHeight: 22 }}
                     >
-                      {t("mobile.chat.composer.ask", { name: agentName })}
+                      {placeholder ?? t("mobile.chat.composer.ask", { name: agentName })}
                     </NativeText>
                   </Animated.View>
                 )}

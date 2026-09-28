@@ -33,6 +33,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
+import { mentionDraft } from "../model/chat-mentions";
 import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
@@ -216,6 +217,8 @@ export function ChatView({
       setPendingMessage(null);
     }
   }, [pendingMessage, projectedMessages, queue?.deliveries, queryClient, target.serverId]);
+  // A private answer has its own masked field in the form, never the composer.
+  const answersQuestion = Boolean(questionForm?.question && !questionForm.question.isSecret);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(
@@ -338,6 +341,15 @@ export function ChatView({
     if (!serverOnline || !canSend || sendingRef.current || pendingMessage) return;
     const body = value.trim();
     if (!body && attachments.items.length === 0) return;
+    // While the agent asks a question, the composer text is the answer. Files still go as a message.
+    if (answersQuestion && questionForm && attachments.items.length === 0) {
+      if (!body || questionForm.disabled) return;
+      Keyboard.dismiss();
+      void haptics.impact();
+      setDraft("");
+      questionForm.answer([mentionDraft(body).text]);
+      return;
+    }
 
     setSendError(null);
     const queueSend = Boolean(queue && (activeTurnId || queue.queued.length));
@@ -614,6 +626,7 @@ export function ChatView({
                   action={action}
                   actionForeground={actionForeground}
                   agentName={target.name}
+                  placeholder={answersQuestion ? t("mobile.chat.question.answerPlaceholder") : undefined}
                   bottomInset={insets.bottom}
                   disabled={!serverOnline || !canSend}
                   sending={sending || Boolean(pendingMessage)}

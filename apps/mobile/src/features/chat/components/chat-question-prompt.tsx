@@ -147,7 +147,7 @@ export function ChatQuestionPrompt({
       </View>
       <View className="flex-row items-center justify-between gap-2">
         <Typography type="body-xs" className="flex-1 text-text-secondary">
-          {t("mobile.chat.question.orTypeAnswer")}
+          {question.isSecret ? t("mobile.chat.question.orTypeAnswer") : t("mobile.chat.question.orReplyInChat")}
         </Typography>
         <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => answer([])}>
           <Typography type="body-xs" className="text-text-secondary">
@@ -155,40 +155,39 @@ export function ChatQuestionPrompt({
           </Typography>
         </Button>
       </View>
-      <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
-        <TextInput
-          accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
-          autoCapitalize={question.isSecret ? "none" : "sentences"}
-          autoCorrect={!question.isSecret}
-          editable={!disabled}
-          maxLength={INPUT_LIMITS.promptAnswerText}
-          placeholder={
-            question.isSecret
-              ? t("mobile.chat.question.privatePlaceholder")
-              : t("mobile.chat.question.answerPlaceholder")
-          }
-          placeholderTextColor={muted}
-          secureTextEntry={question.isSecret}
-          selectionColor={foreground}
-          className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
-          value={controller.draft}
-          onChangeText={controller.setDraft}
-          onSubmitEditing={() => {
-            const answerText = controller.draft.trim();
-            if (answerText) answer([answerText]);
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          isIconOnly
-          accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
-          isDisabled={disabled || !controller.draft.trim()}
-          onPress={() => answer([controller.draft.trim()])}
-        >
-          <Send color={String(muted)} size={18} />
-        </Button>
-      </View>
+      {/* The composer answers in the chat. Only a private answer keeps its own masked field. */}
+      {question.isSecret ? (
+        <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
+          <TextInput
+            accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!disabled}
+            maxLength={INPUT_LIMITS.promptAnswerText}
+            placeholder={t("mobile.chat.question.privatePlaceholder")}
+            placeholderTextColor={muted}
+            secureTextEntry
+            selectionColor={foreground}
+            className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
+            value={controller.draft}
+            onChangeText={controller.setDraft}
+            onSubmitEditing={() => {
+              const answerText = controller.draft.trim();
+              if (answerText) answer([answerText]);
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
+            isDisabled={disabled || !controller.draft.trim()}
+            onPress={() => answer([controller.draft.trim()])}
+          >
+            <Send color={String(muted)} size={18} />
+          </Button>
+        </View>
+      ) : null}
       {pending ? (
         <Typography type="body-xs" accessibilityLiveRegion="polite">
           {t("mobile.chat.question.sending")}
