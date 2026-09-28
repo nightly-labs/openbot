@@ -79,7 +79,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           "This is a reply to a message you sent earlier.",
           "Surface or summarize the result naturally for the user, and start with the name of the teammate.",
           "When the reply reports blocked work, do not repeat that work with the same tools. Give the user the blocker and the action from its Unblock line. When OpenBot has a plugin for the service and that plugin is not in your tools, end your answer with the plugin sentence from your instructions.",
-          "Reply to the teammate only when the message requests another action or reports blocked/failed work; otherwise do not send an acknowledgement and avoid reply loops.",
+          "Reply to the teammate only when the message requests another action, or when you have new information that unblocks its work. Do not send it the same request again. Otherwise do not send an acknowledgement and avoid reply loops.",
         ]
       : delivery.expectsReply === false
         ? [
