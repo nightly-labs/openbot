@@ -68,6 +68,34 @@ export function isBackgroundRefreshDiagnostic(message: string): boolean {
   return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
 }
 
+const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring \d+ unrecognized configuration settings?\b/;
+
+/**
+ * Whether a provider diagnostic is Codex's summary of the settings it ignored in its configuration.
+ *
+ * Codex writes this at `ERROR` level when a configuration layer holds a key it does not know: a
+ * typo, a removed setting, or a key that a newer Codex wrote into the shared `~/.codex/config.toml`.
+ * The keys are on the indented lines after the summary, which reach OpenBot as records of their
+ * own, so the user read only the summary as a "Provider error", once per reconnect, with no key to
+ * fix (#997). Codex starts and works either way. The same text arrives as a `configWarning`
+ * notification, which names the keys and is reported from there, so this copy belongs in the log.
+ */
+export function isIgnoredConfigDiagnostic(message: string): boolean {
+  return IGNORED_CONFIG_SUMMARY.test(message);
+}
+
+/**
+ * The keys a Codex `configWarning` summary names as ignored, or `null` for any other warning.
+ *
+ * Codex lists up to three, one per line, as ``  user (/path/config.toml): `tools.x` is ignored.``
+ * Only the keys are kept: the layer label carries a path, which the renderer does not show.
+ */
+export function ignoredCodexSettings(summary: string): string[] | null {
+  if (!IGNORED_CONFIG_SUMMARY.test(summary)) return null;
+  const keys = [...summary.matchAll(/`([^`\n]+)` is ignored\./g)].flatMap((match) => (match[1] ? [match[1]] : []));
+  return [...new Set(keys)];
+}
+
 /**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not

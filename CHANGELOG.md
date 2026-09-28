@@ -31,6 +31,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- When Codex ignores an unknown setting in its configuration, show one warning that names each
+  setting. Before, a "Provider error" showed only "Codex is ignoring 1 unrecognized configuration
+  setting", with no setting name, and it came back after each reconnect. Codex continues to work.
 - Show the highlight of the selected server across the full row in the mobile server list. Before,
   the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner

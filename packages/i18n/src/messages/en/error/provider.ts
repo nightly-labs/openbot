@@ -104,6 +104,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codexNotStartedHint":
     "Codex CLI was found but could not be started. Run `codex --version` in a new terminal.",
   "error.provider.codexMissing": "ChatGPT is not downloaded. Download it in OpenBot to continue.",
+  "error.provider.codexConfigIgnored":
+    "Codex ignored these settings in its configuration: {settings}. Correct or remove them, or update Codex.",
+  "error.provider.codexConfigIgnoredUnnamed":
+    "Codex ignored a setting in its configuration. Correct or remove it, or update Codex.",
   "error.provider.claudeOutdated": "Claude Code {version} is too old. OpenBot requires 2.1.232 or newer.",
   "error.provider.claudeNotStarted": "Claude CLI was found but could not be started.",
   "error.provider.claudeNotStartedHint":
