@@ -2,14 +2,17 @@ import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { X } from "lucide-react-native";
-import { useMemo } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { AwaitingRepliesSection } from "../components/awaiting-replies-section";
 import { type QueuedUpload, useQueuedChat } from "../context/queued-messages-context";
+import { awaitingReplies } from "../model/awaiting-replies";
 import { queueRowsWithHeldEdit } from "../model/queue-edit-draft";
 import { queuedMessagePreview } from "../model/queued-message-view";
 
@@ -61,6 +64,19 @@ export function QueuedMessagesScreen() {
   const held = queue?.edit?.delivery ?? null;
   const rows = useMemo(() => queueRowsWithHeldEdit(queued ?? [], held), [queued, held]);
   const count = rows.length + (pending ? 1 : 0);
+  const { agents, conversationStore } = useMobileWorkspace();
+  const agentId = queue?.agentId ?? "";
+  const conversation = useSyncExternalStore(
+    useCallback((notify: () => void) => conversationStore.subscribe(agentId, notify), [conversationStore, agentId]),
+    useCallback(() => conversationStore.get(agentId), [conversationStore, agentId]),
+  );
+  const replies = queue?.replies;
+  // The questions this agent asked come from its conversation, the answers from its queue.
+  const waiting = useMemo(
+    () => awaitingReplies(conversation?.messages ?? [], replies ?? []),
+    [conversation?.messages, replies],
+  );
+  const serverAgents = useMemo(() => agents.filter((agent) => agent.serverId === queue?.serverId), [agents, queue]);
   const open = (delivery: QueueDelivery) => {
     void haptics.selection();
     router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId: delivery.id } });
@@ -86,6 +102,11 @@ export function QueuedMessagesScreen() {
           </SettingsSection>
         </>
       ) : null}
+      <AwaitingRepliesSection
+        rows={waiting}
+        agents={serverAgents}
+        self={serverAgents.find((agent) => agent.id === agentId)}
+      />
       {count > 0 ? (
         <SettingsSection title={t("mobile.chat.queue.waitingTitle")}>
           {pending ? <UploadRow pending={pending} /> : null}
@@ -105,12 +126,12 @@ export function QueuedMessagesScreen() {
           ))}
         </SettingsSection>
       ) : null}
-      {count === 0 && queue?.loading ? (
+      {count === 0 && waiting.length === 0 && queue?.loading ? (
         <Typography.Paragraph align="center" className="text-text-secondary">
           {t("mobile.chat.queue.loading")}
         </Typography.Paragraph>
       ) : null}
-      {count === 0 && !queue?.loading ? (
+      {count === 0 && waiting.length === 0 && !queue?.loading ? (
         <View className="items-center px-8 py-12">
           <Typography.Paragraph align="center" weight="semibold">
             {t("mobile.chat.queue.emptyTitle")}

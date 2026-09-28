@@ -148,7 +148,7 @@ describe("Team protocol v4", () => {
     expect(() => decodeTeamProtocolV4CurrentHttpRequest("POST", "/v1/browser/load", { tabId: "tab-1" })).toThrow();
   });
 
-  it("carries the queue edit mark to a current client and drops it for a frozen one", () => {
+  it("carries the queue edit and reply marks to a current client and drops them for a frozen one", () => {
     const delivery = {
       id: "delivery-1",
       messageId: "message-1",
@@ -164,11 +164,24 @@ describe("Team protocol v4", () => {
       createdAt: "2026-09-16T10:00:00.000Z",
       editing: true,
     };
-    const snapshot = { agentId: "chief", deliveries: [delivery] };
+    // A teammate's answer: without the mark a client shows it as a question it can edit or steer.
+    const answer = {
+      ...delivery,
+      id: "delivery-2",
+      messageId: "message-2",
+      sender: { kind: "agent", agentId: "builder" },
+      text: "Status: done",
+      replyToMessageId: "message-0",
+      position: 2,
+      editing: false,
+      expectsReply: false,
+    };
+    const snapshot = { agentId: "chief", deliveries: [delivery, answer] };
     const queuePath = "/v1/agents/chief/queue";
 
     const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot));
     expect(wire.deliveries[0].editing).toBe(true);
+    expect(wire.deliveries[1].expectsReply).toBe(false);
     expect(decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, wire)).toEqual(snapshot);
     // The queue edit response is the same snapshot, so the holder sees the mark too.
     const edited = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("POST", `${queuePath}/edit`, 200, snapshot));
@@ -179,6 +192,7 @@ describe("Team protocol v4", () => {
     // A frozen adapter projects a fixed key list: the mark is absent, not false.
     const frozen = JSON.parse(encodeTeamProtocolV1CurrentHttpResponse("GET", queuePath, 200, snapshot));
     expect(frozen.deliveries[0]).not.toHaveProperty("editing");
+    expect(frozen.deliveries[1]).not.toHaveProperty("expectsReply");
   });
 
   it("carries the exchange reply mark to a current client and drops it for a frozen one", () => {
@@ -230,7 +244,7 @@ describe("Team protocol v4", () => {
     expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow();
   });
 
-  it("rejects a queue snapshot whose edit mark is not a boolean", () => {
+  it("rejects a queue snapshot whose edit or reply mark is not a boolean", () => {
     const queuePath = "/v1/agents/chief/queue";
     const delivery = {
       id: "delivery-1",
@@ -252,6 +266,10 @@ describe("Team protocol v4", () => {
     // to write one, so neither side turns a malformed mark into an editable row.
     expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow();
     expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, snapshot)).toThrow("edit mark");
+    // An unchecked reply mark would read as a question, and offer steer and edit on an answer.
+    const reply = { agentId: "chief", deliveries: [{ ...delivery, expectsReply: "false" }] };
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, reply)).toThrow();
+    expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, reply)).toThrow("reply mark");
     // A host that never sends the mark still passes.
     const unmarked = { agentId: "chief", deliveries: [delivery] };
     const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", queuePath, 200, unmarked));

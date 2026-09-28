@@ -1,4 +1,4 @@
-import type { QueueDelivery } from "@openbot/contracts/ipc";
+import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
 import { fireEvent, screen } from "@testing-library/dom";
 import { act, type PropsWithChildren, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,7 +17,9 @@ const native = vi.hoisted(() => {
   };
   const context: { queue: ChatQueueController | null; pending: QueuedUpload | null } = { queue: null, pending: null };
   const attachments: { preparing: boolean } = { preparing: false };
+  const chief: { conversation?: { messages: ConversationMessage[] } } = {};
   return {
+    chief,
     push: vi.fn(),
     back: vi.fn(),
     alert: vi.fn(),
@@ -101,7 +103,11 @@ vi.mock("heroui-native", () => {
       {children}
     </button>
   );
-  return { Typography: Object.assign(Text, { Paragraph: Text }), Button: Object.assign(Button, { Label: Text }) };
+  return {
+    Typography: Object.assign(Text, { Paragraph: Text }),
+    Button: Object.assign(Button, { Label: Text }),
+    Spinner: () => null,
+  };
 });
 vi.mock("react-native", () => ({
   View: ({ children }: PropsWithChildren) => <div>{children}</div>,
@@ -146,12 +152,32 @@ vi.mock("@/features/settings/components/settings-content", () => {
   return {
     SettingsContent: ({ children }: PropsWithChildren) => <div>{children}</div>,
     SettingsNote: ({ children }: PropsWithChildren) => <p>{children}</p>,
-    SettingsSection: ({ title, children }: PropsWithChildren<{ title?: string }>) => (
-      <section aria-label={title}>{children}</section>
+    SettingsSection: ({ title, footer, children }: PropsWithChildren<{ title?: string; footer?: ReactNode }>) => (
+      <section aria-label={title}>
+        {children}
+        {footer}
+      </section>
     ),
     SettingsRow: Row,
   };
 });
+vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({
+  useMobileWorkspace: () => ({
+    agents: [
+      { id: "agent", serverId: "host", name: "Chief" },
+      { id: "builder", serverId: "host", name: "Builder" },
+      { id: "researcher", serverId: "host", name: "Researcher" },
+    ],
+    conversationStore: {
+      subscribe: () => () => {},
+      get: () => native.chief.conversation,
+    },
+  }),
+}));
+vi.mock("@/features/agents/components/bloub-avatar", () => ({ BloubAvatarThumbnail: () => null }));
+vi.mock("../components/thinking-text-gradient", () => ({
+  ThinkingTextGradient: ({ children }: PropsWithChildren) => children,
+}));
 vi.mock("@/shared/components/sheet-form-field", () => ({
   SheetFormField: ({
     label,
@@ -197,6 +223,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.context.queue = null;
   native.context.pending = null;
+  native.chief.conversation = undefined;
   native.attachments.preparing = false;
   native.params = { chat: "host:agent", deliveryId: "one" };
   native.guard.prevent = false;
@@ -230,6 +257,7 @@ function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueContr
     changeAttachments: async () => {},
     attachmentSupport: () => ({ eml: true, media: true }),
     queued,
+    replies: [],
     deliveries: queued,
     edit: null,
     editUnavailable: false,
@@ -318,6 +346,51 @@ it("allows confirmed deletion while another device is editing", async () => {
   act(() => buttons.find((button) => button.text === "Delete")?.onPress?.());
   expect(native.context.queue?.remove).toHaveBeenCalledWith(edited);
   await act(async () => {});
+});
+
+it("shows a teammate answer in the waiting block, not as a queued message", () => {
+  const answer: QueueDelivery = {
+    ...first,
+    id: "answer",
+    messageId: "message-answer",
+    sender: { kind: "agent", agentId: "builder" },
+    text: "Status: done\nResult: The build passed.\nEvidence: ci log",
+    replyToMessageId: "message-question",
+    position: 2,
+    expectsReply: false,
+  };
+  // Chief asked two teammates. Builder answered; Researcher still works, so the host holds the answer.
+  native.chief.conversation = {
+    messages: [
+      {
+        id: "question",
+        author: "system",
+        text: "",
+        createdAt: "2026-09-15T10:30:00Z",
+        status: "completed",
+        exchange: {
+          direction: "outgoing",
+          messageId: "message-question",
+          senderAgentId: "agent",
+          recipientAgentIds: ["builder", "researcher"],
+          replyToMessageId: null,
+          deliveries: [
+            { id: "to-builder", recipientAgentId: "builder", status: "completed", position: null, error: null },
+            { id: "to-researcher", recipientAgentId: "researcher", status: "running", position: null, error: null },
+          ],
+        },
+      },
+    ],
+  };
+  native.context.queue = stubQueue({ queued: [first], replies: [answer], deliveries: [first, answer] });
+  mount(() => <QueuedMessagesScreen />);
+  expect(screen.getByRole("button", { name: /First request/ })).toBeTruthy();
+  const waiting = screen.getByRole("region", { name: "Waiting for replies" });
+  expect(waiting.textContent).toContain("BuilderThe build passed.Replied");
+  expect(waiting.textContent).toContain("ResearcherWorking");
+  expect(waiting.textContent).toContain("Chief reads the replies when every teammate is done.");
+  // The answer has no queue actions: steer, edit and reorder would treat it as the user's message.
+  expect(screen.queryByRole("button", { name: /build passed/ })).toBeNull();
 });
 
 it("reports an empty queue", () => {

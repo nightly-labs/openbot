@@ -22,6 +22,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Changed
 
+- On the phone, an answer from a teammate agent no longer shows as a queued message that you can
+  edit, steer or move. The queue sheet shows it under "Waiting for replies". A computer on an older
+  version does not send this information, so its answers still show as queued messages.
 - Show a "Connect your computer" screen in the web app when no computer is connected. It gives the
   three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
   small notice showed above an empty conversation. When the computers cannot load, an error message

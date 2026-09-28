@@ -1,8 +1,7 @@
-import type { ChannelTask, QueueDelivery, QueueSnapshot } from "@openbot/contracts/ipc";
+import { type ChannelTask, isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AwaitingReplyItem, AwaitingReplyState } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { currentText } from "@openbot/ui/text";
-import { isQueuedAgentReply } from "./queue-reconciliation";
 
 /**
  * The rows of the waiting block: which agents this agent asked, and where each answer is.

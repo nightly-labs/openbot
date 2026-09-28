@@ -1,4 +1,4 @@
-import type { QueueDelivery, QueueSnapshot } from "@openbot/contracts/ipc";
+import { isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
 
 /**
  * Which of an agent's queue the conversation shows, and in what order.
@@ -27,16 +27,6 @@ export function activeQueueDeliveries(
   if (!activeTurnId) return running;
   const matching = running.filter((delivery) => delivery.turnId === activeTurnId || delivery.turnId === null);
   return matching.length > 0 ? matching : running;
-}
-
-/** A queued answer from another agent. The waiting block shows it, so the queue panel does not. */
-export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
-  return (
-    delivery.status === "queued" &&
-    delivery.sender.kind === "agent" &&
-    delivery.replyToMessageId !== null &&
-    delivery.expectsReply === false
-  );
 }
 
 /**

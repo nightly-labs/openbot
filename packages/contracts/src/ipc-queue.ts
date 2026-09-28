@@ -49,6 +49,22 @@ export interface QueueDelivery {
   expectsReply?: boolean;
 }
 
+/**
+ * A queued answer from another agent to a question this agent asked. A client shows it in the
+ * waiting block, with the question it answers, and does not offer queue actions on it.
+ *
+ * A host too old to send `expectsReply` reports every delivery as a question, so each one stays an
+ * ordinary queue row there.
+ */
+export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
+  return (
+    delivery.status === "queued" &&
+    delivery.sender.kind === "agent" &&
+    delivery.replyToMessageId !== null &&
+    delivery.expectsReply === false
+  );
+}
+
 function isQueueDelivery(value: unknown): value is QueueDelivery {
   return (
     isDynamicRecord(value) &&

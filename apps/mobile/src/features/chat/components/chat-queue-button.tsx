@@ -33,12 +33,23 @@ export const ChatQueueButton = memo(function ChatQueueButton({
   // A queue that failed to load reports no messages. Keep the entry, so the failure and its
   // retry stay reachable instead of leaving the chat with nothing to press.
   const failed = count === 0 && Boolean(queue.error);
-  if (count === 0 && !failed) return null;
+  // Teammate answers are not queue rows, but the sheet shows them. Keep the entry for them alone.
+  const onlyReplies = count === 0 && !failed && queue.replies.length > 0;
+  if (count === 0 && !failed && !onlyReplies) return null;
+  const label = failed
+    ? t("mobile.chat.queue.unavailable")
+    : onlyReplies
+      ? t("mobile.chat.queue.repliesTitle")
+      : t("mobile.chat.queue.count", { count });
   return (
     <View className="mb-2 items-center">
       <ChatGlassButton
         accessibilityLabel={
-          failed ? t("mobile.chat.queue.buttonFailed") : t("mobile.chat.queue.buttonLabel", { count })
+          failed
+            ? t("mobile.chat.queue.buttonFailed")
+            : onlyReplies
+              ? label
+              : t("mobile.chat.queue.buttonLabel", { count })
         }
         className="h-11 flex-row items-center gap-2 px-4"
         fallbackBackground={fallbackBackground}
@@ -55,7 +66,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
           <Clock color={String(muted)} size={16} strokeWidth={2} />
         )}
         <Typography.Paragraph type="body-sm" weight="semibold">
-          {failed ? t("mobile.chat.queue.unavailable") : t("mobile.chat.queue.count", { count })}
+          {label}
         </Typography.Paragraph>
         <ChevronUp color={String(muted)} size={16} strokeWidth={2} />
       </ChatGlassButton>
