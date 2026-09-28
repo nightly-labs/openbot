@@ -765,10 +765,8 @@ function redactedMetadataUrl(value: string | undefined): string {
 export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
   let bytes = Buffer.byteLength(JSON.stringify(snapshot));
   while (bytes > MAX_SERIALIZED_SNAPSHOT_BYTES) {
-    if (snapshot.diagnostics.length > 20) snapshot.diagnostics.shift();
-    else if (snapshot.actions.length > 20) snapshot.actions.shift();
     // The text ends with what is outside the viewport; the elements are what the next action uses.
-    else if (snapshot.text.length > 0) {
+    if (snapshot.text.length > 0) {
       snapshot.truncated = true;
       const excess = bytes - MAX_SERIALIZED_SNAPSHOT_BYTES;
       snapshot.text = snapshot.text.slice(0, Math.max(0, snapshot.text.length - Math.max(1, excess)));

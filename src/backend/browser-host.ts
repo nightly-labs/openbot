@@ -1463,7 +1463,7 @@ export class BrowserHost {
       tab.diagnostics.add({
         kind: "console",
         level: details.level,
-        message: details.message.slice(0, 2_000),
+        message: details.message,
         url: diagnosticUrl(details.sourceId),
       });
       if (details.level === "error") this.#emitChanged();

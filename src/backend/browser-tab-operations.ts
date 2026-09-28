@@ -46,6 +46,12 @@ export function enqueueTabOperation<T>(
     return { drained, result };
   });
   const result = started.then(({ result }) => result);
+  advanceTabQueue(tab, started);
+  return result;
+}
+
+/** Makes the tab's queue wait for `started` to drain, and counts it as pending until it does. */
+function advanceTabQueue(tab: BrowserHostTab, started: Promise<{ drained: Promise<void> }>): void {
   tab.pendingOperations += 1;
   tab.queue = started
     .then(
@@ -55,7 +61,6 @@ export function enqueueTabOperation<T>(
     .finally(() => {
       tab.pendingOperations -= 1;
     });
-  return result;
 }
 
 export async function readTabSnapshot(
@@ -233,7 +238,7 @@ export async function runTabAction(
             action,
             ...(target ? { target: describeBrowserTarget(target) } : {}),
             outcome: "error",
-            detail: String(error).slice(0, 2_000),
+            detail: String(error),
           });
         }
         throw error;
@@ -258,10 +263,7 @@ export async function runTabAction(
     return { drained, response };
   });
   const result = started.then(({ response }) => response);
-  tab.queue = started.then(
-    ({ drained }) => drained,
-    () => undefined,
-  );
+  advanceTabQueue(tab, started);
   return result;
 }
 
@@ -312,7 +314,7 @@ export async function runTabEvaluation(
         tab.diagnostics.action({
           action: "evaluate",
           outcome: "error",
-          detail: String(error).slice(0, 2_000),
+          detail: String(error),
         });
         throw error;
       });
@@ -322,10 +324,7 @@ export async function runTabEvaluation(
     return { drained, response };
   });
   const result = started.then(({ response }) => response);
-  tab.queue = started.then(
-    ({ drained }) => drained,
-    () => undefined,
-  );
+  advanceTabQueue(tab, started);
   return result;
 }
 
