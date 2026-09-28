@@ -534,13 +534,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     else void channels.refresh();
   });
   const channelOpen = () => channels.state.selectedId !== null;
+  const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
+  /** A host with no agents. The first-agent form opens there by itself, as in the desktop app. */
+  const firstAgent = () => workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported();
+  /** An open channel still takes the pane, as a channel closes the desktop form. */
+  const agentFormOpen = () => creating() || (firstAgent() && !channelOpen());
   const readState = () => workspace.conversation()?.page?.readState;
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
   // coming back reads the page again.
   createEffect(
     () =>
-      (readState()?.unreadCount ?? 0) > 0 && !creating() && !channelOpen() && canMarkRead()
+      (readState()?.unreadCount ?? 0) > 0 && !agentFormOpen() && !channelOpen() && canMarkRead()
         ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
         : null,
     (unread) => {
@@ -713,10 +718,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setUsage(null);
     setCreating(true);
   }
-  const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
   /** Profile opens in the right panel of the agent on screen, so it needs that conversation. */
   const profileAgentId = () =>
-    !creating() && !channelOpen() && !noHost() && !hostOffline() ? (conversationAgent()?.id ?? null) : null;
+    !agentFormOpen() && !channelOpen() && !noHost() && !hostOffline() ? (conversationAgent()?.id ?? null) : null;
   function openProfile() {
     const agentId = profileAgentId();
     if (!agentId) return;
@@ -841,7 +845,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onExpand={layout.expandSidebar}
                 onOpenMarketplace={() => setMarketplaceOpen(true)}
                 emptyAction={
-                  workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported()
+                  firstAgent()
                     ? {
                         label: t("sidebar.empty.firstAgent"),
                         avatarSeed: agentAvatar().avatarSeed,
@@ -911,7 +915,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 server={server()}
                 agents={workspace.state.agents}
                 activeAgentId={workspace.state.selectedId ?? ""}
-                composerAvailable={status().phase === "ready" && !creating()}
+                composerAvailable={status().phase === "ready" && !agentFormOpen()}
                 onOpenAgent={(agentId) => {
                   setMobilePane("conversation");
                   if (agentId !== workspace.state.selectedId) void select(agentId);
@@ -1000,10 +1004,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </>
           }
         >
-          <Show when={creating()}>
+          <Show when={agentFormOpen()}>
             <WebAgentSettings
               runtime={workspace.runtime}
               capabilities={workspace.state.capabilities}
+              first={firstAgent()}
               customProviders={providerSettings()?.customProviders}
               // A new form starts empty, with the avatar that the first-agent row showed.
               initialDraft={{ ...createFirstAgentDraft(), ...untrack(agentAvatar) }}
@@ -1016,7 +1021,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
             />
           </Show>
-          <Show when={!creating() && channelOpen()}>
+          <Show when={!agentFormOpen() && channelOpen()}>
             <ChannelConversation
               isOwnMessage={(authorId) =>
                 isOwnChannelAuthor(authorId, {
@@ -1034,7 +1039,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
             />
           </Show>
-          <Show when={!creating() && !channelOpen() && noHost()}>
+          <Show when={!agentFormOpen() && !channelOpen() && noHost()}>
             <WebConnectComputer
               loading={workspace.state.hostsLoading}
               failed={Boolean(workspace.state.hostsError)}
@@ -1042,7 +1047,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               onRefresh={() => void workspace.run(workspace.refreshHosts)}
             />
           </Show>
-          <Show when={!creating() && !channelOpen() && hostOffline()}>
+          <Show when={!agentFormOpen() && !channelOpen() && hostOffline()}>
             <WebHostOffline
               title={
                 workspace.state.host
@@ -1068,7 +1073,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }
             />
           </Show>
-          <Show when={!creating() && !channelOpen() && !noHost() && !hostOffline()}>
+          <Show when={!agentFormOpen() && !channelOpen() && !noHost() && !hostOffline()}>
             <Conversation
               runtime={runtime}
               onOpenMarketplace={() => setMarketplaceOpen(true)}
