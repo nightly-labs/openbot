@@ -16,7 +16,7 @@ export interface DynamicIslandPreference {
 
 /** Limits keep the island large enough to find and to click, whatever the stored value says. */
 export const DYNAMIC_ISLAND_SIZE_LIMITS = {
-  widthPercent: { min: 70, max: 130, step: 5 },
+  widthPercent: { min: 20, max: 130, step: 5 },
   heightPercent: { min: 75, max: 125, step: 5 },
 } as const;
 

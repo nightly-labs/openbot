@@ -8,19 +8,22 @@ import { dynamicIslandPort } from "./dynamic-island-port";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
-const DEFAULT_NOTCH_SIZE: DynamicIslandNotchSize = {
-  width: DEFAULT_NOTCH_WIDTH,
-  height: DEFAULT_NOTCH_HEIGHT,
-};
 
 export function DynamicIslandSurface() {
   const { t } = useText();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
-  const notchWidth = readPositivePixelValue(query.get("notch-width"), DEFAULT_NOTCH_WIDTH);
-  const notchHeight = readPositivePixelValue(query.get("notch-height"), DEFAULT_NOTCH_HEIGHT);
-  const initialNotchSize: DynamicIslandNotchSize = { width: notchWidth, height: notchHeight };
-  const [notchSize, setNotchSize] = createSignal<DynamicIslandNotchSize>(initialNotchSize);
+  // The main process names a notch only on a MacBook that has one. Without it, the island draws its
+  // own gap, which follows the width setting.
+  const queryNotchWidth = query.get("notch-width");
+  const initialNotchSize: DynamicIslandNotchSize | undefined =
+    queryNotchWidth === null
+      ? undefined
+      : {
+          width: readPositivePixelValue(queryNotchWidth, DEFAULT_NOTCH_WIDTH),
+          height: readPositivePixelValue(query.get("notch-height"), DEFAULT_NOTCH_HEIGHT),
+        };
+  const [notchSize, setNotchSize] = createSignal<DynamicIslandNotchSize | undefined>(initialNotchSize);
   const [presentation, setPresentation] = createSignal(IDLE_DYNAMIC_ISLAND_PRESENTATION);
   const [preference, setPreference] = createSignal<DynamicIslandPreference>({
     ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -148,9 +151,7 @@ export function DynamicIslandSurface() {
       .catch(() => undefined);
     const stopPreference = dynamicIslandPort().dynamicIsland.onPreference(applyPreference);
     const stopPresentation = dynamicIslandPort().dynamicIsland.onPresentation(applyPresentation);
-    const stopGeometry = dynamicIslandPort().dynamicIsland.onGeometry((next) =>
-      setNotchSize(next ?? DEFAULT_NOTCH_SIZE),
-    );
+    const stopGeometry = dynamicIslandPort().dynamicIsland.onGeometry((next) => setNotchSize(next ?? undefined));
     const close = () => {
       pointerInside = false;
       focusInside = false;
