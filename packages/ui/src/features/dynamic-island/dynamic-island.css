@@ -122,9 +122,11 @@
   width: min(var(--dynamic-island-compact-width), calc(100vw - var(--openbot-space-6)));
   height: var(--dynamic-island-notch-height);
   display: grid;
+  /* The ears share the width that is left: a fixed floor here pushed the trailing ear out of a
+     narrow island. The width limits keep each ear wide enough for its content. */
   grid-template-columns:
-    minmax(38px, 1fr) var(--dynamic-island-notch-width)
-    minmax(38px, 1fr);
+    minmax(0, 1fr) var(--dynamic-island-notch-width)
+    minmax(0, 1fr);
   align-items: center;
   border: 0;
   border-radius: inherit;
@@ -338,6 +340,20 @@
 .dynamic-island-idle .dynamic-island-ear-trailing {
   color: var(--openbot-text-primary);
   transition: none;
+}
+
+/* Beside a notch, the logo and the greeting keep the same inset from the outer edges. Only the
+   space between them changes with the island width. */
+.dynamic-island.dynamic-island-idle:not(.dynamic-island-external) .dynamic-island-ear-leading {
+  justify-content: flex-start;
+  padding-right: 0;
+  padding-left: var(--openbot-space-4);
+}
+
+.dynamic-island.dynamic-island-idle:not(.dynamic-island-external) .dynamic-island-ear-trailing {
+  justify-content: flex-end;
+  padding-right: var(--openbot-space-4);
+  padding-left: 0;
 }
 
 .dynamic-island-hover-zone {

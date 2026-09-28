@@ -82,7 +82,12 @@ Signal recovery, file transfers, and browser-view streams. The stream codec live
 the old main-process import re-exports that codec without changing its wire format. Account
 requests use a closed list of `/api/browser/*` operations. They cannot carry chat requests.
 Browser tickets and session termination require the same account-session hash that created the
-remote session. Existing bearer-token endpoints retain their behavior.
+remote session. Existing bearer-token endpoints retain their behavior. The browser edits the
+account's name, avatar, and sessions through `v1/me/profile`, `v1/me/avatar`, and `v1/me/sessions`,
+which call the same `AuthService` methods and avatar storage (`avatar-storage.ts`) as the bearer
+routes. The avatar upload is the one write that is not JSON; the origin and `X-OpenBot-Browser`
+checks still apply. `web-account.ts` makes these calls, and the shared `AccountProfilePanel` shows
+them in the conversation's right panel.
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives

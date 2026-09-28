@@ -12,6 +12,8 @@ const meta = {
   parameters: { layout: "fullscreen" },
   args: {
     accountId: "preview-account",
+    accountEmail: "you@example.com",
+    accountName: "Preview User",
     accountFetch: fetch,
     onSessionCheck: async () => {},
     onLogout: async () => {},

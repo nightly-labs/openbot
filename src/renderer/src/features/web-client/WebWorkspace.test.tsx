@@ -61,6 +61,7 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     disconnect: vi.fn().mockResolvedValue(undefined),
     listAgents: vi.fn().mockResolvedValue([STORY_AGENT_SUMMARIES[0]]),
     conversation: vi.fn().mockResolvedValue(page),
+    markRead: vi.fn().mockResolvedValue({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     send: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
     queue: vi.fn(async (agentId: string) => ({ agentId, deliveries: [] })),
@@ -75,6 +76,8 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     cancelUpload: vi.fn(),
     discard: vi.fn(),
     download: vi.fn(),
+    sharedFile: vi.fn(),
+    workspaceFile: vi.fn(),
     dispose: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

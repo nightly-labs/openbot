@@ -507,7 +507,9 @@ vi.mock("@expo/ui", () => {
   };
 });
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
-vi.mock("@/shared/lib/haptics", () => ({ haptics: { impact: async () => {}, notification: async () => {} } }));
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { impact: async () => {}, notification: async () => {}, selection: async () => {} },
+}));
 vi.mock("lucide-react-native", () => ({
   ChevronRight: () => null,
   Ellipsis: () => null,

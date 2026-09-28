@@ -147,6 +147,7 @@ export function createWebWorkspace(
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
   /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
   const queueRevisions = new Map<string, number>();
+  const readWrites = new Map<string, Promise<void>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -793,6 +794,26 @@ export function createWebWorkspace(
         });
     }
   }
+  /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
+  function markRead() {
+    const id = selectedId;
+    if (!id || state.status !== "online") return Promise.resolve();
+    const current = generation;
+    const write = (readWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const page = state.conversations[id]?.page;
+        if (!page || disposed || current !== generation) return;
+        const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[id]?.page;
+          if (value?.threadId === page.threadId) value.readState = readState;
+        });
+      });
+    readWrites.set(id, write);
+    return write;
+  }
   onSettled(() => {
     void refreshHosts().catch(report);
     const focus = () => {
@@ -863,6 +884,7 @@ export function createWebWorkspace(
         return false;
       }
     },
+    markRead,
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

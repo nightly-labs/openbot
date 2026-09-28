@@ -15,6 +15,9 @@ const native = vi.hoisted(() => ({
   remove: vi.fn(),
   alert: vi.fn(),
 }));
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { selection: vi.fn(async () => {}), impact: vi.fn(async () => {}), notification: vi.fn(async () => {}) },
+}));
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({
   useMobileWorkspace: () => ({ downloadAttachment: native.download }),
 }));

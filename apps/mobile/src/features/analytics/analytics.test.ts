@@ -424,6 +424,8 @@ it("instruments message commands without sending their contents or changing the 
     loadAgentStorage: unexpected,
     loadAgentAdminSettings: unexpected,
     updateAgentAdminSettings: unexpected,
+    canInstallAgentTemplate: () => false,
+    installAgentTemplate: unexpected,
     deleteStoredFile: unexpected,
     loadConversation: unexpected,
     loadOlderMessages: unexpected,

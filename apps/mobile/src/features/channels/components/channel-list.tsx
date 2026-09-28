@@ -66,6 +66,7 @@ export const ChannelListRow = memo(function ChannelListRow({
             .command(serverId, { type: "archive", operationId: Crypto.randomUUID(), channelId: channel.id })
             .then(() => haptics.notification())
             .catch((cause: unknown) => {
+              void haptics.notification("error");
               const text = currentText();
               Alert.alert(
                 text.t("mobile.channel.list.deleteFailed"),

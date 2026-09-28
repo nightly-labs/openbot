@@ -16,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { ImageDimensions } from "../model/image-dimensions";
 import { useAttachmentFile } from "./attachment-preview";
@@ -174,7 +175,10 @@ export function ChatImageGeneration({
             onRevealed={() => setRevealed(true)}
             onError={() => setPreviewError(true)}
             hidden={sourceHidden}
-            onPress={() => setViewing(true)}
+            onPress={() => {
+              void haptics.impact("soft");
+              setViewing(true);
+            }}
           />
         ) : null}
       </View>

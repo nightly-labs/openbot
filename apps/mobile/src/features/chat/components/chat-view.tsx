@@ -306,7 +306,9 @@ export function ChatView({
       setPendingMessage(null);
       setHistoryReceipt(null);
       setSendError(null);
+      void haptics.notification("success");
     } catch (error) {
+      void haptics.notification("error");
       setSendError({ agentId: target.id, message: errorMessage(error, t("mobile.chat.history.refreshFailed")) });
     } finally {
       setRefreshingHistory(false);
@@ -326,6 +328,7 @@ export function ChatView({
       setSendError(null);
       void haptics.impact();
       stopTurn(turnId).catch((error: unknown) => {
+        void haptics.notification("error");
         setStoppingTurnId((current) => (current === turnId ? null : current));
         setSendError({
           agentId: target.id,
@@ -422,11 +425,13 @@ export function ChatView({
         setSendRetryVersion((version) => version + 1);
         // A cancelled upload is the user's own choice: the files and text are back in the
         // composer, and no error is needed to explain it.
-        if (!uploadCancelled.current)
+        if (!uploadCancelled.current) {
+          void haptics.notification("error");
           setSendError({
             agentId: target.id,
             message: errorMessage(error, t("mobile.chat.composer.sendFailed")),
           });
+        }
       } finally {
         sendingRef.current = false;
         setSending(false);

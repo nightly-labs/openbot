@@ -11,6 +11,7 @@ import { FileText } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, View } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
@@ -113,6 +114,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       file.write(result.data.base64, { encoding: "base64" });
       await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
     } catch (error) {
+      void haptics.notification("error");
       Alert.alert(
         t("mobile.chat.attachment.openFailed"),
         error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
@@ -143,6 +145,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
+      void haptics.notification("error");
       Alert.alert(
         t("mobile.chat.attachment.saveImageFailed"),
         error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
@@ -183,6 +186,7 @@ export async function shareLocalAttachment(file: { name: string; mimeType: strin
     }
     await Sharing.shareAsync(uri, { mimeType: file.mimeType, dialogTitle: file.name });
   } catch (error) {
+    void haptics.notification("error");
     Alert.alert(
       t("mobile.chat.attachment.openFailed"),
       error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),

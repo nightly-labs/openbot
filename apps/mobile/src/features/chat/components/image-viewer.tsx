@@ -485,7 +485,10 @@ export function ImageViewer({
               hidden={!chromeVisible}
               fallbackBackground={fallbackBackground}
               liquidGlassAvailable={liquidGlassAvailable}
-              onPress={requestClose}
+              onPress={() => {
+                void haptics.impact("soft");
+                requestClose();
+              }}
             >
               <X size={22} color={String(foreground)} />
             </ChatGlassIconButton>
@@ -496,7 +499,10 @@ export function ImageViewer({
                 disabled={busy}
                 fallbackBackground={fallbackBackground}
                 liquidGlassAvailable={liquidGlassAvailable}
-                onPress={onShare}
+                onPress={() => {
+                  void haptics.impact("soft");
+                  onShare();
+                }}
               >
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>

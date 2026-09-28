@@ -8,7 +8,11 @@ import type {
   DynamicIslandPromptItem,
   DynamicIslandTakeoverItem,
 } from "@openbot/contracts/ipc";
-import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, dynamicIslandCompactHeight } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
+  DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT,
+  dynamicIslandCompactHeight,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Badge,
@@ -104,6 +108,10 @@ const STATUS_COMPACT_BADGE_CHROME_WIDTH = 32;
 const STATUS_COMPACT_NOTCH_MIN_WIDTH = 360;
 const STATUS_COMPACT_ISLAND_MIN_WIDTH = 212;
 const STATUS_COMPACT_NAME_MAX_WIDTH = { notch: 72, island: 96 } as const;
+/** The narrowest idle ear beside a notch: the 20px logo, its 16px edge inset and a 4px gap. */
+const IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH = COMPACT_LEADING_SIZE + 20;
+/** The narrowest idle capsule: the logo and the greeting with their insets and a gap between them. */
+const IDLE_COMPACT_ISLAND_MIN_WIDTH = 72;
 
 interface SharedLeadingMotion {
   notch: { x: number; y: number; scale: number };
@@ -111,8 +119,9 @@ interface SharedLeadingMotion {
 }
 
 interface StatusCompactGeometry {
-  notch: { width: number };
-  island: { width: number };
+  /** `minimum` is the narrowest width that still shows all compact content. */
+  notch: { width: number; minimum: number };
+  island: { width: number; minimum: number };
 }
 
 interface IslandModeSwapProps {
@@ -271,19 +280,24 @@ function compactStatusGeometry(
   const notchLeadingWidth = STATUS_COMPACT_NOTCH_EDGE_PADDING + notchLeadingContentWidth;
   const notchTrailingWidth = STATUS_COMPACT_NOTCH_EDGE_PADDING + badgeWidth;
   const notchWidthDelta = physicalNotchWidth - STATUS_COMPACT_NOTCH_WIDTH;
+  const notchContentWidth = physicalNotchWidth + 2 * Math.max(notchLeadingWidth, notchTrailingWidth);
   const notchWidth = clampCompactWidth(
-    physicalNotchWidth + 2 * Math.max(notchLeadingWidth, notchTrailingWidth),
+    notchContentWidth,
     STATUS_COMPACT_NOTCH_MIN_WIDTH + notchWidthDelta,
     STATUS_COMPACT_BASE_WIDTH.notch + notchWidthDelta,
   );
   const islandSideWidth = Math.max(islandLeadingContentWidth, badgeWidth);
+  const islandContentWidth = STATUS_COMPACT_ISLAND_INLINE_PADDING * 2 + islandSideWidth * 2;
   const islandWidth = clampCompactWidth(
-    STATUS_COMPACT_ISLAND_INLINE_PADDING * 2 + islandSideWidth * 2,
+    islandContentWidth,
     STATUS_COMPACT_ISLAND_MIN_WIDTH,
     STATUS_COMPACT_BASE_WIDTH.island,
   );
 
-  return { notch: { width: notchWidth }, island: { width: islandWidth } };
+  return {
+    notch: { width: notchWidth, minimum: Math.min(notchWidth, Math.ceil(notchContentWidth / 2) * 2) },
+    island: { width: islandWidth, minimum: Math.min(islandWidth, Math.ceil(islandContentWidth / 2) * 2) },
+  };
 }
 
 function adjustSharedMotion(
@@ -304,9 +318,13 @@ function adjustSharedMotion(
   };
 }
 
-/** Scales the ears beside the notch and keeps the notch itself: `floor` is the part that stays. */
-function scaleCompactWidth(width: number, floor: number, percent: number): number {
-  return Math.ceil((floor + ((width - floor) * percent) / 100) / 2) * 2;
+/**
+ * Scales the ears beside the notch and keeps the notch itself: `floor` is the part that stays.
+ * The result never gets narrower than `minimum`, so a small percent cannot clip the content, and
+ * `minimum` never makes it wider than `width`, so a small percent never grows the island.
+ */
+function scaleCompactWidth(width: number, floor: number, percent: number, minimum = 0): number {
+  return Math.max(Math.min(minimum, width), Math.ceil((floor + ((width - floor) * percent) / 100) / 2) * 2);
 }
 
 function clampCompactWidth(width: number, minimum: number, maximum: number): number {
@@ -351,16 +369,30 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   let modeTransitionDisposed = false;
   const widthPercent = () => props.widthPercent ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent;
   const heightPercent = () => props.heightPercent ?? DEFAULT_DYNAMIC_ISLAND_PREFERENCE.heightPercent;
-  const physicalNotchWidth = () => props.notchSize?.width ?? STATUS_COMPACT_NOTCH_WIDTH;
+  // A built-in display with no notch reports no size. Its gap is only a style, so it shrinks with
+  // the width; a physical notch is hardware and keeps its width.
+  const physicalNotchWidth = () =>
+    props.notchSize?.width ?? scaleCompactWidth(STATUS_COMPACT_NOTCH_WIDTH, 0, widthPercent());
+  const islandNotchSize = (): DynamicIslandNotchSize | undefined => {
+    if (props.notchSize || props.displayMode === "island") return props.notchSize;
+    if (widthPercent() === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
+    return { width: physicalNotchWidth(), height: DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT };
+  };
   // The shared motion below is placed from these widths, so the size is applied here rather than
   // in the island primitive: the avatar and badge then land on the resized ears.
   const compactGeometry = createMemo(() => {
-    const geometry = compactStatusGeometry(t, compactLayoutPresentation(), props.notchSize?.width);
+    const geometry = compactStatusGeometry(t, compactLayoutPresentation(), physicalNotchWidth());
     const percent = widthPercent();
     if (!geometry || percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return geometry;
     return {
-      notch: { width: scaleCompactWidth(geometry.notch.width, physicalNotchWidth(), percent) },
-      island: { width: scaleCompactWidth(geometry.island.width, 0, percent) },
+      notch: {
+        width: scaleCompactWidth(geometry.notch.width, physicalNotchWidth(), percent, geometry.notch.minimum),
+        minimum: geometry.notch.minimum,
+      },
+      island: {
+        width: scaleCompactWidth(geometry.island.width, 0, percent, geometry.island.minimum),
+        minimum: geometry.island.minimum,
+      },
     };
   });
   const compactWidth = () => {
@@ -368,9 +400,16 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
     if (geometry) return props.displayMode === "island" ? geometry.island.width : geometry.notch.width;
     const percent = widthPercent();
     if (percent === DEFAULT_DYNAMIC_ISLAND_PREFERENCE.widthPercent) return undefined;
-    if (props.displayMode === "island") return scaleCompactWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, 0, percent);
+    if (props.displayMode === "island") {
+      return scaleCompactWidth(STATUS_COMPACT_ISLAND_MIN_WIDTH, 0, percent, IDLE_COMPACT_ISLAND_MIN_WIDTH);
+    }
     const notchWidth = physicalNotchWidth();
-    return scaleCompactWidth(notchWidth + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2, notchWidth, percent);
+    return scaleCompactWidth(
+      notchWidth + DYNAMIC_ISLAND_COMPACT_EAR_TRACK_WIDTH * 2,
+      notchWidth,
+      percent,
+      notchWidth + IDLE_COMPACT_NOTCH_EAR_MIN_WIDTH * 2,
+    );
   };
   const compactHeight = () => {
     const percent = heightPercent();
@@ -514,7 +553,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
         ariaLive={config().ariaLive}
         state={props.state}
         displayMode={props.displayMode}
-        notchSize={props.notchSize}
+        notchSize={islandNotchSize()}
         extendedHoverArea={props.extendedHoverArea}
         suppressInitialHover={props.suppressInitialHover}
         onStateChange={changeState}

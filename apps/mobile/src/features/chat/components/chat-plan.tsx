@@ -22,6 +22,7 @@ import Animated, {
 import Svg, { Circle, Path } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import type { ChatMessage, ChatPlanStepState } from "@/features/chat/model/chat-messages";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
 
@@ -264,7 +265,10 @@ export function ChatPlan({ message }: { message: PlanMessage }) {
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
           accessibilityLabel={`${title}, ${t("mobile.chat.plan.summary", { done, total })}`}
-          onPress={() => setOpen((value) => !value)}
+          onPress={() => {
+            void haptics.selection();
+            setOpen((value) => !value);
+          }}
           className="flex-row items-center gap-3 p-3"
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >

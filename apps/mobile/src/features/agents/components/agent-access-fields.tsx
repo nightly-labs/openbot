@@ -12,6 +12,7 @@ import {
   type MobileServer,
   useMobileWorkspace,
 } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 /**
@@ -57,7 +58,9 @@ export function AgentAccessFields({
     try {
       const saved = await workspace.updateAgentAdminSettings({ agentId: agent.id, ...input }, agent.serverId);
       queryClient.setQueryData<AgentAdminSettings | null>(queryKey, saved);
+      void haptics.notification("success");
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.access.failed")));
     } finally {
       setSaving(false);

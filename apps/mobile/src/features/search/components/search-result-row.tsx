@@ -9,6 +9,7 @@ import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { ChatNavigationGateContext } from "@/features/agents/components/chat-link-pressable";
 import type { MobileSearchResult } from "@/features/search/model/mobile-search";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function MobileSearchResultRow({ result }: { result: MobileSearchResult }) {
@@ -33,7 +34,14 @@ export function MobileSearchResultRow({ result }: { result: MobileSearchResult }
     result.message.author === "user" ? t("mobile.search.fromYou", params) : t("mobile.search.toYou", params);
 
   return (
-    <Pressable accessibilityRole="button" className="min-h-20 flex-row items-center gap-3 px-5 py-3" onPress={openChat}>
+    <Pressable
+      accessibilityRole="button"
+      className="min-h-20 flex-row items-center gap-3 px-5 py-3"
+      onPress={() => {
+        void haptics.impact("soft");
+        openChat();
+      }}
+    >
       <View
         className="size-[54px] items-center justify-center rounded-[18px]"
         style={{ backgroundColor: controlBackground }}

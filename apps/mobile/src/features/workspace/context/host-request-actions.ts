@@ -13,6 +13,7 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
+import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent-install-v1";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -22,6 +23,7 @@ import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/que
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { installAgentTemplate } from "@openbot/team-client/team-admin-requests";
 import type { QueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
@@ -58,6 +60,8 @@ type HostRequestActions = Pick<
   | "loadAgentAdminSettings"
   | "updateAgentAdminSettings"
   | "deleteStoredFile"
+  | "canInstallAgentTemplate"
+  | "installAgentTemplate"
   | "loadAgentAvatar"
   | "duplicateAgent"
   | "loadQueue"
@@ -224,6 +228,16 @@ export function createHostRequestActions({
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY))
         throw new Error(currentText().t("mobile.workspace.error.filesUnsupported"));
       await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
+    },
+    canInstallAgentTemplate: (serverId) => capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY) ?? false,
+    installAgentTemplate: (input, serverId) => {
+      // A host too old to know the route answers 404, so refuse before the request.
+      if (!capabilities.get(serverId)?.includes(AGENT_INSTALL_CAPABILITY))
+        return Promise.reject(new Error(currentText().t("mobile.link.template.error.unsupported")));
+      return installAgentTemplate(
+        (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload),
+        input,
+      );
     },
     loadAgentAvatar: async (agentId, avatarUrl, serverId) => {
       const version = new URL(avatarUrl).searchParams.get("v");

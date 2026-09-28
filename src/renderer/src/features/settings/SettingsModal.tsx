@@ -16,7 +16,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  Button,
   CircleArrowDown,
   Globe2,
   MousePointer2,
@@ -25,7 +24,6 @@ import {
   Smartphone,
   Sparkles,
   Tabs,
-  Text,
   UserRound,
 } from "@openbot/ui";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
@@ -36,7 +34,8 @@ import {
 } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
-import { SaveBarDock, SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
+import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
+import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -295,39 +294,7 @@ export function SettingsModal(props: SettingsModalProps) {
             onConnectProvider={props.onConnectProvider}
           />
         }
-        footer={
-          <SaveBarDock value={profile.nameDirty() ? true : null}>
-            {() => (
-              <section class="settings-modal-save-bar" aria-label={i18n.t("settings.save.region")}>
-                <Text variant="caption" tone="muted">
-                  {i18n.t("settings.save.notSaved")}
-                </Text>
-                <div class="settings-modal-save-actions">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={profile.state.profile.busy}
-                    onClick={profile.resetName}
-                  >
-                    {i18n.t("settings.save.reset")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="default"
-                    loading={profile.state.profile.busy}
-                    loadingLabel={i18n.t("common.saving")}
-                    disabled={profile.state.profile.busy}
-                    onClick={() => void profile.saveName()}
-                  >
-                    {i18n.t("common.save")}
-                  </Button>
-                </div>
-              </section>
-            )}
-          </SaveBarDock>
-        }
+        footer={<ProfileNameSaveBar store={profile} />}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
             {visibleNavItems().map((item) => {

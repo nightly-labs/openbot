@@ -42,6 +42,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
+import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import { ChatPlan } from "@/features/chat/components/chat-plan";
@@ -54,6 +55,7 @@ import { type ChatMessage, indexChatMessages, type RoutineMarkerEvent } from "@/
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { ChatBubbleMessage } from "../context/message-actions-context";
 import { CHAT_HISTORY_BATCH, type ChatHistoryBoundary, chatHistoryStart } from "../model/chat-layout";
@@ -451,12 +453,12 @@ const MessageRow = memo(function MessageRow({
               href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }}
               asChild
             >
-              <Pressable
+              <ChatLinkPressable
                 accessibilityRole="link"
                 accessibilityLabel={t("mobile.chat.exchange.openChat", { name: participant.name })}
               >
                 {badge}
-              </Pressable>
+              </ChatLinkPressable>
             </Link>
           ) : (
             <View key={id ?? legacyName}>{badge}</View>
@@ -1057,7 +1059,10 @@ export function ChatMessageList({
                       accessibilityLabel={t("mobile.chat.starter.dismiss")}
                       accessibilityRole="button"
                       hitSlop={8}
-                      onPress={onDismissStarter}
+                      onPress={() => {
+                        void haptics.selection();
+                        onDismissStarter();
+                      }}
                     >
                       <X color={String(muted)} size={21} strokeWidth={1.8} />
                     </Pressable>

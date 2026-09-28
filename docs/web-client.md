@@ -42,7 +42,16 @@ mock. The separate web preview implements the browser runtime with that same moc
 ## Behavior and limits
 
 - `/api/browser/*` exposes only email start/verify, session read/logout, host list, session
-  start/ticket/end, and invitation preview/accept. It is not a general account or host proxy.
+  start/ticket/end, invitation preview/accept and email, host member and invite administration, and
+  the account's display name, avatar, and session list/revoke (`v1/me/profile`, `v1/me/avatar`,
+  `v1/me/sessions`). It is not a general account or host proxy. Every write needs the same origin
+  and `X-OpenBot-Browser: 1`; all send JSON except the avatar upload, which sends the image bytes.
+- The account dock uses the single-row layout on every browser. Its menu has usage, Profile,
+  Settings (the connected host's settings), Marketplace, Send feedback, Message, and Sign out.
+  Profile opens the desktop Settings > Profile content in the right panel of the agent on screen;
+  it is not available in a channel. A browser session is listed as Desktop, and it can disconnect
+  any other session of the account, as the desktop app can. Providers & permissions and app
+  updates stay desktop only.
 - Sign-in credentials are cookie-only. The browser receives a short connection ticket for the
   existing Signal handshake. Session creation, ticket issue and end are bound to its credential.
 - The production website accepts invitation links for `https://api.openbot.run`; the request still
@@ -65,7 +74,10 @@ mock. The separate web preview implements the browser runtime with that same moc
   has already committed an attachment, cancellation removes that draft after the response.
 - Attachment previews use downloaded bytes and the shared preview panel. Host filesystem paths
   and host preview URLs are not used as browser attachment links. Blob URLs are released when the
-  preview closes, the host changes, or the workspace unmounts.
+  preview closes, the host changes, or the workspace unmounts. A shared or workspace file link
+  reads the file through the host's `/v1/shared-files` or `/v1/workspace-files` route and opens the
+  same panel. "Open" on a file card opens the panel; "Download" saves the file. Images show as
+  file cards, not inline: the browser reads no image bytes until a card is opened.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include

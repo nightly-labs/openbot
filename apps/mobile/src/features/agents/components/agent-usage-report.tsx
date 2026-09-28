@@ -3,6 +3,7 @@ import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 // A usage row names the provider the record carried, which is not always one OpenBot knows:
@@ -58,7 +59,10 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
                 size="sm"
                 variant={metric === value ? "secondary" : "ghost"}
                 accessibilityState={{ selected: metric === value }}
-                onPress={() => setMetric(value)}
+                onPress={() => {
+                  void haptics.selection();
+                  setMetric(value);
+                }}
               >
                 <Button.Label>
                   {t(value === "processedTokens" ? "mobile.agent.usage.tokens" : "mobile.agent.usage.cost")}
@@ -79,7 +83,10 @@ export function AgentUsageReport({ result }: { result: AgentAnalytics }) {
                     accessibilityRole="button"
                     accessibilityLabel={`${day.date}: ${metric === "processedTokens" ? t("mobile.agent.usage.tokenCount", { tokens: number(day[metric]) }) : money(day[metric])}`}
                     accessibilityState={{ selected: selectedDate === day.date }}
-                    onPress={() => setSelectedDate(day.date)}
+                    onPress={() => {
+                      void haptics.selection();
+                      setSelectedDate(day.date);
+                    }}
                   >
                     <View
                       className="rounded-t-sm bg-accent"

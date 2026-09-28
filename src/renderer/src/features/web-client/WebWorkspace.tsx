@@ -57,12 +57,13 @@ import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
 import { WebHostOffline } from "./WebHostOffline";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
+import { createWebAccountCalls } from "./web-account";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
 import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
-import { createWebProviderSettings } from "./web-provider-admin";
+import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
 const CONNECTING_STATUS: AgentStatus = {
@@ -197,6 +198,33 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [agentAvatar, setAgentAvatar] = createSignal(newAgentAvatar());
   const [mobilePane, setMobilePane] = createSignal<WebMobilePane>("conversation");
   const [settingsRequest, setSettingsRequest] = createSignal<{ agentId: string; nonce: number } | null>(null);
+  const [profileRequest, setProfileRequest] = createSignal<{ agentId: string; nonce: number } | null>(null);
+  const account = createMemo(() => ({
+    id: props.accountId,
+    email: props.accountEmail ?? "",
+    name: props.accountName ?? null,
+    avatarUrl: props.accountAvatarUrl ?? null,
+  }));
+  const accountCalls = createWebAccountCalls(props.accountFetch, props.onSessionCheck);
+  /* As in the desktop dock: the reading is taken again when a provider connects or disconnects. */
+  const usageTargetKey = createMemo(() => {
+    const hostId = workspace.state.host?.hostId;
+    if (!hostId || !workspace.runtime.accountUsage || workspace.state.status !== "online") return null;
+    const connected = (status().providers ?? [])
+      .filter((item) => item.state === "available" && item.connectionState !== "connecting")
+      .map((item) => item.id)
+      .sort()
+      .join(",");
+    return `${hostId}:${connected}`;
+  });
+  const usageReady = createMemo(() => {
+    const current = status();
+    return (
+      workspace.state.status === "online" &&
+      (current.phase === "ready" ||
+        Boolean(current.providers?.some((item) => item.state === "available" && item.connectionState !== "connecting")))
+    );
+  });
   const servers = createMemo<ServerSummary[]>(() =>
     workspace.state.hosts.map((host) => {
       const active = host.hostId === workspace.state.host?.hostId;
@@ -435,6 +463,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
   };
+  // On a small screen the sidebar pane covers the chat, and so does the usage report. A covered
+  // message was not seen.
+  const canMarkRead = () => document.hasFocus() && mobilePane() === "conversation" && !usageOpen();
   const channels = createChannelsController({
     port: () => channelsPort,
     agents: workspace.profiles,
@@ -453,9 +484,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       setUsage(null);
       setMessageFocusRequest(null);
     },
-    // On a small screen the sidebar pane covers the channel, and so does the usage report. A covered
-    // message was not seen.
-    canMarkRead: () => document.hasFocus() && mobilePane() === "conversation" && !usageOpen(),
+    canMarkRead,
   });
   onCleanup(
     workspace.onHostEvent((event) => {
@@ -470,6 +499,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     else void channels.refresh();
   });
   const channelOpen = () => channels.state.selectedId !== null;
+  const readState = () => workspace.conversation()?.page?.readState;
+  // Keyed on the newest loaded message, not on the read state: the host can count a message that
+  // this page has not loaded yet, and marking the same message again would not clear it. Focus
+  // coming back reads the page again.
+  createEffect(
+    () =>
+      (readState()?.unreadCount ?? 0) > 0 && !creating() && !channelOpen() && canMarkRead()
+        ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
+        : null,
+    (unread) => {
+      if (unread) void workspace.markRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
+    },
+  );
   const channelApprovals = createMemo(() => {
     const approvals: Record<string, AgentApproval | undefined> = {};
     for (const approval of workspace.state.approvals) approvals[approval.agentId] = approval;
@@ -631,6 +673,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setCreating(true);
   }
   const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
+  /** Profile opens in the right panel of the agent on screen, so it needs that conversation. */
+  const profileAgentId = () =>
+    !creating() && !channelOpen() && !noHost() && !hostOffline() ? (conversationAgent()?.id ?? null) : null;
+  function openProfile() {
+    const agentId = profileAgentId();
+    if (!agentId) return;
+    setMobilePane("conversation");
+    setProfileRequest({ agentId, nonce: Date.now() });
+  }
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
@@ -760,25 +811,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 }
               />
               <AccountDock
-                remoteClient
-                account={{
-                  id: props.accountId,
-                  email: props.accountEmail ?? "",
-                  name: props.accountName ?? null,
-                  avatarUrl: props.accountAvatarUrl ?? null,
-                }}
-                appInfo={WEB_APP_INFO}
+                account={account()}
+                // No platform: the macOS dock shelf is for the desktop app, so every browser gets the one-row dock.
+                appInfo={null}
                 agentStatus={status()}
                 accountUsage={accountUsage()}
                 usageProvider={workspace.selected()?.provider ?? null}
                 usageModel={workspace.selected()?.model ?? null}
-                usageTargetKey={
-                  workspace.runtime.accountUsage && workspace.state.status === "online"
-                    ? (workspace.state.host?.hostId ?? null)
-                    : null
-                }
+                usageTargetKey={usageTargetKey()}
                 usageRefreshRevision={0}
-                usageReady={workspace.state.status === "online"}
+                usageReady={usageReady()}
                 updateStatus={{
                   phase: "unsupported",
                   currentVersion: "web",
@@ -793,10 +835,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onRefreshUsage={refreshUsage}
                 onUpdateAction={unavailable}
                 onLogout={props.onLogout}
-                onOpenExternal={unavailable}
-                onOpenPermissions={() => {}}
-                onOpenSettings={() => {}}
-                onOpenSkills={() => {}}
+                onOpenExternal={openWebDestination}
+                onOpenProfile={profileAgentId() ? openProfile : undefined}
+                onOpenSettings={
+                  workspace.state.host
+                    ? (trigger) => {
+                        const host = workspace.state.host;
+                        if (host) void openServerSettings(host.hostId, trigger);
+                      }
+                    : undefined
+                }
+                onOpenSkills={workspace.state.status === "online" ? () => setMarketplaceOpen(true) : undefined}
               />
               <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
             </>
@@ -1062,14 +1111,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               agents={workspace.profiles()}
               modelOptions={models()}
               messages={messages()}
-              unreadCount={0}
-              firstUnreadMessageId={null}
+              unreadCount={readState()?.unreadCount ?? 0}
+              firstUnreadMessageId={readState()?.firstUnreadMessageId ?? null}
               loaded={Boolean(workspace.conversation()?.page)}
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
               globalOverlayOpen={joinOpen() || serverSettings.state.open || searchOpen()}
               settingsRequest={settingsRequest()}
+              accountProfile={{
+                account: account(),
+                onUpdateAccountName: accountCalls.updateName,
+                onUpdateAccountAvatar: accountCalls.updateAvatar,
+                onListAccountSessions: accountCalls.listSessions,
+                onRevokeAccountSession: accountCalls.revokeSession,
+              }}
+              profileRequest={profileRequest()}
               messageFocusRequest={messageFocusRequest()}
               queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}
               browserRuntime={workspace.runtime.browser}
@@ -1112,7 +1169,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   }));
                 return sent;
               }}
-              onMarkRead={async () => {}}
+              onMarkRead={workspace.markRead}
               onLoadOlder={() => void workspace.older()}
               onLoadLatest={workspace.refresh}
               onSearchMessages={async (query) => {

@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
 export function SidebarSectionHeader({
@@ -42,7 +43,9 @@ export function SidebarSectionHeader({
     setSaving(true);
     try {
       await mutateSidebarLayout(activeServer.id, action);
+      void (action.type === "move" ? haptics.selection() : haptics.notification("success"));
     } catch (error) {
+      void haptics.notification("error");
       const text = currentText();
       Alert.alert(
         text.t("mobile.agent.section.changeFailed"),
@@ -74,7 +77,10 @@ export function SidebarSectionHeader({
           accessibilityRole="button"
           accessibilityLabel={t(collapsed ? "mobile.agent.section.expand" : "mobile.agent.section.collapse", { name })}
           accessibilityState={{ expanded: !collapsed }}
-          onPress={onToggle}
+          onPress={() => {
+            void haptics.selection();
+            onToggle();
+          }}
           className="min-h-12 flex-1 flex-row items-center gap-2"
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >

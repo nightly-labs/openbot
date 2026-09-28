@@ -25,6 +25,7 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
+import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import {
   calculateChatScrollMargin,
@@ -225,6 +226,11 @@ export function ChannelConversation(props: ChannelConversationProps) {
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
+    // The browser has no app to open a file in, so a file it can preview opens in the panel.
+    if (action === "open" && runtime().fileActions === "browser" && canPreviewAttachment(attachment)) {
+      void previewChannelAttachment(attachment);
+      return;
+    }
     void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
   /** Absent where the runtime saves files one at a time, so the row offers no bulk download. */
@@ -468,6 +474,50 @@ export function ChannelConversation(props: ChannelConversationProps) {
     if (!page || page.channel.archived) return [];
     return channelAwaitingReplies({ tasks: page.tasks, agents: agentList(), name });
   });
+  /**
+   * The runs the stop button ends: the top active task above each task that is queued, running or
+   * waiting. `stop` pauses the whole run below the task it names, so one command for each run is
+   * enough. The climb stops at a parent that is not active: a stop would pause a failed parent and
+   * clear the reason it failed, and a completed or cancelled task cannot be stopped.
+   */
+  const activeRuns = createMemo(() => {
+    const page = channels.state.page;
+    if (!page || page.channel.archived) return [];
+    const byId = new Map(page.tasks.map((task) => [task.id, task]));
+    const active = (task: (typeof page.tasks)[number] | undefined) =>
+      task?.state === "queued" || task?.state === "running" || task?.state === "waiting";
+    const activeParent = (task: (typeof page.tasks)[number]) => {
+      const parent = task.parentTaskId ? byId.get(task.parentTaskId) : undefined;
+      return active(parent) ? parent : undefined;
+    };
+    const runs = new Set<string>();
+    for (const task of page.tasks) {
+      if (!active(task)) continue;
+      let top = task;
+      for (let parent = activeParent(top); parent; parent = activeParent(top)) top = parent;
+      runs.add(top.id);
+    }
+    return [...runs];
+  });
+  /**
+   * One stop at a time, and none after the first that fails: the controller keeps one failed
+   * command for its retry, and a later stop that succeeds would clear the error of the one that
+   * failed.
+   */
+  const stopWork = async () => {
+    const channelId = channels.state.page?.channel.id;
+    if (!channelId) return;
+    for (const taskId of activeRuns()) {
+      const stopped = await channels.command({
+        type: "stop",
+        operationId: crypto.randomUUID(),
+        channelId,
+        taskId,
+        recipientAgentId: null,
+      });
+      if (!stopped) return;
+    }
+  };
   const resumeTask = (taskId: string, recipientAgentId: string | null) =>
     channels.command({
       type: recipientAgentId ? "reassign" : "resume",
@@ -944,15 +994,31 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       <Plus aria-hidden="true" />
                     </Button>
                     <div class="composer-primary-actions">
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        class="voice-button"
-                        aria-label={t("channel.composer.send")}
-                        disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
+                      {/* As in the agent chat, an empty composer offers stop while work runs. */}
+                      <Show
+                        when={activeRuns().length > 0 && !composer.text.trim() && !composer.attachments.length}
+                        fallback={
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            class="voice-button"
+                            aria-label={t("channel.composer.send")}
+                            disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
+                          >
+                            <ArrowUp aria-hidden="true" />
+                          </Button>
+                        }
                       >
-                        <ArrowUp aria-hidden="true" />
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          class="voice-button voice-button-active"
+                          aria-label={t("channel.composer.stop")}
+                          onClick={() => void stopWork()}
+                        >
+                          <StopIcon />
+                        </Button>
+                      </Show>
                     </div>
                   </div>
                 </form>
@@ -962,6 +1028,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               {(file) => (
                 <Loading>
                   <ChannelFilePreviewPanel
+                    allowExternalOpen={runtime().fileActions === "native"}
                     preview={file().preview}
                     agents={agentList()}
                     defaultWidth={panelWidth}

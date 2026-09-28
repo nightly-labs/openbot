@@ -1,6 +1,7 @@
 import { Button } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { X } from "lucide-react-native";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export interface ScannerCloseButtonProps {
@@ -17,7 +18,10 @@ export function ScannerCloseButton({ disabled, onPress }: ScannerCloseButtonProp
       variant="secondary"
       className="size-11 rounded-full"
       isDisabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        void haptics.impact("soft");
+        onPress();
+      }}
       accessibilityLabel={t("mobile.auth.closeScanner")}
     >
       <X size={20} color={foreground} />

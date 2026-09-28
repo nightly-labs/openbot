@@ -1,5 +1,6 @@
 import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
+  AddedAgent,
   AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
@@ -15,6 +16,7 @@ import type {
   CreateAgentInput,
   CreateRoutineInput,
   DraftAttachment,
+  InstallAgentTemplateInput,
   InstalledSkill,
   QueueSnapshot,
   RespondToBrowserSecretInput,
@@ -154,6 +156,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentAdminSettings: (agentId: string, serverId: string) => Promise<AgentAdminSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
   updateAgentAdminSettings: (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>;
+  /** True when the host advertises `agent-install-v1`. The host still refuses a member. */
+  canInstallAgentTemplate: (serverId: string) => boolean;
+  /** Owners and admins only. The host downloads the template with its own account. */
+  installAgentTemplate: (input: InstallAgentTemplateInput, serverId: string) => Promise<AddedAgent>;
   /** Owners and admins only; the host refuses a member. */
   deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   /** Searches message text in the server's agent chats, one page from `cursor` or from the newest match. */

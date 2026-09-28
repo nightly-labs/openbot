@@ -13,6 +13,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { toggleChannelMember } from "../model/channel-draft";
 import type { MobileChannelStore } from "../model/channel-store";
@@ -45,7 +46,10 @@ const MemberChoice = memo(function MemberChoice({
       accessibilityLabel={name}
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}
-      onPress={() => onToggle(id)}
+      onPress={() => {
+        void haptics.selection();
+        onToggle(id);
+      }}
       className="min-h-12 flex-row items-center gap-3 px-4 py-3"
     >
       <BloubAvatarThumbnail agentId={id} serverId={serverId} seed={avatarSeed} hue={avatarHue} size={32} />
@@ -136,6 +140,7 @@ function ChannelForm({
   const disabled = saving || !available || finished || Boolean(channel?.archived);
   usePreventRemove(!finished && (dirty || saving), ({ data }) => {
     if (lock.current) return;
+    void haptics.notification("warning");
     const text = currentText();
     Alert.alert(text.t("mobile.channel.discard.title"), text.t("mobile.channel.discard.body"), [
       { text: text.t("mobile.channel.discard.keepEditing"), style: "cancel" },
@@ -158,10 +163,12 @@ function ChannelForm({
     setError(null);
     try {
       await action();
+      void haptics.notification("success");
       operation.current = null;
       setEdits({});
       if (close) setFinished(true);
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.channel.form.saveFailed")));
     } finally {
       lock.current = false;
@@ -206,7 +213,10 @@ function ChannelForm({
             icon="xmark"
             accessibilityLabel={t("common.close")}
             disabled={saving}
-            onPress={() => router.back()}
+            onPress={() => {
+              void haptics.impact("soft");
+              router.back();
+            }}
           >
             {t("common.close")}
           </Stack.Toolbar.Button>
