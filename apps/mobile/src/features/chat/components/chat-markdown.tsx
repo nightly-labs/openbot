@@ -146,6 +146,8 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
       return <AgentMention key={offset} agent={agent} presentation={presentation} />;
     }
     if (token.type === "br") return "\n";
+    // The list row draws the task mark, so the checkbox token adds nothing.
+    if (token.type === "checkbox") return null;
     if (tokenIs(token, "text")) {
       if (token.tokens) return inline(token.tokens, presentation);
       return (
@@ -226,6 +228,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   let line: Token[][] = [run];
   const lines: Token[][][] = [line];
   for (const token of tokens) {
+    if (token.type === "checkbox") continue;
     if (token.type === "br") {
       run = [];
       line = [run];
@@ -233,6 +236,18 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
     } else if (tokenIs(token, "codespan")) {
       run = [];
       line.push([token], run);
+    } else if (tokenIs(token, "text") && !token.tokens) {
+      // One run per word: the row wraps its items, so a long run would leave the line beside the
+      // chip and start below it, instead of continuing after it as text does.
+      for (const word of token.text.split(/(?<=\s)/u)) {
+        if (run.length) {
+          run = [];
+          line.push(run);
+        }
+        run.push({ type: "text", raw: word, text: word, escaped: false });
+      }
+      run = [];
+      line.push(run);
     } else {
       run.push(token);
     }
@@ -286,7 +301,8 @@ function MarkdownBlocks({
           ...parentPresentation,
           animateTail: parentPresentation.animateTail,
         };
-        if (token.type === "space" || token.type === "def") return null;
+        // The list row draws the task mark, so the checkbox token adds nothing.
+        if (token.type === "space" || token.type === "def" || token.type === "checkbox") return null;
         if (tokenIs(token, "paragraph") || tokenIs(token, "text")) {
           if (inList && token.tokens?.some((child) => tokenIs(child, "codespan"))) {
             return <ListParagraph key={offset} tokens={token.tokens} presentation={presentation} />;

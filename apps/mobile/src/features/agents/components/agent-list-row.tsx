@@ -4,7 +4,7 @@ import { BlurView } from "expo-blur";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { type PropsWithChildren, useEffect, useId, useRef } from "react";
+import { type PropsWithChildren, useEffect, useId, useMemo, useRef } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
@@ -26,6 +26,7 @@ import { type AgentAvatarLocation, useAgentPinTransition } from "@/features/agen
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
+import { markdownPreviewText } from "@/features/chat/model/chat-markdown-parser";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
@@ -113,6 +114,7 @@ export function AgentListRow({
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const agentContextMenu = useAgentContextMenu(agent);
   const agentChatPreview = useAgentChatPreview(agent);
+  const previewLine = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
   const isUnread = useAgentUnread(agent.id);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const avatar = (
@@ -185,7 +187,7 @@ export function AgentListRow({
                   ) : null}
                 </View>
                 <Typography.Paragraph type="body-xs" className="text-text-secondary -mt-1" numberOfLines={1}>
-                  {agent.preview}
+                  {previewLine}
                 </Typography.Paragraph>
               </View>
             </AgentRowTextReveal>
