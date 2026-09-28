@@ -149,8 +149,9 @@ All notable changes to OpenBot will be documented here. The project follows
   connect step always failed, because Figma does not accept a browser sign-in from OpenBot. The
   connect dialog shows the steps that turn on the server in Figma. The server can only read designs
   for now.
-- If you installed the Figma plugin before this version, Plugins shows it as not installed. Remove
-  the old `figma` server from the MCP servers of the agent, then install Figma again from Plugins.
+- If you installed the Figma plugin before this version, Plugins shows it as not installed.
+  **Remove the old `figma` server from the MCP servers of the agent, then install Figma again from
+  Plugins.**
 - On Linux, the window no longer closes a short time after it opens on some GPU drivers. OpenBot now uses software rendering on Linux.
 - A finished agent reply no longer shows the text of another message after the chat scrolls or loads more messages.
 - Phones and other devices connect to your computer again when its network comes back. Before, the
