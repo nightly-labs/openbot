@@ -806,7 +806,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       ? null
       : sideRoute
         ? sideRoute.request(path, body)
-        : encodeTeamProtocolV5WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
+        : // A caller names a provider and model on agent creation only when the host advertises
+          // `agent-create-model`, so the pair is kept whenever it is present.
+          encodeTeamProtocolV5WebRtcHttpRequest(method, path, body, {
+            preserveSemanticTags: true,
+            agentCreateModel: true,
+          });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {
