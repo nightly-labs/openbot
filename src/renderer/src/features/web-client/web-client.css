@@ -286,6 +286,12 @@
   flex: 1 1 0;
 }
 
+/* The public site sets `a { color: inherit }`, which beats the zero-specificity button colour. */
+.web-connect-download.ui-button,
+.web-connect-download.ui-button:hover {
+  color: var(--openbot-text-on-light);
+}
+
 .web-connect-refresh.ui-button {
   color: var(--openbot-text-muted);
 }

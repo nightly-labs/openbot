@@ -1,3 +1,4 @@
+import { Toaster } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import type { WebRuntimeFactory } from "../src/features/web-client/web-client-context";
@@ -17,6 +18,7 @@ const meta = {
   },
   render: (args) => (
     <div class="web-app">
+      <Toaster />
       <WebWorkspace {...args} />
     </div>
   ),

@@ -1,52 +1,25 @@
 import { AppLogo } from "@openbot/brand";
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  buttonVariants,
-  Download,
-  Heading,
-  Link2,
-  OctagonX,
-  RefreshCw,
-  Text,
-} from "@openbot/ui";
+import { Button, buttonVariants, Download, Heading, Link2, RefreshCw, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { Show } from "solid-js";
 
 /** The first screen of the web client when the account has no computer to connect to. */
 export function WebConnectComputer(props: {
   loading: boolean;
-  error: string | null;
+  failed: boolean;
   onJoin: () => void;
   onRefresh: () => void;
 }) {
-  const { t, sourceText } = useText();
+  const { t } = useText();
   return (
     <section class="conversation-panel web-connect" aria-labelledby="web-connect-title">
       <div class="web-connect-card">
         <header class="web-connect-header">
           <AppLogo variant="production" class="web-connect-logo" />
           <Heading as="h2" size="lg" id="web-connect-title">
-            {props.error ? t("webClient.notice.hostsFailed") : t("webClient.notice.connectComputer")}
+            {props.failed ? t("webClient.notice.hostsFailed") : t("webClient.notice.connectComputer")}
           </Heading>
           <Text tone="muted">{t("webClient.connect.description")}</Text>
         </header>
-
-        <Show when={props.error}>
-          {(error) => (
-            <Alert tone="danger" role="alert">
-              <AlertIcon>
-                <OctagonX />
-              </AlertIcon>
-              <AlertContent>
-                <AlertDescription>{sourceText(error())}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          )}
-        </Show>
 
         <ol class="web-connect-steps">
           <li>
@@ -71,7 +44,12 @@ export function WebConnectComputer(props: {
 
         <footer class="web-connect-actions">
           <div class="web-connect-primary-actions">
-            <a class={buttonVariants({ variant: "default" })} href="/#download" target="_blank" rel="noreferrer">
+            <a
+              class={`web-connect-download ${buttonVariants({ variant: "default" })}`}
+              href="/#download"
+              target="_blank"
+              rel="noreferrer"
+            >
               <Download aria-hidden="true" />
               {t("webClient.notice.download")}
             </a>

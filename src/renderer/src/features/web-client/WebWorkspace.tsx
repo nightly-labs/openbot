@@ -601,7 +601,7 @@ export function WebWorkspace(props: {
             <Show when={!creating() && !channelOpen() && noHost()}>
               <WebConnectComputer
                 loading={workspace.state.hostsLoading}
-                error={workspace.state.hostsError}
+                failed={Boolean(workspace.state.hostsError)}
                 onJoin={() => setJoinOpen(true)}
                 onRefresh={() => void workspace.run(workspace.refreshHosts)}
               />
