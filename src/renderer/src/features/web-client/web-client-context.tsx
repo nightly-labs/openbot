@@ -139,6 +139,7 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  const readWrites = new Map<string, Promise<void>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -729,6 +730,26 @@ export function createWebWorkspace(
         });
     }
   }
+  /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
+  function markRead() {
+    const id = selectedId;
+    if (!id || state.status !== "online") return Promise.resolve();
+    const current = generation;
+    const write = (readWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const page = state.conversations[id]?.page;
+        if (!page || disposed || current !== generation) return;
+        const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[id]?.page;
+          if (value?.threadId === page.threadId) value.readState = readState;
+        });
+      });
+    readWrites.set(id, write);
+    return write;
+  }
   onSettled(() => {
     void refreshHosts().catch(report);
     const focus = () => {
@@ -770,6 +791,7 @@ export function createWebWorkspace(
     select,
     refresh,
     send,
+    markRead,
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

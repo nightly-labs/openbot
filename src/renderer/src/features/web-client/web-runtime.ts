@@ -17,6 +17,7 @@ import type {
   BrowserPreview,
   BrowserTab,
   ConversationPage,
+  ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
   DuplicateAgentResult,
@@ -39,7 +40,8 @@ import {
   isAgentStatus,
   isAgentSummary,
   isConversationMessage,
-  isConversationSnapshot,
+  isConversationReadState,
+  isConversationWithReadState,
   isQueuedMessageReceipt,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
@@ -122,6 +124,8 @@ export interface WebWorkspaceRuntime {
   disconnect(): Promise<void>;
   listAgents(): Promise<AgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
+  /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
+  markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
   stop(agentId: string, turnId: string): Promise<void>;
   approve(input: RespondToApprovalInput): Promise<void>;
@@ -566,6 +570,11 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
+    async markRead(id, throughMessageId) {
+      const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
+      if (!isConversationReadState(value)) throw new Error("The host returned an invalid read state.");
+      return value;
+    },
     async react(input) {
       await request("POST", TEAM_API_ROUTES.agent.reactions(input.agentId), {
         messageId: input.messageId,
@@ -798,13 +807,13 @@ function decodeWebBrowserPreview(value: unknown): BrowserPreview {
 }
 
 function decodeWebConversationSnapshot(value: unknown): ConversationPage {
-  if (!isConversationSnapshot(value)) throw new Error("The host returned an invalid conversation.");
+  if (!isConversationWithReadState(value)) throw new Error("The host returned an invalid conversation.");
   return { ...value, references: {}, pageInfo: { hasOlder: false, olderCursor: null } };
 }
 
 export function decodeWebConversationPage(value: unknown): ConversationPage {
   if (
-    !isConversationSnapshot(value) ||
+    !isConversationWithReadState(value) ||
     !isDynamicRecord(value) ||
     !isDynamicRecord(value.pageInfo) ||
     typeof value.pageInfo.hasOlder !== "boolean" ||

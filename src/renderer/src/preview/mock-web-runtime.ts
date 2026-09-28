@@ -55,6 +55,7 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
         limit: 50,
         anchor: before ? { type: "before", cursor: before } : { type: "latest" },
       }),
+    markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     send: async (agentId, text, attachmentDraftIds) => {
       await agent.sendMessage({ agentId, text, attachmentDraftIds });
     },

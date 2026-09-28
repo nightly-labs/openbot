@@ -66,6 +66,7 @@ function runtimeFixture(
     disconnect: async () => {},
     listAgents: async () => [],
     conversation: async () => EMPTY_PAGE,
+    markRead: async () => ({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     send: async () => {},
     stop: async () => {},
     approve: async () => {},
