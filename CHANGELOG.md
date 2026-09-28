@@ -26,9 +26,10 @@ All notable changes to OpenBot will be documented here. The project follows
   with the state of each step and a spinner on the step that runs. The last message of a chat and
   its read state do not include plans. Team API v4 now sends the plan of a turn beside its
   checklist text; older clients and hosts keep reading the text.
-- On the iPhone app, you answer a question from an agent with the chat composer. The question form
-  shows "Or reply in the chat" and has no text field of its own. A private answer still uses its
-  own masked field.
+- On the iPhone app, the question form of an agent has no text field of its own. It shows "Reply
+  in the chat" as one more answer row. Tap it, and the next message from the composer is the
+  answer. Without that tap, the composer sends normal messages, also in a channel. A private
+  answer still uses its own masked field.
 - Show a "Connect your computer" screen in the web app when no computer is connected. It gives the
   three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
   small notice showed above an empty conversation. When the computers cannot load, an error message

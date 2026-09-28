@@ -11,10 +11,21 @@ interface PromptState {
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
+  /** The person chose to answer with the chat composer. A new form starts without it. */
+  replyInChat: boolean;
 }
 
 function initialState(scope: string): PromptState {
-  return { scope, index: 0, answers: {}, drafts: {}, pending: false, failedAnswers: null, resolution: null };
+  return {
+    scope,
+    index: 0,
+    answers: {},
+    drafts: {},
+    pending: false,
+    failedAnswers: null,
+    resolution: null,
+    replyInChat: false,
+  };
 }
 
 export function useQuestionPrompt(
@@ -77,6 +88,10 @@ export function useQuestionPrompt(
     draft: question ? (state.drafts[question.id] ?? "") : "",
     setDraft: (text: string) => {
       if (question && !disabled) update({ drafts: { ...state.drafts, [question.id]: text } });
+    },
+    replyInChat: state.replyInChat,
+    setReplyInChat: (replyInChat: boolean) => {
+      if (!disabled) update({ replyInChat });
     },
     setIndex: (index: number) => {
       if (!disabled && prompt?.questions[index]) update({ index });

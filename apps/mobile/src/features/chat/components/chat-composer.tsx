@@ -112,6 +112,8 @@ interface ChatComposerProps {
   sendRetryVersion: number;
   replyTarget: ChatBubbleMessage | null;
   replyFocusVersion: number;
+  /** Focuses the field each time it changes after the first render, such as to type an answer. */
+  focusVersion?: number;
   onCancelReply: () => void;
 }
 
@@ -142,6 +144,7 @@ export function ChatComposer({
   sendRetryVersion,
   replyTarget,
   replyFocusVersion,
+  focusVersion = 0,
   onCancelReply,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
@@ -188,6 +191,13 @@ export function ChatComposer({
       inputRef.current?.focus();
     }
   }, [isFocused, disabled, replyTarget, replyFocusVersion]);
+  const focusedVersion = useRef(focusVersion);
+  useEffect(() => {
+    if (isFocused && !disabled && focusedVersion.current !== focusVersion) {
+      focusedVersion.current = focusVersion;
+      inputRef.current?.focus();
+    }
+  }, [isFocused, disabled, focusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;

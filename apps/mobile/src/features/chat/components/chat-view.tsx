@@ -217,8 +217,15 @@ export function ChatView({
       setPendingMessage(null);
     }
   }, [pendingMessage, projectedMessages, queue?.deliveries, queryClient, target.serverId]);
-  // A private answer has its own masked field in the form, never the composer.
-  const answersQuestion = Boolean(questionForm?.question && !questionForm.question.isSecret);
+  // The composer answers only after the person chooses it in the form. A private answer has its
+  // own masked field in the form, never the composer.
+  const answersQuestion = Boolean(
+    questionForm?.question && !questionForm.question.isSecret && questionForm.replyInChat,
+  );
+  const [answerFocusVersion, setAnswerFocusVersion] = useState(0);
+  useEffect(() => {
+    if (answersQuestion) setAnswerFocusVersion((version) => version + 1);
+  }, [answersQuestion]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(
@@ -620,6 +627,7 @@ export function ChatView({
                   sendRetryVersion={sendRetryVersion}
                   replyTarget={replyTarget}
                   replyFocusVersion={replyFocusVersion}
+                  focusVersion={answerFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
                   key={target.id}
