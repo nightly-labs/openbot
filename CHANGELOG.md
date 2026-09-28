@@ -40,6 +40,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- The web app no longer shows the agent's working notes as chat bubbles. Before, each step of a
+  turn showed as its own bubble, and some of these bubbles were empty. The web app now shows the
+  same messages as the desktop app.
 - Stop "Provider error" messages for Antigravity info and warning log lines, such as "Checkpoint
   summary was too long". Before, one message showed at each step of a long conversation. These
   lines now go to the log. Antigravity error lines still show.

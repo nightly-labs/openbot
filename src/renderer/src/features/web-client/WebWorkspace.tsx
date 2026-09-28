@@ -27,7 +27,7 @@ import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Loading, onCleanup, Show, untrack } from "solid-js";
-import { toAgentMessage } from "../../app-message-projection";
+import { toAgentMessages } from "../../app-message-projection";
 import { AgentTemplateInstall, ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
@@ -373,13 +373,12 @@ export function WebWorkspace(props: {
     };
   });
   const messages = createMemo(() =>
-    (workspace.conversation()?.page?.messages ?? []).map((value) => {
-      const message = toAgentMessage(value, workspace.state.selectedId ?? undefined);
-      return {
+    toAgentMessages(workspace.conversation()?.page?.messages ?? [], workspace.state.selectedId ?? undefined).map(
+      (message) => ({
         ...message,
         attachments: message.attachments?.map((attachment) => ({ ...attachment, previewUrl: null })),
-      };
-    }),
+      }),
+    ),
   );
   createEffect(
     () => workspace.state.error,
