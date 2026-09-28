@@ -6,6 +6,8 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-28
+
 ### Added
 
 - Ask an agent to set up another agent after it creates it. The agent can read another agent's
@@ -34,6 +36,28 @@ All notable changes to OpenBot will be documented here. The project follows
 - Add Paper to the Plugins tab. Agents can read and change the file that is open in Paper Desktop.
   Install Paper Desktop, open it once, and open a file. Paper needs no key. The command of a local
   MCP server can now start with `~/`, which is your home folder.
+- Search is available on mobile. It finds agents and the messages in their chats on the connected computer.
+- Resize the sidebar in OpenBot web, and drag it narrow to make it compact. A narrow browser window
+  makes the sidebar compact by itself, as in the desktop app.
+- Open the usage report of a host from its menu in the OpenBot web server rail.
+- Press Cmd+K or Ctrl+K in OpenBot web to search all conversations on the host.
+- The "Waiting for replies" block now has a close button when every teammate has replied or failed. Before, a failed request kept the block above the message box until you sent a new message.
+- Open the server menu from the server name in the web client. The menu switches and adds servers,
+  opens server settings and the marketplace, and sets the rail or menu layout, as in the desktop app.
+- Show the "Create your first agent" row in the web client sidebar when a server has no agents.
+- In the web app, change your display name and profile photo and disconnect account sessions. Open
+  **Profile** from the account menu; it opens in the right panel of the agent on screen.
+- The web account menu now has usage, Settings (the host's settings), Marketplace, Send feedback, and
+  Message, as in the desktop app. Before, it had only Sign out.
+- Open an invitation link in OpenBot web. The invitation page has an Open in browser button, and the
+  web client opens the join dialog with the link filled in.
+- Open a plugin listing in OpenBot web. The plugin page has an Open in browser button, and the web
+  client opens the marketplace on that listing.
+- "New chat" in the agent settings starts a new chat with the agent. The agent forgets the earlier chat. The earlier messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change. It is available on desktop and in the web client, also for an agent on a joined server that is on this version or later.
+- OpenBot now has a macOS build for Intel Macs: download `OpenBot-<version>-x64.dmg` from the release. It includes the provider runtimes, Computer Use, voice input and remote desktop hosting. Intel Macs get updates for the Intel build, and Apple silicon Macs continue to get the ARM64 build. The Host package (PKG) is still for Apple silicon only.
+- The web client sidebar has channels, as in the desktop app. You can create, edit and delete a
+  channel, open deleted channels, and use channel memories and routines. The "+" menu and the
+  sidebar context menu have New channel.
 
 ### Changed
 
@@ -67,6 +91,26 @@ All notable changes to OpenBot will be documented here. The project follows
 - Ask before an import adds an agent whose name is already on the server, for example when you
   import the same export again. The dialog names the agents and says that each copy is a separate
   agent. Before, only an info icon next to the name showed this.
+- Mobile search shows one list of agents and messages, with no filter, in a rounded search field.
+- The search and add buttons on the mobile home screen are two separate buttons.
+- The mobile search sheet uses the same background and header fade as the other sheets.
+- In "Waiting for replies", the avatar of a working teammate no longer moves. The spinner at the end of the row shows that it works.
+- Agents ask a teammate, or try their connected plugins, the browser and Computer Use, before they
+  say that they cannot do a task. When a site needs a sign-in, the agent asks you to sign in in the
+  browser instead of stopping. When a teammate helps, the answer starts with its name. When nothing
+  works, the agent says what it tried and what you can do to unblock it, such as installing a plugin.
+- You can make the Dynamic Island as narrow as 20% of its default width. Before, the smallest width was 70%.
+- The OpenBot logo and the greeting in the idle Dynamic Island keep a 16px inset from the edges. Only
+  the space between them changes with the width.
+- The web client now opens the first-agent form when a computer has no agents, with the same text
+  as the desktop app and no Cancel button. The model of a new agent is the same default that the
+  desktop app selects.
+- A host can now have up to 3 active members: the owner and 2 other people. A new join or a
+  reactivation that goes over this limit fails with an error. A host that already has more members
+  keeps all of them. Removed and disabled members do not count.
+- Server members on desktop and mobile shows how many members the server has of its limit, for
+  example "1 of 3 members". When the server is full, you cannot create an invitation until you
+  remove a member.
 
 ### Fixed
 
@@ -101,6 +145,87 @@ All notable changes to OpenBot will be documented here. The project follows
   names differ only in case on macOS. The import keeps both files, saves the second one as
   `name (2).ext`, and shows a warning. A file that it cannot write is skipped with a warning. Before,
   the agent was not imported.
+- Connect the Figma plugin to the MCP server in the Figma desktop app on your computer. Before, the
+  connect step always failed, because Figma does not accept a browser sign-in from OpenBot. The
+  connect dialog shows the steps that turn on the server in Figma. The server can only read designs
+  for now.
+- If you installed the Figma plugin before this version, Plugins shows it as not installed. Remove
+  the old `figma` server from the MCP servers of the agent, then install Figma again from Plugins.
+- On Linux, the window no longer closes a short time after it opens on some GPU drivers. OpenBot now uses software rendering on Linux.
+- A finished agent reply no longer shows the text of another message after the chat scrolls or loads more messages.
+- Phones and other devices connect to your computer again when its network comes back. Before, the
+  computer stayed offline for them after Wi‑Fi was off, until you restarted OpenBot.
+- Show an error and a Retry button on the web sign-in screen when the session check fails. Before,
+  the screen showed the email form with no error.
+- Stop the web sign-out from staying on "Signing out…" when sign-out fails. The account menu now
+  shows the error, and you can try again.
+- Show a web session-check error as a notification. Before, the message pushed the dock and the
+  composer out of the window.
+- Use the plain sign-in background on the web, the same as the desktop app.
+- Mobile search no longer shows sample English results that did not come from your computer.
+- Mobile chat previews and search results show message text without Markdown marks such as `**`.
+- A tap anywhere on the mobile search field opens the keyboard. Before, a tap near the edge did nothing.
+- A chat opened from mobile search closes with the same zoom into its row as a chat opened from the list.
+- Show the full compatibility screen in OpenBot web when a host cannot talk to this version. Before,
+  the web showed "Your computer is disconnected".
+- Keep the server rail of OpenBot web as wide as in the desktop app. Before, it was 8 px narrower, so
+  the sidebar and the chat moved.
+- Keep the message that you pick in global search on screen. Before, a conversation that loaded at
+  the same time could scroll to the latest message.
+- In the web client, files that you drop on a chat or channel, or paste into its message box, now attach to the message. Before, the web client ignored them.
+- In the browser, a shared or workspace file link in a message opens the file preview. Before, it
+  showed a "desktop only" error.
+- In the browser, a sent image no longer shows "File not found". Its card shows the name and size,
+  and a click opens the preview.
+- In the browser, "Open" on a file card opens the preview. Before, "Open" and "Download" both
+  downloaded the file.
+- In the browser, an image in the composer shows as a file with its name instead of a broken
+  thumbnail.
+- In the web client, a chat with an agent now shows the unread divider and the new messages banner, and marks messages read on the host. Before, the web client did not show unread messages and did not mark them read.
+- The web account dock shows your name and email on every browser. Before, it used the macOS
+  layout on every computer.
+- The web usage indicator reads usage again when a provider connects or disconnects on the host.
+- A channel now shows a stop button while its agents work. Before, you could not stop a channel run.
+- On a MacBook with no notch, the Dynamic Island gets narrower when you make its width smaller. Before,
+  it kept an empty space for a notch that was not there, and the width setting had almost no effect.
+- A narrow Dynamic Island no longer cuts off the greeting at its right edge.
+- Pause the browser view in OpenBot web while the marketplace or a notification covers it, as the
+  desktop app does.
+- The web client now shows the queued messages of an agent. You can steer, cancel, reorder, and edit them, as on desktop. The "Waiting for replies" count on the web now agrees with desktop.
+- Keep the server order that you drag in the web client's server rail. Before, the rail said the
+  server moved, but the order did not change.
+- Show the real connection state of each server in the web client. Before, every server that was
+  not open showed as offline.
+- Show server logos in the web client's server rail, server menu and server settings.
+- The browser preview no longer waits behind the agent's browser actions. While the agent works on a
+  tab, or when a capture is slow, the preview shows the last frame of the same page. Before, a
+  preview on a heavy web app could take up to 30 seconds, and it also delayed the agent's next
+  action.
+- Browser snapshots are smaller. The page text is limited to 20,000 characters, with the text in
+  the viewport first, and the snapshot says when it left text or elements out. Each snapshot also
+  shows fewer and shorter console and action entries. Before, each browser action could add up to
+  1 MB of page text and log entries to the agent's context.
+- On Linux and macOS, OpenBot finds a provider CLI that you installed yourself, such as OpenCode under
+  nvm, when your shell profile prints text at start. Before, a greeting or a tool such as `fastfetch`
+  in `.bashrc` or `.zshrc` made OpenBot show the provider as not downloaded. MCP server commands had
+  the same fault.
+- The web client now sets the page language to the language of its text. Before, the page always
+  said English, and a screen reader could read other languages with an English voice.
+- While the web client loads, it shows the OpenBot loading screen from the first frame. Before, the
+  first frame was an empty page.
+- The web client no longer uses the smooth scroll and the minimum page width of the site pages.
+- A left-click now closes a sidebar context menu. Before, the menu stayed open when you clicked the
+  empty sidebar area or the row that opened it.
+- The `$` menu in the web client shows the agent's skills, and MCP servers for an owner or admin.
+  Skill tags in messages show as skill chips, and copied messages use the current skill names.
+  Before, the menu was always empty and each skill tag showed as an unavailable skill.
+- The web client keeps pinned agents and channels, and collapsed sections, after a reload. Before,
+  it forgot them, and only agents could be pinned.
+- The fullscreen browser in the web client has back, forward, reload, the address field and tab
+  close, as in the desktop app. Before, its toolbar was empty.
+- The web browser sidebar shows tab previews. Before, the cards had no preview.
+- A new tab in the fullscreen web browser no longer fails with "The host could not complete this
+  request".
 
 ## [0.23.0] - 2026-09-27
 
