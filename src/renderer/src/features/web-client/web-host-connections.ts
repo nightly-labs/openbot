@@ -25,6 +25,8 @@ interface HostEntry {
   recovery: ReturnType<typeof createRemoteConnectionRecovery> | null;
   /** The connect command in progress. Its bootstrap can still end the session after `dispose`. */
   connecting: Promise<unknown> | null;
+  /** Session ends in progress. The peer starts some without waiting, for example after a protocol error. */
+  endingSessions: Set<Promise<void>>;
   incompatible: boolean;
 }
 
@@ -92,6 +94,7 @@ export function createWebHostConnections(options: {
       peer: null,
       recovery: null,
       connecting: null,
+      endingSessions: new Set(),
       incompatible: false,
     };
     entries.set(host.hostId, entry);
@@ -114,7 +117,16 @@ export function createWebHostConnections(options: {
       new Error(message ?? currentText().t("webClient.error.connectionUnavailable"));
     const peer = options.createPeer({
       current: {
-        ...options.actions,
+        getBootstrap: options.actions.getBootstrap,
+        endSession(sessionId) {
+          const ending = options.actions.endSession(sessionId);
+          entry.endingSessions.add(ending);
+          void ending.then(
+            () => entry.endingSessions.delete(ending),
+            () => entry.endingSessions.delete(ending),
+          );
+          return ending;
+        },
         async onConnectionUpdate(update) {
           if (entries.get(host.hostId) !== entry || update.state !== "offline") return;
           if (update.code === "session_revoked") options.onSessionRevoked();
@@ -192,6 +204,7 @@ export function createWebHostConnections(options: {
       // A bootstrap that was still pending ends its session when it returns. The tab that asked for the
       // host would reuse that session, so the lock waits for it.
       await entry.connecting?.catch(() => undefined);
+      await Promise.allSettled([...entry.endingSessions]);
     } finally {
       entry.releaseLock?.();
     }
