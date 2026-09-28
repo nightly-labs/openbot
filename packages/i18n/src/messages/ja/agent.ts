@@ -27,6 +27,7 @@ export const messages = {
   "agent.error.adminOnly": "エージェントの設定を変更できるのはサーバー管理者だけです。",
   "agent.error.continueFailed": "エージェントは続行できませんでした。もう一度お試しください。",
   "agent.error.mcpNotStarted": "MCP サーバーが起動していません",
+  "agent.error.codexConfigIgnored": "Codex の設定に関する警告",
   "agent.error.provider": "プロバイダーのエラー",
   "agent.color.red": "赤",
   "agent.color.orange": "オレンジ",

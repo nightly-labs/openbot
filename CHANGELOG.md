@@ -29,11 +29,17 @@ All notable changes to OpenBot will be documented here. The project follows
   three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
   small notice showed above an empty conversation. When the computers cannot load, an error message
   now shows at the bottom of the screen.
+- Show a centered screen with the same design when your computer is disconnected or connecting. It
+  gives the reason and a Reconnect button. Before, a small notice showed above the conversation.
+  Your draft stays when you reconnect.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
 
 ### Fixed
 
+- When Codex ignores an unknown setting in its configuration, show one warning that names each
+  setting. Before, a "Provider error" showed only "Codex is ignoring 1 unrecognized configuration
+  setting", with no setting name, and it came back after each reconnect. Codex continues to work.
 - Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
   could save the same routine. An agent can no longer add a routine with the name of an existing
   one; it changes that routine instead.
