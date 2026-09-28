@@ -292,7 +292,7 @@ export const messages = {
   "mobile.agent.home.waitingBody": "La liste des agents se chargera une fois ce serveur connecté.",
   "mobile.agent.home.noAgents": "Aucun agent sur ce serveur",
   "mobile.agent.home.noAgentsBody": "Ajoutez un agent pour travailler depuis votre téléphone.",
-  "mobile.agent.home.searchAgents": "Rechercher des agents",
+  "mobile.agent.home.searchAgents": "Rechercher",
   "mobile.agent.home.chatOptions": "Options de la discussion",
   "mobile.agent.route.appearance": "Apparence",
   "mobile.agent.route.cropPhoto": "Déplacer et redimensionner",

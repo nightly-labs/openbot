@@ -67,6 +67,7 @@ function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
       <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
         <Link.Trigger>
           <ChatLinkPressable
+            chatId={agent.id}
             accessibilityLabel={
               agent.title.trim()
                 ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })

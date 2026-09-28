@@ -415,6 +415,7 @@ it("instruments message commands without sending their contents or changing the 
     loadAgentModels: unexpected,
     loadAgentMemories: unexpected,
     loadAgentRoutines: unexpected,
+    searchMessages: unexpected,
     loadAgentAnalytics: unexpected,
     loadAgentSkills: unexpected,
     loadAgentStorage: unexpected,

@@ -1,8 +1,9 @@
 import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@openbot/contracts/agent-template-links";
-import type { CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
-import { Toaster } from "@openbot/ui";
+import { sourceText } from "@openbot/i18n/source";
+import { Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { currentText } from "@openbot/ui/text";
@@ -35,15 +36,11 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     loaded: boolean;
     login: CentralAuthState;
     resendAt: number;
-    busy: boolean;
-    error: string | null;
   }>({
     account: null,
     loaded: false,
     login: { status: "signed_out" },
     resendAt: 0,
-    busy: false,
-    error: null,
   });
   // Kept here, not in the workspace, so the link waits through sign-in.
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
@@ -149,37 +146,28 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
         sessionEnded = false;
         setState((draft) => {
           draft.account = account;
-          draft.error = null;
         });
       }
     } catch (error) {
-      if (!disposed && generation === sessionGeneration)
-        setState((draft) => {
-          draft.error = error instanceof Error ? error.message : text.t("webClient.login.sessionFailed");
-        });
+      if (!disposed && generation === sessionGeneration) {
+        // Signed in, the workspace stays usable. Signed out, the login screen offers a retry, as on desktop.
+        if (state.account)
+          toast.error(
+            text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
+          );
+        else
+          setState((draft) => {
+            draft.login = {
+              status: "error",
+              issue: { code: "auth_api_unavailable", message: sourceText("error.auth.serviceUnavailable") },
+            };
+          });
+      }
     } finally {
       if (!disposed)
         setState((draft) => {
           draft.loaded = true;
         });
-    }
-  }
-  async function action(work: () => Promise<void>) {
-    if (state.busy) return;
-    setState((draft) => {
-      draft.busy = true;
-      draft.error = null;
-    });
-    try {
-      await work();
-    } catch (error) {
-      setState((draft) => {
-        draft.error = error instanceof Error ? error.message : text.t("webClient.login.failed");
-      });
-    } finally {
-      setState((draft) => {
-        draft.busy = false;
-      });
     }
   }
   async function start(email: string) {
@@ -211,7 +199,6 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     channel?.postMessage("session-changed");
     setState((draft) => {
       draft.account = account;
-      draft.error = null;
     });
   }
   async function logout() {
@@ -238,6 +225,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       window.removeEventListener("pageshow", restore);
     };
   });
+  const variant: AppVariant = import.meta.env.DEV ? "dev" : "production";
   // The web client has no saved language setting, so it follows the browser.
   return (
     <StaticI18nProvider
@@ -246,13 +234,13 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     >
       <div class="web-app">
         <Toaster />
-        <Show when={state.loaded} fallback={<AppLoadingScreen variant="production" />}>
+        <Show when={state.loaded} fallback={<AppLoadingScreen variant={variant} />}>
           <Show
             keyed
             when={state.account?.id}
             fallback={
               <AccountLogin
-                variant="production"
+                variant={variant}
                 state={state.login}
                 onRetry={checkSession}
                 onRequestEmailCode={start}
@@ -267,24 +255,19 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
             }
           >
             {(accountId) => (
-              <>
-                <Show when={state.error}>
-                  <p role="alert">{text.sourceText(state.error ?? "")}</p>
-                </Show>
-                <WebWorkspace
-                  accountId={accountId}
-                  accountEmail={state.account?.email ?? ""}
-                  accountName={state.account?.name ?? null}
-                  accountAvatarUrl={state.account?.avatarUrl ?? null}
-                  accountFetch={accountFetch}
-                  onSessionCheck={checkSession}
-                  accountSessionEnded={() => sessionEnded}
-                  onLogout={() => action(logout)}
-                  createRuntime={props.createRuntime}
-                  agentTemplateId={agentTemplateId()}
-                  onAgentTemplateClose={() => setAgentTemplateId(null)}
-                />
-              </>
+              <WebWorkspace
+                accountId={accountId}
+                accountEmail={state.account?.email ?? ""}
+                accountName={state.account?.name ?? null}
+                accountAvatarUrl={state.account?.avatarUrl ?? null}
+                accountFetch={accountFetch}
+                onSessionCheck={checkSession}
+                accountSessionEnded={() => sessionEnded}
+                onLogout={logout}
+                createRuntime={props.createRuntime}
+                agentTemplateId={agentTemplateId()}
+                onAgentTemplateClose={() => setAgentTemplateId(null)}
+              />
             )}
           </Show>
         </Show>

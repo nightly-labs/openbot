@@ -100,6 +100,10 @@ const developmentRemoteDebuggingPort = !app.isPackaged
 // Electron exposes FedCM without an account chooser, so every request fails with a NetworkError.
 // Sites such as Google Sign-In use FedCM when it exists and fall back to their popup when it does not.
 app.commandLine.appendSwitch("disable-features", "FedCm");
+// On some Linux GPU drivers the GPU process dies with no fallback mode left, and Chromium then
+// stops the main process with SIGTRAP ("GPU process isn't usable. Goodbye."). Software rendering
+// keeps the window up. The renderer sandbox stays on.
+if (process.platform === "linux") app.disableHardwareAcceleration();
 if (developmentRemoteDebuggingPort) {
   app.commandLine.appendSwitch("remote-debugging-port", developmentRemoteDebuggingPort);
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");

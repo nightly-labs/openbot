@@ -281,7 +281,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.waitingBody": "The agent list will load once this server is connected.",
   "mobile.agent.home.noAgents": "No agents on this server",
   "mobile.agent.home.noAgentsBody": "Add an agent to start working from your phone.",
-  "mobile.agent.home.searchAgents": "Search agents",
+  "mobile.agent.home.searchAgents": "Search",
   "mobile.agent.home.chatOptions": "Chat options",
   "mobile.agent.route.appearance": "Appearance",
   "mobile.agent.route.cropPhoto": "Move and Scale",

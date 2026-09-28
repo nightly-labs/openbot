@@ -25,8 +25,8 @@
         "auth": [
           {
             "id": "figma-desktop",
-            "kind": "local",
             "label": "Figma desktop app",
+            "kind": "local",
             "steps": [
               "Open the Figma desktop app and sign in. The server needs a Dev or Full seat on a paid plan.",
               "Open a design file from a team project, not from Drafts.",
@@ -40,8 +40,8 @@
       }
     }
   ],
-  "skills": [],
   "websiteUrl": "https://www.figma.com",
   "privacyPolicyUrl": "https://www.figma.com/privacy/",
-  "termsUrl": "https://www.figma.com/tos/"
+  "termsUrl": "https://www.figma.com/tos/",
+  "skills": []
 }

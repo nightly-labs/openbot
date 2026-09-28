@@ -4,14 +4,13 @@ import { router, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowDown } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
-import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { MobileConversationAnalytics } from "@/features/analytics/conversation";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
@@ -47,7 +46,6 @@ import type { ChatQueueController } from "./use-chat-queue";
 export interface ChatViewProps {
   target: ChatTarget;
   queue?: ChatQueueController;
-  animateAvatarOnExit?: boolean;
   agents: MobileAgent[];
   mentionAgents: MobileAgent[];
   projectedMessages: ChatMessage[];
@@ -94,7 +92,6 @@ function leaveConversation(): void {
 export function ChatView({
   target,
   queue,
-  animateAvatarOnExit = false,
   agents: serverAgents,
   mentionAgents,
   projectedMessages,
@@ -130,7 +127,6 @@ export function ChatView({
   const [reducedTransparency, setReducedTransparency] = useState(true);
   const insets = useSafeAreaInsets();
   const keyboardOffset = Math.max(insets.bottom, 10) - 10;
-  const { leaveAgentChatAnimated } = useAgentPinTransition();
   const [foreground, muted, fieldBackground, raised, action, actionForeground, background] = useThemeColor([
     "foreground",
     "muted",
@@ -275,11 +271,6 @@ export function ChatView({
     if (!pendingMessage && isFocused && appActive && atLatest && serverOnline && readBoundary) markRead();
   }, [pendingMessage, isFocused, appActive, atLatest, serverOnline, readBoundary, markRead]);
 
-  const handleLeaveConversation = useCallback(() => {
-    if (animateAvatarOnExit && target.kind === "agent") leaveAgentChatAnimated(target.id);
-    else leaveConversation();
-  }, [animateAvatarOnExit, target.id, target.kind, leaveAgentChatAnimated]);
-
   // The attachment card must not rebuild this gesture. A new gesture object
   // makes GestureDetector re-attach around the whole chat, the input inside it
   // is recreated, and the keyboard goes with it. Read the card's state in the
@@ -301,9 +292,9 @@ export function ChatView({
         .failOffsetY([-16, 16])
         .onEnd((event) => {
           if (menuOpenValue.get()) return;
-          if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(handleLeaveConversation);
+          if (event.translationX >= 48 || event.velocityX >= 650) scheduleOnRN(leaveConversation);
         }),
-    [handleLeaveConversation, menuOpenValue],
+    [menuOpenValue],
   );
 
   async function retryAcceptedHistory() {
@@ -483,7 +474,7 @@ export function ChatView({
               foreground={foreground}
               liquidGlassAvailable={liquidGlassAvailable}
               topInset={insets.top}
-              onBack={handleLeaveConversation}
+              onBack={leaveConversation}
             />
             <ChatMessageList
               agents={serverAgents}

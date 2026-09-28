@@ -1,4 +1,4 @@
-import type { ConversationPage, QueuedMessageReceipt } from "@openbot/contracts/ipc";
+import type { ConversationPage, ConversationSearchPage, QueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { type ConversationMessage, type ConversationSnapshot, isConversationMessage } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 
@@ -47,6 +47,26 @@ export function decodeConversationPage(value: unknown): ConversationPage {
     references: Object.fromEntries(
       Object.entries(value.references).map(([id, message]) => [id, decodeConversationMessage(message)]),
     ),
+  };
+}
+
+export function decodeConversationSearchPage(value: unknown): ConversationSearchPage {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.results) ||
+    !isNumber(value.total) ||
+    (value.nextCursor !== null && !isString(value.nextCursor))
+  ) {
+    throw new Error("The server returned invalid search results.");
+  }
+  return {
+    results: value.results.map((result) => {
+      if (!isDynamicRecord(result) || !isString(result.agentId))
+        throw new Error("The server returned invalid search results.");
+      return { agentId: result.agentId, message: decodeConversationMessage(result.message) };
+    }),
+    total: value.total,
+    nextCursor: value.nextCursor,
   };
 }
 

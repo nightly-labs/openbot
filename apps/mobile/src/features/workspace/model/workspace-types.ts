@@ -9,6 +9,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
+  ConversationSearchPage,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
@@ -145,6 +146,8 @@ export interface MobileWorkspaceContextValue {
   updateAgentAdminSettings: (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>;
   /** Owners and admins only; the host refuses a member. */
   deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
+  /** Searches message text in the server's agent chats, one page from `cursor` or from the newest match. */
+  searchMessages: (query: string, serverId: string, cursor?: string) => Promise<ConversationSearchPage>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;
   loadOlderMessages: (agentId: string) => Promise<void>;
   respondToPrompt: (agentId: string, input: RespondToPromptInput) => Promise<void>;

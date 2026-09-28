@@ -285,7 +285,7 @@ export const messages = {
   "mobile.agent.home.waitingBody": "このサーバーが接続されると、エージェントの一覧が読み込まれます。",
   "mobile.agent.home.noAgents": "このサーバーにエージェントはいません",
   "mobile.agent.home.noAgentsBody": "エージェントを追加すると、スマートフォンから作業を始められます。",
-  "mobile.agent.home.searchAgents": "エージェントを検索",
+  "mobile.agent.home.searchAgents": "検索",
   "mobile.agent.home.chatOptions": "チャットのオプション",
   "mobile.agent.route.appearance": "外観",
   "mobile.agent.route.cropPhoto": "移動と拡大縮小",
