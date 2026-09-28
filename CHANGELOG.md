@@ -1,7 +1,8 @@
 # Changelog
 
 All notable changes to OpenBot will be documented here. The project follows
-[Semantic Versioning](https://semver.org/).
+[Semantic Versioning](https://semver.org/). Notes for the next release are in
+[`changelog.d/`](changelog.d/README.md).
 
 ## [Unreleased]
 

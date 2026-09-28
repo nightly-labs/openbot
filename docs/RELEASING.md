@@ -229,10 +229,13 @@ OpenBot release. One reviewed commit per release.
 
 ## Release notes
 
-`CHANGELOG.md` is the text of the `/changelog` page on the public site. Write the notes before the
-version bump:
+`CHANGELOG.md` is the text of the `/changelog` page on the public site. Each pull request writes its
+notes in its own file, `changelog.d/<branch>.md` with `-` for `/`, so two pull requests never change
+the same lines. The version bump moves the items of every file into `CHANGELOG.md`, in the order
+that the pull requests merged, and deletes the files. Items that are still under `## [Unreleased]`
+in `CHANGELOG.md` go first.
 
-- Put each change that a user can see under `## [Unreleased]`, in one of these groups:
+- Put each change that a user can see in the file, in one of these groups:
   `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, `### Security`.
 - Write one `- ` item for each change, for a user and not for a developer. Say what changed. For a
   fix, say what happened before.
@@ -244,10 +247,13 @@ version bump:
 times, or when it has an unknown group, a group with no items, an item with no text or outside a
 group, a placeholder such as `TODO`, or a heading with no real date. These steps run it:
 
-- `bun run release:patch`, `release:minor` and `release:major` check `## [Unreleased]` before the
-  bump.
-- The pre-commit hook checks the staged `CHANGELOG.md` when a commit changes the `package.json`
-  version.
+- `bun run release:patch`, `release:minor` and `release:major` check the new section before they
+  write it. They stop, and delete no file, when a line is not in an item.
+- The pre-commit hook checks each staged `changelog.d` file with `--fragments`, and the staged
+  `CHANGELOG.md` when a commit changes the `package.json` version.
+- The `Changelog` workflow checks each `changelog.d` file. It fails a pull request that adds no
+  `changelog.d` file and does not change `CHANGELOG.md`, unless the pull request has the
+  `no-changelog` label. Use the label when a user sees no change.
 - `bun run release:preflight` and the tag workflow check the section of the `package.json` version.
 
 ## Publish a version
@@ -260,8 +266,8 @@ git tag -a v0.1.0 -m "OpenBot v0.1.0"
 git push origin v0.1.0
 ```
 
-For later releases, add the release notes under `Unreleased`, then choose the appropriate semantic
-version bump:
+For later releases, the release notes are in `changelog.d/`. Choose the appropriate semantic version
+bump:
 
 ```bash
 bun run release:patch
@@ -269,11 +275,12 @@ bun run release:patch
 # or: bun run release:major
 ```
 
-The command updates `package.json` and moves the unreleased changelog entries under the new dated
-version heading. Review and publish that preparation before creating the tag:
+The command updates `package.json`, moves the `changelog.d` items and the items under `Unreleased`
+under the new dated version heading, and deletes the `changelog.d` files. Review and publish that
+preparation before creating the tag:
 
 ```bash
-git add package.json CHANGELOG.md
+git add package.json CHANGELOG.md changelog.d
 git commit -m "release: prepare vX.Y.Z"
 git push origin main
 bun run release:preflight

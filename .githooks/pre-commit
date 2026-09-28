@@ -46,6 +46,10 @@ if printf '%s\n' "$staged_paths" | grep -Fxq package.json; then
   bun scripts/check-release-notes.ts --staged
 fi
 
+# The release copies each fragment into CHANGELOG.md, so a malformed one stops it later.
+git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' ':(exclude)changelog.d/README.md' |
+  xargs -0 bun scripts/check-release-notes.ts --staged --fragments
+
 # Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.
 code_pattern='\.(ts|tsx|mts|cts|js|mjs|cjs|css|json|jsonc|grit)$|(^|/)bun\.lock$'
 if printf '%s\n' "$staged_paths" | grep -Eq "$code_pattern"; then

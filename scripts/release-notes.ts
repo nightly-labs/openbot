@@ -59,3 +59,63 @@ export function releaseNotesProblems(changelog: string, version: string): string
   }
   return problems;
 }
+
+/** Where each pull request writes its own notes. The release moves them into CHANGELOG.md. */
+export const FRAGMENT_DIR = "changelog.d";
+
+/** What stops one fragment in `changelog.d` from being released. Empty when it is ready. */
+export function fragmentProblems(fragment: string): string[] {
+  const problems = releaseNotesProblems(`## [${UNRELEASED}]\n${fragment}`, UNRELEASED);
+  if (/^##? /m.test(fragment)) problems.push(`Use only "### " group headings in a fragment.`);
+  for (const line of collectGroups(fragment, new Map())) problems.push(`"${line.trim()}" is not in a "- " item.`);
+  return problems;
+}
+
+/**
+ * The section body that holds every item of `bodies`. The groups follow the order of
+ * `RELEASE_GROUPS`, and the items in a group keep the order of `bodies`.
+ */
+export function assembleSection(bodies: readonly string[]): string {
+  const groups = new Map<string, string[]>();
+  // The release deletes the fragments after it writes this section, so a line that would be left
+  // out stops the release instead.
+  const stray = bodies.flatMap((body) => collectGroups(body, groups));
+  if (stray.length > 0) {
+    throw new Error(`These release notes lines are not in a "- " item:\n${stray.join("\n")}`);
+  }
+  const rank = (group: string) => {
+    const index = RELEASE_GROUPS.indexOf(group);
+    return index === -1 ? RELEASE_GROUPS.length : index;
+  };
+  return [...groups]
+    .filter(([, items]) => items.length > 0)
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([group, items]) => `### ${group}\n\n${items.join("\n")}`)
+    .join("\n\n");
+}
+
+/** Adds the items of `body` to `groups`, with their continuation lines. Returns the other lines. */
+function collectGroups(body: string, groups: Map<string, string[]>): string[] {
+  const stray: string[] = [];
+  let items: string[] | undefined;
+  let open = false;
+  for (const line of body.split(/\r?\n/)) {
+    const groupHeading = /^### (.+)$/.exec(line);
+    if (groupHeading) {
+      const group = (groupHeading[1] ?? "").trim();
+      items = groups.get(group) ?? [];
+      groups.set(group, items);
+      open = false;
+    } else if (line.trim() === "") {
+      open = false;
+    } else if (items && line.startsWith("- ")) {
+      items.push(line);
+      open = true;
+    } else if (items && open) {
+      items[items.length - 1] += `\n${line}`;
+    } else {
+      stray.push(line);
+    }
+  }
+  return stray;
+}

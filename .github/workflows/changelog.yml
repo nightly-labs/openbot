@@ -1,0 +1,52 @@
+name: Changelog
+
+# Each pull request writes its release notes in its own `changelog.d` file, so two pull requests
+# never change the same lines. `bun run release:*` moves the files into CHANGELOG.md. The label
+# events run the check again: `ci.yml` does not run when a label changes.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changelog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  notes:
+    name: Release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its first parent, the base branch.
+          fetch-depth: 2
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: none
+
+      # A change to CHANGELOG.md itself also passes: a release, or notes written before `changelog.d`.
+      - name: Require release notes
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if ! git diff --name-only --diff-filter=ACMR HEAD^1 HEAD |
+            grep -Eq '^(changelog\.d/.+\.md|CHANGELOG\.md)$'; then
+            echo "::error::Write the release notes in changelog.d/${BRANCH//\//-}.md (see docs/RELEASING.md#release-notes), or add the no-changelog label when a user sees no change."
+            exit 1
+          fi
+
+      - name: Check changelog fragments
+        shell: bash
+        run: |
+          find changelog.d -name '*.md' ! -name README.md -print0 |
+            xargs -0 bun scripts/check-release-notes.ts --fragments
