@@ -154,11 +154,7 @@ export function encodeTeamProtocolV5CurrentHttpRequest(
     // The frozen base projection names no provider or model, so a chosen pair rides beside it:
     // only a host behind the capability reads them, and anything older drops unknown keys.
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
-      const projected = JSON.parse(
-        encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, {
-          preserveSemanticTags: options.preserveSemanticTags,
-        }),
-      );
+      const projected = JSON.parse(encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options));
       return JSON.stringify({ ...projected, ...decodeAgentCreateModel(value) });
     }
     return encodeTeamProtocolV5BaseCurrentHttpRequest(method, path, value, options);

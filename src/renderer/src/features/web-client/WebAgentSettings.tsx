@@ -15,7 +15,7 @@ export function WebAgentSettings(props: {
   runtime: WebWorkspaceRuntime;
   capabilities: string[];
   /** The host's endpoints, so the picker lists their models on its Custom tab. */
-  customProviders?: readonly CustomProviderSummary[];
+  customProviders?: readonly CustomProviderSummary[] | undefined;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
