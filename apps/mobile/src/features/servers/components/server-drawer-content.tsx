@@ -63,6 +63,8 @@ export function ServerDrawerContent({
   const mutedColor = String(muted);
   const [editing, setEditing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // The iOS menu host sizes to its content, so a row in a menu gets the slot width explicitly.
+  const [rowWidth, setRowWidth] = useState<number>();
   const localServers = servers.filter((server) => server.kind === "local");
   const remoteIds = servers.filter((server) => server.kind !== "local").map((server) => server.id);
   const canReorder = remoteIds.length > 1;
@@ -89,7 +91,7 @@ export function ServerDrawerContent({
 
   const openOptions = (serverId: string) => onNavigate({ pathname: "/server-settings", params: { serverId } });
 
-  function renderRow(serverItem: MobileServer) {
+  function renderRow(serverItem: MobileServer, width?: number) {
     const selected = serverItem.id === activeServerId;
     const remoteIndex = remoteIds.indexOf(serverItem.id);
     const serverLabel = serverKindLabel(serverItem, t);
@@ -115,7 +117,7 @@ export function ServerDrawerContent({
         }}
         className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
-        style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 8, opacity: pressed ? 0.58 : 1 })}
+        style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 8, opacity: pressed ? 0.58 : 1, width })}
       >
         <ServerAvatar server={serverItem} />
         <View className="min-w-0 flex-1">
@@ -141,7 +143,12 @@ export function ServerDrawerContent({
   // Every row gets the same fixed slot, so the list keeps its spacing in edit mode and in the menu wrapper.
   function rowSlot(serverItem: MobileServer, row: ReactNode) {
     return (
-      <View key={serverItem.id} className="justify-center" style={{ height: SERVER_ROW_HEIGHT }}>
+      <View
+        key={serverItem.id}
+        className="justify-center"
+        style={{ height: SERVER_ROW_HEIGHT }}
+        onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
+      >
         {row}
       </View>
     );
@@ -158,7 +165,7 @@ export function ServerDrawerContent({
           if (event.nativeEvent.event === "reorder") setEditing(true);
         }}
       >
-        {renderRow(serverItem)}
+        {renderRow(serverItem, rowWidth)}
       </MenuView>,
     );
   }
