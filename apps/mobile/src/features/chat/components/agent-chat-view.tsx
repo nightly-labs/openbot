@@ -7,13 +7,7 @@ import { ChatView } from "./chat-view";
 import { useChatQueue } from "./use-chat-queue";
 import { useQuestionPrompt } from "./use-question-prompt";
 
-export function MobileChatView({
-  agent,
-  animateAvatarOnExit = false,
-}: {
-  agent: MobileAgent;
-  animateAvatarOnExit?: boolean;
-}) {
+export function MobileChatView({ agent }: { agent: MobileAgent }) {
   const {
     agents,
     conversationStore,
@@ -94,7 +88,6 @@ export function MobileChatView({
     <ChatView
       target={{ ...agent, kind: "agent" }}
       queue={queue}
-      animateAvatarOnExit={animateAvatarOnExit}
       agents={serverAgents}
       mentionAgents={mentionAgents}
       projectedMessages={messages}

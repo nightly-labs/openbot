@@ -1,21 +1,6 @@
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { ConversationMessage, ConversationSearchPage } from "@openbot/contracts/ipc";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-
-export type MobileSearchCategory = "all" | "messages" | "agents" | "files" | "routines";
-type MobileSearchResultCategory = Exclude<MobileSearchCategory, "all">;
-
-export interface MobileSearchFilterOption {
-  id: MobileSearchCategory;
-  label: MobileTextKey;
-}
-
-interface MobileSearchTextResult {
-  id: string;
-  category: Exclude<MobileSearchResultCategory, "agents">;
-  title: string;
-  subtitle: string;
-  updatedLabel: string;
-}
+import { markdownPreviewText } from "../../chat/model/chat-markdown-parser";
 
 interface MobileSearchAgentResult {
   id: string;
@@ -23,77 +8,74 @@ interface MobileSearchAgentResult {
   agent: MobileAgent;
 }
 
-export type MobileSearchResult = MobileSearchTextResult | MobileSearchAgentResult;
-
-export const MOBILE_SEARCH_FILTERS: MobileSearchFilterOption[] = [
-  { id: "all", label: "mobile.search.filter.all" },
-  { id: "messages", label: "mobile.search.filter.messages" },
-  { id: "agents", label: "mobile.search.filter.agents" },
-  { id: "files", label: "mobile.search.filter.files" },
-  { id: "routines", label: "mobile.search.filter.routines" },
-];
-
-//! MOCK DATA RENDERED HERE
-const MOCK_SEARCH_RESULTS: MobileSearchTextResult[] = [
-  {
-    id: "message-project-notes",
-    category: "messages",
-    title: "Project notes and next steps",
-    subtitle: "Chief · I pulled together the latest project notes and next steps.",
-    updatedLabel: "10:00",
-  },
-  {
-    id: "message-research-sources",
-    category: "messages",
-    title: "Three useful sources",
-    subtitle: "Research · The sources are ready for your review.",
-    updatedLabel: "Yesterday",
-  },
-  {
-    id: "file-mobile-navigation",
-    category: "files",
-    title: "mobile-navigation.md",
-    subtitle: "Builder · Markdown document",
-    updatedLabel: "Mon",
-  },
-  {
-    id: "file-research-brief",
-    category: "files",
-    title: "research-brief.pdf",
-    subtitle: "Research · PDF document",
-    updatedLabel: "Yesterday",
-  },
-  {
-    id: "routine-daily-brief",
-    category: "routines",
-    title: "Daily project brief",
-    subtitle: "Runs every weekday at 09:00",
-    updatedLabel: "Daily",
-  },
-  {
-    id: "routine-research-digest",
-    category: "routines",
-    title: "Weekly research digest",
-    subtitle: "Runs every Monday at 08:30",
-    updatedLabel: "Weekly",
-  },
-];
-
-export function createMobileSearchResults(activeAgents: MobileAgent[]): MobileSearchResult[] {
-  return [
-    ...activeAgents.map<MobileSearchAgentResult>((agent) => ({
-      id: `agent-${agent.id}`,
-      category: "agents",
-      agent,
-    })),
-    ...MOCK_SEARCH_RESULTS,
-  ];
+interface MobileSearchMessageResult {
+  id: string;
+  category: "messages";
+  agent: MobileAgent;
+  message: ConversationMessage;
+  text: string;
 }
 
-export function getMobileSearchResultText(result: MobileSearchResult): string[] {
-  if (result.category === "agents") {
-    return [result.agent.name, result.agent.title, result.agent.preview];
-  }
+export type MobileSearchResult = MobileSearchAgentResult | MobileSearchMessageResult;
 
-  return [result.title, result.subtitle];
+/** What the screen shows. Message search runs on the host, so its state is separate from the local agent match. */
+export type MobileSearchView =
+  | { state: "results"; results: MobileSearchResult[]; messages: "idle" | "loading" | "error" | "ready" }
+  | { state: "loading" }
+  | { state: "error" }
+  | { state: "empty" };
+
+export function normalizeMobileSearchQuery(query: string): string {
+  return query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function messageSearchText(message: ConversationMessage): string {
+  return markdownPreviewText(message.text);
+}
+
+function agentSearchResults(agents: MobileAgent[], query: string): MobileSearchAgentResult[] {
+  return agents
+    .filter(
+      (agent) =>
+        !query ||
+        [agent.name, agent.title, agent.preview].some((value) => normalizeMobileSearchQuery(value).includes(query)),
+    )
+    .map((agent) => ({ id: `agent-${agent.id}`, category: "agents", agent }));
+}
+
+/** Keeps only results for agents this device shows, as the desktop search does. */
+function messageSearchResults(page: ConversationSearchPage, agents: MobileAgent[]): MobileSearchMessageResult[] {
+  const agentsById = new Map(agents.map((agent) => [agent.id, agent]));
+  return page.results.flatMap(({ agentId, message }) => {
+    const agent = agentsById.get(agentId);
+    const text = messageSearchText(message);
+    return agent && text
+      ? [{ id: `message-${agentId}-${message.id}`, category: "messages" as const, agent, message, text }]
+      : [];
+  });
+}
+
+export function mobileSearchView({
+  query,
+  agents,
+  messages,
+}: {
+  query: string;
+  agents: MobileAgent[];
+  /** The host message search for the current query; `idle` when no search runs. */
+  messages:
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "error" }
+    | { status: "ready"; page: ConversationSearchPage };
+}): MobileSearchView {
+  const normalized = normalizeMobileSearchQuery(query);
+  // Messages are searched only for a query; an empty query lists the agents.
+  const messageStatus = normalized ? messages.status : "idle";
+  const messageResults = messages.status === "ready" && normalized ? messageSearchResults(messages.page, agents) : [];
+  const results = [...agentSearchResults(agents, normalized), ...messageResults];
+  if (results.length > 0) return { state: "results", results, messages: messageStatus };
+  if (messageStatus === "loading") return { state: "loading" };
+  if (messageStatus === "error") return { state: "error" };
+  return { state: "empty" };
 }

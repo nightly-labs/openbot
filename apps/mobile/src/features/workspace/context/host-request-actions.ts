@@ -22,6 +22,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { QueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
+import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
@@ -49,6 +50,7 @@ type HostRequestActions = Pick<
   | "loadAgentModels"
   | "loadAgentMemories"
   | "loadAgentRoutines"
+  | "searchMessages"
   | "loadAgentSkills"
   | "loadAgentStorage"
   | "deleteStoredFile"
@@ -180,6 +182,15 @@ export function createHostRequestActions({
             throw new Error("The host returned invalid routines.");
           return value;
         },
+        undefined,
+        serverId,
+      ),
+    searchMessages: (query, serverId) =>
+      request(
+        "GET",
+        // A query parameter never reaches the JSON adapters, so every released host reads it as sent.
+        `${TEAM_API_ROUTES.messages.search}?${new URLSearchParams({ q: query, limit: "50" })}`,
+        decodeConversationSearchPage,
         undefined,
         serverId,
       ),

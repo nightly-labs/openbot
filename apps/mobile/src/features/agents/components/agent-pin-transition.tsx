@@ -1,5 +1,4 @@
 import type { AvatarHue, ChannelSummary } from "@openbot/contracts/ipc";
-import { router } from "expo-router";
 import {
   createContext,
   type PropsWithChildren,
@@ -18,7 +17,7 @@ import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/conte
 import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
 import { haptics } from "@/shared/lib/haptics";
 
-export type AgentAvatarLocation = "chat" | "pinned" | "row" | "search";
+export type AgentAvatarLocation = "chat" | "pinned" | "row";
 
 interface AvatarRect {
   height: number;
@@ -39,10 +38,8 @@ export interface AgentPinTransitionState {
 }
 
 interface AgentPinTransitionContextValue {
-  leaveAgentChatAnimated: (agentId: string) => void;
   registerAvatar: (agentId: string, location: AgentAvatarLocation, node: View | null) => void;
   notifyAvatarLayout: (agentId: string, location: AgentAvatarLocation) => void;
-  startAgentNavigationAnimated: (agentId: string, source: AgentAvatarLocation) => void;
   toggleAgentPinAnimated: (agentId: string, options?: { haptic: boolean }) => void;
   toggleChannelPinAnimated: (channel: ChannelSummary, serverId: string, options?: { haptic: boolean }) => void;
   transition: AgentPinTransitionState | null;
@@ -145,65 +142,6 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
     [measureAvatar],
   );
 
-  const startAgentNavigationAnimated = useCallback(
-    (agentId: string, source: AgentAvatarLocation) => {
-      const agent = agents.find((item) => item.id === agentId);
-      const from = avatarRects.get(agentId)?.[source];
-      if (!agent || !from || transitionRef.current) return;
-
-      const nextTransition: AgentPinTransitionState = {
-        chatId: agentId,
-        avatar: { kind: "agent", hue: agent.avatarHue, seed: agent.avatarSeed },
-        from,
-        source,
-        target: "chat",
-      };
-      transitionRef.current = nextTransition;
-      setTransition(nextTransition);
-      progress.set(0);
-      fallbackTimerRef.current = setTimeout(finishTransition, 1200);
-    },
-    [avatarRects, agents, finishTransition, progress],
-  );
-
-  const leaveAgentChatAnimated = useCallback(
-    (agentId: string) => {
-      const navigateBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace("/connected");
-      };
-      const agent = agents.find((item) => item.id === agentId);
-      const from = avatarRects.get(agentId)?.chat;
-
-      if (!agent || !from || transitionRef.current) {
-        navigateBack();
-        return;
-      }
-
-      const target: AgentAvatarLocation = pinnedAgentIds.includes(agentId) ? "pinned" : "row";
-      const to = avatarRects.get(agentId)?.[target];
-      const nextTransition: AgentPinTransitionState = {
-        chatId: agentId,
-        avatar: { kind: "agent", hue: agent.avatarHue, seed: agent.avatarSeed },
-        from,
-        source: "chat",
-        target,
-        ...(to ? { to } : {}),
-      };
-
-      transitionRef.current = nextTransition;
-      setTransition(nextTransition);
-      progress.set(0);
-      fallbackTimerRef.current = setTimeout(finishTransition, 1200);
-
-      requestAnimationFrame(() => {
-        navigateBack();
-        if (to) startMovement(nextTransition);
-      });
-    },
-    [avatarRects, agents, finishTransition, pinnedAgentIds, progress, startMovement],
-  );
-
   const togglePinAnimated = useCallback(
     (
       chatId: string,
@@ -300,23 +238,13 @@ export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
 
   const contextValue = useMemo<AgentPinTransitionContextValue>(
     () => ({
-      leaveAgentChatAnimated,
       registerAvatar,
       notifyAvatarLayout,
-      startAgentNavigationAnimated,
       toggleAgentPinAnimated,
       toggleChannelPinAnimated,
       transition,
     }),
-    [
-      leaveAgentChatAnimated,
-      notifyAvatarLayout,
-      registerAvatar,
-      startAgentNavigationAnimated,
-      toggleAgentPinAnimated,
-      toggleChannelPinAnimated,
-      transition,
-    ],
+    [notifyAvatarLayout, registerAvatar, toggleAgentPinAnimated, toggleChannelPinAnimated, transition],
   );
 
   return (
@@ -336,13 +264,8 @@ export function useAgentPinTransition(): AgentPinTransitionContextValue {
   return useMemo(
     () =>
       context ?? {
-        leaveAgentChatAnimated: () => {
-          if (router.canGoBack()) router.back();
-          else router.replace("/connected");
-        },
         notifyAvatarLayout: () => undefined,
         registerAvatar: () => undefined,
-        startAgentNavigationAnimated: () => undefined,
         toggleAgentPinAnimated: (agentId: string) => {
           toggleAgentPin(agentId);
         },
