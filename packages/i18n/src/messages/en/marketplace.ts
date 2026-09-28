@@ -145,6 +145,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.connectNoServer": "Select a local server to connect this app.",
   "marketplace.error.installNoServer": "Select a local server to install a plugin.",
   "marketplace.error.installNoAgent": "Choose an agent to install this plugin's skills.",
+  "marketplace.error.installLocalOnHost":
+    "Install {name} on the computer that runs these agents: its app runs its server on that computer.",
   "marketplace.error.installOnHost":
     "Install {name} on the computer that runs these agents: its app needs a browser sign-in.",
   "marketplace.error.appInvalid": "{name} cannot be added: {reason}",

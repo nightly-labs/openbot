@@ -15,6 +15,11 @@ export const messages = defineMessages("mcp", {
   "mcp.connect.required": "Required.",
   "mcp.connect.keptOn": "Kept on {host}.",
   "mcp.connect.httpsLinkRequired": "Enter an https link from {hostname}.",
+  "mcp.local.description":
+    "{name} runs this server in its desktop app, on this computer. Turn it on there, then connect.",
+  "mcp.local.stepsTitle": "Turn on the server in {name}",
+  "mcp.local.address": "Address",
+  "mcp.local.docs": "Setup guide",
   "mcp.signIn.description":
     "Sign in to your {name} account. OpenBot gets the tools that account can reach, and no password.",
   "mcp.signIn.waiting": "Waiting for the browser…",

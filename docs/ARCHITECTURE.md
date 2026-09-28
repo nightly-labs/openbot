@@ -66,7 +66,11 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
 `src/renderer/src/features/web-client` owns the browser composition and its typed
 `WebWorkspaceRuntime` interface. It mounts the existing account login, server rail, sidebar,
 account dock, and full conversation view. `ConversationRuntime` routes host actions through
-the browser connection; its desktop default is the preload API. There is no separate web dashboard.
+the browser connection; its desktop default is the preload API. The desktop `WorkspaceShell` and the
+web client draw the same `WorkspaceFrame` under `LayoutProvider`, so the rail geometry, the sidebar
+resizer and compact modes, the compatibility screen, and the usage report slot are the same on both.
+The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
+There is no separate web dashboard.
 Small screens switch between the same conversation and workspace components. The shared browser
 panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
 accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible

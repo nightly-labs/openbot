@@ -9,7 +9,7 @@ import {
   normalizeMcpConfig,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 
 const logger = createOpenBotLogger("build-plugin-catalog");
@@ -82,7 +82,17 @@ export interface PluginKeyFlow {
   docsLabel?: string;
 }
 
-export type PluginAuthFlow = PluginLinkFlow | PluginKeyFlow;
+export interface PluginLocalFlow {
+  id: string;
+  kind: "local";
+  label: string;
+  steps: string[];
+  note?: string;
+  docsUrl?: string | null;
+  docsLabel?: string;
+}
+
+export type PluginAuthFlow = PluginLinkFlow | PluginKeyFlow | PluginLocalFlow;
 
 export interface PluginHttpServer {
   name: string;
@@ -288,12 +298,16 @@ function parseServer(slug: string, value: unknown): PluginServer {
   if (!isString(value.name) || value.name.trim().length === 0) throw new Error(`Plugin ${slug} server needs a name.`);
   const auth = parseAuth(slug, value.auth, value.transport);
   if (value.transport === "http") {
-    if (!isString(value.url) || !value.url.startsWith("https://")) {
-      throw new Error(`Plugin ${slug} server needs an https url.`);
+    /* Plain http leaves this computer in the clear, so only a server another app runs on this
+       computer may use it, and a local flow is how a listing says so. A local flow on a remote
+       address would tell the user to turn on a server that is not theirs. */
+    const local = auth?.some((flow) => flow.kind === "local") ?? false;
+    if (local && auth?.length !== 1) throw new Error(`Plugin ${slug} local server takes no other auth flow.`);
+    const url = value.url;
+    if (!isString(url) || !(local ? isLoopbackHttpUrl(url) : url.startsWith("https://"))) {
+      throw new Error(`Plugin ${slug} server needs ${local ? "a loopback http" : "an https"} url.`);
     }
-    return auth
-      ? { name: value.name, transport: "http", url: value.url, auth }
-      : { name: value.name, transport: "http", url: value.url };
+    return auth ? { name: value.name, transport: "http", url, auth } : { name: value.name, transport: "http", url };
   }
   if (value.transport === "stdio") {
     if (!isString(value.command) || value.command.trim().length === 0 || !Array.isArray(value.args)) {
@@ -323,6 +337,7 @@ function parseFlow(slug: string, value: unknown, transport: unknown): PluginAuth
     if (transport !== "http") throw new Error(`Plugin ${slug} sign-in needs an http server.`);
     return { id: value.id, kind: "link", label: value.label };
   }
+  if (value.kind === "local") return parseLocalFlow(slug, value, { id: value.id, label: value.label }, transport);
   if (value.kind !== "key" || !Array.isArray(value.fields) || value.fields.length === 0 || value.fields.length > 2) {
     throw new Error(`Plugin ${slug} has an invalid auth flow.`);
   }
@@ -340,6 +355,42 @@ function parseFlow(slug: string, value: unknown, transport: unknown): PluginAuth
     kind: "key",
     label: value.label,
     fields,
+    ...(docsUrl ? { docsUrl } : {}),
+    ...(isString(docsLabel) ? { docsLabel } : {}),
+  };
+}
+
+function parseLocalFlow(
+  slug: string,
+  value: DynamicRecord,
+  base: { id: string; label: string },
+  transport: unknown,
+): PluginLocalFlow {
+  if (transport !== "http") throw new Error(`Plugin ${slug} local server needs an http server.`);
+  const steps = value.steps;
+  if (
+    !Array.isArray(steps) ||
+    steps.length === 0 ||
+    steps.length > 8 ||
+    !steps.every((step) => isString(step) && step.trim().length > 0)
+  ) {
+    throw new Error(`Plugin ${slug} local server needs one to eight steps.`);
+  }
+  const note = value.note;
+  if (note !== undefined && (!isString(note) || note.trim().length === 0)) {
+    throw new Error(`Plugin ${slug} has an invalid auth flow.`);
+  }
+  const docsUrl = value.docsUrl;
+  if (docsUrl !== undefined && docsUrl !== null && !isHttpsUrl(docsUrl)) {
+    throw new Error(`Plugin ${slug} auth needs an https docsUrl.`);
+  }
+  const docsLabel = value.docsLabel;
+  if (docsLabel !== undefined && !isString(docsLabel)) throw new Error(`Plugin ${slug} has an invalid auth flow.`);
+  return {
+    ...base,
+    kind: "local",
+    steps: [...steps],
+    ...(isString(note) ? { note } : {}),
     ...(docsUrl ? { docsUrl } : {}),
     ...(isString(docsLabel) ? { docsLabel } : {}),
   };
@@ -437,6 +488,15 @@ function isHttpsUrl(value: unknown): value is string {
   }
 }
 
+function isLoopbackHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
@@ -482,7 +542,8 @@ function printLiteralField(key: string, value: unknown, indent: string, mode: Li
   const flat = inlineLiteral(value, mode);
   const head = `${indent}${name}: ${flat}`;
   if (head.length + 1 <= 120) return head;
-  if (typeof value === "string" && mode === "ts") return `${indent}${name}:\n${indent}  ${flat}`;
+  // The formatter keeps a string on the line of a key shorter than the indent width plus three.
+  if (typeof value === "string" && mode === "ts" && name.length >= 5) return `${indent}${name}:\n${indent}  ${flat}`;
   if (typeof value === "string") return head;
   return `${indent}${name}: ${printLiteral(value, indent, mode, name.length + 2)}`;
 }
@@ -497,7 +558,16 @@ function inlineLiteral(value: unknown, mode: LiteralMode): string {
     const inner = Object.entries(value).map(([key, item]) => pair(key, item));
     return `{ ${inner.join(", ")} }`;
   }
+  if (typeof value === "string" && mode === "ts") return tsString(value);
   return JSON.stringify(value) ?? "null";
+}
+
+/** A string in the quotes the formatter picks: double, unless the value holds more double quotes than single. */
+function tsString(value: string): string {
+  const double = JSON.stringify(value);
+  if (value.split('"').length <= value.split("'").length) return double;
+  const inner = double.slice(1, -1).replace(/\\(.)/gu, (pair, char: string) => (char === '"' ? '"' : pair));
+  return `'${inner.replaceAll("'", "\\'")}'`;
 }
 
 function tsKey(key: string): string {

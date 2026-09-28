@@ -16,6 +16,11 @@ export const messages = {
   "mcp.connect.required": "必須です。",
   "mcp.connect.keptOn": "{host} に保存されます。",
   "mcp.connect.httpsLinkRequired": "{hostname} の https リンクを入力してください。",
+  "mcp.local.description":
+    "{name} はこのコンピューター上のデスクトップアプリでこのサーバーを実行します。アプリで有効にしてから接続してください。",
+  "mcp.local.stepsTitle": "{name} でサーバーを有効にする",
+  "mcp.local.address": "アドレス",
+  "mcp.local.docs": "セットアップガイド",
   "mcp.signIn.description":
     "{name} アカウントにサインインしてください。OpenBot はそのアカウントで使えるツールを取得し、パスワードは取得しません。",
   "mcp.signIn.waiting": "ブラウザーを待っています…",

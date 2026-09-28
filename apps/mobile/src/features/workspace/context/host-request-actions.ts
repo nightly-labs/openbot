@@ -1,6 +1,7 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   assertStorageUsageScope,
+  decodeAgentAdminSettings,
   decodeInstalledSkills,
   decodeStorageUsage,
   isAgentMemory,
@@ -11,6 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -22,6 +24,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { QueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
+import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
@@ -49,8 +52,11 @@ type HostRequestActions = Pick<
   | "loadAgentModels"
   | "loadAgentMemories"
   | "loadAgentRoutines"
+  | "searchMessages"
   | "loadAgentSkills"
   | "loadAgentStorage"
+  | "loadAgentAdminSettings"
+  | "updateAgentAdminSettings"
   | "deleteStoredFile"
   | "loadAgentAvatar"
   | "duplicateAgent"
@@ -183,6 +189,15 @@ export function createHostRequestActions({
         undefined,
         serverId,
       ),
+    searchMessages: (query, serverId, cursor) =>
+      request(
+        "GET",
+        // A query parameter never reaches the JSON adapters, so every released host reads it as sent.
+        `${TEAM_API_ROUTES.messages.search}?${new URLSearchParams({ q: query, limit: "50", ...(cursor ? { cursor } : {}) })}`,
+        decodeConversationSearchPage,
+        undefined,
+        serverId,
+      ),
     // A host too old to know the route answers 404, so ask its advertised capabilities first.
     loadAgentSkills: async (agentId, serverId) =>
       capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
@@ -195,6 +210,15 @@ export function createHostRequestActions({
         await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
         input,
       );
+    },
+    loadAgentAdminSettings: async (agentId, serverId) =>
+      capabilities.get(serverId)?.includes(AGENT_ADMIN_CAPABILITY)
+        ? request("POST", AGENT_ADMIN_ROUTES.settings, decodeAgentAdminSettings, { agentId }, serverId)
+        : null,
+    updateAgentAdminSettings: async (input, serverId) => {
+      if (!capabilities.get(serverId)?.includes(AGENT_ADMIN_CAPABILITY))
+        throw new Error(currentText().t("mobile.agent.access.unsupported"));
+      return request("POST", AGENT_ADMIN_ROUTES.update, decodeAgentAdminSettings, { ...input }, serverId);
     },
     deleteStoredFile: async (fileId, serverId) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY))

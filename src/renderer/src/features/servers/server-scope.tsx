@@ -1,5 +1,6 @@
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, getOwner, isDisposed, onSettled, untrack } from "solid-js";
+import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -152,10 +153,7 @@ const ServerScope = createSimpleContext({
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
         if (
-          event.key.toLocaleLowerCase() !== "k" ||
-          (!event.metaKey && !event.ctrlKey) ||
-          event.altKey ||
-          event.shiftKey ||
+          !isGlobalSearchShortcut(event) ||
           centralAuth().status !== "signed_in" ||
           setupState()?.completed !== true
         ) {
