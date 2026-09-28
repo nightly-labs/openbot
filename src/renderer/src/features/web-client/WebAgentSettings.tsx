@@ -1,4 +1,4 @@
-import type { AgentModelOption, AgentStatus } from "@openbot/contracts/ipc";
+import type { AgentModelOption, AgentStatus, CustomProviderSummary } from "@openbot/contracts/ipc";
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import {
   createFirstAgentDraft,
@@ -14,6 +14,8 @@ import type { WebWorkspaceRuntime } from "./web-runtime";
 export function WebAgentSettings(props: {
   runtime: WebWorkspaceRuntime;
   capabilities: string[];
+  /** The host's endpoints, so the picker lists their models on its Custom tab. */
+  customProviders?: readonly CustomProviderSummary[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -130,6 +132,7 @@ export function WebAgentSettings(props: {
       error={state.error}
       modelOptions={supportsModelSelection() && state.models.length > 0 ? state.models : undefined}
       agentStatus={state.status ?? undefined}
+      customProviders={props.customProviders}
       onChange={(value) =>
         setState((draft) => {
           draft.draft = value;

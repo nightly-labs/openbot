@@ -80,19 +80,27 @@ export function WebWorkspace(props: {
   const { t, sourceText } = useText();
   const [status, setStatus] = createSignal<AgentStatus>(CONNECTING_STATUS);
   const [models, setModels] = createSignal<AgentModelOption[]>([]);
-  /** Bumped on each host change, so a model list read for the previous host is dropped. */
-  let modelsGeneration = 0;
+  /**
+   * Each model read takes the next number. A list is shown only when no later read has been shown,
+   * so a slow first read cannot replace the list that a ready status read again. A host change marks
+   * every number up to now as shown, so a list read for the previous host is dropped.
+   */
+  let modelsRequest = 0;
+  let modelsShown = 0;
+  function showModels(request: number, list: AgentModelOption[]): void {
+    if (request <= modelsShown) return;
+    modelsShown = request;
+    setModels(list);
+  }
   const workspace = createWebWorkspace(props, {
     onStatus: (next) => {
       setStatus(next);
       // As in the desktop app: a ready status can follow a provider sign-in or a new endpoint, so
       // the models are read again.
       if (next.phase !== "ready") return;
-      const generation = modelsGeneration;
+      const request = ++modelsRequest;
       workspace.runtime.models().then(
-        (list) => {
-          if (generation === modelsGeneration) setModels(list);
-        },
+        (list) => showModels(request, list),
         () => undefined,
       );
     },
@@ -393,17 +401,18 @@ export function WebWorkspace(props: {
       usageGeneration += 1;
       setAccountUsage(null);
       setCreating(false);
-      modelsGeneration += 1;
+      modelsShown = ++modelsRequest;
       setModels([]);
       setStatus(CONNECTING_STATUS);
       if (host && state === "online") {
         // Not through `workspace.run`: it drops a task while another runs, and the reconnect that
         // made the host online is still running here.
+        const request = ++modelsRequest;
         void Promise.all([workspace.runtime.status(), workspace.runtime.models()]).then(
           ([nextStatus, nextModels]) => {
             if (!active) return;
             setStatus(nextStatus);
-            setModels(nextModels);
+            showModels(request, nextModels);
           },
           (error: unknown) => {
             if (active) toast.error(error instanceof Error ? error.message : t("webClient.error.hostStatus"));
@@ -574,6 +583,7 @@ export function WebWorkspace(props: {
               <WebAgentSettings
                 runtime={workspace.runtime}
                 capabilities={workspace.state.capabilities}
+                customProviders={providerSettings()?.customProviders}
                 onClose={() => setCreating(false)}
                 onSaved={async () => {
                   await workspace.refresh();
@@ -674,6 +684,12 @@ export function WebWorkspace(props: {
                   </Show>
                 }
                 agentStatus={workspace.state.status === "online" ? status() : CONNECTING_STATUS}
+                // As in the desktop app on a joined host: an owner or admin downloads the host's
+                // providers, and the sign-in stays in the host's settings.
+                providerRuntimeStatuses={providerSettings()?.providerRuntimeStatuses}
+                customProviders={providerSettings()?.customProviders}
+                onDownloadProvider={providerSettings()?.onDownloadProvider}
+                onCancelProviderDownload={providerSettings()?.onCancelProviderDownload}
                 agent={conversationAgent()}
                 agents={workspace.profiles()}
                 modelOptions={models()}
