@@ -87,7 +87,7 @@ export function ConversationHeader() {
             : undefined
         }
         files={
-          // The web client has no storage methods, and a chat without a thread has no files to list.
+          // The web client has no conversation Files panel, and a chat without a thread has no files to list.
           !props.runtime && props.agent?.threadId && serverHasStorage(props.server)
             ? { open: filesOpen(), onToggle: toggleFilesPanel }
             : undefined

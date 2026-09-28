@@ -78,8 +78,9 @@ mock. The separate web preview implements the browser runtime with that same moc
   host serves the related route; a member does not see them. Agent deletion uses
   the shared confirmation and is hidden for members; the host also enforces the role restriction.
 - The marketplace reads the public catalog on its own origin. An owner or admin installs skills,
-  plugin apps, and new agents on the connected host, and adds example prompts and skills to an
-  agent's draft. Submissions, package choice, and agent updates are desktop only. A plugin app
+  plugin apps, and new agents on the connected host, and adds Try skill examples and plugin prompts
+  to an agent's draft. An agent that the host added from a listing gets Update when the host serves
+  `agent-update-v1`. Publishing (submissions and package choice) is desktop only. A plugin app
   that needs a browser sign-in is installed on the host computer, as for a desktop remote admin.
 - Join, marketplace, shared agent, server settings, global search and channel creation use the
   shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay or
@@ -120,6 +121,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   with the shape of the host frame.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
+- These stay desktop only: the application Settings dialog (Providers & permissions, app
+  updates), permissions review, hosted sites, marketplace publishing, server mute and notification
+  level, Picture in Picture, the Memories, Routines and Files sections of agent settings, the
+  conversation Files panel, and file reveal. The browser shows host files in Server settings >
+  Storage.
 
 ## Remote desktop
 
