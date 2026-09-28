@@ -49,7 +49,13 @@ export function MobileChatView({
   );
   const activity = useAgentActivity(agent.id);
   const online = servers.find((item) => item.id === agent.serverId)?.state === "online";
-  const queue = useChatQueue(agent.id, agent.serverId, online, conversation?.activeTurnId ?? null);
+  const queue = useChatQueue(
+    agent.id,
+    agent.serverId,
+    online,
+    conversation?.activeTurnId ?? null,
+    conversation?.messages,
+  );
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const request = useRef(0);
   const fetchHistory = useCallback(() => {

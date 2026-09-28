@@ -33,8 +33,9 @@ export const ChatQueueButton = memo(function ChatQueueButton({
   // A queue that failed to load reports no messages. Keep the entry, so the failure and its
   // retry stay reachable instead of leaving the chat with nothing to press.
   const failed = count === 0 && Boolean(queue.error);
-  // Teammate answers are not queue rows, but the sheet shows them. Keep the entry for them alone.
-  const onlyReplies = count === 0 && !failed && queue.replies.length > 0;
+  // The teammates the agent waits for are not queue rows, but the sheet shows them. Keep the
+  // entry for them alone, also before the first answer arrives.
+  const onlyReplies = count === 0 && !failed && queue.waiting.length > 0;
   if (count === 0 && !failed && !onlyReplies) return null;
   const label = failed
     ? t("mobile.chat.queue.unavailable")

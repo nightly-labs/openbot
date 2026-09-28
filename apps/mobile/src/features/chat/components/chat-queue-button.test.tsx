@@ -69,6 +69,7 @@ function stubQueue(
     attachmentSupport: () => ({ eml: true, media: true }),
     queued,
     replies: [],
+    waiting: [],
     deliveries: queued,
     edit,
     editUnavailable: false,
@@ -174,4 +175,12 @@ it("counts a held edit whose delivery is missing from the queue", () => {
   };
   mount(stubQueue([], null, held));
   expect(screen.getByRole("button", { name: "1 queued message. Show queued messages" })).toBeTruthy();
+});
+
+it("keeps the entry while teammates work and no answer has arrived", () => {
+  // The waiting rows are in the sheet only. Without the entry, nothing would show who the agent waits for.
+  mount({ ...stubQueue([]), waiting: [{ id: "q:builder", agentId: "builder", state: "working", preview: null }] });
+  const button = screen.getByRole("button", { name: "Waiting for replies" });
+  act(() => fireEvent.click(button));
+  expect(native.push).toHaveBeenCalledWith({ pathname: "/queued-messages", params: { chat: "host:agent" } });
 });

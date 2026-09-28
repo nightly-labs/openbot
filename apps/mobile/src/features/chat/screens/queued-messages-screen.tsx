@@ -2,7 +2,7 @@ import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { X } from "lucide-react-native";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -12,7 +12,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { AwaitingRepliesSection } from "../components/awaiting-replies-section";
 import { type QueuedUpload, useQueuedChat } from "../context/queued-messages-context";
-import { awaitingReplies } from "../model/awaiting-replies";
 import { queueRowsWithHeldEdit } from "../model/queue-edit-draft";
 import { queuedMessagePreview } from "../model/queued-message-view";
 
@@ -64,18 +63,9 @@ export function QueuedMessagesScreen() {
   const held = queue?.edit?.delivery ?? null;
   const rows = useMemo(() => queueRowsWithHeldEdit(queued ?? [], held), [queued, held]);
   const count = rows.length + (pending ? 1 : 0);
-  const { agents, conversationStore } = useMobileWorkspace();
-  const agentId = queue?.agentId ?? "";
-  const conversation = useSyncExternalStore(
-    useCallback((notify: () => void) => conversationStore.subscribe(agentId, notify), [conversationStore, agentId]),
-    useCallback(() => conversationStore.get(agentId), [conversationStore, agentId]),
-  );
-  const replies = queue?.replies;
-  // The questions this agent asked come from its conversation, the answers from its queue.
-  const waiting = useMemo(
-    () => awaitingReplies(conversation?.messages ?? [], replies ?? []),
-    [conversation?.messages, replies],
-  );
+  const { agents } = useMobileWorkspace();
+  const agentId = queue?.agentId;
+  const waiting = queue?.waiting ?? [];
   const serverAgents = useMemo(() => agents.filter((agent) => agent.serverId === queue?.serverId), [agents, queue]);
   const open = (delivery: QueueDelivery) => {
     void haptics.selection();

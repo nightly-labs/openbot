@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, assert, expect, it, vi } from "vitest";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import type { QueuedUpload } from "../context/queued-messages-context";
+import { awaitingReplies } from "../model/awaiting-replies";
 import { QueuedMessageActionsScreen } from "./queued-message-actions-screen";
 import { QueuedMessageEditScreen } from "./queued-message-edit-screen";
 import { QueuedMessagesScreen } from "./queued-messages-screen";
@@ -17,9 +18,7 @@ const native = vi.hoisted(() => {
   };
   const context: { queue: ChatQueueController | null; pending: QueuedUpload | null } = { queue: null, pending: null };
   const attachments: { preparing: boolean } = { preparing: false };
-  const chief: { conversation?: { messages: ConversationMessage[] } } = {};
   return {
-    chief,
     push: vi.fn(),
     back: vi.fn(),
     alert: vi.fn(),
@@ -168,10 +167,6 @@ vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({
       { id: "builder", serverId: "host", name: "Builder" },
       { id: "researcher", serverId: "host", name: "Researcher" },
     ],
-    conversationStore: {
-      subscribe: () => () => {},
-      get: () => native.chief.conversation,
-    },
   }),
 }));
 vi.mock("@/features/agents/components/bloub-avatar", () => ({ BloubAvatarThumbnail: () => null }));
@@ -223,7 +218,6 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   native.context.queue = null;
   native.context.pending = null;
-  native.chief.conversation = undefined;
   native.attachments.preparing = false;
   native.params = { chat: "host:agent", deliveryId: "one" };
   native.guard.prevent = false;
@@ -258,6 +252,7 @@ function stubQueue(overrides: Partial<ChatQueueController> = {}): ChatQueueContr
     attachmentSupport: () => ({ eml: true, media: true }),
     queued,
     replies: [],
+    waiting: [],
     deliveries: queued,
     edit: null,
     editUnavailable: false,
@@ -360,29 +355,32 @@ it("shows a teammate answer in the waiting block, not as a queued message", () =
     expectsReply: false,
   };
   // Chief asked two teammates. Builder answered; Researcher still works, so the host holds the answer.
-  native.chief.conversation = {
-    messages: [
-      {
-        id: "question",
-        author: "system",
-        text: "",
-        createdAt: "2026-09-15T10:30:00Z",
-        status: "completed",
-        exchange: {
-          direction: "outgoing",
-          messageId: "message-question",
-          senderAgentId: "agent",
-          recipientAgentIds: ["builder", "researcher"],
-          replyToMessageId: null,
-          deliveries: [
-            { id: "to-builder", recipientAgentId: "builder", status: "completed", position: null, error: null },
-            { id: "to-researcher", recipientAgentId: "researcher", status: "running", position: null, error: null },
-          ],
-        },
+  const messages: ConversationMessage[] = [
+    {
+      id: "question",
+      author: "system",
+      text: "",
+      createdAt: "2026-09-15T10:30:00Z",
+      status: "completed",
+      exchange: {
+        direction: "outgoing",
+        messageId: "message-question",
+        senderAgentId: "agent",
+        recipientAgentIds: ["builder", "researcher"],
+        replyToMessageId: null,
+        deliveries: [
+          { id: "to-builder", recipientAgentId: "builder", status: "completed", position: null, error: null },
+          { id: "to-researcher", recipientAgentId: "researcher", status: "running", position: null, error: null },
+        ],
       },
-    ],
-  };
-  native.context.queue = stubQueue({ queued: [first], replies: [answer], deliveries: [first, answer] });
+    },
+  ];
+  native.context.queue = stubQueue({
+    queued: [first],
+    replies: [answer],
+    waiting: awaitingReplies(messages, [answer]),
+    deliveries: [first, answer],
+  });
   mount(() => <QueuedMessagesScreen />);
   expect(screen.getByRole("button", { name: /First request/ })).toBeTruthy();
   const waiting = screen.getByRole("region", { name: "Waiting for replies" });
