@@ -17,8 +17,11 @@ export const messages = {
   "webClient.notice.connectComputer": "Connectez votre ordinateur",
   "webClient.notice.keepOpen":
     "Gardez OpenBot ouvert sur votre ordinateur. Votre brouillon reste ici pendant la reconnexion.",
-  "webClient.notice.install":
-    "Installez et ouvrez OpenBot sur votre ordinateur, puis connectez-vous avec la même adresse e-mail et activez l’accès à distance. Vous pouvez aussi rejoindre un ordinateur avec une invitation.",
+  "webClient.connect.description":
+    "Lancez OpenBot sur votre ordinateur pour discuter avec vos agents depuis ce navigateur. Vous pouvez aussi rejoindre un ordinateur avec une invitation.",
+  "webClient.connect.stepInstall": "Installez et ouvrez OpenBot sur votre ordinateur.",
+  "webClient.connect.stepSignIn": "Connectez-vous avec votre adresse e-mail.",
+  "webClient.connect.stepRemote": "Activez l’accès à distance.",
   "webClient.notice.download": "Télécharger OpenBot",
   "webClient.notice.join": "Rejoindre avec une invitation",
   "webClient.notice.reconnect": "Se reconnecter",

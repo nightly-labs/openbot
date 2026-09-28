@@ -178,3 +178,132 @@
   margin: var(--openbot-space-4);
   flex: 0 0 auto;
 }
+
+/* Takes the conversation-panel grid cell, so it follows the same desktop and mobile placement. */
+.web-connect.conversation-panel {
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: var(--openbot-space-8) var(--openbot-space-4);
+}
+
+.web-connect-card {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  gap: var(--openbot-space-6);
+}
+
+.web-connect-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  text-align: center;
+}
+
+.web-connect-header .ui-heading {
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-bold);
+  line-height: var(--openbot-leading-3xl);
+}
+
+.web-connect-header .ui-text {
+  max-width: 340px;
+  line-height: var(--openbot-leading-sm);
+}
+
+.web-connect-logo {
+  --app-logo-background: var(--openbot-surface-light);
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  margin-bottom: var(--openbot-space-4);
+  border-radius: var(--openbot-radius-xl);
+  box-shadow:
+    0 12px 28px var(--openbot-shadow-dialog),
+    inset 0 1px 0 var(--openbot-border-strong);
+}
+
+.web-connect-steps {
+  display: grid;
+  margin: 0;
+  padding: var(--openbot-space-1);
+  list-style: none;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+}
+
+.web-connect-steps li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.web-connect-steps li + li {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.web-connect-steps .ui-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.web-connect-step-number {
+  display: grid;
+  width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.web-connect-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* Side by side; the buttons stack when the card is too narrow for both labels. */
+.web-connect-primary-actions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.web-connect-primary-actions .ui-button {
+  min-width: 160px;
+  flex: 1 1 0;
+}
+
+/* The public site sets `a { color: inherit }`, which beats the zero-specificity button colour. */
+.web-connect-download.ui-button,
+.web-connect-download.ui-button:hover {
+  color: var(--openbot-text-on-light);
+}
+
+.web-connect-refresh.ui-button {
+  color: var(--openbot-text-muted);
+}
+
+.web-connect-actions .ui-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.web-connect-refresh.ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}

@@ -17,8 +17,11 @@ export const messages = {
   "webClient.notice.connectComputer": "コンピューターを接続してください",
   "webClient.notice.keepOpen":
     "コンピューターで OpenBot を開いたままにしてください。再接続中も下書きはここに残ります。",
-  "webClient.notice.install":
-    "コンピューターに OpenBot をインストールして開き、同じメールアドレスでサインインしてリモートアクセスを有効にしてください。招待を使ってコンピューターに参加することもできます。",
+  "webClient.connect.description":
+    "コンピューターで OpenBot を実行すると、このブラウザーからエージェントとチャットできます。招待でコンピューターに参加することもできます。",
+  "webClient.connect.stepInstall": "コンピューターに OpenBot をインストールして開きます。",
+  "webClient.connect.stepSignIn": "メールアドレスでサインインします。",
+  "webClient.connect.stepRemote": "リモートアクセスをオンにします。",
   "webClient.notice.download": "OpenBot をダウンロード",
   "webClient.notice.join": "招待で参加",
   "webClient.notice.reconnect": "再接続",
