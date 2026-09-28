@@ -1145,8 +1145,8 @@ shows a live percentage while the host downloads. All members get the `host-rest
 again when a client declares the capability. Like `channelEvent`, the event skips the frozen v1-v3
 event encoders at each hop (host peer, client transport, `remote-peer.ts`, SSE stream). A client that
 loses the host while a restart waits treats it as the restart: desktop keeps the fast WebRTC retry
-instead of the `host_unavailable` wait, and web tries again every 5 s for 3 minutes.
-`host-restart-toast.ts` shows the notice until the host is back.
+instead of the `host_unavailable` wait for 10 minutes, and web tries again every 5 s for 3 minutes.
+`host-restart-toast.ts` shows the notice until the host is back, for 10 minutes at most.
 
 ## OpenCode and ACP
 
