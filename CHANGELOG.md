@@ -31,6 +31,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Stop "Provider error" messages for Antigravity info and warning log lines, such as "Checkpoint
+  summary was too long". Before, one message showed at each step of a long conversation. These
+  lines now go to the log. Antigravity error lines still show.
 - Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
   could save the same routine. An agent can no longer add a routine with the name of an existing
   one; it changes that routine instead.

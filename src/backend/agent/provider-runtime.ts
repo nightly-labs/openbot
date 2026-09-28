@@ -51,6 +51,7 @@ import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   isBackgroundRefreshDiagnostic,
+  isGlogBelowErrorDiagnostic,
   isMcpSubsystemDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -1703,6 +1704,10 @@ export class ProviderRuntime implements ProviderPort {
       if (isUsageLimitDiagnostic(message)) {
         logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         this.refreshUsageAfterLimit(client);
+        return;
+      }
+      if (isGlogBelowErrorDiagnostic(message)) {
+        logger.info("A provider logged an info or warning record.", { provider: client.provider, message });
         return;
       }
       // Without the timestamp, a repeat of one failure is the same message, and the renderer shows
