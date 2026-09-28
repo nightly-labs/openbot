@@ -260,6 +260,35 @@ it("opens the channel creation dialog from both sidebar context menus", async ()
   await screen.findByRole("dialog", { name: "New channel" });
 });
 
+it("closes sidebar context menus on a left press on their trigger, outside press, and Escape", async () => {
+  const chat = await openSavedChannel();
+  const freeArea = screen.getByLabelText("Sidebar free area");
+  const sidebarMenuClosed = () =>
+    waitFor(() => expect(screen.queryByRole("menu", { name: "Sidebar actions" })).not.toBeInTheDocument());
+
+  await fireEvent.contextMenu(freeArea);
+  await screen.findByRole("menu", { name: "Sidebar actions" });
+  await fireEvent.pointerDown(freeArea, { button: 0 });
+  await sidebarMenuClosed();
+
+  await fireEvent.contextMenu(freeArea);
+  const menu = await screen.findByRole("menu", { name: "Sidebar actions" });
+  await fireEvent.keyDown(menu, { key: "Escape" });
+  await sidebarMenuClosed();
+
+  await fireEvent.contextMenu(channelRow("Project room"));
+  await screen.findByRole("menuitem", { name: "Edit channel" });
+  await fireEvent.pointerDown(channelRow("Project room"), { button: 0 });
+  await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Edit channel" })).not.toBeInTheDocument());
+
+  await fireEvent.contextMenu(freeArea);
+  await screen.findByRole("menu", { name: "Sidebar actions" });
+  await waitFor(async () => {
+    await fireEvent.pointerDown(chat, { button: 0 });
+    expect(screen.queryByRole("menu", { name: "Sidebar actions" })).not.toBeInTheDocument();
+  });
+});
+
 it("keeps the section editor open past menu focus restoration", async () => {
   render(() => <App />);
   await screen.findByRole("button", { name: /Open account (actions|menu)/ });

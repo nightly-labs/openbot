@@ -104,6 +104,30 @@ index 839d79ad6ae08342ddca0b8bf2782f81e77fb66c..652237085ecf7f9bb340d27d811c0ed7
  		if (lastSelectedKey) lastAnnouncedSelectedKey = lastSelectedKey;
  	});
  	const dataset = createMemo(() => ({
+diff --git a/dist/context-menu/DxRt6yAn.js b/dist/context-menu/DxRt6yAn.js
+index 00b29793400fec48e0f3f062b4bada29d8904126..c480b38a5817ed8bbd189e88ce8e7ad0b73bec67 100644
+--- a/dist/context-menu/DxRt6yAn.js
++++ b/dist/context-menu/DxRt6yAn.js
+@@ -110,6 +110,7 @@ function ContextMenuTrigger(props) {
+ 	const isTouchOrPen = (e) => e.pointerType === "touch" || e.pointerType === "pen";
+ 	const onPointerDown = (e) => {
+ 		callHandler(e, mergedProps.onPointerDown);
++		if (e.button === 0 && !e.ctrlKey && menuContext.isOpen()) menuContext.close(true);
+ 		if (!mergedProps.disabled && isTouchOrPen(e)) {
+ 			clearLongPressTimeout();
+ 			context.setAnchorRect({
+diff --git a/dist/context-menu/xOPaXELf.jsx b/dist/context-menu/xOPaXELf.jsx
+index df7c55d899320f96df3160a1590c2c2c98ee06ac..ff621f269adfa770e93dc609f18769addc3ac7b1 100644
+--- a/dist/context-menu/xOPaXELf.jsx
++++ b/dist/context-menu/xOPaXELf.jsx
+@@ -97,6 +97,7 @@ function ContextMenuTrigger(props) {
+ 	const isTouchOrPen = (e) => e.pointerType === "touch" || e.pointerType === "pen";
+ 	const onPointerDown = (e) => {
+ 		callHandler(e, mergedProps.onPointerDown);
++		if (e.button === 0 && !e.ctrlKey && menuContext.isOpen()) menuContext.close(true);
+ 		if (!mergedProps.disabled && isTouchOrPen(e)) {
+ 			clearLongPressTimeout();
+ 			context.setAnchorRect({
 diff --git a/dist/create-dom-collection/OK7882aq.js b/dist/create-dom-collection/OK7882aq.js
 index 6b8a3617f27946fec9535b14e108400de48a4bf2..a85c7f25ba6bcba2378334683a24ccec9478ff76 100644
 --- a/dist/create-dom-collection/OK7882aq.js
