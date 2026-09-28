@@ -582,7 +582,7 @@ export function WebWorkspace(props: {
             onExpand={() => {}}
             onOpenMarketplace={() => setMarketplaceOpen(true)}
             emptyAction={
-              workspace.profiles().length === 0 && createSupported()
+              workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported()
                 ? {
                     label: t("sidebar.empty.firstAgent"),
                     avatarSeed: agentDraft().avatarSeed,

@@ -39,6 +39,8 @@ interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
   host: RemoteTeamHost | null;
   agents: AgentSummary[];
+  /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
+  agentsLoaded: boolean;
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
@@ -88,6 +90,7 @@ export function createWebWorkspace(
     hosts: [],
     host: null,
     agents: [],
+    agentsLoaded: false,
     selectedId: null,
     conversations: {},
     approvals: [],
@@ -152,6 +155,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.revocationRevision += 1;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.selectedId = null;
             draft.approvals = [];
@@ -337,6 +341,7 @@ export function createWebWorkspace(
     setState((draft) => {
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
+      draft.agentsLoaded = true;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) delete draft.conversations[id];
@@ -376,6 +381,7 @@ export function createWebWorkspace(
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.approvals = [];
             draft.prompts = [];
@@ -462,6 +468,7 @@ export function createWebWorkspace(
       draft.status = "connecting";
       draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
+      draft.agentsLoaded = false;
       draft.selectedId = null;
       if (!sameHost) {
         draft.conversations = {};
@@ -501,6 +508,7 @@ export function createWebWorkspace(
       setState((draft) => {
         draft.capabilities = capabilities;
         draft.agents = agents;
+        draft.agentsLoaded = true;
         draft.status = "online";
         draft.browserTabs = browserTabs;
         draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
