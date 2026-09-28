@@ -15,6 +15,7 @@ import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { attachmentSizeBucket } from "@/features/analytics/events";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 
@@ -197,6 +198,7 @@ export function useChatAttachments(
         result: "failed",
         failure_code: "operation_failed",
       });
+      void haptics.notification("error");
       Alert.alert(
         t("mobile.chat.attachment.addFailed"),
         error instanceof Error ? error.message : t("mobile.chat.tryAgain"),
@@ -245,6 +247,7 @@ export function useChatAttachments(
           result: "failed",
           failure_code: "operation_failed",
         });
+        void haptics.notification("error");
         Alert.alert(
           t("mobile.chat.attachment.addFailed"),
           error instanceof Error ? error.message : t("mobile.chat.tryAgain"),

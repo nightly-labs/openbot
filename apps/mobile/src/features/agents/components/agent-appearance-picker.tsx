@@ -8,6 +8,7 @@ import { memo, type ReactNode, useCallback, useState } from "react";
 import { View } from "react-native";
 import { AvatarThumbnail, BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { createAvatarCandidates } from "@/features/agents/model/avatar-candidates";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { AgentPhotoProps } from "./agent-photo";
 
@@ -127,7 +128,10 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
           accessibilityLabel={t("mobile.agent.appearance.face", { index: index + 1 })}
           accessibilityState={{ checked: seed === candidate, disabled }}
           isDisabled={disabled}
-          onPress={() => onSeedChange(candidate)}
+          onPress={() => {
+            void haptics.selection();
+            onSeedChange(candidate);
+          }}
         >
           <AvatarThumbnail seed={candidate} hue={hue} size={36} />
         </Button>
@@ -137,7 +141,10 @@ const AvatarFaceOptions = memo(function AvatarFaceOptions({
         variant="ghost"
         accessibilityLabel={t("mobile.agent.appearance.moreFaces")}
         isDisabled={disabled}
-        onPress={onShuffle}
+        onPress={() => {
+          void haptics.selection();
+          onShuffle();
+        }}
       >
         <ShuffleIcon />
       </Button>
@@ -174,7 +181,10 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
             accessibilityLabel={t(HUE_LABELS[option.hue])}
             accessibilityState={{ checked, disabled }}
             isDisabled={disabled}
-            onPress={() => onHueChange(option.hue)}
+            onPress={() => {
+              void haptics.selection();
+              onHueChange(option.hue);
+            }}
           >
             <View className="size-6 rounded-full" style={{ backgroundColor: avatarHueSwatch(option.hue) }} />
           </Button>
@@ -187,7 +197,10 @@ const AvatarHueOptions = memo(function AvatarHueOptions({
         accessibilityLabel={t("mobile.agent.appearance.automatic")}
         accessibilityState={{ checked: hue === null, disabled }}
         isDisabled={disabled}
-        onPress={() => onHueChange(null)}
+        onPress={() => {
+          void haptics.selection();
+          onHueChange(null);
+        }}
       >
         <Typography type="body-sm" className="font-semibold text-foreground">
           {t("mobile.agent.appearance.automaticShort")}

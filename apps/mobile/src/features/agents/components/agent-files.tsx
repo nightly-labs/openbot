@@ -8,6 +8,7 @@ import { Alert, Pressable } from "react-native";
 import { AttachmentThumbnail, useAttachmentFile } from "@/features/chat/components/attachment-preview";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
 const CATEGORIES: { category: StorageCategory; label: MobileTextKey }[] = [
@@ -128,7 +129,11 @@ function StoredFile({
           onPress: () => {
             setDeleting(true);
             deleteStoredFile(file.id, agent.serverId)
+              .then(() => {
+                void haptics.notification("success");
+              })
               .catch((cause: unknown) => {
+                void haptics.notification("error");
                 const text = currentText();
                 Alert.alert(
                   text.t("mobile.agent.files.deleteFailed"),

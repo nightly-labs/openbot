@@ -17,6 +17,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 const SESSION_KIND_KEYS = {
@@ -63,7 +64,11 @@ export function AccountSessionsScreen() {
       }
     },
     onSuccess: async () => {
+      void haptics.notification("success");
       await sessions.refetch();
+    },
+    onError: () => {
+      void haptics.notification("error");
     },
     onSettled: () => {
       revoking.current = false;

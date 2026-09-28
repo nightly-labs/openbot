@@ -24,6 +24,7 @@ import {
   StreamRevealProvider,
 } from "@/features/chat/components/streaming-tail-text";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
@@ -259,12 +260,14 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
           style={{ ...presentation.style, textDecorationLine: "underline" }}
           accessibilityRole="link"
           accessibilityHint={url}
-          onPress={() =>
+          onPress={() => {
+            void haptics.impact("soft");
             void Linking.openURL(url).catch(() => {
+              void haptics.notification("error");
               const { t } = currentText();
               Alert.alert(t("mobile.chat.markdown.linkFailedTitle"), t("mobile.chat.markdown.linkFailedMessage"));
-            })
-          }
+            });
+          }}
         >
           {tokenIs(token, "link") ? (
             <>

@@ -10,6 +10,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { AgentFiles } from "./agent-files";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
@@ -106,7 +107,9 @@ export function AgentInformation({
       setRange({ ...selected, agentId: agent.id });
       setDays(0);
       setRangeError(null);
+      void haptics.selection();
     } catch {
+      void haptics.notification("error");
       setRangeError(t("mobile.agent.usage.rangeInvalid"));
     }
   }
@@ -169,6 +172,7 @@ export function AgentInformation({
                 variant={days === value ? "secondary" : "ghost"}
                 accessibilityState={{ selected: days === value }}
                 onPress={() => {
+                  void haptics.selection();
                   setCustom(false);
                   setRangeError(null);
                   setDays(value);
@@ -185,6 +189,7 @@ export function AgentInformation({
             variant="ghost"
             accessibilityState={{ expanded: custom }}
             onPress={() => {
+              void haptics.selection();
               if (!custom) {
                 setCustomStart(range.startDate);
                 setCustomEnd(range.endDate);

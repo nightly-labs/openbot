@@ -78,7 +78,9 @@ export function SortableServerList({ color, ids, renderRow, onDragActive, onReor
   const finish = (order: string[]) => {
     onDragActive(false);
     if (order.join("\n") === signature) return;
-    if (!onReorder(order)) positions.set(positionsOf(signature.split("\n")));
+    if (onReorder(order)) return;
+    positions.set(positionsOf(signature.split("\n")));
+    void haptics.notification("error");
   };
 
   return (

@@ -19,6 +19,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { haptics } from "@/shared/lib/haptics";
 import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
 
@@ -37,8 +38,10 @@ export function ServerSettingsScreen() {
     setError(null);
     try {
       await operation();
+      void haptics.notification("success");
     } catch {
       setError(t("mobile.server.settings.updateFailed"));
+      void haptics.notification("error");
     } finally {
       locked.current = false;
       setBusy(false);
@@ -129,6 +132,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
 
   usePreventRemove(dirty || saving || picking, ({ data }) => {
     if (pending.current || picking) return;
+    void haptics.notification("warning");
     Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
       { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
       {
@@ -147,6 +151,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
       const photo = await pickAvatarPhoto({ pathname: "/server-settings/crop-logo" });
       if (photo) setLogo(photo);
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.shared.photo.openFailed")));
     } finally {
       setPicking(false);
@@ -154,6 +159,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
   }
 
   function editLogo(): void {
+    void haptics.impact("soft");
     if (!hasLogo) {
       void chooseLogo();
       return;
@@ -184,7 +190,9 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
       });
       setDraftName(undefined);
       setLogo(undefined);
+      void haptics.notification("success");
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.server.settings.identitySaveFailed")));
     } finally {
       pending.current = false;

@@ -18,6 +18,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
@@ -202,7 +203,9 @@ export function QrScanner({
     try {
       await onScan(data);
       completed.current = true;
+      void haptics.notification("success");
     } catch (error) {
+      void haptics.notification("error");
       setScanState({
         status: "error",
         source: "connection",

@@ -7,6 +7,7 @@ import { View } from "react-native";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { forgetIncomingLink, pendingInvitationId, readIncomingLink } from "../model/incoming-links";
 
@@ -54,8 +55,10 @@ function IncomingLinkContent({ request }: { request?: string }) {
       const next = await redeemMobileConnectUrl(link.url);
       connect(next);
       forgetIncomingLink(request);
+      void haptics.notification("success");
       if (mounted.current) setPaired(true);
     } catch (cause) {
+      void haptics.notification("error");
       if (mounted.current) setError(errorMessage(cause, t("mobile.link.connectFailed")));
     } finally {
       locked.current = false;
@@ -105,12 +108,25 @@ function IncomingLinkContent({ request }: { request?: string }) {
       ) : null}
       {link.kind === "plugin" ? (
         <Button
-          onPress={() => void openBrowserAsync(link.url).catch(() => setError(t("mobile.link.plugin.openFailed")))}
+          onPress={() => {
+            void haptics.impact("soft");
+            void openBrowserAsync(link.url).catch(() => {
+              void haptics.notification("error");
+              setError(t("mobile.link.plugin.openFailed"));
+            });
+          }}
         >
           <Button.Label>{t("mobile.link.plugin.view")}</Button.Label>
         </Button>
       ) : null}
-      <Button variant="ghost" isDisabled={busy} onPress={close}>
+      <Button
+        variant="ghost"
+        isDisabled={busy}
+        onPress={() => {
+          void haptics.impact("soft");
+          close();
+        }}
+      >
         <Button.Label>{t("common.close")}</Button.Label>
       </Button>
     </View>

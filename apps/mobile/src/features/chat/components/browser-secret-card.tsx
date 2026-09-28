@@ -2,6 +2,7 @@ import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openb
 import { Button, Input, Typography } from "heroui-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function BrowserSecretCard({
@@ -34,7 +35,9 @@ export function BrowserSecretCard({
     setValue("");
     try {
       await respond(input);
+      void haptics.notification("success");
     } catch {
+      void haptics.notification("error");
       setError(true);
     } finally {
       if (input.decision === "submit") input.secret = "";
@@ -48,7 +51,9 @@ export function BrowserSecretCard({
       setError(false);
       try {
         await respondToTakeover(decision);
+        void haptics.notification("success");
       } catch {
+        void haptics.notification("error");
         setError(true);
       } finally {
         setPending(false);

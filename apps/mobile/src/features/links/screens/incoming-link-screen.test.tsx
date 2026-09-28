@@ -27,6 +27,9 @@ const state = vi.hoisted(() => {
     join: vi.fn<(input: { inviteUrl: string }) => Promise<string>>(),
   };
 });
+vi.mock("@/shared/lib/haptics", () => ({
+  haptics: { selection: vi.fn(async () => {}), impact: vi.fn(async () => {}), notification: vi.fn(async () => {}) },
+}));
 vi.mock("@/features/auth/context/mobile-session-context", () => ({
   useMobileSession: () => ({ session: state.session, connect: state.connect }),
 }));

@@ -4,6 +4,7 @@ import { Button, Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { ChannelTaskActions } from "../components/channel-task-actions";
 import { useChannels } from "../components/use-channels";
@@ -35,7 +36,9 @@ export function ChannelActionsScreen() {
     try {
       await state.store.refreshHistory(serverId, channelId, t("mobile.channel.actions.historyStale"));
       setHistoryPending(false);
+      void haptics.notification("success");
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.channel.actions.refreshFailed")));
     } finally {
       lock.current = false;
@@ -71,7 +74,9 @@ export function ChannelActionsScreen() {
         { waitForRefresh: true },
       );
       operations.current.delete(signature);
+      void haptics.notification("success");
     } catch (cause) {
+      void haptics.notification("error");
       if (cause instanceof ChannelHistoryRefreshError) {
         operations.current.delete(signature);
         setHistoryPending(true);

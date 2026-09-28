@@ -8,7 +8,6 @@ import { useCSSVariable } from "uniwind";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { AwaitingRepliesSection } from "../components/awaiting-replies-section";
 import { type QueuedUpload, useQueuedChat } from "../context/queued-messages-context";
@@ -68,7 +67,6 @@ export function QueuedMessagesScreen() {
   const waiting = queue?.waiting ?? [];
   const serverAgents = useMemo(() => agents.filter((agent) => agent.serverId === queue?.serverId), [agents, queue]);
   const open = (delivery: QueueDelivery) => {
-    void haptics.selection();
     router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId: delivery.id } });
   };
   return (
@@ -79,14 +77,7 @@ export function QueuedMessagesScreen() {
             {queue.error}
           </Typography.Paragraph>
           <SettingsSection>
-            <SettingsRow
-              disclosure={false}
-              disabled={queue.busy || queue.loading}
-              onPress={() => {
-                void haptics.selection();
-                queue.refresh();
-              }}
-            >
+            <SettingsRow disclosure={false} disabled={queue.busy || queue.loading} onPress={() => queue.refresh()}>
               <Typography>{t("common.tryAgain")}</Typography>
             </SettingsRow>
           </SettingsSection>

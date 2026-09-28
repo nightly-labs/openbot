@@ -21,6 +21,7 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 const EMAIL_PLACEHOLDER = "name@example.com";
@@ -71,9 +72,13 @@ export function ServerMembersScreen() {
   const action = useMutation({
     mutationFn: (operation: () => Promise<void>) => operation(),
     onSuccess: () => {
+      void haptics.notification("success");
       // A refresh failure must not retry a committed membership change or invitation.
       void members.refetch();
       if (canInvite) void invites.refetch();
+    },
+    onError: () => {
+      void haptics.notification("error");
     },
     onSettled: () => {
       locked.current = false;
@@ -134,6 +139,7 @@ export function ServerMembersScreen() {
                     selectedValue={inviteMode}
                     enabled={!action.isPending}
                     onValueChange={(value) => {
+                      void haptics.selection();
                       setInviteMode(value);
                       setCreated(null);
                       setCopied(false);
@@ -168,7 +174,14 @@ export function ServerMembersScreen() {
               disclosure={false}
               trailing={
                 <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                  <Picker selectedValue={role} enabled={!action.isPending} onValueChange={setRole}>
+                  <Picker
+                    selectedValue={role}
+                    enabled={!action.isPending}
+                    onValueChange={(value) => {
+                      void haptics.selection();
+                      setRole(value);
+                    }}
+                  >
                     <Picker.Item label={t(SERVER_ROLE_LABEL_KEYS.member)} value="member" />
                     <Picker.Item label={t(SERVER_ROLE_LABEL_KEYS.admin)} value="admin" />
                   </Picker>
@@ -239,10 +252,14 @@ export function ServerMembersScreen() {
                     disabled={inviteUsed}
                     onPress={() => {
                       void Clipboard.setStringAsync(created.inviteUrl)
-                        .then(() => setCopied(true))
-                        .catch(() =>
-                          Alert.alert(t("mobile.server.members.copyFailed"), t("mobile.server.members.copyFailedBody")),
-                        );
+                        .then(() => {
+                          setCopied(true);
+                          void haptics.notification("success");
+                        })
+                        .catch(() => {
+                          void haptics.notification("error");
+                          Alert.alert(t("mobile.server.members.copyFailed"), t("mobile.server.members.copyFailedBody"));
+                        });
                     }}
                   >
                     <Typography.Paragraph type="body-sm" className="text-accent">

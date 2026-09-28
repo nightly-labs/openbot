@@ -20,6 +20,7 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { RoutineTimePicker } from "./routine-schedule-time";
 
@@ -58,9 +59,11 @@ function useRecordAction(
     setError(null);
     try {
       await action();
+      void haptics.notification("success");
       done?.();
       void client.invalidateQueries({ queryKey: invalidate });
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t(failure)));
     } finally {
       lock.current = false;

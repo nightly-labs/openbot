@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useCSSVariable } from "uniwind";
 import { useMessageActions } from "@/features/chat/context/message-actions-context";
 import { isIOS } from "@/shared/lib/platform";
+import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
@@ -14,6 +15,7 @@ export default function MessageActionsLayout() {
   useEffect(() => () => select(null), [select]);
   return (
     <Stack
+      screenListeners={sheetBackHaptics}
       screenOptions={{
         presentation: "card",
         headerBackButtonDisplayMode: "minimal",
