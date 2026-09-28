@@ -2,6 +2,7 @@ import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@
 import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { Toaster, toast } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
@@ -149,12 +150,17 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       }
     } catch (error) {
       if (!disposed && generation === sessionGeneration) {
-        const message = error instanceof Error ? error.message : text.t("webClient.login.sessionFailed");
-        // Signed in, the workspace stays usable. Signed out, the login screen offers a retry.
-        if (state.account) toast.error(text.sourceText(message));
+        // Signed in, the workspace stays usable. Signed out, the login screen offers a retry, as on desktop.
+        if (state.account)
+          toast.error(
+            text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
+          );
         else
           setState((draft) => {
-            draft.login = { status: "error", issue: { code: "auth_api_unavailable", message } };
+            draft.login = {
+              status: "error",
+              issue: { code: "auth_api_unavailable", message: sourceText("error.auth.serviceUnavailable") },
+            };
           });
       }
     } finally {
