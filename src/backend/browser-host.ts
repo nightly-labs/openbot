@@ -45,6 +45,7 @@ import { BrowserControlSessions } from "./browser-control-sessions";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import {
   type BrowserHostTab,
+  type BrowserPreviewPage,
   currentTabUrl,
   type KeepQueueBlocked,
   restoreWebContentsFocus,
@@ -806,7 +807,11 @@ export class BrowserHost {
     if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
     const cached = savedPreview(tab);
     if (cached && tab.pendingOperations > 0) return cached;
-    const capture = tab.previewCapture ?? this.#capturePreviewFrame(tab);
+    const started = this.#previewCapture(tab);
+    // A navigation during the capture makes its frame show the page before it, so take one more.
+    const capture = started.frame.then((frame) =>
+      showsCurrentPage(tab, started) ? frame : this.#previewCapture(tab).frame,
+    );
     if (!cached) return capture;
     let timer: ReturnType<typeof setTimeout> | undefined;
     // After a navigation during the capture the saved frame shows the wrong page, so the preview waits.
@@ -818,11 +823,10 @@ export class BrowserHost {
     return Promise.race([capture, stale]).finally(() => clearTimeout(timer));
   }
 
-  #capturePreviewFrame(tab: BrowserHostTab): Promise<BrowserPreview> {
-    const generation = tab.captureGeneration;
-    const document = tab.documents;
-    const url = currentTabUrl(tab);
-    const capture = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
+  #previewCapture(tab: BrowserHostTab): BrowserPreviewPage & { frame: Promise<BrowserPreview> } {
+    if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
+    const page = currentPreviewPage(tab);
+    const frame = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
       const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
@@ -849,13 +853,12 @@ export class BrowserHost {
       const preview = cropped.resize({ width: 960, height: 600, quality: "good" });
       const dataUrl = `data:image/jpeg;base64,${preview.toJPEG(72).toString("base64")}`;
       const frame = { dataUrl, width: 960, height: 600 };
-      if (tab.captureGeneration === generation && tab.documents === document && currentTabUrl(tab) === url) {
-        tab.preview = { frame, url, document, generation };
-      }
+      if (showsCurrentPage(tab, page)) tab.preview = { ...page, frame };
       return frame;
     });
+    const capture = { ...page, frame };
     tab.previewCapture = capture;
-    void capture
+    void frame
       .finally(() => {
         if (tab.previewCapture === capture) tab.previewCapture = undefined;
       })
@@ -1878,14 +1881,18 @@ export class BrowserHost {
   }
 }
 
-/** The saved preview frame, when it still shows the tab's current page, document and view. */
+function currentPreviewPage(tab: BrowserHostTab): BrowserPreviewPage {
+  return { url: currentTabUrl(tab), document: tab.documents, generation: tab.captureGeneration };
+}
+
+function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolean {
+  const current = currentPreviewPage(tab);
+  return page.url === current.url && page.document === current.document && page.generation === current.generation;
+}
+
+/** The saved preview frame, when it still shows the tab's current page. */
 function savedPreview(tab: BrowserHostTab): BrowserPreview | null {
-  const preview = tab.preview;
-  return preview?.generation === tab.captureGeneration &&
-    preview.document === tab.documents &&
-    preview.url === currentTabUrl(tab)
-    ? preview.frame
-    : null;
+  return tab.preview && showsCurrentPage(tab, tab.preview) ? tab.preview.frame : null;
 }
 
 function validateBounds(bounds: BrowserBounds): BrowserBounds {
