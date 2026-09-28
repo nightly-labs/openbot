@@ -205,7 +205,7 @@ export async function usableMcpServer(
   return {
     config,
     command,
-    workingDirectory: resolveMcpWorkingDirectory(config.workingDirectory),
+    workingDirectory: expandHomePath(config.workingDirectory),
     path,
     authorization: null,
   };
@@ -233,15 +233,17 @@ export function appendToolRuntimes(path: string | null, binDirectories: readonly
 }
 
 /**
- * The directory a stdio server starts in, with a leading `~` replaced by this user's home.
+ * A path with a leading `~` replaced by this user's home: the directory a stdio server starts in,
+ * and a command such as `~/.paper/bin/paper`.
  *
  * The form offers `~/code` as its example, and a shell is what usually expands that: process
- * creation takes the value as written, so a literal `~` would be a directory that does not exist
- * and the spawn would fail. Expanding it here, once, keeps the probe and every provider on the same
- * directory. Anything else is passed through untouched, including a relative path, which a user
- * writes against the agent's own workspace.
+ * creation takes the value as written, so a literal `~` would be a file that does not exist and the
+ * spawn would fail. Expanding it here, once, keeps the probe and every provider on the same path.
+ * It is also the only way a catalog listing can name a program under the home directory: the
+ * listing is the same for every user. Anything else is passed through untouched, including a
+ * relative directory, which a user writes against the agent's own workspace.
  */
-function resolveMcpWorkingDirectory(value: string): string {
+function expandHomePath(value: string): string {
   const trimmed = value.trim();
   // A backslash separates only on Windows. On the other systems it is an ordinary character of a
   // file name, so `~\project` there names a directory called `~\project`.
@@ -264,14 +266,15 @@ function shellWord(value: string): string {
 
 /**
  * An absolute path for a command name, or `null` when the given `PATH` holds none. A command the
- * user already wrote as a path is taken as written: it is their statement of which build to run.
+ * user already wrote as a path is taken as written, after `~` is expanded: it is their statement of
+ * which build to run.
  *
  * `path` is the list to search, which is the list the server will be launched with. Without one the
  * login shell's own is used, because a packaged app starts with a restricted `PATH` - the same
  * reason `collectCandidates` in `cli.ts` uses a login shell.
  */
 export function resolveMcpCommand(command: string, path: string | null = null): Promise<string | null> {
-  const trimmed = command.trim();
+  const trimmed = expandHomePath(command);
   if (!trimmed) return Promise.resolve(null);
   if (isAbsolute(trimmed) || trimmed.startsWith(".")) return Promise.resolve(trimmed);
   // The `PATH` belongs in the key: the same word looked up in two lists names two builds, which is

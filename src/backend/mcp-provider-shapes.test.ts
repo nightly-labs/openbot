@@ -1,5 +1,5 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { afterEach, describe, expect, it } from "vitest";
@@ -337,6 +337,8 @@ describe("resolveMcpCommand", () => {
 
   it("takes a path the user wrote as written, without a lookup", async () => {
     expect(await resolveMcpCommand("/usr/local/bin/server")).toBe("/usr/local/bin/server");
+    // The Paper listing names `~/.paper/bin/paper`. Providers spawn with no shell to expand it.
+    expect(await resolveMcpCommand("~/.paper/bin/paper")).toBe(join(homedir(), ".paper", "bin", "paper"));
     expect(await resolveMcpCommand("  ")).toBeNull();
   });
 });

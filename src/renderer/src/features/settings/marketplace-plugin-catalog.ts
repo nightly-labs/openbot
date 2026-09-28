@@ -299,6 +299,42 @@ const FIGMA: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/figma",
 };
 
+const PAPER: MarketplacePluginDetail = {
+  id: "plugin-paper",
+  slug: "paper",
+  name: "Paper",
+  tagline: "Design canvas built on HTML and CSS",
+  description:
+    "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs at ~/.paper/bin/paper. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+  category: "design",
+  creatorName: "paper.design",
+  iconUrl: "https://paper.design/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-implement", text: "Implement the selected Paper frame in this codebase, with our code conventions." },
+    { id: "prompt-code-to-design", text: "Use the styles in this repository and design a settings page in Paper." },
+    { id: "prompt-tokens", text: "List the design tokens in the open Paper file and compare them with our theme." },
+  ],
+  apps: [
+    {
+      id: "app-paper-mcp",
+      name: "Paper",
+      description:
+        "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
+      iconUrl: "https://paper.design/favicon.ico",
+      server: { name: "paper", transport: "stdio", command: "~/.paper/bin/paper", args: ["mcp"] },
+    },
+  ],
+  websiteUrl: "https://paper.design",
+  privacyPolicyUrl: "https://paper.design/legal/privacy",
+  termsUrl: "https://paper.design/legal/tos",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-09-19T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/paper",
+};
+
 const SENTRY: MarketplacePluginDetail = {
   id: "plugin-sentry",
   slug: "sentry",
@@ -755,6 +791,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   LINEAR,
   NOTION,
   FIGMA,
+  PAPER,
   SENTRY,
   CONTEXT7,
   STRIPE,

@@ -19,6 +19,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - The iPhone app is in public beta on TestFlight. A card at the bottom of the sidebar shows the
   install steps and a QR code of the invite link. You can close the card. Settings > Mobile Connect
   always shows the same steps, the QR code and a button that copies the link.
+- Add Paper to the Plugins tab. Agents can read and change the file that is open in Paper Desktop.
+  Install Paper Desktop, open it once, and open a file. Paper needs no key. The command of a local
+  MCP server can now start with `~/`, which is your home folder.
 
 ### Changed
 

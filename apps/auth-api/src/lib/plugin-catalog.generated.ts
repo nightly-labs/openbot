@@ -55,6 +55,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "2443f0184dd650d5b0e735de31853e3a7d48fdcb1b9538472c4e5450f6c81746",
     },
     {
+      slug: "paper",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "c6197f20026f4d65a8cafddfae062465711cdd0c45b4a8ee7290d3b4c2ba4792",
+    },
+    {
       slug: "sentry",
       version: "1.0.0",
       featured: false,
@@ -370,6 +376,39 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.figma.com",
     privacyPolicyUrl: "https://www.figma.com/privacy/",
     termsUrl: "https://www.figma.com/tos/",
+    skills: [],
+  },
+  paper: {
+    slug: "paper",
+    name: "Paper",
+    tagline: "Design canvas built on HTML and CSS",
+    description:
+      "Paper lets agents read and write the design file that is open in Paper Desktop: inspect artboards, selections, computed styles, JSX and tokens, and create or change frames, text and styles. Install Paper Desktop, open it once, and open a file before you start. OpenBot starts the Paper CLI that Paper Desktop installs at ~/.paper/bin/paper. Paper needs no key. Write tools change the open file, so review each write before you approve it.",
+    category: "design",
+    creatorName: "paper.design",
+    iconUrl: "https://paper.design/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-implement",
+        text: "Implement the selected Paper frame in this codebase, with our code conventions.",
+      },
+      { id: "prompt-code-to-design", text: "Use the styles in this repository and design a settings page in Paper." },
+      { id: "prompt-tokens", text: "List the design tokens in the open Paper file and compare them with our theme." },
+    ],
+    apps: [
+      {
+        id: "app-paper-mcp",
+        name: "Paper",
+        description:
+          "Reads and writes the open Paper Desktop file, over the local MCP server that the Paper CLI relays. Needs Paper Desktop with a file open.",
+        iconUrl: "https://paper.design/favicon.ico",
+        server: { name: "paper", transport: "stdio", command: "~/.paper/bin/paper", args: ["mcp"] },
+      },
+    ],
+    websiteUrl: "https://paper.design",
+    privacyPolicyUrl: "https://paper.design/legal/privacy",
+    termsUrl: "https://paper.design/legal/tos",
     skills: [],
   },
   sentry: {
