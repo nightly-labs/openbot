@@ -1014,8 +1014,9 @@ describe("leaving a remote server", () => {
   // computer's session there. A host that fails the logout must not keep the server in the list.
   it("logs out of an HTTP host before it removes the server, also when the host fails", async () => {
     const teamFetch = stubTeamFetch({
-      compatibility: {},
+      compatibility: { appVersion: "0.4.0" },
       routes: {
+        "/v1/agents": () => Response.json([]),
         "/v1/auth/logout": ({ url }) =>
           url.hostname.startsWith("reachable")
             ? new Response(null, { status: 204 })
@@ -1024,7 +1025,11 @@ describe("leaving a remote server", () => {
     });
     const fixture = await createRemoteManager({
       servers: [storedHttpsServer("reachable"), storedHttpsServer("unreachable")],
+      appVersion: "0.4.0",
     });
+    // A request negotiates the protocol first, as the app does before the user can open settings.
+    await fixture.manager.request("reachable", "/v1/agents", (value) => value);
+    await fixture.manager.request("unreachable", "/v1/agents", (value) => value);
 
     await fixture.manager.remove("reachable");
     await fixture.manager.remove("unreachable");
