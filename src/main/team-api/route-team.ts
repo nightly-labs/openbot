@@ -44,6 +44,17 @@ export async function routeTeam(
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, token, sessionId, json, empty } = context;
 
+  /** What removing a member does, whether an admin removes them or they leave. */
+  async function removeMember(memberId: string): Promise<void> {
+    await store.removeMember(memberId);
+    await remoteScreen?.revokeMember(memberId);
+    refreshPresence();
+  }
+
+  if (method === "POST" && url.pathname === TEAM_API_ROUTES.team.leave) {
+    await removeMember(member.id);
+    return empty(204);
+  }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.auth.logout) {
     await store.logout(token);
     await remoteScreen?.revokeTeamSession(sessionId);
@@ -121,10 +132,7 @@ export async function routeTeam(
   }
   if (method === "DELETE" && memberMatch) {
     requireAdmin(member);
-    const removedMemberId = pathIdentifier(memberMatch[1], "memberId");
-    await store.removeMember(removedMemberId);
-    await remoteScreen?.revokeMember(removedMemberId);
-    refreshPresence();
+    await removeMember(pathIdentifier(memberMatch[1], "memberId"));
     return empty(204);
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.team.invites) {

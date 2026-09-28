@@ -65,6 +65,8 @@ export const TEAM_API_ROUTES = {
     logo: "/v1/team/logo",
     members: "/v1/team/members",
     member: (memberId: string) => `/v1/team/members/${segment(memberId)}`,
+    // Behind `member-leave-v1`: the caller removes their own membership.
+    leave: "/v1/team/leave",
     invites: "/v1/team/invites",
     invite: (inviteId: string) => `/v1/team/invites/${segment(inviteId)}`,
     sessions: "/v1/team/sessions",

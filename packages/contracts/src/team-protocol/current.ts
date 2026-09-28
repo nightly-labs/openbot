@@ -26,6 +26,14 @@ export const TEAM_MODEL_SCOPED_USAGE_CAPABILITY = "model-scoped-usage";
 export const TEAM_AGENT_CREATE_MODEL_CAPABILITY = "agent-create-model";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
+/**
+ * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
+ * caller, a member or an admin, removes their own membership with the same effects as an admin's
+ * `DELETE /v1/team/members/:id`: the member row and every session of it go, on every device. The
+ * owner is refused. A host without the capability answers 404, and the client only logs out.
+ * Widening any of it needs a second capability string.
+ */
+export const TEAM_MEMBER_LEAVE_CAPABILITY = "member-leave-v1";
 export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
@@ -71,6 +79,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDERS_ADMIN_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
+  TEAM_MEMBER_LEAVE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

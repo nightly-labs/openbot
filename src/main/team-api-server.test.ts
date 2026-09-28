@@ -171,6 +171,8 @@ const ROUTE_METHODS: Record<string, string> = {
   "team.logo": "GET",
   "team.members": "GET",
   "team.member": "PATCH",
+  // The walk signs in as the owner, whom the route refuses, so it removes nothing and needs no order.
+  "team.leave": "POST",
   "team.invites": "GET",
   "team.invite": "DELETE",
   "team.sessions": "GET",
@@ -256,6 +258,7 @@ const ROUTES_WITHOUT_A_CLASSIFIED_JSON_BODY = new Set([
   // Answered with 204 and no body at all.
   "attachment",
   "auth.logout",
+  "team.leave",
   "team.invite",
   "team.session",
   "remoteScreen.session",

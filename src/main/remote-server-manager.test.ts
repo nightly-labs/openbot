@@ -1010,38 +1010,42 @@ describe("remote control capability discovery", () => {
 });
 
 describe("leaving a remote server", () => {
-  // A released HTTP host has no route for a member to leave, so logging out is what ends this
-  // computer's session there. A host that fails the logout must not keep the server in the list.
-  it("logs out of an HTTP host before it removes the server, also when the host fails", async () => {
+  // An HTTP host with `member-leave-v1` removes the membership as an admin removal does; an older one
+  // can only end this computer's session. A host that fails either must not keep the server listed.
+  it("leaves an HTTP host that serves the route, logs out of an older one, also when the host fails", async () => {
     const teamFetch = stubTeamFetch({
-      compatibility: { appVersion: "0.4.0" },
       routes: {
+        "/v1/compatibility": ({ url }) =>
+          Response.json({
+            appVersion: "0.4.0",
+            protocol: { minimum: 1, maximum: 1 },
+            capabilities: url.hostname.startsWith("older") ? [] : ["member-leave-v1"],
+          }),
         "/v1/agents": () => Response.json([]),
-        "/v1/auth/logout": ({ url }) =>
-          url.hostname.startsWith("reachable")
-            ? new Response(null, { status: 204 })
-            : Response.json({ error: "Host unavailable." }, { status: 503 }),
+        "/v1/team/leave": ({ url }) =>
+          url.hostname.startsWith("failing")
+            ? Response.json({ error: "Host unavailable." }, { status: 503 })
+            : new Response(null, { status: 204 }),
+        "/v1/auth/logout": () => new Response(null, { status: 204 }),
       },
     });
+    const servers = ["current", "older", "failing"];
     const fixture = await createRemoteManager({
-      servers: [storedHttpsServer("reachable"), storedHttpsServer("unreachable")],
+      servers: servers.map((id) => storedHttpsServer(id)),
       appVersion: "0.4.0",
     });
     // A request negotiates the protocol first, as the app does before the user can open settings.
-    await fixture.manager.request("reachable", "/v1/agents", (value) => value);
-    await fixture.manager.request("unreachable", "/v1/agents", (value) => value);
+    for (const id of servers) await fixture.manager.request(id, "/v1/agents", (value) => value);
 
-    await fixture.manager.remove("reachable");
-    await fixture.manager.remove("unreachable");
+    for (const id of servers) await fixture.manager.remove(id);
 
-    expect(
-      teamFetch
-        .requests("/v1/auth/logout")
-        .map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]),
-    ).toEqual([
-      ["reachable.trycloudflare.com", "POST", "Bearer token-reachable"],
-      ["unreachable.trycloudflare.com", "POST", "Bearer token-unreachable"],
+    const sent = (path: string) =>
+      teamFetch.requests(path).map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]);
+    expect(sent("/v1/team/leave")).toEqual([
+      ["current.trycloudflare.com", "POST", "Bearer token-current"],
+      ["failing.trycloudflare.com", "POST", "Bearer token-failing"],
     ]);
+    expect(sent("/v1/auth/logout")).toEqual([["older.trycloudflare.com", "POST", "Bearer token-older"]]);
     expect(fixture.manager.list().map((server) => server.id)).toEqual(["local"]);
   });
 });

@@ -1028,6 +1028,16 @@ renderer hides those controls from a member. The wire carries no absolute paths,
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
 
+### Leaving a server
+
+Leaving a joined server has the same effect as an admin removal: the membership and every session of
+it end, on all of the member's devices. On WebRTC, the account service revokes the membership, as it
+does for the owner's removal. On HTTP, `member-leave-v1` adds a bodyless `POST /v1/team/leave`, which
+runs the steps of the admin `DELETE /v1/team/members/:id` for the caller; the owner is refused. A host
+without the capability answers 404, so the client only logs out: that token stops working, and the
+membership stays for an admin to remove. Either way the client removes the server, also when the host
+does not answer.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
