@@ -100,7 +100,8 @@ const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 
 /** The host names attachment previews with the desktop `openbot-attachment:` scheme, which a browser cannot load. */
 function withoutPreviewUrls(message: AgentMessage): AgentMessage {
-  return { ...message, attachments: message.attachments?.map((attachment) => ({ ...attachment, previewUrl: null })) };
+  if (!message.attachments) return message;
+  return { ...message, attachments: message.attachments.map((attachment) => ({ ...attachment, previewUrl: null })) };
 }
 
 function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue"> {
