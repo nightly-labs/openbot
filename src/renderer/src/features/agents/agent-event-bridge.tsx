@@ -19,25 +19,11 @@ import { latestIncomingConversationMessage } from "../conversation/conversation-
 import { reconcileQueuesWithRuntimeWork } from "../dynamic-island/dynamic-island-coordinator";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
+import { claimErrorToast, readableAgentError } from "./agent-error-text";
 import { cleanAgentMessageText } from "./agent-message-text";
 import { reconcileAttentionApprovals, reconcileAttentionPrompts } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
-
-/** A provider quotes what it was given, so an error can carry a whole request body back. */
-const ERROR_DESCRIPTION_LIMIT = 300;
-// Repeated model-refresh failures arrive as identical error events. Coalesce
-// them so one outage shows one toast instead of one per retry.
-const ERROR_TOAST_DEDUPE_MS = 30_000;
-const lastErrorToastAt = new Map<string, number>();
-
-/** One sentence a reader can act on, whichever surface shows it. */
-function readableAgentError(message: string): string {
-  const { t, errorMessage } = currentText();
-  const readable = errorMessage(message, t("agent.error.continueFailed"));
-  if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
-  return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
-}
 
 /**
  * The one subscriber to `agent.onEvent`, and the only place a single event is
@@ -293,9 +279,7 @@ export function AgentEventBridge() {
         // No agent to attach it to - a provider that fails to start is the common case - so this
         // one stays global. The message is already redacted in the main process.
         const toastKey = readableAgentError(event.message);
-        const now = Date.now();
-        if ((lastErrorToastAt.get(toastKey) ?? 0) + ERROR_TOAST_DEDUPE_MS < now) {
-          lastErrorToastAt.set(toastKey, now);
+        if (claimErrorToast(toastKey)) {
           // Codex ignored a setting and runs without it. The provider works, so this is a warning
           // about the user's file, not a provider error.
           if (event.code === "codex_config_ignored") {

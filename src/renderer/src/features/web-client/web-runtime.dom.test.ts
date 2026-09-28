@@ -8,6 +8,7 @@ const peer = {
   dispose: vi.fn(),
   sendHostStreamData: vi.fn(),
   cancelUpload: vi.fn(),
+  setTyping: vi.fn(),
   setActive: vi.fn(),
 };
 const host = {

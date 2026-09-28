@@ -69,6 +69,7 @@ function runtimeFixture(
     markRead: async () => ({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     send: async () => {},
     stop: async () => {},
+    setTyping: () => {},
     queue: async (agentId) => ({ agentId, deliveries: [] }),
     editQueue: async ({ agentId }) => ({ agentId, deliveries: [] }),
     cancelQueued: async () => {},
