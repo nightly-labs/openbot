@@ -850,7 +850,7 @@ export class TeamStore {
       await this.#persist();
       return result;
     }
-    requireMemberSeat(state);
+    requireNewMemberSeat(state);
     const member: StoredMember = {
       id: randomUUID(),
       accountId: user.id,
@@ -898,7 +898,7 @@ export class TeamStore {
       const invite = this.#findUsableInvite(token);
       if (!invite) throw new TeamStoreError(sourceText("error.team.inviteInvalid"));
       if (invite.email) throw new TeamStoreError(sourceText("error.team.inviteRequiresAccount"));
-      requireMemberSeat(state);
+      requireNewMemberSeat(state);
       return invite;
     };
     requireJoin();
@@ -1283,11 +1283,16 @@ function identityOf(host: StoredTeam): TeamIdentity {
   };
 }
 
-/** Disabled members keep their record but not their seat, so a remote revoke frees one. */
-function requireMemberSeat(host: StoredTeam): void {
+/** A new member needs a stored record and a seat. */
+function requireNewMemberSeat(host: StoredTeam): void {
   if (host.members.length >= INPUT_LIMITS.teamMembers) {
     throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: INPUT_LIMITS.teamMembers }));
   }
+  requireMemberSeat(host);
+}
+
+/** Disabled members keep their record but not their seat, so a remote revoke frees one. */
+function requireMemberSeat(host: StoredTeam): void {
   if (host.members.filter((member) => !member.disabled).length >= DEFAULT_TEAM_MEMBER_LIMIT) {
     throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: DEFAULT_TEAM_MEMBER_LIMIT }));
   }

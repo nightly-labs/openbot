@@ -36,6 +36,12 @@ export class RemoteControlPlaneError extends Error {
   }
 }
 
+/** A SQL condition and its binds, which a statement adds to its WHERE clause. */
+interface SqlCondition {
+  sql: string;
+  binds: unknown[];
+}
+
 interface RemoteHostRow {
   host_id: string;
   owner_user_id: string;
@@ -616,9 +622,10 @@ export class RemoteControlPlane {
             WHERE host_id = ?
               AND EXISTS(
                 SELECT 1 FROM remote_memberships WHERE host_id = ? AND user_id = ?
-              )`,
+              )
+              AND ${MEMBER_SEAT_AVAILABLE_SQL}`,
         )
-        .bind(now, invite.host_id, invite.host_id, user.id),
+        .bind(now, invite.host_id, invite.host_id, user.id, ...seat),
       this.#authEpochEventStatement(invite.host_id, now),
       this.#database
         .prepare(
@@ -720,58 +727,62 @@ export class RemoteControlPlane {
     const role = input.role ?? membership.role;
     if (role !== "admin" && role !== "member") throw invalid("member role");
     if (input.revoke && input.reactivate) throw invalid("member status");
-    const reactivating = input.reactivate === true && membership.status !== "active";
-    if (reactivating) await this.#requireMemberSeat(input.hostId, membership.user_id);
+    // A role change keeps an active member active, so it needs the seat as a reactivation does.
+    const activating = !input.revoke && (input.reactivate === true || membership.status === "active");
+    if (activating && membership.status !== "active") await this.#requireMemberSeat(input.hostId, membership.user_id);
     const now = this.#now();
     const activeSessions = await this.#database
       .prepare("SELECT session_id FROM remote_sessions WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
       .bind(input.hostId, membership.user_id)
       .all<{ session_id: string }>();
+    // The writes after the membership apply only when it took its seat. A refused UPDATE leaves the
+    // member inactive, so the host keeps its auth epoch and its connections.
+    const applied = activating
+      ? {
+          sql: "EXISTS(SELECT 1 FROM remote_memberships WHERE membership_id = ? AND status = 'active')",
+          binds: [input.membershipId],
+        }
+      : undefined;
     const changed = await this.#database.batch([
-      reactivating
-        ? this.#database
-            .prepare(
-              `UPDATE remote_memberships SET role = ?, status = 'active', updated_at = ?
-                WHERE membership_id = ? AND ${MEMBER_SEAT_AVAILABLE_SQL}`,
-            )
-            .bind(
-              role,
-              now,
-              input.membershipId,
-              input.hostId,
-              membership.user_id,
-              input.hostId,
-              DEFAULT_TEAM_MEMBER_LIMIT,
-            )
-        : this.#database
-            .prepare("UPDATE remote_memberships SET role = ?, status = ?, updated_at = ? WHERE membership_id = ?")
-            .bind(
-              role,
-              input.revoke ? "revoked" : input.reactivate ? "active" : membership.status,
-              now,
-              input.membershipId,
-            ),
       this.#database
-        .prepare("UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ?")
-        .bind(now, input.hostId),
+        .prepare(
+          `UPDATE remote_memberships SET role = ?, status = ?, updated_at = ?
+            WHERE membership_id = ?${activating ? ` AND ${MEMBER_SEAT_AVAILABLE_SQL}` : ""}`,
+        )
+        .bind(
+          role,
+          input.revoke ? "revoked" : activating ? "active" : membership.status,
+          now,
+          input.membershipId,
+          ...(activating ? [input.hostId, membership.user_id, input.hostId, DEFAULT_TEAM_MEMBER_LIMIT] : []),
+        ),
       this.#database
-        .prepare("UPDATE remote_sessions SET ended_at = ? WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
-        .bind(now, input.hostId, membership.user_id),
+        .prepare(
+          `UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ?
+            WHERE host_id = ?${applied ? ` AND ${applied.sql}` : ""}`,
+        )
+        .bind(now, input.hostId, ...(applied?.binds ?? [])),
+      this.#database
+        .prepare(
+          `UPDATE remote_sessions SET ended_at = ?
+            WHERE host_id = ? AND user_id = ? AND ended_at IS NULL${applied ? ` AND ${applied.sql}` : ""}`,
+        )
+        .bind(now, input.hostId, membership.user_id, ...(applied?.binds ?? [])),
       ...activeSessions.results.map((session) =>
         this.#authEventStatement(
           { type: "remote-session-ended", hostId: input.hostId, sessionId: session.session_id },
           now,
+          applied,
         ),
       ),
-      this.#authEpochEventStatement(input.hostId, now),
+      this.#authEpochEventStatement(input.hostId, now, undefined, applied),
       // The member whose membership this is, and not the owner who changed it: a revoked server
       // has to leave that member's list on every device they are signed in on.
-      this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now),
+      this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now, applied),
     ]);
     await this.#flushAuthEvents();
-    // A concurrent join or reactivation took the last seat after the check above.
-    if (reactivating && (changed[0]?.meta.changes ?? 0) !== 1)
-      await this.#requireMemberSeat(input.hostId, membership.user_id);
+    // A concurrent join, reactivation or revoke took the seat after the check above.
+    if (activating && (changed[0]?.meta.changes ?? 0) !== 1) throw memberLimitReached();
   }
 
   async validateMobileConnectHost(userId: string, binding: MobileConnectHostBinding): Promise<void> {
@@ -1041,13 +1052,7 @@ export class RemoteControlPlane {
       .prepare(`SELECT ${MEMBER_SEAT_AVAILABLE_SQL} AS available`)
       .bind(hostId, userId, hostId, DEFAULT_TEAM_MEMBER_LIMIT)
       .first<{ available: number }>();
-    if (!seat?.available) {
-      throw new RemoteControlPlaneError(
-        409,
-        "member_limit_reached",
-        `A host can have up to ${DEFAULT_TEAM_MEMBER_LIMIT} members.`,
-      );
-    }
+    if (!seat?.available) throw memberLimitReached();
   }
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
@@ -1071,18 +1076,31 @@ export class RemoteControlPlane {
       .first<RemoteHostRow>();
   }
 
-  #authEventStatement(event: RemoteAuthEvent, now: number): D1PreparedStatement {
-    return authEventStatement(this.#database, event, now);
+  #authEventStatement(event: RemoteAuthEvent, now: number, condition?: SqlCondition): D1PreparedStatement {
+    return authEventStatement(this.#database, event, now, condition);
   }
 
-  #authEpochEventStatement(hostId: string, now: number, ownerUserId?: string): D1PreparedStatement {
+  #authEpochEventStatement(
+    hostId: string,
+    now: number,
+    ownerUserId?: string,
+    condition?: SqlCondition,
+  ): D1PreparedStatement {
     return this.#database
       .prepare(
         `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
          SELECT ?, json_object('type', 'remote-auth-changed', 'hostId', host_id, 'authEpoch', auth_epoch), ?, 0, ?
-         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)`,
+         FROM remote_hosts WHERE host_id = ? AND (? IS NULL OR owner_user_id = ?)${condition ? ` AND ${condition.sql}` : ""}`,
       )
-      .bind(crypto.randomUUID(), now, now, hostId, ownerUserId ?? null, ownerUserId ?? null);
+      .bind(
+        crypto.randomUUID(),
+        now,
+        now,
+        hostId,
+        ownerUserId ?? null,
+        ownerUserId ?? null,
+        ...(condition?.binds ?? []),
+      );
   }
 
   /**
@@ -1116,12 +1134,26 @@ export async function notifyAccountProfileChanged(
 }
 
 /** Queues one event for Signal. `remote/api` decodes each event type with its own schema. */
-function authEventStatement(database: D1Database, event: RemoteAuthEvent, now: number): D1PreparedStatement {
+function authEventStatement(
+  database: D1Database,
+  event: RemoteAuthEvent,
+  now: number,
+  condition?: SqlCondition,
+): D1PreparedStatement {
   return database
     .prepare(
-      "INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at) VALUES (?, ?, ?, 0, ?)",
+      `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+       SELECT ?, ?, ?, 0, ?${condition ? ` WHERE ${condition.sql}` : ""}`,
     )
-    .bind(crypto.randomUUID(), JSON.stringify(event), now, now);
+    .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
+}
+
+function memberLimitReached(): RemoteControlPlaneError {
+  return new RemoteControlPlaneError(
+    409,
+    "member_limit_reached",
+    `A host can have up to ${DEFAULT_TEAM_MEMBER_LIMIT} members.`,
+  );
 }
 
 export async function deliverPendingRemoteAuthEvents(
