@@ -415,8 +415,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       setUsage(null);
       setMessageFocusRequest(null);
     },
-    // On a small screen the sidebar pane covers the channel, and a covered message was not seen.
-    canMarkRead: () => document.hasFocus() && mobilePane() === "conversation",
+    // On a small screen the sidebar pane covers the channel, and so does the usage report. A covered
+    // message was not seen.
+    canMarkRead: () => document.hasFocus() && mobilePane() === "conversation" && !usageOpen(),
   });
   onCleanup(
     workspace.onHostEvent((event) => {
