@@ -72,8 +72,9 @@ rebuttals, and re-review requests. Continue to Gate 4 only when the
 
 ## Gate 4 — Make CI green
 
-The branch protection on `main` requires the `Check` status, requires the
-branch to be up to date with `main`, and requires resolved conversations.
+The branch protection on `main` requires the `Check` status and resolved
+conversations. It does not require the branch to be up to date with `main`:
+a PR that is behind `main` can merge when it has no merge conflict.
 
 1. Watch the checks on the head SHA:
    `gh pr checks <pr> --watch --interval 120`. Run it in the background.
@@ -84,9 +85,10 @@ branch to be up to date with `main`, and requires resolved conversations.
 4. When the failure is not related to the change, such as a network
    timeout, run `gh run rerun <run-id> --failed` once. When the same job
    fails again, stop and report it to the user.
-5. When `main` moved and the PR is behind, run `gh pr update-branch <pr>`.
-   It merges `main` into the branch with no force-push. The merge starts a
-   full NorbiAI review. Go back to Gate 3.
+5. Do not update the branch only because `main` moved. When
+   `gh pr view <pr> --json mergeable` shows `CONFLICTING`, merge `main` into
+   the branch, resolve the conflicts, and push. Do not force-push. The merge
+   starts a full NorbiAI review. Go back to Gate 3.
 6. Answer each open human review thread. Do not resolve a thread that
    another person opened before you answer it.
 
@@ -97,7 +99,8 @@ Never weaken or skip a test to make CI green.
 Merge only when all of these are true on the same head SHA:
 
 - `gh pr view <pr> --json mergeStateStatus,reviewDecision,statusCheckRollup`
-  shows `mergeStateStatus` `CLEAN`.
+  shows `mergeStateStatus` `CLEAN`. `DIRTY` means a merge conflict: go back
+  to Gate 4, step 5.
 - `Check` and `NorbiAI review` are success.
 - No `P0` or `P1` finding remains, and no conversation is open.
 
