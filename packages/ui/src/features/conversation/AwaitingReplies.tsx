@@ -89,7 +89,6 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
                 <AgentAvatar
                   agent={item().agent}
                   seed={item().agent ? undefined : item().name}
-                  mood={item().state === "working" ? "working" : "idle"}
                   class="awaiting-replies-avatar"
                 />
                 <span class="awaiting-replies-text">
