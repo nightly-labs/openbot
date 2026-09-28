@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type AttachmentImportEvent, type AttachmentSummary, filePreviewKindForFile } from "@openbot/contracts/ipc";
+import type { AttachmentImportEvent, AttachmentSummary } from "@openbot/contracts/ipc";
 import {
   deleteSharedTable,
   installAgentSkill,
@@ -12,7 +12,7 @@ import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
-import { createWebFileSaver } from "./web-file-download";
+import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 /** Skills and shared tables on the connected host. The host answers only an owner or admin. */
@@ -37,6 +37,7 @@ export function createWebConversationRuntime(
   adminRequest?: () => TeamApiRequest,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
+  const files = createWebAttachmentFiles(remote);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   async function cancelImportFiles() {
     if (!importing) return;
@@ -53,10 +54,6 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  const save = createWebFileSaver();
-  async function download(id: string) {
-    save(await remote.download(id));
-  }
   onCleanup(() => {
     void cancelImportFiles();
   });
@@ -73,7 +70,7 @@ export function createWebConversationRuntime(
           listeners.delete(listener);
         };
       },
-      openAttachment: ({ attachmentId }) => download(attachmentId),
+      openAttachment: ({ attachmentId }) => files.download(attachmentId),
       openSharedFile: unavailable,
       openWorkspaceFile: unavailable,
       previewSharedFile: unavailable,
@@ -94,22 +91,8 @@ export function createWebConversationRuntime(
       setVisible: async () => {},
     },
     voice: { onModelStatus: () => () => {}, prepareModel: unavailable, transcribe: unavailable },
-    async openUrl(value) {
-      const url = new URL(value);
-      if (url.protocol !== "https:" && url.protocol !== "http:")
-        throw new Error(currentText().t("webClient.error.linkBlocked"));
-      window.open(url.href, "_blank", "noopener,noreferrer");
-    },
-    async previewAttachment(attachment) {
-      const file = await remote.download(attachment.id);
-      return {
-        name: file.name,
-        size: attachment.size,
-        mimeType: file.mimeType,
-        previewKind: filePreviewKindForFile(file.name, file.mimeType),
-        bytes: Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0)),
-      };
-    },
+    openUrl: openWebLink,
+    previewAttachment: files.preview,
     async importFiles(files) {
       if (importing || files.length === 0) return;
       const serverId = hostId();

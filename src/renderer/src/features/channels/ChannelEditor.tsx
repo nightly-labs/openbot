@@ -17,7 +17,6 @@ import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, For, Show } from "solid-js";
-import { useAgents } from "../agents/agents-context";
 import { useChannels } from "./channels-context";
 import { toggleChannelMember } from "./channels-draft";
 
@@ -44,7 +43,7 @@ interface ChannelEditorProps {
 export function ChannelEditor(props: ChannelEditorProps) {
   const channels = useChannels();
   const { t } = useText();
-  const { agentList } = useAgents();
+  const agentList = channels.agents;
   const channel = () => channels.state.page?.channel;
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });

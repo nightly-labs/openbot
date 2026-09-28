@@ -31,7 +31,7 @@ interface FilePreviewPanelProps {
   allowExternalOpen?: boolean;
   /** Present for an attachment, which the user can also save or locate. A file already has a path. */
   onDownload?: () => void;
-  onReveal?: () => void;
+  onReveal?: (() => void) | undefined;
   onClose: () => void;
 }
 

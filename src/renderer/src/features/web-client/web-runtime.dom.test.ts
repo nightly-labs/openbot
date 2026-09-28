@@ -467,6 +467,87 @@ describe("browser workspace runtime", () => {
     );
     await runtime.dispose();
   });
+  it("keeps host file URLs out of channel pages and keeps a sent channel attachment on a host switch", async () => {
+    const draft = {
+      id: "draft",
+      name: "draft.txt",
+      size: 5,
+      kind: "file" as const,
+      mimeType: "text/plain",
+      previewKind: "text" as const,
+      previewUrl: null,
+    };
+    const channel = {
+      id: "channel",
+      name: "Launch",
+      title: "",
+      instructions: "",
+      members: [],
+      leadAgentId: null,
+      archived: false,
+      revision: 1,
+      createdAt: "2026-09-01T00:00:00.000Z",
+    };
+    const page = {
+      channel,
+      messages: [
+        {
+          id: "message",
+          channelId: "channel",
+          sequence: 1,
+          author: { kind: "member", id: "member", name: "Ada" },
+          taskId: null,
+          superseded: false,
+          message: {
+            id: "message",
+            author: "user",
+            text: "Report",
+            createdAt: "2026-09-01T00:00:00.000Z",
+            status: "completed",
+            attachments: [{ ...draft, previewUrl: "http://127.0.0.1:4100/v1/attachments/draft/preview" }],
+          },
+        },
+      ],
+      tasks: [],
+      olderCursor: null,
+      throughSequence: 1,
+    };
+    peer.execute.mockImplementation(async (command) => ({
+      ok: true,
+      status: 200,
+      body:
+        command.path === "/v1/compatibility"
+          ? { appVersion: "0.1.0", protocol: { minimum: 1, maximum: 4 }, capabilities: ["channel-chats-v1"] }
+          : command.method === "POST" && command.path?.startsWith("/v1/attachments?")
+            ? draft
+            : command.path === "/v1/channels/read"
+              ? page
+              : command.path === "/v1/channels/commands"
+                ? channel
+                : {},
+    }));
+    const runtime = create();
+    await runtime.connect(host);
+    if (!runtime.channels) throw new Error("Runtime channels are unavailable.");
+    const read = await runtime.channels.readChannel({ channelId: "channel" });
+    expect(read.messages[0]?.message.attachments?.[0]?.previewUrl).toBeNull();
+    await runtime.upload(new File(["draft"], draft.name, { type: draft.mimeType }));
+    await runtime.channels.channelCommand({
+      type: "send",
+      operationId: "operation",
+      channelId: "channel",
+      text: "Report",
+      recipientAgentId: null,
+      replyToMessageId: null,
+      attachmentDraftIds: ["draft"],
+    });
+    peer.execute.mockClear();
+    await runtime.connect({ ...host, hostId: "other-host", devicePublicKey: "other-key" });
+    expect(peer.execute).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "request", method: "DELETE", path: "/v1/attachments/draft" }),
+    );
+    await runtime.dispose();
+  });
   it("preserves a completed draft across a same-host reconnect until send", async () => {
     const draft = {
       id: "draft",

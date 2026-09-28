@@ -1,3 +1,4 @@
+import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
 import { createMockOpenBot } from "./mock-openbot";
 
@@ -23,6 +24,9 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     closeBrowserTab: (tabId) => mock.api.browser.close(tabId),
     getSidebarLayout: () => agent.getSidebarLayout(),
     mutateSidebarLayout: (action) => agent.mutateSidebarLayout(action),
+    channels: agent,
+    // The member the mock channels write as.
+    currentMemberId: async () => "preview",
     respondToTakeover: (input) => agent.respondToBrowserTakeover(input),
     listHosts: async () => [host],
     previewInvite: async () => {
@@ -33,7 +37,13 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     },
     connect: async () => {
       events.connection({ hostId: host.hostId, state: "online", message: null });
-      return ["conversation-pagination", "agent-create-model", "agent-duplication", "sidebar-layout"];
+      return [
+        "conversation-pagination",
+        "agent-create-model",
+        "agent-duplication",
+        "sidebar-layout",
+        CHANNEL_CHATS_CAPABILITY,
+      ];
     },
     disconnect: async () => {
       events.connection({ hostId: host.hostId, state: "offline", message: null });
