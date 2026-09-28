@@ -6,19 +6,19 @@
 
 import {
   type HostUpdateStatus,
+  REMOTE_UPDATES_STATES,
   type ScheduledUpdateRestart,
+  UPDATE_FAILURE_CODES,
   UPDATE_PHASES,
-  type UpdateRestartMode,
+  UPDATE_RESTART_MODES,
 } from "./ipc-app-auth";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
-
-const RESTART_MODES: readonly UpdateRestartMode[] = ["when-idle", "now"];
 
 export function decodeScheduledUpdateRestart(value: unknown): ScheduledUpdateRestart {
   if (
     !isDynamicRecord(value) ||
     (value.requestedBy !== null && !isString(value.requestedBy)) ||
-    !isOneOf(RESTART_MODES, value.mode) ||
+    !isOneOf(UPDATE_RESTART_MODES, value.mode) ||
     !Array.isArray(value.waitingFor) ||
     !value.waitingFor.every(isString)
   ) {
@@ -34,9 +34,8 @@ export function decodeHostUpdateStatus(value: unknown): HostUpdateStatus {
     !isString(value.currentVersion) ||
     (value.availableVersion !== null && !isString(value.availableVersion)) ||
     (value.progress !== null && !isNumber(value.progress)) ||
-    (value.errorCode !== null &&
-      !isOneOf(["check_failed", "download_failed", "install_failed"] as const, value.errorCode)) ||
-    !isOneOf(["allowed", "disabled", "managed"] as const, value.remoteUpdates) ||
+    (value.errorCode !== null && !isOneOf(UPDATE_FAILURE_CODES, value.errorCode)) ||
+    !isOneOf(REMOTE_UPDATES_STATES, value.remoteUpdates) ||
     !isBoolean(value.autoDownload) ||
     !isBoolean(value.autoInstall)
   ) {

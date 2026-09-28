@@ -11,8 +11,14 @@ export interface HostRestartView {
   version: string | null;
 }
 
-/** `away` is a restart the member saw the connection drop for; only that one ends with "back online". */
-type Phase = "waiting" | "restarting" | "away";
+/**
+ * `away` is a restart the member saw the connection drop for; only that one ends with "back online".
+ * `expired` is a restart whose host did not come back in time; its notice is closed.
+ */
+type Phase = "waiting" | "restarting" | "away" | "expired";
+
+/** How long the notice of a restart stays. A host that is not back by then is offline, as any other host. */
+const RESTART_NOTICE_MS = 10 * 60_000;
 
 const toastId = (id: string) => `host-restart:${id}`;
 
@@ -23,6 +29,11 @@ const toastId = (id: string) => `host-restart:${id}`;
  */
 export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView[]>): void {
   const phases = new Map<string, Phase>();
+  const expiries = new Map<string, ReturnType<typeof setTimeout>>();
+  const stopExpiry = (id: string) => {
+    clearTimeout(expiries.get(id));
+    expiries.delete(id);
+  };
   createEffect(
     () => hosts().map((host) => ({ ...host })),
     (views) => {
@@ -31,15 +42,19 @@ export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView
       for (const host of views) {
         seen.add(host.id);
         const previous = phases.get(host.id) ?? null;
-        const next: Phase | null =
-          previous !== null && !host.online
-            ? "away"
-            : host.restart === "restarting"
-              ? "restarting"
-              : host.restart === "waiting"
-                ? "waiting"
-                : null;
+        const next = nextPhase(previous, host);
         if (next === previous) continue;
+        if (next === "restarting" || next === "away") {
+          if (!expiries.has(host.id))
+            expiries.set(
+              host.id,
+              setTimeout(() => {
+                expiries.delete(host.id);
+                phases.set(host.id, "expired");
+                toast.dismiss(toastId(host.id));
+              }, RESTART_NOTICE_MS),
+            );
+        } else stopExpiry(host.id);
         if (next === null) {
           phases.delete(host.id);
           // A removed schedule closes the notice; a restart that ended also says the host is back. A
@@ -72,11 +87,20 @@ export function createHostRestartToasts(hosts: Accessor<readonly HostRestartView
       for (const id of [...phases.keys()]) {
         if (seen.has(id)) continue;
         phases.delete(id);
+        stopExpiry(id);
         toast.dismiss(toastId(id));
       }
     },
   );
   onCleanup(() => {
+    for (const id of expiries.keys()) stopExpiry(id);
     for (const id of phases.keys()) toast.dismiss(toastId(id));
   });
+}
+
+function nextPhase(previous: Phase | null, host: HostRestartView): Phase | null {
+  // An expired notice stays closed until the host is back or the restart ends.
+  if (previous === "expired") return host.online || host.restart === null ? null : "expired";
+  if (previous !== null && !host.online) return "away";
+  return host.restart;
 }

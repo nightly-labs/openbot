@@ -91,7 +91,7 @@ export class RequestedUpdate {
   readonly #graceMs: number;
   #allowed: boolean;
   #autoInstall: boolean;
-  /** The version whose automatic restart was cancelled or failed. The next version schedules again. */
+  /** The version whose restart was cancelled, or whose automatic restart failed. The next version schedules again. */
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
@@ -184,14 +184,15 @@ export class RequestedUpdate {
 
   /**
    * Removes the schedule. A download under way continues; it is the same one auto-download runs. A
-   * cancelled automatic restart stays cancelled for that version.
+   * cancelled restart stays cancelled for that version, so the automatic install does not schedule
+   * it again.
    */
   cancel(): HostUpdateStatus {
     const status = this.#updater.getStatus();
     if (status.phase === "installing") throw new RequestedUpdateRefusal("restarting");
     if (this.#schedule) {
       this.#log(`The update restart that ${describe(this.#schedule)} asked for was cancelled.`);
-      if (this.#schedule.memberId === null) this.#declinedVersion = status.availableVersion;
+      this.#declinedVersion = status.availableVersion;
       this.#clear();
     }
     return this.snapshot();

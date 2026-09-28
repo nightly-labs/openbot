@@ -234,7 +234,10 @@ export function ServerUpdatePanel(
                         type="button"
                         size="sm"
                         loading={busy() === "start-when-idle"}
-                        disabled={disabled() || current().phase === "up-to-date"}
+                        // Only a relaunch of the host recovers from a failed install.
+                        disabled={
+                          disabled() || current().phase === "up-to-date" || current().errorCode === "install_failed"
+                        }
                         onClick={() => void start("when-idle")}
                       >
                         {t("server.update.start")}

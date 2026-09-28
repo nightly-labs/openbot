@@ -71,7 +71,8 @@ export interface UpdateStatus {
   scheduledRestart?: ScheduledUpdateRestart;
 }
 
-export type UpdateFailureCode = "check_failed" | "download_failed" | "install_failed";
+export const UPDATE_FAILURE_CODES = ["check_failed", "download_failed", "install_failed"] as const;
+export type UpdateFailureCode = (typeof UPDATE_FAILURE_CODES)[number];
 
 export interface UpdatePreference {
   autoDownload: boolean;
@@ -85,7 +86,8 @@ export interface UpdatePreference {
 export type UpdatePreferenceChange = Partial<UpdatePreference>;
 
 /** `now` restarts as soon as the update is ready; `when-idle` waits until no work runs. */
-export type UpdateRestartMode = "when-idle" | "now";
+export const UPDATE_RESTART_MODES = ["when-idle", "now"] as const;
+export type UpdateRestartMode = (typeof UPDATE_RESTART_MODES)[number];
 
 export interface ScheduledUpdateRestart {
   /** The name of the member who asked, or null when this computer installs updates automatically. */
@@ -96,7 +98,8 @@ export interface ScheduledUpdateRestart {
 }
 
 /** `managed`: a Host Manager controls the updates of this host. */
-export type RemoteUpdatesState = "allowed" | "disabled" | "managed";
+export const REMOTE_UPDATES_STATES = ["allowed", "disabled", "managed"] as const;
+export type RemoteUpdatesState = (typeof REMOTE_UPDATES_STATES)[number];
 
 /** The app update of a joined server's host, as `host-update-v1` reports it. */
 export interface HostUpdateStatus {

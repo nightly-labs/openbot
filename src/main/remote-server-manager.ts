@@ -124,6 +124,9 @@ export interface DevelopmentRemoteServerConnection {
 }
 
 const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+// How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
+// host that is not back by then is offline, as any other host.
+const HOST_RESTART_RETRY_MS = 10 * 60_000;
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #store: RemoteServerStore;
   readonly #connections: RemoteServerConnections;
@@ -137,6 +140,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #allowLocalDevelopmentInvites: boolean;
   readonly #appVersion: string | null;
   #duplicateOperationIds = new Map<string, string>();
+  /** When Signal first missed each host that restarts into an update. */
+  readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
   readonly #getLocalHostId: () => string | null;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
@@ -214,6 +219,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
       this.#events.clearReconnectBackoff(serverId);
+      this.#hostRestartAway.delete(serverId);
       this.#connections.markConnected(serverId);
       void this.#refresh.refreshAgentRoster(serverId).catch(() => undefined);
       this.#emitChanged();
@@ -245,9 +251,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
-      // A host that restarts into an update is away for a short time: keep the fast retry for it.
-      if (code === "host_unavailable" && !this.#connections.hostRestartFor(serverId))
-        this.#events.markHostOffline(serverId);
+      if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId)) this.#events.markHostOffline(serverId);
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
     });
@@ -613,7 +617,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         // one still running. Retrying a host whose channel had never actually dropped therefore
         // left it reading as reconnecting until it next went offline for real.
         if (this.#connections.stateFor(serverId) === "connecting" && this.#webrtcTransport.isConnected(serverId)) {
+          // The same session continues, so the host does not send its restart state again.
+          const hostRestart = this.#connections.hostRestartFor(serverId);
           this.#connections.markConnected(serverId);
+          this.#connections.setHostRestart(serverId, hostRestart);
           this.#emitChanged();
         }
         return requiredServerSummary(this.list(), serverId);
@@ -1123,6 +1130,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else this.#refresh.forward(serverId, event);
+  }
+
+  /** A host that restarts into an update is away for a short time: it keeps the fast retry for a limited time. */
+  #awaitsHostRestart(serverId: string): boolean {
+    if (!this.#connections.hostRestartFor(serverId)) return false;
+    const now = Date.now();
+    const since = this.#hostRestartAway.get(serverId) ?? now;
+    this.#hostRestartAway.set(serverId, since);
+    if (now - since < HOST_RESTART_RETRY_MS) return true;
+    this.#hostRestartAway.delete(serverId);
+    if (this.#connections.setHostRestart(serverId, null)) this.#emitChanged();
+    return false;
   }
 
   #applyHostRestart(serverId: string, { state, version }: HostRestartEvent): void {

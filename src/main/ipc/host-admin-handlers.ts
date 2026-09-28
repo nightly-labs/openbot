@@ -7,6 +7,7 @@ import {
   type HostUpdateStatus,
   LOCAL_SERVER_ID,
   type ServerSummary,
+  UPDATE_RESTART_MODES,
   type UpdateHostIdentityInput,
   type UpdateRestartMode,
 } from "@openbot/contracts/ipc";
@@ -115,6 +116,6 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 }
 
 function parseRestartMode(value: unknown): UpdateRestartMode {
-  if (!isOneOf(["when-idle", "now"] as const, value)) throw new Error("A restart mode is required.");
+  if (!isOneOf(UPDATE_RESTART_MODES, value)) throw new Error("A restart mode is required.");
   return value;
 }

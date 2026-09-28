@@ -73,7 +73,13 @@ export function watchHostUpdate(options: HostUpdateWatch, status?: HostUpdateSta
     stop(options.serverId);
     if (hadProgress && next.phase === "error")
       toast.error(currentText().t("server.update.status.downloadFailed", { name: options.name }));
-    else if (!next.restart && next.availableVersion && (next.phase === "available" || next.phase === "ready"))
+    // An admin who cannot start the update gets no offer.
+    else if (
+      next.remoteUpdates === "allowed" &&
+      !next.restart &&
+      next.availableVersion &&
+      (next.phase === "available" || next.phase === "ready")
+    )
       offerUpdate(options, next.availableVersion, next.currentVersion);
   };
   if (status) apply(status);
