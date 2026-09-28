@@ -65,7 +65,7 @@ happens to exist today.
 
 **Outside a feature:** `@openbot/ui` (the shared patched-Kobalte layer), the app shell and its
 wiring (`App.tsx`, `AppView.tsx`, `app-providers.tsx`, `app-bootstrap.tsx`, `WorkspaceShell.tsx`,
-`WorkspaceOverlays.tsx`, `lazy-views.ts`), the cross-domain modules every feature reads and none
+`WorkspaceOverlays.tsx`, `WorkspaceOverlayViews.tsx`, `lazy-views.ts`), the cross-domain modules every feature reads and none
 owns (`navigation.tsx`, `layout.tsx`, `turns.tsx`, `providers.tsx`,
 `simple-context.tsx`, `scope-lifetime.ts`), `preview/` — whose mocks are the second implementation
 of the IPC surface and belong beside `mock-openbot.ts` — and the base stylesheets in `styles/`

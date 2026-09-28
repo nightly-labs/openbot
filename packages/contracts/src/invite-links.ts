@@ -74,6 +74,35 @@ export function toOpenBotInviteUrl(value: string, options: InviteLinkOptions = {
   return createOpenBotInviteUrl(parseInviteUrl(value, options), options);
 }
 
+/**
+ * The browser client's entry for an invitation: `/app` with the same four fields as `/join`, on the
+ * same origin. The client removes them after it reads them and still asks before it joins.
+ */
+export function createWebAppInvitePath(value: string, options: InviteLinkOptions = {}): string {
+  const url = new URL("/app", OPENBOT_INVITE_ORIGIN);
+  writePayload(url, parseInviteUrl(value, options));
+  return `${url.pathname}${url.search}`;
+}
+
+/** The query fields of an invitation, which the browser client removes from `/app` after it reads them. */
+export const WEB_APP_INVITE_FIELDS: readonly string[] = INVITE_FIELDS;
+
+/**
+ * The canonical invitation link in a `/app` query, or null when the query names none or an invalid
+ * one. Only the four invitation fields are read, so another `/app` parameter does not make it invalid.
+ */
+export function inviteUrlFromWebAppSearch(search: string, options: InviteLinkOptions = {}): string | null {
+  const params = new URLSearchParams(search);
+  if (!INVITE_FIELDS.some((field) => params.has(field))) return null;
+  const url = new URL(OPENBOT_INVITE_PATH, OPENBOT_INVITE_ORIGIN);
+  for (const field of INVITE_FIELDS) for (const value of params.getAll(field)) url.searchParams.append(field, value);
+  try {
+    return createInviteUrl(parseInviteUrl(url.toString(), options), options);
+  } catch {
+    return null;
+  }
+}
+
 export function isCanonicalInviteUrl(value: string, options: InviteLinkOptions = {}): boolean {
   try {
     parseInviteUrl(value, options);

@@ -7,6 +7,8 @@ export interface PluginOpenButtonsProps {
   /** An `openbot://` link, built by a shared helper from contracts. */
   href: string;
   label: string;
+  /** The browser client's entry for the same item, built by a shared helper from contracts. */
+  browserHref?: string;
   /** What the download offer says after the app did not open. */
   downloadCopy: string;
 }
@@ -91,6 +93,13 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
         <Button href={props.href} variant="primary" size="lg" icon="open" onClick={armDownloadHint}>
           {props.label}
         </Button>
+        <Show when={props.browserHref}>
+          {(href) => (
+            <Button href={href()} variant="secondary" size="lg" icon="arrow-right">
+              Open in browser
+            </Button>
+          )}
+        </Show>
       </div>
 
       <Show when={showDownload()}>

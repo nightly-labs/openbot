@@ -1,5 +1,7 @@
 import { agentTemplateIdFromWebAppSearch, WEB_APP_AGENT_TEMPLATE_PARAM } from "@openbot/contracts/agent-template-links";
+import { inviteUrlFromWebAppSearch, WEB_APP_INVITE_FIELDS } from "@openbot/contracts/invite-links";
 import type { AppVariant, CentralAuthState, CentralAuthUser } from "@openbot/contracts/ipc";
+import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contracts/plugin-links";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -28,6 +30,30 @@ function takeAgentTemplateLink(): string | null {
   return id;
 }
 
+/**
+ * The invitation a `/app?api=…&server=…&fingerprint=…&invite=…` link names, as the `/join` page
+ * passes it on. The fields are removed after they are read, so the secret does not stay in the
+ * address bar or the history, and a reload does not open the dialog again.
+ */
+function takeInviteLink(): string | null {
+  const url = new URL(window.location.href);
+  if (!WEB_APP_INVITE_FIELDS.some((field) => url.searchParams.has(field))) return null;
+  const inviteUrl = inviteUrlFromWebAppSearch(url.search, { allowLocalDevelopmentApiUrl: import.meta.env.DEV });
+  for (const field of WEB_APP_INVITE_FIELDS) url.searchParams.delete(field);
+  window.history.replaceState(window.history.state, "", url);
+  return inviteUrl;
+}
+
+/** The plugin listing a `/app?plugin=<slug>` link names. The query is removed after it is read. */
+function takePluginLink(): string | null {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(WEB_APP_PLUGIN_PARAM)) return null;
+  const slug = pluginSlugFromWebAppSearch(url.search);
+  url.searchParams.delete(WEB_APP_PLUGIN_PARAM);
+  window.history.replaceState(window.history.state, "", url);
+  return slug;
+}
+
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   // This component renders the text provider, so it reads the text of the last provider that rendered.
   const text = currentText();
@@ -42,8 +68,10 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     login: { status: "signed_out" },
     resendAt: 0,
   });
-  // Kept here, not in the workspace, so the link waits through sign-in.
+  // Kept here, not in the workspace, so each link waits through sign-in.
   const [agentTemplateId, setAgentTemplateId] = createSignal(takeAgentTemplateLink());
+  const [inviteUrl, setInviteUrl] = createSignal(takeInviteLink());
+  const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
   let channel: BroadcastChannel | null = null;
   let disposed = false;
   let sessionGeneration = 0;
@@ -267,6 +295,10 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                 createRuntime={props.createRuntime}
                 agentTemplateId={agentTemplateId()}
                 onAgentTemplateClose={() => setAgentTemplateId(null)}
+                inviteUrl={inviteUrl()}
+                onInviteClose={() => setInviteUrl(null)}
+                pluginSlug={pluginSlug()}
+                onPluginSlugConsumed={() => setPluginSlug(null)}
               />
             )}
           </Show>

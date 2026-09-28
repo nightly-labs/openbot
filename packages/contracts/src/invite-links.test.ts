@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   createInviteUrl,
   createOpenBotInviteUrl,
+  createWebAppInvitePath,
+  inviteUrlFromWebAppSearch,
   inviteUseCount,
   isCanonicalInviteUrl,
   isNeverExpiringInvite,
@@ -39,6 +41,22 @@ describe("OpenBot invite links", () => {
   it("converts a canonical invitation to the desktop fallback scheme", () => {
     expect(toOpenBotInviteUrl(createInviteUrl(payload))).toBe(createOpenBotInviteUrl(payload));
     expect(parseInviteUrl(createOpenBotInviteUrl(payload))).toEqual(payload);
+  });
+
+  it("reads an invitation from the browser client's entry and refuses any other host", () => {
+    const inviteUrl = createInviteUrl(payload);
+    const path = createWebAppInvitePath(inviteUrl);
+    expect(path.startsWith("/app?")).toBe(true);
+    expect(inviteUrlFromWebAppSearch(new URL(path, "https://openbot.run").search)).toBe(inviteUrl);
+    expect(inviteUrlFromWebAppSearch(`${new URL(path, "https://openbot.run").search}&agent=x`)).toBe(inviteUrl);
+    expect(inviteUrlFromWebAppSearch("?agent=x")).toBeNull();
+
+    const foreign = new URL(path, "https://openbot.run");
+    foreign.searchParams.set("api", "https://example.com/");
+    expect(inviteUrlFromWebAppSearch(foreign.search)).toBeNull();
+    const repeated = new URL(path, "https://openbot.run");
+    repeated.searchParams.append("invite", "c".repeat(43));
+    expect(inviteUrlFromWebAppSearch(repeated.search)).toBeNull();
   });
 
   it("accepts approved root tunnel URLs only", () => {

@@ -8,7 +8,6 @@ import {
   type AppInfo,
   type BrowserTakeoverRequest,
   CHANNEL_CHATS_CAPABILITY,
-  MCP_SERVERS_CAPABILITY,
   type ServerConnectionState,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
@@ -21,25 +20,39 @@ import {
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import { Alert, AlertActions, AlertContent, AlertDescription, AlertTitle, Button, toast } from "@openbot/ui";
+import {
+  Alert,
+  AlertActions,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  hasVisibleToasts,
+  toast,
+} from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
-import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, Loading, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
-import { AgentTemplateInstall, GlobalSearch, ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { PlatformProvider } from "../../platform";
 import { WorkspaceFrame } from "../../WorkspaceFrame";
+import {
+  ChannelCreateOverlay,
+  GlobalSearchOverlay,
+  JoinServerOverlay,
+  MarketplaceOverlay,
+  ServerSettingsOverlay,
+  SharedAgentInstallOverlay,
+} from "../../WorkspaceOverlayViews";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
-import { ChannelCreateDialog } from "../channels/ChannelCreateDialog";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
 import { isOwnChannelAuthor } from "../channels/channel-timeline";
 import { ChannelsControllerProvider } from "../channels/channels-context";
@@ -47,9 +60,6 @@ import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import type { FilesPort } from "../files/files-port";
-import { canManageStorage, serverHasStorage } from "../files/storage-usage";
-import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabilities";
-import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
 import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import type { UsagePort } from "../usage/usage-port";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -100,6 +110,12 @@ type WebWorkspaceProps = {
   /** A shared agent that a `/app?agent=<id>` link named. The dialog installs it only on a press. */
   agentTemplateId?: string | null;
   onAgentTemplateClose?: () => void;
+  /** An invitation that a `/app` link named. The join dialog opens on it and still asks before it joins. */
+  inviteUrl?: string | null;
+  onInviteClose?: () => void;
+  /** A plugin listing that a `/app?plugin=<slug>` link named. The marketplace opens on it. */
+  pluginSlug?: string | null;
+  onPluginSlugConsumed?: () => void;
 };
 
 export function WebWorkspace(props: WebWorkspaceProps) {
@@ -378,32 +394,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest);
   const agentTemplateCalls = createWebAgentTemplateCalls(props.accountFetch, hostRequest);
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
-  /* As in the desktop app: an owner or admin installs on the host's agents, and a member browses. */
-  const manageSkills = createMemo(() => serverCanAdminister(server(), "skills-admin-v1"));
-  /* As in the desktop app: a managed agent whose composer is free to take another line. */
-  const composerFree = createMemo(
-    () =>
-      manageSkills() &&
-      status().phase === "ready" &&
-      !creating() &&
-      !controller.submitting() &&
-      !controller.selectionSending() &&
-      controller.voicePhase() === "idle" &&
-      !controller.editingDeliveryId(),
+  // A link opens its overlay once it has arrived, which can be after sign-in.
+  createEffect(
+    () => props.inviteUrl,
+    (inviteUrl) => {
+      if (inviteUrl) setJoinOpen(true);
+    },
   );
-  /** Adds a marketplace example to an agent's draft, then opens that agent's conversation. */
-  function appendMarketplaceExample(agentId: string, append: (target: { serverId: string; agentId: string }) => void) {
-    const target = server();
-    if (
-      !serverCanAdminister(target, "skills-admin-v1") ||
-      !workspace.state.agents.some((agent) => agent.id === agentId)
-    )
-      return;
-    append({ serverId: target.id, agentId });
-    setMarketplaceOpen(false);
-    setMobilePane("conversation");
-    if (agentId !== workspace.state.selectedId) void select(agentId);
-  }
+  createEffect(
+    () => props.pluginSlug,
+    (slug) => {
+      if (slug) setMarketplaceOpen(true);
+    },
+  );
   const saveFile = createWebFileSaver();
   const storageCalls: FilesPort = {
     agent: { listAgents: () => workspace.runtime.listAgents() },
@@ -833,143 +836,110 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           }
           after={
             <>
-              <Show when={joinOpen()}>
-                <JoinServerDialog
-                  inviteUrl=""
-                  accountEmail={props.accountEmail ?? ""}
-                  onClose={() => setJoinOpen(false)}
-                  onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
-                  onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
-                />
-              </Show>
-              <Show when={marketplaceOpen()}>
-                <Loading>
-                  <SkillsMarketplaceModal
-                    open={true}
-                    calls={marketplaceCalls}
-                    agents={manageSkills() ? workspace.state.agents : []}
-                    activeAgentId={manageSkills() ? (workspace.state.selectedId ?? "") : ""}
-                    hostServerId={remoteAdminServer(server(), "skills-admin-v1")?.id}
-                    agentServerId={remoteAdminServer(server(), "agent-install-v1")?.id}
-                    agentUpdateServerId={remoteAdminServer(server(), "agent-update-v1")?.id}
-                    onOpenChange={setMarketplaceOpen}
-                    onAgentInstalled={async (agent) => {
-                      setMarketplaceOpen(false);
-                      await openAddedAgent(agent);
-                    }}
-                    plugins={MARKETPLACE_PLUGINS}
-                    pluginServerId={
-                      manageSkills() && serverCanAdminister(server(), MCP_SERVERS_CAPABILITY) ? server()?.id : undefined
-                    }
-                    pluginHostName={
-                      manageSkills() ? remoteAdminServer(server(), MCP_SERVERS_CAPABILITY)?.name : undefined
-                    }
-                    onTrySkill={
-                      composerFree()
-                        ? (agentId, skill) =>
-                            appendMarketplaceExample(agentId, (target) => controller.appendSkillExample(target, skill))
-                        : undefined
-                    }
-                    onRunPluginPrompt={
-                      composerFree()
-                        ? (agentId, prompt) =>
-                            appendMarketplaceExample(agentId, (target) =>
-                              controller.appendPluginPrompt(target, prompt.text),
-                            )
-                        : undefined
-                    }
-                  />
-                </Loading>
-              </Show>
-              <Show when={props.agentTemplateId}>
-                {(templateId) => (
-                  <Loading>
-                    <AgentTemplateInstall
-                      templateId={templateId()}
-                      server={remoteAdminServer(server(), "agent-install-v1")}
-                      calls={agentTemplateCalls}
-                      onClose={() => props.onAgentTemplateClose?.()}
-                      onInstalled={openAddedAgent}
-                    />
-                  </Loading>
-                )}
-              </Show>
+              <JoinServerOverlay
+                open={joinOpen()}
+                inviteUrl={props.inviteUrl ?? ""}
+                accountEmail={props.accountEmail ?? ""}
+                onClose={() => {
+                  setJoinOpen(false);
+                  props.onInviteClose?.();
+                }}
+                onPreview={({ inviteUrl }) => workspace.runtime.previewInvite(inviteUrl)}
+                onJoin={({ inviteUrl }) => workspace.joinInvite(inviteUrl)}
+              />
+              <MarketplaceOverlay
+                open={marketplaceOpen()}
+                onOpenChange={setMarketplaceOpen}
+                calls={marketplaceCalls}
+                server={server()}
+                agents={workspace.state.agents}
+                activeAgentId={workspace.state.selectedId ?? ""}
+                composerAvailable={status().phase === "ready" && !creating()}
+                onOpenAgent={(agentId) => {
+                  setMobilePane("conversation");
+                  if (agentId !== workspace.state.selectedId) void select(agentId);
+                  else {
+                    // The agent is already loaded; only what covers its conversation closes.
+                    setCreating(false);
+                    setUsage(null);
+                    channels.close();
+                  }
+                }}
+                onAgentInstalled={async (agent) => {
+                  setMarketplaceOpen(false);
+                  await openAddedAgent(agent);
+                }}
+                pluginSlug={props.pluginSlug}
+                onPluginSlugConsumed={() => props.onPluginSlugConsumed?.()}
+              />
+              <SharedAgentInstallOverlay
+                templateId={props.agentTemplateId}
+                server={server()}
+                calls={agentTemplateCalls}
+                onClose={() => props.onAgentTemplateClose?.()}
+                onInstalled={openAddedAgent}
+              />
               <Show when={serverSettings.state.open && server()}>
                 {(target) => (
-                  <Loading>
-                    <ServerSettingsModal
-                      open={serverSettings.state.open}
-                      onOpenChange={serverSettings.setOpen}
-                      restoreFocusTarget={serverSettings.restoreTarget()}
-                      platform="darwin"
-                      remoteDesktopSupported={false}
-                      server={target()}
-                      hostStatus={null}
-                      members={serverSettings.state.members}
-                      invites={serverSettings.state.invites}
-                      loading={serverSettings.state.loading}
-                      loadError={serverSettings.state.error}
-                      onRetry={serverSettings.refresh}
-                      onSaveIdentity={serverSettings.saveIdentity}
-                      // Publication and screen recording belong to the computer that runs the server.
-                      onSetPublished={unavailable}
-                      onCreateInvite={serverSettings.createInvite}
-                      onUpdateMember={serverSettings.updateMember}
-                      onRemoveMember={serverSettings.removeMember}
-                      onRevokeInvite={serverSettings.revokeInvite}
-                      onOpenScreenRecordingSettings={unavailable}
-                      onRecheckScreenRecording={unavailable}
-                      mcpServers={
-                        serverCanAdminister(target(), MCP_SERVERS_CAPABILITY) ? serverSettings.state.mcp : undefined
-                      }
-                      mcpLoadError={serverSettings.state.mcpError}
-                      onMcpSectionShown={() => void serverSettings.refreshMcp()}
-                      onRetryMcpServers={() => void serverSettings.refreshMcp()}
-                      onSaveMcpServer={serverSettings.saveMcpServer}
-                      onRemoveMcpServer={serverSettings.removeMcpServer}
-                      onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
-                      onTestMcpServer={serverSettings.testMcpServer}
-                      storage={
-                        serverHasStorage(target())
-                          ? {
-                              hostName: target().name,
-                              canManage: canManageStorage(target()),
-                              calls: storageCalls,
-                              onOpenAgent: (agentId) => {
-                                serverSettings.setOpen(false);
-                                setMobilePane("conversation");
-                                void select(agentId);
-                              },
-                              onShowMessage: (agentId, messageId) => {
-                                serverSettings.setOpen(false);
-                                void openMessage(agentId, messageId);
-                              },
-                            }
-                          : undefined
-                      }
-                      providers={providerSettings()}
-                    />
-                  </Loading>
+                  <ServerSettingsOverlay
+                    open={serverSettings.state.open}
+                    onOpenChange={serverSettings.setOpen}
+                    restoreFocusTarget={serverSettings.restoreTarget()}
+                    platform="darwin"
+                    remoteDesktopSupported={false}
+                    server={target()}
+                    hostStatus={null}
+                    members={serverSettings.state.members}
+                    invites={serverSettings.state.invites}
+                    loading={serverSettings.state.loading}
+                    loadError={serverSettings.state.error}
+                    onRetry={serverSettings.refresh}
+                    onSaveIdentity={serverSettings.saveIdentity}
+                    // Publication and screen recording belong to the computer that runs the server.
+                    onSetPublished={unavailable}
+                    onCreateInvite={serverSettings.createInvite}
+                    onUpdateMember={serverSettings.updateMember}
+                    onRemoveMember={serverSettings.removeMember}
+                    onRevokeInvite={serverSettings.revokeInvite}
+                    onOpenScreenRecordingSettings={unavailable}
+                    onRecheckScreenRecording={unavailable}
+                    mcpServers={serverSettings.state.mcp}
+                    mcpLoadError={serverSettings.state.mcpError}
+                    onMcpSectionShown={() => void serverSettings.refreshMcp()}
+                    onRetryMcpServers={() => void serverSettings.refreshMcp()}
+                    onSaveMcpServer={serverSettings.saveMcpServer}
+                    onRemoveMcpServer={serverSettings.removeMcpServer}
+                    onSetMcpServerEnabled={serverSettings.setMcpServerEnabled}
+                    onTestMcpServer={serverSettings.testMcpServer}
+                    storage={{
+                      hostName: target().name,
+                      calls: storageCalls,
+                      onOpenAgent: (agentId) => {
+                        serverSettings.setOpen(false);
+                        setMobilePane("conversation");
+                        void select(agentId);
+                      },
+                      onShowMessage: (agentId, messageId) => {
+                        serverSettings.setOpen(false);
+                        void openMessage(agentId, messageId);
+                      },
+                    }}
+                    providers={providerSettings()}
+                  />
                 )}
               </Show>
-              <Show when={channels.state.editing === "create"}>
-                <ChannelCreateDialog />
-              </Show>
-              <Show when={searchOpen()}>
-                <Loading>
-                  <GlobalSearch
-                    open={true}
-                    agents={workspace.profiles()}
-                    onSearchMessages={searchAllMessages}
-                    onOpenChange={setSearchOpen}
-                    onSelectAgent={(id) => {
-                      setMobilePane("conversation");
-                      void select(id);
-                    }}
-                    onSelectMessage={(agentId, messageId) => void openMessage(agentId, messageId)}
-                  />
-                </Loading>
-              </Show>
+              <ChannelCreateOverlay />
+              <GlobalSearchOverlay
+                open={searchOpen()}
+                agents={workspace.profiles()}
+                onSearchMessages={searchAllMessages}
+                onOpenChange={setSearchOpen}
+                onSelectAgent={(id) => {
+                  setMobilePane("conversation");
+                  void select(id);
+                }}
+                onSelectMessage={(agentId, messageId) => void openMessage(agentId, messageId)}
+              />
             </>
           }
         >
@@ -1098,7 +1068,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
-              globalOverlayOpen={joinOpen() || serverSettings.state.open || searchOpen()}
+              skillsMarketplaceOpen={marketplaceOpen()}
+              mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
+              globalOverlayOpen={
+                joinOpen() || serverSettings.state.open || searchOpen() || marketplaceOpen() || hasVisibleToasts()
+              }
               settingsRequest={settingsRequest()}
               accountProfile={{
                 account: account(),

@@ -1,4 +1,4 @@
-import { createOpenBotPluginUrl, pluginLinkText } from "@openbot/contracts/plugin-links";
+import { createOpenBotPluginUrl, createWebAppPluginPath, pluginLinkText } from "@openbot/contracts/plugin-links";
 import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, onSettled, Show } from "solid-js";
@@ -123,6 +123,7 @@ export function PluginPage(props: PluginPageProps) {
               </div>
               <PluginOpenButtons
                 href={createOpenBotPluginUrl(props.plugin.slug)}
+                browserHref={createWebAppPluginPath(props.plugin.slug)}
                 label="Open in OpenBot"
                 downloadCopy={`${props.plugin.name} installs from inside OpenBot. Get the app, then open this plugin from its Plugins tab.`}
               />

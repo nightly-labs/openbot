@@ -78,9 +78,19 @@ mock. The separate web preview implements the browser runtime with that same moc
   host serves the related route; a member does not see them. Agent deletion uses
   the shared confirmation and is hidden for members; the host also enforces the role restriction.
 - The marketplace reads the public catalog on its own origin. An owner or admin installs skills,
-  plugin apps, and new agents on the connected host. Submissions, package choice, agent updates,
-  and the example-prompt and try-skill actions are desktop only. A plugin app that needs a browser
-  sign-in is installed on the host computer, as for a desktop remote admin.
+  plugin apps, and new agents on the connected host, and adds example prompts and skills to an
+  agent's draft. Submissions, package choice, and agent updates are desktop only. A plugin app
+  that needs a browser sign-in is installed on the host computer, as for a desktop remote admin.
+- Join, marketplace, shared agent, server settings, global search and channel creation use the
+  shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay or
+  toast suspends the browser view, as on desktop.
+- `/app` accepts three links: `?agent=<id>` from a shared agent page, the four invitation fields from
+  the `/join` page, and `?plugin=<slug>` from a plugin page. The client removes the fields after it
+  reads them, so the invitation secret does not stay in the address bar or history. A link opens the
+  preview, the join dialog or the listing; it never installs or joins without a press.
+- The application Settings dialog, permissions review, and hosted sites are desktop only. Hosted
+  sites publish a folder of this computer through a folder picker and local file reads in the main
+  process.
 - Uploads and downloads retain the shared client's 10 MB limit. Message attachment count uses the
   shared contract limit. Cancelling a transfer sends the existing file-cancel frame. If the host
   has already committed an attachment, cancellation removes that draft after the response.

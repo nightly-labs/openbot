@@ -1,5 +1,5 @@
 import { AppLogo } from "@openbot/brand";
-import { OPENBOT_INVITE_ORIGIN, toOpenBotInviteUrl } from "@openbot/contracts/invite-links";
+import { createWebAppInvitePath, OPENBOT_INVITE_ORIGIN, toOpenBotInviteUrl } from "@openbot/contracts/invite-links";
 import { createSignal, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { detectDownloadPlatform } from "../../lib/download-platforms";
@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 
 export function JoinPage() {
   const [openUrl, setOpenUrl] = createSignal("");
+  const [browserUrl, setBrowserUrl] = createSignal("");
   const [downloadUrl, setDownloadUrl] = createSignal<string>(OPENBOT_DOWNLOAD_LINKS.macos);
   const [mobile, setMobile] = createSignal(false);
   const [invalid, setInvalid] = createSignal(false);
@@ -23,6 +24,7 @@ export function JoinPage() {
       const pageUrl = new URL(window.location.href);
       const canonicalUrl = new URL(`${pageUrl.pathname}${pageUrl.search}`, OPENBOT_INVITE_ORIGIN);
       setOpenUrl(toOpenBotInviteUrl(canonicalUrl.toString()));
+      setBrowserUrl(createWebAppInvitePath(canonicalUrl.toString()));
     } catch {
       validInvite = false;
       setInvalid(true);
@@ -72,6 +74,13 @@ export function JoinPage() {
               {(href) => (
                 <Button href={href()} variant="primary" size="lg" icon="open">
                   Open OpenBot
+                </Button>
+              )}
+            </Show>
+            <Show when={browserUrl()}>
+              {(href) => (
+                <Button href={href()} variant="secondary" size="lg" icon="arrow-right">
+                  Open in browser
                 </Button>
               )}
             </Show>

@@ -1,10 +1,11 @@
 /**
- * The two addresses one plugin listing has: the page a person shares, and the link that opens that
- * listing in the app.
+ * The addresses one plugin listing has: the page a person shares, the link that opens that listing
+ * in the app, and the browser client's entry for it.
  *
  * ```
  * https://openbot.run/plugins/<slug>    the link a person shares and the app copies
  * openbot://plugins/<slug>              the link the page button opens
+ * /app?plugin=<slug>                    the page's link to the browser client, on the same origin
  * ```
  *
  * The host gives the kind and the path gives the argument, which is the rule `parseInviteUrl`
@@ -22,6 +23,7 @@
 export const OPENBOT_PLUGIN_ORIGIN = "https://openbot.run";
 export const OPENBOT_PLUGIN_PATH_PREFIX = "/plugins/";
 export const OPENBOT_PLUGIN_HOST = "plugins";
+export const WEB_APP_PLUGIN_PARAM = "plugin";
 
 /**
  * A slug cannot hold a dot, an upper-case letter or a slash. The dot is the load-bearing one: it is
@@ -37,6 +39,21 @@ export function isPluginSlug(value: string): boolean {
 export function createPluginShareUrl(slug: string): string {
   assertPluginSlug(slug);
   return `${OPENBOT_PLUGIN_ORIGIN}${OPENBOT_PLUGIN_PATH_PREFIX}${slug}`;
+}
+
+/**
+ * The browser client's entry for a listing, on the same origin. It opens the marketplace on that
+ * listing; `/app` removes the query after it reads it, so a reload does not open it again.
+ */
+export function createWebAppPluginPath(slug: string): string {
+  assertPluginSlug(slug);
+  return `/app?${WEB_APP_PLUGIN_PARAM}=${slug}`;
+}
+
+/** The slug in a `/app` query, or null when the query names none or an invalid one. */
+export function pluginSlugFromWebAppSearch(search: string): string | null {
+  const slug = new URLSearchParams(search).get(WEB_APP_PLUGIN_PARAM);
+  return slug !== null && isPluginSlug(slug) ? slug : null;
 }
 
 /** The link the page's button opens, which raises the app on this listing. */
