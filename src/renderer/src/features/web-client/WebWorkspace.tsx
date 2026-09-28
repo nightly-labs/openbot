@@ -18,16 +18,7 @@ import {
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
-import {
-  Alert,
-  AlertActions,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  buttonVariants,
-  toast,
-} from "@openbot/ui";
+import { Alert, AlertActions, AlertContent, AlertDescription, AlertTitle, Button, toast } from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
@@ -52,6 +43,7 @@ import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabilities";
 import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
 import { WebAgentSettings } from "./WebAgentSettings";
+import { WebConnectComputer } from "./WebConnectComputer";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
@@ -105,6 +97,8 @@ export function WebWorkspace(props: {
     },
   });
   const controller = createConversationController({ onTypingChange: () => {} }, false);
+  /** The host list was read and holds no computer to connect to. */
+  const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
     () => {
@@ -604,7 +598,16 @@ export function WebWorkspace(props: {
                 }}
               />
             </Show>
-            <Show when={!creating() && !channelOpen()}>
+            <Show when={!creating() && !channelOpen() && noHost()}>
+              <WebConnectComputer
+                accountEmail={props.accountEmail ?? ""}
+                loading={workspace.state.hostsLoading}
+                error={workspace.state.hostsError}
+                onJoin={() => setJoinOpen(true)}
+                onRefresh={() => void workspace.run(workspace.refreshHosts)}
+              />
+            </Show>
+            <Show when={!creating() && !channelOpen() && !noHost()}>
               <Conversation
                 runtime={runtime}
                 onOpenMarketplace={() => setMarketplaceOpen(true)}
@@ -618,51 +621,29 @@ export function WebWorkspace(props: {
                               ? workspace.state.status === "connecting"
                                 ? t("webClient.notice.connecting")
                                 : t("webClient.notice.disconnected")
-                              : workspace.state.hostsLoading
-                                ? t("webClient.notice.findingHosts")
-                                : workspace.state.hostsError
-                                  ? t("webClient.notice.hostsFailed")
-                                  : t("webClient.notice.connectComputer")}
+                              : t("webClient.notice.findingHosts")}
                           </AlertTitle>
-                          <AlertDescription>
-                            {workspace.state.host
-                              ? workspace.state.error
+                          <Show when={workspace.state.host}>
+                            <AlertDescription>
+                              {workspace.state.error
                                 ? sourceText(workspace.state.error)
-                                : t("webClient.notice.keepOpen")
-                              : workspace.state.hostsError
-                                ? sourceText(workspace.state.hostsError)
-                                : t("webClient.notice.install")}
-                          </AlertDescription>
-                          <AlertActions>
-                            <Show when={!workspace.state.host}>
-                              <a
-                                class={buttonVariants({ variant: "outline", size: "sm" })}
-                                href="/#download"
-                                target="_blank"
-                                rel="noreferrer"
+                                : t("webClient.notice.keepOpen")}
+                            </AlertDescription>
+                            <AlertActions>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={workspace.state.hostsLoading || workspace.state.status === "connecting"}
+                                onClick={() =>
+                                  void workspace.run(async () => {
+                                    if (workspace.state.host) await workspace.connect(workspace.state.host);
+                                  })
+                                }
                               >
-                                {t("webClient.notice.download")}
-                              </a>
-                              <Button variant="outline" size="sm" onClick={() => setJoinOpen(true)}>
-                                {t("webClient.notice.join")}
+                                {t("webClient.notice.reconnect")}
                               </Button>
-                            </Show>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={workspace.state.hostsLoading || workspace.state.status === "connecting"}
-                              onClick={() =>
-                                void workspace.run(async () => {
-                                  if (workspace.state.host) await workspace.connect(workspace.state.host);
-                                  else await workspace.refreshHosts();
-                                })
-                              }
-                            >
-                              {workspace.state.host
-                                ? t("webClient.notice.reconnect")
-                                : t("webClient.notice.refreshHosts")}
-                            </Button>
-                          </AlertActions>
+                            </AlertActions>
+                          </Show>
                         </AlertContent>
                       </Alert>
                     </Show>
