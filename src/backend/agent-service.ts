@@ -77,6 +77,7 @@ import type {
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
 import { CONTEXT_RESET_ITEM_TYPE, isContextResetMarker, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -1262,7 +1263,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
       (agent.threadId ? this.#store.database.readConversation(agentId, agent.threadId).activeTurnId : null);
     if (activeTurn || this.#mailbox.hasUnfinishedDelivery(agentId) || this.#threads.providerContextBusy(agent)) {
-      throw new Error(sourceText("error.agent.waitBeforeClearContext"));
+      throw new ContextResetBusyError(sourceText("error.agent.waitBeforeClearContext"));
     }
     const database = this.#store.database;
     const threadId = this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {

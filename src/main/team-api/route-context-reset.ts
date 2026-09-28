@@ -1,4 +1,8 @@
-import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
+import {
+  CONTEXT_RESET_CAPABILITY,
+  CONTEXT_RESET_ROUTES,
+  ContextResetBusyError,
+} from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -12,7 +16,7 @@ import { readJson, stringField } from "./request-helpers";
  */
 export async function routeContextReset(
   context: TeamApiRequestContext,
-  agents: Pick<TeamApiAgents, "clearAgentContext">,
+  agents: Pick<TeamApiAgents, "clearAgentContext" | "listAgents">,
   hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, request, json } = context;
@@ -21,12 +25,13 @@ export async function routeContextReset(
     throw new HttpError(400, sourceText("error.team.contextResetUnsupported"));
   // `readJson` has already run the body through the context-reset wire codec.
   const agentId = stringField(await readJson(request), "agentId");
-  if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
+  if (hiddenAgentIds.has(agentId) || !agents.listAgents().some((agent) => agent.id === agentId))
+    throw new HttpError(404, sourceText("error.team.agentNotFound"));
   try {
     agents.clearAgentContext(agentId);
   } catch (error) {
-    // A busy agent or an unknown id is a sentence for the member, not a host fault.
-    if (error instanceof Error) throw new HttpError(409, error.message);
+    // A busy agent is a sentence for the member. Any other error is a host fault.
+    if (error instanceof ContextResetBusyError) throw new HttpError(409, error.message);
     throw error;
   }
   return json(200, {});

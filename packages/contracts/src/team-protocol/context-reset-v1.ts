@@ -18,3 +18,6 @@ export const CONTEXT_RESET_ROUTES = {
 export const CONTEXT_RESET_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [CONTEXT_RESET_ROUTES.clear, adminRoute(fields({ agentId: identifier }), empty)],
 ]);
+
+/** The host refuses a new chat while the agent works. Its text is a sentence for the member. */
+export class ContextResetBusyError extends Error {}
