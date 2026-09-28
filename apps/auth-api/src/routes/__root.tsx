@@ -16,7 +16,10 @@ export const Route = createRootRoute({
   headers: () => OPENBOT_SECURITY_HEADERS,
   component: RootComponent,
   shellComponent: RootDocument,
-  errorComponent: () => <PageError onRetry={() => window.location.reload()} />,
+  errorComponent: (props) => {
+    console.error(props.error);
+    return <PageError onRetry={() => window.location.reload()} />;
+  },
   notFoundComponent: NotFoundPage,
 });
 

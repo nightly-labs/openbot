@@ -7,6 +7,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Added
 
+- Ask an agent to change the provider, model or reasoning effort of another agent, as it can
+  change a name. The agent gets an error that names the available models when a model is not
+  available. OpenBot records which agent made the change, and the previous and new model.
 - Find local model servers, such as Ollama and LM Studio, and known ACP agents on your computer.
   Settings shows them under "Found on this computer", where you can add or hide each one. First run
   shows the same list. The scan sends no key and does not start a program that it finds. You can
@@ -26,6 +29,9 @@ All notable changes to OpenBot will be documented here. The project follows
   three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
   small notice showed above an empty conversation. When the computers cannot load, an error message
   now shows at the bottom of the screen.
+- Show a centered screen with the same design when your computer is disconnected or connecting. It
+  gives the reason and a Reconnect button. Before, a small notice showed above the conversation.
+  Your draft stays when you reconnect.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
 - Ask before an import adds an agent whose name is already on the server, for example when you
@@ -34,6 +40,17 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- When Codex ignores an unknown setting in its configuration, show one warning that names each
+  setting. Before, a "Provider error" showed only "Codex is ignoring 1 unrecognized configuration
+  setting", with no setting name, and it came back after each reconnect. Codex continues to work.
+- Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
+  could save the same routine. An agent can no longer add a routine with the name of an existing
+  one; it changes that routine instead.
+- Start a new agent on the model that you saved in setup, also when that model is a ChatGPT model.
+  Before, the agent stayed on GPT-6 Luna. Agents from a template, the marketplace or an imported
+  file now also start on the provider and model that you saved in setup. Before, they always
+  started on ChatGPT. When you saved no model, a new agent starts on GPT-6 Luna, and on GPT-6 Luna
+  in the web app too. Existing agents keep their model.
 - Show the highlight of the selected server across the full row in the mobile server list. Before,
   the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
@@ -42,6 +59,8 @@ All notable changes to OpenBot will be documented here. The project follows
   Before, each visit logged a refused request.
 - Show the loading placeholder in a browser tab preview while the page loads. Before, the preview
   could show a failure icon until the next capture.
+- Reload the web app one time when an update removed the files that it needs. Before, the first
+  open after an update could show "This page could not load".
 - Import an agent when one of its files is already in the workspace, for example two files whose
   names differ only in case on macOS. The import keeps both files, saves the second one as
   `name (2).ext`, and shows a warning. A file that it cannot write is skipped with a warning. Before,

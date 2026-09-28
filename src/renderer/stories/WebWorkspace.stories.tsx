@@ -40,10 +40,21 @@ const failedHostsRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
+const otherTabRuntime: WebRuntimeFactory = (...args) => ({
+  ...createMockWebRuntime(...args),
+  connect: async () => {
+    throw new Error("This host is open in another tab. Close that connection before trying again.");
+  },
+});
+
 export const NoHost: Story = {
   args: { accountEmail: "you@example.com", createRuntime: noHostRuntime },
 };
 
 export const HostsFailed: Story = {
   args: { accountEmail: "you@example.com", createRuntime: failedHostsRuntime },
+};
+
+export const Disconnected: Story = {
+  args: { accountEmail: "you@example.com", createRuntime: otherTabRuntime },
 };

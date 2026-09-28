@@ -26,6 +26,7 @@ export const messages = defineMessages("agent", {
   "agent.error.adminOnly": "Agent settings can only be changed by a server administrator.",
   "agent.error.continueFailed": "The agent could not continue. Try again.",
   "agent.error.mcpNotStarted": "MCP server not started",
+  "agent.error.codexConfigIgnored": "Codex configuration warning",
   "agent.error.provider": "Provider error",
   // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "Red",

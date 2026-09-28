@@ -1,3 +1,4 @@
+import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelId,
@@ -74,7 +75,7 @@ export const DEFAULT_FIRST_AGENT_DRAFT: FirstAgentDraft = {
   avatarHue: null,
   suggestionId: null,
   provider: "codex",
-  model: "gpt-5.6-luna",
+  model: agentProviderDescriptor("codex").defaultModel,
 };
 
 export function createFirstAgentDraft(random: () => number = Math.random): FirstAgentDraft {

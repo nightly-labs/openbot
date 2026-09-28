@@ -10,7 +10,7 @@ import type {
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
 } from "@openbot/contracts/ipc";
-import { AgentRoster } from "./database/agent-roster";
+import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
@@ -143,8 +143,8 @@ export class OpenBotDatabase {
     return this.#roster.latestRosterAgents();
   }
 
-  replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {
-    this.#roster.replaceAgents(commandId, agents, eventType);
+  replaceAgents(commandId: string, agents: AgentSummary[], eventType: string, modelChange?: AgentModelChange): void {
+    this.#roster.replaceAgents(commandId, agents, eventType, modelChange);
   }
 
   hardDeleteAgent(commandId: string, agentId: string, threadId: string | null, remainingAgents: AgentSummary[]): void {

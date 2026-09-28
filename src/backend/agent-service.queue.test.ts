@@ -267,6 +267,21 @@ describe.sequential("AgentService: queue", () => {
       provider: "claude",
       model: "claude-opus-5-5",
     });
+    // A template, a marketplace agent or an import names no model, and starts on the same choice.
+    await expect(
+      service.createAgentProfile({
+        name: "Template Agent",
+        description: "",
+        avatarSeed: "setup:template",
+        avatarHue: null,
+      }),
+    ).resolves.toMatchObject({ provider: "claude", model: "claude-opus-5-5" });
+
+    // A Codex model saved in setup is a choice too, not the built-in Luna 6 the record starts on.
+    await service.setPreferredProvider("codex", "gpt-5.6-terra");
+    await expect(
+      service.createAgent({ ...CREATE_AGENT_INPUT, name: "Terra Agent", avatarSeed: "setup:terra" }),
+    ).resolves.toMatchObject({ provider: "codex", model: "gpt-5.6-terra" });
   });
 
   it("starts a new agent on the requested provider and model before the initial message", async () => {
@@ -1875,6 +1890,62 @@ describe.sequential("AgentService: queue", () => {
     expect(
       service.listAgents().filter((agent) => agent.name === "Unknown model" || agent.name === "Unsupported effort"),
     ).toEqual([]);
+  });
+
+  it("changes another agent's model with a record of the caller, and writes nothing for an unlisted model", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      hostedSites: null,
+    });
+    await service.initialize();
+    await store.getOrCreate("design", "Designer", "Design");
+    await service.sendMessage({ agentId: "chief", text: "Move the design teammate to Terra." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+
+    const rejected = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "design",
+      name: "Renamed",
+      model: "gpt-missing",
+    });
+    expect(rejected.error?.message).toContain('Model "gpt-missing" is not available. Available models: ');
+    expect(service.listAgents().find((agent) => agent.id === "design")).toMatchObject({
+      name: "Designer",
+      model: "gpt-6-luna",
+    });
+
+    const changed = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "design",
+      model: "gpt-5.6-terra",
+    });
+    expect(openBotToolPayload(changed.result)).toMatchObject({ provider: "codex", model: "gpt-5.6-terra" });
+    expect(service.listAgents().find((agent) => agent.id === "design")).toMatchObject({
+      provider: "codex",
+      model: "gpt-5.6-terra",
+      reasoningEffort: "low",
+    });
+    const audit = store.database.connection
+      .prepare("SELECT payload_json FROM orchestration_events WHERE event_type = 'agent.model-changed'")
+      .all();
+    expect(audit.map((row) => JSON.parse(String(row.payload_json)).modelChange)).toEqual([
+      {
+        initiatingAgentId: "chief",
+        targetAgentId: "design",
+        previous: { provider: "codex", model: "gpt-6-luna", reasoningEffort: "low" },
+        next: { provider: "codex", model: "gpt-5.6-terra", reasoningEffort: "low" },
+      },
+    ]);
   });
 
   it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {

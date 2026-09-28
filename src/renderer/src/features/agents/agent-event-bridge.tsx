@@ -296,6 +296,12 @@ export function AgentEventBridge() {
         const now = Date.now();
         if ((lastErrorToastAt.get(toastKey) ?? 0) + ERROR_TOAST_DEDUPE_MS < now) {
           lastErrorToastAt.set(toastKey, now);
+          // Codex ignored a setting and runs without it. The provider works, so this is a warning
+          // about the user's file, not a provider error.
+          if (event.code === "codex_config_ignored") {
+            toast.warning(currentText().t("agent.error.codexConfigIgnored"), { description: toastKey });
+            return;
+          }
           // An MCP server left out at hand-off is not the provider failing, and calling it a
           // provider error sends the user to the wrong settings page.
           const { t } = currentText();

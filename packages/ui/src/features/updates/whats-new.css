@@ -1,0 +1,274 @@
+/* The "What's new" dialog after an app update. One centred card: the logo and version on top, the
+ * notes in a scroll area, and the actions in a footer. The groups use the colours of the
+ * changelog page on openbot.run, so a reader sees the same notes in the same way. */
+
+.whats-new-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  animation: whats-new-fade-in var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.whats-new-dialog {
+  position: relative;
+  display: flex;
+  width: min(480px, 100%);
+  max-height: min(640px, calc(100dvh - 2 * var(--openbot-space-6)));
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border-radius: var(--openbot-radius-xl);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.whats-new-close {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+}
+
+.whats-new-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-8) var(--openbot-space-6) var(--openbot-space-4);
+  text-align: center;
+}
+
+.whats-new-logo {
+  --app-logo-background: var(--openbot-surface-light);
+  width: 56px;
+  height: 56px;
+  margin-block-end: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-logo);
+}
+
+.whats-new-title {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-bold);
+  line-height: var(--openbot-leading-2xl);
+}
+
+.whats-new-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--openbot-space-6);
+  overflow-y: auto;
+  padding: var(--openbot-space-2) var(--openbot-space-6) var(--openbot-space-6);
+  border-block-start: 1px solid transparent;
+}
+
+.whats-new-body.scroll-fade-top {
+  border-block-start-color: var(--openbot-border);
+}
+
+.whats-new-body.scroll-fade-bottom {
+  mask-image: linear-gradient(to bottom, var(--openbot-text-primary) calc(100% - 32px), transparent);
+}
+
+.whats-new-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding-block: var(--openbot-space-6);
+  text-align: center;
+}
+
+.whats-new-state .ui-button {
+  margin-block-start: var(--openbot-space-2);
+}
+
+.whats-new-state-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--openbot-warning-text);
+}
+
+.whats-new-notice {
+  padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-4);
+  border-radius: var(--openbot-radius-card);
+  background-image: linear-gradient(
+    180deg,
+    var(--openbot-warning-soft),
+    color-mix(in srgb, var(--openbot-warning) 3%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 26%, transparent);
+  --whats-new-tone: var(--openbot-warning-text);
+}
+
+.whats-new-notice-title {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0 0 var(--openbot-space-2);
+  color: var(--openbot-warning-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.whats-new-notice-title svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.whats-new-group {
+  --whats-new-tone: var(--openbot-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--openbot-space-3);
+}
+
+.whats-new-group[data-type="added"] {
+  --whats-new-tone: var(--openbot-logo-production);
+}
+
+.whats-new-group[data-type="changed"] {
+  --whats-new-tone: var(--openbot-accent-text);
+}
+
+.whats-new-group[data-type="fixed"] {
+  --whats-new-tone: var(--openbot-success-text);
+}
+
+.whats-new-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  color: var(--whats-new-tone);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.whats-new-group-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--whats-new-tone);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--whats-new-tone) 70%, transparent);
+}
+
+.whats-new-group-count {
+  padding: 0 var(--openbot-space-1-5);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--whats-new-tone) 12%, transparent);
+  font-family: var(--openbot-font-mono);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: 0;
+}
+
+.whats-new-list {
+  display: grid;
+  width: 100%;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A hanging mark in the group's colour, so a long item wraps under its own text. */
+.whats-new-item {
+  position: relative;
+  padding-inline-start: var(--openbot-space-6);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  text-wrap: pretty;
+}
+
+.whats-new-item-headline {
+  display: block;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.whats-new-item-detail {
+  display: block;
+  margin-block-start: var(--openbot-space-0-5);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.whats-new-item::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.75em;
+  inset-inline-start: var(--openbot-space-1);
+  width: 8px;
+  height: 1px;
+  background: color-mix(in srgb, var(--whats-new-tone) 70%, transparent);
+}
+
+.whats-new-toggle {
+  margin-inline-start: calc(-1 * var(--openbot-space-2));
+  color: var(--openbot-text-muted);
+}
+
+.whats-new-actions .ui-button svg,
+.whats-new-toggle svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.whats-new-toggle svg {
+  transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.whats-new-toggle[data-expanded] svg {
+  transform: rotate(180deg);
+}
+
+.whats-new-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border-block-start: 1px solid var(--openbot-border);
+}
+
+@keyframes whats-new-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .whats-new-backdrop {
+    padding: var(--openbot-space-3);
+  }
+
+  .whats-new-header {
+    padding-inline: var(--openbot-space-4);
+  }
+
+  .whats-new-body {
+    padding-inline: var(--openbot-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whats-new-backdrop,
+  .whats-new-toggle svg {
+    animation: none;
+    transition: none;
+  }
+}

@@ -305,6 +305,21 @@ describe.sequential("RoutineScheduler: routine mutations, runs and tools", () =>
     expect(openBotToolPayload(retried.result)).toMatchObject({ name: "Morning summary" });
     expect(service.listRoutines("chief").map((routine) => routine.name)).toEqual(["Morning summary"]);
 
+    // A second create with the same name does not add a routine (#998).
+    const existingId = service.listRoutines("chief")[0]?.id;
+    await expectOpenBotToolFailure(
+      client,
+      threadId,
+      "create_routine",
+      {
+        name: "  morning SUMMARY ",
+        instruction: "Summarize the inbox again.",
+        schedule: { kind: "daily", time: "09:00" },
+      },
+      `already exists with routineId ${existingId}`,
+    );
+    expect(service.listRoutines("chief")).toHaveLength(1);
+
     const routine = service.createRoutine({
       agentId: "chief",
       name: "Owned routine",
