@@ -52,7 +52,11 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
+import {
+  decodeTeamProtocolSupportV1,
+  type TeamProtocolSupportV1,
+  teamProtocolUpdateDirection,
+} from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -135,7 +139,8 @@ export interface WebWorkspaceRuntime {
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
-  search(agentId: string, query: string, cursor?: string): Promise<ConversationSearchPage>;
+  /** Searches one agent's conversation, or every conversation on the host when `agentId` is not set. */
+  search(agentId: string | undefined, query: string, cursor?: string): Promise<ConversationSearchPage>;
   /**
    * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
    * does. The browser then sends no end request, which the revoked cookie would only have refused.
@@ -147,6 +152,22 @@ export interface WebRuntimeEvents {
   connection(update: RemoteTeamConnectionUpdate): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+}
+
+/** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
+export class WebHostIncompatibleError extends Error {
+  readonly code: "client_update_required" | "host_update_required";
+  readonly hostAppVersion: string;
+  readonly hostProtocol: TeamProtocolSupportV1["protocol"];
+
+  constructor(support: TeamProtocolSupportV1) {
+    super(currentText().t("webClient.error.incompatible"));
+    this.code =
+      teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol) ??
+      "host_update_required";
+    this.hostAppVersion = support.appVersion;
+    this.hostProtocol = support.protocol;
+  }
 }
 
 interface WebConnectionDependencies {
@@ -499,7 +520,7 @@ export function createWebWorkspaceRuntime(
           throw new Error(currentText().t("webClient.error.connectionUnavailable"));
         const support = decodeTeamProtocolSupportV1(await request("GET", TEAM_API_ROUTES.compatibility));
         if (support.protocol.minimum > TEAM_PROTOCOL_V3 || support.protocol.maximum < TEAM_PROTOCOL_V3)
-          throw new Error(currentText().t("webClient.error.incompatible"));
+          throw new WebHostIncompatibleError(support);
         capabilities = support.capabilities;
         if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
         return capabilities;
@@ -664,7 +685,12 @@ export function createWebWorkspaceRuntime(
       await deleteAgent(teamApi, agentId);
     },
     async search(agentId, query, cursor) {
-      const params = new URLSearchParams({ botId: agentId, q: query, limit: "50", ...(cursor ? { cursor } : {}) });
+      const params = new URLSearchParams({
+        ...(agentId ? { botId: agentId } : {}),
+        q: query,
+        limit: "50",
+        ...(cursor ? { cursor } : {}),
+      });
       const value = await request("GET", `${TEAM_API_ROUTES.messages.search}?${params}`);
       if (
         !isDynamicRecord(value) ||

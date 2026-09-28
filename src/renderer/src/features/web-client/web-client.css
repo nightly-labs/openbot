@@ -19,6 +19,8 @@
 @media (max-width: 720px) {
   .web-app-frame {
     --web-mobile-navigation-height: 64px;
+    /* The workspace pane gives the rail a 56px column, also in the macOS geometry. */
+    --server-rail-width: 56px;
 
     grid-template-columns: minmax(0, 1fr);
     padding-bottom: calc(var(--web-mobile-navigation-height) + env(safe-area-inset-bottom, 0px));
@@ -34,7 +36,13 @@
     display: none;
   }
 
-  .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel {
+  /* One pane at a time leaves nothing to resize. */
+  .web-app-frame > .left-panel-resizer {
+    display: none;
+  }
+
+  .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel,
+  .web-app-frame[data-web-mobile-pane="conversation"] .remote-compatibility-screen {
     grid-column: 1;
     min-width: 0;
   }
@@ -43,7 +51,8 @@
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
-  .web-app-frame[data-web-mobile-pane="workspace"] .conversation-panel {
+  .web-app-frame[data-web-mobile-pane="workspace"] .conversation-panel,
+  .web-app-frame[data-web-mobile-pane="workspace"] .remote-compatibility-screen {
     display: none;
   }
 
