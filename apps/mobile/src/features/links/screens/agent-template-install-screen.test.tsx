@@ -1,7 +1,7 @@
 import type { AddedAgent, AgentTemplateDetail, InstallAgentTemplateInput } from "@openbot/contracts/ipc";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { act, type PropsWithChildren } from "react";
+import { act, type PropsWithChildren, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
@@ -101,7 +101,12 @@ vi.mock("heroui-native", () => ({
   ),
 }));
 vi.mock("react-native", () => ({
-  View: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  View: ({
+    children,
+    accessibilityRole,
+    accessibilityLabel,
+  }: PropsWithChildren<{ accessibilityRole?: string; accessibilityLabel?: string }>) =>
+    accessibilityRole === "progressbar" ? <progress aria-label={accessibilityLabel} /> : <div>{children}</div>,
   Pressable: ({
     children,
     onPress,
@@ -139,9 +144,18 @@ vi.mock("react-native", () => ({
       </button>
     ),
 }));
-vi.mock("heroui-native/hooks", () => ({ useThemeColor: () => "white" }));
+vi.mock("heroui-native/hooks", () => ({
+  useThemeColor: (key: string | string[]) => (Array.isArray(key) ? key.map(() => "white") : "white"),
+}));
 vi.mock("uniwind", () => ({ useCSSVariable: () => "gray" }));
 vi.mock("lucide-react-native", () => ({ Check: () => null, ChevronDown: () => null, ChevronRight: () => null }));
+vi.mock("@/features/chat/components/thinking-text-gradient", () => ({
+  ThinkingTextGradient: ({ children }: PropsWithChildren) => <>{children}</>,
+}));
+vi.mock("@/shared/components/blur-reveal", () => ({
+  BlurReveal: <T,>({ value, children }: { value: T | null; children: (value: T) => ReactNode }) =>
+    value === null ? null : children(value),
+}));
 vi.mock("@/features/agents/components/bloub-avatar", () => ({ BloubAvatarPreview: () => null }));
 
 const templateId = "AbCdEfGhIjKlMnOpQrSt_-";
@@ -222,7 +236,7 @@ afterEach(async () => {
 it("previews the template and installs it only on an eligible server the user chose", async () => {
   const id = receive(`https://openbot.run/agents/${templateId}`);
   await render();
-  expect(screen.getByRole("progressbar").textContent).toBe("Loading agent…");
+  expect(screen.getByRole("progressbar", { name: "Loading agent…" })).toBeTruthy();
   await screen.findByRole("heading", { name: "dr eggbot" });
   expect(state.fetch).toHaveBeenCalledWith(
     `https://api.openbot.run/v1/agent-templates/${templateId}`,

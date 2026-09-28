@@ -6,15 +6,17 @@ import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Check, ChevronDown, ChevronRight } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { ThinkingTextGradient } from "@/features/chat/components/thinking-text-gradient";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
+import { BlurReveal } from "@/shared/components/blur-reveal";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { isIOS } from "@/shared/lib/platform";
@@ -141,9 +143,7 @@ function AgentTemplateInstall({ request }: { request?: string }) {
           title={t("mobile.link.unavailable.title")}
           description={t("mobile.link.unavailable.description")}
         />
-      ) : template.isPending ? (
-        <Typography.Paragraph accessibilityRole="progressbar">{t("mobile.link.template.loading")}</Typography.Paragraph>
-      ) : template.error instanceof AgentTemplateNotFoundError ? (
+      ) : template.isPending ? null : template.error instanceof AgentTemplateNotFoundError ? (
         <TemplateMessage
           title={t("mobile.link.template.notFound.title")}
           description={t("mobile.link.template.notFound.description")}
@@ -158,24 +158,62 @@ function AgentTemplateInstall({ request }: { request?: string }) {
             <Button.Label>{t("common.retry")}</Button.Label>
           </Button>
         </View>
-      ) : detail ? (
-        <>
-          <TemplatePreview detail={detail} apiUrl={apiUrl} />
-          <ServerChoices
-            servers={managed}
-            eligibleIds={new Set(eligible.map((server) => server.id))}
-            selectedId={serverId}
-            disabled={installing || finished}
-            onSelect={setChosenServerId}
-          />
-        </>
       ) : null}
+      {detail ? (
+        <View className="gap-6">
+          <TemplatePreview detail={detail} apiUrl={apiUrl} />
+          <Cascade step={4}>
+            <ServerChoices
+              servers={managed}
+              eligibleIds={new Set(eligible.map((server) => server.id))}
+              selectedId={serverId}
+              disabled={installing || finished}
+              onSelect={setChosenServerId}
+            />
+          </Cascade>
+        </View>
+      ) : null}
+      {/* Over the content, so its exit does not move the preview that comes in under it. */}
+      <View pointerEvents="none" className="absolute inset-x-0 top-0">
+        <BlurReveal value={templateId !== null && template.isPending ? t("mobile.link.template.loading") : null}>
+          {(label) => <TemplateLoading label={label} />}
+        </BlurReveal>
+      </View>
       {error ? (
         <Typography.Paragraph accessibilityRole="alert" align="center" className="text-danger-text">
           {error}
         </Typography.Paragraph>
       ) : null}
     </SheetScrollView>
+  );
+}
+
+const CASCADE_START_MS = 140;
+const CASCADE_STEP_MS = 70;
+
+/**
+ * One part of the preview. The parts come into focus from a blur one after another, from the top
+ * down, after the loading label has gone.
+ */
+function Cascade({ step, children }: PropsWithChildren<{ step: number }>) {
+  return (
+    <BlurReveal value={step} interactive enterDuration={360} enterDelay={CASCADE_START_MS + step * CASCADE_STEP_MS}>
+      {() => children}
+    </BlurReveal>
+  );
+}
+
+/** The label shines as the agent's thinking text does, while the account service answers. */
+function TemplateLoading({ label }: { label: string }) {
+  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={label} className="items-center pt-12">
+      <ThinkingTextGradient text={label} foreground={foreground} muted={muted} enabled fill={false}>
+        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+          {label}
+        </Typography.Paragraph>
+      </ThinkingTextGradient>
+    </View>
   );
 }
 
@@ -193,70 +231,78 @@ function TemplatePreview({ detail, apiUrl }: { detail: AgentTemplateDetail; apiU
   // The account service sends the avatar as a path on its own origin.
   const avatarUrl = detail.avatarUrl && apiUrl ? new URL(detail.avatarUrl, apiUrl).toString() : null;
   return (
-    <View className="gap-6">
-      <View className="items-center gap-1">
-        <View className="mb-2">
-          <BloubAvatarPreview seed={detail.avatarSeed} hue={detail.avatarHue} imageUrl={avatarUrl} size={72} />
-        </View>
-        <Typography.Heading type="h3" align="center">
-          {detail.name}
-        </Typography.Heading>
-        <Typography.Paragraph type="body-sm" align="center" className="text-grouped-secondary">
-          {t("mobile.link.template.creator", { name: detail.creatorName })}
-        </Typography.Paragraph>
-      </View>
-      <SettingsSection title={t("mobile.link.template.section.instructions")}>
-        <View className="gap-1 px-4 py-3">
-          {detail.title ? <Typography.Paragraph>{detail.title}</Typography.Paragraph> : null}
-          <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
-            {detail.description}
+    <>
+      <Cascade step={0}>
+        <View className="items-center gap-1">
+          <View className="mb-2">
+            <BloubAvatarPreview seed={detail.avatarSeed} hue={detail.avatarHue} imageUrl={avatarUrl} size={72} />
+          </View>
+          <Typography.Heading type="h3" align="center">
+            {detail.name}
+          </Typography.Heading>
+          <Typography.Paragraph type="body-sm" align="center" className="text-grouped-secondary">
+            {t("mobile.link.template.creator", { name: detail.creatorName })}
           </Typography.Paragraph>
         </View>
-      </SettingsSection>
-      <SettingsSection title={t("mobile.link.template.section.skills")}>
-        {detail.skills.length > 0 ? (
-          detail.skills.map((skill) =>
-            skill.kind === "embedded" ? (
-              <EmbeddedSkill key={skill.slug} name={skill.name} markdown={skill.markdown} />
-            ) : (
-              <SettingsRow
-                key={skill.slug}
-                supportingText={t("mobile.link.template.skill.marketplace", { version: skill.version })}
-              >
-                <Typography.Paragraph>{skill.name}</Typography.Paragraph>
-              </SettingsRow>
-            ),
-          )
-        ) : (
-          <SettingsRow>
-            <Typography.Paragraph className="text-grouped-secondary">
-              {t("mobile.link.template.section.noSkills")}
+      </Cascade>
+      <Cascade step={1}>
+        <SettingsSection title={t("mobile.link.template.section.instructions")}>
+          <View className="gap-1 px-4 py-3">
+            {detail.title ? <Typography.Paragraph>{detail.title}</Typography.Paragraph> : null}
+            <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
+              {detail.description}
             </Typography.Paragraph>
-          </SettingsRow>
-        )}
-      </SettingsSection>
-      <SettingsSection title={t("mobile.link.template.section.routines")}>
-        {detail.routines.length > 0 ? (
-          detail.routines.map((routine) => (
-            <View key={routine.name} className="gap-1 px-4 py-3">
-              <Typography.Paragraph>{routine.name}</Typography.Paragraph>
-              <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
-                {routineScheduleText(routine.schedule, routine.active, t)}
+          </View>
+        </SettingsSection>
+      </Cascade>
+      <Cascade step={2}>
+        <SettingsSection title={t("mobile.link.template.section.skills")}>
+          {detail.skills.length > 0 ? (
+            detail.skills.map((skill) =>
+              skill.kind === "embedded" ? (
+                <EmbeddedSkill key={skill.slug} name={skill.name} markdown={skill.markdown} />
+              ) : (
+                <SettingsRow
+                  key={skill.slug}
+                  supportingText={t("mobile.link.template.skill.marketplace", { version: skill.version })}
+                >
+                  <Typography.Paragraph>{skill.name}</Typography.Paragraph>
+                </SettingsRow>
+              ),
+            )
+          ) : (
+            <SettingsRow>
+              <Typography.Paragraph className="text-grouped-secondary">
+                {t("mobile.link.template.section.noSkills")}
               </Typography.Paragraph>
-              <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
-                {routine.instruction}
+            </SettingsRow>
+          )}
+        </SettingsSection>
+      </Cascade>
+      <Cascade step={3}>
+        <SettingsSection title={t("mobile.link.template.section.routines")}>
+          {detail.routines.length > 0 ? (
+            detail.routines.map((routine) => (
+              <View key={routine.name} className="gap-1 px-4 py-3">
+                <Typography.Paragraph>{routine.name}</Typography.Paragraph>
+                <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
+                  {routineScheduleText(routine.schedule, routine.active, t)}
+                </Typography.Paragraph>
+                <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
+                  {routine.instruction}
+                </Typography.Paragraph>
+              </View>
+            ))
+          ) : (
+            <SettingsRow>
+              <Typography.Paragraph className="text-grouped-secondary">
+                {t("mobile.link.template.section.noRoutines")}
               </Typography.Paragraph>
-            </View>
-          ))
-        ) : (
-          <SettingsRow>
-            <Typography.Paragraph className="text-grouped-secondary">
-              {t("mobile.link.template.section.noRoutines")}
-            </Typography.Paragraph>
-          </SettingsRow>
-        )}
-      </SettingsSection>
-    </View>
+            </SettingsRow>
+          )}
+        </SettingsSection>
+      </Cascade>
+    </>
   );
 }
 
