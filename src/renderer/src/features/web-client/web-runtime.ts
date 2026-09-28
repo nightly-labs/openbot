@@ -16,11 +16,15 @@ import type {
   BrowserOpenInput,
   BrowserPreview,
   BrowserTab,
+  CancelQueuedMessageInput,
   ConversationPage,
   ConversationSearchPage,
   CreateAgentInput,
   DuplicateAgentResult,
+  EditQueuedMessageInput,
   InvitePreview,
+  QueueSnapshot,
+  ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserSecretInput,
   RespondToBrowserTakeoverInput,
@@ -28,10 +32,12 @@ import type {
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
+  SteerQueuedMessageInput,
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
   UpdateAgentInput,
+  UpdateQueuedMessageInput,
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
@@ -41,6 +47,7 @@ import {
   isConversationMessage,
   isConversationSnapshot,
   isQueuedMessageReceipt,
+  isQueueSnapshot,
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
 } from "@openbot/contracts/ipc";
@@ -73,14 +80,18 @@ import {
   type RemoteTeamConnectionUpdate,
 } from "@openbot/team-client/remote-peer";
 import {
+  cancelQueuedMessage,
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  reorderQueue,
   respondToBrowserSecret,
   respondToBrowserTakeover,
+  steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
   teamChannelsApi,
+  updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
@@ -124,6 +135,12 @@ export interface WebWorkspaceRuntime {
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
   stop(agentId: string, turnId: string): Promise<void>;
+  queue(agentId: string): Promise<QueueSnapshot>;
+  editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
+  cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
+  steerQueued(input: SteerQueuedMessageInput): Promise<void>;
+  updateQueued(input: UpdateQueuedMessageInput): Promise<void>;
+  reorderQueue(input: ReorderQueueInput): Promise<void>;
   approve(input: RespondToApprovalInput): Promise<void>;
   answer(input: RespondToPromptInput): Promise<void>;
   upload(file: File): Promise<AttachmentSummary>;
@@ -596,6 +613,13 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts(attachmentDraftIds);
     },
     stop: (id, turnId) => interruptAgentTurn(teamApi, id, turnId),
+    queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
+    editQueue: ({ agentId, ...edit }) =>
+      teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
+    cancelQueued: (input) => cancelQueuedMessage(teamApi, input),
+    steerQueued: (input) => steerQueuedMessage(teamApi, input),
+    updateQueued: (input) => updateQueuedMessage(teamApi, input),
+    reorderQueue: (input) => reorderQueue(teamApi, input),
     async approve(input) {
       await request("POST", TEAM_API_ROUTES.respond.approval, { ...input });
     },
@@ -758,6 +782,12 @@ function toTeamInvite(invite: RemoteTeamInvite): TeamInviteSummary {
     permanent: invite.permanent,
     useCount: invite.useCount,
   };
+}
+
+function queueSnapshot(agentId: string, value: unknown): QueueSnapshot {
+  if (!isQueueSnapshot(value) || value.agentId !== agentId)
+    throw new Error(currentText().t("app.errorStatus.queueLoad"));
+  return value;
 }
 
 function decodeWebBrowserTab(tab: unknown): BrowserTab {

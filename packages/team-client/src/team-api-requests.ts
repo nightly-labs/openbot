@@ -7,6 +7,7 @@
 import {
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
+  type CancelQueuedMessageInput,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelMemory,
@@ -18,8 +19,11 @@ import {
   decodeChannelSummaries,
   isAttachmentSummary,
   type OpenBotDesktopApi,
+  type ReorderQueueInput,
   type RespondToBrowserSecretInput,
   type RespondToBrowserTakeoverInput,
+  type SteerQueuedMessageInput,
+  type UpdateQueuedMessageInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -54,6 +58,31 @@ export function discardAttachmentDraft(request: TeamApiRequest, attachmentId: st
 
 export function interruptAgentTurn(request: TeamApiRequest, agentId: string, turnId: string): Promise<void> {
   return request("POST", TEAM_API_ROUTES.agent.interrupt(agentId), ignoreResponse, { turnId });
+}
+
+export function cancelQueuedMessage(
+  request: TeamApiRequest,
+  { agentId, deliveryId }: CancelQueuedMessageInput,
+): Promise<void> {
+  return request("POST", TEAM_API_ROUTES.agent.queueCancel(agentId), ignoreResponse, { deliveryId });
+}
+
+export function steerQueuedMessage(
+  request: TeamApiRequest,
+  { agentId, deliveryId, expectedTurnId }: SteerQueuedMessageInput,
+): Promise<void> {
+  return request("POST", TEAM_API_ROUTES.agent.queueSteer(agentId), ignoreResponse, { deliveryId, expectedTurnId });
+}
+
+export function updateQueuedMessage(
+  request: TeamApiRequest,
+  { agentId, ...update }: UpdateQueuedMessageInput,
+): Promise<void> {
+  return request("POST", TEAM_API_ROUTES.agent.queueUpdate(agentId), ignoreResponse, update);
+}
+
+export function reorderQueue(request: TeamApiRequest, { agentId, deliveryIds }: ReorderQueueInput): Promise<void> {
+  return request("POST", TEAM_API_ROUTES.agent.queueReorder(agentId), ignoreResponse, { deliveryIds });
 }
 
 export function deleteAgent(request: TeamApiRequest, agentId: string): Promise<void> {

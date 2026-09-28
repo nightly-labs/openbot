@@ -68,6 +68,12 @@ function runtimeFixture(
     conversation: async () => EMPTY_PAGE,
     send: async () => {},
     stop: async () => {},
+    queue: async (agentId) => ({ agentId, deliveries: [] }),
+    editQueue: async ({ agentId }) => ({ agentId, deliveries: [] }),
+    cancelQueued: async () => {},
+    steerQueued: async () => {},
+    updateQueued: async () => {},
+    reorderQueue: async () => {},
     approve: async () => {},
     answer: async () => {},
     upload: async (): Promise<AttachmentSummary> => {

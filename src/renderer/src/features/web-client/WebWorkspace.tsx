@@ -44,6 +44,7 @@ import { isOwnChannelAuthor } from "../channels/channel-timeline";
 import { ChannelsControllerProvider } from "../channels/channels-context";
 import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
+import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import type { FilesPort } from "../files/files-port";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
@@ -140,13 +141,21 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       );
     },
   });
-  const controller = createConversationController({ onTypingChange: () => {} }, false);
+  const controller = createConversationController({ onTypingChange: () => {} });
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   const hostOffline = () => !noHost() && workspace.state.status !== "online";
+  let resetRevocation = workspace.state.revocationRevision;
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
-    () => {
+    ({ host, revocation }) => {
+      const revoked = revocation !== resetRevocation;
+      resetRevocation = revocation;
+      // A queue edit restored after a reload holds its message on the host. Keep it while that host
+      // connects, so Save or Cancel can release the hold.
+      const editServerId = untrack(controller.editingServerId);
+      if (!revoked && editServerId && (host === undefined || host === editServerId)) return;
+      clearStoredQueueEdit();
       controller.setDrafts({});
       controller.setComposerErrors({});
       controller.setConversationErrors({});
@@ -458,7 +467,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         workspace.state.status === "online" ? (conversation.page?.activeTurnId ?? null) : null,
       ]),
     ),
-    queues: {},
+    queues: workspace.state.queues,
     unreadReplies: {},
     recentReplies: {},
     failedTurns: {},
@@ -1041,7 +1050,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               globalOverlayOpen={joinOpen() || serverSettings.state.open || searchOpen()}
               settingsRequest={settingsRequest()}
               messageFocusRequest={messageFocusRequest()}
-              queue={undefined}
+              queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}
               browserRuntime={workspace.runtime.browser}
               browserTabs={workspace.state.browserTabs}
               activeBrowserTabId={workspace.state.activeBrowserTabId}
@@ -1110,10 +1119,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               agentAutoApproveLocked={remoteAgentAdmin.settings()?.autoApproveLocked ?? false}
               onSetAgentAutoApprove={setAgentAutoApprove()}
               onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
-              onCancelQueuedMessage={() => {}}
-              onSteerQueuedMessage={() => {}}
-              onUpdateQueuedMessage={unavailable}
-              onReorderQueue={() => {}}
+              onCancelQueuedMessage={workspace.cancelQueued}
+              onSteerQueuedMessage={workspace.steerQueued}
+              onUpdateQueuedMessage={async (deliveryId, text, keepAttachmentIds, attachmentDraftIds, target) => {
+                const agentId = target?.agentId ?? workspace.state.selectedId;
+                return agentId
+                  ? workspace.updateQueued(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds)
+                  : false;
+              }}
+              onReorderQueue={workspace.reorderQueue}
               onActivateBrowserTab={workspace.activateBrowserTab}
               onCloseBrowserTab={(tabId) => workspace.runtime.closeBrowserTab(tabId)}
               onOpenRemoteDesktop={unavailable}

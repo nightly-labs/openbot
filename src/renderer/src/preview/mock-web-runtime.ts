@@ -59,6 +59,12 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
       await agent.sendMessage({ agentId, text, attachmentDraftIds });
     },
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
+    queue: (agentId) => agent.listQueue(agentId),
+    editQueue: (input) => agent.editQueuedMessage(input),
+    cancelQueued: (input) => agent.cancelQueuedMessage(input),
+    steerQueued: (input) => agent.steerQueuedMessage(input),
+    updateQueued: (input) => agent.updateQueuedMessage(input),
+    reorderQueue: (input) => agent.reorderQueue(input),
     approve: (input) => agent.respondToApproval(input),
     answer: (input) => agent.respondToPrompt(input),
     upload: async () => {

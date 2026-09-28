@@ -10,6 +10,7 @@ import type {
   BrowserTab,
   BrowserTakeoverRequest,
   ConversationPage,
+  QueueSnapshot,
   RespondToApprovalInput,
   RespondToPromptInput,
   SidebarLayoutAction,
@@ -48,6 +49,8 @@ interface WebWorkspaceState {
   agentsLoaded: boolean;
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
+  /** The queues read from the host, by agent. The selected agent's queue is read on selection. */
+  queues: Record<string, QueueSnapshot>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
   takeovers: BrowserTakeoverRequest[];
@@ -106,6 +109,7 @@ export function createWebWorkspace(
     agentsLoaded: false,
     selectedId: null,
     conversations: {},
+    queues: {},
     approvals: [],
     prompts: [],
     takeovers: [],
@@ -139,6 +143,8 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  /** The newest queue read by agent. An older read that answers later must not replace it. */
+  const queueReads = new Map<string, number>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -171,6 +177,7 @@ export function createWebWorkspace(
             draft.agents = [];
             draft.agentsLoaded = false;
             draft.conversations = {};
+            draft.queues = {};
             draft.selectedId = null;
             draft.approvals = [];
             draft.prompts = [];
@@ -281,6 +288,18 @@ export function createWebWorkspace(
             draft.browserControlState = event.state;
           });
         if (event.type === "agents-changed") reconcileAgents(event.agents);
+        if (event.type === "queue-changed") {
+          const { snapshot } = event;
+          queueReads.set(snapshot.agentId, (queueReads.get(snapshot.agentId) ?? 0) + 1);
+          setState((draft) => {
+            draft.queues[snapshot.agentId] = snapshot;
+          });
+        }
+        if (
+          event.type === "queue-invalidated" &&
+          (event.agentId === selectedId || state.queues[event.agentId] !== undefined)
+        )
+          void loadQueue(event.agentId);
         if (event.type === "sidebar-layout-changed")
           setState((draft) => {
             if (event.layout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = event.layout;
@@ -358,7 +377,10 @@ export function createWebWorkspace(
       draft.agentsLoaded = true;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
-      for (const id of removed) delete draft.conversations[id];
+      for (const id of removed) {
+        delete draft.conversations[id];
+        delete draft.queues[id];
+      }
       if (nextSelected === null) draft.selectedId = null;
       // The layout also orders channels, so only the agents that left may be dropped from it.
       const gone = new Set(removed);
@@ -397,6 +419,7 @@ export function createWebWorkspace(
             draft.agents = [];
             draft.agentsLoaded = false;
             draft.conversations = {};
+            draft.queues = {};
             draft.approvals = [];
             draft.prompts = [];
             draft.takeovers = [];
@@ -486,6 +509,7 @@ export function createWebWorkspace(
       draft.selectedId = null;
       if (!sameHost) {
         draft.conversations = {};
+        draft.queues = {};
         draft.hiddenIds = [];
       } else {
         for (const item of Object.values(draft.conversations)) {
@@ -603,6 +627,29 @@ export function createWebWorkspace(
       item.loading = false;
     });
   }
+  async function loadQueue(id: string) {
+    const current = generation;
+    const read = (queueReads.get(id) ?? 0) + 1;
+    queueReads.set(id, read);
+    try {
+      const queue = await runtime.queue(id);
+      if (disposed || current !== generation || queueReads.get(id) !== read) return;
+      setState((draft) => {
+        draft.queues[id] = queue;
+      });
+    } catch (error) {
+      if (current === generation) report(error);
+    }
+  }
+  /** Sends one queue change for the selected agent. The host then sends the new queue as an event. */
+  function changeQueue(change: (agentId: string) => Promise<void>) {
+    const id = selectedId;
+    const current = generation;
+    if (!id || state.status !== "online") return;
+    void change(id).catch((error) => {
+      if (current === generation) report(error);
+    });
+  }
   async function select(id: string) {
     const current = generation;
     selectedId = id;
@@ -617,6 +664,7 @@ export function createWebWorkspace(
         uncertain: false,
       };
     });
+    void loadQueue(id);
     try {
       await load(id);
     } catch (error) {
@@ -642,6 +690,7 @@ export function createWebWorkspace(
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
       if (!selectedId && agents[0]) await select(agents[0].id);
+      else if (selectedId) void loadQueue(selectedId);
       await refresh();
     } catch (error) {
       if (current === generation) report(error);
@@ -770,6 +819,28 @@ export function createWebWorkspace(
     select,
     refresh,
     send,
+    cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
+    steerQueued(deliveryId: string) {
+      const expectedTurnId = conversation()?.page?.activeTurnId;
+      if (expectedTurnId) changeQueue((agentId) => runtime.steerQueued({ agentId, deliveryId, expectedTurnId }));
+    },
+    reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
+    async updateQueued(
+      agentId: string,
+      deliveryId: string,
+      text: string,
+      keepAttachmentIds: string[],
+      attachmentDraftIds: string[],
+    ): Promise<boolean> {
+      const current = generation;
+      try {
+        await runtime.updateQueued({ agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds });
+        return true;
+      } catch (error) {
+        if (current === generation) report(error);
+        return false;
+      }
+    },
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

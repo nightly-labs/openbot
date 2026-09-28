@@ -61,7 +61,7 @@ export function createWebConversationRuntime(
     agent: {
       discardDraftAttachment: (id) => remote.discard(id),
       downloadAttachments: unavailable,
-      editQueuedMessage: unavailable,
+      editQueuedMessage: (input) => remote.editQueue(input),
       listInstalledSkills: async () => [],
       listMcpServers: async () => [],
       onAttachmentImport(listener) {

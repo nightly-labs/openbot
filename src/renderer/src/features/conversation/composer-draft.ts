@@ -74,6 +74,13 @@ function isComposerDraft(value: unknown): value is ComposerDraft {
     (value.replyToMessageId === null || isString(value.replyToMessageId))
   );
 }
+export function clearStoredQueueEdit(): void {
+  try {
+    window.localStorage.removeItem(QUEUE_EDIT_STORAGE_KEY);
+  } catch {
+    // Storage is unavailable, so nothing was stored.
+  }
+}
 export function readStoredQueueEdit(): StoredQueueEdit | null {
   try {
     return decodeStoredQueueEdit(JSON.parse(window.localStorage.getItem(QUEUE_EDIT_STORAGE_KEY) ?? "null"));
