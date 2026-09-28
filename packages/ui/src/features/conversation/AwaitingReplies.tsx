@@ -1,3 +1,4 @@
+import { IconButton, X } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -24,6 +25,8 @@ export interface AwaitingReplyListProps {
   title?: string;
   /** The list starts collapsed when this is false. */
   defaultOpen?: boolean;
+  /** Hides the block. It has a close button only when this is set and no agent still works. */
+  onDismiss?: () => void;
   class?: string;
 }
 
@@ -64,19 +67,36 @@ function AwaitingReplyList(props: AwaitingReplyListProps) {
     const item = props.items.find((entry) => entry.state === "working");
     return item && { id: item.id, label: t("chat.awaiting.working", { name: item.name }) };
   };
+  // Every agent replied or failed, so nothing more comes for these rows.
+  const settled = () => props.items.every((item) => item.state === "replied" || item.state === "failed");
   return (
     <section class={["task-list", "awaiting-replies", props.class]} data-open={open() ? "" : undefined}>
-      <TaskListHeader
-        open={open()}
-        onToggle={() => setOpen((value) => !value)}
-        panelId={panelId}
-        done={done()}
-        total={total()}
-        title={props.title ?? t("chat.awaiting.title")}
-        active={working()}
-        summary={t("chat.awaiting.summary", { done: done(), total: total() })}
-        count={t("chat.awaiting.count", { done: done(), total: total() })}
-      />
+      <div class="awaiting-replies-bar">
+        <TaskListHeader
+          open={open()}
+          onToggle={() => setOpen((value) => !value)}
+          panelId={panelId}
+          done={done()}
+          total={total()}
+          title={props.title ?? t("chat.awaiting.title")}
+          active={working()}
+          summary={t("chat.awaiting.summary", { done: done(), total: total() })}
+          count={t("chat.awaiting.count", { done: done(), total: total() })}
+        />
+        <Show when={settled() && props.onDismiss}>
+          {(dismiss) => (
+            <IconButton
+              class="awaiting-replies-dismiss"
+              label={t("chat.awaiting.dismiss")}
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => dismiss()()}
+            >
+              <X aria-hidden="true" />
+            </IconButton>
+          )}
+        </Show>
+      </div>
       <div id={panelId} class="task-list-panel" inert={open() ? undefined : true}>
         <ol class="task-list-items">
           <For each={props.items} keyed={(item) => item.id}>

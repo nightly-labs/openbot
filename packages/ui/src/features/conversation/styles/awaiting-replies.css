@@ -19,7 +19,20 @@
 }
 
 .awaiting-replies.task-list .task-list-header {
+  min-width: 0;
+  flex: 1;
   border-radius: var(--openbot-radius-lg);
+}
+
+/* The close button sits next to the header button, because a button cannot hold another. */
+.awaiting-replies-bar {
+  display: flex;
+  align-items: center;
+}
+
+.awaiting-replies-dismiss {
+  margin-right: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
 }
 
 .composer-wrap:has(.composer-attachment) .awaiting-replies:last-child {

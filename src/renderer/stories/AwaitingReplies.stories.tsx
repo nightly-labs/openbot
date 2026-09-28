@@ -1,5 +1,6 @@
 import type { AgentProfile } from "@openbot/ui/data";
 import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
+import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "../src/preview/fixtures";
 
@@ -53,8 +54,10 @@ export const OneFailed: Story = {
   },
 };
 
+/** Every agent is done, so the block has a close button. */
 export const AllReplied: Story = {
   args: {
+    onDismiss: fn(),
     items: items.map((item) => ({ ...item, state: "replied", detail: "Chief reads it next" })),
   },
 };

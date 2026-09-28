@@ -37,6 +37,7 @@ export function ConversationComposer() {
     attachmentAction,
     attachmentBusy,
     awaitingReplies,
+    dismissAwaitingReplies,
     composerFocusRequest,
     composerHasContent,
     currentChatConversationKey,
@@ -156,7 +157,7 @@ export function ConversationComposer() {
         >
           <div class="agent-queue-slot-inner">
             <Show when={awaitingVisible()}>
-              <AwaitingReplies items={awaitingReplies()} />
+              <AwaitingReplies items={awaitingReplies()} onDismiss={dismissAwaitingReplies} />
             </Show>
             <Show when={queueVisible()}>
               <Loading>
