@@ -169,6 +169,7 @@ export const messages = defineMessages("server", {
   "server.members.saveIdentityFirst": "Save the server identity in General first.",
   "server.members.title": "Server members",
   "server.members.count": { other: "{count} members" },
+  "server.members.limitCount": { other: "{count} of {limit} members" },
   "server.members.search": "Search members",
   "server.members.noMatch": "No members match this search.",
   "server.members.inactiveTitle": "Inactive members",
@@ -199,6 +200,7 @@ export const messages = defineMessages("server", {
   "server.invite.showQr": "Show invitation QR code",
   "server.invite.permaHint":
     "Never expires and can be used many times. Anyone with this link can join; revoke it to disable.",
+  "server.invite.full": "This server has the maximum of {limit} members. Remove a member to invite a new person.",
   "server.invite.qrLabel": "Invitation QR code",
   "server.invite.qrDescription": "Scan this code in OpenBot Mobile to join this server.",
   "server.invite.accepted": "Invitation accepted",

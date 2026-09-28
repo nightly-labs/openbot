@@ -257,7 +257,7 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-.server-settings-perma-hint {
+.server-settings-invite-hint {
   display: block;
   margin-top: var(--openbot-space-2);
 }
