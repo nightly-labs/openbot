@@ -68,7 +68,7 @@ export function isBackgroundRefreshDiagnostic(message: string): boolean {
   return /\bcodex_models_manager\b.*\bfailed to refresh available models\b|\bSettings fetch failed\b/.test(message);
 }
 
-const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring \d+ unrecognized configuration settings?\b/;
+const IGNORED_CONFIG_SUMMARY = /\bCodex is ignoring (\d+) unrecognized configuration settings?\b/;
 
 /**
  * Whether a provider diagnostic is Codex's summary of the settings it ignored in its configuration.
@@ -85,15 +85,17 @@ export function isIgnoredConfigDiagnostic(message: string): boolean {
 }
 
 /**
- * The keys a Codex `configWarning` summary names as ignored, or `null` for any other warning.
+ * What a Codex `configWarning` summary names as ignored, or `null` for any other warning.
  *
- * Codex lists up to three, one per line, as ``  user (/path/config.toml): `tools.x` is ignored.``
+ * `count` is the total from the first line. Codex names up to three of them, one per line, as
+ * ``  user (/path/config.toml): `tools.x` is ignored.``, and adds "... and N more" for the rest.
  * Only the keys are kept: the layer label carries a path, which the renderer does not show.
  */
-export function ignoredCodexSettings(summary: string): string[] | null {
-  if (!IGNORED_CONFIG_SUMMARY.test(summary)) return null;
+export function ignoredCodexSettings(summary: string): { count: number; keys: string[] } | null {
+  const count = IGNORED_CONFIG_SUMMARY.exec(summary)?.[1];
+  if (!count) return null;
   const keys = [...summary.matchAll(/`([^`\n]+)` is ignored\./g)].flatMap((match) => (match[1] ? [match[1]] : []));
-  return [...new Set(keys)];
+  return { count: Number(count), keys: [...new Set(keys)] };
 }
 
 /**

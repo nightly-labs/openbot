@@ -1736,16 +1736,16 @@ export class ProviderRuntime implements ProviderPort {
    */
   #reportConfigWarning(client: AgentClient, params: unknown): void {
     const summary = getString(params, "summary");
-    const settings = summary ? ignoredCodexSettings(summary) : null;
-    if (!summary || !settings) return;
+    const ignored = summary ? ignoredCodexSettings(summary) : null;
+    if (!summary || !ignored) return;
     const redacted = shortenDiagnostic(this.#redactMcp(summary));
     logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message: redacted });
     if (this.#reportedConfigWarnings.has(redacted)) return;
     this.#reportedConfigWarnings.add(redacted);
     const message =
-      settings.length > 0
-        ? sourceText("error.provider.codexConfigIgnored", { settings: settings.join(", ") })
-        : sourceText("error.provider.codexConfigIgnoredUnnamed");
+      ignored.keys.length > 0
+        ? sourceText("error.provider.codexConfigIgnored", { count: ignored.count, settings: ignored.keys.join(", ") })
+        : sourceText("error.provider.codexConfigIgnoredUnnamed", { count: ignored.count });
     this.#emitError(`${client.provider}_config_ignored`, message);
   }
 
