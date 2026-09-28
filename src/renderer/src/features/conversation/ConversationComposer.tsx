@@ -304,6 +304,9 @@ export function ConversationComposer() {
               }}
               onSubmit={submitComposer}
               onPickerOpenChange={setPickerOpen}
+              onPasteFiles={(files) => {
+                if (props.runtime?.importFiles) void props.runtime.importFiles(files);
+              }}
               onOpenAttachment={(attachment) =>
                 canPreviewAttachment(attachment)
                   ? void previewAttachment(attachment)

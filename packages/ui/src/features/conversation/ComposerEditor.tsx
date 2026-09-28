@@ -30,6 +30,8 @@ interface ComposerEditorProps {
   onValueChange: (value: string) => void;
   onSubmit: () => void;
   onOpenAttachment?: (attachment: DraftAttachment) => void;
+  /** Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it. */
+  onPasteFiles?: (files: File[]) => void;
   /** Told when the mention picker opens or closes, so the queue panel can give up the same space. */
   onPickerOpenChange?: (open: boolean) => void;
 }
@@ -583,8 +585,18 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (!editor || props.disabled) return;
 
     const clipboard = event.clipboardData;
-    const hasFileItem = Array.from(clipboard?.items ?? []).some((item) => item.kind === "file");
-    if (!clipboard || clipboard.files.length > 0 || hasFileItem) return;
+    if (!clipboard) return;
+    const files =
+      clipboard.files.length > 0
+        ? Array.from(clipboard.files)
+        : Array.from(clipboard.items).flatMap((item) => {
+            const file = item.kind === "file" ? item.getAsFile() : null;
+            return file ? [file] : [];
+          });
+    if (files.length > 0) {
+      props.onPasteFiles?.(files);
+      return;
+    }
 
     const text = clipboard.getData("text/plain").replace(/\r\n?/g, "\n").slice(0, INPUT_LIMITS.messageText);
     if (!text) return;

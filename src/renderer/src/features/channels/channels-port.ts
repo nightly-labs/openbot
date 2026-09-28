@@ -30,6 +30,8 @@ export interface ChannelsPort {
   fileActions: "native" | "browser";
   /** Replaces the preview read from `previewUrl`, which a browser client never receives. */
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
+  /** Uploads dropped or pasted files as drafts. Only a browser client has it; the desktop preload imports them. */
+  importAttachments?: (files: File[]) => Promise<AttachmentSummary[]>;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */
