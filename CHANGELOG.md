@@ -19,6 +19,10 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Changed
 
+- Show a "Connect your computer" screen in the web app when no computer is connected. It gives the
+  three setup steps and the Download, Join with invitation and Refresh hosts buttons. Before, a
+  small notice showed above an empty conversation. When the computers cannot load, an error message
+  now shows at the bottom of the screen.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
 
