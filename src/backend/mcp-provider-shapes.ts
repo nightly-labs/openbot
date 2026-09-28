@@ -11,7 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { commandPathFromShellOutput, runInLoginShell } from "./cli";
+import { runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
 
 const execFileAsync = promisify(execFile);
@@ -364,10 +364,10 @@ async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<s
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
     const stdout = await runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`);
-    // A shell function, such as the `npx` of a lazy-loaded nvm, prints only its name. The server
-    // is spawned with `path`, so the bare name still finds the program there.
-    const lastLine = stdout.trim().split(/\r?\n/u).at(-1)?.trim();
-    return commandPathFromShellOutput(stdout) ?? (lastLine === trimmed ? trimmed : null);
+    // Only the last line: an interactive profile can print a greeting before the command runs. The
+    // line is kept as `command -v` gave it - a relative `PATH` entry gives a relative path, and a
+    // shell function, such as the `npx` of a lazy-loaded nvm, gives its bare name for spawn to find.
+    return stdout.trim().split(/\r?\n/u).at(-1)?.trim() || null;
   } catch {
     return null;
   }
