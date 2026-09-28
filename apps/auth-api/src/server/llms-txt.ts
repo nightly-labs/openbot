@@ -7,7 +7,7 @@ import { OPENBOT_PLANS } from "../content/compare/comparison";
 import { CHANGELOG_DESCRIPTION, changelogUrl } from "../lib/changelog";
 import { CONTENT_COLLECTIONS } from "../lib/content";
 import { articleUrl, collectionIndexUrl } from "../lib/content-collection";
-import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "../lib/landing-links";
+import { OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS, OPENBOT_MACOS_INTEL_DOWNLOAD_LINK } from "../lib/landing-links";
 import { PLUGINS_DESCRIPTION, pluginIndexUrl } from "../lib/plugins";
 import { OPENBOT_SITE_DESCRIPTION, OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { FEED_CACHE_CONTROL } from "./content-feed";
@@ -33,6 +33,7 @@ function llmsTxt(): string {
     "## Download",
     "",
     `- [macOS](${absolute(OPENBOT_DOWNLOAD_LINKS.macos)}): macOS 13 or later, Apple silicon`,
+    `- [macOS for Intel](${absolute(OPENBOT_MACOS_INTEL_DOWNLOAD_LINK)}): macOS 13 or later, Intel`,
     `- [Windows](${absolute(OPENBOT_DOWNLOAD_LINKS.windows)}): Windows 10 or later`,
     `- [Linux](${absolute(OPENBOT_DOWNLOAD_LINKS.linux)}): x64 AppImage`,
     `- [Source code](${OPENBOT_LINKS.repository}): PolyForm Noncommercial 1.0.0`,

@@ -80,6 +80,8 @@ export const messages = {
   "mobile.server.members.createAnother": "新しいリンクを作成",
   "mobile.server.members.create": "招待リンクを作成",
   "mobile.server.members.permanentLimit": "別の永続招待リンクを作成する前に、既存のリンクを取り消してください。",
+  "mobile.server.members.full":
+    "このサーバーのメンバーは上限の {limit} 人です。新しい人を招待するには、メンバーを削除してください。",
   "mobile.server.members.inviteUsed": "招待が承諾されました。メンバーがこのサーバーに参加しました。",
   "mobile.server.members.inviteSent": "{email} に招待を送信しました。",
   "mobile.server.members.permanentCreated":
@@ -94,6 +96,7 @@ export const messages = {
   "mobile.server.members.linkHint": "1 回限りのリンクを共有して、このサーバーにユーザーを招待します。",
   "mobile.server.members.updateFailed": "このメンバーを更新できませんでした。もう一度お試しください。",
   "mobile.server.members.title": "サーバーのメンバー",
+  "mobile.server.members.limitCount": { other: "メンバー {count} / {limit} 人" },
   "mobile.server.members.loadFailed": "メンバーを読み込めませんでした。更新してもう一度お試しください。",
   "mobile.server.members.accessRemoved": "アクセスを削除済み",
   "mobile.server.members.empty": "メンバーはいません。",

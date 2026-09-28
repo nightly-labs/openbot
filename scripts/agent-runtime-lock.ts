@@ -11,8 +11,12 @@ const codexArtifactSchema = z.object({
   executable: z.string().regex(/^bin\/codex(?:\.exe)?$/u),
 });
 const claudeArtifactSchema = z.object({
-  package: z.string().regex(/^@anthropic-ai\/claude-agent-sdk-(?:darwin-arm64|linux-x64|linux-arm64|win32-x64)$/u),
-  asset: z.string().regex(/^claude-agent-sdk-(?:darwin-arm64|linux-x64|linux-arm64|win32-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  package: z
+    .string()
+    .regex(/^@anthropic-ai\/claude-agent-sdk-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|win32-x64)$/u),
+  asset: z
+    .string()
+    .regex(/^claude-agent-sdk-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|win32-x64)-\d+\.\d+\.\d+\.tgz$/u),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
@@ -21,8 +25,10 @@ const claudeArtifactSchema = z.object({
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 const opencodeArtifactSchema = z.object({
-  package: z.string().regex(/^opencode-(?:darwin-arm64|linux-x64|linux-arm64|windows-x64)$/u),
-  asset: z.string().regex(/^opencode-(?:darwin-arm64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
+  package: z.string().regex(/^opencode-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)$/u),
+  asset: z
+    .string()
+    .regex(/^opencode-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
@@ -37,10 +43,16 @@ const opencodeArtifactSchema = z.object({
  * slightly slower, which is nothing against launching one MCP server.
  */
 const bunArtifactSchema = z.object({
-  package: z.string().regex(/^@oven\/bun-(?:darwin-aarch64|linux-x64-baseline|linux-aarch64|windows-x64-baseline)$/u),
+  package: z
+    .string()
+    .regex(
+      /^@oven\/bun-(?:darwin-aarch64|darwin-x64-baseline|linux-x64-baseline|linux-aarch64|windows-x64-baseline)$/u,
+    ),
   asset: z
     .string()
-    .regex(/^bun-(?:darwin-aarch64|linux-x64-baseline|linux-aarch64|windows-x64-baseline)-\d+\.\d+\.\d+\.tgz$/u),
+    .regex(
+      /^bun-(?:darwin-aarch64|darwin-x64-baseline|linux-x64-baseline|linux-aarch64|windows-x64-baseline)-\d+\.\d+\.\d+\.tgz$/u,
+    ),
   assetSha256: sha256Schema,
   binarySha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
@@ -51,7 +63,7 @@ const bunArtifactSchema = z.object({
 const grokArtifactSchema = z.object({
   asset: z
     .string()
-    .regex(/^grok-\d+\.\d+\.\d+-(?:linux-x86_64|linux-aarch64|macos-aarch64|windows-x86_64(?:\.exe)?)$/u),
+    .regex(/^grok-\d+\.\d+\.\d+-(?:linux-x86_64|linux-aarch64|macos-aarch64|macos-x86_64|windows-x86_64(?:\.exe)?)$/u),
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
@@ -66,7 +78,9 @@ const grokArtifactSchema = z.object({
 const antigravityArtifactSchema = z.object({
   asset: z
     .string()
-    .regex(/^agy-acp-server-\d+\.\d+\.\d+-(?:darwin-arm64|linux-x86_64|linux-arm64|windows-x86_64)\.zip$/u),
+    .regex(
+      /^agy-acp-server-\d+\.\d+\.\d+-(?:darwin-arm64|darwin-x86_64|linux-x86_64|linux-arm64|windows-x86_64)\.zip$/u,
+    ),
   assetSha256: sha256Schema,
   downloadBytes: z.number().int().positive(),
   installedBytes: z.number().int().positive(),
@@ -87,6 +101,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": codexArtifactSchema,
+      "darwin-x64": codexArtifactSchema,
       "linux-x64": codexArtifactSchema,
       "linux-arm64": codexArtifactSchema,
       "win32-x64": codexArtifactSchema,
@@ -100,6 +115,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": claudeArtifactSchema,
+      "darwin-x64": claudeArtifactSchema,
       "linux-x64": claudeArtifactSchema,
       "linux-arm64": claudeArtifactSchema,
       "win32-x64": claudeArtifactSchema,
@@ -120,6 +136,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": opencodeArtifactSchema,
+      "darwin-x64": opencodeArtifactSchema,
       "linux-x64": opencodeArtifactSchema,
       "linux-arm64": opencodeArtifactSchema,
       "win32-x64": opencodeArtifactSchema,
@@ -141,6 +158,7 @@ const agentRuntimeLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": bunArtifactSchema,
+      "darwin-x64": bunArtifactSchema,
       "linux-x64": bunArtifactSchema,
       "linux-arm64": bunArtifactSchema,
       "win32-x64": bunArtifactSchema,
@@ -156,6 +174,7 @@ const agentRuntimeLockSchema = z.object({
     noticesSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": grokArtifactSchema,
+      "darwin-x64": grokArtifactSchema,
       "linux-x64": grokArtifactSchema,
       "linux-arm64": grokArtifactSchema,
       "win32-x64": grokArtifactSchema,
@@ -176,6 +195,7 @@ const agentRuntimeLockSchema = z.object({
     licenseUrl: z.literal("https://antigravity.google/terms"),
     artifacts: z.object({
       "darwin-arm64": antigravityArtifactSchema,
+      "darwin-x64": antigravityArtifactSchema,
       "linux-x64": antigravityArtifactSchema,
       "linux-arm64": antigravityArtifactSchema,
       "win32-x64": antigravityArtifactSchema,

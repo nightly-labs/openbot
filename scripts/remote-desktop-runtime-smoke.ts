@@ -12,7 +12,7 @@ if (process.platform !== "darwin") {
 }
 
 const stateDirectory = await mkdtemp(join(tmpdir(), "openbot-remote-runtime-smoke-"));
-const runtimeRoot = resolve("build/remote-desktop-runtime/darwin/arm64");
+const runtimeRoot = resolve("build/remote-desktop-runtime/darwin", process.arch);
 const runtime = new SunshineMoonlightRuntime({
   paths: {
     sunshine: join(runtimeRoot, "Sunshine.app/Contents/MacOS/Sunshine"),

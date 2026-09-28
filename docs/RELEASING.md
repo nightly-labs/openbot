@@ -64,9 +64,9 @@ exact corresponding source for both GPL components with every binary release. A 
 a binary, license, source manifest, checksum, platform signature, or notarization result is missing.
 
 Use this source build only to make or reproduce a runtime version. The
-`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64 and Windows x64 when the
+`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64, macOS x64 and Windows x64 when the
 recipe or a pinned input changes. It publishes an immutable GitHub prerelease named
-`remote-desktop-runtime-<input-digest>`. The prerelease contains both deterministic archives, SPDX
+`remote-desktop-runtime-<input-digest>`. The prerelease contains the three deterministic archives, SPDX
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
@@ -297,7 +297,10 @@ The workflow:
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
 3. runs the complete offline repository check;
-4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on the same GitHub macOS runner;
+4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
+   and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
+   architecture builds on its own runner, because the Whisper and remote desktop builds run on the
+   build machine. The Host PKG is ARM64 only;
    when `hdiutil create` fails with "Device not configured" or "Resource busy", it builds again,
    up to 3 attempts, because that runner error is not caused by the app;
 5. builds an unsigned Windows x64 NSIS installer on a GitHub Windows runner;
@@ -307,7 +310,9 @@ The workflow:
    artifacts, licenses, checksums, platform signing contracts, launch behavior, and update artifact
    size limits;
 8. generates SPDX SBOMs and GitHub build-provenance attestations for all three platforms;
-9. publishes one non-draft GitHub Release only after all three platform jobs pass.
+9. publishes one non-draft GitHub Release only after all platform jobs pass. It joins the ARM64 and
+   x64 `latest-mac.yml` files with `scripts/merge-mac-update-manifests.ts`: electron-updater selects
+   the ZIP whose name contains `arm64` on Apple silicon and the other ZIP on Intel.
 
 Users can verify a downloaded artifact with
 `gh attestation verify <file> --repo nightly-labs/openbot`.
@@ -368,7 +373,7 @@ Before creating the first tag or any later release:
    and that their install checks pass;
 7. smoke-test sign-in/setup, chat streaming, queues, attachments, agent messaging, browser control,
    context compaction, and the update popover;
-8. on macOS ARM64, Windows x64, and Linux x64, update from the last public version and confirm check,
+8. on macOS ARM64, macOS x64, Windows x64, and Linux x64, update from the last public version and confirm check,
    download, preparation, explicit restart, new version, local agents, conversations, and queues. A
    Linux build only auto-updates when it runs from the AppImage, which the runtime reports through
    `APPIMAGE`;
@@ -418,11 +423,17 @@ SHA256SUMS-macos.txt
 OpenBot-<VERSION>-macos.spdx.json
 OpenBot-Host-<VERSION>-macos.spdx.json
 OpenBot-<VERSION>-macos.sigstore.json
+OpenBot-<VERSION>-x64.dmg
+OpenBot-<VERSION>-x64.zip
+SHA256SUMS-macos-x64.txt
+OpenBot-<VERSION>-macos-x64.spdx.json
+OpenBot-<VERSION>-macos-x64.sigstore.json
 ```
 
 The macOS checksum file covers the DMG, ZIP, and Host PKG. The existing provenance step consumes
 that file, so all three artifacts are attested against the same tag, commit, and release run.
-The existing publish job downloads `release-macos` and publishes the PKG with the other assets.
+The publish job downloads `release-macos` and `release-macos-x64` and publishes the PKG with the
+other assets. `SHA256SUMS-macos-x64.txt` covers the x64 DMG and ZIP.
 `latest-mac.yml` still describes only Electron application updates; a `.pkg` reference is rejected.
 
 After verifying OpenBot.app, the macOS job:

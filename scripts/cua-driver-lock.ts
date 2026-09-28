@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 
-export const cuaDriverTargets = ["darwin-arm64", "linux-x64", "linux-arm64", "win32-x64"] as const;
+export const cuaDriverTargets = ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64"] as const;
 export type CuaDriverTarget = (typeof cuaDriverTargets)[number];
 
 /** One file OpenBot copies out of a release archive, and the mode it gets on disk. */
@@ -51,6 +51,15 @@ export const CUA_DRIVER_TARGETS = {
     platform: "darwin",
     architecture: "arm64",
     // Upstream builds one universal Mach-O for both Mac architectures, and signs only that one.
+    assetSuffix: "darwin-universal-binary.tar.gz",
+    archive: "tar.gz",
+    executable: "cua-driver",
+    files: [{ path: "cua-driver", executable: true }],
+  },
+  "darwin-x64": {
+    platform: "darwin",
+    architecture: "x64",
+    // The same universal asset as `darwin-arm64`: its Mach-O carries an x86_64 slice.
     assetSuffix: "darwin-universal-binary.tar.gz",
     archive: "tar.gz",
     executable: "cua-driver",
@@ -105,6 +114,7 @@ const cuaDriverLockSchema = z.object({
     licenseSha256: sha256Schema,
     artifacts: z.object({
       "darwin-arm64": cuaDriverArtifactSchema,
+      "darwin-x64": cuaDriverArtifactSchema,
       "linux-x64": cuaDriverArtifactSchema,
       "linux-arm64": cuaDriverArtifactSchema,
       "win32-x64": cuaDriverArtifactSchema,

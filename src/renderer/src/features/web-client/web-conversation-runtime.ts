@@ -4,11 +4,12 @@ import {
   deleteSharedTable,
   installAgentSkill,
   listAgentSkills,
+  listMcpServers,
   listSharedTables,
   setAgentSkillEnabled,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
-import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { listInstalledSkills, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
@@ -66,8 +67,12 @@ export function createWebConversationRuntime(
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
         return remote.editQueue(input);
       },
-      listInstalledSkills: async () => [],
-      listMcpServers: async () => [],
+      // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
+      listInstalledSkills: async (agentId) => (adminRequest ? listInstalledSkills(adminRequest(), agentId) : []),
+      listMcpServers: async (serverId) => {
+        if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return adminRequest ? listMcpServers(adminRequest()) : [];
+      },
       onAttachmentImport(listener) {
         listeners.add(listener);
         return () => {

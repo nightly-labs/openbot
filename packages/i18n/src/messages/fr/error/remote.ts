@@ -18,7 +18,7 @@ export const messages = {
   "error.remote.sessionCapacity": "L’hôte a déjà quatre sessions actives.",
   "error.remote.linuxUnsupported": "L’hébergement du bureau à distance n’est pas pris en charge sous Linux.",
   "error.remote.runtimeMissing":
-    "Le runtime Sunshine et Moonlight Web est absent ou n’est pas pris en charge sur cet hôte. Installez la version complète d’OpenBot sur un hôte Mac Apple silicon ou Windows x64, puis redémarrez OpenBot.",
+    "Le runtime Sunshine et Moonlight Web est absent ou n’est pas pris en charge sur cet hôte. Installez la version complète d’OpenBot sur un hôte Mac ou Windows x64, puis redémarrez OpenBot.",
   "error.remote.testActive": "Un test du bureau à distance est en cours. Réessayez quand il sera terminé.",
   "error.remote.screenRecordingDenied":
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",

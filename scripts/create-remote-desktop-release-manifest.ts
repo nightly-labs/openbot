@@ -23,7 +23,7 @@ const output = process.argv[3];
 const metadataPaths = process.argv.slice(4);
 if (!repository || !output || metadataPaths.length !== remoteDesktopTargets.length) {
   throw new Error(
-    "Usage: bun scripts/create-remote-desktop-release-manifest.ts owner/repository output.json darwin.json windows.json",
+    "Usage: bun scripts/create-remote-desktop-release-manifest.ts owner/repository output.json darwin-arm64.json darwin-x64.json win32-x64.json",
   );
 }
 
@@ -47,15 +47,11 @@ const artifacts = Object.fromEntries(
     }),
   ),
 );
+const artifactSchema = metadataSchema
+  .pick({ asset: true, sha256: true, sbomAsset: true })
+  .extend({ sbomSha256: z.string().regex(/^[0-9a-f]{64}$/u) });
 const parsedArtifacts = z
-  .object({
-    "darwin-arm64": metadataSchema
-      .pick({ asset: true, sha256: true, sbomAsset: true })
-      .extend({ sbomSha256: z.string().regex(/^[0-9a-f]{64}$/u) }),
-    "win32-x64": metadataSchema
-      .pick({ asset: true, sha256: true, sbomAsset: true })
-      .extend({ sbomSha256: z.string().regex(/^[0-9a-f]{64}$/u) }),
-  })
+  .object({ "darwin-arm64": artifactSchema, "darwin-x64": artifactSchema, "win32-x64": artifactSchema })
   .parse(artifacts);
 const manifest = createReleaseManifest({
   lock,

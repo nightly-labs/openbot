@@ -295,7 +295,7 @@ function bundledProviderExecutable(
   resourcesPath: string | null | undefined,
 ): string | null {
   const targetPlatform =
-    platform === "darwin" && architecture === "arm64"
+    platform === "darwin" && (architecture === "arm64" || architecture === "x64")
       ? "mac"
       : platform === "linux" && (architecture === "x64" || architecture === "arm64")
         ? "linux"

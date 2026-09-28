@@ -167,6 +167,10 @@ jobs:
             platform: darwin
             architecture: arm64
             target: darwin-arm64
+          - os: macos-15-intel
+            platform: darwin
+            architecture: x64
+            target: darwin-x64
           - os: windows-2025
             platform: win32
             architecture: x64
@@ -318,10 +322,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Download macOS build
+      - name: Download macOS ARM64 build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: remote-desktop-runtime-darwin-arm64
+          path: release-assets
+
+      - name: Download macOS x64 build
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: remote-desktop-runtime-darwin-x64
           path: release-assets
 
       - name: Download Windows build
@@ -336,6 +346,7 @@ jobs:
           "$GITHUB_REPOSITORY"
           release-assets/remote-desktop-runtime-manifest.json
           release-assets/darwin-arm64.json
+          release-assets/darwin-x64.json
           release-assets/win32-x64.json
 
       - name: Publish or verify immutable prerelease
@@ -346,8 +357,10 @@ jobs:
         run: |
           assets=(
             release-assets/remote-desktop-runtime-darwin-arm64.tar.gz
+            release-assets/remote-desktop-runtime-darwin-x64.tar.gz
             release-assets/remote-desktop-runtime-win32-x64.tar.gz
             release-assets/remote-desktop-runtime-darwin-arm64.spdx.json
+            release-assets/remote-desktop-runtime-darwin-x64.spdx.json
             release-assets/remote-desktop-runtime-win32-x64.spdx.json
             release-assets/remote-desktop-runtime-manifest.json
           )
@@ -360,8 +373,10 @@ jobs:
               --pattern 'remote-desktop-runtime-manifest.json'
             for asset in \
               remote-desktop-runtime-darwin-arm64.tar.gz \
+              remote-desktop-runtime-darwin-x64.tar.gz \
               remote-desktop-runtime-win32-x64.tar.gz \
               remote-desktop-runtime-darwin-arm64.spdx.json \
+              remote-desktop-runtime-darwin-x64.spdx.json \
               remote-desktop-runtime-win32-x64.spdx.json \
               remote-desktop-runtime-manifest.json; do
               if ! cmp --silent "release-assets/$asset" "$existing/$asset"; then
@@ -409,6 +424,10 @@ jobs:
             platform: darwin
             architecture: arm64
             target: darwin-arm64
+          - os: macos-15-intel
+            platform: darwin
+            architecture: x64
+            target: darwin-x64
           - os: windows-2025
             platform: win32
             architecture: x64

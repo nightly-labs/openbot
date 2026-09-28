@@ -145,6 +145,18 @@ export function StaticI18nProvider(
     t: (key, ...params) => translateFor(props.locale)(key, ...params),
     changeLanguage: () => undefined,
   };
+  // As in `I18nProvider`. The page can outlive this provider (the web client is one route of an
+  // English site), so the previous language comes back when it unmounts.
+  createEffect(
+    () => props.locale,
+    (locale) => {
+      const previous = document.documentElement.lang;
+      document.documentElement.lang = locale;
+      return () => {
+        document.documentElement.lang = previous;
+      };
+    },
+  );
   return (
     <I18nContext value={value}>
       <TextProvider locale={props.locale} formatLocale={props.formatLocale}>

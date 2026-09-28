@@ -24,7 +24,14 @@ const EXPECTED_MACOS_ICON_FILES = [
   "icon_512x512@2x.png",
 ] as const;
 
-const appPath = resolve(process.argv[2] ?? "dist/mac-arm64/OpenBot.app");
+// electron-builder writes the default x64 build to `dist/mac` and adds a suffix for any other one.
+// The package is built for the runner's own architecture, so that is the one to verify.
+const architecture = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
+if (!architecture) throw new Error(`OpenBot does not ship for macOS ${process.arch}.`);
+const machOArchitecture = architecture === "arm64" ? "arm64" : "x86_64";
+const appPath = resolve(
+  process.argv[2] ?? (architecture === "arm64" ? "dist/mac-arm64/OpenBot.app" : "dist/mac/OpenBot.app"),
+);
 const contentsPath = resolve(appPath, "Contents");
 const executablePath = resolve(contentsPath, "MacOS/OpenBot");
 const resourcesPath = resolve(contentsPath, "Resources");
@@ -33,8 +40,8 @@ const sourceIconPath = resolve("build/icon-production.icns");
 const plistPath = resolve(contentsPath, "Info.plist");
 const whisperExecutablePath = resolve(resourcesPath, "whisper/bin/whisper-cli");
 const whisperModelPath = resolve(resourcesPath, "whisper/model/ggml-medium-q5_0.bin");
-const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin/arm64");
-const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin/arm64");
+const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin", architecture);
+const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
 // The database host is spawned by path as its own process, so it has to survive the asar unchanged.
 // Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
 const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
@@ -69,6 +76,13 @@ await Promise.all([
 // Only this Mac's driver ships. A `from: build/cua-driver` that forgot the target would put the
 // Windows and Linux builds in every installer.
 await Promise.all(["win32", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));
+// Each application carries one architecture's runtimes. The other one would only add size.
+const otherArchitecture = architecture === "arm64" ? "x64" : "arm64";
+await Promise.all(
+  ["remote-desktop-runtime", "cua-driver"].map((name) =>
+    assertAbsent(resolve(resourcesPath, name, "darwin", otherArchitecture)),
+  ),
+);
 // `signIgnore` keeps the driver's own Developer ID signature, and with it the Automation
 // entitlement that re-signing under OpenBot's inherited entitlements would drop.
 assertCuaDriverSignature(resolve(cuaDriverPath, "cua-driver"));
@@ -76,7 +90,7 @@ await verifyPackagedIcon(packagedIconPath, sourceIconPath);
 await Promise.all(["codex", "claude", "grok"].map((name) => assertAbsent(resolve(resourcesPath, name))));
 await assertAbsent(resolve(resourcesPath, "cloudflared"));
 await assertAbsent(
-  resolve(resourcesPath, "app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64"),
+  resolve(resourcesPath, `app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk-darwin-${architecture}`),
 );
 
 const plist = JSON.parse(run("plutil", ["-convert", "json", "-o", "-", plistPath]));
@@ -107,11 +121,13 @@ if (/from "(?!node:)/.test(databaseHost)) {
   throw new Error("The database host must import nothing but node: builtins.");
 }
 
-const architecture = run("file", [executablePath]);
-if (!architecture.includes("arm64")) throw new Error(`Expected an ARM64 executable: ${architecture}`);
+const executableArchitecture = run("file", [executablePath]);
+if (!executableArchitecture.includes(machOArchitecture)) {
+  throw new Error(`Expected a ${machOArchitecture} executable: ${executableArchitecture}`);
+}
 const whisperArchitecture = run("file", [whisperExecutablePath]);
-if (!whisperArchitecture.includes("arm64")) {
-  throw new Error(`Expected an ARM64 Whisper executable: ${whisperArchitecture}`);
+if (!whisperArchitecture.includes(machOArchitecture)) {
+  throw new Error(`Expected a ${machOArchitecture} Whisper executable: ${whisperArchitecture}`);
 }
 if (existsSync(whisperModelPath)) throw new Error("The on-demand Whisper model must not be in the application.");
 
@@ -140,7 +156,7 @@ await verifyLaunch(executablePath);
 
 logger.info(`Verified ${appPath}`);
 logger.info(
-  `OpenBot ${String(packageJson.version)} · ARM64 · icon · GPL remote runtime · WebRTC remote stack · ASAR integrity · hardened fuses · launch`,
+  `OpenBot ${String(packageJson.version)} · ${machOArchitecture} · icon · GPL remote runtime · WebRTC remote stack · ASAR integrity · hardened fuses · launch`,
 );
 
 function expectEqual(actual: unknown, expected: unknown, label: string): void {

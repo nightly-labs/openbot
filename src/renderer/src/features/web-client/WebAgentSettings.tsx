@@ -8,12 +8,15 @@ import {
 } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
+import { resolveCreationModel } from "../agents/agent-creation-model";
 import { createAgentInitialMessage } from "../agents/agent-initial-message";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 export function WebAgentSettings(props: {
   runtime: WebWorkspaceRuntime;
   capabilities: string[];
+  /** The host has no agents yet: the form shows the first-agent copy and cannot be cancelled. */
+  first: boolean;
   /** The host's endpoints, so the picker lists their models on its Custom tab. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
   /** The draft the form starts from. */
@@ -30,6 +33,8 @@ export function WebAgentSettings(props: {
     busy: boolean;
     error: string | null;
     uncertain: boolean;
+    /** The user picked a model, so a new catalog no longer replaces it. */
+    modelTouched: boolean;
   }>({
     draft: props.initialDraft ?? createFirstAgentDraft(),
     models: [],
@@ -37,6 +42,7 @@ export function WebAgentSettings(props: {
     busy: false,
     error: null,
     uncertain: false,
+    modelTouched: false,
   });
   let disposed = false;
   let modelRequestGeneration = 0;
@@ -78,10 +84,12 @@ export function WebAgentSettings(props: {
           const selected = models.find(
             (model) => model.provider === draft.draft.provider && model.id === draft.draft.model,
           );
-          const first = models[0];
-          if (!selected && first) {
-            draft.draft.provider = first.provider;
-            draft.draft.model = first.id;
+          if (draft.modelTouched && selected) return;
+          // As in the desktop app. The web client does not know the host's saved setup choice.
+          const resolved = resolveCreationModel(null, models);
+          if (resolved) {
+            draft.draft.provider = resolved.provider;
+            draft.draft.model = resolved.model;
           }
         });
       } catch {
@@ -137,7 +145,7 @@ export function WebAgentSettings(props: {
     <FirstAgentSetup
       value={state.draft}
       suggestions={FIRST_AGENT_SUGGESTIONS}
-      mode="additional"
+      mode={props.first ? "first" : "additional"}
       submitting={state.busy}
       error={state.error}
       modelOptions={supportsModelSelection() && state.models.length > 0 ? state.models : undefined}
@@ -145,12 +153,13 @@ export function WebAgentSettings(props: {
       customProviders={props.customProviders}
       onChange={(value) => {
         setState((draft) => {
+          if (value.provider !== draft.draft.provider || value.model !== draft.draft.model) draft.modelTouched = true;
           draft.draft = value;
         });
         props.onDraftChange?.(value);
       }}
       onSubmit={save}
-      onCancel={props.onClose}
+      onCancel={props.first ? undefined : props.onClose}
     />
   );
 }

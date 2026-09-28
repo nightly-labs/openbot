@@ -4,11 +4,12 @@ import { basename, join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { bundledLibraryLicense, isPortableLoadPath, readMachOLoadPaths } from "./mac-runtime-dylibs";
 import { createRemoteDesktopInputDigest, loadNativeRuntimeLock } from "./native-runtime-lock";
+import { runtimeTarget } from "./remote-desktop-runtime-release";
 
 const logger = createOpenBotLogger("verify-remote-desktop-runtime");
 
 const platform = process.argv.includes("--windows") ? "win32" : "darwin";
-const architecture = platform === "win32" ? "x64" : "arm64";
+const architecture = platform === "win32" ? "x64" : process.arch;
 const distributionRoot = resolve("build/remote-desktop-runtime");
 const root = resolve("build/remote-desktop-runtime", platform, architecture);
 const lock = await loadNativeRuntimeLock();
@@ -28,7 +29,7 @@ if (manifest.moonlightWeb?.patch?.sha256 !== lock.remoteDesktop.moonlightWeb.pat
   throw new Error("The Moonlight Web OpenBot patch is not approved.");
 }
 
-const target = platform === "darwin" ? "darwin-arm64" : "win32-x64";
+const target = runtimeTarget(platform, architecture);
 const names = lock.remoteDesktop.targets[target];
 const sunshinePatch = basename(lock.remoteDesktop.sunshine.patch.path);
 const moonlightPatch = basename(lock.remoteDesktop.moonlightWeb.patch.path);

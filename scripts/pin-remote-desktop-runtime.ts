@@ -7,7 +7,7 @@ import {
   type NativeRuntimeLock,
   parseNativeRuntimeLock,
 } from "./native-runtime-lock";
-import { parseReleaseManifest, sha256 } from "./remote-desktop-runtime-release";
+import { parseReleaseManifest, remoteDesktopTargets, sha256 } from "./remote-desktop-runtime-release";
 
 export function pinRemoteDesktopRuntime(
   lock: NativeRuntimeLock,
@@ -42,16 +42,12 @@ export function pinRemoteDesktopRuntime(
         manifestAsset: "remote-desktop-runtime-manifest.json",
         manifestSha256,
       },
-      releaseArtifacts: {
-        "darwin-arm64": {
-          asset: manifest.artifacts["darwin-arm64"].asset,
-          sha256: manifest.artifacts["darwin-arm64"].sha256,
-        },
-        "win32-x64": {
-          asset: manifest.artifacts["win32-x64"].asset,
-          sha256: manifest.artifacts["win32-x64"].sha256,
-        },
-      },
+      releaseArtifacts: Object.fromEntries(
+        remoteDesktopTargets.map((target) => [
+          target,
+          { asset: manifest.artifacts[target].asset, sha256: manifest.artifacts[target].sha256 },
+        ]),
+      ),
     },
   });
 }

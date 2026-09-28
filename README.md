@@ -37,12 +37,12 @@ visited pages use the network, and installed plugins may connect to their own se
 
 ## Install
 
-OpenBot supports macOS 13 or newer on Apple Silicon, Windows 10 or newer on x64 systems, and x64
+OpenBot supports macOS 13 or newer on Apple silicon or Intel, Windows 10 or newer on x64 systems, and x64
 or arm64 Linux as an AppImage.
 
 ### macOS
 
-1. Download the latest `OpenBot-*.dmg` from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
+1. Download the latest `OpenBot-*-arm64.dmg` (or `OpenBot-*-x64.dmg` on an Intel Mac) from [GitHub Releases](https://github.com/nightly-labs/openbot/releases).
 2. Drag OpenBot to Applications and open it.
 
 ### Windows
@@ -281,15 +281,15 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run cua-driver:doctor` | Print, as JSON, which `cua-driver` binary OpenBot would use for Computer Use, and the driver's own `doctor` report. Read-only, and it starts no daemon. `OPENBOT_CUA_DRIVER_PATH` selects a different binary in a checkout; an installed application runs only the driver it was released with. |
 | `bun run prepare:cua-driver` | Write the pinned Computer Use driver to `build/cua-driver/<platform>/<arch>`, verifying every SHA-256 in `native-runtime.lock.json`. Name another target with `bun scripts/install-cua-driver.ts <platform> <arch>`. Every packaging command runs this first. |
 | `bun run pin:cua-driver <version>` | Print a new `cuaDriver` block for `native-runtime.lock.json` from a published `cua-driver` release. Downloads all three targets and hashes each shipped file. |
-| `bun run package` | Build an unpacked local ARM64 application. |
-| `bun run package:verify` | Build and verify the real ARM64 app bundle, icon, metadata, ASAR, and fuses. |
+| `bun run package` | Build an unpacked local application for the architecture of this Mac. |
+| `bun run package:verify` | Build and verify the real app bundle for this Mac, icon, metadata, ASAR, and fuses. |
 | `bun run package:win` | Build an unpacked local Windows x64 application on Windows. |
 | `bun run package:win:verify` | Build and verify the Windows x64 application on Windows. |
 | `bun run package:linux` | Build an unpacked local Linux x64 application on Linux. |
 | `bun run package:linux:arm64` | Build an unpacked local Linux arm64 application on arm64 Linux. |
 | `bun run package:linux:verify` | Build and verify the Linux x64 application on Linux. Run it under `xvfb-run -a` without a display. |
 | `bun run release:preflight` | Verify version, Git state, and GitHub release secrets before tagging. |
-| `bun run dist:mac` | Build unsigned local ARM64 DMG and ZIP update artifacts. |
+| `bun run dist:mac` | Build unsigned local DMG and ZIP update artifacts for this Mac. |
 | `bun run dist:win` | Build an unsigned Windows x64 NSIS installer on Windows. |
 | `bun run dist:linux` | Build an unsigned Linux x64 AppImage on Linux. |
 | `bun run dist:linux:arm64` | Build an unsigned Linux arm64 AppImage on arm64 Linux. |
@@ -466,7 +466,7 @@ described above.
 
 Releases are tag-driven. `bun run release:patch`, `release:minor`, or `release:major` prepares the
 version and changelog. After review, commit, preflight, and tag the release; pushing the tag builds a
-signed and notarized macOS ARM64 release, an unsigned Windows x64 release, and unsigned Linux x64
+signed and notarized macOS ARM64 and x64 release, an unsigned Windows x64 release, and unsigned Linux x64
 and arm64 AppImages in GitHub Actions.
 Installed builds check GitHub Releases for updates and expose download/restart controls in the account
 popover. Release signing secrets and the complete procedure are documented in

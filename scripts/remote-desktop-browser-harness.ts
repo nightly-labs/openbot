@@ -18,7 +18,7 @@ const runtimePaths = await resolveRemoteDesktopRuntime({
   overrideRoot: resolve(
     "build/remote-desktop-runtime",
     process.platform === "win32" ? "win32" : "darwin",
-    process.platform === "win32" ? "x64" : "arm64",
+    process.platform === "win32" ? "x64" : process.arch,
   ),
 });
 if (!runtimePaths) throw new Error("Build the remote desktop runtime before the browser E2E test.");

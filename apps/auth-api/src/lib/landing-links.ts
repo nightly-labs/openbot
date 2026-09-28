@@ -6,6 +6,9 @@ export const OPENBOT_DOWNLOAD_LINKS = {
   linux: "/download/linux",
 } as const;
 
+// Not a platform of its own: the landing pages offer Apple silicon, and this link is for Intel Macs.
+export const OPENBOT_MACOS_INTEL_DOWNLOAD_LINK = "/download/macos?arch=x64";
+
 export const OPENBOT_LINKS = {
   contact: "https://x.com/OpenBot_",
   download: "#download",

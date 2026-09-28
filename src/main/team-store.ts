@@ -12,7 +12,7 @@ import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { permanentInviteExpiresAt } from "@openbot/contracts/invite-links";
 import type {
   AvatarImageInput,
@@ -850,9 +850,7 @@ export class TeamStore {
       await this.#persist();
       return result;
     }
-    if (state.members.length >= INPUT_LIMITS.teamMembers) {
-      throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: INPUT_LIMITS.teamMembers }));
-    }
+    requireNewMemberSeat(state);
     const member: StoredMember = {
       id: randomUUID(),
       accountId: user.id,
@@ -893,17 +891,21 @@ export class TeamStore {
     validatePassword(password);
     const state = this.#requireState();
     const normalizedUsername = username.trim().toLowerCase();
-    if (state.members.some((member) => member.username === normalizedUsername)) {
-      throw new TeamStoreError(sourceText("error.team.usernameTaken"));
-    }
-    const invite = this.#findUsableInvite(token);
-    if (!invite) throw new TeamStoreError(sourceText("error.team.inviteInvalid"));
-    if (invite.email) throw new TeamStoreError(sourceText("error.team.inviteRequiresAccount"));
-    if (state.members.length >= INPUT_LIMITS.teamMembers) {
-      throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: INPUT_LIMITS.teamMembers }));
-    }
+    const requireJoin = () => {
+      if (state.members.some((member) => member.username === normalizedUsername)) {
+        throw new TeamStoreError(sourceText("error.team.usernameTaken"));
+      }
+      const invite = this.#findUsableInvite(token);
+      if (!invite) throw new TeamStoreError(sourceText("error.team.inviteInvalid"));
+      if (invite.email) throw new TeamStoreError(sourceText("error.team.inviteRequiresAccount"));
+      requireNewMemberSeat(state);
+      return invite;
+    };
+    requireJoin();
     const credentials = await hashPassword(password);
     this.#requireUnchangedState(state);
+    // A concurrent join can take the username, the invitation or the last seat during the hash.
+    const invite = requireJoin();
     const member: StoredMember = {
       id: randomUUID(),
       username: normalizedUsername,
@@ -987,6 +989,7 @@ export class TeamStore {
     const member = state.members.find((candidate) => candidate.id === memberId);
     if (!member) throw new TeamStoreError(sourceText("error.team.memberNotFound"));
     if (member.role === "owner") throw new TeamStoreError(sourceText("error.team.ownerCannotChange"));
+    if (patch.disabled === false && member.disabled) requireMemberSeat(state);
     if (patch.role !== undefined) {
       if (patch.role !== "admin" && patch.role !== "member") throw new TeamStoreError("Invalid role.");
       member.role = patch.role;
@@ -1278,6 +1281,21 @@ function identityOf(host: StoredTeam): TeamIdentity {
     enabledOnLaunch: host.enabledOnLaunch,
     logoVersion: host.serverLogo?.version ?? null,
   };
+}
+
+/** A new member needs a stored record and a seat. */
+function requireNewMemberSeat(host: StoredTeam): void {
+  if (host.members.length >= INPUT_LIMITS.teamMembers) {
+    throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: INPUT_LIMITS.teamMembers }));
+  }
+  requireMemberSeat(host);
+}
+
+/** Disabled members keep their record but not their seat, so a remote revoke frees one. */
+function requireMemberSeat(host: StoredTeam): void {
+  if (host.members.filter((member) => !member.disabled).length >= DEFAULT_TEAM_MEMBER_LIMIT) {
+    throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: DEFAULT_TEAM_MEMBER_LIMIT }));
+  }
 }
 
 function hostOwner(host: StoredTeam): StoredMember | undefined {

@@ -100,6 +100,8 @@ function buildExecutable(): void {
       "-DWHISPER_BUILD_TESTS=OFF",
       "-DWHISPER_BUILD_SERVER=OFF",
       ...(process.platform === "win32" ? ["-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"] : []),
+      // Without a target, clang uses the runner's macOS version, which is above the app's minimum.
+      ...(process.platform === "darwin" ? ["-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"] : []),
     ],
     { stdio: "inherit" },
   );

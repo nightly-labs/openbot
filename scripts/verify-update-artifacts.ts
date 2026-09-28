@@ -51,9 +51,10 @@ if (platform === "linux" || platform === "linux-arm64") {
   throw new Error(`Missing blockmap for ${basename(artifactPath)}.`);
 }
 
+// Each macOS job builds its own architecture, and electron-builder writes x64 to `dist/mac`.
 const resourcesRoot =
   platform === "macos"
-    ? join(distRoot, "mac-arm64", "OpenBot.app", "Contents", "Resources")
+    ? join(distRoot, process.arch === "arm64" ? "mac-arm64" : "mac", "OpenBot.app", "Contents", "Resources")
     : join(distRoot, platform === "windows" ? "win-unpacked" : `${platform}-unpacked`, "resources");
 if (existsSync(join(resourcesRoot, "whisper", "model"))) {
   throw new Error("The packaged application contains the on-demand Whisper model.");

@@ -410,7 +410,7 @@ binary, never stops startup.
 ### Managed provider updates
 
 The main process offers the version that the section above selects. The lock pins each provider
-for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
+for `darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
 that it is not supported instead of offering a download. An older managed installation is display
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.

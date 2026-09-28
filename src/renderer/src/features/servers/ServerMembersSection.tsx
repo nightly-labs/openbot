@@ -1,4 +1,4 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { InviteSummary, TeamPresenceMember, TeamRole } from "@openbot/contracts/ipc";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { AppTextKey } from "@openbot/i18n";
@@ -138,6 +138,17 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       panels.invite.result && !panels.invite.result.permanent && Date.parse(panels.invite.result.expiresAt) <= now(),
     );
   const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
+  /** This host or the account plane applies the limit. A legacy HTTP peer can be a version without it. */
+  const memberLimit = () => (permanentSupported() ? DEFAULT_TEAM_MEMBER_LIMIT : null);
+  const membersFull = () => {
+    const limit = memberLimit();
+    return limit !== null && activeMembers().length >= limit;
+  };
+  const membersCount = () => {
+    const count = activeMembers().length;
+    const limit = memberLimit();
+    return limit === null ? t("server.members.count", { count }) : t("server.members.limitCount", { count, limit });
+  };
   const inactiveLegacyMembers = createMemo(() =>
     props.server.kind === "remote" && /^https?:\/\//u.test(props.server.apiUrl ?? "")
       ? props.members.filter((member) => member.disabled && member.role !== "owner")
@@ -155,6 +166,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
     () =>
       canManage() &&
       published() &&
+      !membersFull() &&
       busy() === null &&
       (panels.invite.mode !== "email" || normalizeEmailAddress(panels.invite.email) !== null),
   );
@@ -285,8 +297,12 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
         <Show when={canManage()}>{inviteComposer()}</Show>
         <SettingsSection
           class="server-settings-members-section"
-          title={t("server.members.title")}
-          description={t("server.members.count", { count: activeMembers().length })}
+          title={
+            <span class="server-settings-members-title">
+              {t("server.members.title")}
+              <Badge variant={membersFull() ? "warning-light" : "secondary"}>{membersCount()}</Badge>
+            </span>
+          }
           actions={
             <label class="server-settings-search">
               <Search aria-hidden="true" />
@@ -491,9 +507,14 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
                 )}
               </Show>
             </div>
-            <Show when={panels.invite.mode === "perma"}>
-              <Text variant="caption" tone="muted" class="server-settings-perma-hint">
+            <Show when={panels.invite.mode === "perma" && !membersFull()}>
+              <Text variant="caption" tone="muted" class="server-settings-invite-hint">
                 {t("server.invite.permaHint")}
+              </Text>
+            </Show>
+            <Show when={membersFull()}>
+              <Text variant="caption" tone="muted" class="server-settings-invite-hint">
+                {t("server.invite.full", { limit: DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
             </Show>
             <Show

@@ -76,8 +76,8 @@ mac:
       to: whisper/bin
     - from: build/remote-desktop-runtime
       to: remote-desktop-runtime
-    - from: build/cua-driver/darwin/arm64
-      to: cua-driver/darwin/arm64
+    - from: build/cua-driver/darwin/${arch}
+      to: cua-driver/darwin/${arch}
   # The Computer Use driver arrives signed by Cua AI with the hardened runtime, a secure timestamp
   # and `com.apple.security.automation.apple-events`. Re-signing it with OpenBot's inherited
   # entitlements would drop that entitlement and break the driver's Automation route, so its own
@@ -96,13 +96,13 @@ mac:
     NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
     NSUserActivityTypes:
       - NSUserActivityTypeBrowsingWeb
+  # No `arch` here: a target's own `arch` list replaces the one given on the command line, so
+  # `--x64` would still build ARM64. With no flag, electron-builder builds for the machine it runs
+  # on. Build one architecture at a time: the Whisper and remote desktop builds on disk are for the
+  # architecture of the machine that made them.
   target:
-    - target: dmg
-      arch:
-        - arm64
-    - target: zip
-      arch:
-        - arm64
+    - dmg
+    - zip
 win:
   icon: build/icon-production.ico
   extraResources:

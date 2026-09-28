@@ -170,6 +170,12 @@ async function createFixture() {
         sbomAsset: "remote-desktop-runtime-darwin-arm64.spdx.json",
         sbomSha256: "d".repeat(64),
       },
+      "darwin-x64": {
+        asset: "remote-desktop-runtime-darwin-x64.tar.gz",
+        sha256: "a".repeat(64),
+        sbomAsset: "remote-desktop-runtime-darwin-x64.spdx.json",
+        sbomSha256: "f".repeat(64),
+      },
       "win32-x64": {
         asset: "remote-desktop-runtime-win32-x64.tar.gz",
         sha256: "c".repeat(64),
