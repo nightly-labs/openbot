@@ -190,7 +190,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
             )
           }
           onWidthChange={setBrowserPanelWidth}
-          capturePreview={props.runtime ? null : undefined}
+          capturePreview={props.runtime?.browser.capturePreview}
           onOpenTab={(tabId, trigger) => {
             browserPreviewTrigger = trigger;
             if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
