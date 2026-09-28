@@ -230,9 +230,10 @@ async function handleAccount(
     return json(await removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: await services.auth.listAccountSessions(token) });
-  const [, encodedSessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
-  if (encodedSessionId !== undefined && request.method === "DELETE") {
-    await services.auth.revokeAccountSession(token, decodeURIComponent(encodedSessionId));
+  // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
+  const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
+  if (sessionId !== undefined && request.method === "DELETE") {
+    await services.auth.revokeAccountSession(token, sessionId);
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
   return null;

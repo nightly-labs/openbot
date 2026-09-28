@@ -82,14 +82,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
         (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
       ),
     );
-  // The profile panel shares the agent settings panel's remembered width and its place in the layout.
-  const [profilePanelWidth, setProfilePanelWidth] = createSettingsPanelWidth();
-  createEffect(
-    () => (profileOpen() ? profilePanelWidth() : null),
-    (width) => {
-      if (width !== null) setSettingsPanelWidth(width);
-    },
-  );
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
     // The web client reaches a host through `runtime`, which has no storage methods.
@@ -345,22 +337,30 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
       </Show>
 
       <Show when={profileOpen() && props.accountProfile}>
-        {(profile) => (
-          <Loading>
-            <AccountProfilePanel
-              account={profile().account}
-              onUpdateAccountName={profile().onUpdateAccountName}
-              onUpdateAccountAvatar={profile().onUpdateAccountAvatar}
-              onListAccountSessions={profile().onListAccountSessions}
-              onRevokeAccountSession={profile().onRevokeAccountSession}
-              width={profilePanelWidth()}
-              maxWidth={settingsMaxWidth}
-              onResize={setProfilePanelWidth}
-              onResizeEnd={saveSettingsPanelWidth}
-              onClose={() => setActiveRightPanel("none")}
-            />
-          </Loading>
-        )}
+        {(profile) => {
+          // Read on each open, as the agent settings panel does, so the two share the last saved width
+          // and the layout reserves this panel's width.
+          const [width, setWidth] = createSettingsPanelWidth();
+          createEffect(width, (value) => {
+            setSettingsPanelWidth(value);
+          });
+          return (
+            <Loading>
+              <AccountProfilePanel
+                account={profile().account}
+                onUpdateAccountName={profile().onUpdateAccountName}
+                onUpdateAccountAvatar={profile().onUpdateAccountAvatar}
+                onListAccountSessions={profile().onListAccountSessions}
+                onRevokeAccountSession={profile().onRevokeAccountSession}
+                width={width()}
+                maxWidth={settingsMaxWidth}
+                onResize={setWidth}
+                onResizeEnd={saveSettingsPanelWidth}
+                onClose={() => setActiveRightPanel("none")}
+              />
+            </Loading>
+          );
+        }}
       </Show>
     </>
   );

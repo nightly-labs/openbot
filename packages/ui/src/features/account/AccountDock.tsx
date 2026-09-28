@@ -54,9 +54,9 @@ interface AccountDockProps {
   onLogout?: () => Promise<void>;
   onOpenExternal: (destination: ExternalDestination) => Promise<void>;
   onOpenPermissions?: () => void;
-  onOpenProfile?: () => void;
-  onOpenSettings?: (trigger: HTMLElement) => void;
-  onOpenSkills?: () => void;
+  onOpenProfile?: (() => void) | undefined;
+  onOpenSettings?: ((trigger: HTMLElement) => void) | undefined;
+  onOpenSkills?: (() => void) | undefined;
 }
 
 const PRODUCT_NAME = "OpenBot";

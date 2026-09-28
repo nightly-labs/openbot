@@ -25,7 +25,6 @@ const avatars: R2Bucket = {
       storageClass: "Standard",
       customMetadata: {},
       httpMetadata: { contentType: "image/png" },
-      range: undefined,
       writeHttpMetadata() {},
     } satisfies R2Object;
   },

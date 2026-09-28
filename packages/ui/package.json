@@ -148,6 +148,7 @@
     "./features/settings/McpSignInDialog": "./src/features/settings/McpSignInDialog.tsx",
     "./features/settings/OpenCodeKeyDialog": "./src/features/settings/OpenCodeKeyDialog.tsx",
     "./features/settings/PluginUninstallDialog": "./src/features/settings/PluginUninstallDialog.tsx",
+    "./features/settings/ProfileNameSaveBar": "./src/features/settings/ProfileNameSaveBar.tsx",
     "./features/settings/SettingsDialogShell": "./src/features/settings/SettingsDialogShell.tsx",
     "./features/settings/SettingsMobileConnectTab": "./src/features/settings/SettingsMobileConnectTab.tsx",
     "./features/settings/SettingsProfileTab": "./src/features/settings/SettingsProfileTab.tsx",

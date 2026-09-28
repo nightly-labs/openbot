@@ -1,8 +1,7 @@
 import type { AccountSession, AvatarImageInput, CentralAuthUser } from "@openbot/contracts/ipc";
-import { Button, Text } from "@openbot/ui";
 import { SettingsPanel, SettingsPanelContent, SettingsPanelHeader } from "../../components/SettingsPanel";
 import { useText } from "../../text";
-import { SaveBarDock } from "./SettingsDialogShell";
+import { ProfileNameSaveBar } from "./ProfileNameSaveBar";
 import { SettingsProfileTab } from "./SettingsProfileTab";
 import { createSettingsProfileStore } from "./stores/profile-store";
 
@@ -21,7 +20,7 @@ export interface AccountProfilePanelProps {
 
 /**
  * Settings > Profile in the right side panel, for a client that has no settings dialog. The tab and
- * its store are the desktop ones; the panel adds the name save bar that the dialog footer holds.
+ * its store and its name save bar are the ones the desktop dialog uses.
  */
 export default function AccountProfilePanel(props: AccountProfilePanelProps) {
   const { t } = useText();
@@ -55,37 +54,7 @@ export default function AccountProfilePanel(props: AccountProfilePanelProps) {
       <SettingsPanelContent>
         <SettingsProfileTab store={profile} account={props.account} canListSessions canRevokeSession />
       </SettingsPanelContent>
-      <SaveBarDock value={profile.nameDirty() ? true : null}>
-        {() => (
-          <section class="settings-modal-save-bar" aria-label={t("settings.save.region")}>
-            <Text variant="caption" tone="muted">
-              {t("settings.save.notSaved")}
-            </Text>
-            <div class="settings-modal-save-actions">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={profile.state.profile.busy}
-                onClick={profile.resetName}
-              >
-                {t("settings.save.reset")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="default"
-                loading={profile.state.profile.busy}
-                loadingLabel={t("common.saving")}
-                disabled={profile.state.profile.busy}
-                onClick={() => void profile.saveName()}
-              >
-                {t("common.save")}
-              </Button>
-            </div>
-          </section>
-        )}
-      </SaveBarDock>
+      <ProfileNameSaveBar store={profile} />
     </SettingsPanel>
   );
 }

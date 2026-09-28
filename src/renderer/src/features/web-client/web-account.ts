@@ -13,6 +13,8 @@ export interface WebAccountCalls {
   revokeSession: (sessionId: string) => Promise<void>;
 }
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 export function createWebAccountCalls(
   accountFetch: typeof fetch,
   onAccountChanged: () => Promise<void>,
@@ -21,15 +23,19 @@ export function createWebAccountCalls(
     path: string,
     init: { method: string; body?: BodyInit; contentType?: string } = { method: "GET" },
   ): Promise<Response> {
+    // As the team client's browser requests: a stalled request fails, so the panel does not stay busy.
     const response = await accountFetch(`/api/browser/${path}`, {
       method: init.method,
       credentials: "same-origin",
       cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers:
         init.method === "GET"
           ? {}
           : { "Content-Type": init.contentType ?? "application/json", "X-OpenBot-Browser": "1" },
       ...(init.body === undefined ? {} : { body: init.body }),
+    }).catch(() => {
+      throw new Error(errorMessage(null));
     });
     if (!response.ok) throw new Error(errorMessage(await response.json().catch(() => null)));
     return response;
