@@ -28,10 +28,10 @@ const targetAgentId = z
 // An installed skill can come from the marketplace too, so its id is not always a local skill id.
 const installedSkillId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
 export const installLocalSkillSchema = z.object({ agentId: targetAgentId, skillId, revision }).strict();
-export const setSkillEnabledSchema = z
+const setSkillEnabledSchema = z
   .object({ agentId: targetAgentId, skillId: installedSkillId, enabled: z.boolean() })
   .strict();
-export const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
+const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
 
 export interface LocalSkillTools {
   create(input: CreateLocalSkillInput): Promise<MarketplaceSkillDetail>;
