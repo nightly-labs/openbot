@@ -233,8 +233,11 @@ export function createConversationViewScope(props: ConversationProps) {
   const queue = createQueueStore({ props, hiddenAwaitingReplyIds });
   const { activeDeliveries, awaitingReplies, orderedQueuedDeliveries, presentedQueueDeliveries, queuePanelVisible } =
     queue;
-  const dismissAwaitingReplies = () =>
+  const dismissAwaitingReplies = () => {
     setHiddenAwaitingReplyIds((ids) => new Set([...ids, ...awaitingReplies().map((row) => row.id)]));
+    // The close button leaves with the block, so the focus goes back to the composer.
+    setComposerFocusRequest((value) => value + 1);
+  };
   const activity = createActivityStore({
     props,
     activeDeliveries,
