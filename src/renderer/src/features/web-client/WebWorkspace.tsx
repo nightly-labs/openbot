@@ -159,6 +159,26 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     controller.setEditingEditId(null);
     clearStoredQueueEdit();
   });
+  /** Releases an open queue edit on the connected host first, so its message can run after sign-out. */
+  async function signOut() {
+    const agentId = controller.editingAgentId();
+    const deliveryId = controller.editingDeliveryId();
+    const editId = controller.editingEditId();
+    if (
+      agentId &&
+      deliveryId &&
+      editId &&
+      workspace.state.status === "online" &&
+      controller.editingServerId() === workspace.state.host?.hostId
+    ) {
+      try {
+        await workspace.runtime.editQueue({ agentId, action: "cancel", deliveryId, editId });
+      } catch {
+        // Sign-out continues. The message stays held until someone deletes it.
+      }
+    }
+    await props.onLogout();
+  }
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   const hostOffline = () => !noHost() && workspace.state.status !== "online";
@@ -834,7 +854,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 withServerRail={layout.serverRailVisible()}
                 onRefreshUsage={refreshUsage}
                 onUpdateAction={unavailable}
-                onLogout={props.onLogout}
+                onLogout={signOut}
                 onOpenExternal={openWebDestination}
                 onOpenProfile={profileAgentId() ? openProfile : undefined}
                 onOpenSettings={
