@@ -4,6 +4,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { Toaster } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
+import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled, Show } from "solid-js";
 import { StaticI18nProvider } from "../../i18n-context";
@@ -245,7 +246,7 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     >
       <div class="web-app">
         <Toaster />
-        <Show when={state.loaded} fallback={<p role="status">{text.t("webClient.loading")}</p>}>
+        <Show when={state.loaded} fallback={<AppLoadingScreen variant="production" />}>
           <Show
             keyed
             when={state.account?.id}

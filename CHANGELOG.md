@@ -20,6 +20,11 @@ All notable changes to OpenBot will be documented here. The project follows
   install steps and a QR code of the invite link. You can close the card. Settings > Mobile Connect
   always shows the same steps, the QR code and a button that copies the link.
 
+### Changed
+
+- Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
+  loads. Before, the page showed only the text "Loading OpenBot…".
+
 ### Fixed
 
 - Show the highlight of the selected server across the full row in the mobile server list. Before,

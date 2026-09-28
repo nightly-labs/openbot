@@ -82,6 +82,8 @@ interface BrowserPanelProps {
   liveViewTabId: string | null;
   liveViewRuntime: BrowserViewRuntime;
   canCloseTabs?: boolean;
+  /** False where the page cannot leave the window, such as the web app. */
+  canEnterPip?: boolean;
   onBack: () => void;
   onEnterPip: () => void;
   /**
@@ -97,6 +99,14 @@ export default function BrowserPanel(props: BrowserPanelProps) {
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
   const actingControl = () => (props.activeControl?.phase === "acting" ? props.activeControl : undefined);
+  /**
+   * The shape of the host's page. A live view takes that shape rather than the window's, so the page
+   * fills its surface instead of sitting between bars.
+   */
+  const [frameSize, setFrameSize] = createSignal<{ width: number; height: number } | undefined>(undefined, {
+    equals: (previous, next) => previous?.width === next?.width && previous?.height === next?.height,
+  });
+  const live = () => props.liveViewTabId !== null;
   let hideButton: HTMLButtonElement | undefined;
   let panel: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -125,7 +135,14 @@ export default function BrowserPanel(props: BrowserPanelProps) {
   const surface = () => (
     <div class="browser-surface" ref={(element) => (surfaceElement = element)}>
       <Show when={props.liveViewTabId}>
-        {(tabId) => <BrowserLiveView runtime={props.liveViewRuntime} tabId={tabId()} active={props.open} />}
+        {(tabId) => (
+          <BrowserLiveView
+            runtime={props.liveViewRuntime}
+            tabId={tabId()}
+            active={props.open}
+            onFrameSize={setFrameSize}
+          />
+        )}
       </Show>
       <Show when={props.tabs.length === 0}>
         <div class="browser-empty-state">
@@ -134,6 +151,20 @@ export default function BrowserPanel(props: BrowserPanelProps) {
         </div>
       </Show>
     </div>
+  );
+
+  const hideBrowserButton = () => (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      ref={(element) => (hideButton = element)}
+      class="no-drag browser-hide"
+      aria-label={t("browser.hide")}
+      title={t("browser.hide")}
+      onClick={props.onBack}
+    >
+      <Minimize2 aria-hidden="true" />
+    </Button>
   );
 
   const addressBar = () => (
@@ -169,8 +200,14 @@ export default function BrowserPanel(props: BrowserPanelProps) {
         {
           "browser-panel-controlled": Boolean(actingControl()),
           "browser-panel-mac-controls": props.macWindowControls === true,
+          "browser-panel-live": live(),
         },
       ]}
+      style={
+        live() && frameSize()
+          ? `--browser-frame-width: ${frameSize()?.width}; --browser-frame-height: ${frameSize()?.height};`
+          : undefined
+      }
       aria-label={t("browser.panel.label")}
       value={props.activeTab?.id ?? "__empty"}
       activationMode="automatic"
@@ -279,22 +316,13 @@ export default function BrowserPanel(props: BrowserPanelProps) {
             </Button>
           </Show>
         </div>
+        <Show when={props.open && live()}>{hideBrowserButton()}</Show>
       </header>
-      <Portal>
-        <Show when={props.open}>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            ref={(element) => (hideButton = element)}
-            class="no-drag browser-hide"
-            aria-label={t("browser.hide")}
-            title={t("browser.hide")}
-            onClick={props.onBack}
-          >
-            <Minimize2 aria-hidden="true" />
-          </Button>
-        </Show>
-      </Portal>
+      {/* A live view is a card inside the window, so its hide button belongs to its own header. The
+       * full-bleed panel pins it to the window corner instead. */}
+      <Show when={props.open && !live()}>
+        <Portal>{hideBrowserButton()}</Portal>
+      </Show>
       <Tabs.Content forceMount value={props.activeTab?.id ?? "__empty"} class="browser-tab-panel">
         <div class="browser-toolbar">
           <Show when={props.onNavigate}>
@@ -349,7 +377,7 @@ export default function BrowserPanel(props: BrowserPanelProps) {
               </span>
             )}
           </Show>
-          <Show when={props.canCloseTabs !== false}>
+          <Show when={props.canEnterPip !== false}>
             <Button
               variant="ghost"
               type="button"

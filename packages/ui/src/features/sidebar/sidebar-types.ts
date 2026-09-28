@@ -27,10 +27,10 @@ export interface SidebarProps {
   activeChannelId?: string | null;
   onSelectChannel?: (channelId: string) => void;
   showingArchivedChannels?: boolean;
-  onToggleArchivedChannels?: () => void;
-  onCreateChannel?: () => void;
+  onToggleArchivedChannels?: (() => void) | undefined;
+  onCreateChannel?: (() => void) | undefined;
   onEditChannel?: (channelId: string) => void;
-  onDeleteChannel?: (channelId: string) => Promise<void>;
+  onDeleteChannel?: ((channelId: string) => Promise<void>) | undefined;
   serverName: string;
   onOpenServerSettings?: (trigger: HTMLElement) => void;
   /** The desktop server menu. Without it, the server name opens the server settings. */

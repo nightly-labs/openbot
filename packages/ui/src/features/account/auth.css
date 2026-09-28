@@ -146,6 +146,73 @@
   }
 }
 
+/* The min-height matches the email step of .account-login, so the lockup stays in place when the login replaces this screen. */
+.app-loading-indicator {
+  width: 180px;
+  min-height: 209px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  gap: 14px;
+}
+
+.app-loading-track {
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border);
+}
+
+.app-loading-bar {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--openbot-logo-production);
+  animation: app-loading-sweep 1.4s var(--openbot-ease-in-out) infinite;
+}
+
+.app-loading-label {
+  margin: 0;
+  background: linear-gradient(
+    90deg,
+    var(--openbot-text-muted) 0%,
+    var(--openbot-text-muted) 35%,
+    var(--openbot-text-primary) 50%,
+    var(--openbot-text-muted) 65%,
+    var(--openbot-text-muted) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  font-size: var(--openbot-text-md);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: app-loading-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+@keyframes app-loading-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes app-loading-shine {
+  0%,
+  18% {
+    background-position: 100% 0;
+  }
+  82%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+
 .account-login-form {
   width: 100%;
   display: grid;
@@ -1108,6 +1175,23 @@
     animation-delay: 18ms;
   }
 
+  .app-loading-screen .account-login-brand-lockup {
+    animation: setup-enter var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+  }
+
+  /* The delay keeps a fast session check from flashing the loader. */
+  .app-loading-indicator {
+    animation: app-loading-enter var(--openbot-duration-overlay) 250ms var(--openbot-ease-out) both;
+  }
+
+  @keyframes app-loading-enter {
+    from {
+      filter: blur(4px);
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
   .account-login[data-transition="forward"] .account-login-form[data-auth-panel="code"] {
     animation: account-login-panel-forward var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
   }
@@ -1166,6 +1250,24 @@
   .account-login[data-transition] .account-login-description,
   .account-login[data-transition] .account-login-form[data-auth-panel] {
     animation: none;
+  }
+
+  .app-loading-bar {
+    width: 100%;
+    animation: app-loading-pulse 1.8s ease-in-out infinite alternate;
+  }
+
+  .app-loading-label {
+    background: none;
+    color: var(--openbot-text-muted);
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+
+  @keyframes app-loading-pulse {
+    from {
+      opacity: 0.35;
+    }
   }
 }
 
