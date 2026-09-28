@@ -73,8 +73,8 @@ mock. The separate web preview implements the browser runtime with that same moc
 - The queue of the selected agent comes from the host's queue route. The client reads it again when
   the host sends `queue-invalidated`. Steer, cancel, reorder, and edit use the same Team API routes
   as a desktop client of a remote host, and edit holds the message when the host has `queue-edit-v1`.
-  An open edit stays in local storage, so a reload can release the hold. Sign-out, a host change,
-  and a revoked session remove it.
+  An open edit stays in local storage after a reload or a host change, so the user can release the
+  hold on its host. Sign-out, another account, and a revoked session remove it.
 - Reconnect reads authoritative state. It never resends uncertain messages. A user must check
   the conversation and acknowledge the uncertain result. New-agent requests with an unknown
   result require closing the form and refreshing before another attempt.

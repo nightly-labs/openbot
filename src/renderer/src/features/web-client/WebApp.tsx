@@ -9,7 +9,6 @@ import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen"
 import { currentText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled, Show } from "solid-js";
 import { StaticI18nProvider } from "../../i18n-context";
-import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";
 
@@ -55,8 +54,6 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   let sessionEnded = false;
   function clearSession(ended = true) {
     sessionEnded = ended;
-    // An open queue edit holds this account's message text. The next account must not restore it.
-    if (ended) clearStoredQueueEdit();
     sessionGeneration += 1;
     setState((draft) => {
       draft.account = null;

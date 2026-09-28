@@ -49,7 +49,7 @@ interface WebWorkspaceState {
   agentsLoaded: boolean;
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
-  /** The queues read from the host, by agent. The selected agent's queue is read on selection. */
+  /** The queues read from the host, by agent. Each agent's queue is read on connect and on each change. */
   queues: Record<string, QueueSnapshot>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
@@ -143,8 +143,10 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
-  /** The newest queue read by agent. An older read that answers later must not replace it. */
-  const queueReads = new Map<string, number>();
+  /** The queue read in flight by agent. An event during a read asks for one more read. */
+  const queueLoads = new Map<string, { generation: number; again: boolean }>();
+  /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
+  const queueRevisions = new Map<string, number>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -287,19 +289,19 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.browserControlState = event.state;
           });
-        if (event.type === "agents-changed") reconcileAgents(event.agents);
+        if (event.type === "agents-changed") {
+          reconcileAgents(event.agents);
+          for (const agent of event.agents) if (!state.queues[agent.id]) loadQueue(agent.id);
+        }
         if (event.type === "queue-changed") {
           const { snapshot } = event;
-          queueReads.set(snapshot.agentId, (queueReads.get(snapshot.agentId) ?? 0) + 1);
+          queueRevisions.set(snapshot.agentId, (queueRevisions.get(snapshot.agentId) ?? 0) + 1);
           setState((draft) => {
             draft.queues[snapshot.agentId] = snapshot;
           });
         }
-        if (
-          event.type === "queue-invalidated" &&
-          (event.agentId === selectedId || state.queues[event.agentId] !== undefined)
-        )
-          void loadQueue(event.agentId);
+        if (event.type === "queue-invalidated" && state.agents.some((agent) => agent.id === event.agentId))
+          loadQueue(event.agentId);
         if (event.type === "sidebar-layout-changed")
           setState((draft) => {
             if (event.layout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = event.layout;
@@ -554,6 +556,7 @@ export function createWebWorkspace(
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
       preferences.reconcileActiveServerPins(agents.map((agent) => agent.id));
+      for (const agent of agents) loadQueue(agent.id);
       void runtime
         .currentMemberId?.()
         .then((memberId) => {
@@ -627,19 +630,32 @@ export function createWebWorkspace(
       item.loading = false;
     });
   }
-  async function loadQueue(id: string) {
-    const current = generation;
-    const read = (queueReads.get(id) ?? 0) + 1;
-    queueReads.set(id, read);
-    try {
-      const queue = await runtime.queue(id);
-      if (disposed || current !== generation || queueReads.get(id) !== read) return;
-      setState((draft) => {
-        draft.queues[id] = queue;
-      });
-    } catch (error) {
-      if (current === generation) report(error);
+  // Coalesce event bursts per agent, as `refresh` does for the conversation.
+  function loadQueue(id: string): void {
+    const running = queueLoads.get(id);
+    if (running?.generation === generation) {
+      running.again = true;
+      return;
     }
+    const load = { generation, again: true };
+    queueLoads.set(id, load);
+    void (async () => {
+      try {
+        while (load.again && !disposed && load.generation === generation) {
+          load.again = false;
+          const revision = queueRevisions.get(id) ?? 0;
+          const queue = await runtime.queue(id);
+          if (disposed || load.generation !== generation || (queueRevisions.get(id) ?? 0) !== revision) continue;
+          setState((draft) => {
+            draft.queues[id] = queue;
+          });
+        }
+      } catch (error) {
+        if (load.generation === generation) report(error);
+      } finally {
+        if (queueLoads.get(id) === load) queueLoads.delete(id);
+      }
+    })();
   }
   /** Sends one queue change for the selected agent. The host then sends the new queue as an event. */
   function changeQueue(change: (agentId: string) => Promise<void>) {
@@ -664,7 +680,6 @@ export function createWebWorkspace(
         uncertain: false,
       };
     });
-    void loadQueue(id);
     try {
       await load(id);
     } catch (error) {
@@ -689,8 +704,8 @@ export function createWebWorkspace(
       setState((draft) => {
         if (sidebarLayout.revision >= draft.sidebarLayout.revision) draft.sidebarLayout = sidebarLayout;
       });
+      for (const agent of agents) loadQueue(agent.id);
       if (!selectedId && agents[0]) await select(agents[0].id);
-      else if (selectedId) void loadQueue(selectedId);
       await refresh();
     } catch (error) {
       if (current === generation) report(error);
@@ -826,12 +841,19 @@ export function createWebWorkspace(
     },
     reorderQueue: (deliveryIds: string[]) => changeQueue((agentId) => runtime.reorderQueue({ agentId, deliveryIds })),
     async updateQueued(
-      agentId: string,
       deliveryId: string,
       text: string,
       keepAttachmentIds: string[],
       attachmentDraftIds: string[],
+      target?: { agentId: string; serverId: string },
     ): Promise<boolean> {
+      const agentId = target?.agentId ?? selectedId;
+      if (!agentId) return false;
+      // The edit belongs to the host that queued the message. This client talks only to the connected one.
+      if (target && target.serverId !== hostId) {
+        report(new Error(currentText().t("webClient.error.hostChanged")));
+        return false;
+      }
       const current = generation;
       try {
         await runtime.updateQueued({ agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds });

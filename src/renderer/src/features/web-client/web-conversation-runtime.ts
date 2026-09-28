@@ -61,7 +61,11 @@ export function createWebConversationRuntime(
     agent: {
       discardDraftAttachment: (id) => remote.discard(id),
       downloadAttachments: unavailable,
-      editQueuedMessage: (input) => remote.editQueue(input),
+      editQueuedMessage: async (input, serverId) => {
+        // The edit belongs to the host that queued the message. This client talks only to the connected one.
+        if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+        return remote.editQueue(input);
+      },
       listInstalledSkills: async () => [],
       listMcpServers: async () => [],
       onAttachmentImport(listener) {

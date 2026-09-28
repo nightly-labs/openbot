@@ -46,6 +46,7 @@ import { createChannelsController } from "../channels/channels-controller";
 import { Conversation, createConversationController } from "../conversation/Conversation";
 import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
+import { composerDraftKey } from "../conversation/conversation-keys";
 import type { FilesPort } from "../files/files-port";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabilities";
@@ -79,6 +80,8 @@ const CONNECTING_STATUS: AgentStatus = {
 const WEB_APP_INFO: AppInfo = { name: "OpenBot", version: "web", platform: "darwin", variant: "production" };
 /** Below this width the web shows one pane at a time; see `web-client.css`. */
 const PHONE_QUERY = "(max-width: 720px)";
+/** The account whose queue edit the browser may hold under `QUEUE_EDIT_STORAGE_KEY`. */
+const QUEUE_EDIT_ACCOUNT_KEY = "openbot.web.queue-edit-account";
 
 function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue"> {
   const { avatarSeed, avatarHue } = createFirstAgentDraft();
@@ -141,24 +144,42 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       );
     },
   });
+  // A stored queue edit holds message text of the account that opened it. Another account must not restore it.
+  try {
+    if (window.localStorage.getItem(QUEUE_EDIT_ACCOUNT_KEY) !== props.accountId) clearStoredQueueEdit();
+    window.localStorage.setItem(QUEUE_EDIT_ACCOUNT_KEY, props.accountId);
+  } catch {
+    clearStoredQueueEdit();
+  }
   const controller = createConversationController({ onTypingChange: () => {} });
+  onCleanup(() => {
+    if (!props.accountSessionEnded?.()) return;
+    // The controller stores an open edit when it closes. Clear it first, so sign-out leaves no text.
+    controller.setEditingEditId(null);
+    clearStoredQueueEdit();
+  });
   /** The host list was read and holds no computer to connect to. */
   const noHost = () => !workspace.state.host && (workspace.state.hostsLoaded || Boolean(workspace.state.hostsError));
   const hostOffline = () => !noHost() && workspace.state.status !== "online";
   let resetRevocation = workspace.state.revocationRevision;
   createEffect(
     () => ({ host: workspace.state.host?.hostId, revocation: workspace.state.revocationRevision }),
-    ({ host, revocation }) => {
+    ({ revocation }) => {
       const revoked = revocation !== resetRevocation;
       resetRevocation = revocation;
-      // A queue edit restored after a reload holds its message on the host. Keep it while that host
-      // connects, so Save or Cancel can release the hold.
-      const editServerId = untrack(controller.editingServerId);
-      if (!revoked && editServerId && (host === undefined || host === editServerId)) return;
-      clearStoredQueueEdit();
-      controller.setDrafts({});
       controller.setComposerErrors({});
       controller.setConversationErrors({});
+      // A queue edit holds its message on its host until Save or Cancel. Keep the edit and its draft
+      // after a reload or a host change, so the user can release the hold on that host.
+      const editAgentId = untrack(controller.editingAgentId);
+      const editServerId = untrack(controller.editingServerId);
+      if (!revoked && editAgentId && editServerId) {
+        const key = composerDraftKey({ agentId: editAgentId, serverId: editServerId });
+        controller.setDrafts((drafts) => (drafts[key] ? { [key]: drafts[key] } : {}));
+        return;
+      }
+      clearStoredQueueEdit();
+      controller.setDrafts({});
       controller.setEditingDraftBackup(null);
       controller.setEditingOriginalAttachmentIds([]);
       controller.setEditingPendingSave(null);
@@ -1121,12 +1142,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
               onCancelQueuedMessage={workspace.cancelQueued}
               onSteerQueuedMessage={workspace.steerQueued}
-              onUpdateQueuedMessage={async (deliveryId, text, keepAttachmentIds, attachmentDraftIds, target) => {
-                const agentId = target?.agentId ?? workspace.state.selectedId;
-                return agentId
-                  ? workspace.updateQueued(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds)
-                  : false;
-              }}
+              onUpdateQueuedMessage={workspace.updateQueued}
               onReorderQueue={workspace.reorderQueue}
               onActivateBrowserTab={workspace.activateBrowserTab}
               onCloseBrowserTab={(tabId) => workspace.runtime.closeBrowserTab(tabId)}
