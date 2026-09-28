@@ -26,4 +26,24 @@ export const messages = defineMessages("update", {
   "update.provider.unavailable": "Provider updates are unavailable.",
   "update.provider.downloadsUnavailable": "Provider downloads are unavailable.",
   "update.provider.startFailed": "The update could not start. Try again.",
+
+  // The "What's new" dialog after an app update.
+  "update.whatsNew.title": "What’s new in OpenBot",
+  "update.whatsNew.description": "The new features and changes in this version of OpenBot.",
+  "update.whatsNew.version": "Version {version}",
+  "update.whatsNew.updatedFrom": "Updated from {from} to {to}",
+  "update.whatsNew.group.added": "New",
+  "update.whatsNew.group.changed": "Improved",
+  "update.whatsNew.group.fixed": "Fixed",
+  "update.whatsNew.notices": "Do this after the update",
+  "update.whatsNew.showFixes": { one: "Show {count} fix", other: "Show {count} fixes" },
+  "update.whatsNew.hideFixes": "Hide fixes",
+  "update.whatsNew.loading": "Loading the release notes…",
+  "update.whatsNew.failed.title": "The release notes did not load",
+  "update.whatsNew.failed.body":
+    "Make sure that you are online and try again. The full changelog also shows all changes.",
+  "update.whatsNew.empty.title": "No new features in this version",
+  "update.whatsNew.empty.body": "This version has small fixes. The full changelog shows all changes.",
+  "update.whatsNew.changelog": "Full changelog",
+  "update.whatsNew.done": "Got it",
 });
