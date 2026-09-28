@@ -33,11 +33,13 @@ export interface BrowserHostTab {
   queue: Promise<unknown>;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
+  /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
+  documents: number;
   /**
-   * The last preview frame, with the page and capture generation it shows. A preview waits behind the
-   * agent's actions, so the preview card shows this frame instead while the tab is busy.
+   * The last preview frame, with the page, document and capture generation it shows. A preview waits
+   * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.
    */
-  preview?: { frame: BrowserPreview; url: string; generation: number } | undefined;
+  preview?: { frame: BrowserPreview; url: string; document: number; generation: number } | undefined;
   /** The preview capture on `queue`, so preview requests share one capture and do not pile up. */
   previewCapture?: Promise<BrowserPreview> | undefined;
   /**

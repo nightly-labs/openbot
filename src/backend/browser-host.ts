@@ -805,7 +805,9 @@ export class BrowserHost {
     const tab = this.#requireTab(tabId);
     if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
     const cached =
-      tab.preview?.generation === tab.captureGeneration && tab.preview.url === currentTabUrl(tab)
+      tab.preview?.generation === tab.captureGeneration &&
+      tab.preview.document === tab.documents &&
+      tab.preview.url === currentTabUrl(tab)
         ? tab.preview.frame
         : null;
     if (cached && tab.pendingOperations > 0) return cached;
@@ -820,6 +822,7 @@ export class BrowserHost {
 
   #capturePreviewFrame(tab: BrowserHostTab): Promise<BrowserPreview> {
     const generation = tab.captureGeneration;
+    const document = tab.documents;
     const url = currentTabUrl(tab);
     const capture = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
       const image = await boundEngineOperation(
@@ -848,7 +851,9 @@ export class BrowserHost {
       const preview = cropped.resize({ width: 960, height: 600, quality: "good" });
       const dataUrl = `data:image/jpeg;base64,${preview.toJPEG(72).toString("base64")}`;
       const frame = { dataUrl, width: 960, height: 600 };
-      if (tab.captureGeneration === generation && currentTabUrl(tab) === url) tab.preview = { frame, url, generation };
+      if (tab.captureGeneration === generation && tab.documents === document && currentTabUrl(tab) === url) {
+        tab.preview = { frame, url, document, generation };
+      }
       return frame;
     });
     tab.previewCapture = capture;
@@ -1266,6 +1271,7 @@ export class BrowserHost {
       diagnostics,
       recording: false,
       captureGeneration: 0,
+      documents: 0,
       viewInvalidations: new Set(),
     };
   }
@@ -1480,6 +1486,7 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      tab.documents += 1;
       if (tab.secretDocument) {
         tab.secretDocument = false;
         contents.navigationHistory.clear();
