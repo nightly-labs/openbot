@@ -12,6 +12,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { BlurReveal } from "@/shared/components/blur-reveal";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { ChatTarget } from "../model/chat-target";
 
@@ -57,7 +58,10 @@ export function ChatHeader({
           accessibilityLabel={t("common.back")}
           fallbackBackground={fallbackBackground}
           liquidGlassAvailable={liquidGlassAvailable}
-          onPress={onBack}
+          onPress={() => {
+            void haptics.impact("soft");
+            onBack();
+          }}
         >
           <ArrowLeft color={iconColor} size={24} strokeWidth={2} />
         </ChatGlassIconButton>
@@ -82,17 +86,19 @@ export function ChatHeader({
             accessibilityLabel={readOnly ? target.name : t("mobile.chat.header.info", { name: target.name })}
             disabled={readOnly}
             hitSlop={8}
-            onPress={() =>
-              target.kind === "channel"
-                ? router.push({
-                    pathname: "/channel-info/[channelId]",
-                    params: { channelId: target.id, serverId: target.serverId },
-                  })
-                : router.push({
-                    pathname: "/agent-info/[agentId]",
-                    params: { agentId: target.id, serverId: target.serverId },
-                  })
-            }
+            onPress={() => {
+              void haptics.impact("soft");
+              if (target.kind === "channel")
+                router.push({
+                  pathname: "/channel-info/[channelId]",
+                  params: { channelId: target.id, serverId: target.serverId },
+                });
+              else
+                router.push({
+                  pathname: "/agent-info/[agentId]",
+                  params: { agentId: target.id, serverId: target.serverId },
+                });
+            }}
           >
             {target.kind === "channel" ? (
               <Link.AppleZoomTarget>
@@ -139,12 +145,13 @@ export function ChatHeader({
                   accessibilityLabel={t("mobile.chat.header.actionsNeeded")}
                   fallbackBackground={fallbackBackground}
                   liquidGlassAvailable={liquidGlassAvailable}
-                  onPress={() =>
+                  onPress={() => {
+                    void haptics.impact("soft");
                     router.push({
                       pathname: "/channel-actions/[channelId]",
                       params: { channelId: actionTarget.id, serverId: actionTarget.serverId },
-                    })
-                  }
+                    });
+                  }}
                 >
                   <TriangleAlert color={String(warning)} size={24} strokeWidth={2.5} />
                 </ChatGlassIconButton>

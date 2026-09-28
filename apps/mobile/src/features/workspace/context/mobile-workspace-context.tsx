@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -25,6 +26,7 @@ import {
 } from "@openbot/team-client";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { updateHostIdentity } from "@openbot/team-client/team-admin-requests";
 import {
   deleteAgent,
   discardAttachmentDraft,
@@ -103,6 +105,7 @@ const NO_IDS: string[] = [];
 const EMPTY_SERVER: MobileServer = {
   id: "unavailable",
   name: "OpenBot",
+  logoKey: null,
   kind: "local",
   state: "connecting",
   initialConnectionPending: true,
@@ -214,7 +217,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         serverAgentIds.current.delete(server.id);
         presenceSignatures.current.delete(server.id);
         queryClient.removeQueries({ queryKey: ["chat-queue", server.id] });
-        for (const kind of ["server-members", "server-invites", "agent-avatar"]) {
+        for (const kind of ["server-members", "server-invites", "agent-avatar", "server-logo"]) {
           queryClient.removeQueries({ queryKey: [kind, session.apiUrl, session.user.id, sessionScope, server.id] });
         }
       }
@@ -237,6 +240,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return {
             id: host.hostId,
             name: host.name,
+            logoKey: host.logoKey,
             kind: serverKind(host.hostId, session.host?.hostId),
             state: previous?.state ?? "unknown",
             initialConnectionPending: previous?.initialConnectionPending ?? true,
@@ -627,8 +631,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });
       }
-      if (event.type === "agents-changed") replaceServerAgents(serverId, event.agents);
-      else if (event.type === "conversation") {
+      if (event.type === "agents-changed") {
+        replaceServerAgents(serverId, event.agents);
+        // Access and auto-approve are not in the agent summary; the host sends this event when either changes.
+        void queryClient.invalidateQueries({
+          queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId],
+          predicate: (query) => query.queryKey.at(-1) === "admin",
+        });
+      } else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
         knownIds.add(event.snapshot.agentId);
         serverAgentIds.current.set(serverId, knownIds);
@@ -649,8 +659,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (conversationStore.get(event.agentId))
           void loadConversation(event.agentId, serverId, true).catch(() => undefined);
       } else if (event.type === "team-identity") {
+        // The host uploads its logo to the account service under its own version, so that version
+        // is also the directory key that loads the image.
         setServers((current) =>
-          current.map((server) => (server.id === serverId ? { ...server, name: event.serverName } : server)),
+          current.map((server) =>
+            server.id === serverId ? { ...server, name: event.serverName, logoKey: event.logoVersion } : server,
+          ),
         );
       }
     },
@@ -838,6 +852,33 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         connections.current.get(serverId)?.refresh();
         await refreshHosts();
       },
+      canEditServerIdentity: (serverId) => {
+        const server = servers.find((candidate) => candidate.id === serverId);
+        return Boolean(
+          server &&
+            server.state === "online" &&
+            (server.role === "owner" || server.role === "admin") &&
+            serverCapabilities.current.get(serverId)?.includes(HOST_ADMIN_CAPABILITY),
+        );
+      },
+      updateServerIdentity: async (serverId, input) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (!server || server.role === "member")
+          throw new Error(currentText().t("mobile.server.settings.identityNotAllowed"));
+        if (!serverCapabilities.current.get(serverId)?.includes(HOST_ADMIN_CAPABILITY))
+          throw new Error(currentText().t("mobile.server.settings.identityUnsupported"));
+        await updateHostIdentity(teamApi(serverId), input);
+        if (input.serverName !== undefined) {
+          const serverName = input.serverName;
+          setServers((current) =>
+            current.map((candidate) => (candidate.id === serverId ? { ...candidate, name: serverName } : candidate)),
+          );
+        }
+        // The host has written the name and logo to the account service; read the new logo key.
+        // A new generation drops a directory read that started before the save, and the refresh
+        // reads again after it. The change is saved, so a failed read must not report a failure.
+        await refreshMemberships().catch(() => undefined);
+      },
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
         await refreshHosts();
@@ -852,6 +893,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           {
             id: host.hostId,
             name: host.name,
+            logoKey: host.logoKey,
             kind: "remote",
             state: "unknown",
             initialConnectionPending: true,
@@ -1064,6 +1106,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     pinnedChannelIds,
     hiddenChannelIds,
     refreshHosts,
+    refreshMemberships,
     readRefresh,
     request,
     serverDirectoryError,

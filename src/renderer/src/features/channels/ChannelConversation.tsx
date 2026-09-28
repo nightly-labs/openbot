@@ -164,6 +164,22 @@ export function ChannelConversation(props: ChannelConversationProps) {
     reply: string | null;
     attachments: DraftAttachment[];
   }>({ text: "", reply: null, attachments: [] });
+  const addAttachments = (load: () => Promise<AttachmentSummary[]>) =>
+    void channels.perform(async () => {
+      const selectedId = channels.state.selectedId;
+      const attachments = await load();
+      if (selectedId === channels.state.selectedId)
+        setComposer((state) => {
+          state.attachments = [...state.attachments, ...attachments];
+        });
+    });
+  /** Dropped or pasted files. Only a browser runtime imports them here; the desktop preload imports its own. */
+  const canImportFiles = () => Boolean(runtime().importAttachments && channels.state.page?.channel.archived === false);
+  const importFiles = (files: File[]) => {
+    const importAttachments = runtime().importAttachments;
+    if (importAttachments && canImportFiles() && files.length > 0) addAttachments(() => importAttachments(files));
+  };
+  const [dropActive, setDropActive] = createSignal(false);
   const [copyError, setCopyError] = createSignal<string | null>(null);
   createEffect(
     () => channels.state.selectedId,
@@ -209,6 +225,11 @@ export function ChannelConversation(props: ChannelConversationProps) {
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
+    // The browser has no app to open a file in, so a file it can preview opens in the panel.
+    if (action === "open" && runtime().fileActions === "browser" && canPreviewAttachment(attachment)) {
+      void previewChannelAttachment(attachment);
+      return;
+    }
     void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
   /** Absent where the runtime saves files one at a time, so the row offers no bulk download. */
@@ -489,7 +510,26 @@ export function ChannelConversation(props: ChannelConversationProps) {
       class="conversation-panel"
       aria-label={t("channel.conversation.label")}
       style={`--settings-panel-width: ${panelWidth()}px`}
+      onDragEnter={(event) => {
+        if (canImportFiles() && event.dataTransfer?.types.includes("Files")) setDropActive(true);
+      }}
+      onDragOver={(event) => {
+        if (canImportFiles() && event.dataTransfer?.types.includes("Files")) event.preventDefault();
+      }}
+      onDragLeave={(event) => {
+        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)))
+          setDropActive(false);
+      }}
+      onDrop={(event) => {
+        setDropActive(false);
+        if (!canImportFiles()) return;
+        event.preventDefault();
+        importFiles([...(event.dataTransfer?.files ?? [])]);
+      }}
     >
+      <Show when={dropActive()}>
+        <div class="attachment-drop-overlay">{t("conversation.view.drop")}</div>
+      </Show>
       <Show when={channels.state.error}>
         <p role="alert">
           {sourceText(channels.state.error ?? "")}
@@ -890,6 +930,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       value={composer.text}
                       disabled={channels.state.pending}
                       onSubmit={submit}
+                      onPasteFiles={importFiles}
                       onValueChange={(text) =>
                         setComposer((state) => {
                           state.text = text;
@@ -903,16 +944,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       variant="ghost"
                       class="composer-button"
                       aria-label={t("channel.composer.attach")}
-                      onClick={() =>
-                        void channels.perform(async () => {
-                          const selectedId = channels.state.selectedId;
-                          const attachments = await runtime().agent.chooseAttachments({ filter: "all" });
-                          if (selectedId === channels.state.selectedId)
-                            setComposer((state) => {
-                              state.attachments = [...state.attachments, ...attachments];
-                            });
-                        })
-                      }
+                      onClick={() => addAttachments(() => runtime().agent.chooseAttachments({ filter: "all" }))}
                     >
                       <Plus aria-hidden="true" />
                     </Button>
@@ -935,6 +967,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               {(file) => (
                 <Loading>
                   <ChannelFilePreviewPanel
+                    allowExternalOpen={runtime().fileActions === "native"}
                     preview={file().preview}
                     agents={agentList()}
                     defaultWidth={panelWidth}

@@ -42,7 +42,6 @@ export function QueuedMessageActionsScreen() {
   // Another device holds this one. Only confirmed deletion remains available.
   const editedElsewhere = Boolean(delivery.editing) && held?.id !== delivery.id;
   const finish = (action: Promise<boolean>) => {
-    void haptics.impact();
     void action.then((done) => {
       void haptics.notification(done ? "success" : "error");
       if (done) router.back();
@@ -74,10 +73,7 @@ export function QueuedMessageActionsScreen() {
         <SettingsRow
           leading={<Pencil color={foreground} size={22} />}
           disabled={locked || editedElsewhere || !queue.canEdit}
-          onPress={() => {
-            void haptics.selection();
-            router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } });
-          }}
+          onPress={() => router.push({ pathname: "/queued-messages/edit", params: { chat, deliveryId: delivery.id } })}
         >
           <Typography>{t("common.edit")}</Typography>
         </SettingsRow>

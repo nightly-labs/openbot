@@ -25,7 +25,12 @@ import { toAgentProfile } from "../../app-message-projection";
 import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
-import { createWebWorkspaceRuntime, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
+import {
+  createWebWorkspaceRuntime,
+  WebHostIncompatibleError,
+  type WebRuntimeEvents,
+  type WebWorkspaceRuntime,
+} from "./web-runtime";
 
 interface WebConversation {
   page: ConversationPage | null;
@@ -39,6 +44,8 @@ interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
   host: RemoteTeamHost | null;
   agents: AgentSummary[];
+  /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
+  agentsLoaded: boolean;
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
@@ -51,6 +58,14 @@ interface WebWorkspaceState {
   presence: TeamPresenceSnapshot | null;
   capabilities: string[];
   status: "connecting" | "online" | "offline";
+  /** The last connection found that the host speaks no protocol this build speaks. */
+  incompatibility: {
+    hostId: string;
+    code: WebHostIncompatibleError["code"];
+    message: string;
+    hostAppVersion: string;
+    hostProtocol: { minimum: number; maximum: number };
+  } | null;
   hostsLoaded: boolean;
   hostsLoading: boolean;
   hostsError: string | null;
@@ -88,6 +103,7 @@ export function createWebWorkspace(
     hosts: [],
     host: null,
     agents: [],
+    agentsLoaded: false,
     selectedId: null,
     conversations: {},
     approvals: [],
@@ -99,6 +115,7 @@ export function createWebWorkspace(
     presence: null,
     capabilities: [],
     status: "offline",
+    incompatibility: null,
     hostsLoaded: false,
     hostsLoading: false,
     hostsError: null,
@@ -152,6 +169,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.revocationRevision += 1;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.selectedId = null;
             draft.approvals = [];
@@ -337,6 +355,7 @@ export function createWebWorkspace(
     setState((draft) => {
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
+      draft.agentsLoaded = true;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) delete draft.conversations[id];
@@ -376,6 +395,7 @@ export function createWebWorkspace(
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.approvals = [];
             draft.prompts = [];
@@ -462,6 +482,7 @@ export function createWebWorkspace(
       draft.status = "connecting";
       draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
+      draft.agentsLoaded = false;
       draft.selectedId = null;
       if (!sameHost) {
         draft.conversations = {};
@@ -485,6 +506,7 @@ export function createWebWorkspace(
       draft.capabilities = [];
       draft.presence = null;
       draft.error = null;
+      draft.incompatibility = null;
     });
     try {
       const capabilities = await runtime.connect(host);
@@ -501,6 +523,7 @@ export function createWebWorkspace(
       setState((draft) => {
         draft.capabilities = capabilities;
         draft.agents = agents;
+        draft.agentsLoaded = true;
         draft.status = "online";
         draft.browserTabs = browserTabs;
         draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
@@ -532,8 +555,17 @@ export function createWebWorkspace(
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
+        // The workspace shows an incompatible host in full, so it is not also reported as an error.
+        if (error instanceof WebHostIncompatibleError)
+          draft.incompatibility = {
+            hostId: host.hostId,
+            code: error.code,
+            message: error.message,
+            hostAppVersion: error.hostAppVersion,
+            hostProtocol: { ...error.hostProtocol },
+          };
       });
-      report(error);
+      if (!(error instanceof WebHostIncompatibleError)) report(error);
     }
   }
   async function load(id: string, older = false) {

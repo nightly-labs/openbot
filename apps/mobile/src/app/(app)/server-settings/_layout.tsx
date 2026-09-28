@@ -1,6 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
 import { isIOS } from "@/shared/lib/platform";
+import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { initialRouteName: "index" };
@@ -10,6 +11,7 @@ export default function ServerSettingsLayout() {
   const background = String(useCSSVariable("--openbot-bg-sheet"));
   return (
     <Stack
+      screenListeners={sheetBackHaptics}
       screenOptions={{
         presentation: "card",
         headerBackButtonDisplayMode: "minimal",
@@ -23,6 +25,7 @@ export default function ServerSettingsLayout() {
     >
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.serverOptions") }} />
       <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
+      <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
     </Stack>
   );
 }

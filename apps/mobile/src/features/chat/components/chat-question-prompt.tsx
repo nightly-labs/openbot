@@ -6,6 +6,7 @@ import { Check, ChevronLeft, ChevronRight, MessageSquareText, Send, X } from "lu
 import { TextInput, View } from "react-native";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function ChatQuestionPrompt({
@@ -123,7 +124,10 @@ export function ChatQuestionPrompt({
             isDisabled={disabled}
             accessibilityLabel={option.label}
             className="h-auto min-h-12 justify-start rounded-[18px] px-2 py-2"
-            onPress={() => answer([option.label])}
+            onPress={() => {
+              void haptics.selection();
+              answer([option.label]);
+            }}
           >
             <View
               className="w-10 self-stretch items-center justify-center rounded-xl bg-control"
@@ -182,7 +186,15 @@ export function ChatQuestionPrompt({
         ) : (
           <View className="flex-1" />
         )}
-        <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => answer([])}>
+        <Button
+          variant="ghost"
+          size="sm"
+          isDisabled={disabled}
+          onPress={() => {
+            void haptics.selection();
+            answer([]);
+          }}
+        >
           <Typography type="body-xs" className="text-text-secondary">
             {t("mobile.chat.question.skip")}
           </Typography>

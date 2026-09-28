@@ -2,6 +2,7 @@ import type { AgentPromptResolution, RespondToPromptInput } from "@openbot/contr
 import { useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { answeredPromptResolution, nextUnansweredQuestion } from "@/features/chat/model/question-prompt";
+import { haptics } from "@/shared/lib/haptics";
 
 interface PromptState {
   scope: string;
@@ -56,7 +57,9 @@ export function useQuestionPrompt(
     try {
       await respond(agentId, { requestId: prompt.requestId, answers });
       update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
+      void haptics.notification("success");
     } catch {
+      void haptics.notification("error");
       update({ failedAnswers: answers });
     } finally {
       submitting.current.delete(scope);
@@ -94,10 +97,14 @@ export function useQuestionPrompt(
     },
     replyInChat: state.replyInChat,
     setReplyInChat: (replyInChat: boolean) => {
-      if (!disabled) update({ replyInChat });
+      if (disabled) return;
+      void haptics.selection();
+      update({ replyInChat });
     },
     setIndex: (index: number) => {
-      if (!disabled && prompt?.questions[index]) update({ index, replyInChat: false });
+      if (disabled || !prompt?.questions[index]) return;
+      void haptics.selection();
+      update({ index, replyInChat: false });
     },
     answer,
     submit,

@@ -12,6 +12,7 @@ import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
 
@@ -46,6 +47,7 @@ export function ProfileSettingsScreen() {
       await operation();
     } catch (cause) {
       setError(errorMessage(cause, t("mobile.settings.profile.saveFailed")));
+      void haptics.notification("error");
     } finally {
       locked.current = false;
       setPendingAction(null);
@@ -58,6 +60,7 @@ export function ProfileSettingsScreen() {
       await updateProfile({ name: validatedName.name });
       setDraftName(null);
       Keyboard.dismiss();
+      void haptics.notification("success");
     });
   }
 
@@ -66,9 +69,16 @@ export function ProfileSettingsScreen() {
     if (!photo) return;
     const avatar = { bytes: photo.bytes, mimeType: photo.mimeType };
     await updateProfile({ avatar });
+    void haptics.notification("success");
+  }
+
+  async function removePhoto(): Promise<void> {
+    await updateProfile({ avatar: null });
+    void haptics.notification("success");
   }
 
   function editPhoto(): void {
+    void haptics.impact("soft");
     if (!avatarUrl) {
       void perform("photo", choosePhoto);
       return;
@@ -78,7 +88,7 @@ export function ProfileSettingsScreen() {
       {
         text: t("mobile.settings.profile.removePhoto"),
         style: "destructive",
-        onPress: () => void perform("photo", () => updateProfile({ avatar: null })),
+        onPress: () => void perform("photo", removePhoto),
       },
       { text: t("common.cancel"), style: "cancel" },
     ]);

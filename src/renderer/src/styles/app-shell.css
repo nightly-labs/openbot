@@ -911,31 +911,34 @@ textarea {
   }
 }
 
-/* The server menu view has no rail, so the server name moves right of the macOS traffic lights. */
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-topbar {
+/* The server menu view has no rail, so the server name moves right of the macOS traffic lights. The web
+ * frame uses the macOS geometry but has no traffic lights, so these rules skip it. */
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-topbar {
   padding-left: 78px;
 }
 
 /* A compact sidebar is too narrow for the traffic lights and the expand button in one row, and the
  * menu view has no rail to hold the traffic lights. The button moves to its own row under them, over
  * the search button. */
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-topbar {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-topbar {
   height: calc(var(--left-header-height) + 36px);
   align-items: flex-end;
   justify-content: center;
   padding: 0 0 2px;
 }
 
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-server-name,
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-new-button {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-server-name,
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button {
   display: none;
 }
 
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-toggle-button {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-toggle-button {
   transform: none;
 }
 
-.app-frame-platform-darwin:not(.app-frame-with-server-rail) .sidebar-compact .sidebar-toggle-button:active {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame)
+  .sidebar-compact
+  .sidebar-toggle-button:active {
   transform: scale(0.96);
 }
 

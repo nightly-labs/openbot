@@ -4,6 +4,7 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ImagePlus, Trash2 } from "lucide-react-native";
 import { useRef, useState } from "react";
+import { haptics } from "@/shared/lib/haptics";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
 
@@ -51,7 +52,10 @@ export function AgentPhotoPicker({
         variant="ghost"
         accessibilityLabel={t(hasPhoto ? "mobile.agent.photo.change" : "mobile.agent.photo.add")}
         isDisabled={disabled}
-        onPress={() => void choose()}
+        onPress={() => {
+          void haptics.impact("soft");
+          void choose();
+        }}
       >
         <ImagePlus color={foreground} size={20} />
       </Button>
@@ -62,6 +66,7 @@ export function AgentPhotoPicker({
           accessibilityLabel={t("mobile.agent.photo.remove")}
           isDisabled={disabled}
           onPress={() => {
+            void haptics.selection();
             setError(null);
             onChange(null);
           }}

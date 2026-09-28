@@ -28,6 +28,7 @@ export function useAgentContextMenu(agent: MobileAgent) {
       else await duplicateAgent(agent.id);
       void haptics.notification();
     } catch (error) {
+      void haptics.notification("error");
       const text = currentText();
       Alert.alert(
         text.t(action === "delete" ? "mobile.agent.menu.deleteFailed" : "mobile.agent.menu.duplicateFailed"),

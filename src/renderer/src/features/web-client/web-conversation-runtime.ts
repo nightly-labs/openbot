@@ -71,10 +71,11 @@ export function createWebConversationRuntime(
         };
       },
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
-      openSharedFile: unavailable,
-      openWorkspaceFile: unavailable,
-      previewSharedFile: unavailable,
-      previewWorkspaceFile: unavailable,
+      // The browser has no app to open a host file in, so it downloads.
+      openSharedFile: ({ path }) => files.saveShared(path),
+      openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
+      previewSharedFile: ({ path }) => files.previewShared(path),
+      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,

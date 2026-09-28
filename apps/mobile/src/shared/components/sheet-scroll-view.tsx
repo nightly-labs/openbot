@@ -59,7 +59,7 @@ export function SheetScrollView({
         <View className="z-10" style={header ? undefined : { height: 1, marginBottom: -1 }}>
           {showCustomEdge ? (
             <SheetScrollEdgeEffect
-              surface={header ? "canvas" : "sheet"}
+              surface="sheet"
               style={
                 header
                   ? { bottom: -24, left: 0, position: "absolute", right: 0, top: 0 }

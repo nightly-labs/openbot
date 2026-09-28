@@ -7,6 +7,7 @@ import { ExternalLink, ImageOff } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import type { ImageDimensions } from "../model/image-dimensions";
 import { attachmentTypeLabel, rememberImageDimensions, useAttachmentFile } from "./attachment-preview";
@@ -113,7 +114,10 @@ export function ChatAttachmentView({
               accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
               accessibilityState={{ disabled: pending || !uri || failed }}
               disabled={pending || !uri || failed}
-              onPress={() => setViewing(true)}
+              onPress={() => {
+                void haptics.impact("soft");
+                setViewing(true);
+              }}
               style={FILL}
             >
               {failed ? (
@@ -239,7 +243,10 @@ export function ChatAttachmentView({
         accessibilityHint={tooLarge ? t("mobile.chat.attachment.tooLargeHint") : undefined}
         // The card is one element to a screen reader, so the progress inside it is read from here.
         accessibilityValue={upload !== undefined ? { min: 0, max: 100, now: Math.round(upload * 100) } : undefined}
-        onPress={share}
+        onPress={() => {
+          void haptics.impact("soft");
+          share();
+        }}
       >
         <View className="size-11 items-center justify-center rounded-xl bg-success/15">
           <Typography.Paragraph type="body-xs" className="font-semibold" style={{ color: fileColor }}>

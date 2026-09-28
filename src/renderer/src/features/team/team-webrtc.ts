@@ -83,6 +83,13 @@ const receiveMainPort = (event: MessageEvent): void => {
 };
 window.addEventListener("message", receiveMainPort);
 
+// A socket that was open when the network went away still reads as open when it comes back, but
+// Signal closed it within minutes. This end sends nothing on it for 45 minutes, so it does not see
+// that, and every device reads the host as offline until the app restarts.
+window.addEventListener("online", () => {
+  for (const state of peers.values()) if (!state.signalHost) replaceSignal(state);
+});
+
 async function handleCommand(command: BridgeCommand): Promise<void> {
   try {
     if (command.type === "connect") {
@@ -561,6 +568,18 @@ function sendSignal(state: PeerState, message: SignalClientMessage): void {
   const socket = (state.signalHost ?? state).socket;
   if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error(sourceText("error.remote.signalNotConnected"));
   socket.send(JSON.stringify(message));
+}
+
+/** Opens a new Signal socket now. The old one is detached first, so its close schedules nothing. */
+function replaceSignal(state: PeerState): void {
+  if (state.closed) return;
+  if (state.reconnectTimer !== null) clearTimeout(state.reconnectTimer);
+  state.reconnectTimer = null;
+  state.reconnectAttempt = 0;
+  const socket = state.socket;
+  state.socket = null;
+  socket?.close(1000, "Network changed");
+  connectSignal(state);
 }
 
 function scheduleSignalReconnect(state: PeerState): void {

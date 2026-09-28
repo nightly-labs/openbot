@@ -52,7 +52,11 @@ import {
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
+import {
+  decodeTeamProtocolSupportV1,
+  type TeamProtocolSupportV1,
+  teamProtocolUpdateDirection,
+} from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -94,6 +98,12 @@ export interface WebAdminRuntime {
   team: ServerAdminPort;
 }
 
+export interface WebFile {
+  name: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   browser: BrowserViewRuntime;
@@ -125,7 +135,11 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<{ name: string; mimeType: string; base64: string }>;
+  download(attachmentId: string): Promise<WebFile>;
+  /** A file under the host's shared folder. */
+  sharedFile(path: string): Promise<WebFile>;
+  /** A file in one agent's workspace on the host. */
+  workspaceFile(agentId: string, path: string): Promise<WebFile>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -135,7 +149,8 @@ export interface WebWorkspaceRuntime {
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
-  search(agentId: string, query: string, cursor?: string): Promise<ConversationSearchPage>;
+  /** Searches one agent's conversation, or every conversation on the host when `agentId` is not set. */
+  search(agentId: string | undefined, query: string, cursor?: string): Promise<ConversationSearchPage>;
   /**
    * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
    * does. The browser then sends no end request, which the revoked cookie would only have refused.
@@ -147,6 +162,20 @@ export interface WebRuntimeEvents {
   connection(update: RemoteTeamConnectionUpdate): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+}
+
+/** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
+export class WebHostIncompatibleError extends Error {
+  readonly code: "client_update_required" | "host_update_required";
+  readonly hostAppVersion: string;
+  readonly hostProtocol: TeamProtocolSupportV1["protocol"];
+
+  constructor(support: TeamProtocolSupportV1, code: WebHostIncompatibleError["code"]) {
+    super(currentText().t("webClient.error.incompatible"));
+    this.code = code;
+    this.hostAppVersion = support.appVersion;
+    this.hostProtocol = support.protocol;
+  }
 }
 
 interface WebConnectionDependencies {
@@ -498,8 +527,11 @@ export function createWebWorkspaceRuntime(
         if (!result.ok || disposed || current !== generation)
           throw new Error(currentText().t("webClient.error.connectionUnavailable"));
         const support = decodeTeamProtocolSupportV1(await request("GET", TEAM_API_ROUTES.compatibility));
-        if (support.protocol.minimum > TEAM_PROTOCOL_V3 || support.protocol.maximum < TEAM_PROTOCOL_V3)
-          throw new Error(currentText().t("webClient.error.incompatible"));
+        const updateDirection = teamProtocolUpdateDirection(
+          { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
+          support.protocol,
+        );
+        if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
         capabilities = support.capabilities;
         if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
         return capabilities;
@@ -603,7 +635,8 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      return value;
+      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
+      return { ...value, previewUrl: null };
     },
     async cancelUpload() {
       uploadGeneration += 1;
@@ -614,18 +647,16 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
     },
     async download(id) {
-      const value = await request("GET", TEAM_API_ROUTES.attachment(id));
-      if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
-      const base64 = requiredString(value, "base64");
-      if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      return {
-        name: requiredString(value, "name"),
-        mimeType: requiredString(value, "mimeType"),
-        base64,
-      };
+      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
+    },
+    async sharedFile(path) {
+      const query = new URLSearchParams({ path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`));
+    },
+    async workspaceFile(agentId, path) {
+      // The released URL spells the agent `botId`.
+      const query = new URLSearchParams({ botId: agentId, path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
     },
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));
@@ -664,7 +695,12 @@ export function createWebWorkspaceRuntime(
       await deleteAgent(teamApi, agentId);
     },
     async search(agentId, query, cursor) {
-      const params = new URLSearchParams({ botId: agentId, q: query, limit: "50", ...(cursor ? { cursor } : {}) });
+      const params = new URLSearchParams({
+        ...(agentId ? { botId: agentId } : {}),
+        q: query,
+        limit: "50",
+        ...(cursor ? { cursor } : {}),
+      });
       const value = await request("GET", `${TEAM_API_ROUTES.messages.search}?${params}`);
       if (
         !isDynamicRecord(value) ||
@@ -697,6 +733,20 @@ export function createWebWorkspaceRuntime(
         releaseHostLock = null;
       }
     },
+  };
+}
+
+function decodeWebFile(value: unknown): WebFile {
+  if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
+  const base64 = requiredString(value, "base64");
+  if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  return {
+    name: requiredString(value, "name"),
+    mimeType: requiredString(value, "mimeType"),
+    base64,
   };
 }
 

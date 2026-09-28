@@ -1,6 +1,6 @@
 import { type MenuAction, MenuView } from "@expo/ui/community/menu";
 import type { SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
-import { router, Stack } from "expo-router";
+import { type Href, router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Bot, Layers3, Plus, Search, WifiOff } from "lucide-react-native";
@@ -33,14 +33,13 @@ import { ConnectionHeaderStatus } from "@/features/workspace/components/connecti
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { mobileSidebarItems } from "@/features/workspace/model/sidebar-layout";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
+import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
-// Agent search is not available in the current mobile release, so keep its entry points hidden until it is ready.
-const IS_AGENT_SEARCH_ENABLED = false;
 
 function TransitioningChatRow({
   chatId,
@@ -154,6 +153,11 @@ function HeaderIconButton({
       {children}
     </Pressable>
   );
+}
+
+function openFromMenu(href: Href): void {
+  void haptics.impact("soft");
+  router.push(href);
 }
 
 export function ConnectedScreen() {
@@ -385,7 +389,14 @@ export function ConnectedScreen() {
                     {t("mobile.agent.home.noAgentsBody")}
                   </Typography.Paragraph>
                 </View>
-                <Button size="md" variant="secondary" onPress={() => router.push("/add-agent")}>
+                <Button
+                  size="md"
+                  variant="secondary"
+                  onPress={() => {
+                    void haptics.impact("soft");
+                    router.push("/add-agent");
+                  }}
+                >
                   <Plus color={iconColor} size={18} strokeWidth={2} />
                   <Button.Label>{t("mobile.agent.home.addAgent")}</Button.Label>
                 </Button>
@@ -410,14 +421,15 @@ export function ConnectedScreen() {
           headerRight: isAndroid
             ? () => (
                 <View className="flex-row items-center gap-1">
-                  {IS_AGENT_SEARCH_ENABLED ? (
-                    <HeaderIconButton
-                      accessibilityLabel={t("mobile.agent.home.searchAgents")}
-                      onPress={() => router.push("/search-agents")}
-                    >
-                      <Search color={iconColor} size={22} strokeWidth={1.9} />
-                    </HeaderIconButton>
-                  ) : null}
+                  <HeaderIconButton
+                    accessibilityLabel={t("mobile.agent.home.searchAgents")}
+                    onPress={() => {
+                      void haptics.impact("soft");
+                      router.push("/search-agents");
+                    }}
+                  >
+                    <Search color={iconColor} size={22} strokeWidth={1.9} />
+                  </HeaderIconButton>
                   <MenuView
                     actions={optionsActions}
                     onPressAction={(event) => {
@@ -456,17 +468,23 @@ export function ConnectedScreen() {
             </Stack.Toolbar.View>
           </Stack.Toolbar>
           <Stack.Toolbar placement="right">
-            {IS_AGENT_SEARCH_ENABLED ? (
-              <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search-agents")} />
-            ) : null}
-            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")}>
-              <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
+            <Stack.Toolbar.Button
+              icon="magnifyingglass"
+              accessibilityLabel={t("mobile.agent.home.searchAgents")}
+              separateBackground
+              onPress={() => {
+                void haptics.impact("soft");
+                router.push("/search-agents");
+              }}
+            />
+            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")} separateBackground>
+              <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => openFromMenu("/add-agent")}>
                 {t("mobile.agent.home.addAgent")}
               </Stack.Toolbar.MenuAction>
               {sidebar?.layout ? (
                 <Stack.Toolbar.MenuAction
                   icon="folder.badge.plus"
-                  onPress={() => router.push({ pathname: "/section-form", params: { serverId: activeServer.id } })}
+                  onPress={() => openFromMenu({ pathname: "/section-form", params: { serverId: activeServer.id } })}
                 >
                   {t("mobile.agent.sectionForm.newTitle")}
                 </Stack.Toolbar.MenuAction>
@@ -474,13 +492,13 @@ export function ConnectedScreen() {
               {channels.supported ? (
                 <Stack.Toolbar.MenuAction
                   icon="number"
-                  onPress={() => router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
+                  onPress={() => openFromMenu({ pathname: "/add-channel", params: { serverId: activeServer.id } })}
                 >
                   {t("mobile.agent.home.newChannel")}
                 </Stack.Toolbar.MenuAction>
               ) : null}
               {hasHiddenChats ? (
-                <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => router.push("/hidden-chats")}>
+                <Stack.Toolbar.MenuAction icon="eye.slash" onPress={() => openFromMenu("/hidden-chats")}>
                   {t("mobile.agent.hidden.title")}
                 </Stack.Toolbar.MenuAction>
               ) : null}

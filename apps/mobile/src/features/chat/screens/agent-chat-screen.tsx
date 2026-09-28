@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
+import { router, useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowLeft } from "lucide-react-native";
@@ -6,6 +6,7 @@ import { Pressable, View } from "react-native";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function AgentChatScreen() {
@@ -14,21 +15,14 @@ export function AgentChatScreen() {
     unstable_dismissalBoundsRect: { minX: 0, maxX: 24 },
   });
 
-  const { avatarTransition, agentId } = useLocalSearchParams<{ avatarTransition?: string; agentId: string }>();
+  const { agentId } = useLocalSearchParams<{ agentId: string }>();
   const { agents } = useMobileWorkspace();
   const foreground = useThemeColor("foreground");
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
-  const resolvedAvatarTransition = Array.isArray(avatarTransition) ? avatarTransition[0] : avatarTransition;
-  const animateAvatarOnExit = resolvedAvatarTransition === "search";
   const agent = agents.find((candidate) => candidate.id === resolvedAgentId);
 
   if (agent) {
-    return (
-      <>
-        <Stack.Screen options={{ animation: animateAvatarOnExit ? "fade" : "slide_from_right" }} />
-        <MobileChatView key={`${agent.serverId}:${agent.id}`} animateAvatarOnExit={animateAvatarOnExit} agent={agent} />
-      </>
-    );
+    return <MobileChatView key={`${agent.serverId}:${agent.id}`} agent={agent} />;
   }
 
   return (
@@ -42,7 +36,11 @@ export function AgentChatScreen() {
       <Pressable
         accessibilityRole="button"
         className="min-h-12 flex-row items-center gap-2 rounded-full bg-control px-5"
-        onPress={() => (router.canGoBack() ? router.back() : router.replace("/connected"))}
+        onPress={() => {
+          void haptics.impact("soft");
+          if (router.canGoBack()) router.back();
+          else router.replace("/connected");
+        }}
       >
         <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
         <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>

@@ -154,7 +154,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
                 onOpenWorkspaceFile={openWorkspaceFile}
                 sourceUrl={attached()?.previewUrl ?? null}
                 onOpenExternally={openSidebarFileExternally}
-                onDownload={attached() ? downloadSidebarFile : undefined}
+                /* In the browser, "open" saves a shared or workspace file, so it is the download. */
+                onDownload={attached() ? downloadSidebarFile : props.runtime ? openSidebarFileExternally : undefined}
                 onReveal={attached() && !props.runtime ? revealSidebarFile : undefined}
                 onClose={closeSidebarFilePreview}
               />

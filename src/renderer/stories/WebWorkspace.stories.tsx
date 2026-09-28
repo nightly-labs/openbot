@@ -2,6 +2,7 @@ import { Toaster } from "@openbot/ui";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { WebWorkspace } from "../src/features/web-client/WebWorkspace";
 import type { WebRuntimeFactory } from "../src/features/web-client/web-client-context";
+import { WebHostIncompatibleError } from "../src/features/web-client/web-runtime";
 import { createMockWebRuntime } from "../src/preview/mock-web-runtime";
 import "../src/features/web-client/web-client.css";
 
@@ -49,6 +50,16 @@ const otherTabRuntime: WebRuntimeFactory = (...args) => ({
   },
 });
 
+const incompatibleRuntime: WebRuntimeFactory = (...args) => ({
+  ...createMockWebRuntime(...args),
+  connect: async () => {
+    throw new WebHostIncompatibleError(
+      { appVersion: "0.40.0", protocol: { minimum: 1, maximum: 2 }, capabilities: [] },
+      "host_update_required",
+    );
+  },
+});
+
 export const NoHost: Story = {
   args: { accountEmail: "you@example.com", createRuntime: noHostRuntime },
 };
@@ -59,4 +70,8 @@ export const HostsFailed: Story = {
 
 export const Disconnected: Story = {
   args: { accountEmail: "you@example.com", createRuntime: otherTabRuntime },
+};
+
+export const Incompatible: Story = {
+  args: { accountEmail: "you@example.com", createRuntime: incompatibleRuntime },
 };

@@ -26,6 +26,15 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
   )
     return true;
   if (
+    segments.length === 5 &&
+    segments[0] === "v2" &&
+    segments[1] === "remote" &&
+    segments[2] === "hosts" &&
+    segments[3] &&
+    segments[4] === "logo"
+  )
+    return true;
+  if (
     segments.length === 6 &&
     segments[0] === "v2" &&
     segments[1] === "remote" &&
