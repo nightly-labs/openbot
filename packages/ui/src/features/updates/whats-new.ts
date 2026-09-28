@@ -1,6 +1,6 @@
 // The display model of the "What's new" dialog. The notes come from the release notes in
-// CHANGELOG.md, which are already written for people, so an entry is one plain sentence and never
-// a commit title.
+// CHANGELOG.md, which are already written for people, so an entry is never a commit title. Each
+// entry is plain text: the loader removes the Markdown of the file, such as `**bold**` and code.
 
 export type WhatsNewGroupType = "added" | "changed" | "fixed";
 
@@ -52,8 +52,11 @@ export interface WhatsNewEntry {
   detail: string;
 }
 
-/** A sentence ends at `.`, `!` or `?` before a space and a capital letter or a quote. */
-const FIRST_SENTENCE = /^(.+?[.!?])\s+(?=[A-Z"“])(.+)$/su;
+/**
+ * A sentence ends at `.`, `!` or `?`, and an optional closing quote, before a space and a capital
+ * letter or a quote. The notes use no abbreviations such as "e.g.", so a period ends a sentence.
+ */
+const FIRST_SENTENCE = /^(.+?[.!?]["”]?)\s+(?=[A-Z"“])(.+)$/su;
 
 /**
  * The changelog writes what changed in the first sentence and why or how in the next ones. The
