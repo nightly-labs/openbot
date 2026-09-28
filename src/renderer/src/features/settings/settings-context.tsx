@@ -268,10 +268,21 @@ const Settings = createSimpleContext({
       const unsubscribe = settingsPort().onOpenSettings(() => openAppSettings());
       // A remote owner or admin can change an agent's grant from a phone or the web client.
       const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
+      // An admin of a joined server can change the update switches of this computer.
+      const unsubscribeUpdates = settingsPort().update.onPreference((preference) => {
+        autoDownloadUpdatesChanged = true;
+        autoInstallUpdatesChanged = true;
+        setGeneralSettings((current) => ({
+          ...current,
+          autoDownloadUpdates: preference.autoDownload,
+          autoInstallUpdates: preference.autoInstall,
+        }));
+      });
       return () => {
         window.removeEventListener("keydown", handleSettingsShortcut);
         unsubscribe();
         unsubscribeApprovals();
+        unsubscribeUpdates();
       };
     });
 

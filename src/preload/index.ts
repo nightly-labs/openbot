@@ -701,6 +701,7 @@ const openbotApi: OpenBotDesktopApi = {
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,
     event: decodeUpdateStatus,
+    preference: decodeUpdatePreference,
   }),
   notifications: bridgeGroup(IPC_ENDPOINTS.notifications, {
     getPreference: decodeNotificationPreference,

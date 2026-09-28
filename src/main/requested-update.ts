@@ -7,6 +7,7 @@
 // change it. The schedule lives in memory, so a host that restarts for another reason forgets it; the
 // admin asks again, and the automatic install schedules the next update again.
 
+import { EventEmitter } from "node:events";
 import type {
   HostUpdateSettingsChange,
   HostUpdateStatus,
@@ -80,7 +81,8 @@ interface Schedule {
 const DEFAULT_POLL_MS = 5_000;
 const DEFAULT_GRACE_MS = 1_000;
 
-export class RequestedUpdate {
+/** `preference`: an admin of a joined server changed the preference; the host Settings show it. */
+export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreference] }> {
   readonly #updater: RequestedUpdateUpdater;
   readonly #describeReadiness: () => RestartReadiness;
   readonly #savePreference: (change: UpdatePreferenceChange) => Promise<UpdatePreference>;
@@ -96,10 +98,16 @@ export class RequestedUpdate {
   #schedule: Schedule | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #installError: UpdateFailureCode | null = null;
+  /**
+   * An install attempt runs. The updater stays `ready` while it checks for other sessions, so a
+   * cancel in that time would report a restart that then happens.
+   */
+  #installing = false;
   #publishing = false;
   readonly #onStatus = (status: UpdateStatus) => this.#advance(status);
 
   constructor(options: RequestedUpdateOptions) {
+    super();
     this.#updater = options.updater;
     this.#describeReadiness = options.describeReadiness;
     this.#log = options.log;
@@ -145,7 +153,7 @@ export class RequestedUpdate {
   start(member: RequestedUpdateMember, mode: UpdateRestartMode): HostUpdateStatus {
     this.#assertAllowed();
     const status = this.#updater.getStatus();
-    if (status.phase === "installing") throw new RequestedUpdateRefusal("restarting");
+    if (this.#restarting()) throw new RequestedUpdateRefusal("restarting");
     // A failed install has run shutdown preparation already, so only a relaunch can recover.
     if (status.phase === "error" && status.errorCode === "install_failed") return this.snapshot();
     this.#installError = null;
@@ -162,7 +170,7 @@ export class RequestedUpdate {
   /** An admin of a joined server sets the host's switches. Only the host user sets `allowRemoteUpdates`. */
   async changeSettings(change: HostUpdateSettingsChange): Promise<HostUpdateStatus> {
     this.#assertAllowed();
-    await this.setPreference(change);
+    this.emit("preference", await this.setPreference(change));
     return this.snapshot();
   }
 
@@ -172,8 +180,7 @@ export class RequestedUpdate {
     this.#updater.setAutoDownload(preference.autoDownload);
     this.#allowed = preference.allowRemoteUpdates;
     this.#autoInstall = preference.autoInstall;
-    const phase = this.#updater.getStatus().phase;
-    if (this.#schedule && phase !== "installing") {
+    if (this.#schedule && !this.#restarting()) {
       // Each switch removes only the restart it allowed: remote access a member's, auto-install its own.
       const automatic = this.#schedule.memberId === null;
       if (automatic ? !this.#autoInstall : !this.#allowed) this.#clear();
@@ -189,7 +196,7 @@ export class RequestedUpdate {
    */
   cancel(): HostUpdateStatus {
     const status = this.#updater.getStatus();
-    if (status.phase === "installing") throw new RequestedUpdateRefusal("restarting");
+    if (this.#restarting()) throw new RequestedUpdateRefusal("restarting");
     if (this.#schedule) {
       this.#log(`The update restart that ${describe(this.#schedule)} asked for was cancelled.`);
       this.#declinedVersion = status.availableVersion;
@@ -269,6 +276,7 @@ export class RequestedUpdate {
     }
     this.#log(`Restarting to install the update that ${describe(schedule)} asked for.`);
     this.#announceState("restarting");
+    this.#installing = true;
     try {
       await this.#updater.installUpdate();
     } catch (error) {
@@ -280,7 +288,14 @@ export class RequestedUpdate {
         if (schedule.memberId === null) this.#declinedVersion = this.#updater.getStatus().availableVersion;
         this.#clear();
       }
+    } finally {
+      // The updater is `installing` from the end of its checks, so the latch can end here.
+      this.#installing = false;
     }
+  }
+
+  #restarting(): boolean {
+    return this.#installing || this.#updater.getStatus().phase === "installing";
   }
 
   #clear(): void {

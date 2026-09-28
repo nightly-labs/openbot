@@ -154,6 +154,26 @@ describe("RequestedUpdate", () => {
     expect(() => requested.cancel()).toThrow(RequestedUpdateRefusal);
   });
 
+  it("refuses a cancel while the install checks for other sessions", async () => {
+    updater.status = { ...updater.status, phase: "ready", availableVersion: "0.25.0", progress: 100 };
+    let finishChecks: () => void = () => undefined;
+    updater.installUpdate.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishChecks = () => {
+            updater.set({ phase: "installing" });
+            resolve();
+          };
+        }),
+    );
+    create().start(ADA, "now");
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(updater.installUpdate).toHaveBeenCalledOnce();
+    expect(() => requested.cancel()).toThrow(RequestedUpdateRefusal);
+    expect(announce).toHaveBeenLastCalledWith("restarting", "0.25.0");
+    finishChecks();
+  });
+
   it("clears the schedule and reports install_failed when the install is refused", async () => {
     updater.status = { ...updater.status, phase: "ready", availableVersion: "0.25.0", progress: 100 };
     updater.installUpdate.mockRejectedValueOnce(new Error("Another OpenBot session is still running."));
@@ -179,7 +199,7 @@ describe("RequestedUpdate", () => {
     expect(requested.snapshot().remoteUpdates).toBe("managed");
     requested.dispose();
 
-    updater.status = { ...updater.status, managedByHost: undefined };
+    updater.status = { ...updater.status, managedByHost: false };
     expect(() => create({ allowRemoteUpdates: false }).check()).toThrow(
       expect.objectContaining({ reason: "disabled" }),
     );

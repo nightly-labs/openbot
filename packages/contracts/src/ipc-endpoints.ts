@@ -599,6 +599,8 @@ export const IPC_ENDPOINTS = {
     setPreference: request<UpdatePreferenceChange, UpdatePreference>()("update:set-preference"),
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
     event: event<UpdateStatus>()("update:event"),
+    // A preference that an admin of a joined server changed on this computer.
+    preference: event<UpdatePreference>()("update:preference-event"),
   },
   notifications: {
     getPreference: request<undefined, NotificationPreference>()("notifications:get-preference"),

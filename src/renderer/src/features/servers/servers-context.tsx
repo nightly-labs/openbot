@@ -134,7 +134,7 @@ const Servers = createSimpleContext({
             serverId,
             name: server.name,
             calls: serversPort().hostAdmin,
-            openUpdates: opener ? () => opener(serverId) : undefined,
+            ...(opener ? { openUpdates: () => opener(serverId) } : {}),
             offer: !mismatchOffers.has(`${serverId}:${sequence}`),
           });
         }

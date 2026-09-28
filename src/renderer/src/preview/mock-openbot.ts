@@ -1523,6 +1523,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         updateListeners.add(listener);
         return () => updateListeners.delete(listener);
       },
+      // The preview has no joined server whose admin could change it.
+      onPreference: () => () => undefined,
     },
     notifications: {
       getPreference: async () => ({ desktopNotifications: true }),
