@@ -98,6 +98,12 @@ export interface WebAdminRuntime {
   team: ServerAdminPort;
 }
 
+export interface WebFile {
+  name: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   browser: BrowserViewRuntime;
@@ -129,7 +135,11 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<{ name: string; mimeType: string; base64: string }>;
+  download(attachmentId: string): Promise<WebFile>;
+  /** A file under the host's shared folder. */
+  sharedFile(path: string): Promise<WebFile>;
+  /** A file in one agent's workspace on the host. */
+  workspaceFile(agentId: string, path: string): Promise<WebFile>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
   models(): Promise<AgentModelOption[]>;
@@ -625,7 +635,8 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("webClient.error.uploadCancelled"));
       }
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
-      return value;
+      // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
+      return { ...value, previewUrl: null };
     },
     async cancelUpload() {
       uploadGeneration += 1;
@@ -636,18 +647,16 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
     },
     async download(id) {
-      const value = await request("GET", TEAM_API_ROUTES.attachment(id));
-      if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
-      const base64 = requiredString(value, "base64");
-      if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
-        throw new Error(currentText().t("error.remote.attachmentTooLarge"));
-      return {
-        name: requiredString(value, "name"),
-        mimeType: requiredString(value, "mimeType"),
-        base64,
-      };
+      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id)));
+    },
+    async sharedFile(path) {
+      const query = new URLSearchParams({ path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`));
+    },
+    async workspaceFile(agentId, path) {
+      // The released URL spells the agent `botId`.
+      const query = new URLSearchParams({ botId: agentId, path });
+      return decodeWebFile(await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`));
     },
     async models() {
       return guardedListDecoder(isAgentModelOption, "models")(await request("GET", TEAM_API_ROUTES.agents.models));
@@ -724,6 +733,20 @@ export function createWebWorkspaceRuntime(
         releaseHostLock = null;
       }
     },
+  };
+}
+
+function decodeWebFile(value: unknown): WebFile {
+  if (!isDynamicRecord(value)) throw new Error("The host returned an invalid file.");
+  const base64 = requiredString(value, "base64");
+  if (base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  if (atob(base64).length > MOBILE_ATTACHMENT_BYTES)
+    throw new Error(currentText().t("error.remote.attachmentTooLarge"));
+  return {
+    name: requiredString(value, "name"),
+    mimeType: requiredString(value, "mimeType"),
+    base64,
   };
 }
 

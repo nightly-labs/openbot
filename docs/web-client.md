@@ -65,7 +65,10 @@ mock. The separate web preview implements the browser runtime with that same moc
   has already committed an attachment, cancellation removes that draft after the response.
 - Attachment previews use downloaded bytes and the shared preview panel. Host filesystem paths
   and host preview URLs are not used as browser attachment links. Blob URLs are released when the
-  preview closes, the host changes, or the workspace unmounts.
+  preview closes, the host changes, or the workspace unmounts. A shared or workspace file link
+  reads the file through the host's `/v1/shared-files` or `/v1/workspace-files` route and opens the
+  same panel. "Open" on a file card opens the panel; "Download" saves the file. Images show as
+  file cards, not inline: the browser reads no image bytes until a card is opened.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include

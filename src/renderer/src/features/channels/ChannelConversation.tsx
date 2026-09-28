@@ -209,6 +209,11 @@ export function ChannelConversation(props: ChannelConversationProps) {
     });
   };
   const channelAttachmentAction = (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => {
+    // The browser has no app to open a file in, so a file it can preview opens in the panel.
+    if (action === "open" && runtime().fileActions === "browser" && canPreviewAttachment(attachment)) {
+      void previewChannelAttachment(attachment);
+      return;
+    }
     void channels.perform(() => runtime().agent.openAttachment({ attachmentId: attachment.id, action }));
   };
   /** Absent where the runtime saves files one at a time, so the row offers no bulk download. */
@@ -935,6 +940,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
               {(file) => (
                 <Loading>
                   <ChannelFilePreviewPanel
+                    allowExternalOpen={runtime().fileActions === "native"}
                     preview={file().preview}
                     agents={agentList()}
                     defaultWidth={panelWidth}

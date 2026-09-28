@@ -69,6 +69,8 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     cancelUpload: vi.fn(),
     discard: vi.fn(),
     download: vi.fn(),
+    sharedFile: vi.fn(),
+    workspaceFile: vi.fn(),
     dispose: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

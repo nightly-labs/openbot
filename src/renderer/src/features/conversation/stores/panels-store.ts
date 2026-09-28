@@ -145,6 +145,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   }
 
   function attachmentAction(attachment: AttachmentSummary, action: "open" | "reveal" | "download") {
+    // A runtime has no app to open a file in, so a file it can preview opens in the panel.
+    if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
+      void previewAttachment(attachment);
+      return;
+    }
     const agentId = deps.props.agent?.id;
     const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     void conversationRuntime(deps.props)

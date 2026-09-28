@@ -67,6 +67,8 @@ export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) => {
     cancelUpload: async () => {},
     discard: (id) => agent.discardDraftAttachment(id),
     download: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
+    sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
+    workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     react: (input) => agent.setMessageReaction(input),
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });
