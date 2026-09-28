@@ -29,6 +29,7 @@ function chooseFiles(): Promise<File[]> {
 export function createWebChannelsPort(
   remote: WebWorkspaceRuntime,
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,
+  hostId: () => string,
 ): ChannelsPort {
   const files = createWebAttachmentFiles(remote);
   const channels = remote.channels;
@@ -56,11 +57,14 @@ export function createWebChannelsPort(
         const chosen = await chooseFiles();
         if (chosen.length > INPUT_LIMITS.attachments)
           throw new Error(currentText().t("webClient.error.attachmentLimit", { limit: INPUT_LIMITS.attachments }));
+        const serverId = hostId();
         const uploaded: AttachmentSummary[] = [];
         try {
           for (const file of chosen) uploaded.push(await remote.upload(file));
         } catch (error) {
-          await Promise.allSettled(uploaded.map((attachment) => remote.discard(attachment.id)));
+          // After a host switch the drafts belong to the previous host, and the runtime discards them there.
+          if (hostId() === serverId)
+            await Promise.allSettled(uploaded.map((attachment) => remote.discard(attachment.id)));
           throw error;
         }
         return uploaded;

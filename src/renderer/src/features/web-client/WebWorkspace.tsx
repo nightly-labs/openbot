@@ -250,21 +250,26 @@ export function WebWorkspace(props: {
     }
     serverSettings.open(trigger);
   }
-  const channelsPort = createWebChannelsPort(workspace.runtime, workspace.onHostEvent);
+  const channelsPort = createWebChannelsPort(
+    workspace.runtime,
+    workspace.onHostEvent,
+    () => workspace.state.host?.hostId ?? "",
+  );
   const channelsSupported = () =>
     workspace.state.status === "online" &&
     workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY) &&
     Boolean(workspace.runtime.channels);
+  const savedChannelId = () => {
+    const hostId = workspace.state.host?.hostId;
+    return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
+  };
   const channels = createChannelsController({
     port: () => channelsPort,
     agents: workspace.profiles,
-    // A host switch, a revoked session and a finished connection each start the list again.
-    scopeKey: () =>
-      `${workspace.state.host?.hostId ?? ""}:${workspace.state.revocationRevision}:${channelsSupported()}`,
-    readSelection: () => {
-      const hostId = workspace.state.host?.hostId;
-      return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
-    },
+    // A host switch and a revoked session start the list again. A dropped connection does not: the
+    // open channel and its draft stay, and the effect below reads the list again when the host is back.
+    scopeKey: () => `${workspace.state.host?.hostId ?? ""}:${workspace.state.revocationRevision}`,
+    readSelection: savedChannelId,
     writeSelection: (channelId) => {
       const hostId = workspace.state.host?.hostId;
       if (hostId) writeChannelSelection(props.accountId, hostId, channelId);
@@ -280,6 +285,13 @@ export function WebWorkspace(props: {
       if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
     }),
   );
+  // The scope starts before the host is online, so the first connection opens the saved channel here.
+  createEffect(channelsSupported, (supported) => {
+    if (!supported) return;
+    const saved = savedChannelId();
+    if (channels.state.selectedId === null && saved !== null) void channels.open(saved);
+    else void channels.refresh();
+  });
   const channelOpen = () => channels.state.selectedId !== null;
   const channelApprovals = createMemo(() => {
     const approvals: Record<string, AgentApproval | undefined> = {};

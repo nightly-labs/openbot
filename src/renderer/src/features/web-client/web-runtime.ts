@@ -407,13 +407,17 @@ export function createWebWorkspaceRuntime(
         // A host file URL must not reach the browser; attachments are downloaded through the host.
         return {
           ...page,
-          messages: page.messages.map((entry) => ({
-            ...entry,
-            message: {
-              ...entry.message,
-              attachments: entry.message.attachments?.map((attachment) => ({ ...attachment, previewUrl: null })),
-            },
-          })),
+          messages: page.messages.map((entry) => {
+            const attachments = entry.message.attachments;
+            if (!attachments) return entry;
+            return {
+              ...entry,
+              message: {
+                ...entry.message,
+                attachments: attachments.map((attachment) => ({ ...attachment, previewUrl: null })),
+              },
+            };
+          }),
         };
       },
       async channelCommand(command) {
