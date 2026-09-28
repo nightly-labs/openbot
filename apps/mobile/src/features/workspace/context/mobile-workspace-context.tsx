@@ -875,8 +875,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           );
         }
         // The host has written the name and logo to the account service; read the new logo key.
-        // The change is saved, so a failed directory read must not report the save as failed.
-        await refreshHosts().catch(() => undefined);
+        // A new generation drops a directory read that started before the save, and the refresh
+        // reads again after it. The change is saved, so a failed read must not report a failure.
+        await refreshMemberships().catch(() => undefined);
       },
       refreshServers: async () => {
         for (const connection of connections.current.values()) connection.refresh();
@@ -1105,6 +1106,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     pinnedChannelIds,
     hiddenChannelIds,
     refreshHosts,
+    refreshMemberships,
     readRefresh,
     request,
     serverDirectoryError,
