@@ -17,8 +17,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
   model list from the server.
 - Leave a joined server from its Server settings. OpenBot asks you to confirm, then removes the
-  server from your list on all your devices. The server and its other members stay. To join again,
-  you need a new invitation.
+  server from your server list. The server and its other members stay. To join again, you need a
+  new invitation.
 
 ### Changed
 

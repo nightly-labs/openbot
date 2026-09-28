@@ -154,10 +154,10 @@ export const messages = defineMessages("server", {
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
   "server.settings.leaveTitle": "Leave server",
   "server.settings.leaveDescription":
-    "Remove this server from your list on all your devices. The server and its other members stay.",
+    "Remove this server from your server list. The server and its other members stay.",
   "server.settings.leaveConfirmTitle": "Leave {name}?",
   "server.settings.leaveConfirmDescription":
-    "You will lose access on all your devices. You will need another invitation to join again.",
+    "You will lose access to this server. You will need another invitation to join again.",
   "server.settings.leaving": "Leaving…",
   "server.settings.leftTitle": "You left {name}",
   "server.members.removeTitle": "Remove {name}?",

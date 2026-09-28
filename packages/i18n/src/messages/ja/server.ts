@@ -158,10 +158,10 @@ export const messages = {
   "server.settings.notReachable": "オンラインでアクセスできません。既存のメンバーと招待はそのまま残ります。",
   "server.settings.leaveTitle": "サーバーから退出",
   "server.settings.leaveDescription":
-    "すべてのデバイスのリストからこのサーバーを削除します。サーバーと他のメンバーはそのまま残ります。",
+    "サーバーリストからこのサーバーを削除します。サーバーと他のメンバーはそのまま残ります。",
   "server.settings.leaveConfirmTitle": "{name} から退出しますか？",
   "server.settings.leaveConfirmDescription":
-    "すべてのデバイスでアクセスできなくなります。再度参加するには新しい招待が必要です。",
+    "このサーバーにアクセスできなくなります。再度参加するには新しい招待が必要です。",
   "server.settings.leaving": "退出中…",
   "server.settings.leftTitle": "{name} から退出しました",
   "server.members.removeTitle": "{name} を削除しますか？",
