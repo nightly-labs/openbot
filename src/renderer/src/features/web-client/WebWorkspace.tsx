@@ -153,13 +153,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     clearStoredQueueEdit();
   }
   const controller = createConversationController({ onTypingChange: () => {} });
-  onCleanup(() => {
-    if (!props.accountSessionEnded?.()) return;
-    // The controller stores an open edit when it closes. Clear it first, so sign-out leaves no text.
-    controller.setEditingEditId(null);
-    clearStoredQueueEdit();
-  });
-  /** Releases an open queue edit on the connected host first, so its message can run after sign-out. */
+  /**
+   * Releases an open queue edit on the connected host first, so its message can run after sign-out.
+   * When the host does not confirm, the stored edit stays for this account, which can release it after sign-in.
+   */
   async function signOut() {
     const agentId = controller.editingAgentId();
     const deliveryId = controller.editingDeliveryId();
@@ -173,8 +170,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     ) {
       try {
         await workspace.runtime.editQueue({ agentId, action: "cancel", deliveryId, editId });
+        // The controller stores an open edit when it closes. Clear it first, so sign-out leaves no text.
+        controller.setEditingEditId(null);
+        clearStoredQueueEdit();
       } catch {
-        // Sign-out continues. The message stays held until someone deletes it.
+        // Sign-out continues with the edit stored.
       }
     }
     await props.onLogout();

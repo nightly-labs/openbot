@@ -86,7 +86,8 @@ mock. The separate web preview implements the browser runtime with that same moc
   the host sends `queue-invalidated`. Steer, cancel, reorder, and edit use the same Team API routes
   as a desktop client of a remote host, and edit holds the message when the host has `queue-edit-v1`.
   An open edit stays in local storage after a reload or a host change, so the user can release the
-  hold on its host. Sign-out, another account, and a revoked session remove it.
+  hold on its host. Sign-out cancels the hold and removes the edit. When the host does not confirm, the
+  edit stays for the same account. Another account and a revoked session remove it.
 - Reconnect reads authoritative state. It never resends uncertain messages. A user must check
   the conversation and acknowledge the uncertain result. New-agent requests with an unknown
   result require closing the form and refreshing before another attempt.
