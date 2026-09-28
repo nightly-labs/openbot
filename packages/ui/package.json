@@ -58,6 +58,7 @@
     "./features/account/AccountDock": "./src/features/account/AccountDock.tsx",
     "./features/account/AccountLogin": "./src/features/account/AccountLogin.tsx",
     "./features/account/AccountUpdateIsland": "./src/features/account/AccountUpdateIsland.tsx",
+    "./features/account/AppLoadingScreen": "./src/features/account/AppLoadingScreen.tsx",
     "./features/account/AccountUsageDetails": "./src/features/account/AccountUsageDetails.tsx",
     "./features/account/OtpInput": "./src/features/account/OtpInput.tsx",
     "./features/account/otp-input.css": "./src/features/account/otp-input.css",

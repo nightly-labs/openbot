@@ -17,6 +17,11 @@ All notable changes to OpenBot will be documented here. The project follows
 - Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
   model list from the server.
 
+### Changed
+
+- Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
+  loads. Before, the page showed only the text "Loading OpenBot…".
+
 ### Fixed
 
 - Show the highlight of the selected server across the full row in the mobile server list. Before,

@@ -12,7 +12,14 @@ function BrowserAppPage() {
   });
   return (
     <div id="root">
-      <Show when={mounted()} fallback={<p role="status">Loading OpenBot…</p>}>
+      <Show
+        when={mounted()}
+        fallback={
+          <div class="web-app">
+            <main class="account-login-screen" role="status" aria-label="Loading OpenBot…" />
+          </div>
+        }
+      >
         <WebApp />
       </Show>
     </div>
