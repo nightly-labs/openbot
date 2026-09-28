@@ -6,7 +6,7 @@ import { Show } from "solid-js";
 /** Takes the conversation panel while the selected computer is not online. */
 export function WebHostOffline(props: {
   title: string;
-  description?: string;
+  description: string | null;
   reconnectable: boolean;
   connecting: boolean;
   disabled: boolean;

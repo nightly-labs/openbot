@@ -622,7 +622,7 @@ export function WebWorkspace(props: {
                     ? workspace.state.error
                       ? sourceText(workspace.state.error)
                       : t("webClient.notice.keepOpen")
-                    : undefined
+                    : null
                 }
                 reconnectable={Boolean(workspace.state.host)}
                 connecting={workspace.state.status === "connecting"}
