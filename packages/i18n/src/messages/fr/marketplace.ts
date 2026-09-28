@@ -142,6 +142,8 @@ export const messages = {
   "marketplace.error.connectNoServer": "Sélectionnez un serveur local pour connecter cette app.",
   "marketplace.error.installNoServer": "Sélectionnez un serveur local pour installer un plugin.",
   "marketplace.error.installNoAgent": "Choisissez un agent pour installer les compétences de ce plugin.",
+  "marketplace.error.installLocalOnHost":
+    "Installez {name} sur l’ordinateur qui exécute ces agents : son app exécute son serveur sur cet ordinateur.",
   "marketplace.error.installOnHost":
     "Installez {name} sur l’ordinateur qui exécute ces agents : son app demande une connexion dans le navigateur.",
   "marketplace.error.appInvalid": "Impossible d’ajouter {name} : {reason}",

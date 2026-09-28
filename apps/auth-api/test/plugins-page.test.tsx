@@ -110,7 +110,9 @@ describe("plugins index", () => {
 
     expect(all).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Design" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getAllByRole("link", { name: (name) => name.includes("v1.0.0") })).toHaveLength(SITE_PLUGINS.length);
+    expect(screen.getAllByRole("link", { name: (name) => /v\d+\.\d+\.\d+/.test(name) })).toHaveLength(
+      SITE_PLUGINS.length,
+    );
   });
 });
 

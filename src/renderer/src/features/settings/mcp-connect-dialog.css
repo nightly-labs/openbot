@@ -128,6 +128,48 @@
   border-top: 1px solid var(--openbot-border-grouped);
 }
 
+/* The steps that turn on a server another app runs. The heading leaves room for the setup link
+   that sits in the row's corner. */
+.mcp-local-heading {
+  margin: 0;
+  padding-right: var(--openbot-space-6);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: var(--openbot-space-2) 0 0;
+  padding-left: var(--openbot-space-4);
+  list-style: decimal;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-steps > li::marker {
+  color: var(--openbot-text-muted);
+}
+
+.mcp-local-address {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.mcp-local-address > code {
+  overflow-wrap: anywhere;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+}
+
 .mcp-connect-form {
   display: flex;
   flex-direction: column;

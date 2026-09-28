@@ -84,6 +84,7 @@ interface TestServer {
     kind: string;
     label: string;
     fields?: TestAuthField[];
+    steps?: string[];
     docsUrl?: string;
   }>;
 }
@@ -190,5 +191,17 @@ describe("plugin catalog validation", () => {
       auth: [{ id: "oauth", kind: "link", label: "Sign in" }],
     });
     expect(() => validatePlugin("example", stdioSignIn, false, updatedAt)).toThrow("sign-in needs an http server");
+  });
+
+  /* Plain http sends what the agent reads in the clear. Only a server on this computer may use it,
+     and only a listing that says so through a local flow. */
+  it("allows plain http only on loopback, and only for a local flow", () => {
+    const local = { id: "desktop", kind: "local", label: "Desktop app", steps: ["Turn on the server."] };
+    const loopback = pluginWithServer({ ...httpServer, url: "http://127.0.0.1:3845/mcp", auth: [local] });
+    expect(() => validatePlugin("example", loopback, false, updatedAt)).not.toThrow();
+    const remote = pluginWithServer({ ...httpServer, url: "http://example.com/mcp", auth: [local] });
+    expect(() => validatePlugin("example", remote, false, updatedAt)).toThrow("loopback http");
+    const unmarked = pluginWithServer({ ...httpServer, url: "http://127.0.0.1:3845/mcp" });
+    expect(() => validatePlugin("example", unmarked, false, updatedAt)).toThrow("an https url");
   });
 });
