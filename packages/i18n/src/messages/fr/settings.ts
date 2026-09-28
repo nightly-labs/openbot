@@ -97,6 +97,18 @@ export const messages = {
   "settings.disconnect.action": "Déconnecter",
   "settings.disconnect.pending": "Déconnexion…",
   "settings.mobileConnect.title": "Connecter votre téléphone",
+  "settings.mobileConnect.iosApp.title": "App iPhone",
+  "settings.mobileConnect.iosApp.description":
+    "OpenBot pour iPhone est en bêta publique sur TestFlight. Installez-la, puis connectez-vous ci-dessous.",
+  "settings.mobileConnect.iosApp.copyLink": "Copier le lien",
+  "settings.mobileConnect.iosApp.linkCopied": "Lien copié",
+  "settings.mobileConnect.iosApp.qrLabel": "Code QR de l'invitation TestFlight",
+  "settings.mobileConnect.iosApp.step.testFlight": "Sur votre iPhone, installez TestFlight depuis l'App Store.",
+  "settings.mobileConnect.iosApp.step.invite":
+    "Scannez ce code QR avec l'appareil photo de l'iPhone, ou copiez le lien d'invitation et ouvrez-le sur votre iPhone.",
+  "settings.mobileConnect.iosApp.step.install": "Dans TestFlight, touchez Accepter, puis Installer.",
+  "settings.mobileConnect.iosApp.step.signIn":
+    "Ouvrez OpenBot sur votre iPhone. Générez un code QR ci-dessous et scannez-le pour vous connecter.",
   "settings.mobileConnect.description":
     "Scannez un code à usage unique avec l’application mobile OpenBot pour utiliser ce compte sur votre téléphone.",
   "settings.mobileConnect.signIn.title": "Connexion mobile",

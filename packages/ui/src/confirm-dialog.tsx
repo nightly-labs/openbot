@@ -23,7 +23,8 @@ export interface ConfirmDialogProps {
   /** Replaces the tone icon, for example with an agent avatar. */
   media?: JSX.Element;
   tone?: ConfirmDialogTone;
-  confirmLabel: string;
+  /** A string, or a `StableLabel` when the label changes while the dialog is open. */
+  confirmLabel: JSX.Element;
   /** Replaces the confirm label while pending, such as "Deleting…". */
   pendingLabel?: string;
   cancelLabel?: string;

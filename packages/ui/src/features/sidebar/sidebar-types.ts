@@ -6,6 +6,7 @@ import type {
   SidebarLayoutSnapshot,
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
+import type { JSX } from "@solidjs/web";
 import type { AvatarMood } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import type { ServerMenuProps } from "../servers/ServerMenu";
@@ -66,6 +67,8 @@ export interface SidebarProps {
   onDuplicateAgent?: (agentId: string) => Promise<void>;
   onDeleteAgent: (agentId: string) => Promise<void>;
   compact: boolean;
+  /** A card under the chat list, such as an announcement. The compact sidebar has no room for it. */
+  footer?: JSX.Element;
   onExpand: () => void;
   onOpenMarketplace: () => void;
   emptyAction?: {
