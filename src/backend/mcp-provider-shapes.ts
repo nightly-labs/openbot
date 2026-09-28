@@ -364,7 +364,10 @@ async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<s
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
     const stdout = await runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`);
-    return commandPathFromShellOutput(stdout);
+    // A shell function, such as the `npx` of a lazy-loaded nvm, prints only its name. The server
+    // is spawned with `path`, so the bare name still finds the program there.
+    const lastLine = stdout.trim().split(/\r?\n/u).at(-1)?.trim();
+    return commandPathFromShellOutput(stdout) ?? (lastLine === trimmed ? trimmed : null);
   } catch {
     return null;
   }

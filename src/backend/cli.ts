@@ -481,7 +481,7 @@ export function loginShellCommand(
 /**
  * The path that `command -v` printed, from what the login shell wrote. An interactive profile can
  * print before the command runs, such as a greeting or `fastfetch`, so the path is the last line
- * that is an absolute path. An alias or a function prints no path and gives `null`.
+ * that is an absolute path. An alias, a function or a builtin prints no path and gives `null`.
  */
 export function commandPathFromShellOutput(stdout: string): string | null {
   const lines = stdout.split(/\r?\n/u).map((line) => line.trim());
