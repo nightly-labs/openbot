@@ -20,8 +20,7 @@ export const messages = {
   "webClient.connect.description":
     "コンピューターで OpenBot を実行すると、このブラウザーからエージェントとチャットできます。招待でコンピューターに参加することもできます。",
   "webClient.connect.stepInstall": "コンピューターに OpenBot をインストールして開きます。",
-  "webClient.connect.stepSignIn": "{email} でサインインします。",
-  "webClient.connect.stepSignInSameEmail": "同じメールアドレスでサインインします。",
+  "webClient.connect.stepSignIn": "メールアドレスでサインインします。",
   "webClient.connect.stepRemote": "リモートアクセスをオンにします。",
   "webClient.notice.download": "OpenBot をダウンロード",
   "webClient.notice.join": "招待で参加",

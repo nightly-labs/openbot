@@ -269,9 +269,35 @@
 .web-connect-actions {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+}
+
+/* Side by side; the buttons stack when the card is too narrow for both labels. */
+.web-connect-primary-actions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
   gap: var(--openbot-space-2);
 }
 
-.web-connect-actions .ui-button {
-  width: 100%;
+.web-connect-primary-actions .ui-button {
+  min-width: 160px;
+  flex: 1 1 0;
+}
+
+.web-connect-refresh.ui-button {
+  color: var(--openbot-text-muted);
+}
+
+.web-connect-actions .ui-button svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+  stroke-width: var(--openbot-icon-stroke);
+}
+
+.web-connect-refresh.ui-button svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }

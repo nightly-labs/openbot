@@ -18,8 +18,7 @@ export const messages = defineMessages("webClient", {
   "webClient.connect.description":
     "Run OpenBot on your computer to chat with your agents from this browser. You can also join a computer with an invitation.",
   "webClient.connect.stepInstall": "Install and open OpenBot on your computer.",
-  "webClient.connect.stepSignIn": "Sign in with {email}.",
-  "webClient.connect.stepSignInSameEmail": "Sign in with the same email.",
+  "webClient.connect.stepSignIn": "Sign in with your email.",
   "webClient.connect.stepRemote": "Turn on remote access.",
   "webClient.notice.download": "Download OpenBot",
   "webClient.notice.join": "Join with invitation",

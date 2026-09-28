@@ -600,7 +600,6 @@ export function WebWorkspace(props: {
             </Show>
             <Show when={!creating() && !channelOpen() && noHost()}>
               <WebConnectComputer
-                accountEmail={props.accountEmail ?? ""}
                 loading={workspace.state.hostsLoading}
                 error={workspace.state.hostsError}
                 onJoin={() => setJoinOpen(true)}

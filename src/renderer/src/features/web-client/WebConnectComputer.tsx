@@ -6,8 +6,11 @@ import {
   AlertIcon,
   Button,
   buttonVariants,
+  Download,
   Heading,
+  Link2,
   OctagonX,
+  RefreshCw,
   Text,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
@@ -15,7 +18,6 @@ import { Show } from "solid-js";
 
 /** The first screen of the web client when the account has no computer to connect to. */
 export function WebConnectComputer(props: {
-  accountEmail: string;
   loading: boolean;
   error: string | null;
   onJoin: () => void;
@@ -57,11 +59,7 @@ export function WebConnectComputer(props: {
             <span class="web-connect-step-number" aria-hidden="true">
               2
             </span>
-            <Text>
-              {props.accountEmail
-                ? t("webClient.connect.stepSignIn", { email: props.accountEmail })
-                : t("webClient.connect.stepSignInSameEmail")}
-            </Text>
+            <Text>{t("webClient.connect.stepSignIn")}</Text>
           </li>
           <li>
             <span class="web-connect-step-number" aria-hidden="true">
@@ -72,19 +70,25 @@ export function WebConnectComputer(props: {
         </ol>
 
         <footer class="web-connect-actions">
-          <a class={buttonVariants({ variant: "default" })} href="/#download" target="_blank" rel="noreferrer">
-            {t("webClient.notice.download")}
-          </a>
-          <Button variant="outline" fullWidth onClick={() => props.onJoin()}>
-            {t("webClient.notice.join")}
-          </Button>
+          <div class="web-connect-primary-actions">
+            <a class={buttonVariants({ variant: "default" })} href="/#download" target="_blank" rel="noreferrer">
+              <Download aria-hidden="true" />
+              {t("webClient.notice.download")}
+            </a>
+            <Button variant="outline" onClick={() => props.onJoin()}>
+              <Link2 aria-hidden="true" />
+              {t("webClient.notice.join")}
+            </Button>
+          </div>
           <Button
+            class="web-connect-refresh"
             variant="ghost"
-            fullWidth
+            size="sm"
             loading={props.loading}
             loadingLabel={t("webClient.notice.findingHosts")}
             onClick={() => props.onRefresh()}
           >
+            <RefreshCw aria-hidden="true" />
             {t("webClient.notice.refreshHosts")}
           </Button>
         </footer>
