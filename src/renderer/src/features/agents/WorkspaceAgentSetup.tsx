@@ -79,7 +79,8 @@ export function WorkspaceAgentSetup() {
       agentStatus={agentStatus()}
       runtimeStatuses={localProviderDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={customProviders()}
-      customAgents={customAgents()}
+      // The custom agents are this computer's. A joined host's picker counts its own from its models.
+      customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
       onDownloadProvider={localProviderDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={localProviderDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}

@@ -24,19 +24,28 @@ import {
   encodeTeamProtocolV4CurrentHttpRequest,
   encodeTeamProtocolV4CurrentHttpResponse,
 } from "./v4-adapter";
+import { TEAM_PROTOCOL_V5 } from "./v5";
+import {
+  decodeTeamProtocolV5CurrentHttpRequest,
+  decodeTeamProtocolV5CurrentHttpResponse,
+  encodeTeamProtocolV5CurrentHttpRequest,
+  encodeTeamProtocolV5CurrentHttpResponse,
+} from "./v5-adapter";
 
 export interface TeamHttpCodecOptions {
   preserveSemanticTags?: boolean;
-  /** Read only by V4, which accepts a model in an agent create request. */
+  /** Read only by V4 and V5, which accept a model in an agent create request. */
   agentCreateModel?: boolean;
 }
 
 type DecodedRequest =
   | ReturnType<typeof decodeTeamProtocolV1CurrentHttpRequest>
-  | ReturnType<typeof decodeTeamProtocolV4CurrentHttpRequest>;
+  | ReturnType<typeof decodeTeamProtocolV4CurrentHttpRequest>
+  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpRequest>;
 type DecodedResponse =
   | ReturnType<typeof decodeTeamProtocolV1CurrentHttpResponse>
-  | ReturnType<typeof decodeTeamProtocolV4CurrentHttpResponse>;
+  | ReturnType<typeof decodeTeamProtocolV4CurrentHttpResponse>
+  | ReturnType<typeof decodeTeamProtocolV5CurrentHttpResponse>;
 
 export interface TeamHttpCodec {
   encodeRequest(method: string, path: string, value: unknown, options: TeamHttpCodecOptions): string;
@@ -67,8 +76,16 @@ const V4_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV4CurrentHttpResponse,
 };
 
+const V5_CODEC: TeamHttpCodec = {
+  encodeRequest: encodeTeamProtocolV5CurrentHttpRequest,
+  decodeRequest: decodeTeamProtocolV5CurrentHttpRequest,
+  encodeResponse: encodeTeamProtocolV5CurrentHttpResponse,
+  decodeResponse: decodeTeamProtocolV5CurrentHttpResponse,
+};
+
 /** The HTTP adapter of a negotiated protocol. No protocol, or one older than V3, gets V1. */
 export function teamHttpCodec(protocol: number | undefined): TeamHttpCodec {
+  if (protocol === TEAM_PROTOCOL_V5) return V5_CODEC;
   if (protocol === TEAM_PROTOCOL_V4) return V4_CODEC;
   if (protocol === TEAM_PROTOCOL_V3) return V3_CODEC;
   return V1_CODEC;

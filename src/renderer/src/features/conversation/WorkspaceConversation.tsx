@@ -209,7 +209,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       accountUsage={auth.accountUsage()}
       providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
       customProviders={customProviders()}
-      customAgents={customAgents()}
+      // The custom agents are this computer's. A joined host's picker counts its own from its models.
+      customAgents={activeServer()?.kind === "local" ? customAgents() : undefined}
       onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}
       onCancelProviderDownload={providerDownloads() ? cancelProviderRuntimeDownload : undefined}
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}

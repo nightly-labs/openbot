@@ -56,8 +56,9 @@ import {
   decodeTeamProtocolV1CurrentClientEvent,
   encodeTeamProtocolV1CurrentEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
-import { TEAM_PROTOCOL_V4 } from "@openbot/contracts/team-protocol/v4";
 import { encodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
+import { TEAM_LOCAL_PROVIDERS_CAPABILITY, TEAM_PROTOCOL_V5 } from "@openbot/contracts/team-protocol/v5";
+import { encodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type * as Ws from "ws";
@@ -683,12 +684,12 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
     options: { preserveSemanticTags?: boolean } = {},
   ): string | null {
-    const protocol = capabilities.has("opencode") ? 4 : 1;
+    const protocol = capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY) ? 5 : capabilities.has("opencode") ? 4 : 1;
     const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
-    const visible = (protocol === 4 ? hiddenAgentView : legacyProviderView)(event, hidden);
+    const visible = protocol === 1 ? legacyProviderView(event, hidden) : hiddenAgentView(event, hidden, protocol);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
-    if (protocol === 4)
-      return encodeTeamProtocolV4BaseCurrentEvent(visible, {
+    if (protocol !== 1)
+      return (protocol === 5 ? encodeTeamProtocolV5BaseCurrentEvent : encodeTeamProtocolV4BaseCurrentEvent)(visible, {
         ...options,
         preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
       });
@@ -743,7 +744,7 @@ export class TeamApiServer {
           !connection.capabilities.has("routine-run-event-markers") ||
           !connection.capabilities.has("hosted-site-event-markers"))
       ) {
-        const key = `${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${connection.capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -1085,7 +1086,9 @@ export class TeamApiServer {
     // error path. Encoding first lets that failure become the 500 the caller can read.
     const visibleValue =
       status < 400 && route.hiddenAgentIds
-        ? (route.protocol < 4 ? legacyProviderView : hiddenAgentView)(value, route.hiddenAgentIds)
+        ? route.protocol < 4
+          ? legacyProviderView(value, route.hiddenAgentIds)
+          : hiddenAgentView(value, route.hiddenAgentIds, route.protocol < 5 ? 4 : 5)
         : value;
     const sideRoute = teamSideRouteCodec(route.path);
     const body = sideRoute
@@ -1128,7 +1131,7 @@ export class TeamApiServer {
   #protocolSupport(): TeamProtocolSupportV1 {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
-      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V4 },
+      protocol: { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V5 },
       capabilities: TEAM_CURRENT_CAPABILITIES.filter((capability) => {
         if (capability === "channel-chats-v1" || capability === CHANNEL_DELETE_CAPABILITY)
           return this.#options.channels !== undefined;
@@ -1181,7 +1184,7 @@ export class TeamApiServer {
         body: { error: "Invalid Team API protocol headers.", code: "protocol_error", host },
       };
     }
-    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V4) return null;
+    if (protocol >= TEAM_PROTOCOL_V1 && protocol <= TEAM_PROTOCOL_V5) return null;
     const clientIsOlder = protocol < TEAM_PROTOCOL_V1;
     return {
       status: 426,

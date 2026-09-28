@@ -12,10 +12,10 @@ import {
   decodeTeamProtocolV2AuthFrame,
   decodeTeamProtocolV2EventFrame,
   decodeTeamProtocolV2RpcFrame,
-  decodeTeamProtocolV4CurrentEvent,
-  decodeTeamProtocolV4WebRtcHttpResponse,
+  decodeTeamProtocolV5CurrentEvent,
+  decodeTeamProtocolV5WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
-  encodeTeamProtocolV4WebRtcHttpRequest,
+  encodeTeamProtocolV5WebRtcHttpRequest,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   type TeamProtocolV2AuthFrame,
@@ -685,7 +685,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
           status: frame.result.status,
           body: sideRoute
             ? sideRoute.response(pending.path, frame.result.status, frame.result.body)
-            : decodeTeamProtocolV4WebRtcHttpResponse(
+            : decodeTeamProtocolV5WebRtcHttpResponse(
                 pending.method,
                 pending.path,
                 frame.result.status,
@@ -719,7 +719,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error(sourceText("error.remote.eventStreamGap"));
     const channel = channelEvent(frame.payload);
-    const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV4CurrentEvent(frame);
+    const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV5CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error(sourceText("error.remote.malformedEvent"));
     state.lastEventSequence = frame.sequence;
     if (decoded.status === "known") await actions.current.onTeamEvent(state.hostId, decoded.event);
@@ -806,7 +806,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       ? null
       : sideRoute
         ? sideRoute.request(path, body)
-        : encodeTeamProtocolV4WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
+        : encodeTeamProtocolV5WebRtcHttpRequest(method, path, body, { preserveSemanticTags: true });
     const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
     const checksConnection = method === "GET" && path === TEAM_API_ROUTES.compatibility;
     const result = new Promise<{ status: number; body: TeamProtocolV2Json }>((resolve, reject) => {

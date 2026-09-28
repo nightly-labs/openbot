@@ -2,12 +2,11 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "@openbot/contracts/team-protocol/v1";
 
 /**
- * Tells if a peer on this protocol must not see the provider. Gemini (`antigravity`) and custom ACP
- * agents (`acp`) stay on this computer: no released Team protocol knows them, v4 included.
- * Protocols 1 to 3 do not know OpenCode.
+ * Tells if a peer on this protocol must not see the provider. Protocols 1 to 4 do not know Gemini
+ * (`antigravity`) or custom ACP agents (`acp`), and protocols 1 to 3 do not know OpenCode.
  */
 export function isPeerHiddenProvider(value: unknown, protocol: number): boolean {
-  return value === "antigravity" || value === "acp" || (protocol < 4 && value === "opencode");
+  return (protocol < 5 && (value === "antigravity" || value === "acp")) || (protocol < 4 && value === "opencode");
 }
 
 /**
@@ -16,7 +15,7 @@ export function isPeerHiddenProvider(value: unknown, protocol: number): boolean 
  * also in the `providers` list of a custom endpoint save or delete reply, and it must stay one.
  */
 function isPeerHiddenId(value: TeamProtocolV1JsonObject, protocol: number, listKey: string): boolean {
-  if (value.id === "acp") return listKey === "providers" && typeof value.state === "string";
+  if (value.id === "acp") return protocol < 5 && listKey === "providers" && typeof value.state === "string";
   return isPeerHiddenProvider(value.id, protocol);
 }
 
@@ -30,10 +29,17 @@ export function legacyProviderView(value: unknown, hiddenIds: ReadonlySet<string
   return project(json, hiddenIds, 1);
 }
 
-/** Removes the named agents and the local-only providers. Protocol 4 knows OpenCode, so it stays. */
-export function hiddenAgentView(value: unknown, hiddenIds: ReadonlySet<string>): TeamProtocolV1JsonValue {
+/**
+ * Removes the named agents and the providers protocol 4 or 5 does not know. Protocol 4 knows
+ * OpenCode; protocol 5 also knows Gemini and custom ACP agents.
+ */
+export function hiddenAgentView(
+  value: unknown,
+  hiddenIds: ReadonlySet<string>,
+  protocol: 4 | 5,
+): TeamProtocolV1JsonValue {
   const json: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value));
-  return project(json, hiddenIds, 4);
+  return project(json, hiddenIds, protocol);
 }
 
 function project(

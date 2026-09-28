@@ -1,0 +1,12 @@
+{
+  "phase": "ready",
+  "cliVersion": null,
+  "auth": { "kind": "antigravity", "email": null },
+  "providers": [
+    { "id": "antigravity", "state": "available", "version": "1.2.0", "message": null },
+    { "id": "acp", "state": "available", "version": null, "message": null }
+  ],
+  "capabilities": { "chat": "ready", "browser": "ready", "computerUse": "unavailable" },
+  "message": null,
+  "fullAccess": true
+}

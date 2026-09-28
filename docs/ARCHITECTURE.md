@@ -591,7 +591,7 @@ the saved messages, and can be tried again when the provider connects or the app
 
 ## Team API compatibility boundary
 
-Current remote connections use Team API protocol v3 over three ordered WebRTC DataChannels: `rpc`,
+Current remote connections use Team API protocol v5 over three ordered WebRTC DataChannels: `rpc`,
 `events`, and `files`. A sandboxed hidden Chromium page owns each `RTCPeerConnection`. Electron main
 uses a `MessagePort` and transfers binary data as `ArrayBuffer`. Signal carries SDP and ICE only.
 OpenBot Mobile uses the same ticket, authentication transcript, framing, RPC codec, and event stream.
@@ -1136,14 +1136,21 @@ The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravit
 `~/.gemini/artifacts` and protects its settings files. Migration 22 adds `antigravity` to
 `projection_provider_sessions`.
 
-The Team API wire protocols do not know `antigravity`. The host hides Gemini agents, models,
-status, and sign-in state from peers on every protocol version, and the providers route omits it.
+Team API v1–v4 do not know `antigravity`. The host hides Gemini agents, models, status, and
+sign-in state from peers on those versions, and the `providers-v1` route omits it. Team API v5
+carries Gemini.
 
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,
 sidebar references, and runtime events before encoding an older client's response. Requests for
 an OpenCode agent from those clients return 404. WebRTC keeps its v2 frame transport and selects
 the v4 application codec when the peer advertises the `opencode` capability.
+
+Team API v5 is the v4 schema with `antigravity` and `acp` added to the providers and auth kinds
+(`v5-base.ts`). WebRTC selects it when the peer advertises `local-providers`, and HTTPS negotiates
+it from the protocol range. A v4 peer still gets the filtered view. A peer counts the host's
+custom agents from the `acp` models; the host never sends an agent's command, arguments or
+environment.
 
 ### Custom agents
 
@@ -1163,7 +1170,7 @@ values. `customAgents.check` starts the program in a temporary folder, sends `in
 stops its process group. The scan (`src/backend/acp-agent-scan.ts`) looks up the preset names on the
 login-shell `PATH` and in the user's folders, and never starts a file. The agents run confined with
 no state paths. Migration 23 adds `acp` to `projection_provider_sessions`. The host hides `acp`
-agents, models, status, and sign-in state from peers on every protocol, and the `customAgents` IPC
+agents, models, status, and sign-in state from peers before protocol 5, and the `customAgents` IPC
 group is local only.
 
 ### Local detection and endpoint edit

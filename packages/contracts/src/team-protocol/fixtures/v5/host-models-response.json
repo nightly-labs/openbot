@@ -1,0 +1,18 @@
+[
+  {
+    "provider": "antigravity",
+    "id": "gemini-3-pro",
+    "name": "Gemini 3 Pro",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["low", "medium", "high"]
+  },
+  {
+    "provider": "acp",
+    "id": "goose/default",
+    "name": "Goose/Default",
+    "description": "",
+    "defaultReasoningEffort": "medium",
+    "supportedReasoningEfforts": ["medium"]
+  }
+]

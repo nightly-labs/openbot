@@ -1,5 +1,5 @@
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
-import { decodeTeamProtocolV4BaseCurrentEvent } from "@openbot/contracts/team-protocol/v4-base-adapter";
+import { decodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
 // This is the only part of the remote-server family that owns a clock. Everything it does -- the
@@ -434,7 +434,7 @@ export class RemoteEventStream {
             const optional = channelEvent(value);
             const decoded = optional
               ? { kind: "known" as const, event: optional }
-              : decodeTeamProtocolV4BaseCurrentEvent(value);
+              : decodeTeamProtocolV5BaseCurrentEvent(value);
             if (decoded.kind === "unknown") return;
             if (decoded.kind === "invalid") {
               protocolFailed = true;

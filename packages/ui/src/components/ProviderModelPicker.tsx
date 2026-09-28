@@ -13,6 +13,7 @@ import type {
 import {
   agentProviderCliName,
   agentProviderName,
+  customAgentIdOfModel,
   defaultProviderModel,
   isCustomProviderModelId,
   PICKER_PROVIDERS,
@@ -173,11 +174,18 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   /**
-   * The agents list is this computer's. A joined server's host reports no `acp` row, because the Team
-   * API does not carry it, so its picker counts none of them.
+   * The agents list is this computer's. A joined server's host sends no list, so the count comes from
+   * the agents its `acp` models name. A host on a protocol before 5 reports no `acp` row, so its
+   * picker counts none of them.
    */
-  const agentCount = () =>
-    props.agentStatus.providers?.some((item) => item.id === "acp") ? (props.customAgents?.length ?? 0) : 0;
+  const agentCount = () => {
+    if (!props.agentStatus.providers?.some((item) => item.id === "acp")) return 0;
+    if (props.customAgents) return props.customAgents.length;
+    const ids = props.modelOptions.flatMap((option) =>
+      option.provider === "acp" ? [customAgentIdOfModel(option.id) ?? option.id] : [],
+    );
+    return new Set(ids).size;
+  };
   const customSummary = () => {
     const endpoints = props.customProviders?.length ?? 0;
     const agents = agentCount();

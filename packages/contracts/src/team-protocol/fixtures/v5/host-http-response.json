@@ -1,0 +1,36 @@
+[
+  {
+    "id": "agent-gemini",
+    "provider": "antigravity",
+    "name": "Research copy",
+    "title": "Research lead",
+    "description": "Finds primary sources.",
+    "notifications": true,
+    "model": "gemini-3-pro",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-gemini",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "research",
+    "avatarHue": 215,
+    "avatarUrl": null
+  },
+  {
+    "id": "agent-goose",
+    "provider": "acp",
+    "name": "Goose",
+    "title": "Custom agent",
+    "description": "",
+    "notifications": true,
+    "model": "goose/default",
+    "reasoningEffort": "medium",
+    "threadId": null,
+    "workspacePath": "/OpenBot/Agents/agent-goose",
+    "preview": "No messages yet",
+    "updatedAt": null,
+    "avatarSeed": "goose",
+    "avatarHue": null,
+    "avatarUrl": null
+  }
+]

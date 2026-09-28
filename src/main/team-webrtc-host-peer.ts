@@ -33,6 +33,12 @@ import {
   decodeTeamProtocolV4WebRtcHttpRequest,
   encodeTeamProtocolV4WebRtcHttpResponse,
 } from "@openbot/contracts/team-protocol/v4-webrtc-adapter";
+import { TEAM_LOCAL_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v5";
+import {
+  createTeamProtocolV5Event,
+  decodeTeamProtocolV5WebRtcHttpRequest,
+  encodeTeamProtocolV5WebRtcHttpResponse,
+} from "@openbot/contracts/team-protocol/v5-webrtc-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import type * as Ws from "ws";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
@@ -437,11 +443,13 @@ export class TeamWebRtcHostPeer {
       headers: {
         Authorization: `Bearer ${this.#localSessionToken}`,
         "Content-Type": uploaded?.mimeType ?? input.contentType ?? "application/json",
-        "OpenBot-Protocol-Version": peerCapabilities.has("opencode")
-          ? "4"
-          : isTeamProtocolV3OnlyRoute(input.method, input.path)
-            ? "3"
-            : "1",
+        "OpenBot-Protocol-Version": peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+          ? "5"
+          : peerCapabilities.has("opencode")
+            ? "4"
+            : isTeamProtocolV3OnlyRoute(input.method, input.path)
+              ? "3"
+              : "1",
         "OpenBot-App-Version": this.#appVersion,
         "OpenBot-Capabilities": [...this.#peerCapabilities].join(","),
         ...(this.#localSessionId ? { "X-OpenBot-WebRTC-Session": this.#localSessionId } : {}),
@@ -456,9 +464,11 @@ export class TeamWebRtcHostPeer {
               : JSON.stringify(
                   sideRoute
                     ? sideRoute.request(input.path, input.body)
-                    : (peerCapabilities.has("opencode")
-                        ? decodeTeamProtocolV4WebRtcHttpRequest
-                        : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
+                    : (peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+                        ? decodeTeamProtocolV5WebRtcHttpRequest
+                        : peerCapabilities.has("opencode")
+                          ? decodeTeamProtocolV4WebRtcHttpRequest
+                          : decodeTeamProtocolV3WebRtcHttpRequest)(input.method, input.path, input.body, {
                         preserveSemanticTags,
                         agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
                       }),
@@ -493,9 +503,11 @@ export class TeamWebRtcHostPeer {
       status: response.status,
       body: sideRoute
         ? sideRoute.response(input.path, response.status, body)
-        : (peerCapabilities.has("opencode")
-            ? encodeTeamProtocolV4WebRtcHttpResponse
-            : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
+        : (peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+            ? encodeTeamProtocolV5WebRtcHttpResponse
+            : peerCapabilities.has("opencode")
+              ? encodeTeamProtocolV4WebRtcHttpResponse
+              : encodeTeamProtocolV3WebRtcHttpResponse)(input.method, input.path, response.status, body, {
             preserveSemanticTags,
           }),
     };
@@ -531,14 +543,14 @@ export class TeamWebRtcHostPeer {
                 sequence: this.#nextEventSequence,
                 payload: channel,
               })
-            : (this.#peerCapabilities.has("opencode") ? createTeamProtocolV4Event : createTeamProtocolV2Event)(
-                this.#nextEventSequence,
-                event,
-                {
-                  preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
-                  preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
-                },
-              ),
+            : (this.#peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
+                ? createTeamProtocolV5Event
+                : this.#peerCapabilities.has("opencode")
+                  ? createTeamProtocolV4Event
+                  : createTeamProtocolV2Event)(this.#nextEventSequence, event, {
+                preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
+                preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
+              }),
         );
       } catch {
         return;

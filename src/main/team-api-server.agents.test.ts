@@ -239,7 +239,7 @@ describe("TeamApiServer agents", () => {
     expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps Gemini agents, provider rows, models and sign-in on the host for every protocol", async () => {
+  it("keeps Gemini agents, provider rows, models and sign-in on the host before protocol 5", async () => {
     const fixture = opencodeFixture[0];
     if (!isAgentSummary(fixture)) throw new Error("Invalid agent fixture.");
     const chief: AgentSummary = { ...fixture, id: "chief", provider: "codex", model: "gpt-5.6-luna" };
@@ -316,6 +316,45 @@ describe("TeamApiServer agents", () => {
     }
     expect(createAgent).not.toHaveBeenCalled();
     expect(updateAgent).not.toHaveBeenCalled();
+
+    // Protocol 5 knows Gemini: the peer sees it, and can rename and start a Gemini agent.
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      [TEAM_PROTOCOL_VERSION_HEADER]: "5",
+      [TEAM_APP_VERSION_HEADER]: "1.0.0",
+      [TEAM_CAPABILITIES_HEADER]: "opencode,local-providers,agent-create-model",
+      "Content-Type": "application/json",
+    };
+    const status = await (await fetch(`${base}/v1/agents/status`, { headers })).json();
+    expect(status.auth).toEqual({ kind: "antigravity", email: "owner@example.com" });
+    expect(status.providers.map((row: { id: string }) => row.id)).toEqual(["codex", "antigravity"]);
+    const models = await (await fetch(`${base}/v1/agents/models`, { headers })).json();
+    expect(models.map((model: { id: string }) => model.id)).toEqual(["gpt-5.6-luna", "gemini-3-pro"]);
+    const agentIds = (await (await fetch(`${base}/v1/agents`, { headers })).json()).map(
+      (agent: AgentSummary) => agent.id,
+    );
+    expect(agentIds).toEqual(["chief", "agent-gemini"]);
+    const update = await fetch(`${base}/v1/agents/${gemini.id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    expect(update.status).toBe(200);
+    const create = await fetch(`${base}/v1/agents`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        name: "Explorer",
+        description: "",
+        initialMessage: "Hello.",
+        avatarSeed: "mobile:newagentseed",
+        avatarHue: null,
+        provider: "antigravity",
+      }),
+    });
+    expect(create.status).toBe(201);
+    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({ provider: "antigravity" }));
+    expect(updateAgent).toHaveBeenCalledTimes(1);
   });
 
   it("keeps agent access on the computer that runs the agent", async () => {
