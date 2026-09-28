@@ -290,7 +290,8 @@ git push origin vX.Y.Z
 
 Pushing the version tag runs `.github/workflows/release.yml`.
 The tag workflow starts only after `https://openbot.run/join` and the Apple association file return
-direct `200` responses with the required security headers, MIME type, app ID, and `/join` scope.
+direct `200` responses with the required security headers, MIME type, app IDs, and paths: `/join`
+for the desktop app, and `/join` and `/agents/*` for the mobile app.
 
 The workflow:
 
