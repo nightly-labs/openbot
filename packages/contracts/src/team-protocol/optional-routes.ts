@@ -7,6 +7,7 @@ import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
 import { PROVIDERS_ADMIN_CODECS } from "./providers-v1";
+import { PROVIDERS_RUNTIMES_V2_CODECS } from "./providers-v2";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
 
@@ -19,6 +20,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_INSTALL_CODECS,
   ...AGENT_UPDATE_CODECS,
   ...PROVIDERS_ADMIN_CODECS,
+  ...PROVIDERS_RUNTIMES_V2_CODECS,
   ...HOST_ADMIN_CODECS,
 ]);
 

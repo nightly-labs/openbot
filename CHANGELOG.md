@@ -43,7 +43,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - Show a centered screen with the same design when your computer is disconnected or connecting. It
   gives the reason and a Reconnect button. Before, a small notice showed above the conversation.
 - The web app and a joined computer now show Gemini and custom ACP agents from the host in the
-  model picker, and can start agents on them. The host and the client must both have this version.
+  model picker, and can start agents on them. An owner or admin can download Gemini on the host.
+  The host and the client must both have this version.
 - The web model picker shows the host's download progress, the Download and Cancel buttons, and
   the host's custom endpoints on the Custom tab, for an owner or admin.
   Your draft stays when you reconnect.

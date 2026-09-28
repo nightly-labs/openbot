@@ -34,6 +34,7 @@ import {
   isTeamCurrentCapability,
   MCP_SERVERS_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
+  PROVIDERS_RUNTIMES_V2_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -1149,7 +1150,8 @@ export class TeamApiServer {
             this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
           );
         if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
-        if (capability === PROVIDERS_ADMIN_CAPABILITY) return this.#options.admin?.providers !== undefined;
+        if (capability === PROVIDERS_ADMIN_CAPABILITY || capability === PROVIDERS_RUNTIMES_V2_CAPABILITY)
+          return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         return true;
       }),

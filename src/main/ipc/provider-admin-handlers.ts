@@ -14,6 +14,10 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import {
+  PROVIDERS_RUNTIMES_V2_CAPABILITY,
+  PROVIDERS_RUNTIMES_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
@@ -63,8 +67,15 @@ export function providerAdminIpcHandlers({
     return remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost);
   }
 
-  const runtime = (path: string) => (provider: ManagedProviderId, serverId: string) =>
-    remote(serverId, path, { provider }, decodeProviderRuntimeSnapshot);
+  /** The runtime routes of the host: `providers-v2` includes Gemini, and `providers-v1` does not. */
+  function runtimeRoutes(serverId: string) {
+    return remoteServers.supportsCapability(serverId, PROVIDERS_RUNTIMES_V2_CAPABILITY)
+      ? PROVIDERS_RUNTIMES_V2_ROUTES
+      : PROVIDERS_ADMIN_ROUTES;
+  }
+
+  const runtime = (route: "runtimesDownload" | "runtimesCancel") => (provider: ManagedProviderId, serverId: string) =>
+    remote(serverId, runtimeRoutes(serverId)[route], { provider }, decodeProviderRuntimeSnapshot);
 
   return {
     providerAdmin: {
@@ -95,19 +106,20 @@ export function providerAdminIpcHandlers({
       getRuntimes: scopedQueryHandler({
         local: () => runtimes.getStatus(),
         remote: (serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesStatus, {}, decodeProviderRuntimeSnapshot),
+          remote(serverId, runtimeRoutes(serverId).runtimesStatus, {}, decodeProviderRuntimeSnapshot),
       }),
       downloadRuntime: scopedHandler(parseManagedProviderId, {
         local: (provider) => runtimes.download(provider),
-        remote: runtime(PROVIDERS_ADMIN_ROUTES.runtimesDownload),
+        remote: runtime("runtimesDownload"),
       }),
       cancelRuntime: scopedHandler(parseManagedProviderId, {
         local: (provider) => runtimes.cancel(provider),
-        remote: runtime(PROVIDERS_ADMIN_ROUTES.runtimesCancel),
+        remote: runtime("runtimesCancel"),
       }),
       checkRuntimeUpdates: scopedQueryHandler({
         local: () => runtimes.checkForUpdates(),
-        remote: (serverId) => remote(serverId, PROVIDERS_ADMIN_ROUTES.runtimesCheck, {}, decodeProviderRuntimeSnapshot),
+        remote: (serverId) =>
+          remote(serverId, runtimeRoutes(serverId).runtimesCheck, {}, decodeProviderRuntimeSnapshot),
       }),
       listCustomProviders: scopedQueryHandler({
         local: () => customProviders.list(),

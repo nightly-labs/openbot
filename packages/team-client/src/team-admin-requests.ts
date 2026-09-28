@@ -61,6 +61,7 @@ import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-upda
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
@@ -250,26 +251,40 @@ export function clearProviderApiKey(request: TeamApiRequest, provider: AgentProv
   return providerChange(request, PROVIDERS_ADMIN_ROUTES.apiKeyClear, { provider });
 }
 
-export function getProviderRuntimes(request: TeamApiRequest): Promise<ProviderRuntimeSnapshot> {
-  return request("POST", PROVIDERS_ADMIN_ROUTES.runtimesStatus, decodeProviderRuntimeSnapshot, {});
+/**
+ * The runtime routes of a host: `providers-v2` includes Gemini, and `providers-v1` does not. The
+ * caller picks by the host's capabilities.
+ */
+export type ProviderRuntimeRoutes = typeof PROVIDERS_RUNTIMES_V2_ROUTES | typeof PROVIDERS_ADMIN_ROUTES;
+
+export function getProviderRuntimes(
+  request: TeamApiRequest,
+  routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
+): Promise<ProviderRuntimeSnapshot> {
+  return request("POST", routes.runtimesStatus, decodeProviderRuntimeSnapshot, {});
 }
 
 export function downloadProviderRuntime(
   request: TeamApiRequest,
   provider: ManagedProviderId,
+  routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Promise<ProviderRuntimeSnapshot> {
-  return request("POST", PROVIDERS_ADMIN_ROUTES.runtimesDownload, decodeProviderRuntimeSnapshot, { provider });
+  return request("POST", routes.runtimesDownload, decodeProviderRuntimeSnapshot, { provider });
 }
 
 export function cancelProviderRuntime(
   request: TeamApiRequest,
   provider: ManagedProviderId,
+  routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
 ): Promise<ProviderRuntimeSnapshot> {
-  return request("POST", PROVIDERS_ADMIN_ROUTES.runtimesCancel, decodeProviderRuntimeSnapshot, { provider });
+  return request("POST", routes.runtimesCancel, decodeProviderRuntimeSnapshot, { provider });
 }
 
-export function checkProviderRuntimeUpdates(request: TeamApiRequest): Promise<ProviderRuntimeSnapshot> {
-  return request("POST", PROVIDERS_ADMIN_ROUTES.runtimesCheck, decodeProviderRuntimeSnapshot, {});
+export function checkProviderRuntimeUpdates(
+  request: TeamApiRequest,
+  routes: ProviderRuntimeRoutes = PROVIDERS_ADMIN_ROUTES,
+): Promise<ProviderRuntimeSnapshot> {
+  return request("POST", routes.runtimesCheck, decodeProviderRuntimeSnapshot, {});
 }
 
 export function listCustomProviders(request: TeamApiRequest): Promise<CustomProviderSummary[]> {

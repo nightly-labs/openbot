@@ -1137,8 +1137,9 @@ The server runs confined; `antigravityStatePaths` gives it `~/.gemini/antigravit
 `projection_provider_sessions`.
 
 Team API v1–v4 do not know `antigravity`. The host hides Gemini agents, models, status, and
-sign-in state from peers on those versions, and the `providers-v1` route omits it. Team API v5
-carries Gemini.
+sign-in state from peers on those versions, and the `providers-v1` routes omit it. Team API v5
+carries Gemini, and the `providers-v2` runtime routes let an owner or admin download or cancel the
+host's Gemini runtime. Gemini signs in through a browser on the host, so no peer route signs it in.
 
 Team API v4 has its own frozen provider-aware schema and adapters. Versions 1–3 remain registered
 with their released provider vocabulary. The host filters OpenCode agents, models, status,

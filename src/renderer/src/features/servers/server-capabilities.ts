@@ -25,6 +25,7 @@ export function serverSupportsCapability(
       capability === "shared-tables-v1" ||
       capability === "agent-install-v1" ||
       capability === "providers-v1" ||
+      capability === "providers-v2" ||
       capability === "host-admin-v1") &&
     server?.kind === "remote"
   ) {

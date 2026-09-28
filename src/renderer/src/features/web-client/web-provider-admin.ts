@@ -5,6 +5,11 @@ import type {
   ProviderAdminDesktopApi,
   ServerSummary,
 } from "@openbot/contracts/ipc";
+import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import {
+  PROVIDERS_RUNTIMES_V2_CAPABILITY,
+  PROVIDERS_RUNTIMES_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v2";
 import {
   cancelProviderCodeLogin,
   cancelProviderRuntime,
@@ -15,6 +20,7 @@ import {
   getProviderApiKeyState,
   getProviderRuntimes,
   listCustomProviders,
+  type ProviderRuntimeRoutes,
   saveCustomProvider,
   setProviderApiKey,
   startProviderCodeLogin,
@@ -27,7 +33,7 @@ import { createCustomProvidersStore } from "../custom-providers/stores/custom-pr
 import { createProviderCodeLogin } from "../provider-updates/provider-code-login";
 import { createProviderRuntimeStore } from "../provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "../provider-updates/remote-provider-runtimes";
-import { remoteAdminServer } from "../servers/server-capabilities";
+import { remoteAdminServer, serverSupportsCapability } from "../servers/server-capabilities";
 import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import { hostProviderKeyApi } from "../settings/provider-key-api";
 
@@ -53,17 +59,21 @@ function openWebDestination(destination: ExternalDestination): Promise<void> {
  * The desktop `providerAdmin` group, answered over the Team API of the connected host. The calls are
  * async so a refused server is a rejected promise, as a failed IPC call is.
  */
-function webProviderAdmin(request: (serverId?: string) => TeamApiRequest): ProviderAdminDesktopApi {
+function webProviderAdmin(
+  request: (serverId?: string) => TeamApiRequest,
+  runtimeRoutes: () => ProviderRuntimeRoutes,
+): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) => startProviderCodeLogin(request(serverId), provider),
     cancelCodeLogin: async (provider, serverId) => cancelProviderCodeLogin(request(serverId), provider),
     getApiKeyState: async (provider, serverId) => getProviderApiKeyState(request(serverId), provider),
     setApiKey: async (input, serverId) => setProviderApiKey(request(serverId), input),
     clearApiKey: async (provider, serverId) => clearProviderApiKey(request(serverId), provider),
-    getRuntimes: async (serverId) => getProviderRuntimes(request(serverId)),
-    downloadRuntime: async (provider, serverId) => downloadProviderRuntime(request(serverId), provider),
-    cancelRuntime: async (provider, serverId) => cancelProviderRuntime(request(serverId), provider),
-    checkRuntimeUpdates: async (serverId) => checkProviderRuntimeUpdates(request(serverId)),
+    getRuntimes: async (serverId) => getProviderRuntimes(request(serverId), runtimeRoutes()),
+    downloadRuntime: async (provider, serverId) =>
+      downloadProviderRuntime(request(serverId), provider, runtimeRoutes()),
+    cancelRuntime: async (provider, serverId) => cancelProviderRuntime(request(serverId), provider, runtimeRoutes()),
+    checkRuntimeUpdates: async (serverId) => checkProviderRuntimeUpdates(request(serverId), runtimeRoutes()),
     listCustomProviders: async (serverId) => listCustomProviders(request(serverId)),
     saveCustomProvider: async (input, serverId) => saveCustomProvider(request(serverId), input),
     deleteCustomProvider: async (input, serverId) => deleteCustomProvider(request(serverId), input),
@@ -84,7 +94,12 @@ export interface WebProviderSettingsOptions {
  * comes back.
  */
 export function createWebProviderSettings(options: WebProviderSettingsOptions): () => HostProviderSettings | undefined {
-  const admin = webProviderAdmin(options.request);
+  // `request` refuses a server other than the connected one, so the connected one decides the routes.
+  const admin = webProviderAdmin(options.request, () =>
+    serverSupportsCapability(options.server(), PROVIDERS_RUNTIMES_V2_CAPABILITY)
+      ? PROVIDERS_RUNTIMES_V2_ROUTES
+      : PROVIDERS_ADMIN_ROUTES,
+  );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
     createMemo(() => {

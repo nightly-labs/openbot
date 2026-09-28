@@ -36,10 +36,15 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(null);
 
   const providerOptions = createMemo<ProviderPickerOption[]>(() =>
-    // A joined server's host serves only the providers that the Team API carries. Custom agents have
-    // their own list, because one row cannot stand for several commands.
+    // A joined server's host serves only the providers that the Team API carries: a host before
+    // protocol 5 sends no Gemini status. Custom agents have their own list, because one row cannot
+    // stand for several commands.
     AGENT_PROVIDERS.filter(
-      (provider) => provider !== "acp" && (!props.providerHostName || !isLocalOnlyProvider(provider)),
+      (provider) =>
+        provider !== "acp" &&
+        (!props.providerHostName ||
+          !isLocalOnlyProvider(provider) ||
+          props.agentStatus?.providers?.some((candidate) => candidate.id === provider) === true),
     ).map((provider) => {
       const agent = props.agentStatus?.providers?.find((candidate) => candidate.id === provider);
       const runtime = props.providerRuntimeStatuses?.[provider];

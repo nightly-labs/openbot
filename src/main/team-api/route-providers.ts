@@ -2,6 +2,10 @@ import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contr
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
+import {
+  PROVIDERS_RUNTIMES_V2_CAPABILITY,
+  PROVIDERS_RUNTIMES_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v2";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { parseProviderId } from "../ipc/app-inputs";
@@ -12,12 +16,13 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** The bound `providers-v1` puts on a runtime message. */
+/** The bound `providers-v1` and `providers-v2` put on a runtime message. */
 const RUNTIME_MESSAGE_LIMIT = 1024;
 
 /**
  * The providers of this computer, managed from a joined server: sign-in with a device code, provider
- * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`.
+ * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`, and by
+ * `providers-v2` for the runtime routes that include Gemini.
  *
  * `requireAdmin` runs on every route. A key or a header value only arrives here; no response
  * carries one, and no error message quotes the request.
@@ -29,7 +34,8 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  if (!providers || !capabilities.has(PROVIDERS_ADMIN_CAPABILITY))
+  const v2 = V2_ROUTES.has(url.pathname);
+  if (!providers || !capabilities.has(v2 ? PROVIDERS_RUNTIMES_V2_CAPABILITY : PROVIDERS_ADMIN_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
@@ -63,6 +69,14 @@ export async function routeProviders(
         return json(200, wireSnapshot(await runtimes.cancel(parsed(managedProvider, body))));
       case PROVIDERS_ADMIN_ROUTES.runtimesCheck:
         return json(200, wireSnapshot(await runtimes.checkForUpdates()));
+      case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus:
+        return json(200, wireSnapshotV2(runtimes.getStatus()));
+      case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesDownload:
+        return json(200, wireSnapshotV2(await runtimes.download(parsed(managedProviderV2, body))));
+      case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCancel:
+        return json(200, wireSnapshotV2(await runtimes.cancel(parsed(managedProviderV2, body))));
+      case PROVIDERS_RUNTIMES_V2_ROUTES.runtimesCheck:
+        return json(200, wireSnapshotV2(await runtimes.checkForUpdates()));
       case PROVIDERS_ADMIN_ROUTES.customList:
         return json(200, customProviders.list());
       case PROVIDERS_ADMIN_ROUTES.customSave:
@@ -79,7 +93,8 @@ export async function routeProviders(
   }
 }
 
-const ROUTES = new Set<string>(Object.values(PROVIDERS_ADMIN_ROUTES));
+const V2_ROUTES = new Set<string>(Object.values(PROVIDERS_RUNTIMES_V2_ROUTES));
+const ROUTES = new Set<string>([...Object.values(PROVIDERS_ADMIN_ROUTES), ...V2_ROUTES]);
 
 function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
@@ -115,6 +130,13 @@ function managedProvider(body: DynamicRecord): ManagedProviderId {
   return id;
 }
 
+/** `providers-v2` knows every managed runtime, Gemini included. */
+function managedProviderV2(body: DynamicRecord): ManagedProviderId {
+  const id = parseProviderId(body.provider);
+  if (!isManagedRuntimeProvider(id)) throw new Error(sourceText("error.team.providerNotManaged"));
+  return id;
+}
+
 function parsed<T>(parse: (value: DynamicRecord) => T, body: DynamicRecord): T {
   try {
     return parse(body);
@@ -135,6 +157,12 @@ function wireSnapshot(snapshot: ProviderRuntimeSnapshot): WireProviderRuntimeSna
     },
     toolRuntimes: { bun: wireStatus(snapshot.toolRuntimes.bun) },
   };
+}
+
+/** The `providers-v2` runtime snapshot: every managed runtime. */
+function wireSnapshotV2(snapshot: ProviderRuntimeSnapshot): ProviderRuntimeSnapshot {
+  const wire = wireSnapshot(snapshot);
+  return { ...wire, providers: { ...wire.providers, antigravity: wireStatus(snapshot.providers.antigravity) } };
 }
 
 function wireStatus(status: ProviderRuntimeStatus): ProviderRuntimeStatus {

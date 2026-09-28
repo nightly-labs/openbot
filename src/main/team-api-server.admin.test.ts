@@ -353,9 +353,13 @@ describe("Team API providers-v1", () => {
       providers: { codex: idle, claude: failed, grok: idle, opencode: idle, antigravity: idle },
       toolRuntimes: { bun: idle },
     };
+    const downloads: string[] = [];
     const runtimes = {
       getStatus: () => snapshot,
-      download: async () => snapshot,
+      download: async (provider: string) => {
+        downloads.push(provider);
+        return snapshot;
+      },
       cancel: async () => snapshot,
       checkForUpdates: async () => snapshot,
     };
@@ -421,6 +425,21 @@ describe("Team API providers-v1", () => {
       400,
     );
     expect(keys.size).toBe(0);
+
+    // providers-v2 adds Gemini to the runtimes, behind its own capability and the same admin gate.
+    const v2 = { ...admin, "OpenBot-Capabilities": "providers-v1, providers-v2" };
+    expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "antigravity" })).status).toBe(400);
+    expect(
+      (await send("/v1/admin/providers/v2/runtimes/status", {}, { ...v2, Authorization: asMember.Authorization }))
+        .status,
+    ).toBe(403);
+    expect((await send("/v1/admin/providers/v2/runtimes/download", { provider: "acp" }, v2)).status).toBe(400);
+    const gemini = await (
+      await send("/v1/admin/providers/v2/runtimes/download", { provider: "antigravity" }, v2)
+    ).json();
+    expect(Object.keys(gemini.providers)).toEqual(["codex", "claude", "grok", "opencode", "antigravity"]);
+    expect(gemini.providers.claude.message).toHaveLength(1024);
+    expect(downloads).toEqual(["claude", "antigravity"]);
 
     const endpoint = {
       id: "studio",
