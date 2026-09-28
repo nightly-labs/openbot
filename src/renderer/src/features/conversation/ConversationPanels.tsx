@@ -275,6 +275,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               computerUseEditable={props.server?.kind === "local"}
               agents={props.agents}
+              onStartNewChat={props.onClearAgentContext}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&

@@ -1097,6 +1097,15 @@ without the capability answers 404, so the client only logs out: that token stop
 membership stays for an admin to remove. Either way the client removes the server, also when the host
 does not answer.
 
+### New chat
+
+`context-reset-v1` adds `POST /v1/agent-context/clear` with `{ agentId }`. Any member who can see the
+agent can send it. The host writes a system message with `itemType: "context-reset"` to the agent's own
+thread and ends that thread's provider sessions. The thread, its messages and the agent do not change.
+The next provider session gets a handoff of only the messages after the last marker. The host refuses
+the request while a turn runs or a message waits in the queue. A client without the capability shows
+the marker as its text. Channel execution threads are not reset.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.

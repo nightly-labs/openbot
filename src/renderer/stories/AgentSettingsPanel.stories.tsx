@@ -20,6 +20,7 @@ const meta = {
     width: 296,
     maxWidth: () => 640,
     onClose: fn(),
+    onStartNewChat: fn(async () => {}),
     onResize: fn(),
     onResizeEnd: fn(),
     onUpdateAgent: fn(async () => undefined),

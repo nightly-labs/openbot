@@ -16,6 +16,7 @@ import {
   type AttachmentImportEvent,
   agentAutoApprovalEnabled,
   type CentralAuthState,
+  CONTEXT_RESET_ITEM_TYPE,
   type ComputerUseState,
   type ConversationMessage,
   type ConversationSnapshot,
@@ -65,6 +66,7 @@ import {
   type UpdateQueuedMessageInput,
   type UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import { filePreviewForPath } from "../../stories/file-previews";
 import { toggleChannelMember } from "../features/channels/channels-draft";
@@ -1441,6 +1443,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           threadId: getSnapshot(input.agentId).threadId ?? `thread-${input.agentId}`,
           turnId: input.turnId,
           status: "interrupted",
+        });
+      },
+      clearContext: async (agentId: string) => {
+        updateSnapshot(agentId, (snapshot) => {
+          snapshot.messages.push({
+            id: crypto.randomUUID(),
+            author: "system",
+            source: "system",
+            text: sourceText("status.agent.contextCleared"),
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            itemType: CONTEXT_RESET_ITEM_TYPE,
+          });
         });
       },
       respondToPrompt: async (_input: RespondToPromptInput) => undefined,

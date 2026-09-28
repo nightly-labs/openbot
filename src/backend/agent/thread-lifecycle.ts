@@ -5,6 +5,7 @@ import {
   type AgentSummary,
   agentComputerUseEnabled,
   agentProviderDescriptor,
+  isContextResetMarker,
   type McpServerConfig,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
@@ -634,6 +635,26 @@ export class ThreadLifecycle {
     if (!deferred) this.#pendingRuntimeRefreshes.delete(agent.id);
   }
 
+  /**
+   * Whether a provider turn may own a session of this agent's own thread, as the checks of
+   * `applyPendingRuntimeRefresh` see it: a compaction, a start in flight, a start not confirmed, or
+   * a running turn. A context reset must not close a session that one of them still needs.
+   */
+  providerContextBusy(agent: AgentSummary): boolean {
+    if (!this.#compaction.mayDrain(agent.id) || this.#pendingStarts.has(agent.id)) return true;
+    if (this.#mailbox.startingDeliveriesForAgent(agent.id).length > 0) return true;
+    return agent.threadId !== null && this.#activeTurnOf(agent.id, agent.threadId) !== null;
+  }
+
+  /**
+   * Ends the provider sessions of the agent's own thread after a context reset marker was written.
+   * The thread and its messages stay. The next turn starts a new session, and its handoff takes
+   * only the messages after the marker. Channel execution threads are not changed.
+   */
+  endThreadContext(threadId: string): void {
+    this.#refreshThreadRuntime(threadId);
+  }
+
   #activeTurnOf(agentId: string, threadId: string): string | null {
     const snapshot = [...this.#conversation.activeSnapshots()].find(
       ([id, candidate]) => id === agentId && candidate.threadId === threadId,
@@ -679,18 +700,24 @@ export class ThreadLifecycle {
     if (this.#conversation.isExecutionThread(threadId)) return null;
     if (this.#store.database.listProviderSessions(threadId).length < 1) return null;
     const persisted = this.#store.database.readConversation(agentId, threadId);
-    const messages = mergeConversationSnapshots(persisted, {
+    const merged = mergeConversationSnapshots(persisted, {
       agentId,
       threadId,
       activeTurnId: null,
       revision: persisted.revision,
       messages: this.#mailbox.conversationMessages(agentId),
-    }).messages.filter(
-      (message) =>
-        ["user", "assistant", "agent"].includes(message.author) &&
-        message.itemType !== "commentary" &&
-        (!message.delivery || ["completed", "failed", "interrupted"].includes(message.delivery.status)),
-    );
+    }).messages;
+    const resetIndex = merged.findLastIndex(isContextResetMarker);
+    // The user cleared the context: what came before the marker stays visible and is not given to
+    // the provider.
+    const messages = merged
+      .slice(resetIndex + 1)
+      .filter(
+        (message) =>
+          ["user", "assistant", "agent"].includes(message.author) &&
+          message.itemType !== "commentary" &&
+          (!message.delivery || ["completed", "failed", "interrupted"].includes(message.delivery.status)),
+      );
     if (messages.length === 0) return null;
 
     const agentNames = agentNamesById(this.#store.list());

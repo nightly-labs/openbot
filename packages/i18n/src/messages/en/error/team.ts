@@ -59,6 +59,7 @@ export const messages = defineMessages("error.team", {
   "error.team.sharedDataUnsupported": "Shared data is not supported by this connection.",
   "error.team.agentInstallUnsupported": "Adding agents is not supported by this connection.",
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
+  "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",
   "error.team.agentUpdateTargetRequired": "An agent to update is required.",
   "error.team.queueEditUnsupported": "This client does not support queue editing.",
   "error.team.skillsUnsupported": "Skills are not supported by this connection.",

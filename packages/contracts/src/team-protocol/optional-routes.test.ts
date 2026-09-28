@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
+import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
@@ -176,5 +177,15 @@ describe("host-admin-v1", () => {
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ serverName: "s".repeat(33) })).toThrow();
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ logo: { ...logo, mimeType: "image/gif" } })).toThrow();
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ logo: { ...logo, data: "A".repeat(699_053) } })).toThrow();
+  });
+});
+
+describe("context-reset-v1", () => {
+  it("carries only the agent id and sends nothing back", () => {
+    expect(codec(CONTEXT_RESET_ROUTES.clear).request({ agentId: "chief", threadId: "t1" })).toEqual({
+      agentId: "chief",
+    });
+    expect(() => codec(CONTEXT_RESET_ROUTES.clear).request({})).toThrow();
+    expect(codec(CONTEXT_RESET_ROUTES.clear).response(200, {})).toEqual({});
   });
 });

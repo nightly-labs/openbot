@@ -11,6 +11,7 @@ import {
   type ServerConnectionState,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { readHostAnalytics } from "@openbot/team-client";
 import {
   clearStorage,
@@ -19,7 +20,7 @@ import {
   getStorageUsage,
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
-import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import {
   Alert,
   AlertActions,
@@ -607,6 +608,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const agent = workspace.selected();
     if (!agent || !remoteAgentAdmin.settings()) return undefined;
     return (autoApprove: boolean) => remoteAgentAdmin.update({ agentId: agent.id, autoApprove });
+  });
+  const clearSelectedAgentContext = createMemo(() => {
+    const agent = workspace.selected();
+    if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
+      return undefined;
+    return () => clearAgentContext(hostRequest(), agent.id);
   });
   const prompt = createMemo<Extract<AgentEvent, { type: "prompt" }> | undefined>(() => {
     if (workspace.state.status !== "online") return;
@@ -1201,6 +1208,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               agentAutoApproves={remoteAgentAdmin.settings()?.autoApprove ?? false}
               agentAutoApproveLocked={remoteAgentAdmin.settings()?.autoApproveLocked ?? false}
               onSetAgentAutoApprove={setAgentAutoApprove()}
+              onClearAgentContext={clearSelectedAgentContext()}
               onRespondToBrowserTakeover={(decision) => workspace.respondToBrowserTakeover(decision)}
               onCancelQueuedMessage={workspace.cancelQueued}
               onSteerQueuedMessage={workspace.steerQueued}

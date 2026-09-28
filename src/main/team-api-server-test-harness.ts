@@ -129,6 +129,7 @@ export function createAgents(overrides: Partial<TeamApiAgents> = {}, events = ne
     editQueuedMessage: unimplemented,
     reorderQueue: unimplemented,
     interrupt: unimplemented,
+    clearAgentContext: unimplemented,
     respondToPrompt: unimplemented,
     respondToApproval: unimplemented,
     respondToBrowserSecret: unimplemented,

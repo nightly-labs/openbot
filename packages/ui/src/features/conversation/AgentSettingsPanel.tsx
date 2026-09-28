@@ -45,7 +45,17 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 
@@ -91,6 +101,11 @@ export interface AgentSettingsPanelProps {
     updates: AgentRuntimeSettingsPatch,
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
+  /**
+   * Starts a new chat with the agent after the user confirms. The agent forgets the messages before
+   * it and keeps its setup. Left out when the host cannot do it.
+   */
+  onStartNewChat?: () => Promise<void>;
 }
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
@@ -138,6 +153,17 @@ interface TextSaveRequest {
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const { t, errorMessage } = useText();
+  const [newChatOpen, setNewChatOpen] = createSignal(false);
+  const [newChatError, setNewChatError] = createSignal<string | null>(null);
+  async function startNewChat(start: () => Promise<void>): Promise<void> {
+    setNewChatError(null);
+    try {
+      await start();
+      setNewChatOpen(false);
+    } catch (error) {
+      setNewChatError(errorMessage(error, t("agentSettings.newChat.failed")));
+    }
+  }
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       batch: 0,
@@ -918,7 +944,44 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               }}
             />
           </div>
+          <Show when={props.onStartNewChat}>
+            <div class="agent-settings-notifications">
+              <div>
+                <strong>{t("agentSettings.newChat.title")}</strong>
+                <span>{t("agentSettings.newChat.description")}</span>
+              </div>
+              <Button
+                variant="outline"
+                type="button"
+                aria-label={t("agentSettings.newChat.confirm")}
+                aria-haspopup="dialog"
+                disabled={props.working}
+                onClick={() => {
+                  setNewChatError(null);
+                  setNewChatOpen(true);
+                }}
+              >
+                {t("agentSettings.newChat.button")}
+              </Button>
+            </div>
+          </Show>
         </SettingsPanelContent>
+        <Show when={props.onStartNewChat}>
+          {(start) => (
+            <ConfirmDialog
+              open={newChatOpen()}
+              tone="default"
+              initialFocus="cancel"
+              media={<AgentAvatar agent={props.agent} style={{ width: "44px", height: "44px" }} />}
+              title={t("agentSettings.newChat.confirmTitle", { name: props.agent.name })}
+              description={t("agentSettings.newChat.confirmDescription")}
+              confirmLabel={t("agentSettings.newChat.confirm")}
+              error={newChatError() ?? undefined}
+              onCancel={() => setNewChatOpen(false)}
+              onConfirm={() => startNewChat(start())}
+            />
+          )}
+        </Show>
         <ConfirmDialog
           open={draft.confirmingFullAccess}
           tone="default"

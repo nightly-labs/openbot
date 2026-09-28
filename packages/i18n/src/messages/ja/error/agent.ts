@@ -31,6 +31,8 @@ export const messages = {
     "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、「プロバイダーと権限」でデフォルトのプロバイダーを変更してください。",
   "error.agent.waitBeforeProviderChange":
     "プロバイダーを変更する前に、実行中のターンとキューが終わるまでお待ちください。",
+  "error.agent.waitBeforeClearContext":
+    "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.unknown": "不明なエージェントです: {id}",
   "error.agent.onlyUserWidensSettings":
     "エージェントにフルアクセスを与える、または Computer Use をオンにできるのはユーザーだけです。エージェントの設定で変更するようユーザーに依頼してください。",

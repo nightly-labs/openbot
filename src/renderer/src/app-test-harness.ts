@@ -854,6 +854,7 @@ export function installOpenbotStub(): void {
       updateQueuedMessage: vi.fn().mockResolvedValue(undefined),
       reorderQueue: vi.fn().mockResolvedValue(undefined),
       interrupt: vi.fn().mockResolvedValue(undefined),
+      clearContext: vi.fn().mockResolvedValue(undefined),
       respondToPrompt: vi.fn().mockResolvedValue(undefined),
       respondToApproval: vi.fn().mockResolvedValue(undefined),
       respondToBrowserSecret: vi.fn().mockResolvedValue(undefined),

@@ -101,6 +101,7 @@ type TeamApiAgentMethods = Pick<
   | "editQueuedMessage"
   | "reorderQueue"
   | "interrupt"
+  | "clearAgentContext"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"

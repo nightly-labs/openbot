@@ -763,7 +763,8 @@ button.chat-action-target:active,
 }
 
 /* Markers without a target pill keep the same optical label-to-time rhythm. */
-.chat-action-marker-unavailable .chat-action-marker-label {
+.chat-action-marker-unavailable .chat-action-marker-label,
+.chat-action-marker-context-reset .chat-action-marker-label {
   padding-inline-end: var(--openbot-space-1-5);
 }
 

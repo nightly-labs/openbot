@@ -61,6 +61,15 @@ export const messages = {
   "agentSettings.notifications.title": "通知",
   "agentSettings.notifications.description": "このエージェントが完了したときや入力が必要なときに通知を受け取ります",
 
+  "agentSettings.newChat.title": "新しいチャット",
+  "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",
+  "agentSettings.newChat.button": "開始",
+  "agentSettings.newChat.confirmTitle": "{name} と新しいチャットを始めますか？",
+  "agentSettings.newChat.confirmDescription":
+    "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+  "agentSettings.newChat.confirm": "新しいチャットを始める",
+  "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+
   "agentSettings.fullAccess.title": "このエージェントにフルアクセスを許可しますか？",
   "agentSettings.fullAccess.description":
     "エージェントは、あなたのユーザーアカウントがアクセスできるすべてのファイルの読み取り、変更、削除、任意のコマンドの実行、ネットワークの使用ができるようになります。指示の誤解や悪意のある Web ページ 1 つで、個人のファイルに影響が及ぶ可能性があります。",

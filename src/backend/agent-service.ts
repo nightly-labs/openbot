@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AccountUsage,
@@ -18,6 +19,7 @@ import type {
   ChannelMemory,
   ChannelRoutine,
   ChannelRoutineRun,
+  ConversationMessage,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -74,7 +76,7 @@ import type {
   UpdateQueuedMessageInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
-import { workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import { CONTEXT_RESET_ITEM_TYPE, isContextResetMarker, workspaceAccessEnforced } from "@openbot/contracts/ipc";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -1246,6 +1248,47 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   refreshAgentRuntime(agentId: string): void {
     this.#threads.refreshAgentRuntime(agentId);
+  }
+
+  /**
+   * Starts a new chat with the agent and keeps the agent. A marker goes into the agent's own thread,
+   * and its provider sessions end, so the next turn starts a new session that does not see the
+   * messages before the marker. The messages stay visible, and the profile, memories, workspace, and
+   * browser do not change.
+   */
+  clearAgentContext(agentId: string): void {
+    const agent = this.#conversation.requireKnownAgent(agentId);
+    const activeTurn =
+      this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
+      (agent.threadId ? this.#store.database.readConversation(agentId, agent.threadId).activeTurnId : null);
+    if (activeTurn || this.#mailbox.hasUnfinishedDelivery(agentId) || this.#threads.providerContextBusy(agent)) {
+      throw new Error(sourceText("error.agent.waitBeforeClearContext"));
+    }
+    const database = this.#store.database;
+    const threadId = this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {
+      const last = snapshot.messages.at(-1);
+      if (!last || isContextResetMarker(last)) return { result: threadId, snapshot };
+      const message: ConversationMessage = {
+        id: `context-reset-${randomUUID()}`,
+        author: "system",
+        source: "system",
+        text: sourceText("status.agent.contextCleared"),
+        createdAt: new Date().toISOString(),
+        status: "completed",
+        itemType: CONTEXT_RESET_ITEM_TYPE,
+      };
+      snapshot.messages.push(message);
+      sortConversationMessages(snapshot.messages);
+      snapshot.revision = database.appendConversationMessage({
+        agentId,
+        threadId,
+        activeTurnId: snapshot.activeTurnId,
+        message,
+        eventType: "thread.context-cleared",
+      });
+      return { result: threadId, snapshot };
+    });
+    this.#threads.endThreadContext(threadId);
   }
 
   resolveAvatar(agentId: string): { path: string; mimeType: AvatarImageInput["mimeType"]; version: string } | null {
