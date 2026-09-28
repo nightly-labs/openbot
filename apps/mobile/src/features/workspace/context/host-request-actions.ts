@@ -185,11 +185,11 @@ export function createHostRequestActions({
         undefined,
         serverId,
       ),
-    searchMessages: (query, serverId) =>
+    searchMessages: (query, serverId, cursor) =>
       request(
         "GET",
         // A query parameter never reaches the JSON adapters, so every released host reads it as sent.
-        `${TEAM_API_ROUTES.messages.search}?${new URLSearchParams({ q: query, limit: "50" })}`,
+        `${TEAM_API_ROUTES.messages.search}?${new URLSearchParams({ q: query, limit: "50", ...(cursor ? { cursor } : {}) })}`,
         decodeConversationSearchPage,
         undefined,
         serverId,

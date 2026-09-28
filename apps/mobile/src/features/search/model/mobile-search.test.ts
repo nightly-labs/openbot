@@ -34,11 +34,12 @@ it("shows host message results with local agent matches", () => {
   const view = mobileSearchView({
     query: "budget",
     agents: [agent],
-    messages: { status: "ready", page },
+    messages: { status: "ready", page, hasMore: false },
   });
   expect(view).toEqual({
     state: "results",
     messages: "ready",
+    canLoadMore: false,
     results: [
       {
         id: "message-chief-one",
@@ -53,11 +54,12 @@ it("shows host message results with local agent matches", () => {
   const agents = mobileSearchView({
     query: "chief",
     agents: [agent],
-    messages: { status: "ready", page: { results: [], total: 0, nextCursor: null } },
+    messages: { status: "ready", page: { results: [], total: 0, nextCursor: null }, hasMore: false },
   });
   expect(agents).toEqual({
     state: "results",
     messages: "ready",
+    canLoadMore: false,
     results: [{ id: "agent-chief", category: "agents", agent }],
   });
 });
@@ -68,26 +70,60 @@ it("says when nothing matches", () => {
     mobileSearchView({
       query: "nothing",
       agents: [agent],
-      messages: { status: "ready", page: empty },
+      messages: { status: "ready", page: empty, hasMore: false },
     }),
   ).toEqual({ state: "empty" });
   // An empty query lists every agent and does not search messages.
   expect(mobileSearchView({ query: "", agents: [agent], messages: { status: "idle" } })).toEqual({
     state: "results",
     messages: "idle",
+    canLoadMore: false,
     results: [{ id: "agent-chief", category: "agents", agent }],
   });
 });
 
+it("reads past pages that hold only hidden agents' matches", () => {
+  const hiddenOnly = {
+    results: [{ agentId: "hidden", message: message("two", "Budget for hidden agent") }],
+    total: 51,
+    nextCursor: "50",
+  };
+  // More pages exist, so a page with no visible match is not "no matches".
+  expect(
+    mobileSearchView({
+      query: "budget",
+      agents: [agent],
+      messages: { status: "ready", page: hiddenOnly, hasMore: true },
+    }),
+  ).toEqual({ state: "loading" });
+  expect(
+    mobileSearchView({
+      query: "budget",
+      agents: [agent],
+      messages: { status: "ready", page: hiddenOnly, hasMore: false },
+    }),
+  ).toEqual({ state: "empty" });
+  // Visible matches with more pages offer the older ones.
+  expect(
+    mobileSearchView({ query: "budget", agents: [agent], messages: { status: "ready", page, hasMore: true } }),
+  ).toMatchObject({ state: "results", messages: "ready", canLoadMore: true });
+});
+
 it("reports loading and errors from the host search", () => {
-  expect(mobileSearchView({ query: "budget", agents: [agent], messages: { status: "loading" } })).toEqual({
+  expect(
+    mobileSearchView({ query: "budget", agents: [agent], messages: { status: "loading", page: null, hasMore: false } }),
+  ).toEqual({
     state: "loading",
   });
-  expect(mobileSearchView({ query: "budget", agents: [agent], messages: { status: "error" } })).toEqual({
+  expect(
+    mobileSearchView({ query: "budget", agents: [agent], messages: { status: "error", page: null, hasMore: false } }),
+  ).toEqual({
     state: "error",
   });
   // Agent matches stay visible while the message search fails.
-  expect(mobileSearchView({ query: "chief", agents: [agent], messages: { status: "error" } })).toMatchObject({
+  expect(
+    mobileSearchView({ query: "chief", agents: [agent], messages: { status: "error", page: null, hasMore: false } }),
+  ).toMatchObject({
     state: "results",
     messages: "error",
   });

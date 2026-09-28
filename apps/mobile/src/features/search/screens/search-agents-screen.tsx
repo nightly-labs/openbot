@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -30,12 +30,16 @@ export function SearchAgentsScreen() {
     const timer = setTimeout(() => setMessageQuery(normalizeMobileSearchQuery(query)), 150);
     return () => clearTimeout(timer);
   }, [query]);
-  const messages = useQuery({
+  const messages = useInfiniteQuery({
     queryKey: ["message-search", session?.apiUrl, session?.user.id, sessionScope, activeServer.id, messageQuery],
-    queryFn: () => searchMessages(messageQuery, activeServer.id),
+    queryFn: ({ pageParam }) => searchMessages(messageQuery, activeServer.id, pageParam),
+    // An empty cursor asks for the newest matches.
+    initialPageParam: "",
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: messageQuery !== "",
     retry: false,
   });
+  const pages = messages.data?.pages;
   const view = useMemo(
     () =>
       mobileSearchView({
@@ -43,14 +47,27 @@ export function SearchAgentsScreen() {
         agents: activeAgents,
         messages: !messageQuery
           ? { status: "idle" }
-          : messages.isError
-            ? { status: "error" }
-            : messages.data
-              ? { status: "ready", page: messages.data }
-              : { status: "loading" },
+          : {
+              status: messages.isError ? "error" : messages.isFetching ? "loading" : "ready",
+              page: pages
+                ? { results: pages.flatMap((page) => page.results), total: pages[0]?.total ?? 0, nextCursor: null }
+                : null,
+              hasMore: messages.hasNextPage,
+            },
       }),
-    [activeAgents, query, messageQuery, messages.data, messages.isError],
+    [activeAgents, query, messageQuery, pages, messages.isError, messages.isFetching, messages.hasNextPage],
   );
+  // A page can hold only matches of hidden agents. Read on until a visible match or the last page.
+  const readsOn =
+    messages.hasNextPage &&
+    !messages.isFetching &&
+    !messages.isError &&
+    (view.state === "loading" || (view.state === "results" && view.messages === "loading"));
+  const { fetchNextPage, refetch } = messages;
+  useEffect(() => {
+    if (readsOn) void fetchNextPage();
+  }, [readsOn, fetchNextPage]);
+  const retry = () => void (messages.isFetchNextPageError ? fetchNextPage() : refetch());
   const resultCount = view.state === "results" ? view.results.length : 0;
 
   const searchSummary = useRef({ used: false, count: 0 });
@@ -108,17 +125,19 @@ export function SearchAgentsScreen() {
           {view.messages === "loading" ? (
             <SearchNotice title={t("mobile.search.searching")} />
           ) : view.messages === "error" ? (
-            <SearchNotice title={t("mobile.search.errorTitle")} onRetry={() => void messages.refetch()} />
+            <SearchNotice title={t("mobile.search.errorTitle")} onRetry={retry} />
+          ) : view.canLoadMore ? (
+            <View className="items-center px-8 py-6">
+              <Button size="sm" variant="secondary" onPress={() => void fetchNextPage()}>
+                <Button.Label>{t("mobile.search.showMore")}</Button.Label>
+              </Button>
+            </View>
           ) : null}
         </>
       ) : view.state === "loading" ? (
         <SearchNotice title={t("mobile.search.searching")} />
       ) : view.state === "error" ? (
-        <SearchNotice
-          title={t("mobile.search.errorTitle")}
-          body={t("mobile.search.errorBody")}
-          onRetry={() => void messages.refetch()}
-        />
+        <SearchNotice title={t("mobile.search.errorTitle")} body={t("mobile.search.errorBody")} onRetry={retry} />
       ) : (
         <SearchNotice title={t("mobile.search.emptyTitle")} body={t("mobile.search.emptyBody")} />
       )}

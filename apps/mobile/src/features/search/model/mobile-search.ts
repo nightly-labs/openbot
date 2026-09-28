@@ -20,7 +20,13 @@ export type MobileSearchResult = MobileSearchAgentResult | MobileSearchMessageRe
 
 /** What the screen shows. Message search runs on the host, so its state is separate from the local agent match. */
 export type MobileSearchView =
-  | { state: "results"; results: MobileSearchResult[]; messages: "idle" | "loading" | "error" | "ready" }
+  | {
+      state: "results";
+      results: MobileSearchResult[];
+      messages: "idle" | "loading" | "error" | "ready";
+      /** The host has older matches that the user can ask for. */
+      canLoadMore: boolean;
+    }
   | { state: "loading" }
   | { state: "error" }
   | { state: "empty" };
@@ -62,19 +68,26 @@ export function mobileSearchView({
 }: {
   query: string;
   agents: MobileAgent[];
-  /** The host message search for the current query; `idle` when no search runs. */
+  /**
+   * The host message search for the current query, with the pages read so far; `idle` when no search
+   * runs. `hasMore` is true when the host has another page.
+   */
   messages:
     | { status: "idle" }
-    | { status: "loading" }
-    | { status: "error" }
-    | { status: "ready"; page: ConversationSearchPage };
+    | { status: "loading" | "error" | "ready"; page: ConversationSearchPage | null; hasMore: boolean };
 }): MobileSearchView {
   const normalized = normalizeMobileSearchQuery(query);
   // Messages are searched only for a query; an empty query lists the agents.
-  const messageStatus = normalized ? messages.status : "idle";
-  const messageResults = messages.status === "ready" && normalized ? messageSearchResults(messages.page, agents) : [];
+  const search = normalized && messages.status !== "idle" ? messages : null;
+  const messageResults = search?.page ? messageSearchResults(search.page, agents) : [];
+  const hasMore = search?.hasMore ?? false;
+  let messageStatus: "idle" | "loading" | "error" | "ready" = search?.status ?? "idle";
+  // The host sorts every match before this device drops hidden agents, so a page can hold no visible
+  // match while a later one does. The screen reads on in that case; show it as loading, not empty.
+  if (messageStatus === "ready" && messageResults.length === 0 && hasMore) messageStatus = "loading";
   const results = [...agentSearchResults(agents, normalized), ...messageResults];
-  if (results.length > 0) return { state: "results", results, messages: messageStatus };
+  if (results.length > 0)
+    return { state: "results", results, messages: messageStatus, canLoadMore: messageStatus === "ready" && hasMore };
   if (messageStatus === "loading") return { state: "loading" };
   if (messageStatus === "error") return { state: "error" };
   return { state: "empty" };

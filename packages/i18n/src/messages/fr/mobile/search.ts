@@ -9,6 +9,7 @@ export const messages = {
   "mobile.search.errorTitle": "Impossible de rechercher les messages",
   "mobile.search.errorBody": "Vérifiez la connexion à cet ordinateur, puis réessayez.",
   "mobile.search.retry": "Réessayer",
+  "mobile.search.showMore": "Afficher plus de messages",
   "mobile.search.fromYou": "Vous à {name} · {time}",
   "mobile.search.toYou": "{name} à vous · {time}",
 } as const satisfies PartialTranslation<typeof source>;
