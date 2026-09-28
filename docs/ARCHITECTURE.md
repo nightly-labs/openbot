@@ -475,8 +475,10 @@ a routine run says so in the delegated message. The tool returns only after the 
 can take minutes. The end of the turn cancels the request, so the agent keeps waiting for the result,
 also when the provider returns control while the call runs. In the smoke runs, Codex `exec` did this
 about every 30 seconds. After an error or a cancel, the agent does not point to a takeover window.
-When the agent reaches a service in the browser and the plugin for it is not installed, the answer
-ends with a fixed sentence that names the plugin in Marketplace, on the Plugins tab.
+When the agent reaches a service in the browser and the plugin for it is not in its tools, the answer
+ends with a fixed sentence: install the plugin in Marketplace, on the Plugins tab, or enable it in MCP
+servers. The sentence names both actions because `read_agent` and the agent's tools show only enabled
+servers, so an agent cannot tell a disabled plugin from a missing one.
 
 When its own tools fail, the agent checks its teammates. When a teammate reports that it is blocked
 or waits for the user, the requester does not repeat that work or send the same request again; it
@@ -487,8 +489,8 @@ at the moment it answers. An earlier failure does not stop the agent from asking
 a new request. It never sends a task back to the teammate that gave it. The answer that gives a
 delegated result starts with the teammate's name, and the agent does not say that a service was
 checked unless a tool result or a reply shows it. When nothing works, the agent says what was tried
-and the one action that unblocks it; for a service with a plugin, that action is to install the
-plugin. It can offer to create a specialist teammate, but it creates one only after the user agrees.
+and the one action that unblocks it; for a service with a plugin, that action is to install or
+enable the plugin. It can offer to create a specialist teammate, but it creates one only after the user agrees.
 
 An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
