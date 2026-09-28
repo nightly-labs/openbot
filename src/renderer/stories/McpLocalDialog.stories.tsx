@@ -49,7 +49,7 @@ function LocalPlayground(props: LocalPlaygroundProps) {
         onTest={connectAs(props.outcome, FIGMA_SUBJECT.name)}
         onConnected={stage.onConnected}
         onCancel={stage.close}
-        onOpenUrl={props.showsTheSetupPage ? fn() : undefined}
+        {...(props.showsTheSetupPage ? { onOpenUrl: fn() } : {})}
       />
     </ConnectStage>
   );
