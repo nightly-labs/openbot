@@ -9,6 +9,7 @@ import type {
   SkillConversationEvent,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 
 const sourcePath = z.string().min(1).max(INPUT_LIMITS.path);
@@ -81,7 +82,7 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "uninstall_skill",
     description:
-      "Remove an installed skill from yourself or another local agent when the user asks. Omit agentId for yourself. Get the skillId from read_agent. Refuses to remove a skill whose files were changed; only the user can remove those. The local library keeps the skill.",
+      "Remove an installed skill from yourself or another local agent when the user asks. Omit agentId for yourself. Get the skillId from read_agent. Refuses to remove a skill whose files were changed; only the user can remove those. Cannot remove a workspace folder skill. The local library keeps the skill.",
     shape: uninstallSkillSchema.shape,
   },
 ];
@@ -153,6 +154,11 @@ export async function runLocalSkillTool(
     case "uninstall_skill": {
       const input = uninstallSkillSchema.parse(args);
       const target = targetAgent(input.agentId);
+      // The service ignores an id that is not in the lock file, and workspace folder skills are never in it.
+      const installed = await api.listInstalled(target);
+      if (!installed.some((skill) => skill.skillId === input.skillId && skill.origin !== "workspace")) {
+        throw new Error(sourceText("error.skill.notFound"));
+      }
       // Never `removeModified`: files the user changed are theirs to remove.
       await api.uninstall({ agentId: target, skillId: input.skillId });
       return { agentId: target, skillId: input.skillId, removed: true };
