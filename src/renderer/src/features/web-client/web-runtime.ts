@@ -12,6 +12,8 @@ import type {
   AttachmentSummary,
   AvatarImageInput,
   BrowserLiveViewEvent,
+  BrowserNavigateInput,
+  BrowserOpenInput,
   BrowserPreview,
   BrowserTab,
   ConversationPage,
@@ -49,6 +51,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -96,6 +99,10 @@ export interface WebWorkspaceRuntime {
   browser: BrowserViewRuntime;
   browserTabs(): Promise<BrowserTab[]>;
   browserPreview?: (tabId: string) => Promise<BrowserPreview>;
+  openBrowserTab(input: BrowserOpenInput): Promise<BrowserTab>;
+  navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
+  reloadBrowserTab(tabId: string): Promise<void>;
+  closeBrowserTab(tabId: string): Promise<void>;
   respondToBrowserSecret?: (input: RespondToBrowserSecretInput) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
@@ -369,23 +376,27 @@ export function createWebWorkspaceRuntime(
     async browserTabs() {
       const value = await request("GET", TEAM_API_ROUTES.browser.tabs);
       if (!Array.isArray(value)) throw new Error("The host returned an invalid tab list.");
-      return value.map((tab) => {
-        if (
-          !isDynamicRecord(tab) ||
-          typeof tab.loading !== "boolean" ||
-          (tab.ownerThreadId !== null && typeof tab.ownerThreadId !== "string") ||
-          (tab.ownerAgentId !== null && typeof tab.ownerAgentId !== "string")
-        )
-          throw new Error("The host returned an invalid tab.");
-        return {
-          id: requiredString(tab, "id"),
-          title: requiredString(tab, "title"),
-          url: requiredString(tab, "url"),
-          loading: tab.loading,
-          ownerThreadId: tab.ownerThreadId,
-          ownerAgentId: tab.ownerAgentId,
-        };
-      });
+      return value.map(decodeWebBrowserTab);
+    },
+    async openBrowserTab(input) {
+      return decodeWebBrowserTab(await request("POST", TEAM_API_ROUTES.browser.open, { ...input }));
+    },
+    async navigateBrowserTab(input) {
+      if (!("url" in input)) {
+        await request("POST", TEAM_API_ROUTES.browser.navigate, { ...input });
+        return;
+      }
+      // An older host has no route that moves an existing tab to an address; the browser store
+      // opens a new tab for it instead.
+      if (!capabilities.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserNavigateUnsupported"));
+      await request("POST", TEAM_API_ROUTES.browser.load, { ...input });
+    },
+    async reloadBrowserTab(tabId) {
+      await request("POST", TEAM_API_ROUTES.browser.reload, { tabId });
+    },
+    async closeBrowserTab(tabId) {
+      await request("POST", TEAM_API_ROUTES.browser.close, { tabId });
     },
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
@@ -719,6 +730,24 @@ function toTeamInvite(invite: RemoteTeamInvite): TeamInviteSummary {
     email: invite.email,
     permanent: invite.permanent,
     useCount: invite.useCount,
+  };
+}
+
+function decodeWebBrowserTab(tab: unknown): BrowserTab {
+  if (
+    !isDynamicRecord(tab) ||
+    typeof tab.loading !== "boolean" ||
+    (tab.ownerThreadId !== null && typeof tab.ownerThreadId !== "string") ||
+    (tab.ownerAgentId !== null && typeof tab.ownerAgentId !== "string")
+  )
+    throw new Error("The host returned an invalid tab.");
+  return {
+    id: requiredString(tab, "id"),
+    title: requiredString(tab, "title"),
+    url: requiredString(tab, "url"),
+    loading: tab.loading,
+    ownerThreadId: tab.ownerThreadId,
+    ownerAgentId: tab.ownerAgentId,
   };
 }
 

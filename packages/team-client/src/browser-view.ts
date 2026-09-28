@@ -86,7 +86,9 @@ export function createRemoteBrowserView(
       }
     },
     async open(tabId: string, frame: (frame: BrowserViewFrame) => void, ended: () => void): Promise<RemoteBrowserView> {
-      await close();
+      // The host removes a session when its stream closes, so the delete that follows can answer
+      // not found. The previous view is gone either way; that must not fail the next one.
+      await close().catch(() => undefined);
       const current = ++generation;
       const session = decodeBrowserViewSessionResponse(
         await request("POST", TEAM_API_ROUTES.browser.viewSessions, { tabId }),

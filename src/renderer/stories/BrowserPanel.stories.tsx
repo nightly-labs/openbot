@@ -1,4 +1,5 @@
-import type { BrowserControlSession, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserControlSession, BrowserLiveViewEvent, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import BrowserPanel from "@openbot/ui/features/browser/BrowserPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -152,5 +153,48 @@ export const PopupBlocked: Story = {
         message: "The browser tab limit was reached. Close a tab, then retry from the page.",
       },
     },
+  },
+};
+
+/** A host that sends one 4:3 frame, drawn in the theme's colors. */
+function remoteLiveViewRuntime(): BrowserViewRuntime {
+  const listeners = new Set<(event: BrowserLiveViewEvent) => void>();
+  return {
+    async startLiveView(tabId) {
+      const width = 1024;
+      const height = 768;
+      const canvas = new OffscreenCanvas(width, height);
+      const context = canvas.getContext("2d");
+      const theme = getComputedStyle(document.documentElement);
+      if (context) {
+        context.fillStyle = theme.getPropertyValue("--openbot-bg-surface");
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = theme.getPropertyValue("--openbot-text-primary");
+        context.font = "48px sans-serif";
+        context.fillText("Page on the host", 64, 128);
+      }
+      const image = new Uint8Array(await (await canvas.convertToBlob({ type: "image/jpeg" })).arrayBuffer());
+      for (const listener of listeners) listener({ type: "frame", tabId, sequence: 1, width, height, image });
+    },
+    stopLiveView: async () => undefined,
+    sendLiveViewInput: async () => undefined,
+    onLiveViewEvent(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+/**
+ * A remote host's tab, as the web app and a desktop connected to a host show it. The panel is a card
+ * of the frame's shape over the app, not a full-bleed window, and has no Picture in Picture.
+ */
+export const RemoteLiveView: Story = {
+  args: {
+    liveViewTabId: tab.id,
+    liveViewRuntime: remoteLiveViewRuntime(),
+    canEnterPip: false,
   },
 };
