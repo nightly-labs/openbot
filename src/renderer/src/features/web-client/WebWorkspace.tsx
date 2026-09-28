@@ -539,6 +539,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const firstAgent = () => workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported();
   /** An open channel still takes the pane, as a channel closes the desktop form. */
   const agentFormOpen = () => creating() || (firstAgent() && !channelOpen());
+  // The host reports the new agent before the create call returns. Hold the form open until the
+  // save is done, so the new-agent avatar still changes after it.
+  createEffect(firstAgent, (first) => {
+    if (first && !untrack(channelOpen)) setCreating(true);
+  });
   const readState = () => workspace.conversation()?.page?.readState;
   // Keyed on the newest loaded message, not on the read state: the host can count a message that
   // this page has not loaded yet, and marking the same message again would not clear it. Focus
