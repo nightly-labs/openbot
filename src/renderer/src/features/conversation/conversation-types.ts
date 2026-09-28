@@ -21,6 +21,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
+import type { AccountProfilePanelProps } from "@openbot/ui/features/settings/AccountProfilePanel";
 import type { JSX } from "@solidjs/web";
 import type { ConversationRuntime } from "./conversation-runtime";
 
@@ -98,6 +99,12 @@ export interface ConversationProps {
   mcpSettingsOpen?: boolean;
   globalOverlayOpen: boolean;
   settingsRequest: { agentId: string; nonce: number } | null;
+  /** The account Profile panel, for a client that has no settings dialog. `profileRequest` opens it. */
+  accountProfile?: Pick<
+    AccountProfilePanelProps,
+    "account" | "onUpdateAccountName" | "onUpdateAccountAvatar" | "onListAccountSessions" | "onRevokeAccountSession"
+  >;
+  profileRequest?: { agentId: string; nonce: number } | null;
   messageFocusRequest: { agentId: string; messageId: string; nonce: number } | null;
   queue: QueueSnapshot | undefined;
   browserTabs: BrowserTab[];
@@ -200,5 +207,6 @@ export type RightPanelMode =
   | "browser-expanded"
   | "browser-pip"
   | "settings"
+  | "profile"
   | "file-preview"
   | "files";

@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Tooltip,
   UserAvatar,
+  UserRound,
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { TypingDots } from "../../components/TypingDots";
@@ -32,8 +33,8 @@ import { AccountUpdateIsland } from "./AccountUpdateIsland";
 import { AccountUsageDetails } from "./AccountUsageDetails";
 import { accountUsageProviderRows, accountUsageSummary } from "./account-usage-view";
 
+/** A menu row shows only when its action is given, so a client without that surface omits it. */
 interface AccountDockProps {
-  remoteClient?: boolean;
   account: CentralAuthUser;
   appInfo: AppInfo | null;
   agentStatus: AgentStatus;
@@ -52,9 +53,10 @@ interface AccountDockProps {
   onUpdateAction: () => Promise<void>;
   onLogout?: () => Promise<void>;
   onOpenExternal: (destination: ExternalDestination) => Promise<void>;
-  onOpenPermissions: () => void;
-  onOpenSettings: (trigger: HTMLElement) => void;
-  onOpenSkills: () => void;
+  onOpenPermissions?: () => void;
+  onOpenProfile?: () => void;
+  onOpenSettings?: (trigger: HTMLElement) => void;
+  onOpenSkills?: () => void;
 }
 
 const PRODUCT_NAME = "OpenBot";
@@ -144,6 +146,9 @@ export function AccountDock(props: AccountDockProps) {
   const usageRefreshActive = createMemo(() => usageLoading() || usageRefreshAcknowledging());
   const usageRefreshDisabled = createMemo(() => usageRefreshActive() || !props.usageReady || !props.usageTargetKey);
   const updatePresentation = createMemo(() => presentUpdateStatus(props.updateStatus, text));
+  const updateRowVisible = createMemo(
+    () => props.updateStatus.phase !== "unsupported" && (!hybridLayout() || !updatePresentation().available),
+  );
   const accountMenuError = createMemo(
     () =>
       menuError() ??
@@ -321,7 +326,7 @@ export function AccountDock(props: AccountDockProps) {
   function accountMenu(includeDockActions = false) {
     return (
       <>
-        <Show when={includeDockActions && !props.remoteClient}>
+        <Show when={includeDockActions}>
           <AccountUsageDetails
             rows={usageRows()}
             loading={usageLoading()}
@@ -332,27 +337,43 @@ export function AccountDock(props: AccountDockProps) {
             title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
           />
           <div class="account-menu-separator" />
+        </Show>
+        <Show when={props.onOpenProfile || (includeDockActions && props.onOpenSettings)}>
           <section class="account-menu-group" aria-label={t("account.menu.account")}>
-            <Button
-              variant="ghost"
-              type="button"
-              class="account-menu-row"
-              onClick={() => {
-                setMenuOpen(false);
-                if (legacyTrigger) props.onOpenSettings(legacyTrigger);
-              }}
-            >
-              <Settings class="account-menu-icon" aria-hidden="true" />
-              <span>{t("account.menu.settings")}</span>
-            </Button>
+            <Show when={props.onOpenProfile}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenProfile?.();
+                }}
+              >
+                <UserRound class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.profile")}</span>
+              </Button>
+            </Show>
+            <Show when={includeDockActions && props.onOpenSettings}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (legacyTrigger) props.onOpenSettings?.(legacyTrigger);
+                }}
+              >
+                <Settings class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.settings")}</span>
+              </Button>
+            </Show>
           </section>
           <div class="account-menu-separator" />
         </Show>
-        <Show when={!props.remoteClient}>
+        <Show when={updateRowVisible() || props.onOpenSkills || props.onOpenPermissions}>
           <section class="account-menu-group" aria-label={PRODUCT_NAME}>
-            <Show
-              when={props.updateStatus.phase !== "unsupported" && (!hybridLayout() || !updatePresentation().available)}
-            >
+            <Show when={updateRowVisible()}>
               <Button
                 variant="ghost"
                 type="button"
@@ -370,44 +391,47 @@ export function AccountDock(props: AccountDockProps) {
                 <small>{updatePresentation().detail}</small>
               </Button>
             </Show>
-            <Button
-              variant="ghost"
-              type="button"
-              class="account-menu-row"
-              onClick={() => {
-                setMenuOpen(false);
-                props.onOpenSkills();
-              }}
-            >
-              <Puzzle class="account-menu-icon" aria-hidden="true" />
-              <span>{t("account.menu.marketplace")}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              class="account-menu-row"
-              onClick={() => {
-                setMenuOpen(false);
-                props.onOpenPermissions();
-              }}
-            >
-              <ShieldCheck class="account-menu-icon" aria-hidden="true" />
-              <span>{t("account.menu.providersPermissions")}</span>
-            </Button>
+            <Show when={props.onOpenSkills}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenSkills?.();
+                }}
+              >
+                <Puzzle class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.marketplace")}</span>
+              </Button>
+            </Show>
+            <Show when={props.onOpenPermissions}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenPermissions?.();
+                }}
+              >
+                <ShieldCheck class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.providersPermissions")}</span>
+              </Button>
+            </Show>
           </section>
-
           <div class="account-menu-separator" />
-          <section class="account-menu-group" aria-label={t("account.menu.help")}>
-            <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("feedback")}>
-              <Megaphone class="account-menu-icon" aria-hidden="true" />
-              <span>{t("account.menu.sendFeedback")}</span>
-            </Button>
-            <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("message")}>
-              <Mail class="account-menu-icon" aria-hidden="true" />
-              <span>{t("account.menu.message")}</span>
-            </Button>
-          </section>
         </Show>
+        <section class="account-menu-group" aria-label={t("account.menu.help")}>
+          <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("feedback")}>
+            <Megaphone class="account-menu-icon" aria-hidden="true" />
+            <span>{t("account.menu.sendFeedback")}</span>
+          </Button>
+          <Button variant="ghost" type="button" class="account-menu-row" onClick={() => openExternal("message")}>
+            <Mail class="account-menu-icon" aria-hidden="true" />
+            <span>{t("account.menu.message")}</span>
+          </Button>
+        </section>
         <Show when={props.onLogout}>
           <div class="account-menu-separator" />
           <Button
@@ -462,7 +486,7 @@ export function AccountDock(props: AccountDockProps) {
           <span class="account-dock-copy">
             <strong title={accountName()}>{accountName()}</strong>
             <span title={props.account.email}>{props.account.email}</span>
-            <Show when={!props.remoteClient && props.appInfo}>
+            <Show when={props.appInfo}>
               {(info) => (
                 <span class="sr-only">
                   {t("account.dock.version", { version: info().version, platform: info().platform })}
@@ -521,7 +545,7 @@ export function AccountDock(props: AccountDockProps) {
             <span class="account-dock-copy">
               <strong title={accountName()}>{accountName()}</strong>
               <span title={props.account.email}>{props.account.email}</span>
-              <Show when={!props.remoteClient && props.appInfo}>
+              <Show when={props.appInfo}>
                 {(info) => (
                   <span class="sr-only">
                     {t("account.dock.version", { version: info().version, platform: info().platform })}
@@ -541,82 +565,80 @@ export function AccountDock(props: AccountDockProps) {
           </Popover.Portal>
         </Popover.Root>
 
-        <Show when={!props.remoteClient || props.usageTargetKey}>
-          <Tooltip.Root
-            open={usageTooltipOpen()}
-            onOpenChange={(nextOpen) => setUsageTooltipOpen(usageOpen() ? false : nextOpen)}
-            openDelay={250}
-            closeDelay={75}
-            placement="top"
-            gutter={8}
-          >
-            <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
-              <Popover.Root
-                open={usageOpen()}
-                onOpenChange={(nextOpen) => {
-                  setUsageOpen(nextOpen);
-                  if (nextOpen) {
-                    setUsageTooltipOpen(false);
-                    setMenuOpen(false);
-                    if (!props.accountUsage && !usageLoading()) void refreshUsage();
-                  } else {
-                    restoreFocusWhenDockIsIdle(usageTrigger);
-                  }
-                }}
-                placement="top-end"
-                gutter={10}
+        <Tooltip.Root
+          open={usageTooltipOpen()}
+          onOpenChange={(nextOpen) => setUsageTooltipOpen(usageOpen() ? false : nextOpen)}
+          openDelay={250}
+          closeDelay={75}
+          placement="top"
+          gutter={8}
+        >
+          <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
+            <Popover.Root
+              open={usageOpen()}
+              onOpenChange={(nextOpen) => {
+                setUsageOpen(nextOpen);
+                if (nextOpen) {
+                  setUsageTooltipOpen(false);
+                  setMenuOpen(false);
+                  if (!props.accountUsage && !usageLoading()) void refreshUsage();
+                } else {
+                  restoreFocusWhenDockIsIdle(usageTrigger);
+                }
+              }}
+              placement="top-end"
+              gutter={10}
+            >
+              <Popover.Trigger
+                ref={(element) => (usageTrigger = element)}
+                as="button"
+                type="button"
+                class={buttonVariants({ variant: "ghost", class: "account-dock-usage-trigger" })}
+                aria-label={usageButtonLabel()}
+                aria-expanded={usageOpen() ? "true" : "false"}
+                data-usage-tone={usageTone()}
               >
-                <Popover.Trigger
-                  ref={(element) => (usageTrigger = element)}
-                  as="button"
-                  type="button"
-                  class={buttonVariants({ variant: "ghost", class: "account-dock-usage-trigger" })}
-                  aria-label={usageButtonLabel()}
-                  aria-expanded={usageOpen() ? "true" : "false"}
-                  data-usage-tone={usageTone()}
+                <span class="account-dock-usage-chip">
+                  <Gauge aria-hidden="true" />
+                  <strong>
+                    <Show
+                      when={usageLoading() && usageRemaining() === null}
+                      fallback={<AnimatedUsagePercentage value={usageRemaining()} />}
+                    >
+                      <TypingDots class="account-dock-usage-loading" />
+                    </Show>
+                  </strong>
+                </span>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  class="ui-popover-menu-surface account-usage-popover"
+                  aria-hidden={usageOpen() ? undefined : "true"}
                 >
-                  <span class="account-dock-usage-chip">
-                    <Gauge aria-hidden="true" />
-                    <strong>
-                      <Show
-                        when={usageLoading() && usageRemaining() === null}
-                        fallback={<AnimatedUsagePercentage value={usageRemaining()} />}
-                      >
-                        <TypingDots class="account-dock-usage-loading" />
-                      </Show>
-                    </strong>
-                  </span>
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Content
-                    class="ui-popover-menu-surface account-usage-popover"
-                    aria-hidden={usageOpen() ? undefined : "true"}
-                  >
-                    <AccountUsageDetails
-                      rows={usageRows()}
-                      loading={usageLoading()}
-                      error={usageError()}
-                      refreshActive={usageRefreshActive()}
-                      refreshDisabled={usageRefreshDisabled()}
-                      onRefresh={refreshUsageWithFeedback}
-                      title={
-                        <Popover.Title class="account-usage-popover-title">{t("account.usage.title")}</Popover.Title>
-                      }
-                    />
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
-            </Tooltip.Trigger>
-            <Tooltip.Portal>
-              <Tooltip.Content class="ui-tooltip">
-                {usageSummary()
-                  ? t("account.dock.usageTooltip", { name: usageSummary()?.name ?? "" })
-                  : t("account.usage.title")}
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-        </Show>
-        <Show when={!props.remoteClient}>
+                  <AccountUsageDetails
+                    rows={usageRows()}
+                    loading={usageLoading()}
+                    error={usageError()}
+                    refreshActive={usageRefreshActive()}
+                    refreshDisabled={usageRefreshDisabled()}
+                    onRefresh={refreshUsageWithFeedback}
+                    title={
+                      <Popover.Title class="account-usage-popover-title">{t("account.usage.title")}</Popover.Title>
+                    }
+                  />
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content class="ui-tooltip">
+              {usageSummary()
+                ? t("account.dock.usageTooltip", { name: usageSummary()?.name ?? "" })
+                : t("account.usage.title")}
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+        <Show when={props.onOpenSettings}>
           <Tooltip.Root openDelay={250} closeDelay={75} placement="top" gutter={8}>
             <Tooltip.Trigger as="div" class="account-dock-tooltip-trigger">
               <Button
@@ -628,7 +650,7 @@ export function AccountDock(props: AccountDockProps) {
                 onClick={() => {
                   setMenuOpen(false);
                   setUsageOpen(false);
-                  if (settingsTrigger) props.onOpenSettings(settingsTrigger);
+                  if (settingsTrigger) props.onOpenSettings?.(settingsTrigger);
                 }}
               >
                 <Settings aria-hidden="true" />

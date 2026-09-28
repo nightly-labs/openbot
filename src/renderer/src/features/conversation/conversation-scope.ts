@@ -171,6 +171,7 @@ export function createConversationViewScope(props: ConversationProps) {
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
+    profileOpen,
     filesOpen,
     toggleFilesPanel,
     filePreviewOpen,
@@ -509,6 +510,7 @@ export function createConversationViewScope(props: ConversationProps) {
   let lastConversationIdentity: string | undefined;
   let lastPanelAgentId: string | undefined;
   let lastHandledSettingsRequestNonce: number | undefined;
+  let lastHandledProfileRequestNonce: number | undefined;
   let lastHandledMessageFocusNonce: number | undefined;
   let lastRuntimeSettingsSignature: string | undefined;
   async function saveAgentPatch(
@@ -790,7 +792,11 @@ export function createConversationViewScope(props: ConversationProps) {
         setSidebarFilePreview(null);
         setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
       }
-      if (!previousAgentId || !agentId || (panel !== "settings" && panel !== "file-preview" && panel !== "files"))
+      if (
+        !previousAgentId ||
+        !agentId ||
+        (panel !== "settings" && panel !== "profile" && panel !== "file-preview" && panel !== "files")
+      )
         return;
       setRightPanels((current) => ({ ...current, [agentId]: "none" }));
     },
@@ -802,6 +808,15 @@ export function createConversationViewScope(props: ConversationProps) {
       if (!request || agentId !== request.agentId || request.nonce === lastHandledSettingsRequestNonce) return;
       lastHandledSettingsRequestNonce = request.nonce;
       setActiveRightPanel("settings", agentId);
+    },
+  );
+
+  createEffect(
+    () => ({ request: props.profileRequest, agentId: props.agent?.id }),
+    ({ request, agentId }) => {
+      if (!request || agentId !== request.agentId || request.nonce === lastHandledProfileRequestNonce) return;
+      lastHandledProfileRequestNonce = request.nonce;
+      setActiveRightPanel("profile", agentId);
     },
   );
 
@@ -1133,6 +1148,7 @@ export function createConversationViewScope(props: ConversationProps) {
     settingsModel,
     settingsProvider,
     settingsOpen,
+    profileOpen,
     settingsPanelWidth,
     settingsReasoning,
     sidebarFilePreview,

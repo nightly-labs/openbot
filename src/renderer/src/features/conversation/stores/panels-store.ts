@@ -49,6 +49,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     return agentId ? (deps.rightPanels()[agentId] ?? "none") : "none";
   });
   const settingsOpen = () => activeRightPanel() === "settings";
+  const profileOpen = () => activeRightPanel() === "profile";
   const filesOpen = () => activeRightPanel() === "files";
   const filePreviewOpen = () =>
     activeRightPanel() === "file-preview" && deps.sidebarFilePreview()?.ownerAgentId === deps.props.agent?.id;
@@ -234,6 +235,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
+    profileOpen,
     filesOpen,
     toggleFilesPanel,
     filePreviewOpen,

@@ -959,3 +959,13 @@
     transform: none;
   }
 }
+
+/* The Profile side panel is as narrow as a small screen, so its name field goes under its label. */
+.settings-panel .settings-identity-name-row {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.settings-panel .settings-identity-name-control {
+  width: 100%;
+}

@@ -3,6 +3,7 @@ import { handleBrowserApi } from "../../../server/browser-api";
 import {
   remoteControlPlaneErrorResponse,
   requestAuthService,
+  requestAvatarBucket,
   requestRemoteControlPlane,
   requestRemoteSignalUrl,
   requestSourceIp,
@@ -14,6 +15,7 @@ function handle({ request }: { request: Request }) {
     auth: requestAuthService(),
     remote: requestRemoteControlPlane(),
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
+    avatarBucket: requestAvatarBucket,
     signalUrl: requestRemoteSignalUrl,
     sourceIp: requestSourceIp,
     errorResponse: remoteControlPlaneErrorResponse,
