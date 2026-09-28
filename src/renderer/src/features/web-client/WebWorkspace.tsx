@@ -770,6 +770,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onOpenAgent={(agentId) => {
                   setMobilePane("conversation");
                   if (agentId !== workspace.state.selectedId) void select(agentId);
+                  else {
+                    // The agent is already loaded; only what covers its conversation closes.
+                    setCreating(false);
+                    setUsage(null);
+                    channels.close();
+                  }
                 }}
                 onAgentInstalled={async (agent) => {
                   setMarketplaceOpen(false);
@@ -970,6 +976,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
+              skillsMarketplaceOpen={marketplaceOpen()}
+              mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
               globalOverlayOpen={
                 joinOpen() || serverSettings.state.open || searchOpen() || marketplaceOpen() || hasVisibleToasts()
               }
