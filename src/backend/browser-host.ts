@@ -808,10 +808,16 @@ export class BrowserHost {
     const cached = savedPreview(tab);
     if (cached && tab.pendingOperations > 0) return cached;
     const started = this.#previewCapture(tab);
-    // A navigation during the capture makes its frame show the page before it, so take one more.
-    const capture = started.frame.then((frame) =>
-      showsCurrentPage(tab, started) ? frame : this.#previewCapture(tab).frame,
-    );
+    // A navigation during the capture makes its frame show the page before it, so take one more,
+    // and fail rather than show the wrong page when that one is also out of date.
+    const capture = started.frame.then((frame) => {
+      if (showsCurrentPage(tab, started)) return frame;
+      const retry = this.#previewCapture(tab);
+      return retry.frame.then((retried) => {
+        if (!showsCurrentPage(tab, retry)) throw new Error(sourceText("error.backend.browserPreviewPageChanged"));
+        return retried;
+      });
+    });
     if (!cached) return capture;
     let timer: ReturnType<typeof setTimeout> | undefined;
     // After a navigation during the capture the saved frame shows the wrong page, so the preview waits.
