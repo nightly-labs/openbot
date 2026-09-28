@@ -67,13 +67,53 @@ export interface UpdateStatus {
    * install, download and check actions but keeps showing the status; absent means unmanaged.
    */
   managedByHost?: boolean;
+  /** A restart that an admin of a joined server asked for. Absent when none waits. */
+  scheduledRestart?: ScheduledUpdateRestart;
 }
 
 export type UpdateFailureCode = "check_failed" | "download_failed" | "install_failed";
 
 export interface UpdatePreference {
   autoDownload: boolean;
+  /** Owners and admins of a joined server can start an update of this computer. */
+  allowRemoteUpdates: boolean;
+  /** Restart into a downloaded update when no work runs, without a request. */
+  autoInstall: boolean;
 }
+
+/** The fields to change. An absent field keeps its stored value. */
+export type UpdatePreferenceChange = Partial<UpdatePreference>;
+
+/** `now` restarts as soon as the update is ready; `when-idle` waits until no work runs. */
+export type UpdateRestartMode = "when-idle" | "now";
+
+export interface ScheduledUpdateRestart {
+  /** The name of the member who asked, or null when this computer installs updates automatically. */
+  requestedBy: string | null;
+  mode: UpdateRestartMode;
+  /** The restart blockers that still run, such as `agent-turn`. Empty when none. */
+  waitingFor: string[];
+}
+
+/** `managed`: a Host Manager controls the updates of this host. */
+export type RemoteUpdatesState = "allowed" | "disabled" | "managed";
+
+/** The app update of a joined server's host, as `host-update-v1` reports it. */
+export interface HostUpdateStatus {
+  phase: UpdatePhase;
+  currentVersion: string;
+  availableVersion: string | null;
+  /** An integer from 0 to 100, or null. */
+  progress: number | null;
+  errorCode: UpdateFailureCode | null;
+  remoteUpdates: RemoteUpdatesState;
+  autoDownload: boolean;
+  autoInstall: boolean;
+  restart: ScheduledUpdateRestart | null;
+}
+
+/** The host's update switches that an admin sets. An absent field keeps its stored value. */
+export type HostUpdateSettingsChange = Partial<Pick<UpdatePreference, "autoDownload" | "autoInstall">>;
 
 export type ProviderRuntimePhase = "not-downloaded" | "downloading" | "finishing" | "ready" | "download-error";
 

@@ -42,6 +42,7 @@ import { createServerGeneralSection } from "./ServerGeneralSection";
 import { type ServerImportOptions, ServerImportPanel } from "./ServerImportPanel";
 import { type McpPanelDetail, ServerMcpPanel } from "./ServerMcpPanel";
 import { createServerMembersSection } from "./ServerMembersSection";
+import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -112,9 +113,25 @@ export interface ServerSettingsModalProps {
   providers?: HostProviderSettings | undefined;
   /** The Import section appears only when a caller supplies this: agents import into the local server. */
   agentImport?: ServerImportOptions;
+  /**
+   * The Updates section appears only when a caller supplies this: a remote host with
+   * `host-update-v1` that this member administers.
+   */
+  hostUpdate?: ServerUpdateOptions | undefined;
+  /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
+  initialSection?: ServerSettingsSection | null;
 }
 
-type Section = "general" | "members" | "desktop" | "mcp" | "storage" | "providers" | "import";
+export type ServerSettingsSection =
+  | "general"
+  | "members"
+  | "desktop"
+  | "mcp"
+  | "storage"
+  | "providers"
+  | "updates"
+  | "import";
+type Section = ServerSettingsSection;
 
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
@@ -123,6 +140,7 @@ const sections = {
   mcp: { title: "server.settings.mcpTitle", description: "server.settings.mcpDescription" },
   storage: { title: "server.settings.storageTitle", description: "server.settings.storageDescription" },
   providers: { title: "server.settings.providersTitle", description: "server.settings.providersDescription" },
+  updates: { title: "server.settings.updatesTitle", description: "server.settings.updatesDescription" },
   import: { title: "server.settings.importTitle", description: "server.settings.importDescription" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
@@ -151,6 +169,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
    */
   const canManageMcp = () => serverRoleCanAdminister(props.server);
   const actionsAvailable = () => local() || props.server.state === "online";
+  const availableInitialSection = (): Section | null =>
+    props.initialSection === "updates" && !props.hostUpdate ? null : (props.initialSection ?? null);
   const published = () => (local() ? props.hostStatus?.phase === "online" : props.server.state === "online");
 
   async function run(key: string, action: () => Promise<void>): Promise<boolean> {
@@ -219,11 +239,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       if (!open) return;
       if (syncedServerId !== id) {
         syncedServerId = id;
-        setSection("general");
+        setSection(untrack(availableInitialSection) ?? "general");
         general.resetForServer();
         members.resetForServer();
       }
       if (!editing) general.syncFromServer(name, logoUrl);
+    },
+  );
+
+  /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
+  createEffect(
+    () => (props.open ? availableInitialSection() : null),
+    (requested) => {
+      if (requested) setSection(requested);
     },
   );
 
@@ -252,6 +280,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "mcp" ||
         value === "storage" ||
         value === "providers" ||
+        value === "updates" ||
         value === "import"
       )
         setSection(value);
@@ -431,6 +460,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 <span>{t(sections.providers.title)}</span>
               </Tabs.Trigger>
             </Show>
+            <Show when={props.hostUpdate}>
+              <Tabs.Trigger class="settings-modal-nav-item" value="updates">
+                <RefreshCw aria-hidden="true" />
+                <span>{t(sections.updates.title)}</span>
+              </Tabs.Trigger>
+            </Show>
             <Show when={props.agentImport}>
               <Tabs.Trigger class="settings-modal-nav-item" value="import">
                 <Download aria-hidden="true" />
@@ -485,6 +520,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           {(providers) => (
             <Tabs.Content value="providers" class="settings-modal-tab-panel server-settings-panel" data-tab="providers">
               <HostProviderSettingsPanel {...providers()} hostName={props.server.name} selectMount={modalElement()} />
+            </Tabs.Content>
+          )}
+        </Show>
+        <Show when={props.hostUpdate}>
+          {(hostUpdate) => (
+            <Tabs.Content value="updates" class="settings-modal-tab-panel server-settings-panel" data-tab="updates">
+              <ServerUpdatePanel
+                {...hostUpdate()}
+                serverId={props.server.id}
+                hostName={props.server.name}
+                actionsAvailable={actionsAvailable()}
+              />
             </Tabs.Content>
           )}
         </Show>

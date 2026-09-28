@@ -1,11 +1,14 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 /**
- * What the updates context reaches in main: the app update status and its check, download and
- * install steps.
+ * What the updates context reaches in main: the app update status, its check, download and
+ * install steps, and the cancel of a restart that a server admin asked for.
  */
 export interface UpdatesPort {
-  update: Pick<OpenBotDesktopApi["update"], "check" | "download" | "getStatus" | "install" | "onEvent">;
+  update: Pick<
+    OpenBotDesktopApi["update"],
+    "check" | "download" | "getStatus" | "install" | "onEvent" | "cancelScheduledRestart"
+  >;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

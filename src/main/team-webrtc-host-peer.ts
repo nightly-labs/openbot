@@ -10,6 +10,7 @@ import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
 } from "@openbot/contracts/team-protocol/current";
+import { hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -532,9 +533,10 @@ export class TeamWebRtcHostPeer {
         // `channels-changed` is outside the frozen v1 vocabulary, so the base event adapter
         // rejects it and the catch below would drop it without a trace: a remote client would
         // stop seeing incoming messages and task updates until its next refresh. The optional
-        // protocol validates and envelopes its own event, exactly as the request path does.
+        // protocol validates and envelopes its own event, exactly as the request path does. The
+        // `host-update-v1` restart notice takes the same path.
         const event = JSON.parse(data.toString());
-        const channel = channelEvent(event);
+        const channel = channelEvent(event) ?? hostRestartEvent(event);
         frame = encodeTeamProtocolV2Frame(
           channel
             ? decodeTeamProtocolV2EventFrame({

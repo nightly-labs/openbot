@@ -63,6 +63,7 @@ import {
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
+  type UpdatePreference,
   type UpdateQueuedMessageInput,
   type UpdateStatus,
 } from "@openbot/contracts/ipc";
@@ -95,6 +96,7 @@ import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockAuth, type MockAuthOptions } from "./mock-auth";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels } from "./mock-channels";
+import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
@@ -107,7 +109,8 @@ export interface MockOpenBotOptions
     MockAuthOptions,
     MockBrowserOptions,
     MockTeamOptions,
-    MockSkillsOptions {
+    MockSkillsOptions,
+    MockHostUpdateOptions {
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
   languagePreference?: AppLanguagePreference;
@@ -220,6 +223,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const models = clone(options.models ?? STORY_MODELS);
   const snapshots = clone(options.snapshots ?? STORY_SNAPSHOTS);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
+  let updatePreference: UpdatePreference = { autoDownload: true, allowRemoteUpdates: true, autoInstall: false };
   const usage = clone(options.usage ?? STORY_USAGE);
   let agentCounter = agents.length;
   let hostedSites = clone(STORY_HOSTED_SITES);
@@ -1504,8 +1508,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         updateStatus = { ...updateStatus, phase: "installing" };
         emit(updateListeners, updateStatus);
       },
-      getPreference: async () => ({ autoDownload: true }),
-      setPreference: async (input) => ({ ...input }),
+      getPreference: async () => clone(updatePreference),
+      setPreference: async (input) => {
+        updatePreference = { ...updatePreference, ...input };
+        return clone(updatePreference);
+      },
+      cancelScheduledRestart: async () => {
+        const { scheduledRestart: _cancelled, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
       onEvent: (listener) => {
         updateListeners.add(listener);
         return () => updateListeners.delete(listener);
@@ -1540,6 +1553,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!server) throw new Error("Server not found");
         return server;
       },
+      ...createMockHostUpdate(options),
     },
     storage: createMockStorage(),
     agentImport: {

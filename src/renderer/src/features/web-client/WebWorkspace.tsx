@@ -12,12 +12,18 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { readHostAnalytics } from "@openbot/team-client";
 import {
+  cancelHostUpdate,
+  checkHostForUpdate,
   clearStorage,
   deleteStoredFile,
   getAgentAdminSettings,
+  getHostUpdateStatus,
   getStorageUsage,
+  setHostUpdateSettings,
+  startHostUpdate,
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
@@ -66,6 +72,10 @@ import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { FilesPort } from "../files/files-port";
+import { watchHostUpdate } from "../servers/host-update-toast";
+import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
+import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
+import { remoteAdminServer } from "../servers/server-capabilities";
 import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import type { UsagePort } from "../usage/usage-port";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -510,15 +520,45 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     },
   };
-  async function openServerSettings(serverId: string, trigger: HTMLElement | null): Promise<void> {
+  const hostUpdateCalls: HostUpdateCalls = {
+    getUpdateStatus: async (serverId) => getHostUpdateStatus(hostRequest(serverId)),
+    checkForUpdate: async (serverId) => checkHostForUpdate(hostRequest(serverId)),
+    startUpdate: async (restart, serverId) => startHostUpdate(hostRequest(serverId), restart),
+    cancelUpdate: async (serverId) => cancelHostUpdate(hostRequest(serverId)),
+    setUpdateSettings: async (settings, serverId) => setHostUpdateSettings(hostRequest(serverId), settings),
+  };
+  const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
+  async function openServerSettings(
+    serverId: string,
+    trigger: HTMLElement | null,
+    section: ServerSettingsSection | null = null,
+  ): Promise<void> {
     if (server()?.id !== serverId || workspace.state.status !== "online") {
       const host = workspace.state.hosts.find((item) => item.hostId === serverId);
       if (!host) return;
       await workspace.connect(host);
       if (server()?.id !== serverId || workspace.state.status !== "online") return;
     }
+    setServerSettingsSection(section);
     serverSettings.open(trigger);
   }
+  // An admin learns about a new version, or sees the download that runs, each time the host connects.
+  createEffect(
+    () => {
+      const current = server();
+      // An id, not an object: the summary is rebuilt on each host change, and one read is enough.
+      return current?.state === "online" && remoteAdminServer(current, HOST_UPDATE_CAPABILITY) ? current.id : null;
+    },
+    (serverId) => {
+      if (!serverId) return;
+      watchHostUpdate({
+        serverId,
+        name: untrack(() => server()?.name) ?? "",
+        calls: hostUpdateCalls,
+        openUpdates: () => void openServerSettings(serverId, null, "updates"),
+      });
+    },
+  );
   const channelsPort = createWebChannelsPort(
     workspace.runtime,
     workspace.onHostEvent,
@@ -1042,6 +1082,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     open={serverSettings.state.open}
                     onOpenChange={serverSettings.setOpen}
                     restoreFocusTarget={serverSettings.restoreTarget()}
+                    initialSection={serverSettingsSection()}
                     platform="darwin"
                     remoteDesktopSupported={false}
                     server={target()}
@@ -1082,6 +1123,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                     }}
                     providers={providerSettings()}
+                    hostUpdate={{ calls: hostUpdateCalls }}
                   />
                 )}
               </Show>

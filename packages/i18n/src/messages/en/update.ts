@@ -27,6 +27,15 @@ export const messages = defineMessages("update", {
   "update.provider.downloadsUnavailable": "Provider downloads are unavailable.",
   "update.provider.startFailed": "The update could not start. Try again.",
 
+  // An update that an admin of this server asked for. {name} is the admin.
+  "update.scheduled.title": "{name} scheduled an OpenBot update",
+  // The same notice when "Install updates automatically" scheduled the restart.
+  "update.scheduled.automaticTitle": "OpenBot installs an update",
+  "update.scheduled.whenIdle": "OpenBot restarts when the agents are idle.",
+  "update.scheduled.now": "OpenBot restarts when the update is downloaded.",
+  "update.scheduled.cancel": "Cancel update",
+  "update.scheduled.cancelFailed": "The update could not be cancelled.",
+
   // The "What's new" dialog after an app update.
   "update.whatsNew.title": "What’s new in OpenBot",
   "update.whatsNew.description": "The new features and changes in this version of OpenBot.",

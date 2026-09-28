@@ -24,6 +24,7 @@ import {
   type DetectedAcpAgent,
   type DetectedModelServer,
   type DiscoverModelsResult,
+  decodeScheduledUpdateRestart,
   type ExportResult,
   type HostedSiteSummary,
   isAgentModel,
@@ -185,7 +186,7 @@ export function decodeAccountSessions(value: unknown): AccountSession[] {
 
 export function decodeUpdateStatus(value: unknown): UpdateStatus {
   const status = decodeRecord(value, "update status");
-  const { phase, errorCode, managedByHost } = status;
+  const { phase, errorCode, managedByHost, scheduledRestart } = status;
   if (!isOneOf(UPDATE_PHASES, phase)) throw new Error("Invalid phase.");
   if (errorCode !== null && !isOneOf(["check_failed", "download_failed", "install_failed"] as const, errorCode)) {
     throw new Error("Invalid errorCode.");
@@ -200,11 +201,17 @@ export function decodeUpdateStatus(value: unknown): UpdateStatus {
     message: nullableString(status, "message"),
     errorCode,
     ...(managedByHost === undefined ? {} : { managedByHost }),
+    ...(scheduledRestart === undefined ? {} : { scheduledRestart: decodeScheduledUpdateRestart(scheduledRestart) }),
   };
 }
 
 export function decodeUpdatePreference(value: unknown): UpdatePreference {
-  return { autoDownload: requiredBoolean(decodeRecord(value, "update preference"), "autoDownload") };
+  const preference = decodeRecord(value, "update preference");
+  return {
+    autoDownload: requiredBoolean(preference, "autoDownload"),
+    allowRemoteUpdates: requiredBoolean(preference, "allowRemoteUpdates"),
+    autoInstall: requiredBoolean(preference, "autoInstall"),
+  };
 }
 
 export function decodeNotificationPreference(value: unknown): NotificationPreference {

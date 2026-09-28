@@ -55,6 +55,7 @@ export function remoteServerSummaries(
         compatibility: status.compatibility,
         issue: status.issue,
         connectionSequence: status.connectionSequence,
+        hostRestart: status.hostRestart,
       };
     }),
   ];

@@ -252,7 +252,7 @@ export function decodeRemoteDesktopConnectResult(value: unknown): RemoteDesktopC
 }
 
 function server(summary: DynamicRecord): ServerSummary {
-  const { notificationLevel, kind, state, role, compatibility, issue, connectionSequence } = summary;
+  const { notificationLevel, kind, state, role, compatibility, issue, connectionSequence, hostRestart } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
   if (!isOneOf(SERVER_STATES, state)) throw new Error("Invalid state.");
@@ -275,7 +275,15 @@ function server(summary: DynamicRecord): ServerSummary {
       : { compatibility: compatibility === null ? null : serverCompatibility(compatibility) }),
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
+    ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
   };
+}
+
+function serverHostRestart(value: unknown): NonNullable<ServerSummary["hostRestart"]> {
+  const restart = decodeRecord(value, "server host restart");
+  const { state } = restart;
+  if (state !== "waiting" && state !== "restarting") throw new Error("Invalid hostRestart.");
+  return { state, version: nullableString(restart, "version") };
 }
 
 function serverCompatibility(value: unknown): ServerCompatibility {

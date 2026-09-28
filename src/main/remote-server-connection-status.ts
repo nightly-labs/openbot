@@ -28,6 +28,7 @@ export interface RemoteServerConnectionStatus {
   // Bumped on every fresh connection. The renderer uses it to tell a reconnect from a still-open
   // connection, so it has to change even when nothing else about the status does.
   connectionSequence: number;
+  hostRestart: ServerSummary["hostRestart"];
 }
 
 export interface RemoteConnectionOutcome {

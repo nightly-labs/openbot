@@ -27,6 +27,7 @@ import { cleanAgentMessageText } from "../agents/agent-message-text";
 import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
+import { createHostRestartToasts } from "../updates/host-restart-toast";
 import type { WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
@@ -68,6 +69,8 @@ interface WebWorkspaceState {
   presence: TeamPresenceSnapshot | null;
   capabilities: string[];
   status: "connecting" | "online" | "offline";
+  /** The opened host said it restarts into an update (`host-update-v1`). Cleared when it is online again. */
+  hostRestart: { state: "waiting" | "restarting"; version: string | null } | null;
   /** The state of each host that this tab has not opened, from its status connection. */
   hostStates: Record<string, WebHostState>;
   /** The last connection found that the host speaks no protocol this build speaks. */
@@ -91,6 +94,10 @@ interface WebWorkspaceState {
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
 }
+/** A host restarts in under a minute; the retries stop after three. */
+const HOST_RESTART_RETRY_MS = 5_000;
+const HOST_RESTART_RETRY_LIMIT = 36;
+
 export type WebRuntimeFactory = (
   accountId: string,
   events: WebRuntimeEvents,
@@ -129,6 +136,7 @@ export function createWebWorkspace(
     presence: null,
     capabilities: [],
     status: "offline",
+    hostRestart: null,
     hostStates: {},
     incompatibility: null,
     hostsLoaded: false,
@@ -154,6 +162,8 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  /** The next reconnect to a host that restarts into an update. The opened host has no other retry. */
+  let restartRetry: ReturnType<typeof setTimeout> | null = null;
   /** The queue read in flight by agent. An event during a read asks for one more read. */
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
   /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
@@ -236,7 +246,14 @@ export function createWebWorkspace(
           return;
         }
         if (update.state === "online") revokedReconnect = false;
-        if (update.state === "online" && update.resync) void resync();
+        else if (state.hostRestart) retryAfterRestart();
+        if (update.state === "online" && update.resync) {
+          // A host that still waits to restart says so again when the connection declares capabilities.
+          setState((draft) => {
+            draft.hostRestart = null;
+          });
+          void resync();
+        }
       },
       event(id, event) {
         if (disposed || id !== hostId) return;
@@ -244,6 +261,10 @@ export function createWebWorkspace(
         if (event.type === "team-presence")
           setState((draft) => {
             draft.presence = event.snapshot;
+          });
+        if (event.type === "host-restart")
+          setState((draft) => {
+            draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
         if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
@@ -523,6 +544,20 @@ export function createWebWorkspace(
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
   }
+  /** `connect` clears `hostRestart`, so the retries count down instead of reading it again. */
+  function retryAfterRestart(retries = HOST_RESTART_RETRY_LIMIT): void {
+    if (restartRetry || disposed || retries <= 0) return;
+    const retryHostId = hostId;
+    restartRetry = setTimeout(() => {
+      restartRetry = null;
+      if (disposed || hostId !== retryHostId || state.status === "online") return;
+      void reconnect()
+        .catch(() => undefined)
+        .then(() => {
+          if (!disposed && hostId === retryHostId && state.status !== "online") retryAfterRestart(retries - 1);
+        });
+    }, HOST_RESTART_RETRY_MS);
+  }
   async function reconnect(): Promise<void> {
     const host = state.hosts.find((listed) => listed.hostId === state.host?.hostId) ?? state.host;
     if (!host || state.status === "connecting") return;
@@ -551,6 +586,7 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.host = host;
       draft.status = "connecting";
+      draft.hostRestart = null;
       draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
       draft.agentsLoaded = false;
@@ -923,6 +959,19 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
+  createHostRestartToasts(() =>
+    state.host
+      ? [
+          {
+            id: state.host.hostId,
+            name: state.host.name,
+            online: state.status === "online",
+            restart: state.hostRestart?.state ?? null,
+            version: state.hostRestart?.version ?? null,
+          },
+        ]
+      : [],
+  );
   onSettled(() => {
     void refreshHosts().catch(report);
     const focus = () => {
@@ -938,6 +987,7 @@ export function createWebWorkspace(
       disposed = true;
       generation += 1;
       acceptedInvite = null;
+      if (restartRetry) clearTimeout(restartRetry);
       window.removeEventListener("focus", focus);
       void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
     };

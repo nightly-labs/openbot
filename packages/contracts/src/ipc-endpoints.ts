@@ -67,11 +67,15 @@ import type {
   ComputerUseState,
   ExportResult,
   ExternalDestination,
+  HostUpdateSettingsChange,
+  HostUpdateStatus,
   MacPermissionId,
   ProviderRuntimeSnapshot,
   SaveSetupInput,
   SetAnalyticsPreferenceInput,
   UpdatePreference,
+  UpdatePreferenceChange,
+  UpdateRestartMode,
   UpdateStatus,
   VerifyEmailCodeInput,
 } from "./ipc-app-auth";
@@ -532,11 +536,18 @@ export const IPC_ENDPOINTS = {
       "provider-admin:delete-custom-provider",
     ),
   },
-  // The server name and logo of one server's host. `host.updateIdentity` changes this computer's
-  // only; this takes the server, so a remote admin changes the host's. The result is the server as
-  // the list shows it after the change.
+  // The server name, logo and app update of one server's host. `host.updateIdentity` and `update`
+  // reach this computer only; these take the server, so a remote admin reaches the host. The
+  // identity result is the server as the list shows it after the change.
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
+    getUpdateStatus: scopedQuery<HostUpdateStatus, "required">()("host-admin:get-update-status"),
+    checkForUpdate: scopedQuery<HostUpdateStatus, "required">()("host-admin:check-for-update"),
+    startUpdate: scopedRequest<UpdateRestartMode, HostUpdateStatus, "required">()("host-admin:start-update"),
+    cancelUpdate: scopedQuery<HostUpdateStatus, "required">()("host-admin:cancel-update"),
+    setUpdateSettings: scopedRequest<HostUpdateSettingsChange, HostUpdateStatus, "required">()(
+      "host-admin:set-update-settings",
+    ),
   },
   hostedSites: {
     list: request<undefined, HostedSiteSummary[]>()("hosted-sites:list"),
@@ -585,7 +596,8 @@ export const IPC_ENDPOINTS = {
     download: request<undefined, UpdateStatus>()("update:download"),
     install: request<undefined, void>()("update:install"),
     getPreference: request<undefined, UpdatePreference>()("update:get-preference"),
-    setPreference: request<UpdatePreference, UpdatePreference>()("update:set-preference"),
+    setPreference: request<UpdatePreferenceChange, UpdatePreference>()("update:set-preference"),
+    cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
     event: event<UpdateStatus>()("update:event"),
   },
   notifications: {

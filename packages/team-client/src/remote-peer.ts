@@ -23,6 +23,7 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
+import { hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -728,7 +729,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       return;
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error(sourceText("error.remote.eventStreamGap"));
-    const channel = channelEvent(frame.payload);
+    const channel = channelEvent(frame.payload) ?? hostRestartEvent(frame.payload);
     const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV5CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error(sourceText("error.remote.malformedEvent"));
     state.lastEventSequence = frame.sequence;

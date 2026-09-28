@@ -60,6 +60,7 @@
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",
     "./team-protocol/providers-v2": "./src/team-protocol/providers-v2.ts",
     "./team-protocol/host-admin-v1": "./src/team-protocol/host-admin-v1.ts",
+    "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",
     "./team-protocol/optional-routes": "./src/team-protocol/optional-routes.ts",

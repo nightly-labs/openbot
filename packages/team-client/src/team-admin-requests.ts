@@ -1,5 +1,5 @@
 // Admin requests to one host: agent settings and skills, shared tables, the server name and logo,
-// MCP servers, storage and providers.
+// the app update, MCP servers, storage and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
 // them through their own transport, so the path, body and decoding of each request are here once.
@@ -21,6 +21,7 @@ import {
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostAddedAgent,
+  decodeHostUpdateStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
   decodeMcpTestResult,
@@ -29,6 +30,8 @@ import {
   decodeProviderRuntimeSnapshot,
   decodeStorageUsage,
   type GetStorageUsageInput,
+  type HostUpdateSettingsChange,
+  type HostUpdateStatus,
   type InstallAgentTemplateInput,
   type InstalledSkill,
   type InstallMarketplaceAgentInput,
@@ -52,6 +55,7 @@ import {
   type UninstallSkillInput,
   type UpdateAgentAdminSettingsInput,
   type UpdateHostIdentityInput,
+  type UpdateRestartMode,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -59,6 +63,7 @@ import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin
 import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import type { PROVIDERS_RUNTIMES_V2_ROUTES } from "@openbot/contracts/team-protocol/providers-v2";
@@ -175,6 +180,31 @@ export function updateHostIdentity(request: TeamApiRequest, input: UpdateHostIde
   if (input.logo !== undefined)
     body.logo = input.logo ? { mimeType: input.logo.mimeType, data: bytesToBase64(input.logo.bytes) } : null;
   return request("POST", HOST_ADMIN_ROUTES.identity, ignoreResponse, body);
+}
+
+export function getHostUpdateStatus(request: TeamApiRequest): Promise<HostUpdateStatus> {
+  return request("POST", HOST_UPDATE_ROUTES.status, decodeHostUpdateStatus, {});
+}
+
+/** The host starts the check and answers at once; read the status again for the outcome. */
+export function checkHostForUpdate(request: TeamApiRequest): Promise<HostUpdateStatus> {
+  return request("POST", HOST_UPDATE_ROUTES.check, decodeHostUpdateStatus, {});
+}
+
+/** A second start replaces the restart mode of the first, which is how an admin skips the wait. */
+export function startHostUpdate(request: TeamApiRequest, restart: UpdateRestartMode): Promise<HostUpdateStatus> {
+  return request("POST", HOST_UPDATE_ROUTES.start, decodeHostUpdateStatus, { restart });
+}
+
+export function cancelHostUpdate(request: TeamApiRequest): Promise<HostUpdateStatus> {
+  return request("POST", HOST_UPDATE_ROUTES.cancel, decodeHostUpdateStatus, {});
+}
+
+export function setHostUpdateSettings(
+  request: TeamApiRequest,
+  settings: HostUpdateSettingsChange,
+): Promise<HostUpdateStatus> {
+  return request("POST", HOST_UPDATE_ROUTES.settings, decodeHostUpdateStatus, settings);
 }
 
 /** The one MCP read route, and the only one the host answers to a GET. */

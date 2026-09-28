@@ -20,6 +20,10 @@ export interface GeneralSettingsValue {
    */
   turboMode: boolean;
   autoDownloadUpdates: boolean;
+  /** Owners and admins of a joined server can start an update of this computer. */
+  allowRemoteUpdates: boolean;
+  /** Restart into a downloaded update when no work runs. */
+  autoInstallUpdates: boolean;
   productAnalytics: boolean;
 }
 
@@ -38,5 +42,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   taskCompletionSound: false,
   turboMode: false,
   autoDownloadUpdates: true,
+  allowRemoteUpdates: true,
+  autoInstallUpdates: false,
   productAnalytics: true,
 };

@@ -9,16 +9,20 @@ import type {
   AgentSummary,
   ApprovalAutomationPreference,
   CustomProviderSummary,
+  HostUpdateSettingsChange,
+  HostUpdateStatus,
   InstalledSkill,
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
   SaveCustomProviderInput,
   SharedTable,
   UpdateHostIdentityInput,
+  UpdateRestartMode,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAgentAdminSettings } from "./agent-admin-settings";
+import { RequestedUpdateRefusal } from "./requested-update";
 import { createTeamApiFixture, stopTeamApiFixtures, type TeamApiOptions } from "./team-api-server-test-harness";
 
 afterEach(stopTeamApiFixtures);
@@ -48,7 +52,7 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
     Authorization: `Bearer ${await fixture.signIn()}`,
     "OpenBot-Protocol-Version": "3",
     "OpenBot-Capabilities":
-      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1",
+      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1",
     "Content-Type": "application/json",
   };
   const invite = await fixture.store.createInvite("member");
@@ -505,5 +509,75 @@ describe("Team API host-admin-v1", () => {
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("host-admin-v1");
+  });
+});
+
+describe("Team API host-update-v1", () => {
+  it("lets only an admin start an update, and refuses it when the host user turned it off", async () => {
+    let allowed = true;
+    let autoInstall = false;
+    const starts: { member: string; mode: UpdateRestartMode }[] = [];
+    const snapshot = (): HostUpdateStatus => ({
+      phase: "ready",
+      currentVersion: "0.24.0",
+      availableVersion: "0.25.0",
+      progress: 100,
+      errorCode: null,
+      remoteUpdates: allowed ? "allowed" : "disabled",
+      autoDownload: true,
+      autoInstall,
+      restart: starts.length
+        ? { requestedBy: "Admin", mode: "when-idle", waitingFor: ["agent-turn", "future-blocker", "later-blocker"] }
+        : null,
+    });
+    const update = {
+      snapshot,
+      check: snapshot,
+      cancel: snapshot,
+      start: (member: { id: string; name: string }, mode: UpdateRestartMode) => {
+        if (!allowed) throw new RequestedUpdateRefusal("disabled");
+        starts.push({ member: member.name, mode });
+        return snapshot();
+      },
+      changeSettings: async (change: HostUpdateSettingsChange) => {
+        if (!allowed) throw new RequestedUpdateRefusal("disabled");
+        autoInstall = change.autoInstall ?? autoInstall;
+        return snapshot();
+      },
+    };
+    const { base, admin, asMember, post } = await signedIn("host-update", { admin: { update } });
+
+    expect(
+      (await post("/v1/admin/host/update/start", { restart: "now" }, { ...admin, "OpenBot-Capabilities": "" })).status,
+    ).toBe(400);
+    expect((await post("/v1/admin/host/update/status", {}, asMember)).status).toBe(403);
+    expect((await post("/v1/admin/host/update/start", { restart: "now" }, asMember)).status).toBe(403);
+    expect((await post("/v1/admin/host/update/settings", { autoInstall: true }, asMember)).status).toBe(403);
+    expect((await post("/v1/admin/host/update/start", { restart: "later" })).status).toBe(400);
+    expect((await post("/v1/admin/host/update/settings", { autoInstall: "yes" })).status).toBe(400);
+    expect(starts).toEqual([]);
+    expect(autoInstall).toBe(false);
+
+    expect((await (await post("/v1/admin/host/update/settings", { autoInstall: true })).json()).autoInstall).toBe(true);
+
+    // A blocker the contract does not list travels as "other", once.
+    const started = await post("/v1/admin/host/update/start", { restart: "when-idle" });
+    expect((await started.json()).restart).toEqual({
+      requestedBy: "Admin",
+      mode: "when-idle",
+      waitingFor: ["agent-turn", "other"],
+    });
+    expect(starts).toEqual([{ member: "owner", mode: "when-idle" }]);
+
+    allowed = false;
+    const refused = await post("/v1/admin/host/update/start", { restart: "now" });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: "Updates from server admins are turned off on this computer." });
+    expect((await post("/v1/admin/host/update/settings", { autoInstall: false })).status).toBe(403);
+    expect(autoInstall).toBe(true);
+    expect((await (await post("/v1/admin/host/update/status", {})).json()).remoteUpdates).toBe("disabled");
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("host-update-v1");
   });
 });

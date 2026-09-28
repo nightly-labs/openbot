@@ -1,11 +1,14 @@
 import type { HostStatus, ServerNotificationLevel, ServerSummary } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
-import { serverSupportsCapability } from "./server-capabilities";
+import { createHostRestartToasts } from "../updates/host-restart-toast";
+import { watchHostUpdate } from "./host-update-toast";
+import { remoteAdminServer, serverSupportsCapability } from "./server-capabilities";
 import { serversPort } from "./servers-port";
 
 /**
@@ -82,12 +85,24 @@ const Servers = createSimpleContext({
       return serverSupportsCapability(activeServer(), capability);
     }
 
+    /** Opens Server Settings > Updates. The settings context below this one sets it. */
+    let openHostUpdate: ((serverId: string) => void) | undefined;
+    function setHostUpdateOpener(opener: ((serverId: string) => void) | undefined): void {
+      openHostUpdate = opener;
+    }
+
+    /** The connection of each admin server whose update status was read, so each connection reads it once. */
+    const updateChecks = new Map<string, number>();
+    /** `serverId:sequence` of each version mismatch notice that already offered the update. */
+    const mismatchOffers = new Set<string>();
+
     function applyServerSummaries(value: ServerSummary[]): void {
       const previous = new Map(servers().map((server) => [server.id, server]));
       for (const server of value) {
         const sequence = server.connectionSequence ?? 0;
         const previousSequence = previous.get(server.id)?.connectionSequence ?? 0;
         const compatibility = server.compatibility;
+        const administersUpdate = server.kind === "remote" && remoteAdminServer(server, HOST_UPDATE_CAPABILITY);
         if (
           server.kind === "remote" &&
           sequence > previousSequence &&
@@ -95,12 +110,32 @@ const Servers = createSimpleContext({
           compatibility.hostAppVersion !== compatibility.localAppVersion
         ) {
           const { t } = currentText();
+          const opener = openHostUpdate;
+          const serverId = server.id;
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
             description: t("server.compatibility.versionMismatchDescription", {
               protocol: String(compatibility.negotiatedProtocol),
               clientVersion: compatibility.localAppVersion,
               hostVersion: compatibility.hostAppVersion,
             }),
+            action:
+              opener && administersUpdate
+                ? { label: t("server.update.hostAction"), onClick: () => opener(serverId) }
+                : undefined,
+          });
+          if (opener && administersUpdate) mismatchOffers.add(`${serverId}:${sequence}`);
+        }
+        // An admin learns about a new version, or sees the download that runs, when the host connects.
+        if (administersUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
+          updateChecks.set(server.id, sequence);
+          const opener = openHostUpdate;
+          const serverId = server.id;
+          watchHostUpdate({
+            serverId,
+            name: server.name,
+            calls: serversPort().hostAdmin,
+            openUpdates: opener ? () => opener(serverId) : undefined,
+            offer: !mismatchOffers.has(`${serverId}:${sequence}`),
           });
         }
       }
@@ -225,9 +260,26 @@ const Servers = createSimpleContext({
       }
     }
 
+    createHostRestartToasts(() =>
+      servers().flatMap((server) =>
+        server.kind === "remote"
+          ? [
+              {
+                id: server.id,
+                name: server.name,
+                online: server.state === "online",
+                restart: server.hostRestart?.state ?? null,
+                version: server.hostRestart?.version ?? null,
+              },
+            ]
+          : [],
+      ),
+    );
+
     return {
       servers,
       setServers,
+      setHostUpdateOpener,
       activeServer,
       activeServerId,
       activeServerSupportsCapability,

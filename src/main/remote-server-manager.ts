@@ -44,6 +44,7 @@ import { LOCAL_SERVER_ID, REMOTE_DESKTOP_SETUP_CAPABILITY, type RemoteDesktopTes
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { contentDispositionFileName } from "./content-disposition";
@@ -201,6 +202,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onPresence: (serverId, snapshot) => this.#presence.accept(serverId, snapshot),
       onDirectMessage: (serverId, event) => this.emit("directMessage", serverId, event),
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
+      onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
       onChanged: () => this.#emitChanged(),
     });
@@ -243,7 +245,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
-      if (code === "host_unavailable") this.#events.markHostOffline(serverId);
+      // A host that restarts into an update is away for a short time: keep the fast retry for it.
+      if (code === "host_unavailable" && !this.#connections.hostRestartFor(serverId))
+        this.#events.markHostOffline(serverId);
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
     });
@@ -1117,7 +1121,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#presence.accept(serverId, event.snapshot);
     } else if (event.type === "team-direct-message") this.emit("directMessage", serverId, event);
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
+    else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
     else this.#refresh.forward(serverId, event);
+  }
+
+  #applyHostRestart(serverId: string, { state, version }: HostRestartEvent): void {
+    if (this.#connections.setHostRestart(serverId, state === "none" ? null : { state, version })) this.#emitChanged();
   }
 
   #applyServerIdentity(serverId: string, identity: { serverName: string; logoVersion: string | null }): void {

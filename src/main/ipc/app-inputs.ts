@@ -6,6 +6,7 @@ import type {
   DynamicIslandPreference,
   DynamicIslandPresentation,
   ExternalDestination,
+  HostUpdateSettingsChange,
   InstallMarketplaceAgentInput,
   InstallSkillInput,
   MacPermissionId,
@@ -23,7 +24,7 @@ import type {
   SubmitMarketplaceAgentInput,
   SubmitSkillInput,
   UninstallSkillInput,
-  UpdatePreference,
+  UpdatePreferenceChange,
   VerifyEmailCodeInput,
 } from "@openbot/contracts/ipc";
 import {
@@ -79,9 +80,31 @@ export function parseAppLanguagePreference(input: unknown): SetAppLanguagePrefer
   return { language: input.language };
 }
 
-export function parseUpdatePreference(input: unknown): UpdatePreference {
-  if (!isDynamicRecord(input) || !isBoolean(input.autoDownload)) throw new Error("Update preference is required.");
-  return { autoDownload: input.autoDownload };
+export function parseUpdatePreference(input: unknown): UpdatePreferenceChange {
+  return parseSwitches(input, ["autoDownload", "allowRemoteUpdates", "autoInstall"], "Update preference is required.");
+}
+
+/** The switches an admin of a joined server sets on its host. `allowRemoteUpdates` stays with the host user. */
+export function parseHostUpdateSettings(input: unknown): HostUpdateSettingsChange {
+  return parseSwitches(input, ["autoDownload", "autoInstall"], "Update settings are required.");
+}
+
+/** At least one of `keys`, each a boolean. An absent key stays absent. */
+function parseSwitches<Key extends string>(
+  input: unknown,
+  keys: readonly Key[],
+  message: string,
+): Partial<Record<Key, boolean>> {
+  if (!isDynamicRecord(input)) throw new Error(message);
+  const change: Partial<Record<Key, boolean>> = {};
+  for (const key of keys) {
+    const value = input[key];
+    if (value === undefined) continue;
+    if (!isBoolean(value)) throw new Error(message);
+    change[key] = value;
+  }
+  if (Object.keys(change).length === 0) throw new Error(message);
+  return change;
 }
 
 export function parseNotificationPreference(input: unknown): NotificationPreference {

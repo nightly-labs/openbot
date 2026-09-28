@@ -1,4 +1,9 @@
-import type { AccountUsage, AgentSummary, ApprovalAutomationPreference } from "@openbot/contracts/ipc";
+import type {
+  AccountUsage,
+  AgentSummary,
+  ApprovalAutomationPreference,
+  UpdatePreference,
+} from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { assert, expect, it, vi } from "vitest";
@@ -406,7 +411,11 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("persists every settings preference through its own IPC channel", async () => {
-    vi.mocked(window.openbot.update.getPreference).mockResolvedValue({ autoDownload: false });
+    vi.mocked(window.openbot.update.getPreference).mockResolvedValue({
+      autoDownload: false,
+      allowRemoteUpdates: true,
+      autoInstall: false,
+    });
     render(() => <App />);
     await fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
 
@@ -605,7 +614,7 @@ describe("OpenBot connected desktop shell", () => {
   });
 
   it("keeps a toggle made before the stored preference finishes loading", async () => {
-    let resolvePreference: ((value: { autoDownload: boolean }) => void) | undefined;
+    let resolvePreference: ((value: UpdatePreference) => void) | undefined;
     vi.mocked(window.openbot.update.getPreference).mockReturnValueOnce(
       new Promise((resolve) => {
         resolvePreference = resolve;
@@ -621,7 +630,7 @@ describe("OpenBot connected desktop shell", () => {
 
     // The stored read finally lands with the value the user has just replaced. Painting it back would
     // leave the switch disagreeing with both disk and the main process.
-    resolvePreference?.({ autoDownload: true });
+    resolvePreference?.({ autoDownload: true, allowRemoteUpdates: true, autoInstall: false });
     // Let the hydration continuation actually run, otherwise this asserts before it could apply.
     await new Promise((resolve) => setTimeout(resolve, 0));
 

@@ -1,5 +1,6 @@
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
+import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
 
 // The id every IPC payload carries for "this computer" rather than a remote team server. It is a
 // wire value the main process, the preload bridge and the renderer all compare against, so it lives
@@ -74,6 +75,8 @@ export interface ServerSummary {
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
+  /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
+  hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
 }
 
 export interface JoinServerInput {
@@ -253,7 +256,8 @@ export type TeamRealtimeEvent =
       senderMemberId: string;
       recipientMemberId: string;
       typing: boolean;
-    };
+    }
+  | HostRestartEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;
 

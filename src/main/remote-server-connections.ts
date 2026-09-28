@@ -35,6 +35,7 @@ interface MutableStatus {
   compatibility: ServerCompatibility | null;
   issue: ServerConnectionIssue | null;
   connectionSequence: number;
+  hostRestart: ServerSummary["hostRestart"];
 }
 
 export class RemoteServerConnections {
@@ -58,6 +59,7 @@ export class RemoteServerConnections {
       compatibility: status?.compatibility ?? checkingCompatibility(this.#appVersion),
       issue: status?.issue ?? null,
       connectionSequence: status?.connectionSequence ?? 0,
+      hostRestart: status?.hostRestart ?? null,
     };
   }
 
@@ -77,6 +79,19 @@ export class RemoteServerConnections {
 
   hasIssue(serverId: string): boolean {
     return this.issueFor(serverId) != null;
+  }
+
+  hostRestartFor(serverId: string): ServerSummary["hostRestart"] {
+    return this.#statuses.get(serverId)?.hostRestart ?? null;
+  }
+
+  /** What the host said about its restart into an update. Answers whether it changed. */
+  setHostRestart(serverId: string, hostRestart: ServerSummary["hostRestart"]): boolean {
+    const status = this.#mutable(serverId);
+    if (status.hostRestart?.state === hostRestart?.state && status.hostRestart?.version === hostRestart?.version)
+      return false;
+    status.hostRestart = hostRestart;
+    return true;
   }
 
   setState(serverId: string, state: ServerSummary["state"]): void {
@@ -110,12 +125,14 @@ export class RemoteServerConnections {
   }
 
   // A connection that just came up: online, no issue, nothing known about the host yet, and a new
-  // sequence number so the renderer treats it as a reconnect rather than a continuing session.
+  // sequence number so the renderer treats it as a reconnect rather than a continuing session. A host
+  // that still waits to restart says so again when the client declares its capabilities.
   markConnected(serverId: string): void {
     const status = this.#mutable(serverId);
     status.state = "online";
     status.compatibility = null;
     status.issue = null;
+    status.hostRestart = null;
     status.connectionSequence += 1;
   }
 
@@ -182,7 +199,13 @@ export class RemoteServerConnections {
   #mutable(serverId: string): MutableStatus {
     const existing = this.#statuses.get(serverId);
     if (existing) return existing;
-    const status: MutableStatus = { state: "offline", compatibility: null, issue: null, connectionSequence: 0 };
+    const status: MutableStatus = {
+      state: "offline",
+      compatibility: null,
+      issue: null,
+      connectionSequence: 0,
+      hostRestart: null,
+    };
     this.#statuses.set(serverId, status);
     return status;
   }
