@@ -1008,3 +1008,44 @@ describe("remote control capability discovery", () => {
     }
   });
 });
+
+describe("leaving a remote server", () => {
+  // An HTTP host with `member-leave-v1` removes the membership as an admin removal does; an older one
+  // can only end this computer's session. A host that fails either must not keep the server listed.
+  it("leaves an HTTP host that serves the route, logs out of an older one, also when the host fails", async () => {
+    const teamFetch = stubTeamFetch({
+      routes: {
+        "/v1/compatibility": ({ url }) =>
+          Response.json({
+            appVersion: "0.4.0",
+            protocol: { minimum: 1, maximum: 1 },
+            capabilities: url.hostname.startsWith("older") ? [] : ["member-leave-v1"],
+          }),
+        "/v1/agents": () => Response.json([]),
+        "/v1/team/leave": ({ url }) =>
+          url.hostname.startsWith("failing")
+            ? Response.json({ error: "Host unavailable." }, { status: 503 })
+            : new Response(null, { status: 204 }),
+        "/v1/auth/logout": () => new Response(null, { status: 204 }),
+      },
+    });
+    const servers = ["current", "older", "failing"];
+    const fixture = await createRemoteManager({
+      servers: servers.map((id) => storedHttpsServer(id)),
+      appVersion: "0.4.0",
+    });
+    // A request negotiates the protocol first, as the app does before the user can open settings.
+    for (const id of servers) await fixture.manager.request(id, "/v1/agents", (value) => value);
+
+    for (const id of servers) await fixture.manager.remove(id);
+
+    const sent = (path: string) =>
+      teamFetch.requests(path).map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]);
+    expect(sent("/v1/team/leave")).toEqual([
+      ["current.trycloudflare.com", "POST", "Bearer token-current"],
+      ["failing.trycloudflare.com", "POST", "Bearer token-failing"],
+    ]);
+    expect(sent("/v1/auth/logout")).toEqual([["older.trycloudflare.com", "POST", "Bearer token-older"]]);
+    expect(fixture.manager.list().map((server) => server.id)).toEqual(["local"]);
+  });
+});

@@ -31,6 +31,8 @@ export const messages = {
   "error.import.noMembersImported": "このチャンネルのエージェントは 1 つもインポートされませんでした。",
   "error.import.leadNotImported": "{name}: リーダーがインポートされなかったため、リーダーがいません。",
   "error.import.routineSkipped": "{name}: ルーティン「{routine}」をスキップします。{reason}",
+  "error.import.fileRenamed": "{name}: {file} はすでに存在するため、このコピーを {saved} として保存します。",
+  "error.import.fileSkipped": "{name}: ファイル {file} をスキップします。{reason}",
   "error.import.chooseZip": ".zip ファイルを選択してください。",
   "error.import.zipTooLarge": "エクスポートは 500 MB 未満の .zip である必要があります。",
   "error.import.unsafeFile": "エクスポートに安全でないファイルが含まれています: {name}",

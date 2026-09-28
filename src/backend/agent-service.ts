@@ -97,7 +97,13 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { creationModel, type ProviderPreference, startingChoice, startingModel } from "./agent/model-choice";
+import {
+  creationModel,
+  type ModelChoice,
+  type ProviderPreference,
+  startingChoice,
+  startingModel,
+} from "./agent/model-choice";
 import { OpenBotToolRouter } from "./agent/openbot-tool-router";
 import { ProfileClients } from "./agent/profile-clients";
 import { generateProfile, generateTextWithoutTools } from "./agent/profile-generation";
@@ -743,13 +749,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       tables: this.#tables,
       sidebarLayout: this.#sidebarLayout,
       localSkillTools: this.#localSkillTools,
+      approvalAutomation: options.approvalAutomation,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
         preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) => this.createAgent(input, configure),
-        updateAgent: (input) => this.updateAgent(input),
+        updateAgent: (input, initiatingAgentId) => this.updateAgent(input, initiatingAgentId),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image),
+        enabledMcpServers: () => this.enabledMcpServers(),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) => this.#interruptTurn(agentId, turnId, undefined, mayStop),
@@ -1066,29 +1074,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               : requested.model.defaultReasoningEffort,
         });
       } else {
-        const preference = this.#preference();
-        const starting = startingChoice(this.#endpoints.available(), preference, {
-          developmentDefaults: this.#developmentDefaults,
-          providerAvailable: (provider) => this.#providerAvailable(provider),
-        });
+        const starting = this.#startingChoice();
         // No provider lists a model, the preferred one included, so the agent could never answer.
         // The error names the provider the user chose, because that is the one they expected.
         if (!starting) {
-          throw new Error(sourceText("error.agent.noStartingModel", { provider: providerLabel(preference.provider) }));
+          throw new Error(
+            sourceText("error.agent.noStartingModel", { provider: providerLabel(this.#preference().provider) }),
+          );
         }
-        // A new record starts on the built-in default provider, so this is the one place a preferred
-        // provider lands on a new agent -- and with it the model setup chose, which is how a custom
-        // endpoint becomes the default: it is a model of the CLI that runs it, never a provider. A
-        // fallback from the preferred provider always lands: the record's own provider can be the
-        // fallback, and the model the record holds need not be one that provider lists.
-        if (starting.provider !== agent.provider || starting.provider !== preference.provider) {
-          agent = await this.#store.updateAgent({
-            agentId: agent.id,
-            provider: starting.provider,
-            model: starting.model.id,
-            reasoningEffort: starting.model.defaultReasoningEffort,
-          });
-        }
+        agent = await this.#landOnStartingChoice(agent, starting);
       }
       if (configure) agent = await configure(agent);
       await this.sendMessage({ agentId: agent.id, text: initialMessage, attachmentDraftIds: [] });
@@ -1108,12 +1102,41 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   }
 
+  /** Where a new agent that names no model starts: the saved choice, else its provider default (Luna 6 for ChatGPT). */
+  #startingChoice(): ModelChoice | null {
+    return startingChoice(this.#endpoints.available(), this.#preference(), {
+      developmentDefaults: this.#developmentDefaults,
+      providerAvailable: (provider) => this.#providerAvailable(provider),
+    });
+  }
+
+  /**
+   * Moves a new record onto `starting`. A new record starts on the built-in default provider, so this
+   * is the one place a preferred provider lands on a new agent -- and with it the model setup chose,
+   * which is how a custom endpoint becomes the default: it is a model of the CLI that runs it, never a
+   * provider. A record already on the chosen model keeps its effort, which is the low one a new agent
+   * leads with rather than the one the CLI reports.
+   */
+  async #landOnStartingChoice(agent: AgentSummary, starting: ModelChoice): Promise<AgentSummary> {
+    if (starting.provider === agent.provider && starting.model.id === agent.model) return agent;
+    return this.#store.updateAgent({
+      agentId: agent.id,
+      provider: starting.provider,
+      model: starting.model.id,
+      reasoningEffort: starting.model.defaultReasoningEffort,
+    });
+  }
+
   async createAgentProfile(
     input: Omit<CreateAgentInput, "initialMessage"> & { title?: string },
   ): Promise<AgentSummary> {
     let agent = await this.#store.createAgent(input);
     try {
       await this.#prepareAgentWorkspace(agent);
+      // A template, a marketplace agent and an imported one name no model. They start where a new
+      // agent does; with nothing listed yet they keep the record's own, because no message waits.
+      const starting = this.#startingChoice();
+      if (starting) agent = await this.#landOnStartingChoice(agent, starting);
       if (input.title) agent = await this.#store.updateAgent({ agentId: agent.id, title: input.title });
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       return agent;
@@ -1141,11 +1164,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return agent;
   }
 
-  updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
-    return this.#endpoints.runExclusive(() => this.#applyAgentUpdate(input));
+  /** `initiatingAgentId` is set when an agent, not the user, asks for the change. */
+  updateAgent(input: UpdateAgentInput, initiatingAgentId?: string): Promise<AgentSummary> {
+    return this.#endpoints.runExclusive(() => this.#applyAgentUpdate(input, initiatingAgentId));
   }
 
-  async #applyAgentUpdate(input: UpdateAgentInput): Promise<AgentSummary> {
+  async #applyAgentUpdate(input: UpdateAgentInput, initiatingAgentId?: string): Promise<AgentSummary> {
     this.#conversation.requireKnownAgent(input.agentId);
     const previous = this.#store.list().find((agent) => agent.id === input.agentId);
     const requestedModel = input.model
@@ -1181,10 +1205,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.reasoningEffort !== undefined ||
       input.access !== undefined ||
       input.computerUse !== undefined;
-    const agent = await this.#store.updateAgent({
-      ...input,
-      ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}),
-    });
+    const agent = await this.#store.updateAgent(
+      { ...input, ...(requestedModel && !input.provider ? { provider: requestedModel.provider } : {}) },
+      initiatingAgentId,
+    );
     const activeSession = this.#store.activeProviderSession(agent.id);
     if (previous?.threadId && requestedProvider && requestedProvider !== providerForAgent(previous)) {
       this.#store.database.deactivateProviderSessions(previous.threadId);

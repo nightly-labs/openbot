@@ -39,6 +39,12 @@
       "detailSha256": "2443f0184dd650d5b0e735de31853e3a7d48fdcb1b9538472c4e5450f6c81746"
     },
     {
+      "slug": "paper",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "cfc59276d82b8b54ae133336032b611613b5f8c0e93672f8f07009d126c39464"
+    },
+    {
       "slug": "sentry",
       "version": "1.0.0",
       "featured": false,

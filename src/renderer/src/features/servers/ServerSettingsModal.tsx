@@ -68,6 +68,11 @@ export interface ServerSettingsModalProps {
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
+  /**
+   * Ends this account's membership of a joined server. The Leave section appears only when a
+   * caller supplies this: the browser client is attached to one host and cannot leave it.
+   */
+  onLeaveServer?: () => Promise<void>;
   /** Opens the macOS pane that grants OpenBot screen recording, for the host that was refused it. */
   onOpenScreenRecordingSettings: () => Promise<void>;
   /** Asks the host to read the grant again, so the owner who gave it sees the warning go. */
@@ -493,6 +498,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       </SettingsDialogShell>
 
       <members.RemoveDialog />
+      <general.LeaveDialog />
     </Tabs.Root>
   );
 }

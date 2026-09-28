@@ -3,12 +3,13 @@
 // `stage` reads only the manifest and the avatars and measures the other entries without
 // inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
 // Each agent is created through the same services the user reaches by hand. When one step fails,
-// that agent is deleted and reported, and the other agents continue. Group chats become channels
+// that agent is deleted and reported, and the other agents continue. A workspace file that cannot
+// be written is a warning, not a failed step, so the agent still imports. Group chats become channels
 // after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
 
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { AVATAR_MIME_TYPES, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -292,7 +293,8 @@ export class AgentImportService {
     });
     const published: Array<{ id: string; revision: number }> = [];
     try {
-      if (source.files) await writeTree(join(agent.workspacePath, IMPORTED_FILES), read(source.files));
+      if (source.files)
+        await writeImportedFiles(join(agent.workspacePath, IMPORTED_FILES), read(source.files), source.name, warnings);
       for (const skill of skills) {
         const folder = `${SKILL_STAGING}/${skill.slug}`;
         const target = join(agent.workspacePath, ...folder.split("/"));
@@ -433,6 +435,48 @@ async function writeTree(root: string, files: ReadonlyArray<readonly [string, Ui
     // `wx` refuses to replace a file, so an entry can never overwrite what is already there.
     await writeFile(target, data, { flag: "wx" });
   }
+}
+
+/**
+ * Writes the workspace files of one agent and never replaces a file. When a file is already there,
+ * for example `README.md` and `readme.md` on a disk that ignores case, the entry is saved beside it
+ * as `README (2).md`. A file that still cannot be written is skipped. Each case adds a warning.
+ */
+async function writeImportedFiles(
+  root: string,
+  files: ReadonlyArray<readonly [string, Uint8Array]>,
+  agentName: string,
+  warnings: string[],
+): Promise<void> {
+  const base = resolve(root);
+  for (const [name, data] of files) {
+    const target = resolve(base, name);
+    if (isAbsolute(name) || isUnsafeEntry(name) || target === base || !isPathInside(base, target))
+      throw new Error(sourceText("error.import.unsafeFile", { name }));
+    try {
+      await mkdir(dirname(target), { recursive: true });
+      for (let copy = 1; ; copy += 1) {
+        try {
+          await writeFile(copy === 1 ? target : copyName(target, copy), data, { flag: "wx" });
+          if (copy > 1)
+            warnings.push(
+              sourceText("error.import.fileRenamed", { name: agentName, file: name, saved: copyName(name, copy) }),
+            );
+          break;
+        } catch (error) {
+          if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+        }
+      }
+    } catch (error) {
+      warnings.push(sourceText("error.import.fileSkipped", { name: agentName, file: name, reason: message(error) }));
+    }
+  }
+}
+
+/** `notes/plan.md` becomes `notes/plan (2).md`. */
+function copyName(path: string, copy: number): string {
+  const extension = extname(path);
+  return `${path.slice(0, path.length - extension.length)} (${copy})${extension}`;
 }
 
 function sha256(bytes: Uint8Array): string {

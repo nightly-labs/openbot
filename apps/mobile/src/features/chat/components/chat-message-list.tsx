@@ -44,6 +44,7 @@ import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail, getBloubAvatarColor } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { ChatPlan } from "@/features/chat/components/chat-plan";
 import { ChatQuestionPrompt } from "@/features/chat/components/chat-question-prompt";
 import { useActivityPresence } from "@/features/chat/components/use-activity-presence";
 import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
@@ -462,6 +463,8 @@ const MessageRow = memo(function MessageRow({
           );
         })}
       </View>
+    ) : message.kind === "plan" ? (
+      <ChatPlan key={message.id} message={message} />
     ) : message.kind === "question" ? (
       <ChatQuestionPrompt
         key={message.id}

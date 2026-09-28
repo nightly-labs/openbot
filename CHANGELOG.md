@@ -7,6 +7,14 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Added
 
+- Ask an agent to set up another agent after it creates it. The agent can read another agent's
+  profile, model, settings, skills, routines and MCP servers. It can install, turn off and remove
+  local skills for another agent. It can set another agent to Workspace only, turn Computer Use off
+  and change notifications. Only you can give Full access, turn Computer Use on, change auto-approve
+  or change MCP servers. A new agent gets the access limits of the agent that creates it.
+- Ask an agent to change the provider, model or reasoning effort of another agent, as it can
+  change a name. The agent gets an error that names the available models when a model is not
+  available. OpenBot records which agent made the change, and the previous and new model.
 - Find local model servers, such as Ollama and LM Studio, and known ACP agents on your computer.
   Settings shows them under "Found on this computer", where you can add or hide each one. First run
   shows the same list. The scan sends no key and does not start a program that it finds. You can
@@ -16,12 +24,28 @@ All notable changes to OpenBot will be documented here. The project follows
   are stored encrypted on your computer.
 - Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
   model list from the server.
+- Leave a joined server from its Server settings. OpenBot asks you to confirm, then removes the
+  server from your server list. The server and its other members stay. To join again, you need a
+  new invitation.
 - The iPhone app is in public beta on TestFlight. A card at the bottom of the sidebar shows the
   install steps and a QR code of the invite link. You can close the card. Settings > Mobile Connect
   always shows the same steps, the QR code and a button that copies the link.
+- Add Paper to the Plugins tab. Agents can read and change the file that is open in Paper Desktop.
+  Install Paper Desktop, open it once, and open a file. Paper needs no key. The command of a local
+  MCP server can now start with `~/`, which is your home folder.
 
 ### Changed
 
+- The iPhone app shows an agent plan as a task list, as desktop does: a card that opens and closes,
+  with the state of each step and a spinner on the step that runs. The last message of a chat and
+  its read state do not include plans. Team API v4 now sends the plan of a turn beside its
+  checklist text; older clients and hosts keep reading the text.
+- The iPhone app shows a file name in inline code, such as `package.json`, as desktop does: a type
+  badge and the name in the colour of its file type. You cannot open the file from the phone yet.
+- On the iPhone app, the question form of an agent has no text field of its own. It shows "Reply
+  in the chat" as one more answer row. Tap it, and the next message from the composer is the
+  answer. Without that tap, the composer sends normal messages, also in a channel. A private
+  answer still uses its own masked field.
 - On the phone, an answer from a teammate agent no longer shows as a queued message that you can
   edit, steer or move. The queue sheet shows it under "Waiting for replies". A computer on an older
   version does not send this information, so its answers still show as queued messages.
@@ -34,15 +58,29 @@ All notable changes to OpenBot will be documented here. The project follows
   Your draft stays when you reconnect.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
+- Ask before an import adds an agent whose name is already on the server, for example when you
+  import the same export again. The dialog names the agents and says that each copy is a separate
+  agent. Before, only an info icon next to the name showed this.
 
 ### Fixed
 
+- The web app no longer shows the agent's working notes as chat bubbles. Before, each step of a
+  turn showed as its own bubble, and some of these bubbles were empty. The web app now shows the
+  same messages as the desktop app.
+- Stop "Provider error" messages for Antigravity info and warning log lines, such as "Checkpoint
+  summary was too long". Before, one message showed at each step of a long conversation. These
+  lines now go to the log. Antigravity error lines still show.
 - When Codex ignores an unknown setting in its configuration, show one warning that names each
   setting. Before, a "Provider error" showed only "Codex is ignoring 1 unrecognized configuration
   setting", with no setting name, and it came back after each reconnect. Codex continues to work.
 - Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
   could save the same routine. An agent can no longer add a routine with the name of an existing
   one; it changes that routine instead.
+- Start a new agent on the model that you saved in setup, also when that model is a ChatGPT model.
+  Before, the agent stayed on GPT-6 Luna. Agents from a template, the marketplace or an imported
+  file now also start on the provider and model that you saved in setup. Before, they always
+  started on ChatGPT. When you saved no model, a new agent starts on GPT-6 Luna, and on GPT-6 Luna
+  in the web app too. Existing agents keep their model.
 - Show the highlight of the selected server across the full row in the mobile server list. Before,
   the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
@@ -53,6 +91,10 @@ All notable changes to OpenBot will be documented here. The project follows
   could show a failure icon until the next capture.
 - Reload the web app one time when an update removed the files that it needs. Before, the first
   open after an update could show "This page could not load".
+- Import an agent when one of its files is already in the workspace, for example two files whose
+  names differ only in case on macOS. The import keeps both files, saves the second one as
+  `name (2).ext`, and shows a warning. A file that it cannot write is skipped with a warning. Before,
+  the agent was not imported.
 
 ## [0.23.0] - 2026-09-27
 

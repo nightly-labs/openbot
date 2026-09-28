@@ -1,5 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AGENT_PROVIDERS, AGENT_REASONING_EFFORTS, AVATAR_HUES, AVATAR_SEED_PATTERN } from "@openbot/contracts/ipc";
+import {
+  AGENT_ACCESS_MODES,
+  AGENT_PROVIDERS,
+  AGENT_REASONING_EFFORTS,
+  AVATAR_HUES,
+  AVATAR_SEED_PATTERN,
+} from "@openbot/contracts/ipc";
 import { z } from "zod";
 
 const profileFields = {
@@ -57,6 +63,38 @@ export const updateProfileToolSchema = z
       .describe(
         "Local PNG, JPEG, or WebP file, up to 512 KB. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
       )
+      .optional(),
+    provider: z
+      .enum(AGENT_PROVIDERS)
+      .describe("New provider for the agent. Pass a model with it, or omit the model to use the provider's default.")
+      .optional(),
+    model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("New model id from list_models.").optional(),
+    reasoningEffort: z
+      .enum(AGENT_REASONING_EFFORTS)
+      .describe(
+        "New reasoning effort that the model supports, from list_models. Omit to keep the current effort when the model supports it, else to use the model's default.",
+      )
+      .optional(),
+    access: z
+      .enum(AGENT_ACCESS_MODES)
+      .describe("workspace limits the agent to writing in its workspace. Only the user can set full.")
+      .optional(),
+    computerUse: z
+      .boolean()
+      .describe("false turns Computer Use off for the agent. Only the user can turn it on.")
+      .optional(),
+    notifications: z.boolean().describe("Whether the user gets notifications for the agent.").optional(),
+  })
+  .strict();
+
+export const readAgentToolSchema = z
+  .object({
+    agentId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(INPUT_LIMITS.identifier)
+      .describe("Stable id from list_agents. Omit it to read your own agent.")
       .optional(),
   })
   .strict();

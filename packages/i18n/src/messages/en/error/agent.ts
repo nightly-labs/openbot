@@ -29,6 +29,8 @@ export const messages = defineMessages("error.agent", {
     "{provider} has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Providers & permissions.",
   "error.agent.waitBeforeProviderChange": "Wait for the active turn and queue to finish before changing provider.",
   "error.agent.unknown": "Unknown agent: {id}",
+  "error.agent.onlyUserWidensSettings":
+    "Only the user can give an agent Full access or turn Computer Use on. Ask the user to change it in the agent's settings.",
   "error.agent.queuedMessageCreateFailed": "Unable to create queued message.",
   "error.agent.messageUnavailable": "The message is no longer available.",
   "error.agent.hostLimit": "A host can have up to {limit} agents.",

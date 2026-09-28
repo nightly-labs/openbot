@@ -15,6 +15,7 @@ import {
   isBrowserViewSessionRoute,
   isBrowserViewSessionsRoute,
 } from "./browser-view-v1";
+import { withConversationPlans } from "./conversation-plan-v4";
 import {
   isAgentAnalyticsRoute,
   isAgentCreateRoute,
@@ -254,8 +255,11 @@ export function encodeTeamProtocolV4CurrentHttpResponse(
     );
   if (isConversationRoute(method, path) && status < 400)
     return JSON.stringify(
-      withExchangeExpectsReply(
-        JSON.parse(encodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value, options)),
+      withConversationPlans(
+        withExchangeExpectsReply(
+          JSON.parse(encodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value, options)),
+          value,
+        ),
         value,
       ),
     );
@@ -299,7 +303,10 @@ export function decodeTeamProtocolV4CurrentHttpResponse(
   if (isQueueSnapshotRoute(method, path) && status < 400)
     return withQueueMarks(decodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value), value);
   if (isConversationRoute(method, path) && status < 400)
-    return withExchangeExpectsReply(decodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value), value);
+    return withConversationPlans(
+      withExchangeExpectsReply(decodeTeamProtocolV4BaseCurrentHttpResponse(method, path, status, value), value),
+      value,
+    );
   if (isConversationUnreadRoute(method, path))
     return decodeTeamProtocolV4BaseCurrentHttpResponse(method, readPath(path), status, value);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {

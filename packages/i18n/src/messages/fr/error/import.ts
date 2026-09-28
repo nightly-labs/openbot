@@ -31,6 +31,8 @@ export const messages = {
   "error.import.noMembersImported": "Aucun de ses agents n’a été importé.",
   "error.import.leadNotImported": "{name} : son responsable n’a pas été importé, donc il n’a pas de responsable.",
   "error.import.routineSkipped": "{name} : la routine « {routine} » est ignorée. {reason}",
+  "error.import.fileRenamed": "{name} : {file} existe déjà, cette copie est donc enregistrée sous {saved}.",
+  "error.import.fileSkipped": "{name} : le fichier {file} est ignoré. {reason}",
   "error.import.chooseZip": "Choisissez un fichier .zip.",
   "error.import.zipTooLarge": "L’exportation doit être un fichier .zip de moins de 500 Mo.",
   "error.import.unsafeFile": "L’exportation contient un fichier non sûr : {name}",

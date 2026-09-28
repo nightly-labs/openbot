@@ -2,7 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { Check, ChevronLeft, ChevronRight, Send, X } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, MessageSquareText, Send, X } from "lucide-react-native";
 import { TextInput, View } from "react-native";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
@@ -20,7 +20,7 @@ export function ChatQuestionPrompt({
   onActivate?: () => void;
 }) {
   const { t } = useText();
-  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  const [foreground, muted, accentForeground] = useThemeColor(["foreground", "muted", "accent-foreground"]);
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className="max-w-[88%] self-start gap-2 rounded-[30px] bg-control/60 px-4 py-3">
@@ -64,7 +64,8 @@ export function ChatQuestionPrompt({
   }
 
   if (!controller?.question) return null;
-  const { question, index, disabled, pending, failedAnswers, setIndex, answer, submit } = controller;
+  const { question, index, disabled, pending, failedAnswers, setIndex, answer, submit, replyInChat, setReplyInChat } =
+    controller;
 
   return (
     <View
@@ -144,51 +145,82 @@ export function ChatQuestionPrompt({
             </View>
           </Button>
         ))}
+        {question.isSecret ? null : (
+          // One more answer row, so it reads as a choice like the options above. The composer
+          // answers only after this choice, so a message typed meanwhile still goes to the chat,
+          // which matters in a channel where others talk too.
+          <Button
+            variant="ghost"
+            isDisabled={disabled}
+            accessibilityLabel={t("mobile.chat.question.replyInChat")}
+            accessibilityState={{ selected: replyInChat, disabled }}
+            className={`h-auto min-h-12 justify-start rounded-[18px] px-2 py-2 ${replyInChat ? "bg-control/60" : ""}`}
+            onPress={() => setReplyInChat(!replyInChat)}
+          >
+            <View
+              className={`w-10 self-stretch items-center justify-center rounded-xl ${replyInChat ? "bg-accent" : "bg-control"}`}
+              style={{ borderCurve: "continuous" }}
+            >
+              <MessageSquareText color={String(replyInChat ? accentForeground : muted)} size={18} />
+            </View>
+            <View className="min-w-0 flex-1 gap-0.5">
+              <Typography type="body-sm" weight="medium">
+                {t("mobile.chat.question.replyInChat")}
+              </Typography>
+              <Typography type="body-xs" className="text-text-secondary">
+                {replyInChat ? t("mobile.chat.question.replyInChatActive") : t("mobile.chat.question.replyInChatHint")}
+              </Typography>
+            </View>
+          </Button>
+        )}
       </View>
       <View className="flex-row items-center justify-between gap-2">
-        <Typography type="body-xs" className="flex-1 text-text-secondary">
-          {t("mobile.chat.question.orTypeAnswer")}
-        </Typography>
+        {question.isSecret ? (
+          <Typography type="body-xs" className="flex-1 text-text-secondary">
+            {t("mobile.chat.question.orTypeAnswer")}
+          </Typography>
+        ) : (
+          <View className="flex-1" />
+        )}
         <Button variant="ghost" size="sm" isDisabled={disabled} onPress={() => answer([])}>
           <Typography type="body-xs" className="text-text-secondary">
             {t("mobile.chat.question.skip")}
           </Typography>
         </Button>
       </View>
-      <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
-        <TextInput
-          accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
-          autoCapitalize={question.isSecret ? "none" : "sentences"}
-          autoCorrect={!question.isSecret}
-          editable={!disabled}
-          maxLength={INPUT_LIMITS.promptAnswerText}
-          placeholder={
-            question.isSecret
-              ? t("mobile.chat.question.privatePlaceholder")
-              : t("mobile.chat.question.answerPlaceholder")
-          }
-          placeholderTextColor={muted}
-          secureTextEntry={question.isSecret}
-          selectionColor={foreground}
-          className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
-          value={controller.draft}
-          onChangeText={controller.setDraft}
-          onSubmitEditing={() => {
-            const answerText = controller.draft.trim();
-            if (answerText) answer([answerText]);
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          isIconOnly
-          accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
-          isDisabled={disabled || !controller.draft.trim()}
-          onPress={() => answer([controller.draft.trim()])}
-        >
-          <Send color={String(muted)} size={18} />
-        </Button>
-      </View>
+      {/* The composer answers in the chat. Only a private answer keeps its own masked field. */}
+      {question.isSecret ? (
+        <View className="flex-row items-center gap-2 rounded-[18px] bg-default px-3">
+          <TextInput
+            accessibilityLabel={t("mobile.chat.question.customAnswerFor", { question: question.question })}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!disabled}
+            maxLength={INPUT_LIMITS.promptAnswerText}
+            placeholder={t("mobile.chat.question.privatePlaceholder")}
+            placeholderTextColor={muted}
+            secureTextEntry
+            selectionColor={foreground}
+            className="min-h-12 min-w-0 flex-1 font-sans text-foreground"
+            value={controller.draft}
+            onChangeText={controller.setDraft}
+            onSubmitEditing={() => {
+              const answerText = controller.draft.trim();
+              if (answerText) answer([answerText]);
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            accessibilityLabel={t("mobile.chat.question.sendCustomAnswer")}
+            isDisabled={disabled || !controller.draft.trim()}
+            onPress={() => answer([controller.draft.trim()])}
+          >
+            <Send color={String(muted)} size={18} />
+          </Button>
+        </View>
+      ) : null}
       {pending ? (
         <Typography type="body-xs" accessibilityLiveRegion="polite">
           {t("mobile.chat.question.sending")}

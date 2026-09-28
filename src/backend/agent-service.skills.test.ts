@@ -39,6 +39,9 @@ describe.sequential("local skill provider tools", () => {
         list: vi.fn<LocalSkillTools["list"]>().mockResolvedValue([]),
         get: vi.fn<LocalSkillTools["get"]>(),
         install: vi.fn<LocalSkillTools["install"]>(),
+        listInstalled: vi.fn<LocalSkillTools["listInstalled"]>().mockResolvedValue([]),
+        setEnabled: vi.fn<LocalSkillTools["setEnabled"]>(),
+        uninstall: vi.fn<LocalSkillTools["uninstall"]>(),
       };
       service = createTestService({
         store,

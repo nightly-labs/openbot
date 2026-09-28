@@ -819,8 +819,8 @@ data and are manual because they can require local credentials.
 
 Users create and edit agent profiles by asking an agent in the normal desktop or mobile
 conversation. `openbot.create_agent` creates a persistent teammate with instructions and a first
-task; `openbot.update_profile` changes an existing agent's name, title, instructions, or generated
-or custom avatar. `avatarPath` accepts a local PNG, JPEG, or WebP file up to 512 KB, with relative
+task; `openbot.update_profile` changes an existing agent's name, title, instructions, generated
+or custom avatar, provider, model, reasoning effort, access, Computer Use, or notifications. `avatarPath` accepts a local PNG, JPEG, or WebP file up to 512 KB, with relative
 paths resolved from the calling agent’s workspace. The agent uses its available tools to resize or
 compress a copy when needed. OpenBot validates the prepared file before profile changes and copies
 it into managed avatar storage. Generated avatar settings remove the custom image. Both run through
@@ -830,6 +830,19 @@ read-only `openbot.list_models` returns the models of each provider that the mod
 their reasoning efforts and the default model for a request that names only a provider. An unknown
 model or an unsupported effort is an error that names the valid values; OpenBot checks them before
 it creates the agent. Without these fields, the new agent starts on the user's default.
+Creation stays this small. The calling agent then configures the new agent, or any other local
+agent, with the same tools that act on itself. `openbot.read_agent` returns one agent's setup:
+profile, runtime, access, Computer Use, notifications, auto-approve, installed skills, routines,
+and the names and transports of the MCP servers it gets. It does not return MCP commands,
+environment values, URLs, or headers, because they can hold secrets. `install_local_skill`,
+`set_skill_enabled`, `uninstall_skill`, and the routine tools take an optional `agentId`; without
+it they act on the caller. `uninstall_skill` never removes skill files that the user changed.
+An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
+only a restriction, so a user change between its check and the write is never undone. Only the
+user widens them again, and only the user changes auto-approve and MCP servers. A new agent gets
+the access and Computer Use limits of the agent that creates it, so a Workspace-only agent cannot
+get around its sandbox through a teammate. There is no creation step for skills or routines in
+the UI.
 Codex and Grok receive the dynamic tool definitions; Claude exposes the same operations through
 its SDK MCP bridge. `src/backend/openbot-tools.ts` owns the tool names, descriptions, and Zod
 argument shapes used by both declarations. It reuses the profile, section, and routine schemas.
@@ -1027,6 +1040,16 @@ exists. Every member reads usage; delete and clear need an owner or admin (`requ
 renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
 download files travel only as category totals. A host without the capability reads as null, and the
 surface asks for an update; a change is refused before any request.
+
+### Leaving a server
+
+Leaving a joined server has the same effect as an admin removal: the membership and every session of
+it end, on all of the member's devices. On WebRTC, the account service revokes the membership, as it
+does for the owner's removal. On HTTP, `member-leave-v1` adds a bodyless `POST /v1/team/leave`, which
+runs the steps of the admin `DELETE /v1/team/members/:id` for the caller; the owner is refused. A host
+without the capability answers 404, so the client only logs out: that token stops working, and the
+membership stays for an admin to remove. Either way the client removes the server, also when the host
+does not answer.
 
 ### Admin capabilities
 

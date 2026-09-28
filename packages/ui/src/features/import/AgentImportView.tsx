@@ -10,6 +10,7 @@ import {
   Checkbox,
   ChevronRight,
   CircleCheck,
+  ConfirmDialog,
   CopyButton,
   Download,
   ExternalLink,
@@ -296,6 +297,14 @@ function ImportReview(props: {
           channels: countLabel(selectedChannels().length, "channel", t),
         })
       : t("import.review.importAgents", { agents: countLabel(selected().length, "agent", t) });
+  const startImport = () =>
+    props.onImport(
+      selected().map((agent) => agent.key),
+      selectedChannels().map((channel) => channel.key),
+    );
+  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
+  const duplicates = createMemo(() => selected().filter((agent) => agent.nameExists));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
 
   return (
     <>
@@ -433,16 +442,29 @@ function ImportReview(props: {
           disabled={selected().length === 0 || props.reading}
           loading={props.importing}
           loadingLabel={t("import.review.importing")}
-          onClick={() =>
-            props.onImport(
-              selected().map((agent) => agent.key),
-              selectedChannels().map((channel) => channel.key),
-            )
-          }
+          onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startImport())}
         >
           {importLabel()}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("import.review.duplicatesTitle")}
+        description={t("import.review.duplicatesDescription", {
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("import.review.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startImport();
+        }}
+      />
     </>
   );
 }

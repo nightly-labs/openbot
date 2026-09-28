@@ -85,6 +85,8 @@ interface ChatComposerProps {
   action: ViewStyle["backgroundColor"];
   actionForeground: ViewStyle["backgroundColor"];
   agentName: string;
+  /** Replaces "Ask {name}", such as while the composer answers a question. */
+  placeholder?: string;
   mentionAgents: MobileAgent[];
   bottomInset: number;
   disabled: boolean;
@@ -110,6 +112,8 @@ interface ChatComposerProps {
   sendRetryVersion: number;
   replyTarget: ChatBubbleMessage | null;
   replyFocusVersion: number;
+  /** Focuses the field each time it changes after the first render, such as to type an answer. */
+  focusVersion?: number;
   onCancelReply: () => void;
 }
 
@@ -118,6 +122,7 @@ export function ChatComposer({
   action,
   actionForeground,
   agentName,
+  placeholder,
   mentionAgents,
   bottomInset,
   disabled,
@@ -139,6 +144,7 @@ export function ChatComposer({
   sendRetryVersion,
   replyTarget,
   replyFocusVersion,
+  focusVersion = 0,
   onCancelReply,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
@@ -185,6 +191,13 @@ export function ChatComposer({
       inputRef.current?.focus();
     }
   }, [isFocused, disabled, replyTarget, replyFocusVersion]);
+  const focusedVersion = useRef(focusVersion);
+  useEffect(() => {
+    if (isFocused && !disabled && focusedVersion.current !== focusVersion) {
+      focusedVersion.current = focusVersion;
+      inputRef.current?.focus();
+    }
+  }, [isFocused, disabled, focusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
@@ -552,7 +565,7 @@ export function ChatComposer({
             )
           }
         >
-          {t("mobile.chat.composer.ask", { name: agentName })}
+          {placeholder ?? t("mobile.chat.composer.ask", { name: agentName })}
         </NativeText>
         <GestureDetector gesture={pan}>
           <AnimatedGlassView
@@ -770,7 +783,7 @@ export function ChatComposer({
                       className="font-sans"
                       style={{ color: String(muted), fontSize: 16, lineHeight: 22 }}
                     >
-                      {t("mobile.chat.composer.ask", { name: agentName })}
+                      {placeholder ?? t("mobile.chat.composer.ask", { name: agentName })}
                     </NativeText>
                   </Animated.View>
                 )}

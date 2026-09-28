@@ -271,6 +271,7 @@ function ServerSettings() {
     createServerInvite,
     updateServerMember,
     removeServerMember,
+    leaveServer,
     revokeServerInvite,
     serverSettingsMcp,
     serverSettingsMcpError,
@@ -338,6 +339,7 @@ function ServerSettings() {
             onUpdateMember={updateServerMember}
             onRemoveMember={removeServerMember}
             onRevokeInvite={revokeServerInvite}
+            onLeaveServer={leaveServer}
             onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
             onRecheckScreenRecording={recheckScreenRecording}
             mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}

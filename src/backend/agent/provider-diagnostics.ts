@@ -99,6 +99,27 @@ export function ignoredCodexSettings(summary: string): { count: number; keys: st
 }
 
 /**
+ * A glog record whose own severity is info or warning, as in
+ * `W0927 21:23:15.702056 14876 step_string_converters.go:923] Checkpoint summary was too long…`.
+ *
+ * The Antigravity ACP server relays each line of its Go harness's stderr as
+ * `local_connection.py:578] harness stderr: <line>`, and the harness writes its lines with the
+ * glog notice `ERROR: logging before google.Init:` in front. That notice is about glog's start, not
+ * about the record, but its word `ERROR` let every info and warning line through as a "Provider
+ * error" toast, one per step (#980). The severity letter of the relayed record decides instead.
+ *
+ * Only a record that opens with a glog header counts. An `E` or `F` record, or relayed text that is
+ * not a glog record - a Go panic included - stays visible.
+ */
+const GLOG_RECORD =
+  /^(?:.*\bharness stderr:\s*|(?!.*\bharness stderr:))(?:ERROR: logging before (?:google\.Init|flag\.Parse):\s*)?([IWEF])\d{4} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+[^\s\]]+:\d+\]/su;
+
+export function isGlogBelowErrorDiagnostic(message: string): boolean {
+  const severity = GLOG_RECORD.exec(message)?.[1];
+  return severity === "I" || severity === "W";
+}
+
+/**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
  * something to act on, and it makes every repeat of one failure a new message.

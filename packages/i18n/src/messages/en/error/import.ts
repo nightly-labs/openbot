@@ -28,6 +28,8 @@ export const messages = defineMessages("error.import", {
   "error.import.noMembersImported": "None of its agents were imported.",
   "error.import.leadNotImported": "{name}: its lead was not imported, so it has no lead.",
   "error.import.routineSkipped": '{name}: routine "{routine}" is skipped. {reason}',
+  "error.import.fileRenamed": "{name}: {file} already exists, so this copy is saved as {saved}.",
+  "error.import.fileSkipped": "{name}: the file {file} is skipped. {reason}",
   "error.import.chooseZip": "Choose a .zip file.",
   "error.import.zipTooLarge": "The export must be a .zip under 500 MB.",
   "error.import.unsafeFile": "The export contains an unsafe file: {name}",

@@ -43,7 +43,7 @@ import type {
 import { LOCAL_SERVER_ID, REMOTE_DESKTOP_SETUP_CAPABILITY, type RemoteDesktopTestInput } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
-import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { contentDispositionFileName } from "./content-disposition";
@@ -636,6 +636,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (server.role === "owner") hideHost = true;
       else await this.#webrtcTransport.leaveHost(serverId);
       await this.#webrtcTransport.disconnect(serverId).catch(() => undefined);
+    } else if (server && this.#connections.compatibilityFor(serverId)?.negotiatedProtocol) {
+      // An HTTP host with `member-leave-v1` removes the membership as an admin removal does. An
+      // older host has no such route, so logging out is the most it can do: this computer's token
+      // stops working, and the membership stays for an admin to remove. Only a host that has already
+      // answered the negotiation is asked, so leaving never waits for one still being negotiated,
+      // and a failure is ignored, as the WebRTC disconnect is: a host that is gone for good must not
+      // keep the server in the list.
+      const path = this.supportsCapability(serverId, TEAM_MEMBER_LEAVE_CAPABILITY)
+        ? TEAM_API_ROUTES.team.leave
+        : TEAM_API_ROUTES.auth.logout;
+      await this.request(serverId, path, decodeVoid, { method: "POST" }).catch(() => undefined);
     }
     this.#clearServerConnectionState(serverId);
     await this.#store.remove(serverId, { hideHost });

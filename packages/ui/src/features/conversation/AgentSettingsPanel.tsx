@@ -153,7 +153,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     access: DEFAULT_AGENT_ACCESS,
     computerUse: true,
     confirmingFullAccess: false,
-    runtime: { model: "gpt-5.6-luna", provider: untrack(() => props.agent.provider), reasoningEffort: "medium" },
+    runtime: untrack(() => ({ ...props.runtimeSettings })),
     saveError: null,
   });
   const avatarUrl = () => props.agent.avatarUrl ?? null;

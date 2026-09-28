@@ -318,6 +318,29 @@ const ServerSettings = createSimpleContext({
     }
 
     /**
+     * Ends this account's membership of a joined server. Main removes the server from the list and
+     * sends the new list, which removes the dialog's target, so the dialog closes here first.
+     */
+    async function leaveServer(): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!server) throw new Error(currentText().t("server.settings.unavailable"));
+      const analytics = desktopAnalytics.scope();
+      try {
+        await serversPort().servers.remove(server.id);
+      } catch (error) {
+        analytics.track("team_action", {
+          action: "server_left",
+          result: "failed",
+          server_kind: server.kind,
+          failure_code: "server_leave_failed",
+        });
+        throw error;
+      }
+      analytics.track("team_action", { action: "server_left", result: "succeeded", server_kind: server.kind });
+      setServerSettingsOpen(false);
+    }
+
+    /**
      * The MCP list.
      *
      * It is read when the MCP section opens, not when the dialog opens, because most visits to this
@@ -437,6 +460,7 @@ const ServerSettings = createSimpleContext({
       updateServerMember,
       removeServerMember,
       revokeServerInvite,
+      leaveServer,
       serverSettingsMcp,
       serverSettingsMcpError,
       refreshMcpServers,

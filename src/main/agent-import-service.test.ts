@@ -484,6 +484,29 @@ describe("AgentImportService", () => {
     expect(await library.list()).toEqual([]);
   });
 
+  it("imports every agent when a file is already there, and keeps both copies", async () => {
+    const keys = ["research", "sales", "marketing", "support", "legal"];
+    const template = "raw/dot-github/pull_request_template.md";
+    const path = await exportFile({
+      "openbot-import.json": manifest(keys.map((key) => manifestAgent(key, { files: `agents/${key}/files` }))),
+      ...Object.fromEntries(keys.map((key) => [`agents/${key}/files/${template}`, encode(`# ${key}`)])),
+    });
+    const preview = await service.stage(path);
+    // On a disk that ignores case, `PULL_REQUEST_TEMPLATE.md` in the same export is this file.
+    const existing = join(root, "workspaces", "agent-3", "imported", template);
+    await mkdir(join(existing, ".."), { recursive: true });
+    await writeFile(existing, "# existing");
+
+    const result = await service.apply({ token: preview.token, keys, channelKeys: [] });
+    expect(result.agents.map((agent) => agent.name)).toEqual(["Research", "Sales", "Marketing", "Support", "Legal"]);
+    expect(result.skipped).toEqual([]);
+    expect(result.warnings).toEqual([
+      `Marketing: ${template} already exists, so this copy is saved as raw/dot-github/pull_request_template (2).md.`,
+    ]);
+    expect(await readFile(existing, "utf8")).toBe("# existing");
+    expect(await readFile(join(existing, "../pull_request_template (2).md"), "utf8")).toBe("# marketing");
+  });
+
   it("removes the skill revision a failed import published", async () => {
     const files = {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),

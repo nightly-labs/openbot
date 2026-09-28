@@ -32,6 +32,8 @@ export const messages = {
   "error.agent.waitBeforeProviderChange":
     "プロバイダーを変更する前に、実行中のターンとキューが終わるまでお待ちください。",
   "error.agent.unknown": "不明なエージェントです: {id}",
+  "error.agent.onlyUserWidensSettings":
+    "エージェントにフルアクセスを与える、または Computer Use をオンにできるのはユーザーだけです。エージェントの設定で変更するようユーザーに依頼してください。",
   "error.agent.queuedMessageCreateFailed": "キューに入れるメッセージを作成できません。",
   "error.agent.messageUnavailable": "このメッセージはもう使用できません。",
   "error.agent.hostLimit": "1 つのホストに置けるエージェントは {limit} 個までです。",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isAgentSummary } from "../ipc-agents";
+import type { ConversationPlan } from "../ipc-conversation-plan";
 import { isDynamicRecord } from "../runtime-values";
 import { TEAM_API_ROUTES } from "../team-api-routes";
 import { browserViewStreamPath } from "./browser-view-v1";
@@ -242,6 +243,67 @@ describe("Team protocol v4", () => {
       "reply mark",
     );
     expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow();
+  });
+
+  it("carries a turn plan to a current client over HTTP, events and WebRTC, and drops it for a frozen one", () => {
+    const conversationPath = "/v1/agents/chief/conversation";
+    const plan: ConversationPlan = {
+      explanation: null,
+      steps: [
+        { id: "0", text: "Read README.md", status: "completed" },
+        { id: "1", text: "List files", activeText: "Listing files", status: "inProgress" },
+      ],
+    };
+    const conversation = <Plan>(value?: Plan) => ({
+      agentId: "chief",
+      threadId: "thread-1",
+      activeTurnId: "turn-1",
+      revision: 1,
+      messages: [
+        {
+          id: "plan-1",
+          turnId: "turn-1",
+          author: "assistant" as const,
+          itemType: "plan",
+          text: "- [x] Read README.md\n- [ ] List files",
+          createdAt: "2026-09-28T10:00:00.000Z",
+          status: "streaming" as const,
+          ...(value === undefined ? {} : { plan: value }),
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null },
+    });
+    const planned = conversation(plan);
+
+    const wire = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, planned));
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, wire)).toEqual(planned);
+    const overWebRtc = encodeTeamProtocolV4WebRtcHttpResponse("GET", conversationPath, 200, planned);
+    expect(decodeTeamProtocolV4WebRtcHttpResponse("GET", conversationPath, 200, overWebRtc)).toEqual(planned);
+    // The live updates of a running plan arrive as conversation events.
+    const event = { type: "conversation" as const, snapshot: planned };
+    const eventWire = JSON.parse(encodeTeamProtocolV4BaseCurrentEvent(event) ?? "null");
+    const received = decodeTeamProtocolV4CurrentEvent(createTeamProtocolV4Event(1, eventWire));
+    expect(
+      received.status === "known" &&
+        received.event.type === "conversation" &&
+        received.event.snapshot.messages[0]?.plan,
+    ).toEqual(plan);
+    // A frozen adapter keeps its key list, so an older client reads the checklist text as before.
+    const frozen = JSON.parse(encodeTeamProtocolV1CurrentHttpResponse("GET", conversationPath, 200, planned));
+    expect(frozen.messages[0]).not.toHaveProperty("plan");
+    expect(frozen.messages[0].text).toBe(planned.messages[0]?.text);
+    // A host that never sends the plan still passes.
+    const unplanned = conversation();
+    const plain = JSON.parse(encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, unplanned));
+    expect(decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, plain)).toEqual(unplanned);
+    // A plan outside the stored bounds fails closed in both directions and on the event stream.
+    const malformed = conversation({ explanation: null, steps: [{ id: "0", text: "Step", status: "running" }] });
+    expect(() => encodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow("plan");
+    expect(() => decodeTeamProtocolV4CurrentHttpResponse("GET", conversationPath, 200, malformed)).toThrow();
+    expect(decodeTeamProtocolV4BaseCurrentEvent({ ...eventWire, snapshot: malformed })).toEqual({
+      kind: "invalid",
+      type: "conversation",
+    });
   });
 
   it("rejects a queue snapshot whose edit or reply mark is not a boolean", () => {
