@@ -416,8 +416,8 @@ async function collectCandidates(command: AgentProviderId, configuredPath: strin
     candidates.push(...windowsFallbackPaths(command));
   } else {
     try {
-      const stdout = await runInLoginShell(`command -v ${command}`);
-      if (stdout.trim()) candidates.push(stdout.trim());
+      const path = commandPathFromShellOutput(await runInLoginShell(`command -v ${command}`));
+      if (path) candidates.push(path);
     } catch {
       // Packaged apps often start with a restricted PATH; known locations are checked next.
     }
@@ -476,6 +476,16 @@ export function loginShellCommand(
   const preferred = environment.SHELL?.trim();
   if (!preferred) return { command: "/bin/sh", args: ["-lc"] };
   return { command: preferred, args: preferred.endsWith("/sh") ? ["-lc"] : ["-lic"] };
+}
+
+/**
+ * The path that `command -v` printed, from what the login shell wrote. An interactive profile can
+ * print before the command runs, such as a greeting or `fastfetch`, so the path is the last line
+ * that is an absolute path. An alias or a function prints no path and gives `null`.
+ */
+export function commandPathFromShellOutput(stdout: string): string | null {
+  const lines = stdout.split(/\r?\n/u).map((line) => line.trim());
+  return lines.findLast((line) => line.startsWith("/")) ?? null;
 }
 
 const LOGIN_SHELL_TIMEOUT_MS = 5_000;

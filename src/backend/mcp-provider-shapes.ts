@@ -11,7 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { runInLoginShell } from "./cli";
+import { commandPathFromShellOutput, runInLoginShell } from "./cli";
 import { getRecord } from "./protocol";
 
 const execFileAsync = promisify(execFile);
@@ -364,7 +364,7 @@ async function lookUpMcpCommand(trimmed: string, path: string | null): Promise<s
     // the user's profile first, and a profile that appends to `PATH` would undo an inherited one.
     const search = path === null ? "" : `PATH=${shellWord(path)} `;
     const stdout = await runInLoginShell(`${search}command -v -- ${shellWord(trimmed)}`);
-    return stdout.trim() || null;
+    return commandPathFromShellOutput(stdout);
   } catch {
     return null;
   }
