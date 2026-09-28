@@ -891,15 +891,21 @@ export class TeamStore {
     validatePassword(password);
     const state = this.#requireState();
     const normalizedUsername = username.trim().toLowerCase();
-    if (state.members.some((member) => member.username === normalizedUsername)) {
-      throw new TeamStoreError(sourceText("error.team.usernameTaken"));
-    }
-    const invite = this.#findUsableInvite(token);
-    if (!invite) throw new TeamStoreError(sourceText("error.team.inviteInvalid"));
-    if (invite.email) throw new TeamStoreError(sourceText("error.team.inviteRequiresAccount"));
-    requireMemberSeat(state);
+    const requireJoin = () => {
+      if (state.members.some((member) => member.username === normalizedUsername)) {
+        throw new TeamStoreError(sourceText("error.team.usernameTaken"));
+      }
+      const invite = this.#findUsableInvite(token);
+      if (!invite) throw new TeamStoreError(sourceText("error.team.inviteInvalid"));
+      if (invite.email) throw new TeamStoreError(sourceText("error.team.inviteRequiresAccount"));
+      requireMemberSeat(state);
+      return invite;
+    };
+    requireJoin();
     const credentials = await hashPassword(password);
     this.#requireUnchangedState(state);
+    // A concurrent join can take the username, the invitation or the last seat during the hash.
+    const invite = requireJoin();
     const member: StoredMember = {
       id: randomUUID(),
       username: normalizedUsername,
@@ -983,11 +989,11 @@ export class TeamStore {
     const member = state.members.find((candidate) => candidate.id === memberId);
     if (!member) throw new TeamStoreError(sourceText("error.team.memberNotFound"));
     if (member.role === "owner") throw new TeamStoreError(sourceText("error.team.ownerCannotChange"));
+    if (patch.disabled === false && member.disabled) requireMemberSeat(state);
     if (patch.role !== undefined) {
       if (patch.role !== "admin" && patch.role !== "member") throw new TeamStoreError("Invalid role.");
       member.role = patch.role;
     }
-    if (patch.disabled === false && member.disabled) requireMemberSeat(state);
     if (patch.disabled !== undefined) member.disabled = patch.disabled;
     if (member.disabled) {
       state.sessions = state.sessions.filter((session) => session.memberId !== member.id);

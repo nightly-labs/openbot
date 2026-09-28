@@ -720,23 +720,37 @@ export class RemoteControlPlane {
     const role = input.role ?? membership.role;
     if (role !== "admin" && role !== "member") throw invalid("member role");
     if (input.revoke && input.reactivate) throw invalid("member status");
-    if (input.reactivate && membership.status !== "active") {
-      await this.#requireMemberSeat(input.hostId, membership.user_id);
-    }
+    const reactivating = input.reactivate === true && membership.status !== "active";
+    if (reactivating) await this.#requireMemberSeat(input.hostId, membership.user_id);
     const now = this.#now();
     const activeSessions = await this.#database
       .prepare("SELECT session_id FROM remote_sessions WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
       .bind(input.hostId, membership.user_id)
       .all<{ session_id: string }>();
-    await this.#database.batch([
-      this.#database
-        .prepare("UPDATE remote_memberships SET role = ?, status = ?, updated_at = ? WHERE membership_id = ?")
-        .bind(
-          role,
-          input.revoke ? "revoked" : input.reactivate ? "active" : membership.status,
-          now,
-          input.membershipId,
-        ),
+    const changed = await this.#database.batch([
+      reactivating
+        ? this.#database
+            .prepare(
+              `UPDATE remote_memberships SET role = ?, status = 'active', updated_at = ?
+                WHERE membership_id = ? AND ${MEMBER_SEAT_AVAILABLE_SQL}`,
+            )
+            .bind(
+              role,
+              now,
+              input.membershipId,
+              input.hostId,
+              membership.user_id,
+              input.hostId,
+              DEFAULT_TEAM_MEMBER_LIMIT,
+            )
+        : this.#database
+            .prepare("UPDATE remote_memberships SET role = ?, status = ?, updated_at = ? WHERE membership_id = ?")
+            .bind(
+              role,
+              input.revoke ? "revoked" : input.reactivate ? "active" : membership.status,
+              now,
+              input.membershipId,
+            ),
       this.#database
         .prepare("UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ?")
         .bind(now, input.hostId),
@@ -755,6 +769,9 @@ export class RemoteControlPlane {
       this.#authEventStatement({ type: "account-servers-changed", userId: membership.user_id }, now),
     ]);
     await this.#flushAuthEvents();
+    // A concurrent join or reactivation took the last seat after the check above.
+    if (reactivating && (changed[0]?.meta.changes ?? 0) !== 1)
+      await this.#requireMemberSeat(input.hostId, membership.user_id);
   }
 
   async validateMobileConnectHost(userId: string, binding: MobileConnectHostBinding): Promise<void> {
