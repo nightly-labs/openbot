@@ -4,6 +4,7 @@ import { SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
 import {
   Badge,
   Button,
+  ConfirmDialog,
   CopyButton,
   Image,
   ImageRemoveButton,
@@ -22,6 +23,7 @@ import {
   SettingsSection,
   SwitchField,
   Text,
+  toast,
 } from "@openbot/ui";
 import { avatarImageDataUrl, normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
@@ -61,11 +63,13 @@ interface ServerIdentityDraft {
  */
 interface GeneralPanels {
   offerRemoteDesktopSetup: boolean;
+  confirmLeave: boolean;
   identity: ServerIdentityDraft;
 }
 
 interface ServerGeneralSection {
   Panel: () => JSX.Element;
+  LeaveDialog: () => JSX.Element;
   /** True while the user edits the identity, so the server's own name and logo do not replace the draft. */
   editing: Accessor<boolean>;
   identityDirty: Accessor<boolean>;
@@ -77,7 +81,7 @@ interface ServerGeneralSection {
   resetForServer(): void;
 }
 
-/** The General section: server identity, access, and notifications. */
+/** The General section: server identity, access, notifications, and leaving a joined server. */
 export function createServerGeneralSection(
   host: ServerSettingsSectionHost,
   options: { onSetUpDesktop: () => void },
@@ -86,6 +90,7 @@ export function createServerGeneralSection(
   const { props, local, configured, published, actionsAvailable, busy, run } = host;
   const [panels, setPanels] = createStore<GeneralPanels>({
     offerRemoteDesktopSetup: false,
+    confirmLeave: false,
     identity: {
       editing: false,
       logo: undefined,
@@ -114,6 +119,8 @@ export function createServerGeneralSection(
     return null;
   };
   const visibleNameError = () => (panels.identity.nameTouched ? nameError() : null);
+  /** The owner cannot leave the host they own, and the local server is this computer. */
+  const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
   const identityDirty = () =>
     canEditIdentity() &&
     (trimmedName() !== panels.identity.savedName ||
@@ -240,6 +247,7 @@ export function createServerGeneralSection(
   function resetForServer(): void {
     setPanels((state) => {
       state.offerRemoteDesktopSetup = false;
+      state.confirmLeave = false;
       state.identity.editing = false;
       state.identity.nameTouched = false;
       state.identity.nameShaking = false;
@@ -512,12 +520,72 @@ export function createServerGeneralSection(
             </ItemGroup>
           </SettingsSection>
         </Show>
+        <Show when={canLeave()}>
+          <SettingsSection title={t("server.settings.leaveTitle")}>
+            <ItemGroup class="settings-modal-card">
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{t("server.settings.leaveTitle")}</ItemTitle>
+                  <ItemDescription>{t("server.settings.leaveDescription")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={Boolean(busy())}
+                    onClick={() =>
+                      setPanels((state) => {
+                        state.confirmLeave = true;
+                      })
+                    }
+                  >
+                    {t("server.settings.leaveTitle")}
+                  </Button>
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
       </>
+    );
+  }
+
+  function LeaveDialog() {
+    return (
+      <Show when={panels.confirmLeave && canLeave()}>
+        <ConfirmDialog
+          open
+          initialFocus="cancel"
+          pending={busy() === "leave"}
+          title={t("server.settings.leaveConfirmTitle", { name: props.server.name })}
+          description={t("server.settings.leaveConfirmDescription")}
+          confirmLabel={t("server.settings.leaveTitle")}
+          pendingLabel={t("server.settings.leaving")}
+          onCancel={() =>
+            setPanels((state) => {
+              state.confirmLeave = false;
+            })
+          }
+          onConfirm={async () => {
+            // Read now: a successful leave takes the server out of the list and unmounts this dialog.
+            const name = props.server.name;
+            await run("leave", async () => {
+              await props.onLeaveServer?.();
+              setPanels((state) => {
+                state.confirmLeave = false;
+              });
+              toast.success(t("server.settings.leftTitle", { name }));
+            });
+          }}
+        />
+      </Show>
     );
   }
 
   return {
     Panel,
+    LeaveDialog,
     editing: () => panels.identity.editing,
     identityDirty,
     resetIdentity,

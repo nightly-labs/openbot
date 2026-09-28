@@ -7,7 +7,7 @@ import type {
   TeamPresenceMember,
 } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { createMockOpenBot } from "../../preview/mock-openbot";
@@ -734,6 +734,55 @@ describe("ServerSettingsModal", () => {
     await fireEvent.click(await screen.findByRole("button", { name: "Remove member" }));
 
     await waitFor(() => expect(onRemoveMember).toHaveBeenCalledWith("alice-1"));
+  });
+
+  it("offers Leave only for a joined server the account does not own", async () => {
+    const onLeaveServer = vi.fn(async () => undefined);
+    const local = render(() => <ServerSettingsModal {...props({ onLeaveServer })} />);
+    expect(screen.queryByRole("button", { name: "Leave server" })).not.toBeInTheDocument();
+    local.unmount();
+
+    const owner = render(() => (
+      <ServerSettingsModal
+        {...props({ server: { ...remoteServer, role: "owner" }, hostStatus: null, onLeaveServer })}
+      />
+    ));
+    expect(screen.queryByRole("button", { name: "Leave server" })).not.toBeInTheDocument();
+    owner.unmount();
+
+    render(() => <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null })} />);
+    expect(screen.queryByRole("button", { name: "Leave server" })).not.toBeInTheDocument();
+  });
+
+  it("confirms leaving a server, keeps it after cancellation, and reports a failure", async () => {
+    const onLeaveServer = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error("The account service is unavailable."))
+      .mockResolvedValueOnce(undefined);
+    render(() => (
+      <>
+        <ServerSettingsModal {...props({ server: remoteServer, hostStatus: null, onLeaveServer })} />
+        <Toaster />
+      </>
+    ));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Leave server" }));
+    await fireEvent.click(
+      within(await screen.findByRole("alertdialog", { name: "Leave Studio Team?" })).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+    expect(onLeaveServer).not.toHaveBeenCalled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Leave server" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Leave Studio Team?" });
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Leave server" }));
+    expect(await screen.findByText("The account service is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Leave Studio Team?" })).toBeInTheDocument();
+
+    await fireEvent.click(await within(dialog).findByRole("button", { name: "Leave server" }));
+    expect(await screen.findByText("You left Studio Team")).toBeInTheDocument();
+    expect(onLeaveServer).toHaveBeenCalledTimes(2);
   });
 
   it("lets a remote administrator invite, search, revoke, and change member roles", async () => {

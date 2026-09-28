@@ -37,6 +37,7 @@ export interface ServersPort {
     | "onEvent"
     | "onPresence"
     | "refreshIdentity"
+    | "remove"
     | "reorder"
     | "retryConnection"
     | "select"

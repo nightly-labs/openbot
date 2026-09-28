@@ -152,6 +152,14 @@ export const messages = defineMessages("server", {
   "server.settings.saveIdentityFirst": "Save the server identity before publishing.",
   "server.settings.reachable": "Reachable online. Only invited people can sign in.",
   "server.settings.notReachable": "Not reachable online. Existing members and invitations remain.",
+  "server.settings.leaveTitle": "Leave server",
+  "server.settings.leaveDescription":
+    "Remove this server from your list on all your devices. The server and its other members stay.",
+  "server.settings.leaveConfirmTitle": "Leave {name}?",
+  "server.settings.leaveConfirmDescription":
+    "You will lose access on all your devices. You will need another invitation to join again.",
+  "server.settings.leaving": "Leaving…",
+  "server.settings.leftTitle": "You left {name}",
   "server.members.removeTitle": "Remove {name}?",
   "server.members.removeDescription": "This person will lose access to the server and its shared conversations.",
   "server.members.remove": "Remove member",

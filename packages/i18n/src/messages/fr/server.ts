@@ -157,6 +157,14 @@ export const messages = {
   "server.settings.saveIdentityFirst": "Enregistrez l’identité du serveur avant de publier.",
   "server.settings.reachable": "Accessible en ligne. Seules les personnes invitées peuvent se connecter.",
   "server.settings.notReachable": "Inaccessible en ligne. Les membres et les invitations existants restent.",
+  "server.settings.leaveTitle": "Quitter le serveur",
+  "server.settings.leaveDescription":
+    "Retirez ce serveur de votre liste sur tous vos appareils. Le serveur et ses autres membres restent.",
+  "server.settings.leaveConfirmTitle": "Quitter {name} ?",
+  "server.settings.leaveConfirmDescription":
+    "Vous perdrez l’accès sur tous vos appareils. Il vous faudra une nouvelle invitation pour revenir.",
+  "server.settings.leaving": "Départ…",
+  "server.settings.leftTitle": "Vous avez quitté {name}",
   "server.members.removeTitle": "Supprimer {name} ?",
   "server.members.removeDescription": "Cette personne perdra l’accès au serveur et à ses conversations partagées.",
   "server.members.remove": "Supprimer le membre",

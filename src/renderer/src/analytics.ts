@@ -80,6 +80,7 @@ export interface DesktopAnalyticsEvents {
     action:
       | "server_selected"
       | "server_joined"
+      | "server_left"
       | "identity_saved"
       | "published"
       | "unpublished"
@@ -309,6 +310,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   team_action: [
     "server_selected",
     "server_joined",
+    "server_left",
     "identity_saved",
     "published",
     "unpublished",
