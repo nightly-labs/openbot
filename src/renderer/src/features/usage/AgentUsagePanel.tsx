@@ -24,7 +24,7 @@ import {
 } from "@openbot/ui/features/usage/usage-format";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
-import { usagePort } from "./usage-port";
+import { type UsagePort, usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
   agentId?: string;
@@ -32,6 +32,8 @@ interface AgentUsagePanelProps {
   serverId: string;
   hostName: string;
   onBack: () => void;
+  /** The browser client reads the host through its own connection. The desktop app uses `window.openbot`. */
+  port?: UsagePort;
 }
 interface UsageState {
   range: HostAnalyticsInput;
@@ -55,6 +57,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     serverId: props.serverId,
   });
   let generation = 0;
+  const port = () => props.port ?? usagePort();
   /**
    * A refresh nobody asked for keeps the report on screen. Clearing `result` unmounts
    * `AgentUsageReport`, which returns on the next response with its breakdown back to
@@ -74,8 +77,8 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     try {
       const [result, agents] = await Promise.all([
         // Electron cannot clone the Solid store proxy across the context bridge.
-        usagePort().agent.getHostAnalytics({ ...range }, serverId),
-        usagePort().agent.listAgents(serverId),
+        port().agent.getHostAnalytics({ ...range }, serverId),
+        port().agent.listAgents(serverId),
       ]);
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
@@ -114,7 +117,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     },
   );
   onSettled(() => {
-    const unsubscribe = usagePort().agent.onScopedEvent(({ serverId, event }) => {
+    const unsubscribe = port().agent.onScopedEvent(({ serverId, event }) => {
       if (
         serverId === props.serverId &&
         event.type === "turn-completed" &&
@@ -122,7 +125,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       )
         void load(state.range, true);
     });
-    const reconnect = usagePort().servers.onEvent((servers) => {
+    const reconnect = port().servers.onEvent((servers) => {
       if (servers.some((server) => server.id === props.serverId && server.state === "online"))
         void load(state.range, true);
     });

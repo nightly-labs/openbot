@@ -6,6 +6,7 @@ import { RemoteControlPlaneError } from "../src/server/remote-control-plane";
 
 const token = "a".repeat(43);
 const user = { id: "account-one", email: "one@example.test", name: null, avatarUrl: null };
+const logoVersion = "9b2f0c1e-4d5a-4b6c-8d7e-0f1a2b3c4d5e";
 function setup() {
   const services: BrowserApiServices = {
     auth: {
@@ -27,7 +28,9 @@ function setup() {
       createInvite: vi.fn().mockResolvedValue({ inviteId: "invite", token: "invite-token" }),
       revokeInvite: vi.fn().mockResolvedValue(undefined),
       changeMembership: vi.fn().mockResolvedValue(undefined),
+      hostAsset: vi.fn().mockResolvedValue({ logoKey: logoVersion }),
     },
+    hostLogo: vi.fn().mockResolvedValue(new Response("logo", { headers: { "Content-Type": "image/png" } })),
     inviteEmailDelivery: () => ({ send: vi.fn().mockResolvedValue(undefined) }),
     signalUrl: () => "wss://signal.example.test",
     sourceIp: () => "127.0.0.1",
@@ -248,6 +251,50 @@ describe("browser account boundary", () => {
       );
       expect(refused.status).toBe(400);
       expect(send).not.toHaveBeenCalled();
+    });
+  });
+  describe("host logo", () => {
+    const cookie = `__Host-openbot-web=${token}`;
+    const path = `v2/remote/hosts/host%2Fone/logo?v=${logoVersion}`;
+    it("requires the browser cookie before reading membership or storage", async () => {
+      const services = setup();
+      expect((await handleBrowserApi(request(path), services)).status).toBe(401);
+      expect(services.remote.hostAsset).not.toHaveBeenCalled();
+      expect(services.hostLogo).not.toHaveBeenCalled();
+    });
+    it("refuses a cross-site read", async () => {
+      const services = setup();
+      const response = await handleBrowserApi(
+        new Request(`https://openbot.test/api/browser/${path}`, {
+          headers: { Cookie: cookie, "Sec-Fetch-Site": "cross-site" },
+        }),
+        services,
+      );
+      expect(response.status).toBe(403);
+      expect(services.hostLogo).not.toHaveBeenCalled();
+    });
+    it("gives a member the current logo", async () => {
+      const services = setup();
+      const response = await handleBrowserApi(request(path, { cookie }), services);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("logo");
+      expect(services.remote.hostAsset).toHaveBeenCalledWith(user.id, "host/one");
+      expect(services.hostLogo).toHaveBeenCalledWith("host/one", logoVersion);
+    });
+    it("keeps the control plane refusal for a reader who is not a member", async () => {
+      const services = setup();
+      vi.mocked(services.remote.hostAsset).mockRejectedValue(
+        new RemoteControlPlaneError(403, "remote_forbidden", "You are not a member of this host."),
+      );
+      expect((await handleBrowserApi(request(path, { cookie }), services)).status).toBe(403);
+      expect(services.hostLogo).not.toHaveBeenCalled();
+    });
+    it("does not read storage for an old or missing version", async () => {
+      const services = setup();
+      for (const stale of ["v2/remote/hosts/host/logo?v=old", "v2/remote/hosts/host/logo"]) {
+        expect((await handleBrowserApi(request(stale, { cookie }), services)).status).toBe(404);
+      }
+      expect(services.hostLogo).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { isUuidV4 } from "@openbot/contracts/validation";
 import { createFileRoute } from "@tanstack/solid-router";
 import { AvatarUploadError, readAvatarUpload } from "../../../../../server/avatar-storage";
+import { hostLogoObjectKey, readHostLogo } from "../../../../../server/host-logo";
 import {
   apiError,
   remoteControlPlaneErrorResponse,
@@ -20,16 +21,10 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/logo")({
           if (!logoKey || new URL(request.url).searchParams.get("v") !== logoKey) {
             return new Response("Not found", { status: 404 });
           }
-          const object = await requestAvatarBucket().get(hostLogoObjectKey(params.hostId, logoKey));
-          if (!object) return new Response("Not found", { status: 404 });
-          return new Response(object.body, {
-            headers: {
-              "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
-              "Cache-Control": "private, max-age=31536000, immutable",
-              ETag: object.httpEtag,
-              "X-Content-Type-Options": "nosniff",
-            },
-          });
+          return (
+            (await readHostLogo(requestAvatarBucket(), params.hostId, logoKey)) ??
+            new Response("Not found", { status: 404 })
+          );
         } catch (error) {
           return remoteControlPlaneErrorResponse(error);
         }
@@ -79,8 +74,3 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/logo")({
     },
   },
 });
-
-function hostLogoObjectKey(hostId: string, version: string): string {
-  if (!/^[A-Za-z0-9:_-]{1,128}$/u.test(hostId) || !isUuidV4(version)) throw new Error("Invalid host logo key.");
-  return `remote-hosts/${hostId}/logos/${version}`;
-}

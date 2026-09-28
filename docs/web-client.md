@@ -41,14 +41,24 @@ mock. The separate web preview implements the browser runtime with that same moc
 
 ## Behavior and limits
 
-- `/api/browser/*` exposes only email start/verify, session read/logout, host list, session
-  start/ticket/end, and invitation preview/accept. It is not a general account or host proxy.
+- `/api/browser/*` exposes only email start/verify, session read/logout, host list, host logo read,
+  session start/ticket/end, and invitation preview/accept. It is not a general account or host
+  proxy. A host logo is given to a member of that host, for its current `logoKey` only.
 - Sign-in credentials are cookie-only. The browser receives a short connection ticket for the
   existing Signal handshake. Session creation, ticket issue and end are bound to its credential.
 - The production website accepts invitation links for `https://api.openbot.run`; the request still
   goes to its own origin. Other services are refused. Host fingerprints are checked before use.
 - One tab can connect to a given host with an account. Other accounts and hosts have separate
   locks. A second tab gets an explicit message instead of replacing the first tab's peer.
+- As on mobile, the server rail shows the real state of every host. Each host that no tab has open
+  gets a status connection (connect and compatibility read, no events) in one tab, which holds that
+  host's lock. The other tabs learn its state on a `BroadcastChannel`. A tab that opens the host
+  asks for it on the channel: the status connection ends its session, then gives up the lock, and
+  that tab waits 30 seconds before it asks for the lock again. A hidden tab keeps its connections
+  but does not retry them. Each status connection uses one Signal socket, and the host shows the
+  user as present.
+- The rail order is kept in this browser, per account. The server menu has Usage and Settings.
+  Mute and notification level are desktop only, because they control desktop notifications.
 - Capability checks hide unavailable browser-view and creation-model controls. Hosts without
   pagination use their full conversation endpoint. Unsupported media and EML uploads are refused
   before transfer. Host authorization remains the final decision for every action.

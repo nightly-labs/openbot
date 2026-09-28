@@ -26,7 +26,10 @@ export interface BrowserApiServices {
     | "createInvite"
     | "revokeInvite"
     | "changeMembership"
+    | "hostAsset"
   >;
+  /** The stored logo of one host version, or null. The handler checks membership and the version first. */
+  hostLogo: (hostId: string, version: string) => Promise<Response | null>;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   signalUrl: () => string;
   sourceIp: (request: Request) => string;
@@ -127,6 +130,17 @@ export async function handleBrowserApi(request: Request, services: BrowserApiSer
     if (path === "session" && request.method === "GET") return json({ user });
     if (path === "v2/remote/hosts" && request.method === "GET")
       return json({ hosts: await services.remote.listHosts(user.id) });
+    const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
+    if (encodedLogoHostId !== undefined && request.method === "GET") {
+      const hostId = decodeURIComponent(encodedLogoHostId);
+      // Any member may read the logo. The version keeps a cached image from outliving a logo change.
+      const { logoKey } = await services.remote.hostAsset(user.id, hostId);
+      const logo =
+        logoKey && new URL(request.url).searchParams.get("v") === logoKey
+          ? await services.hostLogo(hostId, logoKey)
+          : null;
+      return logo ?? failure(404, "host_logo_not_found", "The host has no logo.");
+    }
     const administration = await handleAdministration(request, path, user, services);
     if (administration) return administration;
     if (request.method !== "POST")

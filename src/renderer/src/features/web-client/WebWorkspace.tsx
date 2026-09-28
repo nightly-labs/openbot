@@ -8,6 +8,7 @@ import {
   type BrowserTakeoverRequest,
   CHANNEL_CHATS_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
+  type ServerConnectionState,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import {
@@ -42,6 +43,7 @@ import type { FilesPort } from "../files/files-port";
 import { canManageStorage, serverHasStorage } from "../files/storage-usage";
 import { remoteAdminServer, serverCanAdminister } from "../servers/server-capabilities";
 import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
+import { AgentUsagePanel } from "../usage/AgentUsagePanel";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
 import { WebHostOffline } from "./WebHostOffline";
@@ -53,6 +55,7 @@ import { createWebFileSaver } from "./web-file-download";
 import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
 import { createWebProviderSettings } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
+import { createWebUsagePort } from "./web-usage-port";
 
 const CONNECTING_STATUS: AgentStatus = {
   phase: "starting",
@@ -130,16 +133,24 @@ export function WebWorkspace(props: {
   const [creating, setCreating] = createSignal(false);
   const [mobilePane, setMobilePane] = createSignal<WebMobilePane>("conversation");
   const [settingsRequest, setSettingsRequest] = createSignal<{ agentId: string; nonce: number } | null>(null);
+  /** The opened host has its own connection. Another host shows its status connection, as on mobile. */
+  function hostState(hostId: string): ServerConnectionState {
+    if (hostId === workspace.state.host?.hostId) return workspace.state.status;
+    const state = workspace.state.hostStates[hostId];
+    return !state || state === "unknown" ? "connecting" : state;
+  }
   const servers = createMemo<ServerSummary[]>(() =>
-    workspace.state.hosts.map((host) => ({
+    workspace.orderedHosts().map((host) => ({
       id: host.hostId,
       name: host.name,
       kind: "remote",
       role: host.role,
       apiUrl: null,
-      logoUrl: null,
+      logoUrl: host.logoKey
+        ? `/api/browser/v2/remote/hosts/${encodeURIComponent(host.hostId)}/logo?v=${encodeURIComponent(host.logoKey)}`
+        : null,
       active: host.hostId === workspace.state.host?.hostId,
-      state: host.hostId === workspace.state.host?.hostId ? workspace.state.status : "offline",
+      state: hostState(host.hostId),
       notificationsMuted: false,
       notificationsMutedUntil: null,
       notificationLevel: "all",
@@ -253,6 +264,33 @@ export function WebWorkspace(props: {
       if (server()?.id !== serverId || workspace.state.status !== "online") return;
     }
     serverSettings.open(trigger);
+  }
+  /** The usage report of the opened host. It follows a host switch, as on desktop. */
+  const [usage, setUsage] = createSignal<{ trigger: HTMLElement | null } | null>(null);
+  const usagePort = createWebUsagePort({
+    request: hostRequest,
+    capabilities: () => workspace.state.capabilities,
+    listAgents: () => workspace.runtime.listAgents(),
+    hostId: () => workspace.state.host?.hostId ?? null,
+    onHostEvent: workspace.onHostEvent,
+    servers,
+  });
+  async function openUsage(serverId: string, trigger: HTMLElement | null): Promise<void> {
+    if (server()?.id !== serverId || workspace.state.status !== "online") {
+      const host = workspace.state.hosts.find((item) => item.hostId === serverId);
+      if (!host) return;
+      await workspace.connect(host);
+      if (server()?.id !== serverId || workspace.state.status !== "online") return;
+    }
+    setMobilePane("conversation");
+    setUsage({ trigger });
+  }
+  function closeUsage(): void {
+    const trigger = usage()?.trigger;
+    setUsage(null);
+    queueMicrotask(() => {
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+    });
   }
   const channelsPort = createWebChannelsPort(
     workspace.runtime,
@@ -451,7 +489,10 @@ export function WebWorkspace(props: {
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
         <div
-          class="app-frame app-frame-edge app-frame-with-server-rail web-app-frame"
+          class={[
+            "app-frame app-frame-edge app-frame-with-server-rail web-app-frame",
+            { "app-frame-usage-open": Boolean(usage()) },
+          ]}
           data-web-mobile-pane={mobilePane()}
           style="--left-panel-width: 280px"
         >
@@ -461,8 +502,9 @@ export function WebWorkspace(props: {
               const host = workspace.state.hosts.find((item) => item.hostId === id);
               if (host) void workspace.connect(host);
             }}
-            onReorder={() => {}}
+            onReorder={workspace.reorderHosts}
             onAdd={() => setJoinOpen(true)}
+            onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
             onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
           />
           <Sidebar
@@ -578,7 +620,7 @@ export function WebWorkspace(props: {
             onOpenSkills={() => {}}
           />
           <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
-          <div class="usage-workspace-content">
+          <div class="usage-workspace-content" inert={Boolean(usage())} aria-hidden={usage() ? "true" : undefined}>
             <Show when={creating()}>
               <WebAgentSettings
                 runtime={workspace.runtime}
@@ -786,6 +828,13 @@ export function WebWorkspace(props: {
               />
             </Show>
           </div>
+          <Show when={usage() && server()}>
+            {(target) => (
+              <div class="conversation-panel agent-usage-workspace">
+                <AgentUsagePanel serverId={target().id} hostName={target().name} port={usagePort} onBack={closeUsage} />
+              </div>
+            )}
+          </Show>
           <Show when={joinOpen()}>
             <JoinServerDialog
               inviteUrl=""

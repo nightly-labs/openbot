@@ -82,7 +82,15 @@ import {
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
 import type { ServerAdminPort } from "../servers/servers-port";
-import { acquireWebHostLock } from "./web-host-lock";
+import { createWebHostConnections, type WebHostConnections } from "./web-host-connections";
+import {
+  acquireOpenedWebHostLock,
+  acquireWebHostLock,
+  decodeWebHostTabMessage,
+  openWebHostChannel,
+  type WebHostState,
+  type WebHostTabMessage,
+} from "./web-host-lock";
 
 /**
  * The host controls of the connected host. The host answers the Team API routes, and the account
@@ -96,6 +104,8 @@ export interface WebAdminRuntime {
 
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
+  /** The status connections of the hosts that this tab has not opened. */
+  hosts?: WebHostConnections;
   browser: BrowserViewRuntime;
   browserTabs(): Promise<BrowserTab[]>;
   browserPreview?: (tabId: string) => Promise<BrowserPreview>;
@@ -147,18 +157,36 @@ export interface WebRuntimeEvents {
   connection(update: RemoteTeamConnectionUpdate): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+  /** The state of a host this tab has not opened. */
+  hostState?(hostId: string, state: WebHostState): void;
+  /** A host that this tab has not opened revoked its session. */
+  hostSessionRevoked?(): void;
 }
 
 interface WebConnectionDependencies {
   createPeer: typeof createRemoteTeamPeer;
   acquireHostLock: typeof acquireWebHostLock;
+  /** The channel between the tabs of the account. Without one, this tab keeps no status connections. */
+  openHostChannel?: (accountId: string) => BroadcastChannel | null;
+}
+
+/** Pin after directory validation and before connecting. Never silently replace a saved identity. */
+function pinWebHostKey(accountId: string, host: RemoteTeamHost): void {
+  const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
+  const pinned = localStorage.getItem(key);
+  if (pinned && pinned !== host.devicePublicKey) throw new Error(currentText().t("webClient.error.identityChanged"));
+  localStorage.setItem(key, host.devicePublicKey);
 }
 
 export function createWebWorkspaceRuntime(
   accountId: string,
   events: WebRuntimeEvents,
   accountFetch: typeof fetch,
-  dependencies: WebConnectionDependencies = { createPeer: createRemoteTeamPeer, acquireHostLock: acquireWebHostLock },
+  dependencies: WebConnectionDependencies = {
+    createPeer: createRemoteTeamPeer,
+    acquireHostLock: acquireWebHostLock,
+    openHostChannel: openWebHostChannel,
+  },
 ): WebWorkspaceRuntime {
   const directory = new RemoteTeamDirectoryClient({
     apiUrl: window.location.origin,
@@ -172,12 +200,15 @@ export function createWebWorkspaceRuntime(
     },
   });
   let sessionsEnded = false;
+  const sessionActions = {
+    getBootstrap: (id: string, key: string, sessionId: string | null) => directory.createBootstrap(id, key, sessionId),
+    endSession: async (id: string) => {
+      if (!sessionsEnded) await directory.endSession(id);
+    },
+  };
   const peer = dependencies.createPeer({
     current: {
-      getBootstrap: (id, key, sessionId) => directory.createBootstrap(id, key, sessionId),
-      endSession: async (id) => {
-        if (!sessionsEnded) await directory.endSession(id);
-      },
+      ...sessionActions,
       onConnectionUpdate: async (update) => {
         if (update.state !== "online") {
           const releaseGeneration = liveViewGeneration + 1;
@@ -194,6 +225,29 @@ export function createWebWorkspaceRuntime(
   });
   let releaseHostLock: (() => void) | null = null;
   let lockedHostId: string | null = null;
+  const hostChannel = dependencies.openHostChannel?.(accountId) ?? null;
+  const hosts = hostChannel
+    ? createWebHostConnections({
+        accountId,
+        channel: hostChannel,
+        actions: sessionActions,
+        createPeer: dependencies.createPeer,
+        acquireHostLock: dependencies.acquireHostLock,
+        pinHostKey: (host) => pinWebHostKey(accountId, host),
+        onState: (hostId, state) => events.hostState?.(hostId, state),
+        onSessionRevoked: () => events.hostSessionRevoked?.(),
+      })
+    : undefined;
+  // Another tab asks for the host that this tab has open: it stays here.
+  hostChannel?.addEventListener("message", (event) => {
+    const message = decodeWebHostTabMessage(event.data);
+    if (message?.type === "release" && message.hostId === lockedHostId)
+      hostChannel.postMessage({
+        type: "busy",
+        hostId: message.hostId,
+        requestId: message.requestId,
+      } satisfies WebHostTabMessage);
+  });
   let connecting = false;
   let disposed = false;
   let generation = 0;
@@ -346,6 +400,7 @@ export function createWebWorkspaceRuntime(
   };
   return {
     admin,
+    hosts,
     browser: {
       async startLiveView(tabId) {
         const currentGeneration = ++liveViewGeneration;
@@ -473,7 +528,14 @@ export function createWebWorkspaceRuntime(
           releaseHostLock?.();
           releaseHostLock = null;
           lockedHostId = null;
-          const release = await dependencies.acquireHostLock(accountId, host.hostId);
+          // This tab's own status connection gives the host up first.
+          await hosts?.select(host.hostId);
+          const release = await acquireOpenedWebHostLock(
+            accountId,
+            host.hostId,
+            hostChannel,
+            dependencies.acquireHostLock,
+          );
           if (disposed) {
             release();
             throw new Error(currentText().t("webClient.error.connectionClosed"));
@@ -483,12 +545,7 @@ export function createWebWorkspaceRuntime(
         }
         const current = ++generation;
         connectedHost = host;
-        // Pin after directory validation and before connecting. Never silently replace a saved identity.
-        const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
-        const pinned = localStorage.getItem(key);
-        if (pinned && pinned !== host.devicePublicKey)
-          throw new Error(currentText().t("webClient.error.identityChanged"));
-        localStorage.setItem(key, host.devicePublicKey);
+        pinWebHostKey(accountId, host);
         const result = await peer.execute({
           id: crypto.randomUUID(),
           type: "connect",
@@ -532,6 +589,7 @@ export function createWebWorkspaceRuntime(
         releaseHostLock = null;
         lockedHostId = null;
         connectedHost = null;
+        void hosts?.select(null);
       }
     },
     async listAgents() {
@@ -691,10 +749,11 @@ export function createWebWorkspaceRuntime(
       connectedHost = null;
       duplicateOperationIds.clear();
       try {
-        await peer.dispose();
+        await Promise.all([peer.dispose(), hosts?.dispose()]);
       } finally {
         releaseHostLock?.();
         releaseHostLock = null;
+        hostChannel?.close();
       }
     },
   };
