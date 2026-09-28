@@ -65,6 +65,11 @@ const CONNECTING_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
+function newAgentAvatar(): Pick<FirstAgentDraft, "avatarSeed" | "avatarHue"> {
+  const { avatarSeed, avatarHue } = createFirstAgentDraft();
+  return { avatarSeed, avatarHue };
+}
+
 function readServerView(): ServerView {
   try {
     return window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "menu" ? "menu" : "rail";
@@ -139,8 +144,8 @@ export function WebWorkspace(props: {
   let usageGeneration = 0;
   const [joinOpen, setJoinOpen] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
-  /** The new agent form's draft. The first-agent row in an empty sidebar shows its avatar. */
-  const [agentDraft, setAgentDraft] = createSignal<FirstAgentDraft>(createFirstAgentDraft());
+  /** The new agent form's avatar. The first-agent row in an empty sidebar shows it. */
+  const [agentAvatar, setAgentAvatar] = createSignal(newAgentAvatar());
   // `useLayout().serverView` holds this choice on desktop. The web client has no layout provider yet.
   const [serverView, setServerViewSignal] = createSignal<ServerView>(readServerView());
   function setServerView(view: ServerView): void {
@@ -474,13 +479,6 @@ export function WebWorkspace(props: {
   function startCreate() {
     setMobilePane("conversation");
     channels.close();
-    // A new form starts empty, with the avatar that the first-agent row showed.
-    if (!creating())
-      setAgentDraft((draft) => ({
-        ...createFirstAgentDraft(),
-        avatarSeed: draft.avatarSeed,
-        avatarHue: draft.avatarHue,
-      }));
     setCreating(true);
   }
   const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
@@ -522,10 +520,6 @@ export function WebWorkspace(props: {
             onToggleArchivedChannels={channelsSupported() ? channels.toggleArchived : undefined}
             onCreateChannel={channelsSupported() ? channels.create : undefined}
             serverName={workspace.state.host?.name ?? "OpenBot"}
-            onOpenServerSettings={(trigger) => {
-              const host = workspace.state.host;
-              if (host) void openServerSettings(host.hostId, trigger);
-            }}
             serverMenu={{
               servers: servers(),
               view: serverView(),
@@ -585,8 +579,8 @@ export function WebWorkspace(props: {
               workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported()
                 ? {
                     label: t("sidebar.empty.firstAgent"),
-                    avatarSeed: agentDraft().avatarSeed,
-                    avatarHue: agentDraft().avatarHue,
+                    avatarSeed: agentAvatar().avatarSeed,
+                    avatarHue: agentAvatar().avatarHue,
                     onSelect: startCreate,
                   }
                 : undefined
@@ -638,12 +632,13 @@ export function WebWorkspace(props: {
                 runtime={workspace.runtime}
                 capabilities={workspace.state.capabilities}
                 customProviders={providerSettings()?.customProviders}
-                initialDraft={untrack(agentDraft)}
-                onDraftChange={setAgentDraft}
+                // A new form starts empty, with the avatar that the first-agent row showed.
+                initialDraft={{ ...createFirstAgentDraft(), ...untrack(agentAvatar) }}
+                onDraftChange={({ avatarSeed, avatarHue }) => setAgentAvatar({ avatarSeed, avatarHue })}
                 onClose={() => setCreating(false)}
                 onSaved={async () => {
-                  setAgentDraft(createFirstAgentDraft());
                   await workspace.refresh();
+                  setAgentAvatar(newAgentAvatar());
                   setCreating(false);
                 }}
               />
