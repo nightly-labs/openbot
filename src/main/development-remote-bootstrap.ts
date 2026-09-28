@@ -90,7 +90,10 @@ export async function startDevelopmentRemoteRole({
 }: DevelopmentRemoteRoleOptions): Promise<void> {
   if (role === "host") {
     await rm(developmentRemoteConnectionPath(), { force: true });
-    await host.startDevelopmentLocal();
+    // Publish, so the local account API lists this host for the web client at `/app`. The local
+    // Team API is enough for the test client, so a failed publish falls back to it.
+    const status = await host.start();
+    if (status.phase !== "online") await host.startDevelopmentLocal();
     if (testClientEnabled) {
       await writeDevelopmentRemoteConnection(await host.createDevelopmentConnection());
     }
