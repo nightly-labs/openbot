@@ -42,6 +42,7 @@
 @import "./features/provider-updates/provider-updates.css";
 @import "@openbot/ui/features/custom-providers/custom-providers.css";
 @import "@openbot/ui/features/agents/agent-template.css";
+@import "@openbot/ui/features/updates/whats-new.css";
 @import "@openbot/ui/styles/reference-chip.css";
 @import "@openbot/ui/skill-preview.css";
 

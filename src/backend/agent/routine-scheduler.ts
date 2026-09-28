@@ -319,10 +319,18 @@ export class RoutineScheduler implements RoutineDueSource {
         args.timezone === undefined
           ? localTimezone()
           : routineToolString(args.timezone, "timezone", 128, "A routine timezone is required.");
+      const name = routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required.");
+      const key = name.trim().toLowerCase();
+      const existing = this.list(agentId).find((routine) => routine.name.trim().toLowerCase() === key);
+      if (existing) {
+        throw new RoutineInputError(
+          `Routine "${existing.name}" already exists with routineId ${existing.id}. Call update_routine to change it instead of creating another.`,
+        );
+      }
       const routine = this.create(
         {
           agentId,
-          name: routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required."),
+          name,
           instruction: routineToolString(
             args.instruction,
             "instruction",

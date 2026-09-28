@@ -34,6 +34,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - When Codex ignores an unknown setting in its configuration, show one warning that names each
   setting. Before, a "Provider error" showed only "Codex is ignoring 1 unrecognized configuration
   setting", with no setting name, and it came back after each reconnect. Codex continues to work.
+- Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
+  could save the same routine. An agent can no longer add a routine with the name of an existing
+  one; it changes that routine instead.
 - Show the highlight of the selected server across the full row in the mobile server list. Before,
   the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
@@ -42,6 +45,8 @@ All notable changes to OpenBot will be documented here. The project follows
   Before, each visit logged a refused request.
 - Show the loading placeholder in a browser tab preview while the page loads. Before, the preview
   could show a failure icon until the next capture.
+- Reload the web app one time when an update removed the files that it needs. Before, the first
+  open after an update could show "This page could not load".
 
 ## [0.23.0] - 2026-09-27
 
