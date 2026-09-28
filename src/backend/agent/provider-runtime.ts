@@ -35,6 +35,7 @@ import {
   decodeAccountReadResult,
   decodeModelListResponse,
   decodeRecordResponse,
+  getString,
   type ModelListResponse,
 } from "./../protocol";
 import {
@@ -50,8 +51,10 @@ import { normalizeAccountUsage } from "./account-usage";
 import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
+  ignoredCodexSettings,
   isBackgroundRefreshDiagnostic,
   isGlogBelowErrorDiagnostic,
+  isIgnoredConfigDiagnostic,
   isMcpSubsystemDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -290,6 +293,11 @@ export class ProviderRuntime implements ProviderPort {
   /** Per provider: one provider that exits must not delay, or take the retries of, another. */
   readonly #restartAttempts = new Map<AgentProvider, number>();
   readonly #restartTimers = new Map<AgentProvider, NodeJS.Timeout>();
+  /**
+   * Ignored-settings warnings already shown. Codex repeats one at each start, and a reconnect does
+   * not change the file it reads, so the user sees each one once per app run.
+   */
+  readonly #reportedConfigWarnings = new Set<string>();
   /** Counts `dispose()` calls, so a start from before one cannot add its client after it. */
   #disposals = 0;
   #models = structuredClone(FALLBACK_MODELS);
@@ -1701,6 +1709,10 @@ export class ProviderRuntime implements ProviderPort {
         logger.warn("A provider reported a failed background refresh.", { provider: client.provider, message });
         return;
       }
+      if (isIgnoredConfigDiagnostic(message)) {
+        logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message });
+        return;
+      }
       if (isUsageLimitDiagnostic(message)) {
         logger.warn("A provider reported an exhausted usage limit.", { provider: client.provider, message });
         this.refreshUsageAfterLimit(client);
@@ -1714,7 +1726,32 @@ export class ProviderRuntime implements ProviderPort {
       // it once rather than once per attempt.
       this.#emitError(`${client.provider}_diagnostic`, message.replace(LOG_TIMESTAMP_PREFIX, ""));
     });
+    client.on("notification", (notification) => {
+      if (notification.method === "configWarning") this.#reportConfigWarning(client, notification.params);
+    });
     client.once("exit", (error) => this.#handleExit(client, error));
+  }
+
+  /**
+   * Codex's report of the settings it ignored, with each key named: the stderr copy of it has only
+   * the summary (see `isIgnoredConfigDiagnostic`). The full text, with the path of each file, goes
+   * to the log; the user gets the keys, because the renderer does not show paths.
+   *
+   * Other configuration warnings are not reported here.
+   */
+  #reportConfigWarning(client: AgentClient, params: unknown): void {
+    const summary = getString(params, "summary");
+    const ignored = summary ? ignoredCodexSettings(summary) : null;
+    if (!summary || !ignored) return;
+    const redacted = shortenDiagnostic(this.#redactMcp(summary));
+    logger.warn("A provider ignored settings in its configuration.", { provider: client.provider, message: redacted });
+    if (this.#reportedConfigWarnings.has(redacted)) return;
+    this.#reportedConfigWarnings.add(redacted);
+    const message =
+      ignored.keys.length > 0
+        ? sourceText("error.provider.codexConfigIgnored", { count: ignored.count, settings: ignored.keys.join(", ") })
+        : sourceText("error.provider.codexConfigIgnoredUnnamed", { count: ignored.count });
+    this.#emitError(`${client.provider}_config_ignored`, message);
   }
 
   #handleExit(client: AgentClient, error: Error): void {

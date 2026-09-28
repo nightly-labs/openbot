@@ -33,7 +33,13 @@ import type { DrainScheduler } from "./drain-scheduler";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import type { MailboxSync } from "./mailbox-sync";
-import { listModelsPayload, modelList, requestedToolModel, requireReasoningEffort } from "./model-tools";
+import {
+  listModelsPayload,
+  type ModelRequest,
+  modelList,
+  requestedToolModel,
+  requireReasoningEffort,
+} from "./model-tools";
 import { createAgentToolSchema, listModelsToolSchema, updateProfileToolSchema } from "./profile-tools";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
@@ -50,7 +56,8 @@ export interface OpenBotToolRouterHooks {
     input: CreateAgentInput,
     configure?: (agent: AgentSummary) => Promise<AgentSummary>,
   ): Promise<AgentSummary>;
-  updateAgent(input: UpdateAgentInput): Promise<AgentSummary>;
+  /** `initiatingAgentId` is the calling agent, recorded with a model change. */
+  updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Promise<AgentSummary>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary>;
   emitError(code: string, error: unknown, agentId?: string): void;
   /** True while the provider runs a turn for this agent, a context compaction included. */
@@ -229,6 +236,43 @@ export class OpenBotToolRouter {
       }
       this.#hooks.emitError("server_request_failed", error);
     }
+  }
+
+  /**
+   * The provider, model and effort an `update_profile` call names, checked against what the CLIs list
+   * now. Like `create_agent`, a model or an effort that is not listed is an error that names the valid
+   * values. A new model keeps the agent's effort when it supports it, else takes the model's default.
+   */
+  #requestedRuntime(
+    agentId: string,
+    request: ModelRequest,
+  ): Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort"> {
+    if (request.provider === undefined && request.model === undefined && request.reasoningEffort === undefined) {
+      return {};
+    }
+    const target = this.#hooks.listAgents().find((agent) => agent.id === agentId);
+    if (!target) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    const models = this.#hooks.listModels();
+    const requested = requestedToolModel(request, models);
+    if (requested) {
+      const keptEffort = requested.supportedReasoningEfforts.includes(target.reasoningEffort)
+        ? target.reasoningEffort
+        : requested.defaultReasoningEffort;
+      return {
+        provider: requested.provider,
+        model: requested.id,
+        reasoningEffort: request.reasoningEffort ?? keptEffort,
+      };
+    }
+    if (request.reasoningEffort === undefined) return {};
+    const current = models.find((model) => model.provider === target.provider && model.id === target.model);
+    if (!current) {
+      throw new Error(
+        sourceText("error.agent.modelNotListed", { model: target.model, models: modelList(models, target.provider) }),
+      );
+    }
+    requireReasoningEffort(current, request.reasoningEffort);
+    return { reasoningEffort: request.reasoningEffort };
   }
 
   async #handleOpenBotTool(params: DynamicToolCallParams): Promise<OpenBotToolResponse> {
@@ -416,12 +460,14 @@ export class OpenBotToolRouter {
 
     if (params.tool === "update_profile") {
       const args = updateProfileToolSchema.parse(params.arguments);
-      const { agentId, avatarHue, avatarPath, ...fields } = args;
+      const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");
       }
+      const runtimeRequest = { provider, model, reasoningEffort };
       if (
         Object.values(fields).every((value) => value === undefined) &&
+        Object.values(runtimeRequest).every((value) => value === undefined) &&
         avatarHue === undefined &&
         avatarPath === undefined
       ) {
@@ -429,9 +475,17 @@ export class OpenBotToolRouter {
       }
       const sender = this.#hooks.listAgents().find((agent) => agent.id === senderAgentId);
       if (!sender) throw new Error("The calling agent no longer exists.");
+      // Checked before anything is written, so a model the provider does not list leaves the name
+      // and every other field of the same call unchanged.
+      const runtime = this.#requestedRuntime(agentId, runtimeRequest);
       const image = avatarPath === undefined ? undefined : await loadAvatarFile(avatarPath, sender.workspacePath);
-      const input: UpdateAgentInput = { agentId, ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) };
-      let updated = await this.#hooks.updateAgent(input);
+      const input: UpdateAgentInput = {
+        agentId,
+        ...fields,
+        ...runtime,
+        ...(avatarHue === undefined ? {} : { avatarHue }),
+      };
+      let updated = await this.#hooks.updateAgent(input, senderAgentId);
       if (image !== undefined) {
         updated = await this.#hooks.setAvatar(agentId, image);
       } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
@@ -450,6 +504,9 @@ export class OpenBotToolRouter {
               avatarSeed: updated.avatarSeed,
               avatarHue: updated.avatarHue,
               avatarUrl: updated.avatarUrl,
+              provider: updated.provider,
+              model: updated.model,
+              reasoningEffort: updated.reasoningEffort,
             }),
           },
         ],

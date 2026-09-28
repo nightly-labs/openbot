@@ -49,6 +49,7 @@ import { isGeneratedAgentId, isUuidV4, legacyAgentId } from "@openbot/contracts/
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
+import type { AgentModelChange } from "./database/agent-roster";
 import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
@@ -502,7 +503,8 @@ export class AgentStore {
     }
   }
 
-  async updateAgent(input: UpdateAgentInput): Promise<AgentSummary> {
+  /** `initiatingAgentId` names the agent that asked for the change, for the audit entry of a model change. */
+  async updateAgent(input: UpdateAgentInput, initiatingAgentId?: string): Promise<AgentSummary> {
     const agent = this.#requireAgent(input.agentId);
     const next = { ...agent };
     if (input.name !== undefined) {
@@ -550,9 +552,20 @@ export class AgentStore {
     }
     next.updatedAt = new Date().toISOString();
     const previous = { ...agent };
+    const modelChanged =
+      next.provider !== agent.provider || next.model !== agent.model || next.reasoningEffort !== agent.reasoningEffort;
+    const modelChange: AgentModelChange | undefined =
+      initiatingAgentId !== undefined && modelChanged
+        ? {
+            initiatingAgentId,
+            targetAgentId: agent.id,
+            previous: { provider: agent.provider, model: agent.model, reasoningEffort: agent.reasoningEffort },
+            next: { provider: next.provider, model: next.model, reasoningEffort: next.reasoningEffort },
+          }
+        : undefined;
     Object.assign(agent, next);
     try {
-      this.#persist("agent.updated");
+      this.#persist(modelChange ? "agent.model-changed" : "agent.updated", modelChange);
     } catch (error) {
       Object.assign(agent, previous);
       throw error;
@@ -1116,8 +1129,8 @@ export class AgentStore {
     logger.warn("Agents were restored to the roster from the event log.", restored.length);
   }
 
-  #persist(eventType: string): void {
-    this.#database.replaceAgents(`agents:${eventType}:${randomUUID()}`, this.#state.agents, eventType);
+  #persist(eventType: string, modelChange?: AgentModelChange): void {
+    this.#database.replaceAgents(`agents:${eventType}:${randomUUID()}`, this.#state.agents, eventType, modelChange);
   }
 
   #createRecord(id: string, name: string, title: string, description = ""): StoredAgent {

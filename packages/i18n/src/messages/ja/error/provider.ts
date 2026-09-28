@@ -108,6 +108,14 @@ export const messages = {
     "Codex CLI は見つかりましたが、起動できませんでした。新しいターミナルで `codex --version` を実行してください。",
   "error.provider.codexMissing":
     "ChatGPT はダウンロードされていません。続けるには OpenBot でダウンロードしてください。",
+  "error.provider.codexConfigIgnored": {
+    other:
+      "Codex は設定ファイルの {count} 件の設定を無視しました: {settings}。設定を修正または削除するか、Codex を更新してください。",
+  },
+  "error.provider.codexConfigIgnoredUnnamed": {
+    other:
+      "Codex は設定ファイルの {count} 件の設定を無視しました。設定を修正または削除するか、Codex を更新してください。",
+  },
   "error.provider.claudeOutdated": "Claude Code {version} は古すぎます。OpenBot には 2.1.232 以降が必要です。",
   "error.provider.claudeNotStarted": "Claude CLI は見つかりましたが、起動できませんでした。",
   "error.provider.claudeNotStartedHint":
