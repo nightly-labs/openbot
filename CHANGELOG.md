@@ -31,6 +31,9 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Create one routine when you ask an agent to make a new agent with a schedule. Before, both agents
+  could save the same routine. An agent can no longer add a routine with the name of an existing
+  one; it changes that routine instead.
 - Show the highlight of the selected server across the full row in the mobile server list. Before,
   the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
