@@ -39,6 +39,8 @@ All notable changes to OpenBot will be documented here. The project follows
   Before, each visit logged a refused request.
 - Show the loading placeholder in a browser tab preview while the page loads. Before, the preview
   could show a failure icon until the next capture.
+- Reload the web app one time when an update removed the files that it needs. Before, the first
+  open after an update could show "This page could not load".
 
 ## [0.23.0] - 2026-09-27
 
