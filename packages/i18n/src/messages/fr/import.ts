@@ -50,6 +50,10 @@ export const messages = {
   "import.review.channelNeedsMember": "Sélectionnez au moins un de ses agents pour l’importer.",
   "import.review.channelWithout": "Importé sans {names}.",
   "import.review.nameExists": "Un agent nommé {name} existe déjà. L’import en ajoute un autre.",
+  "import.review.duplicatesTitle": "Importer des agents en double ?",
+  "import.review.duplicatesDescription":
+    "Ces agents existent déjà sur ce serveur : {names}. L’import ajoute une deuxième copie de chacun. Chaque copie est un agent distinct, avec ses propres conversations, fichiers et mémoires.",
+  "import.review.duplicatesConfirm": "Importer les doublons",
   "import.result.title": "Import terminé",
   "import.result.importedAgents": "{agents} importés",
   "import.result.importedBoth": "{agents} et {channels} importés",

@@ -48,6 +48,10 @@ export const messages = defineMessages("import", {
   "import.review.channelNeedsMember": "Select at least one of its agents to import it.",
   "import.review.channelWithout": "Imports without {names}.",
   "import.review.nameExists": "An agent named {name} already exists. The import adds another one.",
+  "import.review.duplicatesTitle": "Import duplicate agents?",
+  "import.review.duplicatesDescription":
+    "These agents already exist on this server: {names}. The import adds a second copy of each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "import.review.duplicatesConfirm": "Import duplicates",
   "import.result.title": "Import finished",
   "import.result.importedAgents": "{agents} imported",
   "import.result.importedBoth": "{agents} and {channels} imported",

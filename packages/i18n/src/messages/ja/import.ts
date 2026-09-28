@@ -52,6 +52,10 @@ export const messages = {
   "import.review.channelWithout": "{names} を除いてインポートします。",
   "import.review.nameExists":
     "{name} という名前のエージェントはすでにあります。インポートすると、もう 1 つ追加されます。",
+  "import.review.duplicatesTitle": "重複するエージェントをインポートしますか？",
+  "import.review.duplicatesDescription":
+    "次のエージェントはこのサーバーにすでにあります: {names}。インポートすると、それぞれ 2 つ目のコピーが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "import.review.duplicatesConfirm": "重複をインポート",
   "import.result.title": "インポートが完了しました",
   "import.result.importedAgents": "{agents}をインポートしました",
   "import.result.importedBoth": "{agents}と{channels}をインポートしました",

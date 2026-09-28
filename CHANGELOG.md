@@ -28,6 +28,9 @@ All notable changes to OpenBot will be documented here. The project follows
   now shows at the bottom of the screen.
 - Show the OpenBot logo and an animated loading bar on the sign-in background while the web app
   loads. Before, the page showed only the text "Loading OpenBot…".
+- Ask before an import adds an agent whose name is already on the server, for example when you
+  import the same export again. The dialog names the agents and says that each copy is a separate
+  agent. Before, only an info icon next to the name showed this.
 
 ### Fixed
 
