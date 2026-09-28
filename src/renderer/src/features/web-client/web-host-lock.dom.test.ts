@@ -44,7 +44,13 @@ function createLocks() {
   return acquire;
 }
 
-function createTab(accountId: string, acquireHostLock: typeof acquireWebHostLock, endSession: () => Promise<void>) {
+function createTab(
+  accountId: string,
+  acquireHostLock: typeof acquireWebHostLock,
+  endSession: () => Promise<void>,
+  /** When the connect command's bootstrap returns. It ends its session itself after a dispose. */
+  bootstrap: () => Promise<void> = async () => undefined,
+) {
   const peers: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
   const hostState = vi.fn();
   const runtime = createWebWorkspaceRuntime(
@@ -54,8 +60,9 @@ function createTab(accountId: string, acquireHostLock: typeof acquireWebHostLock
     {
       createPeer: (_actions: { current: RemoteTeamPeerActions }) => {
         const peer = {
-          execute: vi.fn(
-            async (command: RemoteTeamCommand): Promise<RemoteTeamCommandResult> => ({
+          execute: vi.fn(async (command: RemoteTeamCommand): Promise<RemoteTeamCommandResult> => {
+            if (command.type === "connect") await bootstrap();
+            return {
               commandId: command.id,
               ok: true,
               status: 200,
@@ -63,8 +70,8 @@ function createTab(accountId: string, acquireHostLock: typeof acquireWebHostLock
                 command.type === "request" && command.path === "/v1/compatibility"
                   ? { appVersion: "0.1.0", protocol: { minimum: 1, maximum: 4 }, capabilities: [] }
                   : {},
-            }),
-          ),
+            };
+          }),
           dispose: vi.fn(endSession),
           sendHostStreamData: vi.fn(),
           cancelUpload: vi.fn(async () => undefined),
@@ -147,6 +154,43 @@ describe("browser host ownership", () => {
     await expect(third.runtime.connect(host)).rejects.toThrow("another tab");
 
     await Promise.all([first.runtime.dispose(), second.runtime.dispose(), third.runtime.dispose()]);
+  });
+  it("keeps the lock until a status connection's pending bootstrap has ended its session", async () => {
+    vi.stubGlobal("navigator", { locks: {} });
+    const acquire = createLocks();
+    let returnBootstrap: () => void = () => {};
+    const bootstrapReturned = new Promise<void>((resolve) => {
+      returnBootstrap = resolve;
+    });
+    const host = {
+      hostId: "host",
+      name: "Host",
+      logoKey: null,
+      devicePublicKey: "key-one",
+      membershipId: "membership",
+      role: "owner" as const,
+    };
+    const first = createTab(
+      "one",
+      acquire,
+      async () => undefined,
+      () => bootstrapReturned,
+    );
+    first.runtime.hosts?.setHosts([host]);
+    await vi.waitFor(() => expect(first.hostState).toHaveBeenCalledWith("host", "connecting"));
+
+    const second = createTab("one", acquire, async () => undefined);
+    let opened = false;
+    const opening = second.runtime.connect(host).then((capabilities) => {
+      opened = true;
+      return capabilities;
+    });
+    await vi.waitFor(() => expect(first.peers.at(-1)?.dispose).toHaveBeenCalled());
+    expect(opened).toBe(false);
+    returnBootstrap();
+    await expect(opening).resolves.toEqual([]);
+
+    await Promise.all([first.runtime.dispose(), second.runtime.dispose()]);
   });
   it("refuses connection when the browser has no lock manager", async () => {
     vi.stubGlobal("navigator", {});

@@ -23,6 +23,8 @@ interface HostEntry {
   releaseLock: (() => void) | null;
   peer: Peer | null;
   recovery: ReturnType<typeof createRemoteConnectionRecovery> | null;
+  /** The connect command in progress. Its bootstrap can still end the session after `dispose`. */
+  connecting: Promise<unknown> | null;
   incompatible: boolean;
 }
 
@@ -89,6 +91,7 @@ export function createWebHostConnections(options: {
       releaseLock: null,
       peer: null,
       recovery: null,
+      connecting: null,
       incompatible: false,
     };
     entries.set(host.hostId, entry);
@@ -132,12 +135,14 @@ export function createWebHostConnections(options: {
           recovery.suspend(error);
           return;
         }
-        const connected = await peer.execute({
+        const connecting = peer.execute({
           id: crypto.randomUUID(),
           type: "connect",
           hostId: host.hostId,
           hostPublicKey: host.devicePublicKey,
         });
+        entry.connecting = connecting;
+        const connected = await connecting;
         if (!connected.ok) throw failed(connected.error);
         const response = await peer.execute({
           id: crypto.randomUUID(),
@@ -184,6 +189,9 @@ export function createWebHostConnections(options: {
     entry.recovery?.dispose();
     try {
       await entry.peer?.dispose();
+      // A bootstrap that was still pending ends its session when it returns. The tab that asked for the
+      // host would reuse that session, so the lock waits for it.
+      await entry.connecting?.catch(() => undefined);
     } finally {
       entry.releaseLock?.();
     }
