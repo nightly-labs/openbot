@@ -677,6 +677,9 @@ export function createWebWorkspace(
           ),
           references: { ...old?.references, ...page.references },
           pageInfo: !older && old ? old.pageInfo : page.pageInfo,
+          // An older page has the thread's current revision but not its newest messages. The loaded
+          // newest messages keep their revision, so a delta held during this read still applies.
+          revision: older && old ? old.revision : page.revision,
         };
         item.loading = false;
       });

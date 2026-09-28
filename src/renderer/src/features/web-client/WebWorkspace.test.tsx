@@ -744,6 +744,58 @@ describe("web workspace state", () => {
     expect(workspace.conversation()?.page?.revision).toBe(7);
     expect(app.runtime.conversation).toHaveBeenCalledTimes(2);
   });
+  it("applies a delta that arrives while older messages load", async () => {
+    const reply = {
+      id: "reply",
+      turnId: "turn-one",
+      author: "assistant" as const,
+      text: "Hel",
+      createdAt: "2026-09-28T10:00:00.000Z",
+      status: "streaming" as const,
+    };
+    let resolveOlder: ((value: ConversationPage) => void) | undefined;
+    const conversation = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...page,
+        activeTurnId: "turn-one",
+        revision: 2,
+        messages: [reply],
+        pageInfo: { hasOlder: true, olderCursor: "cursor-one" },
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<ConversationPage>((resolve) => {
+            resolveOlder = resolve;
+          }),
+      );
+    const app = harness({ conversation });
+    await waitFor(() => expect(app.workspace().conversation()?.page?.revision).toBe(2));
+    const workspace = app.workspace();
+    const loading = workspace.older();
+    await waitFor(() => expect(conversation).toHaveBeenCalledTimes(2));
+    app.events().event("host", {
+      type: "conversation-delta",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-one",
+      messageId: "reply",
+      delta: "lo",
+      createdAt: reply.createdAt,
+      revision: 3,
+    });
+    // The older page carries the thread's current revision, but not the newest reply.
+    resolveOlder?.({
+      ...page,
+      activeTurnId: "turn-one",
+      revision: 4,
+      messages: [{ ...reply, id: "earlier", author: "user", text: "Earlier", status: "completed" }],
+    });
+    await loading;
+    await waitFor(() =>
+      expect(workspace.conversation()?.page?.messages.map((message) => message.text)).toEqual(["Earlier", "Hello"]),
+    );
+  });
   it("keeps the progress detail of a running turn until it completes", async () => {
     const app = harness();
     const workspace = await connected(app);
