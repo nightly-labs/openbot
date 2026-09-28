@@ -74,7 +74,10 @@ logger.info(
 
 /** The fragments in `changelog.d`, oldest commit first. A fragment with no commit is last. */
 async function releaseFragments(): Promise<string[]> {
-  const names = (await readdir(FRAGMENT_DIR)).filter((name) => name.endsWith(".md") && name !== "README.md");
+  // Recursive, as the hook and the workflow check a fragment in a subdirectory too.
+  const names = (await readdir(FRAGMENT_DIR, { recursive: true })).filter(
+    (name) => name.endsWith(".md") && name !== "README.md",
+  );
   const added = (path: string) => {
     const time = execFileSync("git", ["log", "--diff-filter=A", "--format=%ct", "-1", "--", path], {
       encoding: "utf8",

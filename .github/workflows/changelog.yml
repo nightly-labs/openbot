@@ -40,6 +40,7 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: |
           if ! git diff --name-only --diff-filter=ACMR HEAD^1 HEAD |
+            grep -vFx changelog.d/README.md |
             grep -Eq '^(changelog\.d/.+\.md|CHANGELOG\.md)$'; then
             echo "::error::Write the release notes in changelog.d/${BRANCH//\//-}.md (see docs/RELEASING.md#release-notes), or add the no-changelog label when a user sees no change."
             exit 1
@@ -48,5 +49,5 @@ jobs:
       - name: Check changelog fragments
         shell: bash
         run: |
-          find changelog.d -name '*.md' ! -name README.md -print0 |
-            xargs -0 bun scripts/check-release-notes.ts --fragments
+          find changelog.d -name '*.md' ! -path changelog.d/README.md -print0 |
+            xargs -0 -r bun scripts/check-release-notes.ts --fragments
