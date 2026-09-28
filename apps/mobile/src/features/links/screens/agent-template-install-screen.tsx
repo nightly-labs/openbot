@@ -61,11 +61,12 @@ function AgentTemplateInstall({ request }: { request?: string }) {
     (server) => server.state === "online" && workspace.canInstallAgentTemplate(server.id),
   );
   const [chosenServerId, setChosenServerId] = useState<string | null>(null);
-  const serverId =
-    eligible.find((server) => server.id === chosenServerId)?.id ??
-    eligible.find((server) => server.id === workspace.activeServer.id)?.id ??
-    eligible[0]?.id ??
-    null;
+  // The default applies only until the user selects a server. After that, the choice stays: a
+  // selected server that disconnects keeps its check mark and disables Add agent, so the agent never
+  // goes to a server the user did not select.
+  const selectedServerId =
+    chosenServerId ?? eligible.find((server) => server.id === workspace.activeServer.id)?.id ?? eligible[0]?.id ?? null;
+  const serverId = eligible.some((server) => server.id === selectedServerId) ? selectedServerId : null;
   const [installing, setInstalling] = useState(false);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +167,7 @@ function AgentTemplateInstall({ request }: { request?: string }) {
             <ServerChoices
               servers={managed}
               eligibleIds={new Set(eligible.map((server) => server.id))}
-              selectedId={serverId}
+              selectedId={selectedServerId}
               disabled={installing || finished}
               onSelect={setChosenServerId}
             />

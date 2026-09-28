@@ -201,8 +201,8 @@ function receive(url: string): string {
   state.request = id;
   return id;
 }
+let client: QueryClient;
 async function render(): Promise<void> {
-  const client = new QueryClient();
   await act(() =>
     root.render(
       <QueryClientProvider client={client}>
@@ -224,6 +224,7 @@ beforeEach(() => {
   state.fetch.mockReset().mockImplementation(async () => json(detail));
   state.install.mockReset().mockResolvedValue({ id: "agent-1", name: "dr eggbot" });
   state.refreshServer.mockResolvedValue(undefined);
+  client = new QueryClient();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -270,6 +271,20 @@ it("previews the template and installs it only on an eligible server the user ch
   await waitFor(() => expect(state.dismissTo).toHaveBeenCalledWith("/connected"));
   expect(state.selectServer).toHaveBeenCalledWith("lab");
   expect(state.refreshServer).toHaveBeenCalledWith("lab");
+});
+
+it("keeps the selected server when it disconnects and does not install elsewhere", async () => {
+  receive(`openbot://agents/${templateId}`);
+  await render();
+  await screen.findByRole("heading", { name: "dr eggbot" });
+  await act(() => fireEvent.click(screen.getByRole("radio", { name: "Lab" })));
+  state.servers = state.servers.map((entry) => (entry.id === "lab" ? { ...entry, state: "offline" } : entry));
+  await render();
+  expect(screen.getByRole("radio", { name: "Lab" })).toHaveProperty("checked", true);
+  expect(screen.getByRole("radio", { name: "Studio" })).toHaveProperty("checked", false);
+  expect(screen.getByRole("button", { name: "Add agent" })).toHaveProperty("disabled", true);
+  await act(() => fireEvent.click(screen.getByRole("button", { name: "Add agent" })));
+  expect(state.install).not.toHaveBeenCalled();
 });
 
 it("keeps the sheet and shows the host refusal when the install fails", async () => {
