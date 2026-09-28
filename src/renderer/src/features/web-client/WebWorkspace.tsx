@@ -442,13 +442,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   });
   const channelOpen = () => channels.state.selectedId !== null;
   const readState = () => workspace.conversation()?.page?.readState;
-  // Each page read gives a new read state, so a failed write is tried again on the next read. Focus
+  // Keyed on the newest loaded message, not on the read state: the host can count a message that
+  // this page has not loaded yet, and marking the same message again would not clear it. Focus
   // coming back reads the page again.
   createEffect(
-    () => {
-      const current = readState();
-      return current && current.unreadCount > 0 && !creating() && !channelOpen() && canMarkRead() ? current : null;
-    },
+    () =>
+      (readState()?.unreadCount ?? 0) > 0 && !creating() && !channelOpen() && canMarkRead()
+        ? (workspace.conversation()?.page?.messages.at(-1)?.id ?? null)
+        : null,
     (unread) => {
       if (unread) void workspace.markRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
     },
