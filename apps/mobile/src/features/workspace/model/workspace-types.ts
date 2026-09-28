@@ -1,5 +1,6 @@
 import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
+  AgentAdminSettings,
   AgentAnalytics,
   AgentAnalyticsInput,
   AgentMemory,
@@ -20,6 +21,7 @@ import type {
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   StorageUsage,
+  UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -137,6 +139,10 @@ export interface MobileWorkspaceContextValue {
   loadAgentSkills: (agentId: string, serverId: string) => Promise<InstalledSkill[] | null>;
   /** Null when the host does not advertise `storage-v1`. */
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
+  /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
+  loadAgentAdminSettings: (agentId: string, serverId: string) => Promise<AgentAdminSettings | null>;
+  /** Owners and admins only; the host refuses a member. Resolves with the settings the host saved. */
+  updateAgentAdminSettings: (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>;
   /** Owners and admins only; the host refuses a member. */
   deleteStoredFile: (fileId: string, serverId: string) => Promise<void>;
   loadConversation: (agentId: string) => Promise<ConversationSnapshot>;

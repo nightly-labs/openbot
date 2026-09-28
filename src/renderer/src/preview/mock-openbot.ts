@@ -202,6 +202,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let languagePreference = clone<AppLanguagePreference>(options.languagePreference ?? { language: "system" });
   const languageListeners = new Set<(preference: AppLanguagePreference) => void>();
+  const approvalAutomationListeners = new Set<(preference: ApprovalAutomationPreference) => void>();
   let dynamicIslandPreference: DynamicIslandPreference = { ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE };
   let dynamicIslandPresentation: DynamicIslandPresentation = { serverId: "local", mode: "idle" };
   const agentStatus = clone(options.agentStatus ?? STORY_AGENT_STATUS);
@@ -419,7 +420,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
             ? { ...approvalAutomation.autoApproveOverrides, [agentId]: autoApprove }
             : approvalAutomation.autoApproveOverrides,
       };
+      for (const listener of approvalAutomationListeners) listener(clone(approvalAutomation));
       return clone(approvalAutomation);
+    },
+    onApprovalAutomation: (listener) => {
+      approvalAutomationListeners.add(listener);
+      return () => approvalAutomationListeners.delete(listener);
     },
     getAppLanguagePreference: async () => clone(languagePreference),
     setAppLanguagePreference: async ({ language }) => {

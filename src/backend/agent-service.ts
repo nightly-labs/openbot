@@ -1010,6 +1010,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#mcp.changed();
   }
 
+  /**
+   * A setting that lives outside the agent store changed, such as an agent's auto-approve grant.
+   * Clients of this host read those settings again when the agent list changes.
+   */
+  notifyAgentsChanged(): void {
+    this.#emit({ type: "agents-changed", agents: this.listAgents() });
+  }
+
   listModels(): AgentModelOption[] {
     return this.#endpoints.available();
   }

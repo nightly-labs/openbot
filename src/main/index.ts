@@ -740,6 +740,11 @@ if (!hasSingleInstanceLock) {
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
+      built.approvalAutomation.subscribe((preference) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          sendToRenderer(window, IPC_ENDPOINTS.app.approvalAutomation, preference);
+        }
+      });
       host.on("changed", forwardHostStatus);
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));

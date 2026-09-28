@@ -418,6 +418,8 @@ it("instruments message commands without sending their contents or changing the 
     loadAgentAnalytics: unexpected,
     loadAgentSkills: unexpected,
     loadAgentStorage: unexpected,
+    loadAgentAdminSettings: unexpected,
+    updateAgentAdminSettings: unexpected,
     deleteStoredFile: unexpected,
     loadConversation: unexpected,
     loadOlderMessages: unexpected,

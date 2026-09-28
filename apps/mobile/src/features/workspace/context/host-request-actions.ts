@@ -1,6 +1,7 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   assertStorageUsageScope,
+  decodeAgentAdminSettings,
   decodeInstalledSkills,
   decodeStorageUsage,
   isAgentMemory,
@@ -11,6 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import {
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
@@ -51,6 +53,8 @@ type HostRequestActions = Pick<
   | "loadAgentRoutines"
   | "loadAgentSkills"
   | "loadAgentStorage"
+  | "loadAgentAdminSettings"
+  | "updateAgentAdminSettings"
   | "deleteStoredFile"
   | "loadAgentAvatar"
   | "duplicateAgent"
@@ -195,6 +199,15 @@ export function createHostRequestActions({
         await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
         input,
       );
+    },
+    loadAgentAdminSettings: async (agentId, serverId) =>
+      capabilities.get(serverId)?.includes(AGENT_ADMIN_CAPABILITY)
+        ? request("POST", AGENT_ADMIN_ROUTES.settings, decodeAgentAdminSettings, { agentId }, serverId)
+        : null,
+    updateAgentAdminSettings: async (input, serverId) => {
+      if (!capabilities.get(serverId)?.includes(AGENT_ADMIN_CAPABILITY))
+        throw new Error(currentText().t("mobile.agent.access.unsupported"));
+      return request("POST", AGENT_ADMIN_ROUTES.update, decodeAgentAdminSettings, { ...input }, serverId);
     },
     deleteStoredFile: async (fileId, serverId) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY))
