@@ -34,7 +34,19 @@ vi.mock("@/features/auth/context/mobile-session-context", () => ({
   useMobileSession: () => ({ session: state.session, connect: state.connect }),
 }));
 vi.mock("@/features/auth/api/mobile-auth", () => ({ redeemMobileConnectUrl: state.redeem }));
-vi.mock("@/features/auth/screens/sign-in-screen", () => ({ SignInScreen: () => <p>Desktop sign-in</p> }));
+vi.mock("@/features/auth/screens/sign-in-screen", () => ({
+  SignInScreen: ({ notice }: { notice?: { title: string; cancelLabel: string; onCancel: () => void } }) => (
+    <>
+      <p>Desktop sign-in</p>
+      <h2>{notice?.title}</h2>
+      {notice ? (
+        <button type="button" onClick={notice.onCancel}>
+          {notice.cancelLabel}
+        </button>
+      ) : null}
+    </>
+  ),
+}));
 vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ request: state.request }),
   router: { replace: state.replace, dismissTo: state.dismiss, back: state.dismiss, push: state.push },
@@ -88,7 +100,12 @@ vi.mock("react-native", () => ({
   ),
   Keyboard: { dismiss: () => {} },
 }));
-vi.mock("lucide-react-native", () => ({ ScanLine: () => null, Server: () => null }));
+vi.mock("lucide-react-native", () => ({
+  Bot: () => null,
+  ScanLine: () => null,
+  Server: () => null,
+  UserPlus: () => null,
+}));
 vi.mock("@/features/auth/components/app-logo", () => ({ AppLogo: () => null }));
 vi.mock("@/shared/components/sheet-scroll-view", () => ({
   SheetScrollView: ({ children }: PropsWithChildren) => <div>{children}</div>,
@@ -166,7 +183,7 @@ afterEach(async () => {
 it("keeps an invitation through sign-in and routes to review without accepting it", async () => {
   const id = receive(invite);
   await act(() => root.render(<IncomingLinkScreen />));
-  expect(screen.getByText("Desktop sign-in")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Sign in to join this server" })).toBeTruthy();
   expect(state.join).not.toHaveBeenCalled();
   state.session = session;
   await act(() => root.render(<IncomingLinkScreen />));
@@ -177,7 +194,7 @@ it("keeps an invitation through sign-in and routes to review without accepting i
 it("keeps an agent link through sign-in and routes to its preview", async () => {
   const id = receive("openbot://agents/AbCdEfGhIjKlMnOpQrSt_-");
   await act(() => root.render(<IncomingLinkScreen />));
-  expect(screen.getByText("Desktop sign-in")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Sign in to add this agent" })).toBeTruthy();
   state.session = session;
   await act(() => root.render(<IncomingLinkScreen />));
   // The sheet opens in the running workspace; a replace from this root screen would mount a second one.

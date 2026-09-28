@@ -3,7 +3,9 @@ import type { messages as source } from "../../en/mobile/link";
 
 export const messages = {
   "mobile.link.connectFailed": "OpenBot n’a pas pu se connecter. Réessayez.",
-  "mobile.link.invite.signIn": "Connectez-vous avec votre ordinateur pour examiner cette invitation.",
+  "mobile.link.invite.signInTitle": "Connectez-vous pour rejoindre ce serveur",
+  "mobile.link.invite.signInDescription":
+    "Scannez le code QR dans OpenBot sur votre ordinateur. Vous pourrez ensuite examiner l’invitation.",
   "mobile.link.invite.cancel": "Annuler l’invitation",
   "mobile.link.pairing.title": "Connecter ce téléphone",
   "mobile.link.pairing.alreadySignedIn":
@@ -18,7 +20,9 @@ export const messages = {
   "mobile.link.unavailable.title": "Lien indisponible",
   "mobile.link.unavailable.description":
     "Ce lien n’est pas valide, n’est plus disponible ou n’est pas pris en charge sur mobile.",
-  "mobile.link.template.signIn": "Connectez-vous avec votre ordinateur pour ajouter cet agent partagé.",
+  "mobile.link.template.signInTitle": "Connectez-vous pour ajouter cet agent",
+  "mobile.link.template.signInDescription":
+    "Scannez le code QR dans OpenBot sur votre ordinateur. Vous pourrez ensuite examiner l’agent avant de l’ajouter.",
   "mobile.link.template.loading": "Chargement de l’agent…",
   "mobile.link.template.creator": "Par {name}",
   "mobile.link.template.section.instructions": "Instructions",

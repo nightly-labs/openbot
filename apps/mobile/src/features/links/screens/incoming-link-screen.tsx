@@ -2,6 +2,7 @@ import { Redirect, router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { openBrowserAsync } from "expo-web-browser";
 import { Button, Typography } from "heroui-native";
+import { Bot, UserPlus } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { redeemMobileConnectUrl } from "@/features/auth/api/mobile-auth";
@@ -80,30 +81,30 @@ function IncomingLinkContent({ request }: { request?: string }) {
   if (link.kind === "invite") {
     if (session) return <Redirect href={{ pathname: "/add-server", params: { request } }} />;
     return (
-      <View className="flex-1 bg-background">
-        <View className="gap-2 px-5 pt-safe-offset-4">
-          <Typography.Paragraph align="center">{t("mobile.link.invite.signIn")}</Typography.Paragraph>
-          <Button variant="ghost" onPress={close}>
-            <Button.Label>{t("mobile.link.invite.cancel")}</Button.Label>
-          </Button>
-        </View>
-        <SignInScreen />
-      </View>
+      <SignInScreen
+        notice={{
+          icon: UserPlus,
+          title: t("mobile.link.invite.signInTitle"),
+          description: t("mobile.link.invite.signInDescription"),
+          cancelLabel: t("mobile.link.invite.cancel"),
+          onCancel: close,
+        }}
+      />
     );
   }
 
   if (link.kind === "template") {
     if (session) return null;
     return (
-      <View className="flex-1 bg-background">
-        <View className="gap-2 px-5 pt-safe-offset-4">
-          <Typography.Paragraph align="center">{t("mobile.link.template.signIn")}</Typography.Paragraph>
-          <Button variant="ghost" onPress={close}>
-            <Button.Label>{t("common.cancel")}</Button.Label>
-          </Button>
-        </View>
-        <SignInScreen />
-      </View>
+      <SignInScreen
+        notice={{
+          icon: Bot,
+          title: t("mobile.link.template.signInTitle"),
+          description: t("mobile.link.template.signInDescription"),
+          cancelLabel: t("common.cancel"),
+          onCancel: close,
+        }}
+      />
     );
   }
 

@@ -2,7 +2,9 @@ import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("mobile.link", {
   "mobile.link.connectFailed": "OpenBot could not connect. Try again.",
-  "mobile.link.invite.signIn": "Sign in with your desktop to review this invitation.",
+  "mobile.link.invite.signInTitle": "Sign in to join this server",
+  "mobile.link.invite.signInDescription":
+    "Scan the QR code in OpenBot on your computer. Then you can review the invitation.",
   "mobile.link.invite.cancel": "Cancel invitation",
   "mobile.link.pairing.title": "Connect this phone",
   "mobile.link.pairing.alreadySignedIn":
@@ -15,7 +17,9 @@ export const messages = defineMessages("mobile.link", {
   "mobile.link.plugin.view": "View plugin",
   "mobile.link.unavailable.title": "Link unavailable",
   "mobile.link.unavailable.description": "This link is invalid, is no longer available, or is not supported on mobile.",
-  "mobile.link.template.signIn": "Sign in with your desktop to add this shared agent.",
+  "mobile.link.template.signInTitle": "Sign in to add this agent",
+  "mobile.link.template.signInDescription":
+    "Scan the QR code in OpenBot on your computer. Then you can review the agent before you add it.",
   "mobile.link.template.loading": "Loading agent…",
   "mobile.link.template.creator": "By {name}",
   "mobile.link.template.section.instructions": "Instructions",

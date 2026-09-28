@@ -1,7 +1,9 @@
 import { useIsFocused } from "expo-router/react-navigation";
 import { Accordion, Typography } from "heroui-native";
+import { useThemeColor } from "heroui-native/hooks";
+import { type LucideIcon, X } from "lucide-react-native";
 import { useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
-import { ScrollView, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -33,7 +35,48 @@ function useContentReveal(delay: number) {
   });
 }
 
-export function SignInScreen() {
+/** A link that waits for sign-in, such as an invitation. A banner above the sign-in content names it. */
+export interface SignInNotice {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  cancelLabel: string;
+  onCancel: () => void;
+}
+
+const BANNER_GAP = 12;
+
+function SignInNoticeBanner({ notice, disabled }: { notice: SignInNotice; disabled: boolean }) {
+  const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  const Icon = notice.icon;
+  return (
+    <View className="flex-row items-start gap-3 rounded-grouped bg-grouped py-3 pr-2 pl-3">
+      <View className="size-9 items-center justify-center rounded-full bg-background">
+        <Icon size={18} color={foreground} strokeWidth={1.75} />
+      </View>
+      <View accessible accessibilityRole="summary" className="min-w-0 flex-1 gap-0.5 py-0.5">
+        <Typography.Paragraph className="font-medium">{notice.title}</Typography.Paragraph>
+        <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
+          {notice.description}
+        </Typography.Paragraph>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={notice.cancelLabel}
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        hitSlop={8}
+        onPress={notice.onCancel}
+        className="size-8 items-center justify-center rounded-full"
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      >
+        <X size={18} color={muted} strokeWidth={1.75} />
+      </Pressable>
+    </View>
+  );
+}
+
+export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const { t } = useText();
   const reportContentReady = useContext(SplashContentReadyContext);
   const motion = useContext(SplashMotionContext);
@@ -70,7 +113,11 @@ export function SignInScreen() {
   const [helpTriggerHeight, setHelpTriggerHeight] = useState(0);
   // Centre the closed composition. Expanded help adds scrollable content below it.
   const closedHeight = mainHeight + HELP_GAP + helpTriggerHeight;
-  const contentTop = insets.top + Math.max(32, (viewport.height - insets.top - insets.bottom - closedHeight) / 2);
+  // A link banner takes the top of the screen; the sign-in content is centred in the space below it.
+  const [bannerHeight, setBannerHeight] = useState(0);
+  const bannerSpace = notice ? bannerHeight + BANNER_GAP : 0;
+  const top = insets.top + bannerSpace;
+  const contentTop = top + Math.max(32, (viewport.height - top - insets.bottom - closedHeight) / 2);
   const closeScanner = useCallback(() => {
     setOrigin(null);
   }, []);
@@ -187,6 +234,17 @@ export function SignInScreen() {
           </Animated.View>
         </View>
       </ScrollView>
+      {notice ? (
+        <Animated.View
+          style={[titleStyle, { position: "absolute", top: insets.top + 8, left: 16, right: 16 }]}
+          pointerEvents={scannerOpen ? "none" : "box-none"}
+          accessibilityElementsHidden={scannerOpen}
+          importantForAccessibility={scannerOpen ? "no-hide-descendants" : "auto"}
+          onLayout={({ nativeEvent: { layout } }) => setBannerHeight(layout.height)}
+        >
+          <SignInNoticeBanner notice={notice} disabled={scannerOpen} />
+        </Animated.View>
+      ) : null}
       {origin && isFocused ? (
         <ScanQrSheet
           origin={origin}
