@@ -174,6 +174,17 @@ it("keeps an invitation through sign-in and routes to review without accepting i
   expect(readIncomingLink(id)).toEqual({ kind: "invite", url: invite });
 });
 
+it("keeps an agent link through sign-in and routes to its preview", async () => {
+  const id = receive("openbot://agents/AbCdEfGhIjKlMnOpQrSt_-");
+  await act(() => root.render(<IncomingLinkScreen />));
+  expect(screen.getByText("Desktop sign-in")).toBeTruthy();
+  state.session = session;
+  await act(() => root.render(<IncomingLinkScreen />));
+  // The sheet opens in the running workspace; a replace from this root screen would mount a second one.
+  expect(state.dismiss).toHaveBeenCalledWith("/connected");
+  expect(state.push).toHaveBeenCalledExactlyOnceWith({ pathname: "/install-agent", params: { request: id } });
+});
+
 it("clears a canceled invitation before returning to sign-in", async () => {
   const id = receive(invite);
   await act(() => root.render(<IncomingLinkScreen />));

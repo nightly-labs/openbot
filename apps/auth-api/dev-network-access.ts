@@ -17,6 +17,16 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
   if (MOBILE_LAN_PATHS.has(pathname)) return true;
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 3 && segments[0] === "v1" && segments[1] === "avatars" && segments[2]) return true;
+  // The public preview of one shared agent and its avatar. `mine` lists the user's own templates and
+  // stays on loopback.
+  if (
+    (segments.length === 3 || (segments.length === 4 && segments[3] === "avatar")) &&
+    segments[0] === "v1" &&
+    segments[1] === "agent-templates" &&
+    segments[2] &&
+    segments[2] !== "mine"
+  )
+    return true;
   if (
     segments.length === 4 &&
     segments[0] === "v1" &&

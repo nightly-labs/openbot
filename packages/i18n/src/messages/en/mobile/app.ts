@@ -5,6 +5,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.actionsNeeded": "Actions needed",
   "mobile.app.route.newChannel": "New channel",
   "mobile.app.route.createAgent": "Create an agent",
+  "mobile.app.route.addSharedAgent": "Add a shared agent",
   "mobile.app.route.newSection": "New section",
   "mobile.app.route.settings": "Settings",
   "mobile.app.route.profile": "Profile",

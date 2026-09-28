@@ -9,7 +9,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { SignInScreen } from "@/features/auth/screens/sign-in-screen";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { forgetIncomingLink, pendingInvitationId, readIncomingLink } from "../model/incoming-links";
+import { forgetIncomingLink, pendingSignInLinkId, readIncomingLink } from "../model/incoming-links";
 
 export function IncomingLinkScreen() {
   const { request } = useLocalSearchParams<{ request?: string }>();
@@ -28,9 +28,20 @@ function IncomingLinkContent({ request }: { request?: string }) {
   });
   useEffect(() => {
     if (!paired || busy) return;
-    const invitation = pendingInvitationId();
-    router.replace(invitation ? { pathname: "/incoming-link", params: { request: invitation } } : "/connected");
+    const pending = pendingSignInLinkId();
+    router.replace(pending ? { pathname: "/incoming-link", params: { request: pending } } : "/connected");
   }, [paired, busy]);
+  const opened = useRef(false);
+  const signedIn = Boolean(session);
+  useEffect(() => {
+    if (link.kind !== "template" || !signedIn || opened.current) return;
+    opened.current = true;
+    // Return to the running workspace, then open the sheet in its stack. A replace from this root
+    // screen would mount a second workspace, which opens a second connection to each host. With no
+    // workspace under this screen, `dismissTo` replaces this screen with one.
+    router.dismissTo("/connected");
+    router.push({ pathname: "/install-agent", params: { request } });
+  }, [link.kind, signedIn, request]);
   const locked = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
@@ -74,6 +85,21 @@ function IncomingLinkContent({ request }: { request?: string }) {
           <Typography.Paragraph align="center">{t("mobile.link.invite.signIn")}</Typography.Paragraph>
           <Button variant="ghost" onPress={close}>
             <Button.Label>{t("mobile.link.invite.cancel")}</Button.Label>
+          </Button>
+        </View>
+        <SignInScreen />
+      </View>
+    );
+  }
+
+  if (link.kind === "template") {
+    if (session) return null;
+    return (
+      <View className="flex-1 bg-background">
+        <View className="gap-2 px-5 pt-safe-offset-4">
+          <Typography.Paragraph align="center">{t("mobile.link.template.signIn")}</Typography.Paragraph>
+          <Button variant="ghost" onPress={close}>
+            <Button.Label>{t("common.cancel")}</Button.Label>
           </Button>
         </View>
         <SignInScreen />
