@@ -29,6 +29,7 @@ body {
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
   font-synthesis: none;
+  text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -40,7 +41,6 @@ html:not(:has(.web-app)) {
 
 body:not(:has(.web-app)) {
   min-width: 320px;
-  text-rendering: geometricPrecision;
 }
 
 a {
