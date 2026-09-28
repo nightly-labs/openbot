@@ -82,6 +82,36 @@ describe("the live browser view on a host", () => {
     await gateway.stop();
   });
 
+  it("opens a view after the host's Team API stopped and started again", async () => {
+    let started = 0;
+    const gateway = new BrowserViewGateway({
+      browser: {
+        startView: async () => {
+          started += 1;
+          return async () => undefined;
+        },
+        dispatchViewInput: async () => undefined,
+      },
+      authenticate: () => null,
+    });
+    const origin = await serve(gateway);
+    // The Team API stops the gateway on every runtime stop; the host service keeps the instance.
+    await gateway.stop();
+    const session = gateway.createSession({ memberId: "member-1", teamSessionId: TEAM_SESSION, tabId: "tab-1" });
+
+    const socket = new webSockets.WebSocket(`${origin}${session.streamPath}`, {
+      headers: { "X-OpenBot-WebRTC-Session": TEAM_SESSION },
+    });
+    const unexpected = new Promise<number>((resolve) =>
+      socket.once("unexpected-response", (_request, response) => resolve(response.statusCode ?? 0)),
+    );
+    const opened = new Promise<"open">((resolve) => socket.once("open", () => resolve("open")));
+    await expect(Promise.race([opened, unexpected])).resolves.toBe("open");
+    await vi.waitFor(() => expect(started).toBe(1));
+    socket.close();
+    await gateway.stop();
+  });
+
   it("keeps a click on the last frame the member saw when a newer frame is dropped", async () => {
     const dispatched: BrowserViewportInput[] = [];
     let send: ((frame: { sequence: number; width: number; height: number; image: Uint8Array }) => void) | undefined;
