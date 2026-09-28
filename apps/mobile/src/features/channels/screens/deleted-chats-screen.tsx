@@ -1,7 +1,8 @@
 import { Link, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useMemo } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useText } from "@/shared/lib/text";
@@ -40,7 +41,7 @@ export function DeletedChatsScreen() {
             asChild
             dismissTo
           >
-            <Pressable
+            <ChatLinkPressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.channel.deleted.preview", { name: channel.name })}
               className="min-h-18 flex-row items-center gap-3 px-3 py-3"
@@ -54,7 +55,7 @@ export function DeletedChatsScreen() {
                   {channel.lastMessage?.text ?? t("mobile.channel.list.noMessages")}
                 </Typography.Paragraph>
               </View>
-            </Pressable>
+            </ChatLinkPressable>
           </Link>
         ))}
       </View>

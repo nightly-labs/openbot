@@ -183,6 +183,8 @@ export const messages = {
   "mobile.chat.upload.cancelled": "添付ファイルのアップロードをキャンセルしました。",
   "mobile.chat.upload.uploaded": "アップロード済み",
   "mobile.chat.upload.uploadingLabel": "アップロード中",
+  "mobile.chat.failure.title": "未回答",
+  "mobile.chat.failure.fallback": "エージェントは回答する前に停止しました。もう一度メッセージを送信してください。",
   "mobile.chat.reply.to": "返信先: {text}",
   "mobile.chat.reply.attachment": "添付ファイル",
   "mobile.chat.reply.unavailable": "メッセージを利用できません",

@@ -23,8 +23,8 @@ import { createSimpleContext } from "./simple-context";
  */
 const Platform = createSimpleContext({
   name: "Platform",
-  init: (props: AppProps) => {
-    const [appInfo, setAppInfo] = createSignal<AppInfo | null>(null);
+  init: (props: AppProps & { appInfo?: AppInfo }) => {
+    const [appInfo, setAppInfo] = createSignal<AppInfo | null>(props.appInfo ?? null);
     const [appFocused, setAppFocused] = createSignal(document.hasFocus());
     // Whether `appInfo` is what main reported, as opposed to the fallback below.
     // Analytics attribution is only honest about the former.
@@ -36,20 +36,22 @@ const Platform = createSimpleContext({
       const handleFocus = () => flush(() => setAppFocused(true));
       window.addEventListener("blur", handleBlur);
       window.addEventListener("focus", handleFocus);
-      void appPort()
-        .getAppInfo()
-        .then((info) => {
-          infoFromHost = true;
-          setAppInfo(info);
-        })
-        .catch(() =>
-          setAppInfo({
-            name: "OpenBot",
-            version: "unavailable",
-            platform: "darwin",
-            variant: "production",
-          }),
-        );
+      // The web client has no main process to ask, so it passes a fixed `appInfo`.
+      if (!props.appInfo)
+        void appPort()
+          .getAppInfo()
+          .then((info) => {
+            infoFromHost = true;
+            setAppInfo(info);
+          })
+          .catch(() =>
+            setAppInfo({
+              name: "OpenBot",
+              version: "unavailable",
+              platform: "darwin",
+              variant: "production",
+            }),
+          );
       return () => {
         window.removeEventListener("blur", handleBlur);
         window.removeEventListener("focus", handleFocus);

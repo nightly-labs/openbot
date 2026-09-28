@@ -17,6 +17,7 @@ function handle({ request }: { request: Request }) {
     remote: requestRemoteControlPlane(),
     hostLogo: (hostId, version) => readHostLogo(requestAvatarBucket(), hostId, version),
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
+    avatarBucket: requestAvatarBucket,
     signalUrl: requestRemoteSignalUrl,
     sourceIp: requestSourceIp,
     errorResponse: remoteControlPlaneErrorResponse,

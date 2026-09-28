@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -21,6 +22,7 @@ export function BlurReveal<T>({
   interactive = false,
   enterDuration = 240,
   exitDuration = 180,
+  enterDelay = 0,
 }: {
   value: T | null;
   children: (value: T) => ReactNode;
@@ -28,6 +30,8 @@ export function BlurReveal<T>({
   interactive?: boolean;
   enterDuration?: number;
   exitDuration?: number;
+  /** Waits before the entrance, so several reveals can come in one after another. */
+  enterDelay?: number;
 }) {
   const [retained, setRetained] = useState(value);
   const target = useRef<View | null>(null);
@@ -45,22 +49,26 @@ export function BlurReveal<T>({
       if (!cancelled) setRetained(null);
     };
     progress.set(
-      withTiming(
-        visible ? 1 : 0,
-        {
-          duration: visible ? enterDuration : exitDuration,
-          easing: EASE_OUT,
-          reduceMotion: ReduceMotion.System,
-        },
-        (finished) => {
-          if (finished && !visible && collapseOnHide) scheduleOnRN(clearRetained);
-        },
+      withDelay(
+        visible ? enterDelay : 0,
+        withTiming(
+          visible ? 1 : 0,
+          {
+            duration: visible ? enterDuration : exitDuration,
+            easing: EASE_OUT,
+            reduceMotion: ReduceMotion.System,
+          },
+          (finished) => {
+            if (finished && !visible && collapseOnHide) scheduleOnRN(clearRetained);
+          },
+        ),
+        ReduceMotion.System,
       ),
     );
     return () => {
       cancelled = true;
     };
-  }, [collapseOnHide, enterDuration, exitDuration, progress, visible]);
+  }, [collapseOnHide, enterDelay, enterDuration, exitDuration, progress, visible]);
 
   const contentStyle = useAnimatedStyle(() => ({
     opacity: progress.get(),

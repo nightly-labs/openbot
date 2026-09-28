@@ -12,6 +12,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
@@ -61,8 +62,10 @@ export function AddAgentScreen() {
         avatarSeed,
         avatarHue,
       });
+      void haptics.notification("success");
       setFinished(true);
     } catch (cause) {
+      void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.agent.add.failed")));
       pending.current = false;
       setSaving(false);
@@ -82,7 +85,10 @@ export function AddAgentScreen() {
           icon={isIOS ? "xmark" : undefined}
           accessibilityLabel={t("common.close")}
           disabled={saving}
-          onPress={() => router.back()}
+          onPress={() => {
+            void haptics.impact("soft");
+            router.back();
+          }}
         >
           {isIOS ? t("common.close") : "×"}
         </Stack.Toolbar.Button>

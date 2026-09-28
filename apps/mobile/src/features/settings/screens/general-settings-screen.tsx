@@ -16,6 +16,7 @@ import {
 } from "@/features/settings/model/dictation-language";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { useText } from "@/shared/lib/text";
 
@@ -33,7 +34,11 @@ function LanguageSection({ dark }: { dark: boolean }) {
               enabled={language.ready && !language.saving}
               onValueChange={(next) => {
                 setError(null);
-                void saveAppLanguage(next).catch(() => setError(t("mobile.settings.saveFailed")));
+                void haptics.selection();
+                void saveAppLanguage(next).catch(() => {
+                  setError(t("mobile.settings.saveFailed"));
+                  void haptics.notification("error");
+                });
               }}
             >
               {APP_LANGUAGE_OPTIONS.map((option) => (
@@ -87,7 +92,11 @@ function DictationSection({ dark }: { dark: boolean }) {
               enabled={language.ready && !language.saving}
               onValueChange={(next) => {
                 setError(null);
-                void saveDictationLanguage(next).catch(() => setError(t("mobile.settings.saveFailed")));
+                void haptics.selection();
+                void saveDictationLanguage(next).catch(() => {
+                  setError(t("mobile.settings.saveFailed"));
+                  void haptics.notification("error");
+                });
               }}
             >
               <Picker.Item label={t("mobile.settings.dictation.automatic")} value={AUTOMATIC_DICTATION_LANGUAGE} />
@@ -114,6 +123,7 @@ export function GeneralSettingsScreen() {
     setHapticsError(null);
     void saveHapticsPreference(enabled).catch(() => {
       setHapticsError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
     });
   }
   const analytics = useAnalyticsPreference();
@@ -125,6 +135,7 @@ export function GeneralSettingsScreen() {
     void saveAnalyticsPreference(enabled).catch(() => {
       setRetryAnalyticsValue(enabled);
       setAnalyticsError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
     });
   }
   const { value, ready, saving } = useAppearance();
@@ -143,7 +154,11 @@ export function GeneralSettingsScreen() {
                 enabled={ready && !saving}
                 onValueChange={(next) => {
                   setError(null);
-                  void saveAppearance(next).catch(() => setError(t("mobile.settings.appearance.saveFailed")));
+                  void haptics.selection();
+                  void saveAppearance(next).catch(() => {
+                    setError(t("mobile.settings.appearance.saveFailed"));
+                    void haptics.notification("error");
+                  });
                 }}
               >
                 <Picker.Item label={t("mobile.settings.appearance.system")} value="system" />

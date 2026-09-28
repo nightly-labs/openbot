@@ -4,6 +4,7 @@ import { Children, type PropsWithChildren, type ReactNode } from "react";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { haptics } from "@/shared/lib/haptics";
 
 export function SettingsContent({ children }: PropsWithChildren) {
   return (
@@ -95,7 +96,10 @@ export function SettingsRow({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        void haptics.impact("soft");
+        onPress();
+      }}
       className="min-h-12 flex-row items-center gap-3 px-4 py-3"
       style={({ pressed }) => ({ opacity: disabled ? 0.45 : pressed ? 0.6 : 1 })}
     >

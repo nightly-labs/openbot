@@ -62,6 +62,8 @@ export function ConversationView(props: ConversationProps) {
         onDrop={(event) => {
           event.preventDefault();
           setDropActive(false);
+          // The desktop preload imports a dropped file; a client with its own runtime imports it here.
+          if (props.runtime?.importFiles) void props.runtime.importFiles([...(event.dataTransfer?.files ?? [])]);
         }}
       >
         <MessageSelectionActions

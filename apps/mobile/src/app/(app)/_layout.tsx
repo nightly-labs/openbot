@@ -134,6 +134,22 @@ function AuthenticatedStack() {
           }}
         />
         <Stack.Screen
+          name="install-agent"
+          options={{
+            contentStyle: { backgroundColor: sheetBackground },
+            headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+            headerTransparent: isIOS,
+            headerBlurEffect: "none",
+            scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+            presentation: "formSheet",
+            // A page to read before adding: full height, as the agent search.
+            sheetAllowedDetents: [1],
+            sheetInitialDetentIndex: "last",
+            sheetGrabberVisible: true,
+            title: t("mobile.app.route.addSharedAgent"),
+          }}
+        />
+        <Stack.Screen
           name="section-form"
           options={{
             contentStyle: { backgroundColor: sheetBackground },

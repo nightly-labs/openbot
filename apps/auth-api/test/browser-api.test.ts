@@ -7,6 +7,37 @@ import { RemoteControlPlaneError } from "../src/server/remote-control-plane";
 const token = "a".repeat(43);
 const user = { id: "account-one", email: "one@example.test", name: null, avatarUrl: null };
 const logoVersion = "9b2f0c1e-4d5a-4b6c-8d7e-0f1a2b3c4d5e";
+const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const storedAvatars = new Set<string>();
+const unusedBucketMethod = () => {
+  throw new Error("Unused");
+};
+const avatars: R2Bucket = {
+  async put(key) {
+    storedAvatars.add(key);
+    return {
+      key,
+      version: "1",
+      size: PNG.byteLength,
+      etag: "etag",
+      httpEtag: '"etag"',
+      checksums: { toJSON: () => ({}) },
+      uploaded: new Date(),
+      storageClass: "Standard",
+      customMetadata: {},
+      httpMetadata: { contentType: "image/png" },
+      writeHttpMetadata() {},
+    } satisfies R2Object;
+  },
+  async delete(keys) {
+    for (const key of Array.isArray(keys) ? keys : [keys]) storedAvatars.delete(key);
+  },
+  head: unusedBucketMethod,
+  get: unusedBucketMethod,
+  list: unusedBucketMethod,
+  createMultipartUpload: unusedBucketMethod,
+  resumeMultipartUpload: unusedBucketMethod,
+};
 function setup() {
   const services: BrowserApiServices = {
     auth: {
@@ -14,7 +45,12 @@ function setup() {
       verifyEmailCode: vi.fn().mockResolvedValue({ sessionToken: token, user }),
       authenticate: vi.fn().mockResolvedValue(user),
       enforceTeamInviteRateLimit: vi.fn().mockResolvedValue(undefined),
+      updateName: vi.fn().mockResolvedValue({ ...user, name: "One" }),
+      updateAvatar: vi.fn().mockImplementation(async (_token, avatarUrl) => ({ ...user, avatarUrl })),
+      listAccountSessions: vi.fn().mockResolvedValue([]),
+      revokeAccountSession: vi.fn().mockResolvedValue(undefined),
     },
+    avatarBucket: () => avatars,
     remote: {
       listHosts: vi.fn().mockResolvedValue([]),
       startSession: vi.fn().mockResolvedValue({ sessionId: "session", hostId: "host", expiresAt: 100 }),
@@ -295,6 +331,101 @@ describe("browser account boundary", () => {
         expect((await handleBrowserApi(request(stale, { cookie }), services)).status).toBe(404);
       }
       expect(services.hostLogo).not.toHaveBeenCalled();
+    });
+  });
+  describe("account profile, avatar and sessions", () => {
+    const cookie = `__Host-openbot-web=${token}`;
+    const sessionId = "9b2f7c1e-8d4a-4b3c-9e2f-1a2b3c4d5e6f";
+    function avatarUpload(options: { contentType?: string; origin?: string; csrf?: string; cookie?: string } = {}) {
+      return new Request("https://openbot.test/api/browser/v1/me/avatar", {
+        method: "PUT",
+        headers: {
+          "Content-Type": options.contentType ?? "image/png",
+          Origin: options.origin ?? "https://openbot.test",
+          "X-OpenBot-Browser": options.csrf ?? "1",
+          ...(options.cookie === undefined ? { Cookie: cookie } : options.cookie ? { Cookie: options.cookie } : {}),
+        },
+        body: PNG,
+      });
+    }
+    const operations: [string, string, object | undefined][] = [
+      ["PATCH", "v1/me/profile", { name: "One" }],
+      ["DELETE", "v1/me/avatar", undefined],
+      ["DELETE", `v1/me/sessions/${sessionId}`, undefined],
+    ];
+    it.each(operations)("%s %s requires the browser cookie", async (method, path, body) => {
+      const services = setup();
+      expect((await handleBrowserApi(request(path, { method, body }), services)).status).toBe(401);
+      expect((await handleBrowserApi(request("v1/me/sessions"), services)).status).toBe(401);
+      expect((await handleBrowserApi(avatarUpload({ cookie: "" }), services)).status).toBe(401);
+      expect(services.auth.updateName).not.toHaveBeenCalled();
+      expect(services.auth.updateAvatar).not.toHaveBeenCalled();
+      expect(services.auth.listAccountSessions).not.toHaveBeenCalled();
+      expect(services.auth.revokeAccountSession).not.toHaveBeenCalled();
+    });
+    it.each(operations)("%s %s refuses a foreign origin or a missing CSRF header", async (method, path, body) => {
+      const services = setup();
+      for (const refused of [
+        request(path, { method, body, cookie, origin: "https://attacker.test" }),
+        request(path, { method, body, cookie, csrf: "" }),
+        avatarUpload({ origin: "https://attacker.test" }),
+        avatarUpload({ csrf: "" }),
+      ]) {
+        expect((await handleBrowserApi(refused, services)).status).toBe(403);
+      }
+      expect(services.auth.updateName).not.toHaveBeenCalled();
+      expect(services.auth.updateAvatar).not.toHaveBeenCalled();
+      expect(services.auth.revokeAccountSession).not.toHaveBeenCalled();
+    });
+    it("accepts image bytes only for the avatar upload", async () => {
+      const services = setup();
+      expect((await handleBrowserApi(avatarUpload({ contentType: "text/plain" }), services)).status).toBe(403);
+      expect((await handleBrowserApi(avatarUpload({ contentType: "application/json" }), services)).status).toBe(403);
+      const profileAsImage = new Request("https://openbot.test/api/browser/v1/me/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "image/png",
+          Origin: "https://openbot.test",
+          "X-OpenBot-Browser": "1",
+          Cookie: cookie,
+        },
+        body: PNG,
+      });
+      expect((await handleBrowserApi(profileAsImage, services)).status).toBe(403);
+      expect(services.auth.updateAvatar).not.toHaveBeenCalled();
+      expect(services.auth.updateName).not.toHaveBeenCalled();
+    });
+    it("acts on the account of the browser cookie", async () => {
+      const services = setup();
+      const renamed = await handleBrowserApi(
+        request("v1/me/profile", { method: "PATCH", body: { name: "One" }, cookie }),
+        services,
+      );
+      expect(await renamed.json()).toMatchObject({ name: "One" });
+      expect(services.auth.updateName).toHaveBeenCalledWith(token, "One");
+
+      // Avatar object keys take a UUID account ID.
+      const accountId = "4c7e2a91-3b5d-4f8e-a1c2-6d9e0f1a2b3c";
+      vi.mocked(services.auth.authenticate).mockResolvedValue({ ...user, id: accountId });
+      const uploaded = await handleBrowserApi(avatarUpload(), services);
+      expect(uploaded.status).toBe(200);
+      expect(services.auth.updateAvatar).toHaveBeenCalledWith(
+        token,
+        expect.stringMatching(new RegExp(`^/v1/avatars/${accountId}\\?v=`, "u")),
+        null,
+      );
+      expect(storedAvatars.size).toBe(1);
+
+      const listed = await handleBrowserApi(request("v1/me/sessions", { cookie }), services);
+      expect(await listed.json()).toEqual({ sessions: [] });
+      expect(services.auth.listAccountSessions).toHaveBeenCalledWith(token);
+
+      const revoked = await handleBrowserApi(
+        request(`v1/me/sessions/${sessionId}`, { method: "DELETE", cookie }),
+        services,
+      );
+      expect(revoked.status).toBe(204);
+      expect(services.auth.revokeAccountSession).toHaveBeenCalledWith(token, sessionId);
     });
   });
 });

@@ -5,7 +5,7 @@ import {
 } from "../src/routes/[.]well-known/apple-app-site-association";
 
 describe("Apple app site association", () => {
-  it("associates only the canonical invitation path with the signed desktop and mobile apps", async () => {
+  it("associates invitations with both signed apps and shared agents with the mobile app only", async () => {
     const response = createAppleAppSiteAssociationResponse();
 
     expect(response.status).toBe(200);
@@ -18,7 +18,7 @@ describe("Apple app site association", () => {
       },
       {
         appID: "ZTRDTUL87R.run.openbot.mobile",
-        paths: ["/join"],
+        paths: ["/join", "/agents/*"],
       },
     ]);
   });

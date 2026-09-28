@@ -516,6 +516,7 @@ export function ChatComposer({
                 className="min-h-12 flex-row justify-start gap-3 rounded-none px-4"
                 accessibilityLabel={t("mobile.chat.composer.mention", { name: agent.name })}
                 onPress={() => {
+                  void haptics.selection();
                   const next = insertMention(latestTextRef.current, query, agent);
                   latestTextRef.current = next;
                   onChangeDraft(next);
@@ -619,7 +620,10 @@ export function ChatComposer({
                   size="sm"
                   variant="ghost"
                   accessibilityLabel={t("mobile.chat.composer.cancelReply")}
-                  onPress={onCancelReply}
+                  onPress={() => {
+                    void haptics.selection();
+                    onCancelReply();
+                  }}
                 >
                   <X color={String(muted)} size={16} />
                 </Button>
@@ -650,8 +654,14 @@ export function ChatComposer({
                       disabled={sending || attachments.preparing}
                       foreground={foreground}
                       raised={raised}
-                      onPreview={() => setPreviewId(item.id)}
-                      onRemove={() => attachments.remove(item.id)}
+                      onPreview={() => {
+                        void haptics.impact("soft");
+                        setPreviewId(item.id);
+                      }}
+                      onRemove={() => {
+                        void haptics.selection();
+                        attachments.remove(item.id);
+                      }}
                     />
                   ))}
                 </ScrollView>
@@ -719,6 +729,7 @@ export function ChatComposer({
                             onChangeDraft(pasted.draft);
                           })
                           .catch((error) => {
+                            void haptics.notification("error");
                             Alert.alert(
                               t("mobile.chat.composer.pasteFailed"),
                               error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),

@@ -1,5 +1,6 @@
 import type { AgentEvent, ChannelSummary, SidebarLayoutSnapshot, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { remoteHostFingerprint } from "@openbot/team-client";
 import type { RemoteTeamConnectionUpdate } from "@openbot/team-client/remote-peer";
@@ -17,7 +18,14 @@ const native = vi.hoisted(() => ({
   storage: new Map<string, string>(),
 }));
 const sent = vi.hoisted((): { method: string; path: string; body: unknown }[] => []);
-const host = {
+const host: {
+  hostId: string;
+  name: string;
+  logoKey: string | null;
+  devicePublicKey: string;
+  membershipId: string;
+  role: string;
+} = {
   hostId: "host",
   name: "Desktop",
   logoKey: null,
@@ -60,6 +68,8 @@ vi.mock("expo-secure-store", () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: "device-only",
 }));
 let sidebarSupported = false;
+let hostAdminSupported = false;
+let identityFailure: Error | null = null;
 const initialLayout: SidebarLayoutSnapshot = {
   revision: 1,
   sections: [
@@ -111,7 +121,10 @@ vi.mock("../components/remote-team-transport", () => ({
             return decode({
               appVersion: "test",
               protocol: { minimum: 3, maximum: 3 },
-              capabilities: sidebarSupported ? ["sidebar-layout"] : [],
+              capabilities: [
+                ...(sidebarSupported ? ["sidebar-layout"] : []),
+                ...(hostAdminSupported ? [HOST_ADMIN_CAPABILITY] : []),
+              ],
             });
           if (path === TEAM_API_ROUTES.agents.all)
             return decode(
@@ -127,6 +140,10 @@ vi.mock("../components/remote-team-transport", () => ({
               })),
             );
           if (path === TEAM_API_ROUTES.agents.conversationReads) return decode({});
+          if (path === HOST_ADMIN_ROUTES.identity) {
+            if (identityFailure) throw identityFailure;
+            return decode({});
+          }
           throw new Error(`Unexpected request: ${path}`);
         },
       }),
@@ -153,6 +170,9 @@ afterEach(async () => {
   sent.length = 0;
   reconnectSnapshot = null;
   sidebarSupported = false;
+  hostAdminSupported = false;
+  identityFailure = null;
+  Object.assign(host, { name: "Desktop", logoKey: null, role: "owner" });
   sidebarRequest.mockReset();
   sidebarRequest.mockResolvedValue(initialLayout);
 });
@@ -426,4 +446,68 @@ it("stops a running turn through the interrupt route", async () => {
     path: TEAM_API_ROUTES.agent.interrupt("working"),
     body: { turnId: "running-turn" },
   });
+});
+
+async function mountWorkspace() {
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <MobileWorkspaceProvider>
+          <Workspace />
+        </MobileWorkspaceProvider>
+      </QueryClientProvider>,
+    ),
+  );
+}
+
+it("saves and removes the server logo and name through the host, then reads the new logo key", async () => {
+  hostAdminSupported = true;
+  await mountWorkspace();
+  // The directory as it is after the host saved the change.
+  Object.assign(host, { name: "Research lab", logoKey: "logo-2" });
+  await act(() =>
+    current.updateServerIdentity(host.hostId, {
+      serverName: "Research lab",
+      logo: { mimeType: "image/jpeg", bytes: new Uint8Array([1, 2, 3]) },
+    }),
+  );
+  expect(sent.at(-1)).toEqual({
+    method: "POST",
+    path: HOST_ADMIN_ROUTES.identity,
+    body: { serverName: "Research lab", logo: { mimeType: "image/jpeg", data: "AQID" } },
+  });
+  expect(current.servers[0]).toMatchObject({ name: "Research lab", logoKey: "logo-2" });
+
+  host.logoKey = null;
+  await act(() => current.updateServerIdentity(host.hostId, { logo: null }));
+  expect(sent.at(-1)?.body).toEqual({ logo: null });
+  expect(current.servers[0]?.logoKey).toBeNull();
+});
+
+it("keeps the saved name when the host refuses the change", async () => {
+  hostAdminSupported = true;
+  identityFailure = new Error("Upload failed.");
+  await mountWorkspace();
+  await expect(act(() => current.updateServerIdentity(host.hostId, { serverName: "Other name" }))).rejects.toThrow(
+    "Upload failed.",
+  );
+  expect(current.servers[0]?.name).toBe("Desktop");
+});
+
+it("does not send an identity change for a member", async () => {
+  hostAdminSupported = true;
+  host.role = "member";
+  await mountWorkspace();
+  const before = sent.length;
+  await expect(current.updateServerIdentity(host.hostId, { serverName: "Other name" })).rejects.toThrow();
+  expect(current.canEditServerIdentity(host.hostId)).toBe(false);
+  expect(sent).toHaveLength(before);
+});
+
+it("applies a name and logo change that another client made", async () => {
+  await mountWorkspace();
+  await act(async () =>
+    emit({ type: "team-identity", serverId: host.hostId, serverName: "Renamed", logoVersion: "logo-3" }),
+  );
+  expect(current.servers[0]).toMatchObject({ name: "Renamed", logoKey: "logo-3" });
 });

@@ -12,6 +12,7 @@ import { moveServerId } from "@/features/workspace/model/server-order";
 import { serverStatusLabel } from "@/features/workspace/model/server-status";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
@@ -74,6 +75,7 @@ export function ServerDrawerContent({
 
   // A drag cut short by leaving edit mode never reports its end, so leaving also releases the scroll lock.
   const stopEditing = () => {
+    void haptics.selection();
     setEditing(false);
     setDragging(false);
   };

@@ -7,6 +7,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface SettingsPort {
   getAnalyticsPreference: OpenBotDesktopApi["getAnalyticsPreference"];
   getApprovalAutomation: OpenBotDesktopApi["getApprovalAutomation"];
+  onApprovalAutomation: OpenBotDesktopApi["onApprovalAutomation"];
   onOpenSettings: OpenBotDesktopApi["onOpenSettings"];
   setAnalyticsPreference: OpenBotDesktopApi["setAnalyticsPreference"];
   setApprovalAutomation: OpenBotDesktopApi["setApprovalAutomation"];

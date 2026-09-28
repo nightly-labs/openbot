@@ -83,6 +83,7 @@ export class ApprovalAutomation {
   #preference: ApprovalAutomationPreference;
   #pendingWrite: Promise<unknown> = Promise.resolve();
   readonly #deletingAgentIds = new Set<string>();
+  readonly #listeners = new Set<(preference: ApprovalAutomationPreference) => void>();
 
   constructor(options: ApprovalAutomationOptions) {
     this.#path = options.path;
@@ -112,6 +113,15 @@ export class ApprovalAutomation {
 
   turboEnabled(): boolean {
     return this.#preference.turbo;
+  }
+
+  /**
+   * Called after each saved change. A remote admin can change a grant through `agent-admin-v1`, so
+   * the local window cannot rely on its own writes to know the current value.
+   */
+  subscribe(listener: (preference: ApprovalAutomationPreference) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   set(input: SetApprovalAutomationInput): Promise<ApprovalAutomationPreference> {
@@ -151,7 +161,9 @@ export class ApprovalAutomation {
       this.#preference = previous;
       throw error;
     }
-    return this.current();
+    const saved = this.current();
+    for (const listener of this.#listeners) listener(this.current());
+    return saved;
   }
 
   #next(input: SetApprovalAutomationInput): ApprovalAutomationPreference {

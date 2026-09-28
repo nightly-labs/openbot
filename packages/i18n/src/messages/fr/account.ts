@@ -13,6 +13,7 @@ export const messages = {
   "account.dock.updateBadge": "Mise à jour",
   "account.dock.updateAvailable": "Mise à jour d’OpenBot disponible",
   "account.menu.account": "Compte",
+  "account.menu.profile": "Profil",
   "account.menu.settings": "Réglages",
   "account.menu.marketplace": "Marketplace",
   "account.menu.providersPermissions": "Fournisseurs et autorisations",

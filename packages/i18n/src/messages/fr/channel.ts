@@ -20,6 +20,7 @@ export const messages = {
   "channel.composer.placeholder": "Message à {name}",
   "channel.composer.attach": "Joindre des fichiers",
   "channel.composer.send": "Envoyer le message",
+  "channel.composer.stop": "Arrêter le travail",
   "channel.panel.label": "Panneau du canal",
   "channel.panel.close": "Fermer le panneau du canal",
   "channel.settings.title": "Réglages du canal",

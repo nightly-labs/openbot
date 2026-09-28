@@ -4,6 +4,7 @@ import { ChevronLeft, SwitchCamera } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { cubicBezier, useReducedMotion } from "react-native-reanimated";
+import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 // The preview arrives when the hardware is ready, which is not when the panel
@@ -61,8 +62,10 @@ export function ChatCameraContent({
       busyRef.current = false;
       setBusy(false);
       onBusyChange(false);
+      void haptics.notification("success");
       onCaptured(photo.uri);
     } catch (cause) {
+      void haptics.notification("error");
       if (mounted.current)
         setError(cause instanceof Error ? sourceText(cause.message) : t("mobile.chat.camera.captureFailed"));
     } finally {
@@ -111,7 +114,10 @@ export function ChatCameraContent({
           className="size-12 rounded-full bg-black/60"
           accessibilityLabel={t("mobile.chat.camera.close")}
           isDisabled={busy}
-          onPress={onCancel}
+          onPress={() => {
+            void haptics.impact("soft");
+            onCancel();
+          }}
         >
           <ChevronLeft color="white" size={25} />
         </Button>
@@ -130,6 +136,7 @@ export function ChatCameraContent({
           accessibilityLabel={t("mobile.chat.camera.switch")}
           isDisabled={busy}
           onPress={() => {
+            void haptics.selection();
             setReady(false);
             setError(null);
             setFacing((current) => (current === "back" ? "front" : "back"));

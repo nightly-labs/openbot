@@ -2,13 +2,14 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/mobile/search";
 
 export const messages = {
-  "mobile.search.filter.all": "すべて",
-  "mobile.search.filter.messages": "メッセージ",
-  "mobile.search.filter.agents": "エージェント",
-  "mobile.search.filter.files": "ファイル",
-  "mobile.search.filter.routines": "ルーティン",
-  "mobile.search.filterResults": "結果を絞り込み、{filter}",
   "mobile.search.clear": "検索をクリア",
   "mobile.search.emptyTitle": "一致する結果はありません",
-  "mobile.search.emptyBody": "別の検索語を試すか、別のフィルターを選択してください。",
+  "mobile.search.emptyBody": "別の検索語をお試しください。",
+  "mobile.search.searching": "メッセージを検索中…",
+  "mobile.search.errorTitle": "メッセージを検索できませんでした",
+  "mobile.search.errorBody": "このコンピューターへの接続を確認して、もう一度お試しください。",
+  "mobile.search.retry": "もう一度試す",
+  "mobile.search.showMore": "さらにメッセージを表示",
+  "mobile.search.fromYou": "あなた → {name} · {time}",
+  "mobile.search.toYou": "{name} → あなた · {time}",
 } as const satisfies PartialTranslation<typeof source>;

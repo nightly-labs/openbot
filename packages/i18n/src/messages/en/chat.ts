@@ -32,6 +32,7 @@ export const messages = defineMessages("chat", {
   "chat.awaiting.state.failed": "Failed",
   "chat.awaiting.readsNext": "{name} reads it next",
   "chat.awaiting.working": "{name} is working",
+  "chat.awaiting.dismiss": "Hide this list",
   "chat.marker.status.queued": "Queued",
   "chat.marker.status.inProgress": "In progress",
   "chat.marker.status.needsAttention": "Needs attention",

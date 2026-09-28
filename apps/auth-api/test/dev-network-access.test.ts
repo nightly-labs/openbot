@@ -25,6 +25,9 @@ describe("development Auth API LAN access", () => {
       "/v2/remote/invites/preview",
       "/v2/remote/invites/accept",
       "/v2/remote/hosts/host-1/members/member-1",
+      "/v2/remote/hosts/host-1/logo?v=logo-version",
+      "/v1/agent-templates/AbCdEfGhIjKlMnOpQrSt_-",
+      "/v1/agent-templates/AbCdEfGhIjKlMnOpQrSt_-/avatar",
     ]) {
       expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(true);
     }
@@ -34,7 +37,10 @@ describe("development Auth API LAN access", () => {
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/devices/session-id/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/me/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/avatars/user-id/other")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/agent-templates/mine")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/agent-templates/template-id/card")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/register")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/host-1/logo/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/sessions/session-1/other")).toBe(false);
   });
 });

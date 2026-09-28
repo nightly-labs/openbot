@@ -4,6 +4,9 @@
 export function createChatNavigationGate() {
   let transitioning = false;
   let pending: { navigate: () => void; isFocused: () => boolean } | null = null;
+  // The home rows that open each chat. A chat opened from the search sheet goes through its row, so
+  // the chat has the row's zoom source and zooms back into the row when it closes.
+  const openers = new Map<string, () => void>();
 
   function flush() {
     if (transitioning || !pending?.isFocused()) return;
@@ -37,6 +40,19 @@ export function createChatNavigationGate() {
     cancel() {
       transitioning = false;
       pending = null;
+    },
+    /** Registers the home row that opens a chat. Returns a function that removes it. */
+    registerOpener(chatId: string, open: () => void) {
+      openers.set(chatId, open);
+      return () => {
+        if (openers.get(chatId) === open) openers.delete(chatId);
+      };
+    },
+    /** Opens a chat through its home row. Returns false when the home screen shows no row for it. */
+    openFromHome(chatId: string): boolean {
+      const open = openers.get(chatId);
+      open?.();
+      return Boolean(open);
     },
   };
 }

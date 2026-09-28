@@ -33,6 +33,7 @@ export const messages = {
   "chat.awaiting.state.failed": "Échec",
   "chat.awaiting.readsNext": "{name} la lira ensuite",
   "chat.awaiting.working": "{name} travaille",
+  "chat.awaiting.dismiss": "Masquer cette liste",
   "chat.marker.status.queued": "En attente",
   "chat.marker.status.inProgress": "En cours",
   "chat.marker.status.needsAttention": "Attention requise",

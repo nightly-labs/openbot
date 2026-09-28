@@ -1,5 +1,5 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
+import { decodeTeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { createRemoteTeamPeer, RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
@@ -148,7 +148,8 @@ export function createWebHostConnections(options: {
         });
         if (!response.ok || (response.status ?? 500) >= 400) throw failed(response.error);
         const support = decodeTeamProtocolSupportV1(response.body);
-        if (support.protocol.minimum > TEAM_PROTOCOL_V3 || support.protocol.maximum < TEAM_PROTOCOL_V3) {
+        // The same rule as opening the host, so the rail and the open agree.
+        if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
           entry.incompatible = true;
           recovery.suspend();
         }

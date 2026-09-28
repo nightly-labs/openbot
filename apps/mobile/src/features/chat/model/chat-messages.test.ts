@@ -1,6 +1,6 @@
-import type { ConversationMessage } from "@openbot/contracts/ipc";
+import type { ConversationMessage, QueueDelivery } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
-import { latestReadableMessage, projectChatMessages } from "./chat-messages";
+import { latestReadableMessage, projectChatMessages, withFailureReasons } from "./chat-messages";
 
 function planMessage(text: string, status: ConversationMessage["status"], plan?: ConversationMessage["plan"]) {
   return {
@@ -63,5 +63,79 @@ describe("mobile plan messages", () => {
     const messages = [answer, planMessage("- [ ] Patch", "interrupted")];
     const plan = projectChatMessages(messages).find((item) => item.kind === "plan");
     expect([plan?.kind === "plan" && plan.stopped, latestReadableMessage(messages)?.id]).toEqual([true, "answer"]);
+  });
+});
+
+function userMessage(id: string, status: ConversationMessage["status"]): ConversationMessage {
+  return {
+    id,
+    author: "user",
+    source: "user",
+    text: `Question ${id}`,
+    createdAt: `2026-09-28T10:00:0${id.length}.000Z`,
+    status,
+    delivery: { id, status: status === "failed" ? "failed" : "completed", position: null },
+  };
+}
+
+function delivery(id: string, status: QueueDelivery["status"], error: string | null): QueueDelivery {
+  return {
+    id,
+    messageId: `message-${id}`,
+    recipientAgentId: "agent-1",
+    sender: { kind: "user" },
+    text: `Question ${id}`,
+    attachments: [],
+    replyToMessageId: null,
+    status,
+    position: null,
+    turnId: `turn-${id}`,
+    error,
+    createdAt: "2026-09-28T10:00:00.000Z",
+  };
+}
+
+function reasons(messages: ReturnType<typeof projectChatMessages>) {
+  return messages.flatMap((message) =>
+    message.kind === "message" ? [{ id: message.id, status: message.status, reason: message.failureReason }] : [],
+  );
+}
+
+describe("withFailureReasons", () => {
+  it("puts the reason of a failed delivery under its own user message only", () => {
+    const projected = projectChatMessages([userMessage("a", "completed"), userMessage("bb", "failed")]);
+    const result = withFailureReasons(projected, [
+      delivery("a", "completed", null),
+      delivery("bb", "failed", "You have hit your usage limit."),
+    ]);
+    expect(reasons(result)).toEqual([
+      { id: "a", status: "completed", reason: undefined },
+      { id: "bb", status: "failed", reason: "You have hit your usage limit." },
+    ]);
+  });
+
+  it("keeps a failed message without a reason until the queue reports one", () => {
+    const projected = projectChatMessages([userMessage("a", "failed")]);
+    // Before the queue loads, after a reconnect, or for a delivery the host keeps no reason for.
+    expect(reasons(withFailureReasons(projected, []))).toEqual([{ id: "a", status: "failed", reason: undefined }]);
+    expect(reasons(withFailureReasons(projected, [delivery("a", "failed", null)]))).toEqual([
+      { id: "a", status: "failed", reason: undefined },
+    ]);
+    const loaded = withFailureReasons(projected, [delivery("a", "failed", "Provider stopped.")]);
+    expect(reasons(loaded)).toEqual([{ id: "a", status: "failed", reason: "Provider stopped." }]);
+    // A refreshed queue with the same reason keeps the same item, so the row does not render again.
+    expect(withFailureReasons(projected, [delivery("a", "failed", "Provider stopped.")])[0]).toBe(loaded[0]);
+  });
+
+  it("shows no reason after the message is sent again and its turn completes", () => {
+    const projected = projectChatMessages([userMessage("a", "failed"), userMessage("bb", "completed")]);
+    const result = withFailureReasons(projected, [
+      delivery("a", "failed", "Provider stopped."),
+      delivery("bb", "completed", null),
+    ]);
+    expect(reasons(result)).toEqual([
+      { id: "a", status: "failed", reason: "Provider stopped." },
+      { id: "bb", status: "completed", reason: undefined },
+    ]);
   });
 });

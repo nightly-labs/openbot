@@ -6,6 +6,7 @@ export const messages = {
   "mobile.app.route.actionsNeeded": "必要な操作",
   "mobile.app.route.newChannel": "新しいチャンネル",
   "mobile.app.route.createAgent": "エージェントを作成",
+  "mobile.app.route.addSharedAgent": "共有エージェントを追加",
   "mobile.app.route.newSection": "新しいセクション",
   "mobile.app.route.settings": "設定",
   "mobile.app.route.profile": "プロフィール",

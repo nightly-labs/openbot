@@ -33,6 +33,7 @@ export const messages = {
   "chat.awaiting.state.failed": "失敗",
   "chat.awaiting.readsNext": "次に {name} が読みます",
   "chat.awaiting.working": "{name} が作業中",
+  "chat.awaiting.dismiss": "この一覧を非表示",
   "chat.marker.status.queued": "待機中",
   "chat.marker.status.inProgress": "進行中",
   "chat.marker.status.needsAttention": "対応が必要",

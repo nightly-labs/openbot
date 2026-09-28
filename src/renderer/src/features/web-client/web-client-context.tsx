@@ -26,7 +26,12 @@ import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import type { WebHostState } from "./web-host-lock";
-import { createWebWorkspaceRuntime, type WebRuntimeEvents, type WebWorkspaceRuntime } from "./web-runtime";
+import {
+  createWebWorkspaceRuntime,
+  WebHostIncompatibleError,
+  type WebRuntimeEvents,
+  type WebWorkspaceRuntime,
+} from "./web-runtime";
 import { orderWebHosts, readWebServerOrder, writeWebServerOrder } from "./web-server-order";
 
 interface WebConversation {
@@ -41,6 +46,8 @@ interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
   host: RemoteTeamHost | null;
   agents: AgentSummary[];
+  /** The host answered an agent list. Until then, an empty `agents` does not mean the host has none. */
+  agentsLoaded: boolean;
   selectedId: string | null;
   conversations: Record<string, WebConversation>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
@@ -55,6 +62,14 @@ interface WebWorkspaceState {
   status: "connecting" | "online" | "offline";
   /** The state of each host that this tab has not opened, from its status connection. */
   hostStates: Record<string, WebHostState>;
+  /** The last connection found that the host speaks no protocol this build speaks. */
+  incompatibility: {
+    hostId: string;
+    code: WebHostIncompatibleError["code"];
+    message: string;
+    hostAppVersion: string;
+    hostProtocol: { minimum: number; maximum: number };
+  } | null;
   hostsLoaded: boolean;
   hostsLoading: boolean;
   hostsError: string | null;
@@ -92,6 +107,7 @@ export function createWebWorkspace(
     hosts: [],
     host: null,
     agents: [],
+    agentsLoaded: false,
     selectedId: null,
     conversations: {},
     approvals: [],
@@ -104,6 +120,7 @@ export function createWebWorkspace(
     capabilities: [],
     status: "offline",
     hostStates: {},
+    incompatibility: null,
     hostsLoaded: false,
     hostsLoading: false,
     hostsError: null,
@@ -127,6 +144,7 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  const readWrites = new Map<string, Promise<void>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -164,6 +182,7 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.revocationRevision += 1;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.selectedId = null;
             draft.approvals = [];
@@ -358,6 +377,7 @@ export function createWebWorkspace(
     setState((draft) => {
       const removed = draft.agents.filter((agent) => !ids.has(agent.id)).map((agent) => agent.id);
       draft.agents = agents;
+      draft.agentsLoaded = true;
       draft.hiddenIds = draft.hiddenIds.filter((id) => ids.has(id));
       draft.duplicatingAgentIds = draft.duplicatingAgentIds.filter((id) => ids.has(id));
       for (const id of removed) delete draft.conversations[id];
@@ -397,6 +417,7 @@ export function createWebWorkspace(
             draft.memberId = null;
             draft.selectedId = null;
             draft.agents = [];
+            draft.agentsLoaded = false;
             draft.conversations = {};
             draft.approvals = [];
             draft.prompts = [];
@@ -488,6 +509,7 @@ export function createWebWorkspace(
       draft.status = "connecting";
       draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
+      draft.agentsLoaded = false;
       draft.selectedId = null;
       if (!sameHost) {
         draft.conversations = {};
@@ -511,6 +533,7 @@ export function createWebWorkspace(
       draft.capabilities = [];
       draft.presence = null;
       draft.error = null;
+      draft.incompatibility = null;
     });
     try {
       const capabilities = await runtime.connect(host);
@@ -527,6 +550,7 @@ export function createWebWorkspace(
       setState((draft) => {
         draft.capabilities = capabilities;
         draft.agents = agents;
+        draft.agentsLoaded = true;
         draft.status = "online";
         draft.browserTabs = browserTabs;
         draft.activeBrowserTabId = browserTabs[0]?.id ?? null;
@@ -558,8 +582,17 @@ export function createWebWorkspace(
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.status = "offline";
+        // The workspace shows an incompatible host in full, so it is not also reported as an error.
+        if (error instanceof WebHostIncompatibleError)
+          draft.incompatibility = {
+            hostId: host.hostId,
+            code: error.code,
+            message: error.message,
+            hostAppVersion: error.hostAppVersion,
+            hostProtocol: { ...error.hostProtocol },
+          };
       });
-      report(error);
+      if (!(error instanceof WebHostIncompatibleError)) report(error);
     }
   }
   async function load(id: string, older = false) {
@@ -723,6 +756,26 @@ export function createWebWorkspace(
         });
     }
   }
+  /** Marks the selected agent's messages read through the newest loaded one. Writes for one agent run in order. */
+  function markRead() {
+    const id = selectedId;
+    if (!id || state.status !== "online") return Promise.resolve();
+    const current = generation;
+    const write = (readWrites.get(id) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const page = state.conversations[id]?.page;
+        if (!page || disposed || current !== generation) return;
+        const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
+        if (disposed || current !== generation) return;
+        setState((draft) => {
+          const value = draft.conversations[id]?.page;
+          if (value?.threadId === page.threadId) value.readState = readState;
+        });
+      });
+    readWrites.set(id, write);
+    return write;
+  }
   onSettled(() => {
     void refreshHosts().catch(report);
     const focus = () => {
@@ -770,6 +823,7 @@ export function createWebWorkspace(
     select,
     refresh,
     send,
+    markRead,
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

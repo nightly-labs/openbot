@@ -32,7 +32,7 @@ interface AgentUsagePanelProps {
   serverId: string;
   hostName: string;
   onBack: () => void;
-  /** The browser client reads the host through its own connection. The desktop app uses `window.openbot`. */
+  /** The web client reads the host through its own connection. The default is the desktop bridge. */
   port?: UsagePort;
 }
 interface UsageState {
@@ -47,6 +47,7 @@ interface UsageState {
 
 export function AgentUsagePanel(props: AgentUsagePanelProps) {
   const { t } = useText();
+  const port = () => props.port ?? usagePort();
   const [state, setState] = createStore<UsageState>({
     range: { ...analyticsRange("range"), agentId: props.agentId },
     agents: [],
@@ -57,7 +58,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     serverId: props.serverId,
   });
   let generation = 0;
-  const port = () => props.port ?? usagePort();
   /**
    * A refresh nobody asked for keeps the report on screen. Clearing `result` unmounts
    * `AgentUsageReport`, which returns on the next response with its breakdown back to
