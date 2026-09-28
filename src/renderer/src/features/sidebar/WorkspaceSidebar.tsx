@@ -1,8 +1,11 @@
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
+import { IOS_TESTFLIGHT_URL } from "@openbot/ui/features/mobile-app/ios-testflight";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createMemo } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
+import { writeClipboardText } from "../../clipboard";
 import { useLayout } from "../../layout";
 import { DirectConversation } from "../../lazy-views";
 import { useNavigation } from "../../navigation";
@@ -19,6 +22,9 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { useSidebar } from "./sidebar-context";
+
+/** Dismissing the iOS beta card is a choice of this computer, like the sidebar width. */
+const MOBILE_APP_DISMISSED_STORAGE_KEY = "openbot:ios-beta-card-dismissed";
 
 /**
  * The list of Agents and people. It reads the most domains of any pane, and every
@@ -58,6 +64,9 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     reorderPinnedSidebarItems,
     reorderSidebarPeople,
   } = useSidebar();
+  const [mobileAppDismissed, setMobileAppDismissed] = createSignal(
+    window.localStorage.getItem(MOBILE_APP_DISMISSED_STORAGE_KEY) === "true",
+  );
 
   /* Channels reach the sidebar as data, not as a list of their own: they sit in the layout's
    * sections beside the agents, so the sidebar has to be able to order and group them. */
@@ -153,6 +162,17 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       onDeleteAgent={deleteAgent}
       compact={layout.leftPanelCompact()}
       onExpand={layout.expandSidebar}
+      footer={
+        <Show when={!platform.landingPreview && !mobileAppDismissed()}>
+          <SidebarMobileAppCard
+            onCopyInvite={() => writeClipboardText(IOS_TESTFLIGHT_URL)}
+            onDismiss={() => {
+              window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
+              setMobileAppDismissed(true);
+            }}
+          />
+        </Show>
+      }
       onOpenMarketplace={() => setSkillsMarketplaceOpen(true)}
       emptyAction={
         agentList().length === 0

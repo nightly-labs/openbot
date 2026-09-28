@@ -1,3 +1,4 @@
+import { Show } from "solid-js";
 import { SidebarDialogs } from "./SidebarDialogs";
 import { SidebarFrame } from "./SidebarFrame";
 import { SidebarNav } from "./SidebarNav";
@@ -16,6 +17,8 @@ export function Sidebar(props: SidebarProps) {
         <SidebarSearch />
 
         <SidebarNav />
+
+        <Show when={!props.compact}>{props.footer}</Show>
 
         <SidebarDialogs />
       </SidebarFrame>

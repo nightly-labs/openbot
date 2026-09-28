@@ -16,6 +16,9 @@ All notable changes to OpenBot will be documented here. The project follows
   are stored encrypted on your computer.
 - Edit a saved custom endpoint. An empty key field keeps the saved key. "Find again" loads the
   model list from the server.
+- The iPhone app is in public beta on TestFlight. A card at the bottom of the sidebar shows the
+  install steps and a QR code of the invite link. You can close the card. Settings > Mobile Connect
+  always shows the same steps, the QR code and a button that copies the link.
 
 ### Fixed
 

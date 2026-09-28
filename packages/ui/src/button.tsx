@@ -2,7 +2,7 @@ import { type ButtonRootProps, Root } from "@kobalte/core/button";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
 import type { ComponentProps, JSX, ValidComponent } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
-import { createEffect, createSignal, omit, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, omit, onCleanup, Show } from "solid-js";
 import { Check, Copy } from "./icons";
 import { Spinner } from "./surface";
 import { cx } from "./utils";
@@ -170,9 +170,38 @@ export function CopyButton(props: CopyButtonProps): JSX.Element {
       <Show when={copied()} fallback={<Copy aria-hidden="true" />}>
         <Check aria-hidden="true" />
       </Show>
-      <span class={props.iconOnly ? "sr-only" : undefined} aria-live="polite">
-        {copied() ? (props.copiedLabel ?? "Copied") : (props.label ?? "Copy")}
-      </span>
+      <Show
+        when={!props.iconOnly}
+        fallback={
+          <span class="sr-only" aria-live="polite">
+            {copied() ? (props.copiedLabel ?? "Copied") : (props.label ?? "Copy")}
+          </span>
+        }
+      >
+        <StableLabel labels={[props.label ?? "Copy", props.copiedLabel ?? "Copied"]} active={copied() ? 1 : 0} live />
+      </Show>
     </Button>
+  );
+}
+
+/**
+ * A label that swaps between texts without a change in width: every text takes the same grid cell,
+ * and only the active one is visible. A button that says "Copied" after a click does not push the
+ * text beside it to a new line.
+ */
+export function StableLabel(props: { labels: readonly string[]; active: number; live?: boolean }): JSX.Element {
+  return (
+    <span class="ui-stable-label">
+      <span class="ui-stable-label-text" aria-live={props.live ? "polite" : undefined}>
+        {props.labels[props.active]}
+      </span>
+      <For each={props.labels}>
+        {(label) => (
+          <span class="ui-stable-label-sizer" aria-hidden="true">
+            {label}
+          </span>
+        )}
+      </For>
+    </span>
   );
 }

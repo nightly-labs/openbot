@@ -8,6 +8,7 @@ import {
   AlertTitle,
   Button,
   CircleCheck,
+  CopyButton,
   Info,
   Item,
   ItemActions,
@@ -22,6 +23,7 @@ import {
 } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
+import { IOS_TESTFLIGHT_URL } from "../mobile-app/ios-testflight";
 import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
 
 interface SettingsMobileConnectTabProps {
@@ -43,6 +45,33 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   return (
     <SettingsSection title={t("settings.mobileConnect.title")} description={t("settings.mobileConnect.description")}>
+      {/* Always here, so the install steps stay available after the sidebar announcement is closed. */}
+      <ItemGroup class="settings-modal-card settings-mobile-connect-card">
+        <Item class="settings-modal-row settings-mobile-connect-action-row">
+          <ItemContent>
+            <ItemTitle>{t("settings.mobileConnect.iosApp.title")}</ItemTitle>
+            <ItemDescription>{t("settings.mobileConnect.iosApp.description")}</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <CopyButton
+              variant="outline"
+              value={IOS_TESTFLIGHT_URL}
+              label={t("settings.mobileConnect.iosApp.copyLink")}
+              copiedLabel={t("settings.mobileConnect.iosApp.linkCopied")}
+            />
+          </ItemActions>
+        </Item>
+        <div class="settings-mobile-app-install">
+          <QrCode value={IOS_TESTFLIGHT_URL} size={132} label={t("settings.mobileConnect.iosApp.qrLabel")} />
+          <ol class="settings-mobile-app-steps">
+            <li>{t("settings.mobileConnect.iosApp.step.testFlight")}</li>
+            <li>{t("settings.mobileConnect.iosApp.step.invite")}</li>
+            <li>{t("settings.mobileConnect.iosApp.step.install")}</li>
+            <li>{t("settings.mobileConnect.iosApp.step.signIn")}</li>
+          </ol>
+        </div>
+      </ItemGroup>
+
       <ItemGroup class="settings-modal-card settings-mobile-connect-card">
         <Item class="settings-modal-row settings-mobile-connect-action-row">
           <ItemContent>

@@ -90,6 +90,18 @@ export const messages = {
   "settings.disconnect.action": "接続を解除",
   "settings.disconnect.pending": "接続を解除しています…",
   "settings.mobileConnect.title": "スマートフォンを接続",
+  "settings.mobileConnect.iosApp.title": "iPhone アプリ",
+  "settings.mobileConnect.iosApp.description":
+    "iPhone 版 OpenBot は TestFlight で公開ベータ中です。インストールしてから、下でサインインします。",
+  "settings.mobileConnect.iosApp.copyLink": "リンクをコピー",
+  "settings.mobileConnect.iosApp.linkCopied": "リンクをコピーしました",
+  "settings.mobileConnect.iosApp.qrLabel": "TestFlight 招待の QR コード",
+  "settings.mobileConnect.iosApp.step.testFlight": "iPhone で App Store から TestFlight をインストールします。",
+  "settings.mobileConnect.iosApp.step.invite":
+    "iPhone のカメラでこの QR コードを読み取るか、招待リンクをコピーして iPhone で開きます。",
+  "settings.mobileConnect.iosApp.step.install": "TestFlight で「同意する」、次に「インストール」をタップします。",
+  "settings.mobileConnect.iosApp.step.signIn":
+    "iPhone で OpenBot を開きます。下で QR コードを生成し、読み取ってサインインします。",
   "settings.mobileConnect.description":
     "OpenBot モバイルアプリで 1 回限りのコードをスキャンすると、このアカウントをスマートフォンで使えます。",
   "settings.mobileConnect.signIn.title": "モバイルサインイン",

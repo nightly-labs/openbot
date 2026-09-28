@@ -2594,6 +2594,53 @@ textarea {
   );
 }
 
+/* The iOS beta card sits between the chat list and the dock, so the card keeps clear of the dock
+ * and the list only fades into the card. */
+.app-frame .sidebar-mobile-app {
+  margin-bottom: calc(52px + var(--openbot-space-2));
+}
+
+.app-frame:has(.account-dock-hybrid) .sidebar-mobile-app {
+  margin-bottom: calc(60px + var(--openbot-space-4));
+}
+
+.app-frame:has(.account-dock-hybrid):has(.sidebar-mobile-app) .agent-list {
+  padding-bottom: var(--openbot-space-2);
+  scroll-padding-bottom: var(--openbot-space-2);
+}
+
+.app-frame:has(.account-dock-hybrid):has(.sidebar-mobile-app) .agent-list.scroll-fade-bottom:not(.scroll-fade-top) {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) 0,
+    var(--openbot-text-primary) calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+.app-frame:has(.account-dock-hybrid):has(.sidebar-mobile-app) .agent-list.scroll-fade-top.scroll-fade-bottom {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--openbot-text-primary) 18px,
+    var(--openbot-text-primary) calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--openbot-text-primary) 18px,
+    var(--openbot-text-primary) calc(100% - 24px),
+    transparent 100%
+  );
+}
+
 .account-dock-hybrid {
   height: 60px;
   border-top: 0;
