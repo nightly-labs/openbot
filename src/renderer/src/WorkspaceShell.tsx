@@ -3,7 +3,6 @@ import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
-import { ChannelCreateDialog } from "./features/channels/ChannelCreateDialog";
 import { useChannels } from "./features/channels/channels-context";
 import { WorkspaceChannelConversation } from "./features/channels/WorkspaceChannelConversation";
 import { useDirectMessages } from "./features/conversation/direct-messages-context";
@@ -83,14 +82,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           )}
         </Show>
       }
-      after={
-        <>
-          <WorkspaceOverlays account={props.account} />
-          <Show when={channels.state.editing === "create"}>
-            <ChannelCreateDialog />
-          </Show>
-        </>
-      }
+      after={<WorkspaceOverlays account={props.account} />}
     >
       <Show when={agentSetupOpen()}>
         <WorkspaceAgentSetup />

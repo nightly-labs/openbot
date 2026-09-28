@@ -1,42 +1,36 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import { currentText } from "@openbot/ui/text";
 import { createMemo, Loading, Show } from "solid-js";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
 import { useAgents } from "./features/agents/agents-context";
-import { useConversationController } from "./features/conversation/conversation-controller-context";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
-import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
-import { remoteAdminServer, serverCanAdminister } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
-import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
-import {
-  AgentTemplateInstall,
-  GlobalSearch,
-  InitialSetup,
-  JoinServerDialog,
-  RemoteDesktopWorkspace,
-  ServerSettingsModal,
-  SettingsModal,
-  SkillsMarketplaceModal,
-} from "./lazy-views";
+import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
 import { useNavigation } from "./navigation";
 import { usePlatform } from "./platform";
 import { useProviders } from "./providers";
+import {
+  ChannelCreateOverlay,
+  GlobalSearchOverlay,
+  JoinServerOverlay,
+  MarketplaceOverlay,
+  ServerSettingsOverlay,
+  SharedAgentInstallOverlay,
+} from "./WorkspaceOverlayViews";
 
 interface AccountProps {
   account: () => CentralAuthUser;
@@ -54,6 +48,9 @@ interface AccountProps {
  * single-use modules at the renderer root because each is a dozen lines of
  * wiring, and the list of what can cover the workspace is worth reading in one
  * place.
+ *
+ * The overlays the web client also raises are views in `WorkspaceOverlayViews`, which take props:
+ * the components here read the desktop contexts and pass them on.
  */
 export function WorkspaceOverlays(props: AccountProps) {
   return (
@@ -66,6 +63,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
       <RemoteDesktop />
+      <ChannelCreateOverlay />
     </>
   );
 }
@@ -109,85 +107,23 @@ function PermissionsReview(props: AccountProps) {
 function SkillsMarketplace() {
   const { skillsMarketplaceOpen, setSkillsMarketplaceOpen, pendingPluginSlug, setPendingPluginSlug } = useSettings();
   const { agentList, activeAgent, agentStatus, agentSetupOpen, creatingAgent } = useAgents();
-  const controller = useConversationController();
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const manage = createMemo(() => serverCanAdminister(activeServer(), "skills-admin-v1"));
-  const hostServerId = () => remoteAdminServer(activeServer(), "skills-admin-v1")?.id;
-  const agentServerId = () => remoteAdminServer(activeServer(), "agent-install-v1")?.id;
-  /* What both example controls need: a managed agent whose composer is free to take another line. */
-  const composerFree = createMemo(
-    () =>
-      manage() &&
-      agentStatus().phase === "ready" &&
-      !controller.submitting() &&
-      !controller.selectionSending() &&
-      controller.voicePhase() === "idle" &&
-      !controller.editingDeliveryId() &&
-      !(agentSetupOpen() && creatingAgent()),
-  );
 
   return (
-    <Show when={skillsMarketplaceOpen()}>
-      <Loading>
-        <SkillsMarketplaceModal
-          open={true}
-          agents={manage() ? agentList() : []}
-          activeAgentId={manage() ? (activeAgent()?.id ?? "") : ""}
-          hostServerId={hostServerId()}
-          agentServerId={agentServerId()}
-          agentUpdateServerId={remoteAdminServer(activeServer(), "agent-update-v1")?.id}
-          onOpenChange={(open) => {
-            /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
-               hand lands on the catalog rather than on the listing a link once named. */
-            if (!open) setPendingPluginSlug(null);
-            setSkillsMarketplaceOpen(open);
-          }}
-          onTrySkill={
-            composerFree()
-              ? (agentId, skill) => {
-                  const server = activeServer();
-                  if (
-                    !serverCanAdminister(server, "skills-admin-v1") ||
-                    !agentList().some((agent) => agent.id === agentId)
-                  )
-                    return;
-                  selectAgent(agentId);
-                  controller.appendSkillExample({ serverId: server.id, agentId }, skill);
-                  setSkillsMarketplaceOpen(false);
-                }
-              : undefined
-          }
-          onAgentInstalled={openInstalledMarketplaceAgent}
-          plugins={MARKETPLACE_PLUGINS}
-          initialPluginSlug={pendingPluginSlug() ?? undefined}
-          onInitialPluginSlugConsumed={() => setPendingPluginSlug(null)}
-          /* A plugin's app is an MCP server, which the host holds. A joined server takes one over
-             `mcp-servers-v1` from an admin, as the agents list does; a member browses the listings
-             and installs nothing. */
-          pluginServerId={
-            manage() && serverCanAdminister(activeServer(), MCP_SERVERS_CAPABILITY) ? activeServer()?.id : undefined
-          }
-          pluginHostName={manage() ? remoteAdminServer(activeServer(), MCP_SERVERS_CAPABILITY)?.name : undefined}
-          onRunPluginPrompt={
-            composerFree()
-              ? (agentId, prompt) => {
-                  const server = activeServer();
-                  if (
-                    !serverCanAdminister(server, "skills-admin-v1") ||
-                    !agentList().some((agent) => agent.id === agentId)
-                  )
-                    return;
-                  selectAgent(agentId);
-                  controller.appendPluginPrompt({ serverId: server.id, agentId }, prompt.text);
-                  setSkillsMarketplaceOpen(false);
-                }
-              : undefined
-          }
-        />
-      </Loading>
-    </Show>
+    <MarketplaceOverlay
+      open={skillsMarketplaceOpen()}
+      onOpenChange={setSkillsMarketplaceOpen}
+      server={activeServer()}
+      agents={agentList()}
+      activeAgentId={activeAgent()?.id ?? ""}
+      composerAvailable={agentStatus().phase === "ready" && !(agentSetupOpen() && creatingAgent())}
+      onOpenAgent={selectAgent}
+      onAgentInstalled={openInstalledMarketplaceAgent}
+      pluginSlug={pendingPluginSlug()}
+      onPluginSlugConsumed={() => setPendingPluginSlug(null)}
+    />
   );
 }
 
@@ -201,16 +137,12 @@ function SharedAgentInstall() {
   const { activeServer } = useServers();
 
   return (
-    <Show when={pendingAgentTemplateId()}>
-      <Loading>
-        <AgentTemplateInstall
-          templateId={pendingAgentTemplateId()}
-          server={remoteAdminServer(activeServer(), "agent-install-v1")}
-          onClose={() => setPendingAgentTemplateId(null)}
-          onInstalled={openInstalledMarketplaceAgent}
-        />
-      </Loading>
-    </Show>
+    <SharedAgentInstallOverlay
+      templateId={pendingAgentTemplateId()}
+      server={activeServer()}
+      onClose={() => setPendingAgentTemplateId(null)}
+      onInstalled={openInstalledMarketplaceAgent}
+    />
   );
 }
 
@@ -221,20 +153,17 @@ function JoinServer(props: AccountProps) {
   const { joinServer } = useServerSelection();
 
   return (
-    <Show when={joinServerOpen()}>
-      <Loading>
-        <JoinServerDialog
-          inviteUrl={setup.pendingInviteUrl()}
-          accountEmail={props.account().email}
-          onClose={() => {
-            setJoinServerOpen(false);
-            setup.setPendingInviteUrl("");
-          }}
-          onPreview={setup.previewInvite}
-          onJoin={joinServer}
-        />
-      </Loading>
-    </Show>
+    <JoinServerOverlay
+      open={joinServerOpen()}
+      inviteUrl={setup.pendingInviteUrl()}
+      accountEmail={props.account().email}
+      onClose={() => {
+        setJoinServerOpen(false);
+        setup.setPendingInviteUrl("");
+      }}
+      onPreview={setup.previewInvite}
+      onJoin={joinServer}
+    />
   );
 }
 
@@ -282,12 +211,6 @@ function ServerSettings() {
     testMcpServer,
   } = useServerSettings();
 
-  /**
-   * The gate on the whole feature: the tab and the panel both hang off `mcpServers`. A remote host
-   * answers 403 to a `member` and 400 without the capability, so neither ever sees the section.
-   */
-  const canUseMcp = (server: ServerSummary) => serverCanAdminister(server, MCP_SERVERS_CAPABILITY);
-
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -298,73 +221,66 @@ function ServerSettings() {
     });
   };
 
-  /** A remote host without `storage-v1` has no Storage section at all. */
-  const storageOptions = (server: ServerSummary): ServerStorageOptions | undefined => {
-    if (!serverHasStorage(server)) return undefined;
-    return {
-      hostName:
-        server.kind === "local"
-          ? platform.appInfo()?.platform === "darwin"
-            ? currentText().t("app.host.thisMac")
-            : currentText().t("app.host.thisComputer")
-          : server.name,
-      canManage: canManageStorage(server),
-      onOpenAgent: (agentId) => openOnServer(server, agentId, () => selectAgent(agentId)),
-      onShowMessage: (agentId, messageId) =>
-        openOnServer(server, agentId, () => selectGlobalSearchMessage(agentId, messageId)),
-    };
-  };
+  const storageOptions = (server: ServerSummary): Omit<ServerStorageOptions, "canManage"> => ({
+    hostName:
+      server.kind === "local"
+        ? platform.appInfo()?.platform === "darwin"
+          ? currentText().t("app.host.thisMac")
+          : currentText().t("app.host.thisComputer")
+        : server.name,
+    onOpenAgent: (agentId) => openOnServer(server, agentId, () => selectAgent(agentId)),
+    onShowMessage: (agentId, messageId) =>
+      openOnServer(server, agentId, () => selectGlobalSearchMessage(agentId, messageId)),
+  });
 
   return (
     <Show when={serverSettingsTarget()}>
       {(server) => (
-        <Loading>
-          <ServerSettingsModal
-            open={serverSettingsOpen()}
-            onOpenChange={setServerSettingsOpen}
-            restoreFocusTarget={serverSettingsRestoreTarget()}
-            platform={platform.appInfo()?.platform ?? "darwin"}
-            server={server()}
-            hostStatus={server().kind === "local" ? hostStatus() : null}
-            members={serverSettingsMembers()}
-            invites={serverSettingsInvites()}
-            loading={serverSettingsLoading()}
-            loadError={serverSettingsError()}
-            onRetry={() => refreshServerSettings(server().id)}
-            onSaveIdentity={saveServerIdentity}
-            onSetPublished={setServerPublished}
-            onSetMuted={(muted) => setServerMuted(server().id, muted)}
-            onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
-            onCreateInvite={createServerInvite}
-            onUpdateMember={updateServerMember}
-            onRemoveMember={removeServerMember}
-            onRevokeInvite={revokeServerInvite}
-            onLeaveServer={leaveServer}
-            onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
-            onRecheckScreenRecording={recheckScreenRecording}
-            mcpServers={canUseMcp(server()) ? serverSettingsMcp() : undefined}
-            // Only for the computer whose runtimes this window holds: another host starts its servers
-            // with its own runtime, which this window has not read.
-            mcpToolRuntimeNote={holdsToolRuntimes(server()) ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
-            mcpLoadError={serverSettingsMcpError()}
-            onMcpSectionShown={() => void refreshMcpServers()}
-            onRetryMcpServers={() => void refreshMcpServers()}
-            onSaveMcpServer={saveMcpServer}
-            onRemoveMcpServer={removeMcpServer}
-            onSetMcpServerEnabled={setMcpServerEnabled}
-            onTestMcpServer={testMcpServer}
-            storage={storageOptions(server())}
-            // Agents import into this computer only; a remote host has no Import section.
-            agentImport={
-              server().kind === "local"
-                ? {
-                    onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)),
-                    onClose: () => setServerSettingsOpen(false),
-                  }
-                : undefined
-            }
-          />
-        </Loading>
+        <ServerSettingsOverlay
+          open={serverSettingsOpen()}
+          onOpenChange={setServerSettingsOpen}
+          restoreFocusTarget={serverSettingsRestoreTarget()}
+          platform={platform.appInfo()?.platform ?? "darwin"}
+          server={server()}
+          hostStatus={server().kind === "local" ? hostStatus() : null}
+          members={serverSettingsMembers()}
+          invites={serverSettingsInvites()}
+          loading={serverSettingsLoading()}
+          loadError={serverSettingsError()}
+          onRetry={() => refreshServerSettings(server().id)}
+          onSaveIdentity={saveServerIdentity}
+          onSetPublished={setServerPublished}
+          onSetMuted={(muted) => setServerMuted(server().id, muted)}
+          onSetNotificationLevel={(level) => setServerNotificationLevel(server().id, level)}
+          onCreateInvite={createServerInvite}
+          onUpdateMember={updateServerMember}
+          onRemoveMember={removeServerMember}
+          onRevokeInvite={revokeServerInvite}
+          onLeaveServer={leaveServer}
+          onOpenScreenRecordingSettings={() => appPort().openExternal("mac-screen-recording")}
+          onRecheckScreenRecording={recheckScreenRecording}
+          mcpServers={serverSettingsMcp()}
+          // Only for the computer whose runtimes this window holds: another host starts its servers
+          // with its own runtime, which this window has not read.
+          mcpToolRuntimeNote={holdsToolRuntimes(server()) ? mcpToolRuntimeNote(toolRuntimeStatuses().bun) : null}
+          mcpLoadError={serverSettingsMcpError()}
+          onMcpSectionShown={() => void refreshMcpServers()}
+          onRetryMcpServers={() => void refreshMcpServers()}
+          onSaveMcpServer={saveMcpServer}
+          onRemoveMcpServer={removeMcpServer}
+          onSetMcpServerEnabled={setMcpServerEnabled}
+          onTestMcpServer={testMcpServer}
+          storage={storageOptions(server())}
+          // Agents import into this computer only; a remote host has no Import section.
+          agentImport={
+            server().kind === "local"
+              ? {
+                  onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)),
+                  onClose: () => setServerSettingsOpen(false),
+                }
+              : undefined
+          }
+        />
       )}
     </Show>
   );
@@ -497,18 +413,14 @@ function GlobalMessageSearch() {
     useNavigation();
 
   return (
-    <Show when={globalSearchOpen()}>
-      <Loading>
-        <GlobalSearch
-          open={true}
-          agents={agentList()}
-          onSearchMessages={searchGlobalMessages}
-          onOpenChange={setGlobalSearchVisibility}
-          onSelectAgent={selectAgent}
-          onSelectMessage={selectGlobalSearchMessage}
-        />
-      </Loading>
-    </Show>
+    <GlobalSearchOverlay
+      open={globalSearchOpen()}
+      agents={agentList()}
+      onSearchMessages={searchGlobalMessages}
+      onOpenChange={setGlobalSearchVisibility}
+      onSelectAgent={selectAgent}
+      onSelectMessage={selectGlobalSearchMessage}
+    />
   );
 }
 

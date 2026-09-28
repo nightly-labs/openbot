@@ -69,6 +69,10 @@ account dock, and full conversation view. `ConversationRuntime` routes host acti
 the browser connection; its desktop default is the preload API. The desktop `WorkspaceShell` and the
 web client draw the same `WorkspaceFrame` under `LayoutProvider`, so the rail geometry, the sidebar
 resizer and compact modes, the compatibility screen, and the usage report slot are the same on both.
+The overlays that both clients raise - join, marketplace, shared agent, server settings, global
+search and channel creation - are prop-driven views in `WorkspaceOverlayViews.tsx`.
+`WorkspaceOverlays` fills them from the desktop contexts, and the web client fills them from its
+host connection, so what an overlay decides from its server is decided in one place.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
 Small screens switch between the same conversation and workspace components. The shared browser
@@ -1398,7 +1402,10 @@ loads, so the page loads the avatar and its colour in the browser after hydratio
 `openbot://agents/<id>`, the third renderer link kind in
 `src/main/deep-link-router.ts`. The app then shows the template in `AgentTemplateInstallDialog`;
 like a plugin link, the link itself installs nothing. The page's fallback line also links
-`/app?agent=<id>`, where the browser client shows the same preview.
+`/app?agent=<id>`, where the browser client shows the same preview. In the same way, the invitation
+page links `/app` with the four invitation fields, and a plugin page links `/app?plugin=<slug>`. The
+browser client removes these fields after it reads them and opens the join dialog or the marketplace
+listing. It never joins or installs without a press.
 
 ## macOS Host Manager
 
