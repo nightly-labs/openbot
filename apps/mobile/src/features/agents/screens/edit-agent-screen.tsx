@@ -7,13 +7,18 @@ import { useThemeColor } from "heroui-native/hooks";
 import { Pencil } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
+import { AgentAccessFields } from "@/features/agents/components/agent-access-fields";
 import { AgentAppearancePicker } from "@/features/agents/components/agent-appearance-picker";
 import { AgentInformation } from "@/features/agents/components/agent-information";
 import { type AgentPhotoDraft, AgentPhotoPicker } from "@/features/agents/components/agent-photo-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  type MobileAgent,
+  type MobileServer,
+  useMobileWorkspace,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -48,7 +53,9 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   if (agent) lastAgent.current = agent;
   const displayed = agent ?? lastAgent.current;
   if (displayed) {
-    return <AgentForm agent={displayed} available={Boolean(agent && host?.state === "online")} page={page} />;
+    return (
+      <AgentForm agent={displayed} host={host} available={Boolean(agent && host?.state === "online")} page={page} />
+    );
   }
   return (
     <SheetScrollView className="bg-sheet" contentContainerClassName="p-5 pb-safe-offset-5">
@@ -59,7 +66,17 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   );
 }
 
-function AgentForm({ agent, available, page }: { agent: MobileAgent; available: boolean; page: AgentPage }) {
+function AgentForm({
+  agent,
+  host,
+  available,
+  page,
+}: {
+  agent: MobileAgent;
+  host: MobileServer | undefined;
+  available: boolean;
+  page: AgentPage;
+}) {
   const { t, errorMessage } = useText();
   const { updateAgent, setAgentAvatar } = useMobileWorkspace();
   const navigation = useNavigation();
@@ -265,6 +282,7 @@ function AgentForm({ agent, available, page }: { agent: MobileAgent; available: 
           onChange={change}
         />
       ) : null}
+      {page === "runtime" ? <AgentAccessFields agent={agent} server={host} available={available} /> : null}
       {page === "usage" ||
       page === "memories" ||
       page === "skills" ||

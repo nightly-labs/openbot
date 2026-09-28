@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
+import { router, useLocalSearchParams, usePreventZoomTransitionDismissal } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { ArrowLeft } from "lucide-react-native";
@@ -14,21 +14,14 @@ export function AgentChatScreen() {
     unstable_dismissalBoundsRect: { minX: 0, maxX: 24 },
   });
 
-  const { avatarTransition, agentId } = useLocalSearchParams<{ avatarTransition?: string; agentId: string }>();
+  const { agentId } = useLocalSearchParams<{ agentId: string }>();
   const { agents } = useMobileWorkspace();
   const foreground = useThemeColor("foreground");
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
-  const resolvedAvatarTransition = Array.isArray(avatarTransition) ? avatarTransition[0] : avatarTransition;
-  const animateAvatarOnExit = resolvedAvatarTransition === "search";
   const agent = agents.find((candidate) => candidate.id === resolvedAgentId);
 
   if (agent) {
-    return (
-      <>
-        <Stack.Screen options={{ animation: animateAvatarOnExit ? "fade" : "slide_from_right" }} />
-        <MobileChatView key={`${agent.serverId}:${agent.id}`} animateAvatarOnExit={animateAvatarOnExit} agent={agent} />
-      </>
-    );
+    return <MobileChatView key={`${agent.serverId}:${agent.id}`} agent={agent} />;
   }
 
   return (

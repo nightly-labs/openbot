@@ -852,6 +852,8 @@ export async function createApplicationServices({
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
   });
+  // A grant changed on this computer must reach the phones and web clients that show it.
+  approvalAutomation.subscribe(() => service.notifyAgentsChanged());
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),

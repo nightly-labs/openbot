@@ -59,10 +59,13 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
     !prefersReducedMotion();
   let targetBody = untrack(() => initialMessage.body);
   let targetStreaming = untrack(() => initialMessage.author === "agent" && initialMessage.streaming === true);
+  /* A virtual chat row can show a different message later. The reveal buffer belongs to one
+     message id, so the row does not keep the text of the message it showed first. */
+  let shownId = untrack(() => initialMessage.id);
   /* A plain copy of `body`, because the signal can still hold its earlier value until the
      next flush. */
   let shownBody = animateInitialText ? "" : targetBody;
-  const [body, setBody] = createSignal(shownBody);
+  const [buffer, setBuffer] = createSignal({ id: shownId, text: shownBody });
   const [trail, setTrail] = createSignal<StreamingRevealChunk[]>([]);
   const [animateTail, setAnimateTail] = createSignal(false);
   const [smoothHeight, setSmoothHeight] = createSignal(targetStreaming || animateInitialText);
@@ -78,7 +81,7 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
 
   const showBody = (next: string) => {
     shownBody = next;
-    setBody(next);
+    setBuffer({ id: shownId, text: next });
   };
   const clearRevealTimer = () => {
     if (revealTimer === undefined) return;
@@ -140,17 +143,20 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
 
   createEffect(
     () => ({
+      id: message().id,
       body: message().body,
       streaming: message().author === "agent" && message().streaming === true,
     }),
-    ({ body: nextBody, streaming }) => {
+    ({ id, body: nextBody, streaming }) => {
+      const replaced = id !== shownId;
+      shownId = id;
       targetBody = nextBody;
       targetStreaming = streaming;
       if (streaming) {
         smoothingActive = true;
         keepHeightSmoothingActive();
       }
-      if (prefersReducedMotion() || !nextBody.startsWith(shownBody) || (!streaming && !smoothingActive)) {
+      if (replaced || prefersReducedMotion() || !nextBody.startsWith(shownBody) || (!streaming && !smoothingActive)) {
         clearRevealTimer();
         revealBudget = 0;
         setAnimateTail(false);
@@ -171,6 +177,13 @@ function createStreamingBody(message: () => AgentMessage, animate?: boolean) {
   onCleanup(() => {
     clearRevealTimer();
     if (smoothHeightTimer !== undefined) window.clearTimeout(smoothHeightTimer);
+  });
+  /* The effect above runs after the render. Until it does, and if a later update does not reach
+     it, a buffer of another message, or one that is not the start of the body, shows the body. */
+  const body = createMemo(() => {
+    const current = message();
+    const shown = buffer();
+    return shown.id === current.id && current.body.startsWith(shown.text) ? shown.text : current.body;
   });
   const revealing = createMemo(() => message().streaming === true || body() !== message().body);
   return { animateTail, body, smoothHeight, revealing, trail };

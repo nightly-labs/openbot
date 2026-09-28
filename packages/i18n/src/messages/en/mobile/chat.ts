@@ -179,6 +179,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.upload.cancelled": "Attachment upload cancelled.",
   "mobile.chat.upload.uploaded": "Uploaded",
   "mobile.chat.upload.uploadingLabel": "Uploading",
+  "mobile.chat.failure.title": "Not answered",
+  "mobile.chat.failure.fallback": "The agent stopped before it could answer. Send the message again to try again.",
   "mobile.chat.reply.to": "Reply to: {text}",
   "mobile.chat.reply.attachment": "Attachment",
   "mobile.chat.reply.unavailable": "Message unavailable",

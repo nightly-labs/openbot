@@ -50,9 +50,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "figma",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: true,
-      detailSha256: "2443f0184dd650d5b0e735de31853e3a7d48fdcb1b9538472c4e5450f6c81746",
+      detailSha256: "e28db6313e77ca00d6173b94c1bc2ed47735896aa770414a3fb7891543ef26f3",
     },
     {
       slug: "paper",
@@ -348,11 +348,11 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Figma",
     tagline: "Designs and prototypes",
     description:
-      "Figma lets agents read design files, inspect components and styles, extract assets, and hand production specs to engineers. Note: browser sign-in does not work yet, because Figma has not approved OpenBot as an MCP client. Only the local MCP server works: turn it on in the Figma desktop app (Dev Mode), then add a custom http MCP server with the URL http://127.0.0.1:3845/mcp.",
+      "Figma lets agents read design files, inspect components, styles and variables, and hand production specs to engineers. It connects to the MCP server in the Figma desktop app, on this computer. The server can read designs only; write support is in progress.",
     category: "design",
     creatorName: "figma.com",
     iconUrl: "https://static.figma.com/app/icon/1/favicon.ico",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-handoff", text: "Hand off the checkout file: list screens, components, and styles." },
       { id: "prompt-audit", text: "Audit this file for inconsistent spacing and color use." },
@@ -363,13 +363,27 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         id: "app-figma-mcp",
         name: "Figma",
         description:
-          "File reading, component inspection, and asset extraction, over Figma's MCP server. Browser sign-in does not work yet; use the local MCP server from the Figma desktop app.",
+          "Design context, metadata, variables and screenshots, over the MCP server in the Figma desktop app. Read-only for now.",
         iconUrl: "https://static.figma.com/app/icon/1/favicon.ico",
         server: {
-          name: "figma",
+          name: "figma-desktop",
           transport: "http",
-          url: "https://mcp.figma.com/mcp",
-          auth: [{ id: "figma-oauth", kind: "link", label: "Sign in" }],
+          url: "http://127.0.0.1:3845/mcp",
+          auth: [
+            {
+              id: "figma-desktop",
+              label: "Figma desktop app",
+              kind: "local",
+              steps: [
+                "Open the Figma desktop app and sign in. The server needs a Dev or Full seat on a paid plan.",
+                "Open a design file from a team project, not from Drafts.",
+                'Press ⌘K (Ctrl+K on Windows), search for "MCP", and turn on "Enable desktop MCP server".',
+                "Keep Figma open while agents use it.",
+              ],
+              note: "The local server can only read designs: layout, code context, variables and screenshots. It cannot draw or edit yet. We are working on write support.",
+              docsUrl: "https://developers.figma.com/docs/figma-mcp-server/local-server-installation/",
+            },
+          ],
         },
       },
     ],

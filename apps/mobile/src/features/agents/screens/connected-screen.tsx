@@ -39,8 +39,6 @@ import { useText } from "@/shared/lib/text";
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
-// Agent search is not available in the current mobile release, so keep its entry points hidden until it is ready.
-const IS_AGENT_SEARCH_ENABLED = false;
 
 function TransitioningChatRow({
   chatId,
@@ -410,14 +408,12 @@ export function ConnectedScreen() {
           headerRight: isAndroid
             ? () => (
                 <View className="flex-row items-center gap-1">
-                  {IS_AGENT_SEARCH_ENABLED ? (
-                    <HeaderIconButton
-                      accessibilityLabel={t("mobile.agent.home.searchAgents")}
-                      onPress={() => router.push("/search-agents")}
-                    >
-                      <Search color={iconColor} size={22} strokeWidth={1.9} />
-                    </HeaderIconButton>
-                  ) : null}
+                  <HeaderIconButton
+                    accessibilityLabel={t("mobile.agent.home.searchAgents")}
+                    onPress={() => router.push("/search-agents")}
+                  >
+                    <Search color={iconColor} size={22} strokeWidth={1.9} />
+                  </HeaderIconButton>
                   <MenuView
                     actions={optionsActions}
                     onPressAction={(event) => {
@@ -456,10 +452,13 @@ export function ConnectedScreen() {
             </Stack.Toolbar.View>
           </Stack.Toolbar>
           <Stack.Toolbar placement="right">
-            {IS_AGENT_SEARCH_ENABLED ? (
-              <Stack.Toolbar.Button icon="magnifyingglass" onPress={() => router.push("/search-agents")} />
-            ) : null}
-            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")}>
+            <Stack.Toolbar.Button
+              icon="magnifyingglass"
+              accessibilityLabel={t("mobile.agent.home.searchAgents")}
+              separateBackground
+              onPress={() => router.push("/search-agents")}
+            />
+            <Stack.Toolbar.Menu icon="plus" accessibilityLabel={t("mobile.agent.home.chatOptions")} separateBackground>
               <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => router.push("/add-agent")}>
                 {t("mobile.agent.home.addAgent")}
               </Stack.Toolbar.MenuAction>

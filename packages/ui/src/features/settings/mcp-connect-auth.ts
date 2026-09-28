@@ -63,7 +63,23 @@ export interface McpKeyFlow extends McpConnectFlowBase {
   docsLabel?: string;
 }
 
-export type McpConnectFlow = McpLinkFlow | McpKeyFlow;
+/**
+ * A server that another app on this computer runs, such as a desktop app's own MCP server. Nothing
+ * is typed and nothing is signed in to: the user turns the server on in that app, and the dialog
+ * connects to the listing's loopback address to see that it answers.
+ */
+export interface McpLocalFlow extends McpConnectFlowBase {
+  kind: "local";
+  /** What the user does in the other app, in order. One short sentence each. */
+  steps: string[];
+  /** What the server can and cannot do, such as a server that only reads. */
+  note?: string;
+  /** The app's own setup page. Opened externally; never fetched here. */
+  docsUrl?: string | null;
+  docsLabel?: string;
+}
+
+export type McpConnectFlow = McpLinkFlow | McpKeyFlow | McpLocalFlow;
 
 /** Every way into one server. The first is the one the dialog opens on. Empty is a server that
  *  asks for nothing, which still connects: a server that is down is found before an agent has it. */

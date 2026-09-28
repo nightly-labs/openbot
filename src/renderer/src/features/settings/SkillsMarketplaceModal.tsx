@@ -43,6 +43,7 @@ import { CATEGORY_LABELS, MarketplaceCatalog } from "@openbot/ui/features/settin
 import { MarketplacePluginDetail, PluginIcon } from "@openbot/ui/features/settings/MarketplacePluginDetail";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import { McpKeyDialog } from "@openbot/ui/features/settings/McpKeyDialog";
+import { McpLocalDialog } from "@openbot/ui/features/settings/McpLocalDialog";
 import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
 import type {
   MarketplacePluginApp,
@@ -391,10 +392,16 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       setError(t("marketplace.error.installNoAgent"));
       return;
     }
-    /* A browser sign-in saves its grant on the computer that finishes it, so an app that asks for
-       one is installed on the host itself. */
-    if (props.hostServerId && plugin.apps.some((app) => app.server.auth?.[0]?.kind === "link")) {
-      setError(t("marketplace.error.installOnHost", { name: plugin.name }));
+    /* A browser sign-in saves its grant on the computer that finishes it, and a local server
+       answers only on the computer that runs it, so an app that asks for either is installed on
+       the host itself. */
+    const hostOnly = plugin.apps.find((app) => ["link", "local"].includes(app.server.auth?.[0]?.kind ?? ""));
+    if (props.hostServerId && hostOnly) {
+      const key =
+        hostOnly.server.auth?.[0]?.kind === "local"
+          ? "marketplace.error.installLocalOnHost"
+          : "marketplace.error.installOnHost";
+      setError(t(key, { name: plugin.name }));
       return;
     }
     setBusy(`plugin:${plugin.id}`);
@@ -1362,6 +1369,19 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
                   onCancel={() => pending.settle(null)}
                   onOpenUrl={openPluginUrl}
                   hostName={props.pluginHostName}
+                />
+              )}
+            </Match>
+            <Match when={pending.flow.kind === "local" ? pending.flow : null} keyed>
+              {(flow) => (
+                <McpLocalDialog
+                  open={true}
+                  subject={pending.subject}
+                  flow={flow}
+                  onTest={testPluginApp}
+                  onConnected={(config) => pending.settle(config)}
+                  onCancel={() => pending.settle(null)}
+                  onOpenUrl={openPluginUrl}
                 />
               )}
             </Match>

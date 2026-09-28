@@ -372,6 +372,9 @@ export const IPC_ENDPOINTS = {
     setApprovalAutomation: request<SetApprovalAutomationInput, ApprovalAutomationPreference>()(
       "app:set-approval-automation",
     ),
+    // A remote owner or admin can change a grant from a phone or the web client, so main tells the
+    // window instead of the window only reading the value at start.
+    approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getAppLanguagePreference: request<undefined, AppLanguagePreference>()("app:get-language-preference"),
     setAppLanguagePreference: request<SetAppLanguagePreferenceInput, AppLanguagePreference>()(
       "app:set-language-preference",

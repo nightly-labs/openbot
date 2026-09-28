@@ -242,9 +242,12 @@ const Settings = createSimpleContext({
       };
       window.addEventListener("keydown", handleSettingsShortcut);
       const unsubscribe = settingsPort().onOpenSettings(() => openAppSettings());
+      // A remote owner or admin can change an agent's grant from a phone or the web client.
+      const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
       return () => {
         window.removeEventListener("keydown", handleSettingsShortcut);
         unsubscribe();
+        unsubscribeApprovals();
       };
     });
 

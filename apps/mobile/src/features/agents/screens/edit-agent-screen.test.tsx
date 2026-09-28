@@ -1,4 +1,5 @@
 import {
+  type AgentAdminSettings,
   type AgentAnalytics,
   type AgentMemory,
   analyticsRange,
@@ -14,6 +15,7 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   type StorageUsage,
+  type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
@@ -212,6 +214,14 @@ const workspace = {
     async () => null,
   ),
   deleteStoredFile: vi.fn(async () => {}),
+  loadAgentAdminSettings: vi.fn<(agentId: string, serverId: string) => Promise<AgentAdminSettings | null>>(
+    async () => null,
+  ),
+  updateAgentAdminSettings: vi.fn<
+    (input: UpdateAgentAdminSettingsInput, serverId: string) => Promise<AgentAdminSettings>
+  >(async () => {
+    throw new Error("unexpected");
+  }),
 };
 vi.mock("@/features/workspace/context/mobile-workspace-context", () => ({ useMobileWorkspace: () => workspace }));
 vi.mock("@/features/auth/context/mobile-session-context", () => ({
@@ -574,6 +584,8 @@ beforeEach(() => {
   workspace.loadAgentSkills.mockReset().mockResolvedValue([]);
   workspace.loadAgentStorage.mockReset().mockResolvedValue(null);
   workspace.deleteStoredFile.mockReset().mockResolvedValue();
+  workspace.loadAgentAdminSettings.mockReset().mockResolvedValue(null);
+  workspace.updateAgentAdminSettings.mockReset();
   mocks.shareFile.mockClear();
   channelRows = [channel];
   actionTasks = [];
@@ -994,6 +1006,81 @@ it("saves a supported model and reasoning level on the original host", async () 
     { agentId: original.id, model: "model-one", reasoningEffort: "high" },
     host.id,
   );
+});
+
+it.each([
+  ["a member", "member", { access: "workspace", autoApprove: false, autoApproveLocked: false }],
+  ["a host without agent-admin-v1", "admin", null],
+] as const)("hides access controls for %s", async (_case, role, settings) => {
+  workspace.servers = [{ ...host, role }];
+  workspace.loadAgentAdminSettings.mockResolvedValue(settings);
+  workspace.loadAgentModels.mockClear();
+  await renderSheet("runtime");
+  await waitFor(() => expect(workspace.loadAgentModels).toHaveBeenCalled());
+  if (role === "member") expect(workspace.loadAgentAdminSettings).not.toHaveBeenCalled();
+  else await waitFor(() => expect(workspace.loadAgentAdminSettings).toHaveBeenCalledWith(original.id, host.id));
+  await act(async () => {});
+  expect(screen.queryByRole("switch", { name: "Auto approve" })).toBeNull();
+  expect(screen.queryByDisplayValue("Workspace only")).toBeNull();
+});
+
+it("saves access and auto-approve on the host for an admin", async () => {
+  workspace.servers = [{ ...host, role: "admin" }];
+  let saved: AgentAdminSettings = { access: "workspace", autoApprove: false, autoApproveLocked: false };
+  workspace.loadAgentAdminSettings.mockImplementation(async () => saved);
+  workspace.updateAgentAdminSettings.mockImplementation(async ({ agentId: _agentId, ...input }) => {
+    saved = { ...saved, ...input };
+    return saved;
+  });
+  await renderSheet("runtime");
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("disabled", false));
+  await click("Auto approve", "switch");
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true));
+  expect(workspace.updateAgentAdminSettings).toHaveBeenLastCalledWith(
+    { agentId: original.id, autoApprove: true },
+    host.id,
+  );
+
+  await act(() => fireEvent.change(screen.getByDisplayValue("Workspace only"), { target: { value: "full" } }));
+  expect(mocks.alert.mock.calls.at(-1)?.[0]).toBe("Give this agent full access?");
+  await act(async () => mocks.alert.mock.calls.at(-1)?.[2][1].onPress());
+  await waitFor(() => expect(screen.getByDisplayValue("Full access")).toBeTruthy());
+  expect(workspace.updateAgentAdminSettings).toHaveBeenLastCalledWith(
+    { agentId: original.id, access: "full" },
+    host.id,
+  );
+
+  // A new sheet reads the host again and shows the saved values.
+  await act(() => root.unmount());
+  root = createRoot(container);
+  client.clear();
+  await renderSheet("runtime");
+  await waitFor(() => expect(screen.getByDisplayValue("Full access")).toBeTruthy());
+  expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true);
+});
+
+it("keeps the host value and shows the reason when an access update fails", async () => {
+  workspace.servers = [{ ...host, role: "owner" }];
+  workspace.loadAgentAdminSettings.mockResolvedValue({ access: "full", autoApprove: true, autoApproveLocked: false });
+  workspace.updateAgentAdminSettings.mockRejectedValue(new Error("Host refused the change."));
+  await renderSheet("runtime");
+  await waitFor(() => expect(screen.getByDisplayValue("Full access")).toHaveProperty("disabled", false));
+  await act(() => fireEvent.change(screen.getByDisplayValue("Full access"), { target: { value: "workspace" } }));
+  expect(await screen.findByText("Host refused the change.")).toBeTruthy();
+  expect(screen.getByDisplayValue("Full access")).toBeTruthy();
+  expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true);
+});
+
+it("shows auto-approve as read-only when Turbo mode is on", async () => {
+  workspace.servers = [{ ...host, role: "admin" }];
+  workspace.loadAgentAdminSettings.mockResolvedValue({
+    access: "workspace",
+    autoApprove: false,
+    autoApproveLocked: true,
+  });
+  await renderSheet("runtime");
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("checked", true));
+  expect(screen.getByRole("switch", { name: "Auto approve" })).toHaveProperty("disabled", true);
 });
 
 it("hides the header action after saving", async () => {

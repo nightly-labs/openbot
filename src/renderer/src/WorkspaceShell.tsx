@@ -1,5 +1,4 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
 import { createMemo, Show } from "solid-js";
 import { WorkspaceAccountDock } from "./features/account/WorkspaceAccountDock";
 import { useAgents } from "./features/agents/agents-context";
@@ -17,15 +16,14 @@ import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { AgentUsagePanel } from "./features/usage/AgentUsagePanel";
 import { useUsage } from "./features/usage/usage-context";
 import { useLayout } from "./layout";
-import { LEFT_PANEL_COMPACT } from "./layout-constants";
 import { usePlatform } from "./platform";
-import { WorkspaceLeftPanelResizer } from "./WorkspaceLeftPanelResizer";
+import { WorkspaceFrame } from "./WorkspaceFrame";
 import { WorkspaceOverlays } from "./WorkspaceOverlays";
 
 /**
- * The application frame, and nothing else: which pane occupies the middle, how
- * wide the left column is, and whether the whole frame is hidden behind the
- * remote-desktop workspace.
+ * The desktop application frame, and nothing else: which pane occupies the
+ * middle and whether the whole frame is hidden behind the remote-desktop
+ * workspace. `WorkspaceFrame` draws the grid, which the web client shares.
  *
  * Each pane below reads the domains it needs through its own `use*()`, so this
  * component reads only what the frame itself decides with. That is the point of
@@ -60,71 +58,52 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
   );
 
   return (
-    <div
-      ref={platform.setAppFrameElement}
-      class={[
-        "app-frame",
-        {
-          "app-frame-sidebar-compact": layout.leftPanelCompact(),
-          "app-frame-edge": platform.appInfo() !== null,
-          "app-frame-with-server-rail": layout.serverRailVisible(),
-          "app-frame-usage-open": !!usage.state.serverId,
-          "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
-        },
-      ]}
-      aria-hidden={remoteDesktopWorkspaceVisible() ? "true" : undefined}
-      style={`--left-panel-width: ${layout.leftPanelCompact() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth()}px`}
-    >
-      <WorkspaceServerRail />
-      <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
-      <WorkspaceAccountDock account={props.account} />
-      <WorkspaceLeftPanelResizer />
-      <div
-        class="usage-workspace-content"
-        inert={!!usage.state.serverId}
-        aria-hidden={usage.state.serverId ? "true" : undefined}
-      >
-        <Show when={blockedRemoteServer()} keyed>
-          {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => retryServerConnection(server.id)} />}
-        </Show>
-        <Show when={!blockedRemoteServer() && agentSetupOpen()}>
-          <WorkspaceAgentSetup />
-        </Show>
-        <Show
-          when={
-            !blockedRemoteServer() &&
-            activePeopleEnabled() &&
-            !agentSetupOpen() &&
-            !channelOpen() &&
-            activeDirectMember()
-          }
-          keyed
-        >
-          {(member) => <WorkspaceDirectConversation member={member} />}
-        </Show>
-        <Show when={!blockedRemoteServer() && !agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
-          <WorkspaceConversation account={props.account} />
-        </Show>
-        <Show when={!blockedRemoteServer() && !agentSetupOpen() && channelOpen()}>
-          <WorkspaceChannelConversation />
-        </Show>
-      </div>
-      <Show when={usage.state.serverId}>
-        {(serverId) => (
-          <div class="conversation-panel agent-usage-workspace">
+    <WorkspaceFrame
+      compact={layout.leftPanelCompact()}
+      hidden={remoteDesktopWorkspaceVisible()}
+      blockedServer={blockedRemoteServer()}
+      onRetryServer={retryServerConnection}
+      usageOpen={!!usage.state.serverId}
+      left={
+        <>
+          <WorkspaceServerRail />
+          <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+          <WorkspaceAccountDock account={props.account} />
+        </>
+      }
+      usage={
+        <Show when={usage.state.serverId}>
+          {(serverId) => (
             <AgentUsagePanel
               serverId={serverId()}
               hostName={servers().find((server) => server.id === serverId())?.name ?? "Host"}
               agentId={usage.state.agentId}
               onBack={usage.closeUsage}
             />
-          </div>
-        )}
+          )}
+        </Show>
+      }
+      after={
+        <>
+          <WorkspaceOverlays account={props.account} />
+          <Show when={channels.state.editing === "create"}>
+            <ChannelCreateDialog />
+          </Show>
+        </>
+      }
+    >
+      <Show when={agentSetupOpen()}>
+        <WorkspaceAgentSetup />
       </Show>
-      <WorkspaceOverlays account={props.account} />
-      <Show when={channels.state.editing === "create"}>
-        <ChannelCreateDialog />
+      <Show when={activePeopleEnabled() && !agentSetupOpen() && !channelOpen() && activeDirectMember()} keyed>
+        {(member) => <WorkspaceDirectConversation member={member} />}
       </Show>
-    </div>
+      <Show when={!agentSetupOpen() && !channelOpen() && !activeDirectMember()}>
+        <WorkspaceConversation account={props.account} />
+      </Show>
+      <Show when={!agentSetupOpen() && channelOpen()}>
+        <WorkspaceChannelConversation />
+      </Show>
+    </WorkspaceFrame>
   );
 }

@@ -138,6 +138,8 @@ export const messages = {
   "marketplace.error.connectNoServer": "このアプリを接続するローカルサーバーを選択してください。",
   "marketplace.error.installNoServer": "プラグインをインストールするローカルサーバーを選択してください。",
   "marketplace.error.installNoAgent": "このプラグインのスキルをインストールするエージェントを選んでください。",
+  "marketplace.error.installLocalOnHost":
+    "{name} は、これらのエージェントを実行するコンピュータにインストールしてください。そのアプリはそのコンピュータ上でサーバーを実行します。",
   "marketplace.error.installOnHost":
     "{name} は、これらのエージェントを実行するコンピュータにインストールしてください。そのアプリはブラウザでのサインインが必要です。",
   "marketplace.error.appInvalid": "{name} を追加できません：{reason}",

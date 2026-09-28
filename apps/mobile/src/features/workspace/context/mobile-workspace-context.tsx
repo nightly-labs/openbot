@@ -631,8 +631,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });
       }
-      if (event.type === "agents-changed") replaceServerAgents(serverId, event.agents);
-      else if (event.type === "conversation") {
+      if (event.type === "agents-changed") {
+        replaceServerAgents(serverId, event.agents);
+        // Access and auto-approve are not in the agent summary; the host sends this event when either changes.
+        void queryClient.invalidateQueries({
+          queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId],
+          predicate: (query) => query.queryKey.at(-1) === "admin",
+        });
+      } else if (event.type === "conversation") {
         const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
         knownIds.add(event.snapshot.agentId);
         serverAgentIds.current.set(serverId, knownIds);
