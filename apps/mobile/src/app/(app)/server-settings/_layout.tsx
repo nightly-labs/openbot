@@ -23,6 +23,7 @@ export default function ServerSettingsLayout() {
     >
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.serverOptions") }} />
       <Stack.Screen name="members" options={{ title: t("mobile.app.route.members") }} />
+      <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
     </Stack>
   );
 }

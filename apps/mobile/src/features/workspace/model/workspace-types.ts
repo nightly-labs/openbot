@@ -8,6 +8,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AvatarHue,
+  AvatarImageInput,
   ConversationSnapshot,
   CreateAgentInput,
   CreateRoutineInput,
@@ -37,6 +38,8 @@ export type MobileServerDirectoryState = "loading" | "ready" | "error";
 export interface MobileServer {
   id: string;
   name: string;
+  /** The logo version in the account directory, or null when the server has no logo. */
+  logoKey: string | null;
   kind: MobileServerKind;
   state: MobileServerState;
   initialConnectionPending: boolean;
@@ -116,6 +119,13 @@ export interface MobileWorkspaceContextValue {
   leaveServer: (serverId: string) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
+  canEditServerIdentity: (serverId: string) => boolean;
+  /** An absent field stays unchanged; a `null` logo removes it. */
+  updateServerIdentity: (
+    serverId: string,
+    input: { serverName?: string; logo?: AvatarImageInput | null },
+  ) => Promise<void>;
   addRemoteServer: (input: AddRemoteServerInput) => Promise<string>;
   createAgent: (input: CreateAgentInput) => Promise<void>;
   updateAgent: (input: UpdateAgentInput, serverId?: string) => Promise<void>;

@@ -16,6 +16,7 @@ const server: MobileServer = {
   address: null,
   accent: "",
   publicKey: "key",
+  logoKey: null,
   membershipId: "member",
   role: "owner",
 };
