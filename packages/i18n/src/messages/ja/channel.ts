@@ -20,6 +20,7 @@ export const messages = {
   "channel.composer.placeholder": "{name} へのメッセージ",
   "channel.composer.attach": "ファイルを添付",
   "channel.composer.send": "メッセージを送信",
+  "channel.composer.stop": "作業を停止",
   "channel.panel.label": "チャンネルパネル",
   "channel.panel.close": "チャンネルパネルを閉じる",
   "channel.settings.title": "チャンネル設定",

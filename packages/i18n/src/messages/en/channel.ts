@@ -19,6 +19,7 @@ export const messages = defineMessages("channel", {
   "channel.composer.placeholder": "Message {name}",
   "channel.composer.attach": "Attach files",
   "channel.composer.send": "Send message",
+  "channel.composer.stop": "Stop work",
   "channel.panel.label": "Channel panel",
   "channel.panel.close": "Close channel panel",
   "channel.settings.title": "Channel settings",

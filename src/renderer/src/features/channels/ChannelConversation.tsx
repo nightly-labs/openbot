@@ -25,6 +25,7 @@ import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingRepli
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor, expandComposerMentions } from "@openbot/ui/features/conversation/ComposerEditor";
+import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { ApprovalCard, BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import {
   calculateChatScrollMargin,
@@ -473,6 +474,40 @@ export function ChannelConversation(props: ChannelConversationProps) {
     if (!page || page.channel.archived) return [];
     return channelAwaitingReplies({ tasks: page.tasks, agents: agentList(), name });
   });
+  /**
+   * The runs the stop button ends: the top open task above each task that is queued, running or
+   * waiting. `stop` pauses the whole run below the task it names, so one command for each run is
+   * enough, and a completed or cancelled task cannot be stopped.
+   */
+  const activeRuns = createMemo(() => {
+    const page = channels.state.page;
+    if (!page || page.channel.archived) return [];
+    const byId = new Map(page.tasks.map((task) => [task.id, task]));
+    const openParent = (task: (typeof page.tasks)[number]) => {
+      const parent = task.parentTaskId ? byId.get(task.parentTaskId) : undefined;
+      return parent && parent.state !== "completed" && parent.state !== "cancelled" ? parent : undefined;
+    };
+    const runs = new Set<string>();
+    for (const task of page.tasks) {
+      if (task.state !== "queued" && task.state !== "running" && task.state !== "waiting") continue;
+      let top = task;
+      for (let parent = openParent(top); parent; parent = openParent(top)) top = parent;
+      runs.add(top.id);
+    }
+    return [...runs];
+  });
+  const stopWork = () => {
+    const channelId = channels.state.page?.channel.id;
+    if (!channelId) return;
+    for (const taskId of activeRuns())
+      void channels.command({
+        type: "stop",
+        operationId: crypto.randomUUID(),
+        channelId,
+        taskId,
+        recipientAgentId: null,
+      });
+  };
   const resumeTask = (taskId: string, recipientAgentId: string | null) =>
     channels.command({
       type: recipientAgentId ? "reassign" : "resume",
@@ -949,15 +984,31 @@ export function ChannelConversation(props: ChannelConversationProps) {
                       <Plus aria-hidden="true" />
                     </Button>
                     <div class="composer-primary-actions">
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        class="voice-button"
-                        aria-label={t("channel.composer.send")}
-                        disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
+                      {/* As in the agent chat, an empty composer offers stop while work runs. */}
+                      <Show
+                        when={activeRuns().length > 0 && !composer.text.trim() && !composer.attachments.length}
+                        fallback={
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            class="voice-button"
+                            aria-label={t("channel.composer.send")}
+                            disabled={channels.state.pending || (!composer.text.trim() && !composer.attachments.length)}
+                          >
+                            <ArrowUp aria-hidden="true" />
+                          </Button>
+                        }
                       >
-                        <ArrowUp aria-hidden="true" />
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          class="voice-button voice-button-active"
+                          aria-label={t("channel.composer.stop")}
+                          onClick={stopWork}
+                        >
+                          <StopIcon />
+                        </Button>
+                      </Show>
                     </div>
                   </div>
                 </form>
