@@ -158,6 +158,12 @@
   background: var(--openbot-bg-control);
 }
 
+.server-settings-members-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
 .server-settings-search {
   position: relative;
   width: 188px;

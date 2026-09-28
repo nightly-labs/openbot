@@ -297,8 +297,12 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
         <Show when={canManage()}>{inviteComposer()}</Show>
         <SettingsSection
           class="server-settings-members-section"
-          title={t("server.members.title")}
-          description={membersCount()}
+          title={
+            <span class="server-settings-members-title">
+              {t("server.members.title")}
+              <Badge variant={membersFull() ? "warning-light" : "secondary"}>{membersCount()}</Badge>
+            </span>
+          }
           actions={
             <label class="server-settings-search">
               <Search aria-hidden="true" />
