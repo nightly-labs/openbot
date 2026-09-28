@@ -68,6 +68,15 @@
     width: auto;
   }
 
+  /* The server menu view draws no rail, so the sidebar takes the full width. */
+  .web-app-frame[data-web-mobile-pane="workspace"]:not(.app-frame-with-server-rail) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .web-app-frame[data-web-mobile-pane="workspace"]:not(.app-frame-with-server-rail) > .sidebar {
+    grid-column: 1;
+  }
+
   .web-app-frame[data-web-mobile-pane="workspace"] > .account-dock {
     display: block;
     width: 100%;

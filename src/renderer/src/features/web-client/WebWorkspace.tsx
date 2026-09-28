@@ -21,13 +21,16 @@ import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { Alert, AlertActions, AlertContent, AlertDescription, AlertTitle, Button, toast } from "@openbot/ui";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
+import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { JoinServerDialog } from "@openbot/ui/features/servers/JoinServerDialog";
+import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Loading, onCleanup, Show, untrack } from "solid-js";
 import { toAgentMessages } from "../../app-message-projection";
+import { SERVER_VIEW_STORAGE_KEY } from "../../layout-constants";
 import { AgentTemplateInstall, ServerSettingsModal, SkillsMarketplaceModal } from "../../lazy-views";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
@@ -62,6 +65,14 @@ const CONNECTING_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
+function readServerView(): ServerView {
+  try {
+    return window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "menu" ? "menu" : "rail";
+  } catch {
+    return "rail";
+  }
+}
+
 export function WebWorkspace(props: {
   accountId: string;
   accountEmail?: string;
@@ -128,6 +139,18 @@ export function WebWorkspace(props: {
   let usageGeneration = 0;
   const [joinOpen, setJoinOpen] = createSignal(false);
   const [creating, setCreating] = createSignal(false);
+  /** The new agent form's draft. The first-agent row in an empty sidebar shows its avatar. */
+  const [agentDraft, setAgentDraft] = createSignal<FirstAgentDraft>(createFirstAgentDraft());
+  // `useLayout().serverView` holds this choice on desktop. The web client has no layout provider yet.
+  const [serverView, setServerViewSignal] = createSignal<ServerView>(readServerView());
+  function setServerView(view: ServerView): void {
+    setServerViewSignal(view);
+    try {
+      window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
+    } catch {
+      // The choice stays for this page when the browser blocks storage.
+    }
+  }
   const [mobilePane, setMobilePane] = createSignal<WebMobilePane>("conversation");
   const [settingsRequest, setSettingsRequest] = createSignal<{ agentId: string; nonce: number } | null>(null);
   const servers = createMemo<ServerSummary[]>(() =>
@@ -444,6 +467,24 @@ export function WebWorkspace(props: {
       await select(agent.id);
     });
   }
+  function selectServer(id: string) {
+    const host = workspace.state.hosts.find((item) => item.hostId === id);
+    if (host) void workspace.connect(host);
+  }
+  function startCreate() {
+    setMobilePane("conversation");
+    channels.close();
+    // A new form starts empty, with the avatar that the first-agent row showed.
+    if (!creating())
+      setAgentDraft((draft) => ({
+        ...createFirstAgentDraft(),
+        avatarSeed: draft.avatarSeed,
+        avatarHue: draft.avatarHue,
+      }));
+    setCreating(true);
+  }
+  const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
+  const serverRailVisible = () => serverView() === "rail";
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
   };
@@ -451,20 +492,19 @@ export function WebWorkspace(props: {
     <ConversationControllerProvider controller={controller}>
       <ChannelsControllerProvider controller={channels}>
         <div
-          class="app-frame app-frame-edge app-frame-with-server-rail web-app-frame"
+          class={["app-frame app-frame-edge web-app-frame", { "app-frame-with-server-rail": serverRailVisible() }]}
           data-web-mobile-pane={mobilePane()}
           style="--left-panel-width: 280px"
         >
-          <ServerRail
-            servers={servers()}
-            onSelect={(id) => {
-              const host = workspace.state.hosts.find((item) => item.hostId === id);
-              if (host) void workspace.connect(host);
-            }}
-            onReorder={() => {}}
-            onAdd={() => setJoinOpen(true)}
-            onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
-          />
+          <Show when={serverRailVisible()}>
+            <ServerRail
+              servers={servers()}
+              onSelect={selectServer}
+              onReorder={() => {}}
+              onAdd={() => setJoinOpen(true)}
+              onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
+            />
+          </Show>
           <Sidebar
             channels={channelsSupported() ? channels.state.channels.filter((channel) => !channel.archived) : []}
             deletedChannels={channelsSupported() ? channels.state.channels.filter((channel) => channel.archived) : []}
@@ -485,6 +525,14 @@ export function WebWorkspace(props: {
             onOpenServerSettings={(trigger) => {
               const host = workspace.state.host;
               if (host) void openServerSettings(host.hostId, trigger);
+            }}
+            serverMenu={{
+              servers: servers(),
+              view: serverView(),
+              onViewChange: setServerView,
+              onSelect: selectServer,
+              onAdd: () => setJoinOpen(true),
+              onOpenSettings: (id, trigger) => void openServerSettings(id, trigger),
             }}
             agents={workspace.profiles()}
             activeAgentId={channelOpen() ? "" : (workspace.state.selectedId ?? "")}
@@ -511,12 +559,8 @@ export function WebWorkspace(props: {
               void select(id);
             }}
             onSelectPerson={() => {}}
-            onCreateAgent={() => {
-              setMobilePane("conversation");
-              channels.close();
-              setCreating(true);
-            }}
-            createSupported={workspace.state.status === "online" && workspace.state.host !== null}
+            onCreateAgent={startCreate}
+            createSupported={createSupported()}
             onEditAgent={(id) => {
               setMobilePane("conversation");
               void select(id);
@@ -537,6 +581,16 @@ export function WebWorkspace(props: {
             compact={false}
             onExpand={() => {}}
             onOpenMarketplace={() => setMarketplaceOpen(true)}
+            emptyAction={
+              workspace.profiles().length === 0 && createSupported()
+                ? {
+                    label: t("sidebar.empty.firstAgent"),
+                    avatarSeed: agentDraft().avatarSeed,
+                    avatarHue: agentDraft().avatarHue,
+                    onSelect: startCreate,
+                  }
+                : undefined
+            }
           />
           <AccountDock
             remoteClient
@@ -568,7 +622,7 @@ export function WebWorkspace(props: {
               errorCode: null,
             }}
             compact={false}
-            withServerRail
+            withServerRail={serverRailVisible()}
             onRefreshUsage={refreshUsage}
             onUpdateAction={unavailable}
             onLogout={props.onLogout}
@@ -584,8 +638,11 @@ export function WebWorkspace(props: {
                 runtime={workspace.runtime}
                 capabilities={workspace.state.capabilities}
                 customProviders={providerSettings()?.customProviders}
+                initialDraft={untrack(agentDraft)}
+                onDraftChange={setAgentDraft}
                 onClose={() => setCreating(false)}
                 onSaved={async () => {
+                  setAgentDraft(createFirstAgentDraft());
                   await workspace.refresh();
                   setCreating(false);
                 }}
