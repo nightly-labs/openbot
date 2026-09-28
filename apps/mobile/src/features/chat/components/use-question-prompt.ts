@@ -11,7 +11,7 @@ interface PromptState {
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
-  /** The person chose to answer with the chat composer. A new form starts without it. */
+  /** The person chose to answer the current question with the chat composer. */
   replyInChat: boolean;
 }
 
@@ -73,6 +73,9 @@ export function useQuestionPrompt(
       drafts: { ...state.drafts, [question.id]: "" },
       failedAnswers: null,
       index: next ?? state.index,
+      // The choice to answer in the chat belongs to one question. The next question asks again,
+      // so a later message does not answer a question the person did not choose to answer.
+      replyInChat: false,
     });
     if (next === null) void submit(answers);
   }
@@ -94,7 +97,7 @@ export function useQuestionPrompt(
       if (!disabled) update({ replyInChat });
     },
     setIndex: (index: number) => {
-      if (!disabled && prompt?.questions[index]) update({ index });
+      if (!disabled && prompt?.questions[index]) update({ index, replyInChat: false });
     },
     answer,
     submit,
