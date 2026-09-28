@@ -10,16 +10,16 @@ describe("BrowserDiagnostics", () => {
     }
 
     const snapshot = diagnostics.snapshot();
-    expect(snapshot.diagnostics).toHaveLength(50);
-    expect(snapshot.actions).toHaveLength(50);
-    expect(snapshot.diagnostics[0]?.message).toBe("GET 70");
+    expect(snapshot.diagnostics).toHaveLength(20);
+    expect(snapshot.actions).toHaveLength(10);
+    expect(snapshot.diagnostics[0]?.message).toBe("GET 100");
     expect(snapshot.actions.at(-1)?.target).toBe("ref 119");
     expect(diagnostics.errorCount).toBe(10);
 
     diagnostics.clearDiagnostics();
     const cleared = diagnostics.snapshot();
     expect(cleared.diagnostics).toEqual([]);
-    expect(cleared.actions).toHaveLength(50);
+    expect(cleared.actions).toHaveLength(10);
     expect(diagnostics.errorCount).toBe(0);
   });
 

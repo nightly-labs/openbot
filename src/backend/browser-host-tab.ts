@@ -1,4 +1,4 @@
-import type { BrowserEnvironment, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserEnvironment, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { BrowserWindow, type WebContents, type WebContentsView, webContents } from "electron";
 import type { BrowserCdpEngine } from "./browser-cdp";
 import type { BrowserDiagnostics } from "./browser-diagnostics";
@@ -31,6 +31,15 @@ export interface BrowserHostTab {
   ownerAgentId: string | null;
   revision: number;
   queue: Promise<unknown>;
+  /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
+  pendingOperations: number;
+  /**
+   * The last preview frame, with the page and capture generation it shows. A preview waits behind the
+   * agent's actions, so the preview card shows this frame instead while the tab is busy.
+   */
+  preview?: { frame: BrowserPreview; url: string; generation: number } | undefined;
+  /** The preview capture on `queue`, so preview requests share one capture and do not pile up. */
+  previewCapture?: Promise<BrowserPreview> | undefined;
   /**
    * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
    * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.

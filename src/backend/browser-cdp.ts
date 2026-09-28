@@ -298,6 +298,7 @@ export class BrowserCdpEngine {
         viewport,
         text: parsed.text,
         elements: parsed.elements,
+        truncated: parsed.truncated,
         focus,
         diagnostics: context.diagnostics,
         actions: context.actions,

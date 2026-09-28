@@ -94,6 +94,8 @@ export interface BrowserSnapshot {
   viewport: BrowserViewport;
   text: string;
   elements: BrowserElement[];
+  /** Page text or elements were left out to keep the snapshot within its size limit. */
+  truncated: boolean;
   focus: BrowserFocus | null;
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];

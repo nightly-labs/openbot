@@ -1559,9 +1559,42 @@ async function main(): Promise<void> {
       throw new Error("V2 snapshot candidate cap hid an actionable ARIA role.");
     }
     const largeValue = boundedSnapshot.elements.find((element) => element.name === "Large value")?.value;
-    if (!largeValue || largeValue.length > 2_000 || Buffer.byteLength(JSON.stringify(boundedSnapshot)) > 1024 * 1024) {
+    if (!largeValue || largeValue.length > 2_000 || Buffer.byteLength(JSON.stringify(boundedSnapshot)) > 128 * 1024) {
       throw new Error("V2 snapshot did not enforce its value and aggregate serialization limits.");
     }
+    if (!boundedSnapshot.truncated) throw new Error("V2 snapshot did not report its element cap.");
+    await boundedContents.executeJavaScript(
+      "document.body.replaceChildren(...Array.from({ length: 400 }, (_, index) => Object.assign(document.createElement('p'), { textContent: 'Background ' + index + ' ' + 'filler '.repeat(20) })), Object.assign(document.createElement('div'), { role: 'dialog', textContent: 'Dialog sentinel', style: 'position:fixed;top:0;left:0' })); true",
+      true,
+    );
+    const longTextSnapshot = await browser.snapshot(boundedTab.id);
+    if (
+      !longTextSnapshot.truncated ||
+      longTextSnapshot.text.length > 20_000 ||
+      !longTextSnapshot.text.includes("Dialog sentinel")
+    ) {
+      throw new Error("V2 snapshot did not bound its text or put viewport text first.");
+    }
+    // A preview behind an agent operation gets the last frame at once instead of waiting for it.
+    const firstPreview = await browser.capturePreview(boundedTab.id);
+    let heldEvaluationSettled = false;
+    const heldEvaluation = callBrowserTool(browser, "evaluate", {
+      tabId: boundedTab.id,
+      expression:
+        "new Promise(resolve => { window.releaseHeldEvaluation = resolve; document.body.dataset.held = 'true'; })",
+    }).finally(() => {
+      heldEvaluationSettled = true;
+    });
+    await waitFor(
+      async () => (await boundedContents.executeJavaScript("document.body.dataset.held === 'true'")) === true,
+      "the held evaluation to start",
+    );
+    const busyPreview = await browser.capturePreview(boundedTab.id);
+    if (heldEvaluationSettled || busyPreview.dataUrl !== firstPreview.dataUrl) {
+      throw new Error("A preview waited behind an agent operation instead of returning the last frame.");
+    }
+    await boundedContents.executeJavaScript("window.releaseHeldEvaluation(true); true");
+    if (!(await heldEvaluation).success) throw new Error("The held evaluation failed.");
     await browser.close(boundedTab.id);
     const focusSentinel = new BrowserWindow({
       show: false,

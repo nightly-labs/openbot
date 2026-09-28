@@ -46,10 +46,15 @@ export function enqueueTabOperation<T>(
     return { drained, result };
   });
   const result = started.then(({ result }) => result);
-  tab.queue = started.then(
-    ({ drained }) => drained,
-    () => undefined,
-  );
+  tab.pendingOperations += 1;
+  tab.queue = started
+    .then(
+      ({ drained }) => drained,
+      () => undefined,
+    )
+    .finally(() => {
+      tab.pendingOperations -= 1;
+    });
   return result;
 }
 

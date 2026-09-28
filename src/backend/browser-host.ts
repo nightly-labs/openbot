@@ -120,6 +120,12 @@ const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
  */
 const DOCUMENT_ENUMERATION_TIMEOUT_MS = 10_000;
 /**
+ * How long a preview request waits for a new frame before it answers with the last one. The card
+ * asks again three seconds after each answer, and the capture keeps running, so the next request
+ * gets the frame that was late.
+ */
+const PREVIEW_STALE_AFTER_MS = 1_000;
+/**
  * The live view's frames. The quality is what a page of text survives on a slow link, and the size
  * is the client's panel rather than the host's monitor: a frame larger than the panel that draws it
  * is bytes nobody sees.
@@ -790,8 +796,32 @@ export class BrowserHost {
     });
   }
 
+  /**
+   * A preview waits behind whatever the agent does on the tab, and its capture resizes the page twice,
+   * which a heavy single-page application answers slowly. So while the tab is busy, or while a capture
+   * takes longer than `PREVIEW_STALE_AFTER_MS`, the card gets the last frame of the same page instead.
+   */
   async capturePreview(tabId: string): Promise<BrowserPreview> {
-    return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+    const tab = this.#requireTab(tabId);
+    if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
+    const cached =
+      tab.preview?.generation === tab.captureGeneration && tab.preview.url === currentTabUrl(tab)
+        ? tab.preview.frame
+        : null;
+    if (cached && tab.pendingOperations > 0) return cached;
+    const capture = tab.previewCapture ?? this.#capturePreviewFrame(tab);
+    if (!cached) return capture;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stale = new Promise<BrowserPreview>((resolve) => {
+      timer = setTimeout(() => resolve(cached), PREVIEW_STALE_AFTER_MS);
+    });
+    return Promise.race([capture, stale]).finally(() => clearTimeout(timer));
+  }
+
+  #capturePreviewFrame(tab: BrowserHostTab): Promise<BrowserPreview> {
+    const generation = tab.captureGeneration;
+    const url = currentTabUrl(tab);
+    const capture = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
       const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
@@ -817,8 +847,17 @@ export class BrowserHost {
       });
       const preview = cropped.resize({ width: 960, height: 600, quality: "good" });
       const dataUrl = `data:image/jpeg;base64,${preview.toJPEG(72).toString("base64")}`;
-      return { dataUrl, width: 960, height: 600 };
+      const frame = { dataUrl, width: 960, height: 600 };
+      if (tab.captureGeneration === generation && currentTabUrl(tab) === url) tab.preview = { frame, url, generation };
+      return frame;
     });
+    tab.previewCapture = capture;
+    void capture
+      .finally(() => {
+        if (tab.previewCapture === capture) tab.previewCapture = undefined;
+      })
+      .catch(() => undefined);
+    return capture;
   }
 
   /**
@@ -1220,6 +1259,7 @@ export class BrowserHost {
       ownerAgentId,
       revision: 0,
       queue: Promise.resolve(),
+      pendingOperations: 0,
       focusOnVisible: false,
       environment,
       engine: new BrowserCdpEngine(view.webContents),
