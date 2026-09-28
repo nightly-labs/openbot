@@ -26,6 +26,8 @@ All notable changes to OpenBot will be documented here. The project follows
   with the state of each step and a spinner on the step that runs. The last message of a chat and
   its read state do not include plans. Team API v4 now sends the plan of a turn beside its
   checklist text; older clients and hosts keep reading the text.
+- The iPhone app shows a file name in inline code, such as `package.json`, as desktop does: a type
+  badge and the name in the colour of its file type. You cannot open the file from the phone yet.
 - On the iPhone app, the question form of an agent has no text field of its own. It shows "Reply
   in the chat" as one more answer row. Tap it, and the next message from the composer is the
   answer. Without that tap, the composer sends normal messages, also in a channel. A private

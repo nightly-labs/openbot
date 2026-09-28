@@ -1,3 +1,4 @@
+import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import type { Token, Tokens, TokensList } from "marked";
@@ -830,7 +831,7 @@ function LocalFileLink(props: {
   onOpen: (path: string) => void;
 }) {
   const { t } = useText();
-  const name = workspaceFileName(props.path);
+  const name = fileReferenceName(props.path);
   return (
     <Button
       variant="ghost"
@@ -955,7 +956,7 @@ function localFileTarget(value: string): string | null {
   if (!workspace) return null;
   const shared = sharedFileTarget(path);
   if (shared) return shared;
-  return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileMention(path) ? workspace : null;
+  return /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path) || isFileReference(path) ? workspace : null;
 }
 
 function workspaceFileTarget(value: string): string | null {
@@ -964,15 +965,6 @@ function workspaceFileTarget(value: string): string | null {
   if (/^[A-Za-z]:[/\\]/u.test(path)) return path;
   if (/^[A-Za-z][A-Za-z\d+.-]*:/u.test(path)) return null;
   return path;
-}
-
-function workspaceFileName(path: string): string {
-  const name = path.replaceAll("\\", "/").split("/").at(-1) || "file";
-  try {
-    return decodeURIComponent(name);
-  } catch {
-    return name;
-  }
 }
 
 function messageFileDirectory(body: string): FileDirectoryContext | null {
@@ -990,7 +982,7 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
 
 function mentionedFileTarget(value: string, directory: FileDirectoryContext | null): FileDirectoryContext | null {
   const path = value.trim();
-  if (!isFileMention(path)) return null;
+  if (!isFileReference(path)) return null;
   const shared = sharedFileTarget(path);
   if (shared) return { path: shared, kind: "shared" };
   if (/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
@@ -1003,13 +995,4 @@ function mentionedFileTarget(value: string, directory: FileDirectoryContext | nu
     path: `${directory.path.replace(/[/\\]+$/u, "")}${separator}${path}`,
     kind: directory.kind,
   };
-}
-
-function isFileMention(value: string): boolean {
-  if (!value || /[\0\r\n]/u.test(value) || /[/\\]$/u.test(value)) return false;
-  const name = workspaceFileName(value);
-  if (/^(Dockerfile|Makefile|\.gitignore)$/iu.test(name)) return true;
-  return /\.(?:avif|bash|c|conf|cpp|cs|css|csv|env|fish|gif|go|h|hpp|html?|ini|java|jpe?g|jsx?|json|kt|kts|log|markdown|md|pdf|php|png|ps1|py|rb|rs|scala|sh|sql|swift|toml|tsx?|txt|webp|xml|ya?ml|zsh)$/iu.test(
-    name,
-  );
 }

@@ -1,12 +1,21 @@
+import {
+  type FileReferenceTone,
+  fileReferenceBadge,
+  fileReferenceName,
+  fileReferenceTone,
+  isFileReference,
+} from "@openbot/brand/file-reference";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import { FileText } from "lucide-react-native";
 import type { Token, Tokens } from "marked";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { Alert, type ColorValue, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkIcon } from "@/features/chat/components/chat-link-icon";
 import {
@@ -88,7 +97,56 @@ function sourceEntries<T>(values: T[], source: (value: T) => string) {
   });
 }
 
+/** The colour family of each file tone, as the desktop `data-file-tone` rules use them. */
+const FILE_TONE_COLORS: Record<FileReferenceTone, [string, string]> = {
+  source: ["--openbot-file-blue", "--openbot-file-blue-soft"],
+  script: ["--openbot-file-yellow", "--openbot-file-yellow-soft"],
+  markup: ["--openbot-file-orange", "--openbot-file-orange-soft"],
+  style: ["--openbot-file-teal", "--openbot-file-teal-soft"],
+  data: ["--openbot-file-green", "--openbot-file-green-soft"],
+  document: ["--openbot-file-red", "--openbot-file-red-soft"],
+  media: ["--openbot-file-pink", "--openbot-file-pink-soft"],
+  default: ["--openbot-file-default", "--openbot-file-default-soft"],
+};
+
+/**
+ * Inline code that names a file, drawn as the desktop file reference: a type badge and the name
+ * in the colour of its file family. Mobile cannot open workspace files, so it is not a control.
+ */
+function FileReference({ text, presentation }: { text: string; presentation: TextPresentation }) {
+  const name = fileReferenceName(text.trim());
+  const badge = fileReferenceBadge(name);
+  const [color, soft] = useCSSVariable(FILE_TONE_COLORS[fileReferenceTone(name)]);
+  const small = presentation.type === "body-sm";
+  return (
+    <View collapsable={false} className="max-w-full shrink flex-row items-center gap-1 self-start px-0.5">
+      <View
+        className="h-4 min-w-4 items-center justify-center rounded px-0.5"
+        style={{ backgroundColor: String(soft) }}
+      >
+        {badge ? (
+          <Typography style={{ color: String(color), fontSize: 8, lineHeight: 10, fontWeight: "800" }}>
+            {badge}
+          </Typography>
+        ) : (
+          <FileText size={11} color={String(color)} strokeWidth={2} />
+        )}
+      </View>
+      <Typography
+        selectable={presentation.selectable}
+        numberOfLines={1}
+        type={small ? "body-xs" : presentation.type}
+        className="shrink"
+        style={{ ...presentation.style, color: String(color), fontWeight: "600" }}
+      >
+        {text.trim()}
+      </Typography>
+    </View>
+  );
+}
+
 function CodeSpan({ text, presentation }: { text: string; presentation: TextPresentation }) {
+  if (isFileReference(text.trim())) return <FileReference text={text} presentation={presentation} />;
   return (
     <View
       collapsable={false}

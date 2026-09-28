@@ -11,6 +11,7 @@
     "./tokens.css": "./src/tokens.css",
     "./tokens-native.css": "./src/tokens-native.css",
     "./article-gradient": "./src/article-gradient.ts",
+    "./file-reference": "./src/file-reference.ts",
     "./app-logo-shape": "./src/app-logo-shape.ts",
     "./provider-logo-shape": "./src/provider-logo-shape.ts"
   },
