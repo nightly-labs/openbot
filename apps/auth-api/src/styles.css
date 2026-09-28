@@ -19,21 +19,28 @@
 }
 
 html {
-  min-width: 320px;
-  scroll-behavior: smooth;
   background: var(--openbot-bg-canvas);
 }
 
 body {
-  min-width: 320px;
   min-height: 100vh;
   margin: 0;
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);
   font-family: var(--openbot-font-sans);
   font-synthesis: none;
-  text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Site pages only: the web client at /app keeps the desktop document styles. */
+html:not(:has(.web-app)) {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body:not(:has(.web-app)) {
+  min-width: 320px;
+  text-rendering: geometricPrecision;
 }
 
 a {
