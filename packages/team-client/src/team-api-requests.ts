@@ -17,6 +17,8 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeInstalledSkills,
+  type InstalledSkill,
   isAttachmentSummary,
   type OpenBotDesktopApi,
   type ReorderQueueInput,
@@ -89,6 +91,11 @@ export function reorderQueue(request: TeamApiRequest, { agentId, deliveryIds }: 
 /** Starts a new chat with the agent. Send it only to a host that serves `context-reset-v1`. */
 export function clearAgentContext(request: TeamApiRequest, agentId: string): Promise<void> {
   return request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId });
+}
+
+/** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */
+export function listInstalledSkills(request: TeamApiRequest, agentId: string): Promise<InstalledSkill[]> {
+  return request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills);
 }
 
 export function deleteAgent(request: TeamApiRequest, agentId: string): Promise<void> {
