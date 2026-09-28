@@ -3,6 +3,20 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import type { DatabaseCore } from "./database-core";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
 
+type AgentRuntime = Pick<AgentSummary, "provider" | "model" | "reasoningEffort">;
+
+/**
+ * The audit entry of a model change that one agent made to another agent, or to itself. It rides in
+ * the roster event of the same write, so the entry and the change commit or fail together. A change
+ * the user makes carries none: the user is the default author of every roster event.
+ */
+export interface AgentModelChange {
+  initiatingAgentId: string;
+  targetAgentId: string;
+  previous: AgentRuntime;
+  next: AgentRuntime;
+}
+
 export interface AgentRosterOptions {
   core: DatabaseCore;
 }
@@ -94,7 +108,7 @@ export class AgentRoster {
     return payload.agents;
   }
 
-  replaceAgents(commandId: string, agents: AgentSummary[], eventType: string): void {
+  replaceAgents(commandId: string, agents: AgentSummary[], eventType: string, modelChange?: AgentModelChange): void {
     this.#core.dispatch(
       commandId,
       [
@@ -102,7 +116,7 @@ export class AgentRoster {
           aggregateType: "agents",
           aggregateId: "agents",
           eventType,
-          payload: { agents },
+          payload: modelChange ? { agents, modelChange } : { agents },
         },
       ],
       (db, sequences) => {

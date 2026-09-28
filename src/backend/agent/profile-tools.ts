@@ -58,5 +58,16 @@ export const updateProfileToolSchema = z
         "Local PNG, JPEG, or WebP file, up to 512 KB. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
       )
       .optional(),
+    provider: z
+      .enum(AGENT_PROVIDERS)
+      .describe("New provider for the agent. Pass a model with it, or omit the model to use the provider's default.")
+      .optional(),
+    model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("New model id from list_models.").optional(),
+    reasoningEffort: z
+      .enum(AGENT_REASONING_EFFORTS)
+      .describe(
+        "New reasoning effort that the model supports, from list_models. Omit to keep the current effort when the model supports it, else to use the model's default.",
+      )
+      .optional(),
   })
   .strict();
