@@ -19,7 +19,7 @@ export function AgentTemplateInstall(props: {
   templateId: string | null;
   server?: ServerSummary | undefined;
   /** Defaults to the desktop port. */
-  calls?: AgentTemplateInstallCalls;
+  calls?: AgentTemplateInstallCalls | undefined;
   onClose: () => void;
   onInstalled: (agent: AddedAgent, serverId?: string) => Promise<void>;
 }) {

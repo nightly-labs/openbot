@@ -125,7 +125,7 @@ interface SkillsMarketplaceModalProps {
    * The listing an `openbot://plugins/<slug>` link asked for. It selects the tab and opens the page;
    * it never installs, so what a link can do is show a user a listing they then decide about.
    */
-  initialPluginSlug?: string;
+  initialPluginSlug?: string | undefined;
   /**
    * Runs after the modal consumes `initialPluginSlug`. The owner clears the pending slug there, so
    * a second link to the same listing reads as a new request instead of no change.
