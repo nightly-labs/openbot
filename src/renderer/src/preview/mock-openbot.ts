@@ -342,7 +342,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       description: input.description ?? "A new agent ready to help with focused work.",
       notifications: input.notifications ?? true,
       model: input.model ?? defaultProviderModel("codex"),
-      reasoningEffort: input.reasoningEffort ?? "medium",
+      reasoningEffort: input.reasoningEffort ?? "low",
       access: input.access ?? "full",
       computerUse: input.computerUse ?? true,
       threadId: input.threadId ?? `thread-${id}`,
