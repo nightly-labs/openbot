@@ -19,6 +19,8 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Fixed
 
+- Show the highlight of the selected server across the full row in the mobile server list. Before,
+  the highlight stopped at the end of the server name.
 - Keep the reason when an agent turn fails. The queue now shows the provider error after the banner
   closes and after a restart. Before, a failed message kept no reason.
 - Do not ask a joined server for its MCP server list when you are a member without the admin role.
