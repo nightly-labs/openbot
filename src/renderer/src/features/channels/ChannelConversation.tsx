@@ -475,38 +475,48 @@ export function ChannelConversation(props: ChannelConversationProps) {
     return channelAwaitingReplies({ tasks: page.tasks, agents: agentList(), name });
   });
   /**
-   * The runs the stop button ends: the top open task above each task that is queued, running or
+   * The runs the stop button ends: the top active task above each task that is queued, running or
    * waiting. `stop` pauses the whole run below the task it names, so one command for each run is
-   * enough, and a completed or cancelled task cannot be stopped.
+   * enough. The climb stops at a parent that is not active: a stop would pause a failed parent and
+   * clear the reason it failed, and a completed or cancelled task cannot be stopped.
    */
   const activeRuns = createMemo(() => {
     const page = channels.state.page;
     if (!page || page.channel.archived) return [];
     const byId = new Map(page.tasks.map((task) => [task.id, task]));
-    const openParent = (task: (typeof page.tasks)[number]) => {
+    const active = (task: (typeof page.tasks)[number] | undefined) =>
+      task?.state === "queued" || task?.state === "running" || task?.state === "waiting";
+    const activeParent = (task: (typeof page.tasks)[number]) => {
       const parent = task.parentTaskId ? byId.get(task.parentTaskId) : undefined;
-      return parent && parent.state !== "completed" && parent.state !== "cancelled" ? parent : undefined;
+      return active(parent) ? parent : undefined;
     };
     const runs = new Set<string>();
     for (const task of page.tasks) {
-      if (task.state !== "queued" && task.state !== "running" && task.state !== "waiting") continue;
+      if (!active(task)) continue;
       let top = task;
-      for (let parent = openParent(top); parent; parent = openParent(top)) top = parent;
+      for (let parent = activeParent(top); parent; parent = activeParent(top)) top = parent;
       runs.add(top.id);
     }
     return [...runs];
   });
-  const stopWork = () => {
+  /**
+   * One stop at a time, and none after the first that fails: the controller keeps one failed
+   * command for its retry, and a later stop that succeeds would clear the error of the one that
+   * failed.
+   */
+  const stopWork = async () => {
     const channelId = channels.state.page?.channel.id;
     if (!channelId) return;
-    for (const taskId of activeRuns())
-      void channels.command({
+    for (const taskId of activeRuns()) {
+      const stopped = await channels.command({
         type: "stop",
         operationId: crypto.randomUUID(),
         channelId,
         taskId,
         recipientAgentId: null,
       });
+      if (!stopped) return;
+    }
   };
   const resumeTask = (taskId: string, recipientAgentId: string | null) =>
     channels.command({
@@ -1004,7 +1014,7 @@ export function ChannelConversation(props: ChannelConversationProps) {
                           variant="ghost"
                           class="voice-button voice-button-active"
                           aria-label={t("channel.composer.stop")}
-                          onClick={stopWork}
+                          onClick={() => void stopWork()}
                         >
                           <StopIcon />
                         </Button>
