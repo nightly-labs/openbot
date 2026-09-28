@@ -542,7 +542,8 @@ function printLiteralField(key: string, value: unknown, indent: string, mode: Li
   const flat = inlineLiteral(value, mode);
   const head = `${indent}${name}: ${flat}`;
   if (head.length + 1 <= 120) return head;
-  if (typeof value === "string" && mode === "ts") return `${indent}${name}:\n${indent}  ${flat}`;
+  // The formatter keeps a string on the line of a key shorter than the indent width plus three.
+  if (typeof value === "string" && mode === "ts" && name.length >= 5) return `${indent}${name}:\n${indent}  ${flat}`;
   if (typeof value === "string") return head;
   return `${indent}${name}: ${printLiteral(value, indent, mode, name.length + 2)}`;
 }
@@ -557,7 +558,16 @@ function inlineLiteral(value: unknown, mode: LiteralMode): string {
     const inner = Object.entries(value).map(([key, item]) => pair(key, item));
     return `{ ${inner.join(", ")} }`;
   }
+  if (typeof value === "string" && mode === "ts") return tsString(value);
   return JSON.stringify(value) ?? "null";
+}
+
+/** A string in the quotes the formatter picks: double, unless the value holds more double quotes than single. */
+function tsString(value: string): string {
+  const double = JSON.stringify(value);
+  if (value.split('"').length <= value.split("'").length) return double;
+  const inner = double.slice(1, -1).replace(/\\(.)/gu, (pair, char: string) => (char === '"' ? '"' : pair));
+  return `'${inner.replaceAll("'", "\\'")}'`;
 }
 
 function tsKey(key: string): string {
