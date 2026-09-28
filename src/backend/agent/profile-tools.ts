@@ -1,5 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AGENT_PROVIDERS, AGENT_REASONING_EFFORTS, AVATAR_HUES, AVATAR_SEED_PATTERN } from "@openbot/contracts/ipc";
+import {
+  AGENT_ACCESS_MODES,
+  AGENT_PROVIDERS,
+  AGENT_REASONING_EFFORTS,
+  AVATAR_HUES,
+  AVATAR_SEED_PATTERN,
+} from "@openbot/contracts/ipc";
 import { z } from "zod";
 
 const profileFields = {
@@ -68,6 +74,27 @@ export const updateProfileToolSchema = z
       .describe(
         "New reasoning effort that the model supports, from list_models. Omit to keep the current effort when the model supports it, else to use the model's default.",
       )
+      .optional(),
+    access: z
+      .enum(AGENT_ACCESS_MODES)
+      .describe("workspace limits the agent to writing in its workspace. Only the user can set full.")
+      .optional(),
+    computerUse: z
+      .boolean()
+      .describe("false turns Computer Use off for the agent. Only the user can turn it on.")
+      .optional(),
+    notifications: z.boolean().describe("Whether the user gets notifications for the agent.").optional(),
+  })
+  .strict();
+
+export const readAgentToolSchema = z
+  .object({
+    agentId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(INPUT_LIMITS.identifier)
+      .describe("Stable id from list_agents. Omit it to read your own agent.")
       .optional(),
   })
   .strict();

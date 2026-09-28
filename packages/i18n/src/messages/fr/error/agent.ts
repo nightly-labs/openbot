@@ -33,6 +33,8 @@ export const messages = {
   "error.agent.waitBeforeProviderChange":
     "Attendez la fin du tour actif et de la file d’attente avant de changer de fournisseur.",
   "error.agent.unknown": "Agent inconnu : {id}",
+  "error.agent.onlyUserWidensSettings":
+    "Seul l’utilisateur peut donner à un agent l’accès complet ou activer Computer Use. Demandez à l’utilisateur de le modifier dans les réglages de l’agent.",
   "error.agent.queuedMessageCreateFailed": "Impossible de créer le message en file d’attente.",
   "error.agent.messageUnavailable": "Le message n’est plus disponible.",
   "error.agent.hostLimit": "Un hôte peut avoir jusqu’à {limit} agents.",

@@ -12,6 +12,9 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
     },
     revise: (input) => library.revise(input.agentId, input.skillId, input.expectedRevision, input.sourcePath),
     install: (input) => skills.installLocal(input),
+    listInstalled: (agentId) => skills.listInstalled(agentId),
+    setEnabled: (input) => skills.setEnabled(input),
+    uninstall: (input) => skills.uninstall(input),
     create: async (input) => {
       const skill = await library.create(input.agentId, input.sourcePath);
       try {

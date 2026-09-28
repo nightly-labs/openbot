@@ -749,6 +749,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       tables: this.#tables,
       sidebarLayout: this.#sidebarLayout,
       localSkillTools: this.#localSkillTools,
+      approvalAutomation: options.approvalAutomation,
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
@@ -756,6 +757,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         createAgent: (input, configure) => this.createAgent(input, configure),
         updateAgent: (input, initiatingAgentId) => this.updateAgent(input, initiatingAgentId),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image),
+        enabledMcpServers: () => this.enabledMcpServers(),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) => this.#interruptTurn(agentId, turnId, undefined, mayStop),

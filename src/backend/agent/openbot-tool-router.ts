@@ -6,10 +6,16 @@ import type {
   AgentSummary,
   AvatarImageInput,
   CreateAgentInput,
+  McpServerConfig,
   SidebarLayoutSnapshot,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
-import { isMessageReaction, skillConversationEventItemType } from "@openbot/contracts/ipc";
+import {
+  agentComputerUseEnabled,
+  isMessageReaction,
+  skillConversationEventItemType,
+  workspaceAccessEnforced,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
@@ -19,9 +25,11 @@ import type { AgentStore } from "../agent-store";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { MailboxStore } from "../mailbox-store";
+import { agentMcpServers } from "../mcp-provider-shapes";
 import { type AppServerRequest, type DynamicToolCallParams, isRecord } from "../protocol";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
@@ -40,9 +48,14 @@ import {
   requestedToolModel,
   requireReasoningEffort,
 } from "./model-tools";
-import { createAgentToolSchema, listModelsToolSchema, updateProfileToolSchema } from "./profile-tools";
+import {
+  createAgentToolSchema,
+  listModelsToolSchema,
+  readAgentToolSchema,
+  updateProfileToolSchema,
+} from "./profile-tools";
 import type { RoutineScheduler } from "./routine-scheduler";
-import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -59,6 +72,8 @@ export interface OpenBotToolRouterHooks {
   /** `initiatingAgentId` is the calling agent, recorded with a model change. */
   updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Promise<AgentSummary>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<AgentSummary>;
+  /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
+  enabledMcpServers(): McpServerConfig[];
   emitError(code: string, error: unknown, agentId?: string): void;
   /** True while the provider runs a turn for this agent, a context compaction included. */
   runsTurn(agentId: string): boolean;
@@ -85,6 +100,7 @@ export interface OpenBotToolRouterOptions {
   tables: AgentTables | null;
   sidebarLayout: AgentSidebar | null;
   localSkillTools?: () => LocalSkillTools;
+  approvalAutomation?: ApprovalAutomationPolicy;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -112,6 +128,7 @@ export class OpenBotToolRouter {
   readonly #tables: AgentTables | null;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #localSkillTools?: () => LocalSkillTools;
+  readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
 
@@ -132,6 +149,7 @@ export class OpenBotToolRouter {
     this.#tables = options.tables;
     this.#sidebarLayout = options.sidebarLayout;
     this.#localSkillTools = options.localSkillTools;
+    this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -238,6 +256,65 @@ export class OpenBotToolRouter {
     }
   }
 
+  #requireAgent(agentId: string): AgentSummary {
+    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
+    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    return agent;
+  }
+
+  /**
+   * One agent's whole setup, for another agent to read before it changes it. MCP servers belong to
+   * the user and are shown by name and transport only: their commands, environment, URLs, and
+   * headers can hold secrets.
+   */
+  async #readAgent(agentId: string) {
+    const agent = this.#requireAgent(agentId);
+    const computerUse = agentComputerUseEnabled(agent);
+    let skills: unknown[] | undefined;
+    let skillsError: string | undefined;
+    try {
+      if (!this.#localSkillTools) throw new Error("Skill tools are unavailable.");
+      skills = (await this.#localSkillTools().listInstalled(agent.id)).map((skill) => ({
+        skillId: skill.skillId,
+        name: skill.name,
+        ...(skill.description ? { description: skill.description } : {}),
+        origin: skill.origin ?? "marketplace",
+        enabled: skill.enabled !== false,
+        state: skill.state,
+        installedVersion: skill.installedVersion,
+        ...(skill.problem ? { problem: skill.problem } : {}),
+      }));
+    } catch (error) {
+      // The rest of the setup stays readable when the skill folders cannot be read.
+      skillsError = error instanceof Error ? error.message : String(error);
+    }
+    return {
+      id: agent.id,
+      name: agent.name,
+      title: agent.title,
+      description: agent.description,
+      provider: agent.provider,
+      model: agent.model,
+      reasoningEffort: agent.reasoningEffort,
+      access: workspaceAccessEnforced(agent) ? "workspace" : "full",
+      computerUse,
+      notifications: agent.notifications,
+      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+      ...(skills ? { skills } : { skillsError }),
+      routines: this.#routines.list(agent.id).map((routine) => ({
+        id: routine.id,
+        name: routine.name,
+        active: routine.active,
+        schedule: routine.trigger.schedule,
+        nextRunAt: routine.trigger.nextRunAt,
+      })),
+      mcpServers: agentMcpServers(this.#hooks.enabledMcpServers(), computerUse).map((server) => ({
+        name: server.name,
+        transport: server.transport,
+      })),
+    };
+  }
+
   /**
    * The provider, model and effort an `update_profile` call names, checked against what the CLIs list
    * now. Like `create_agent`, a model or an effort that is not listed is an error that names the valid
@@ -250,8 +327,7 @@ export class OpenBotToolRouter {
     if (request.provider === undefined && request.model === undefined && request.reasoningEffort === undefined) {
       return {};
     }
-    const target = this.#hooks.listAgents().find((agent) => agent.id === agentId);
-    if (!target) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    const target = this.#requireAgent(agentId);
     const models = this.#hooks.listModels();
     const requested = requestedToolModel(request, models);
     if (requested) {
@@ -283,23 +359,30 @@ export class OpenBotToolRouter {
       try {
         if (!this.#localSkillTools) throw new Error("Local skill tools are unavailable.");
         const result = openBotToolResult(
-          await runLocalSkillTool(this.#localSkillTools(), senderAgentId, params.tool, params.arguments, (event) => {
-            const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-            const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
-            snapshot.messages.push({
-              id: randomUUID(),
-              turnId: params.turnId,
-              author: "system",
-              source: "system",
-              status: "completed",
-              createdAt: new Date().toISOString(),
-              itemType: skillConversationEventItemType(event),
-              text: redactText(event.skillName),
-            });
-            const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
-            this.#conversation.setSnapshot(senderAgentId, persisted);
-            this.#conversation.publishConversation(persisted);
-          }),
+          await runLocalSkillTool(
+            this.#localSkillTools(),
+            senderAgentId,
+            params.tool,
+            params.arguments,
+            (agentId) => this.#requireAgent(agentId ?? senderAgentId).id,
+            (event) => {
+              const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+              const snapshot = structuredClone(this.#conversation.ensureSnapshot(senderAgentId, executionThreadId));
+              snapshot.messages.push({
+                id: randomUUID(),
+                turnId: params.turnId,
+                author: "system",
+                source: "system",
+                status: "completed",
+                createdAt: new Date().toISOString(),
+                itemType: skillConversationEventItemType(event),
+                text: redactText(event.skillName),
+              });
+              const persisted = this.#store.database.persistConversation(snapshot, `skill.${event.action}`, event);
+              this.#conversation.setSnapshot(senderAgentId, persisted);
+              this.#conversation.publishConversation(persisted);
+            },
+          ),
         );
         return {
           ...result,
@@ -399,6 +482,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "interrupt_agent") return this.#interruptTool.handle(params, senderAgentId);
 
+    if (params.tool === "read_agent") {
+      const args = readAgentToolSchema.parse(params.arguments ?? {});
+      const payload = await this.#readAgent(args.agentId ?? senderAgentId);
+      return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
+    }
+
     if (params.tool === "create_agent") {
       const args = createAgentToolSchema.parse(params.arguments);
       const hue = args.avatarHue ?? null;
@@ -408,6 +497,13 @@ export class OpenBotToolRouter {
       // An effort alone applies to the model the new agent starts on, known only once it exists.
       const lateEffort = requested === null ? args.reasoningEffort : undefined;
       const sectionId = this.#sidebarLayout?.getSnapshot().agentAssignments[senderAgentId] ?? null;
+      // A new agent starts with Full access and Computer Use. A caller without them passes its limits
+      // on, so it cannot get around them through an agent it creates.
+      const caller = this.#requireAgent(senderAgentId);
+      const limits: Pick<UpdateAgentInput, "access" | "computerUse"> = {
+        ...(workspaceAccessEnforced(caller) ? { access: "workspace" } : {}),
+        ...(agentComputerUseEnabled(caller) ? {} : { computerUse: false }),
+      };
       const create = (assign?: (agentId: string) => Promise<SidebarLayoutSnapshot>) =>
         this.#hooks.createAgent(
           {
@@ -443,11 +539,12 @@ export class OpenBotToolRouter {
               }
               requireReasoningEffort(model, lateEffort);
             }
-            if (args.title === undefined && lateEffort === undefined) return agent;
+            if (args.title === undefined && lateEffort === undefined && Object.keys(limits).length === 0) return agent;
             return this.#store.updateAgent({
               agentId: agent.id,
               ...(args.title === undefined ? {} : { title: args.title }),
               ...(lateEffort === undefined ? {} : { reasoningEffort: lateEffort }),
+              ...limits,
             });
           },
         );
@@ -460,7 +557,7 @@ export class OpenBotToolRouter {
 
     if (params.tool === "update_profile") {
       const args = updateProfileToolSchema.parse(params.arguments);
-      const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, ...fields } = args;
+      const { agentId, avatarHue, avatarPath, provider, model, reasoningEffort, access, computerUse, ...fields } = args;
       if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
         throw new Error("Use avatarPath or generated avatar settings, not both.");
       }
@@ -468,6 +565,8 @@ export class OpenBotToolRouter {
       if (
         Object.values(fields).every((value) => value === undefined) &&
         Object.values(runtimeRequest).every((value) => value === undefined) &&
+        access === undefined &&
+        computerUse === undefined &&
         avatarHue === undefined &&
         avatarPath === undefined
       ) {
@@ -475,6 +574,15 @@ export class OpenBotToolRouter {
       }
       const sender = this.#hooks.listAgents().find((agent) => agent.id === senderAgentId);
       if (!sender) throw new Error("The calling agent no longer exists.");
+      // Only the user can widen what an agent may do. An agent can restrict itself or a teammate, and a
+      // request for the value the agent already has changes nothing.
+      const target = this.#requireAgent(agentId);
+      if (
+        (access === "full" && workspaceAccessEnforced(target)) ||
+        (computerUse === true && !agentComputerUseEnabled(target))
+      ) {
+        return openBotToolFailure(sourceText("error.agent.onlyUserWidensSettings"));
+      }
       // Checked before anything is written, so a model the provider does not list leaves the name
       // and every other field of the same call unchanged.
       const runtime = this.#requestedRuntime(agentId, runtimeRequest);
@@ -483,6 +591,9 @@ export class OpenBotToolRouter {
         agentId,
         ...fields,
         ...runtime,
+        // Only a restriction is written, so a user change between the check and this write is never undone.
+        ...(access === "workspace" ? { access } : {}),
+        ...(computerUse === false ? { computerUse } : {}),
         ...(avatarHue === undefined ? {} : { avatarHue }),
       };
       let updated = await this.#hooks.updateAgent(input, senderAgentId);
@@ -507,6 +618,9 @@ export class OpenBotToolRouter {
               provider: updated.provider,
               model: updated.model,
               reasoningEffort: updated.reasoningEffort,
+              access: workspaceAccessEnforced(updated) ? "workspace" : "full",
+              computerUse: agentComputerUseEnabled(updated),
+              notifications: updated.notifications,
             }),
           },
         ],

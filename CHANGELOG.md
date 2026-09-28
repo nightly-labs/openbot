@@ -7,6 +7,11 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ### Added
 
+- Ask an agent to set up another agent after it creates it. The agent can read another agent's
+  profile, model, settings, skills, routines and MCP servers. It can install, turn off and remove
+  local skills for another agent. It can set another agent to Workspace only, turn Computer Use off
+  and change notifications. Only you can give Full access, turn Computer Use on, change auto-approve
+  or change MCP servers. A new agent gets the access limits of the agent that creates it.
 - Ask an agent to change the provider, model or reasoning effort of another agent, as it can
   change a name. The agent gets an error that names the available models when a model is not
   available. OpenBot records which agent made the change, and the previous and new model.

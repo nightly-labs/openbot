@@ -14,6 +14,7 @@ import {
   createFakeGrok,
   createFakeOpencode,
   createTestService,
+  expectOpenBotToolFailure,
   FakeAgentClient,
   firstInputText,
   inputRecords,
@@ -1946,6 +1947,117 @@ describe.sequential("AgentService: queue", () => {
         next: { provider: "codex", model: "gpt-5.6-terra", reasoningEffort: "low" },
       },
     ]);
+  });
+
+  it("lets an agent read and restrict a teammate, never widen one, and keeps MCP secrets out", async () => {
+    const clients = new Map<AgentProvider, FakeAgentClient>();
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider);
+        clients.set(provider, client);
+        return client;
+      },
+      hostedSites: null,
+      approvalAutomation: { autoApproves: (agentId) => agentId === "design", turboEnabled: () => false },
+    });
+    await service.initialize();
+    await store.getOrCreate("design", "Designer", "Design");
+    await service.updateAgent({ agentId: "design", access: "workspace", computerUse: false });
+    const [envSecret, headerSecret, urlSecret] = [
+      "synthetic-env-secret",
+      "synthetic-header-secret",
+      "synthetic-url-secret",
+    ] as const;
+    const server = { args: [], envPassthrough: [], workingDirectory: "", enabled: true, id: "" };
+    service.saveMcpServer({
+      config: {
+        ...server,
+        name: "Filesystem",
+        transport: "stdio",
+        command: "/bin/echo",
+        env: [{ key: "TOKEN", value: envSecret }],
+        url: "",
+        headers: [],
+      },
+    });
+    service.saveMcpServer({
+      config: {
+        ...server,
+        name: "Tracker",
+        transport: "http",
+        command: "",
+        env: [],
+        url: `https://tracker.example/mcp?key=${urlSecret}`,
+        headers: [{ key: "Authorization", value: `Bearer ${headerSecret}` }],
+      },
+    });
+    await service.sendMessage({ agentId: "chief", text: "Set up the design teammate." });
+    await waitFor(() => Boolean(store.activeProviderSession("chief")?.externalSessionId));
+    const client = clients.get("codex");
+    const threadId = store.activeProviderSession("chief")?.externalSessionId;
+    if (!client || !threadId) throw new Error("The agent session did not start.");
+    const agent = (id: string) => service?.listAgents().find((candidate) => candidate.id === id);
+
+    const read = await callOpenBotTool(client, threadId, "read_agent", { agentId: "design" });
+    const text = JSON.stringify(read.result);
+    for (const secret of [envSecret, headerSecret, urlSecret]) expect(text).not.toContain(secret);
+    expect(openBotToolPayload(read.result)).toMatchObject({
+      id: "design",
+      access: "workspace",
+      computerUse: false,
+      autoApprove: true,
+      routines: [],
+      mcpServers: [
+        { name: "Filesystem", transport: "stdio" },
+        { name: "Tracker", transport: "http" },
+      ],
+    });
+
+    for (const widen of [{ access: "full", name: "Renamed" }, { computerUse: true }]) {
+      await expectOpenBotToolFailure(
+        client,
+        threadId,
+        "update_profile",
+        { agentId: "design", ...widen },
+        "Only the user can give an agent Full access or turn Computer Use on.",
+      );
+    }
+    expect(agent("design")).toMatchObject({ name: "Designer", access: "workspace", computerUse: false });
+
+    const restricted = await callOpenBotTool(client, threadId, "update_profile", {
+      agentId: "chief",
+      access: "workspace",
+      computerUse: false,
+      notifications: false,
+    });
+    expect(openBotToolPayload(restricted.result)).toMatchObject({
+      access: "workspace",
+      computerUse: false,
+      notifications: false,
+    });
+    expect(agent("chief")).toMatchObject({ access: "workspace", computerUse: false, notifications: false });
+    await expectOpenBotToolFailure(
+      client,
+      threadId,
+      "update_profile",
+      { agentId: "chief", access: "full" },
+      "Only the user can give an agent Full access or turn Computer Use on.",
+    );
+
+    const created = await callOpenBotTool(client, threadId, "create_agent", {
+      name: "Researcher",
+      description: "Research",
+      initialMessage: "Start.",
+    });
+    const createdId = openBotToolPayload(created.result).id;
+    expect(service.listAgents().find((candidate) => candidate.id === createdId)).toMatchObject({
+      access: "workspace",
+      computerUse: false,
+    });
   });
 
   it("creates and groups a persistent teammate from conversation and rejects invalid changes", async () => {
