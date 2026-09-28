@@ -1919,6 +1919,20 @@
   box-shadow: none;
 }
 
+/* `StableLabel`: all texts share one grid cell, so the widest one sets the width. */
+.ui-stable-label {
+  display: inline-grid;
+}
+
+.ui-stable-label-text,
+.ui-stable-label-sizer {
+  grid-area: 1 / 1;
+}
+
+.ui-stable-label-sizer {
+  visibility: hidden;
+}
+
 /* The standard confirmation: the icon beside a left-aligned title and description, and the actions
  * on a footer below a divider. The surface uses the dialog ring and shadow of the other dialogs.
  * A confirmation always answers the surface that opened it, so it takes the top nested dialog step:
@@ -2026,6 +2040,10 @@
   background: var(--openbot-bg-control);
   padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-3) var(--openbot-space-8);
   list-style: disc;
+}
+
+.ui-confirm-dialog-body :where(ol) {
+  list-style: decimal;
 }
 
 .ui-confirm-dialog-body :where(li)::marker {

@@ -317,3 +317,29 @@
     stroke-dashoffset: 0;
   }
 }
+
+/* The iPhone app install guide: the TestFlight invite QR code beside the numbered steps. It stays
+ * here for good, because the sidebar announcement of the beta can be closed. */
+.settings-mobile-app-install {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--openbot-space-6);
+  border-top: 1px solid var(--openbot-border);
+  padding: var(--openbot-space-4);
+}
+
+.settings-mobile-app-steps {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding-left: var(--openbot-space-4);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  list-style: decimal;
+}
+
+.settings-mobile-app-steps > li::marker {
+  color: var(--openbot-text-dim);
+}
