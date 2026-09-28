@@ -433,7 +433,7 @@ export function createWebWorkspaceRuntime(
   };
   return {
     admin,
-    hosts,
+    ...(hosts ? { hosts } : {}),
     browser: {
       async startLiveView(tabId) {
         const currentGeneration = ++liveViewGeneration;
