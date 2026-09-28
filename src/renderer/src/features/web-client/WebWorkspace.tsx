@@ -52,7 +52,7 @@ import {
   ServerSettingsOverlay,
   SharedAgentInstallOverlay,
 } from "../../WorkspaceOverlayViews";
-import { readableAgentError } from "../agents/agent-error-text";
+import { claimErrorToast, readableAgentError } from "../agents/agent-error-text";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
@@ -528,7 +528,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
-  // the last. An error with no agent is a toast. The host redacts the message before it sends it.
+  // the last. An error with no agent is a toast, once per text in 30 seconds. The host redacts the
+  // message before it sends it.
   onCleanup(
     workspace.onHostEvent((event) => {
       if (event.type !== "error") return;
@@ -536,7 +537,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
         controller.setConversationErrors((current) => ({ ...current, [key]: readableAgentError(event.message) }));
-      } else toast.error(t("webClient.error.hostReported"), { description: readableAgentError(event.message) });
+        return;
+      }
+      const description = readableAgentError(event.message);
+      if (claimErrorToast(description)) toast.error(t("webClient.error.hostReported"), { description });
     }),
   );
   // The scope starts before the host is online, so the first connection opens the saved channel here.
