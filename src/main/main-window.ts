@@ -70,6 +70,8 @@ export interface MainWindowContext {
   developmentProfile: string | null;
   developmentRemoteRole: "host" | "client" | null;
   developmentTestClientEnabled: boolean;
+  /** Packaged VPS host: keep the renderer alive and never show the window. */
+  headless: boolean;
   /** A function, not a flag: the window is built long before the first quit is requested. */
   isQuitting: () => boolean;
   /** A function, not a value: nothing exists yet when the first window is created. */
@@ -100,6 +102,7 @@ export function createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  headless,
   isQuitting,
   getServices,
   getTranslate,
@@ -157,6 +160,7 @@ export function createMainWindowController({
 
     window.once("ready-to-show", () => {
       if (
+        !headless &&
         shouldShowDevelopmentWindow({
           remoteRole: developmentRemoteRole,
           testClientEnabled: developmentTestClientEnabled,
@@ -167,7 +171,7 @@ export function createMainWindowController({
     });
     window.on("close", (event) => {
       rememberMainWindowBounds(window.getNormalBounds());
-      if (process.platform === "darwin" && !isQuitting()) {
+      if ((process.platform === "darwin" || headless) && !isQuitting()) {
         // The hidden renderer owns the cross-host Dynamic Island coordinator and must outlive its visible window.
         event.preventDefault();
         window.hide();
