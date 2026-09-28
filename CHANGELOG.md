@@ -39,6 +39,10 @@ All notable changes to OpenBot will be documented here. The project follows
   Before, each visit logged a refused request.
 - Show the loading placeholder in a browser tab preview while the page loads. Before, the preview
   could show a failure icon until the next capture.
+- Import an agent when one of its files is already in the workspace, for example two files whose
+  names differ only in case on macOS. The import keeps both files, saves the second one as
+  `name (2).ext`, and shows a warning. A file that it cannot write is skipped with a warning. Before,
+  the agent was not imported.
 
 ## [0.23.0] - 2026-09-27
 
