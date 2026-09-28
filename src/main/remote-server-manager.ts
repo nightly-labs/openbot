@@ -636,6 +636,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (server.role === "owner") hideHost = true;
       else await this.#webrtcTransport.leaveHost(serverId);
       await this.#webrtcTransport.disconnect(serverId).catch(() => undefined);
+    } else if (server) {
+      // A released HTTP host has no route for a member to leave. Logging out ends this computer's
+      // session there, so the token stops working; the membership stays for an admin to remove. It
+      // is best effort, as the WebRTC disconnect is: an unreachable host must not keep the server.
+      await this.request(serverId, TEAM_API_ROUTES.auth.logout, decodeVoid, { method: "POST" }).catch(() => undefined);
     }
     this.#clearServerConnectionState(serverId);
     await this.#store.remove(serverId, { hideHost });

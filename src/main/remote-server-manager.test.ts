@@ -1008,3 +1008,35 @@ describe("remote control capability discovery", () => {
     }
   });
 });
+
+describe("leaving a remote server", () => {
+  // A released HTTP host has no route for a member to leave, so logging out is what ends this
+  // computer's session there. A host that fails the logout must not keep the server in the list.
+  it("logs out of an HTTP host before it removes the server, also when the host fails", async () => {
+    const teamFetch = stubTeamFetch({
+      compatibility: {},
+      routes: {
+        "/v1/auth/logout": ({ url }) =>
+          url.hostname.startsWith("reachable")
+            ? new Response(null, { status: 204 })
+            : Response.json({ error: "Host unavailable." }, { status: 503 }),
+      },
+    });
+    const fixture = await createRemoteManager({
+      servers: [storedHttpsServer("reachable"), storedHttpsServer("unreachable")],
+    });
+
+    await fixture.manager.remove("reachable");
+    await fixture.manager.remove("unreachable");
+
+    expect(
+      teamFetch
+        .requests("/v1/auth/logout")
+        .map((call) => [call.url.hostname, call.init?.method, call.headers.get("Authorization")]),
+    ).toEqual([
+      ["reachable.trycloudflare.com", "POST", "Bearer token-reachable"],
+      ["unreachable.trycloudflare.com", "POST", "Bearer token-unreachable"],
+    ]);
+    expect(fixture.manager.list().map((server) => server.id)).toEqual(["local"]);
+  });
+});
