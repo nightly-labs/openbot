@@ -52,6 +52,7 @@ import {
   ServerSettingsOverlay,
   SharedAgentInstallOverlay,
 } from "../../WorkspaceOverlayViews";
+import { readableAgentError } from "../agents/agent-error-text";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import { ChannelConversation } from "../channels/ChannelConversation";
 import { readChannelSelection, writeChannelSelection } from "../channels/channel-selection";
@@ -524,6 +525,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   onCleanup(
     workspace.onHostEvent((event) => {
       if (event.type === "channels-changed" || event.type === "runtime-snapshot") void channels.refresh();
+    }),
+  );
+  // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
+  // the last. An error with no agent is a toast. The host redacts the message before it sends it.
+  onCleanup(
+    workspace.onHostEvent((event) => {
+      if (event.type !== "error") return;
+      const serverId = server()?.id;
+      if (event.agentId && serverId) {
+        const key = composerDraftKey({ agentId: event.agentId, serverId });
+        controller.setConversationErrors((current) => ({ ...current, [key]: readableAgentError(event.message) }));
+      } else toast.error(t("webClient.error.hostReported"), { description: readableAgentError(event.message) });
     }),
   );
   // The scope starts before the host is online, so the first connection opens the saved channel here.
@@ -1125,6 +1138,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               hasOlder={workspace.conversation()?.page?.pageInfo.hasOlder}
               loadingOlder={workspace.conversation()?.loading}
               activeTurnId={workspace.conversation()?.page?.activeTurnId}
+              activityDetail={
+                workspace.state.selectedId ? workspace.state.progress[workspace.state.selectedId]?.detail : undefined
+              }
               skillsMarketplaceOpen={marketplaceOpen()}
               mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
               globalOverlayOpen={
@@ -1177,7 +1193,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 if (!sent)
                   controller.setComposerErrors((current) => ({
                     ...current,
-                    [`${server()?.id}:${id}`]: workspace.state.error ?? t("webClient.error.checkConversation"),
+                    [`${server()?.id}:${id}`]:
+                      workspace.state.conversations[id]?.sendError ?? t("webClient.error.checkConversation"),
                   }));
                 return sent;
               }}
