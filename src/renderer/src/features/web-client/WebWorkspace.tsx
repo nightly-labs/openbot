@@ -666,7 +666,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       let active = true;
       usageGeneration += 1;
       setAccountUsage(null);
-      setCreating(false);
+      // A connect can load an empty host in the same update, so the first-agent form stays open.
+      setCreating(untrack(() => firstAgent() && !channelOpen()));
       modelsShown = ++modelsRequest;
       setModels([]);
       setStatus(CONNECTING_STATUS);
