@@ -804,18 +804,16 @@ export class BrowserHost {
   async capturePreview(tabId: string): Promise<BrowserPreview> {
     const tab = this.#requireTab(tabId);
     if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
-    const cached =
-      tab.preview?.generation === tab.captureGeneration &&
-      tab.preview.document === tab.documents &&
-      tab.preview.url === currentTabUrl(tab)
-        ? tab.preview.frame
-        : null;
+    const cached = savedPreview(tab);
     if (cached && tab.pendingOperations > 0) return cached;
     const capture = tab.previewCapture ?? this.#capturePreviewFrame(tab);
     if (!cached) return capture;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // After a navigation during the capture the saved frame shows the wrong page, so the preview waits.
     const stale = new Promise<BrowserPreview>((resolve) => {
-      timer = setTimeout(() => resolve(cached), PREVIEW_STALE_AFTER_MS);
+      timer = setTimeout(() => {
+        if (savedPreview(tab) === cached) resolve(cached);
+      }, PREVIEW_STALE_AFTER_MS);
     });
     return Promise.race([capture, stale]).finally(() => clearTimeout(timer));
   }
@@ -1878,6 +1876,16 @@ export class BrowserHost {
       });
     return this.#persistQueue;
   }
+}
+
+/** The saved preview frame, when it still shows the tab's current page, document and view. */
+function savedPreview(tab: BrowserHostTab): BrowserPreview | null {
+  const preview = tab.preview;
+  return preview?.generation === tab.captureGeneration &&
+    preview.document === tab.documents &&
+    preview.url === currentTabUrl(tab)
+    ? preview.frame
+    : null;
 }
 
 function validateBounds(bounds: BrowserBounds): BrowserBounds {
