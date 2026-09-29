@@ -65,6 +65,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
   const [query, setQuery] = createSignal("");
   const [messageResults, setMessageResults] = createSignal<GlobalSearchResult[]>([]);
   let input: HTMLInputElement | undefined;
+  let dialog: HTMLDivElement | undefined;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let searchRequest = 0;
 
@@ -150,7 +151,14 @@ export function GlobalSearch(props: GlobalSearchProps) {
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay class="global-search-overlay" />
-        <Dialog.Content class="global-search-dialog" aria-describedby={undefined}>
+        <Dialog.Content
+          ref={(element) => (dialog = element)}
+          class="global-search-dialog"
+          aria-describedby={undefined}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !event.isComposing) props.onOpenChange(false);
+          }}
+        >
           <Dialog.Title class="sr-only">{t("conversation.globalSearch.title")}</Dialog.Title>
           <Combobox.Root<GlobalSearchResult>
             options={results()}
@@ -242,7 +250,14 @@ export function GlobalSearch(props: GlobalSearchProps) {
               </Tabs.List>
             </Tabs.Root>
 
-            <Combobox.Content class="global-search-results">
+            {/* The always-open results are the top Kobalte layer, so they get outside presses, not the dialog. */}
+            <Combobox.Content
+              class="global-search-results"
+              onPointerDownOutside={(event) => {
+                const target = event.detail.originalEvent.target;
+                if (!(target instanceof Node && dialog?.contains(target))) props.onOpenChange(false);
+              }}
+            >
               <Combobox.Listbox aria-label={t("conversation.globalSearch.results")} />
               <Show when={results().length === 0}>
                 <div class="global-search-empty">{t("conversation.globalSearch.empty")}</div>
