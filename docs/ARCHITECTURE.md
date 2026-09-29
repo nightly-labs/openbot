@@ -1167,7 +1167,8 @@ browser, such as a hosted server. `src/backend/agent/cli-code-login.ts` reads th
 the code, from the CLI output. The Claude CLI shows its paste prompt only on a terminal, so the host
 runs it under the util-linux `script`, and the admin sends back the code that the Claude page shows
 (`code-login/submit`). This flow runs only on a Linux host: the macOS `script` refuses a socket for
-stdin, and Windows has no `script`. The CLI output and the pasted code are secrets; no log line or
+stdin, and Windows has no `script`. So only a Linux host advertises `providers-v3`; a macOS or
+Windows host keeps `providers-v1`, and its clients offer the Codex code sign-in only. The CLI output and the pasted code are secrets; no log line or
 error quotes them. How a sign-in ends arrives in the host's agent status, as for Codex.
 `codeSignInProviders` in `server-capabilities.ts` picks the providers that the Providers list offers
 for a code sign-in, from the host's capabilities.

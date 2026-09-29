@@ -36,6 +36,7 @@ describe("parseCliCodePrompt", () => {
       verificationUrlComplete: "https://accounts.x.ai/oauth2/device?user_code=6Z9Q-HAAK",
     });
     expect(parseCliCodePrompt("device", GROK_OUTPUT.slice(0, GROK_OUTPUT.indexOf("Confirm")))).toBeNull();
+    expect(parseCliCodePrompt("device", GROK_OUTPUT.slice(0, GROK_OUTPUT.lastIndexOf("6Z9Q-HAAK") + 3))).toBeNull();
   });
 
   it("reads the Claude link out of its hyperlink only once the paste prompt shows", () => {

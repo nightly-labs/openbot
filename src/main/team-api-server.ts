@@ -1222,12 +1222,9 @@ export class TeamApiServer {
           );
         if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
         if (capability === AGENT_PUBLISH_CAPABILITY) return this.#options.admin?.agentTemplates !== undefined;
-        if (
-          capability === PROVIDERS_ADMIN_CAPABILITY ||
-          capability === PROVIDERS_RUNTIMES_V2_CAPABILITY ||
-          capability === PROVIDERS_SIGN_IN_V3_CAPABILITY
-        )
+        if (capability === PROVIDERS_ADMIN_CAPABILITY || capability === PROVIDERS_RUNTIMES_V2_CAPABILITY)
           return this.#options.admin?.providers !== undefined;
+        if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;

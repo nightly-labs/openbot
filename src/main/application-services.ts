@@ -46,6 +46,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import { app, type BrowserWindow, nativeImage, safeStorage, screen, shell } from "electron";
+import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
 import { AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
@@ -1002,6 +1003,7 @@ export async function createApplicationServices({
         credentials: providerCredentials,
         runtimes: providerRuntimes,
         customProviders: customProviderChanges,
+        pasteSignIn: pasteCodeLoginSupported(),
       },
       update: {
         snapshot: () => scheduledUpdate().snapshot(),

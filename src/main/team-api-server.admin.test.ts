@@ -514,7 +514,7 @@ describe("Team API providers-v1", () => {
       },
     };
     const { base, admin, asMember, post } = await signedIn("providers", {
-      admin: { providers: { service, credentials, runtimes, customProviders } },
+      admin: { providers: { service, credentials, runtimes, customProviders, pasteSignIn: true } },
       logger: createOpenBotLogger("test", (line) => lines.push(line)),
     });
     const bodies: string[] = [];

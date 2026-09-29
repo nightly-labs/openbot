@@ -122,12 +122,17 @@ export function normalizePastedCode(code: string): string {
   return value;
 }
 
+/** Whether a pasted-code sign-in can run on this platform: see `startCliCodeLogin`. */
+export function pasteCodeLoginSupported(platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "linux";
+}
+
 /**
  * The CLI under a pseudo-terminal, on Linux. The executable travels in the environment, so no path
  * is ever pasted into a shell command. The arguments are the driver's own constants.
  */
 function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { file: string; args: string[] } {
-  if (platform === "linux") {
+  if (pasteCodeLoginSupported(platform)) {
     const line = ['exec "$OPENBOT_LOGIN_EXECUTABLE"', ...argv.map(shellQuote)].join(" ");
     return { file: "script", args: ["-q", "-e", "-f", "-c", line, "/dev/null"] };
   }
@@ -170,12 +175,15 @@ export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string):
   };
 }
 
-/** The first non-empty line after "Confirm this code", when it is a code. */
+/**
+ * The first non-empty line after "Confirm this code", when it is a code. The last line has no
+ * newline yet, so a chunk can end in it with part of the code.
+ */
 function codeAfterConfirmLine(text: string): string | null {
   const lines = text.split("\n").map((line) => line.trim());
   const confirm = lines.findIndex((line) => /confirm this code/i.test(line));
   if (confirm < 0) return null;
-  const code = lines.slice(confirm + 1).find(Boolean);
+  const code = lines.slice(confirm + 1, -1).find(Boolean);
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
 }
 

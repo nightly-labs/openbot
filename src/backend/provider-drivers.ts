@@ -91,7 +91,7 @@ type ProviderSignIn =
  * link: `device` prints a code the user confirms, `paste` waits for the code the provider's page
  * shows, which the user copies back.
  */
-export type ProviderCodeSignIn =
+type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "cli"; flow: "device" | "paste"; command: ProviderCliCommand };
 
