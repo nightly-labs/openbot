@@ -109,10 +109,10 @@ const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) =>
     message: null,
     fullAccess: true,
   };
-  const setClaude = (change: Partial<AgentProviderStatus>) => {
+  const setClaude = (row: AgentProviderStatus) => {
     status = {
       ...status,
-      providers: status.providers?.map((row) => (row.id === "claude" ? { ...row, ...change } : row)),
+      providers: (status.providers ?? []).map((current) => (current.id === "claude" ? row : current)),
     };
   };
   const ready = (version: string) => ({ phase: "ready", progress: 100, message: null, version });
@@ -138,10 +138,11 @@ const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) =>
     }),
     // The host checks the code for a moment, then Claude is signed in.
     [PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit]: () => {
-      setClaude({ connectionState: "connecting" });
+      const claude = { id: "claude", version: "2.1.263", message: null } as const;
+      setClaude({ ...claude, state: "sign-in-required", connectionState: "connecting" });
       window.setTimeout(() => {
         status = { ...status, phase: "ready" };
-        setClaude({ state: "available", connectionState: undefined, email: "you@example.com" });
+        setClaude({ ...claude, state: "available", email: "you@example.com" });
         events.event(NEW_SERVER_ID, { type: "status", status });
       }, 1500);
       return {};

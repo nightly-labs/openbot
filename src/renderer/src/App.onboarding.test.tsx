@@ -565,7 +565,7 @@ describe("OpenBot connected desktop shell", () => {
       status: {
         ...hostStatus,
         phase: "ready",
-        providers: hostStatus.providers?.map((row) =>
+        providers: (hostStatus.providers ?? []).map((row) =>
           row.id === "claude" ? { ...row, state: "available" as const, email: "ada@example.com" } : row,
         ),
       },

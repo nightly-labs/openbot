@@ -17,6 +17,7 @@ import {
 } from "@openbot/contracts/team-protocol/providers-v3";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText, registerSecretValue } from "@openbot/logging";
+import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
@@ -161,12 +162,12 @@ function signInProvider(body: DynamicRecord): SignInProviderId {
   return id;
 }
 
-/** The error never quotes the code. The CLI checks what the code is; this only bounds its size. */
+/** The error never quotes the code. The CLI checks what the code is; this uses the local check. */
 function codeSubmitInput(body: DynamicRecord): { provider: SignInProviderId; code: string } {
-  const code = body.code;
-  if (typeof code !== "string" || !code.trim() || code.length > 2048) throw new Error("Invalid sign-in code.");
+  if (typeof body.code !== "string") throw new Error("Invalid sign-in code.");
+  const code = normalizePastedCode(body.code);
   // From here on, an error or a log line that quotes the code is masked, as for a provider key.
-  registerSecretValue(code.trim());
+  registerSecretValue(code);
   return { provider: signInProvider(body), code };
 }
 

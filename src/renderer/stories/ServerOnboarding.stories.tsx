@@ -25,7 +25,7 @@ const newHostStatus: AgentStatus = {
 const connectedHostStatus: AgentStatus = {
   ...newHostStatus,
   phase: "ready",
-  providers: newHostStatus.providers?.map((provider) =>
+  providers: (newHostStatus.providers ?? []).map((provider) =>
     provider.id === "claude" ? { ...provider, state: "available", email: "person@example.com" } : provider,
   ),
 };

@@ -132,7 +132,12 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
     const target = codeLoginTarget;
     if (!provider || state.phase !== "paste" || state.submitting || !target?.submit) return;
     const generation = codeLoginGeneration;
-    setCodeLoginState({ ...state, submitting: true, error: undefined });
+    setCodeLoginState({
+      phase: "paste",
+      verificationUrl: state.verificationUrl,
+      expiresAt: state.expiresAt,
+      submitting: true,
+    });
     try {
       const status = await target.submit(provider, code);
       if (generation !== codeLoginGeneration) return;
