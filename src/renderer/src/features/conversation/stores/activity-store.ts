@@ -79,7 +79,10 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   const activeActivityDetail = createMemo(() => {
     const hold = heldByOwnChannelWork();
     if (hold) return currentText().t("chat.activity.workingIn", { channel: hold.channelName });
-    return latestActiveCommentary() ?? (deps.props.activityDetail?.trim() || null);
+    const progress = deps.props.activityDetail?.trim();
+    // The agent's own commentary is shown as it is; the host's progress text is in the host's source
+    // English and is read here in the user's language.
+    return latestActiveCommentary() ?? (progress ? currentText().sourceText(progress) : null);
   });
   const agentActivity = createMemo<"Working" | null>(() => (activeActivityId() ? "Working" : null));
   const activityLabel = createMemo<AgentActivityLabel | null>(() => {

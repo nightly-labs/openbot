@@ -1,5 +1,6 @@
 import { agentProviderName, COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { type AgentProvider, RequestTimeoutError } from "../agent-client";
 import { AppServerError } from "../app-server-client";
 import { type DynamicToolCallParams, getString, isRecord, reasoningText, type ThreadItem } from "../protocol";
@@ -175,7 +176,7 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   // The completed text is what the user reads while the model decides the next action, so a long
   // wait after it is the model, not the driver.
   if (getString(item, "server") === COMPUTER_USE_MCP_SERVER_NAME || descriptor.includes(COMPUTER_USE_MCP_SERVER_NAME)) {
-    return completed ? "Deciding the next step in the app…" : "Using an app on this computer…";
+    return sourceText(completed ? "status.computerUse.progressDeciding" : "status.computerUse.progressActing");
   }
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
     return completed ? "Reviewing the sources and information I found…" : "Searching for current information…";

@@ -202,6 +202,14 @@ class CallAnswerLines extends Transform {
     this.#expected.push(request);
   }
 
+  /** The tool calls still waiting for their answer, oldest first. Each is returned only once. */
+  takeUnanswered(): PendingCall[] {
+    const calls = [this.#answering, ...this.#expected].filter((call): call is PendingCall => call !== null);
+    this.#answering = null;
+    this.#expected.length = 0;
+    return calls;
+  }
+
   override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
     let start = 0;
     while (start < chunk.length) {
@@ -344,6 +352,8 @@ export class CuaDriverActionTap {
     this.#sockets.add(daemon);
     const answers = new CallAnswerLines((tool, ms) => this.#logAnswered(tool, ms), this.#now);
     const end = () => {
+      // A call that hangs in the driver ends here, when the agent gives up and closes the connection.
+      for (const call of answers.takeUnanswered()) this.#logUnanswered(call.tool, this.#now() - call.at);
       this.#sockets.delete(client);
       this.#sockets.delete(daemon);
       client.destroy();
@@ -394,5 +404,9 @@ export class CuaDriverActionTap {
   #logAnswered(tool: string, ms: number): void {
     const log = ms >= SLOW_CALL_MS ? this.#logger.info : this.#logger.debug;
     log("Computer Use driver answered", { tool, ms });
+  }
+
+  #logUnanswered(tool: string, ms: number): void {
+    this.#logger.info("Computer Use driver did not answer", { tool, ms });
   }
 }

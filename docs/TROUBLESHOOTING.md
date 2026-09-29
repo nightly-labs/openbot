@@ -91,14 +91,16 @@ installed release, and each build must be granted once.
 ## Computer Use is slow
 
 A Computer Use step has two parts: the driver does the action, and then the model reads the result
-and chooses the next action. While the driver works, the chat shows **Using an app on this
-computer…**. While the model works, it shows **Deciding the next step in the app…**. After 5 seconds
-on one step, the time the step has run shows next to the text.
+and chooses the next action. While the driver works, the activity line in the chat shows **Using an
+app on this computer…**. While the model works, it shows **Deciding the next step in the app…**.
+When the agent writes its own progress note, the line shows that note instead. When the line stays
+the same for 5 seconds, the time since it changed shows next to the text.
 
 A driver call usually takes a few seconds or less. To see the time of each call, start OpenBot from
 a terminal. Each driver call that takes 5 seconds or more shows in its output as `Computer Use
-driver answered`, with the tool name and the milliseconds. Set `OPENBOT_LOG_LEVEL=debug` to show
-every call. The log does not contain what the agent typed.
+driver answered`, with the tool name and the milliseconds. A call that gets no answer before the
+agent closes the connection shows as `Computer Use driver did not answer`. Set
+`OPENBOT_LOG_LEVEL=debug` to show every call. The log does not contain what the agent typed.
 
 Most of the time in a slow step is the model. Its time depends on the model and on the reasoning
 effort in the agent settings: a high effort can use tens of seconds before each action. For
