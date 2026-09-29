@@ -16,7 +16,8 @@ export interface MarkdownListEdit {
 
 const LIST_ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?/u;
 const THEMATIC_BREAK = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
-const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/u;
+// Any indent, and a list marker before it, so a fence inside a list item counts too.
+const CODE_FENCE = /^[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}|~{3,})(.*)$/u;
 
 /** The edit for a line break typed at `caret` in `text`, or null when the line break is plain. */
 export function markdownListLineBreak(text: string, caret: number): MarkdownListEdit | null {
