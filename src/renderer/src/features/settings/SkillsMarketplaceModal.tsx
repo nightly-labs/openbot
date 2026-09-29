@@ -405,6 +405,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       return;
     }
     setBusy(`plugin:${plugin.id}`);
+    const analytics = desktopAnalytics.scope();
     const installed = await run(async () => {
       const added: string[] = [];
       try {
@@ -435,6 +436,16 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       }
       return true;
     });
+    // `false` is a closed connect dialog: the user's decision, not an install.
+    if (installed !== false) {
+      analytics.track("marketplace_action", {
+        entity: "plugin",
+        action: "install",
+        result: installed ? "succeeded" : "failed",
+        listing_slug: plugin.slug,
+        ...(installed ? {} : { failure_code: "install_failed" }),
+      });
+    }
     /* Only on success: reading the list again starts by clearing the panel, which would take the
        failure off the screen before the reader saw it. */
     if (installed && plugin.skills.length > 0) await loadInstalled(agentId);
@@ -488,6 +499,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     const agentId = market.browse.targetAgentId;
     setBusy(`plugin-uninstall:${plugin.id}`);
     setError(null);
+    const analytics = desktopAnalytics.scope();
     const failures: string[] = [];
     for (const app of plugin.apps) {
       const config = heldApp(app);
@@ -509,6 +521,13 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
       }
     }
     setUninstalling(null);
+    analytics.track("marketplace_action", {
+      entity: "plugin",
+      action: "uninstall",
+      result: failures.length > 0 ? "failed" : "succeeded",
+      listing_slug: plugin.slug,
+      ...(failures.length > 0 ? { failure_code: "uninstall_failed" } : {}),
+    });
     /* Read back before the failure is written: the reads clear the panel, and a message set first
        would be taken off screen by the refresh that follows it. */
     await loadHostMcpServers(serverId);
@@ -718,6 +737,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
+      listing_slug: skill.id,
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
@@ -743,6 +763,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     analytics.track("marketplace_action", {
       entity: "skill",
       action: "view",
+      listing_slug: skillId,
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
@@ -785,6 +806,7 @@ export function SkillsMarketplaceModal(props: SkillsMarketplaceModalProps) {
     analytics.track("marketplace_action", {
       entity: "skill",
       action,
+      listing_slug: skill.id,
       result: result ? "succeeded" : "failed",
       ...(result ? {} : { failure_code: action === "update" ? "update_failed" : "install_failed" }),
     });

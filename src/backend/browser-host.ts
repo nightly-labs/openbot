@@ -111,6 +111,19 @@ interface BrowserHostEvents {
   changed: [tabs: BrowserTab[], activeTabId: string | null];
   controlChanged: [state: BrowserControlState];
   documentChanged: [tabId: string, documentIds: ReadonlySet<string>];
+  siteVisited: [visit: BrowserSiteVisit];
+}
+
+/**
+ * A tab reached a page on a new host. Only the hostname leaves the browser: never the path, query,
+ * fragment or title. It feeds the local host's product analytics, which reduces it further.
+ */
+export interface BrowserSiteVisit {
+  tabId: string;
+  hostname: string;
+  /** `agent` while an agent turn is driving this tab with browser tools. */
+  actor: "agent" | "user";
+  agentId: string | null;
 }
 
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
@@ -196,6 +209,7 @@ export class BrowserHost {
   readonly #closingTabDrains = new Map<string, Promise<void>>();
   readonly #listeners = new Set<(...args: BrowserHostEvents["changed"]) => void>();
   readonly #documentListeners = new Set<(...args: BrowserHostEvents["documentChanged"]) => void>();
+  readonly #siteVisitListeners = new Set<(...args: BrowserHostEvents["siteVisited"]) => void>();
   readonly #controls = new BrowserControlSessions();
   readonly #reservedDownloadPaths = new Set<string>();
   readonly #recorder: BrowserRecorder;
@@ -304,6 +318,11 @@ export class BrowserHost {
   onDocumentChanged(listener: (...args: BrowserHostEvents["documentChanged"]) => void): () => void {
     this.#documentListeners.add(listener);
     return () => this.#documentListeners.delete(listener);
+  }
+
+  onSiteVisited(listener: (...args: BrowserHostEvents["siteVisited"]) => void): () => void {
+    this.#siteVisitListeners.add(listener);
+    return () => this.#siteVisitListeners.delete(listener);
   }
 
   getControlState(): BrowserControlState {
@@ -1231,6 +1250,7 @@ export class BrowserHost {
     this.#listeners.clear();
     this.#controls.dispose();
     this.#documentListeners.clear();
+    this.#siteVisitListeners.clear();
     const results = await Promise.allSettled([
       this.#session.cookies.flushStore(),
       statePersistence,
@@ -1509,6 +1529,7 @@ export class BrowserHost {
       }
       if (this.#tabs.get(tab.id) !== tab) return;
       if (isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
+      this.#noteSiteVisit(tab, url);
       tab.revision += 1;
       changed();
       this.#schedulePersist();
@@ -1851,6 +1872,38 @@ export class BrowserHost {
     return focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
       ? focusedContents
       : null;
+  }
+
+  #noteSiteVisit(tab: BrowserHostTab, url: string): void {
+    if (this.#siteVisitListeners.size === 0) return;
+    let hostname: string;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+      hostname = parsed.hostname;
+    } catch {
+      return;
+    }
+    if (!hostname || tab.visitedHost === hostname) return;
+    tab.visitedHost = hostname;
+    const driven = this.#controls
+      .state()
+      .sessions.some(
+        (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
+      );
+    const visit: BrowserSiteVisit = {
+      tabId: tab.id,
+      hostname,
+      actor: driven ? "agent" : "user",
+      agentId: driven ? tab.ownerAgentId : null,
+    };
+    for (const listener of this.#siteVisitListeners) {
+      try {
+        listener(visit);
+      } catch {
+        // Analytics must never stop a navigation.
+      }
+    }
   }
 
   #emitChanged(): void {

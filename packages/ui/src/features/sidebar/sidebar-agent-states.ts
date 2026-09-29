@@ -1,10 +1,17 @@
 import type { QueueSnapshot } from "@openbot/contracts/ipc";
 import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
 
-/** The turn a prompt or approval is blocked on. Only `turnId` matters to the badge. */
+/** A question or a browser takeover that an agent is blocked on. */
 export type SidebarAttention =
-  | { type: "prompt"; turnId: string }
+  | { type: "prompt"; turnId: string; questions?: readonly { question: string }[] }
   | { type: "browser-takeover-requested"; request: { turnId: string } };
+
+/** An approval that an agent is blocked on. The command or the reason is the tooltip detail. */
+export interface SidebarApproval {
+  turnId: string;
+  command?: string | null;
+  reason?: string | null;
+}
 
 export interface SidebarAgentStatesInput {
   agentIds: readonly string[];
@@ -13,7 +20,7 @@ export interface SidebarAgentStatesInput {
   unreadReplies: Record<string, number>;
   recentReplies: Record<string, boolean>;
   pendingPrompts: Record<string, SidebarAttention | undefined>;
-  pendingApprovals: Record<string, { turnId: string } | undefined>;
+  pendingApprovals: Record<string, SidebarApproval | undefined>;
   failedTurns: Record<string, string | undefined>;
 }
 
@@ -43,9 +50,10 @@ export function isAgentWorking(
  * The badge each agent shows in the sidebar.
  *
  * Pure, and outside every context, because the inputs come from different domains and a context
- * that read all of them would have to sit under all of them. The precedence is the point: a
- * routine mark outranks a generic working mark, and either outranks unread replies, because that
- * count is about to change again.
+ * that read all of them would have to sit under all of them. The precedence is the point: an agent
+ * that waits for the user outranks everything, because nothing moves until the user acts. A routine
+ * mark outranks a generic working mark, and either outranks unread replies, because that count is
+ * about to change again.
  *
  * One routine mark per agent. Several routine deliveries share it; `count` is how many are in the
  * phase the mark shows. A paused schedule is not a delivery, so it does not mark the row.
@@ -56,8 +64,9 @@ export function isAgentWorking(
 export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Record<string, SidebarAgentState> {
   const states: Record<string, SidebarAgentState> = {};
   for (const agentId of input.agentIds) {
-    const routine = routineBadge(agentId, input);
-    if (routine) states[agentId] = routine;
+    const marked =
+      waitingState(input.pendingPrompts[agentId], input.pendingApprovals[agentId]) ?? routineBadge(agentId, input);
+    if (marked) states[agentId] = marked;
     else if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
       states[agentId] = { kind: "unread", count: input.unreadReplies[agentId] ?? 1 };
@@ -71,9 +80,6 @@ function routineBadge(agentId: string, input: SidebarAgentStatesInput): SidebarA
   if (deliveries.length === 0) return undefined;
 
   const running = deliveries.filter((delivery) => delivery.status === "starting" || delivery.status === "running");
-  const attentionTurnId = blockedTurnId(input.pendingPrompts[agentId], input.pendingApprovals[agentId]);
-  const blocked = running.filter((delivery) => delivery.turnId !== null && delivery.turnId === attentionTurnId);
-  if (blocked.length > 0) return routineState("needs-attention", blocked.length);
   if (running.length > 0) return routineState("running", running.length);
 
   const failedTurnId = input.failedTurns[agentId];
@@ -89,11 +95,17 @@ function routineState(phase: SidebarRoutinePhase, count: number): SidebarAgentSt
   return { kind: "routine", phase, count };
 }
 
-function blockedTurnId(
+/** When a prompt and an approval are both pending, the prompt names the wait. */
+function waitingState(
   prompt: SidebarAttention | undefined,
-  approval: { turnId: string } | undefined,
-): string | undefined {
-  if (prompt?.type === "prompt") return prompt.turnId;
-  if (prompt?.type === "browser-takeover-requested") return prompt.request.turnId;
-  return approval?.turnId;
+  approval: SidebarApproval | undefined,
+): SidebarAgentState | undefined {
+  if (prompt?.type === "prompt") {
+    return { kind: "waiting", reason: "question", detail: prompt.questions?.[0]?.question.trim() || null };
+  }
+  if (prompt?.type === "browser-takeover-requested") return { kind: "waiting", reason: "takeover", detail: null };
+  if (approval) {
+    return { kind: "waiting", reason: "approval", detail: approval.command?.trim() || approval.reason?.trim() || null };
+  }
+  return undefined;
 }

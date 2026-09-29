@@ -11,6 +11,7 @@ import { SidebarChannelRow } from "./SidebarChannelRow";
 import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
 import { SidebarSectionList } from "./SidebarSectionList";
+import { SidebarWaitingGroup } from "./SidebarWaitingGroup";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarNav() {
@@ -29,6 +30,7 @@ export function SidebarNav() {
     setAgentListElement,
     startCreateSection,
     updateSidebarNativeDrag,
+    waitingAgents,
   } = useSidebarScope();
   const { t } = useText();
   return (
@@ -46,6 +48,7 @@ export function SidebarNav() {
         <Show
           when={
             resolvedPinnedItems().length === 0 &&
+            waitingAgents().length === 0 &&
             filteredChats().length === 0 &&
             (props.showPeople === false || filteredPeople().length === 0) &&
             pending.sectionEditor?.target.kind !== "create"
@@ -54,6 +57,7 @@ export function SidebarNav() {
           <SidebarEmptyState />
         </Show>
         <SidebarPinnedGroup />
+        <SidebarWaitingGroup />
         <SidebarSectionList />
         <Show when={props.showingArchivedChannels}>
           <section class="sidebar-chat-group sidebar-section" aria-label={t("sidebar.deletedChannels.title")}>

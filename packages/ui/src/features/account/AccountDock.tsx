@@ -59,6 +59,8 @@ interface AccountDockProps {
   onOpenBilling?: (() => void) | undefined;
   onOpenSettings?: ((trigger: HTMLElement) => void) | undefined;
   onOpenSkills?: (() => void) | undefined;
+  /** Draws the shelf (identity, usage chip, settings) on any platform. By default only the macOS app does. */
+  shelf?: boolean;
 }
 
 const PRODUCT_NAME = "OpenBot";
@@ -131,7 +133,7 @@ export function AccountDock(props: AccountDockProps) {
   let usageTrigger: HTMLButtonElement | undefined;
   let settingsTrigger: HTMLButtonElement | undefined;
 
-  const hybridLayout = createMemo(() => props.appInfo?.platform === "darwin" && !props.compact);
+  const hybridLayout = createMemo(() => (props.shelf ?? props.appInfo?.platform === "darwin") && !props.compact);
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );

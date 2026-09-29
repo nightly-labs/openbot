@@ -16,14 +16,20 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, or `account_api`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `mobile`, or `account_api`;
 - `environment`: currently `production` only;
-- `event_schema_version`: the integer schema generation, currently `8`;
+- `event_schema_version`: the integer schema generation of that surface: currently `6` on `desktop`
+  and `desktop_host`, `8` on `landing` and `account_api`, and `1` on `mobile`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
-Reports must filter to `event_schema_version = 8`. Generation 8 adds the article path to website
+Each surface counts its own generations, so a report filters by `surface` and that surface's current
+generation. Desktop and host generation 6 adds the usage events below (`system_tool_used`,
+`system_site_visited`, `system_routine_run`, `system_inventory`), `agent_source` and `agent_listing`
+on host turn and input events, and `plugin` entities and `listing_slug` on `marketplace_action`.
+
+Landing reports must filter to `event_schema_version = 8`. Generation 8 adds the article path to website
 `screen_view` and the content and download-selection events below, so generation 7 cannot answer a
 per-article question and must not be combined with generation 8 in one content report. Generation 5 renames the product agent throughout: the
 `origin` property reports `agent` where generation 4 reported `bot`, so the two generations cannot be
@@ -77,6 +83,10 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `system_turn_completed` | Are turns reliable and fast? | Host emitted completion; status describes outcome |
 | `system_agent_input_requested` | Where do agents need human input? | Host requested a prompt answer or approval |
 | `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted failure code |
+| `system_tool_used` | Which tools and plugins do agents use for their tasks? | One row per tool kind, plugin and tool in a completed turn, with call and failure counts (Claude reports no tool failures, so its `failed_count` is 0). `plugin` is a catalog slug, `builtin`, or `custom`; `tool` is sent only for `builtin` and catalog plugins. At most 32 rows per turn |
+| `system_site_visited` | Which websites do users and agents work on? | A browser tab reached a new registrable domain. `actor` is `user` or `agent`; only the eTLD+1 is sent, and IP addresses, single-label names and names with no public suffix are dropped. An intranet host under a public domain is sent as that domain |
+| `system_routine_run` | Do routine runs succeed, and which schedules are used? | A routine run that this host saw running reached `succeeded`, `failed`, `needs-attention`, `interrupted`, or `cancelled` |
+| `system_inventory` | What have accounts set up? | At most once per local day: counts of agents, enabled routines, custom MCP servers, local and community skills, and the slugs of catalog plugins, curated skills and curated agents |
 | `agent_input_action` | Can users resolve prompts and approvals? | Response IPC completed |
 | `queue_action` | Can users control queued work? | Queue operation completed |
 | `routine_action` | Are routines adopted and reliable? | Routine operation completed; `duration_ms` measures execution time |
@@ -85,7 +95,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `search_action` | Is search useful and healthy? | Search returned a safe result count |
 | `remote_desktop_action` | Is Remote Desktop usable? | Session/display operation completed |
 | `update_action` | Do update checks and downloads work? | Returned status is not an error; actual installs use `app_updated` |
-| `marketplace_action` | Do marketplace views convert to installs/updates? | Marketplace operation completed |
+| `marketplace_action` | Do marketplace views convert to installs/updates? | Marketplace operation completed. `entity` is `skill`, `agent`, or `plugin`; `listing_slug` names only a curated skill or agent or a catalog plugin |
 | `memory_action` | Are manual memories used? | Memory persistence operation completed |
 | `voice_transcription` | Is local voice input reliable and fast? | Transcription returned text without sending it to analytics |
 | `reaction_action` | Are reactions used? | Reaction operation completed |
@@ -108,8 +118,9 @@ Payloads are validated at runtime as well as by TypeScript. String enums are all
 version values use bounded safe formats, arrays are filtered and capped, and numeric values reject
 non-finite, negative, or implausibly large inputs. Failure codes are static and allowlisted.
 
-Never send message content, prompts, answers, generated content, search terms, arbitrary URLs,
-referrers, file names, local paths, commands, tokens, invitation values, raw errors, or local
+Never send message content, prompts, answers, generated content, search terms, URLs (a website is
+reported only as its registrable domain), referrers, user-authored names such as a custom MCP server,
+routine or skill name, file names, local paths, commands, tokens, invitation values, raw errors, or local
 identifiers. Website events use only the fixed paths `/`, `/join`, `/news`, and `/guides`, or the
 path of an article published in `src/lib/news.ts` or `src/lib/guides.ts`. Article slugs are an
 editor-authored closed set, not visitor input: `safeScreenPath` and the `slug` property check look
@@ -135,7 +146,8 @@ hash is ever included. Session replay and automatic interaction capture remain d
    following `landing_download_clicked`, which shows how often the detected platform is corrected.
 5. Reliability: failed outcomes, safe failure codes, P90/P99 durations, and update/provider health.
 
-Every dashboard must filter by the intended `surface` and `event_schema_version = 8`. Website bounce
+Every dashboard must filter by the intended `surface` and that surface's current
+`event_schema_version`. Website bounce
 uses OpenPanel's standard single-`screen_view` definition. Do not emit synthetic screen views to
 change it; use the engaged-session report for meaningful landing activity.
 
@@ -161,6 +173,7 @@ were recorded before this behavior shipped are not re-attributed.
 - A campaign link produces a session whose `utm_source`, `utm_medium`, and `utm_campaign` match the
   link, instead of `Direct / Not set`.
 - A duplicate host turn start produces one `system_turn_started` event.
+- A routine run or tool use replayed from history after a restart produces no event.
 - A known stored turn origin wins over a completion payload whose origin is `unknown`.
 - `system_turn_completed` never exceeds starts for the same reporting window without a documented
   process restart boundary.

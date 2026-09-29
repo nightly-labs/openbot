@@ -89,8 +89,8 @@ Mobile never sends scanned QR values, install-referrer URLs or route identifiers
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
-search queries, embedded-browser URLs or page titles, file names, local paths, commands, raw error
-messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
+search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
+error messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
 Website page views carry the five standard campaign tags `utm_source`, `utm_medium`, `utm_campaign`,
 `utm_content`, and `utm_term` when a visitor arrives through a campaign link. Each tag is sent only
 as a lowercase label of at most 64 characters made of letters, digits, dots, hyphens, and
@@ -130,6 +130,30 @@ They are sent once with their original timestamps after an account becomes avail
 expiry, and process exit discard unclaimed events. The oldest event is removed when the buffer is
 full. Sign-out ends the old account's operation scopes; later signed-out activity can be associated
 with the next account that signs in. No anonymous mobile event is sent before that association.
+
+The local host also records how the agents are used:
+
+- **Websites.** When a page in the embedded browser reaches a new registrable domain, the host sends
+  that domain (for example `linkedin.com` for `www.linkedin.com`) and whether the user or an agent
+  opened it. It never sends the subdomain, path, query, fragment or page title. A subdomain under a
+  shared suffix is reduced to that suffix, so `user.github.io` is sent as `github.io`. IP addresses,
+  single-label names, `localhost`, and names with no public suffix (for example `.local`, `.lan`,
+  `.internal` or `.home.arpa`) are not sent.
+- **Tools.** When a turn completes, the host sends one count per kind of tool the agent used (for
+  example command, file change, web search, browser, or MCP), how many of those calls failed (Claude
+  does not report failed tool calls, so its count is 0), and
+  the plugin: the slug of an OpenBot catalog plugin, `builtin` for OpenBot's own tools, or `custom`.
+  The tool name is sent only for OpenBot's own tools and catalog plugins. The name, address and
+  command of a server the user added, the tool arguments and the tool results are not sent.
+- **Routine runs.** The host sends the outcome of a routine run, whether it was scheduled or manual,
+  and its schedule type (for example daily or weekly). The routine name and instruction are not
+  sent.
+- **Setup.** At most once a day, the host sends counts of agents, enabled routines, custom MCP
+  servers, local skills and community skills; the slugs of enabled catalog plugins and of curated
+  skills and agents; the providers in use; and whether Computer Use is enabled.
+- **Agent source.** Turn events say whether the agent came from a curated listing, a community
+  listing, or neither, and name only a curated listing. Marketplace events name only a curated
+  skill, agent or catalog plugin.
 
 Hosted Site analytics records only the operation, entry point, result, and bounded failure code. It
 does not contain the site's URL, hostname, title, source path, site ID, or content. A one-time

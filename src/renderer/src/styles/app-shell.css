@@ -1443,6 +1443,39 @@ textarea {
   width: 100%;
 }
 
+/* "Needs you" is not a section, so its heading is plain text with a count, and a rule ends it. */
+.sidebar-waiting-group {
+  border-bottom: 1px solid var(--openbot-border);
+  padding-bottom: var(--openbot-space-2);
+}
+
+.sidebar-waiting-group-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0 7px;
+  color: var(--openbot-text-readable);
+  font-size: var(--openbot-text-sm);
+  font-weight: 400;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.sidebar-waiting-group-count {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-warning);
+  padding: 0 4px;
+  color: var(--openbot-bg-sidebar);
+  font-size: var(--openbot-text-sm);
+  font-weight: 650;
+}
+
 .sidebar-chat-group > .sidebar-section-editor-wrap {
   height: 36px;
 }
@@ -1968,12 +2001,91 @@ textarea {
   height: 10px;
 }
 
-.agent-row-agent-status-routine-needs-attention {
-  color: var(--openbot-warning);
-}
-
 .agent-row-agent-status-routine-failed {
   color: var(--openbot-danger);
+}
+
+/* An agent that waits for the user: amber, and a little larger than the routine marks, so it is
+   the first badge the eye finds in a busy list. */
+.agent-row-agent-status-waiting {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-warning);
+  color: var(--openbot-bg-sidebar);
+}
+
+.agent-row-agent-status-waiting svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* The action chip takes the time slot: the time does not matter while the agent waits. */
+.agent-row-wait-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-warning-soft);
+  padding: 1px 7px 1px 5px;
+  color: var(--openbot-warning-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.agent-row-wait-chip svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* The tooltip anchors to this wrapper, so it needs a box of its own. */
+.sidebar-agent-tooltip-trigger {
+  display: block;
+}
+
+.sidebar-wait-tooltip {
+  z-index: var(--openbot-layer-popover);
+  display: grid;
+  max-width: min(260px, calc(100vw - 16px));
+  gap: 2px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-bg-surface-raised);
+  box-shadow: var(--openbot-shadow-raised);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  pointer-events: none;
+}
+
+.sidebar-wait-tooltip-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+  color: var(--openbot-warning-text);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.sidebar-wait-tooltip-title svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-wait-tooltip-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-wait-tooltip-hint {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
 }
 
 .agent-row-agent-status-entering {
@@ -2510,6 +2622,16 @@ textarea {
 .sidebar:not(.sidebar-compact) .sidebar-section-body .agent-row {
   width: 100%;
   margin-inline: 0;
+}
+
+.sidebar:not(.sidebar-compact) .sidebar-waiting-group .agent-row {
+  width: 100%;
+  margin-inline: 0;
+}
+
+/* A waiting row does not drag, so it does not show the grab cursor. */
+.sidebar-waiting-group .sidebar-agent-item .agent-row {
+  cursor: default;
 }
 
 .sidebar:not(.sidebar-compact) .sidebar-pinned-row.agent-row {
