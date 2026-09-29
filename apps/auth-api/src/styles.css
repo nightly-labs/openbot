@@ -5144,12 +5144,6 @@ a {
   justify-content: center;
 }
 
-/* Below the card, so the card holds one action: add the agent to the app. */
-.agent-share-browser {
-  position: relative;
-  z-index: 1;
-}
-
 .agent-share-fallback {
   position: relative;
   z-index: 1;
