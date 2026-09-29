@@ -182,6 +182,7 @@ describe.sequential("GrokAgentClient", () => {
     ["Upstream request failed: Insufficient account funds", "opencodeBilling"],
     ["Upstream request failed: Endpoint is unavailable.", "opencodeProviderFailed"],
     ["Service Unavailable", "opencodeProviderFailed"],
+    ["Upstream request failed: Cannot connect to API: Unable to connect.", "opencodeProviderFailed"],
     ["Cannot connect to API: Unable to connect.", "opencodeNetwork"],
   ] as const)("names the kind of the OpenCode request failure %s", async (reason, kind) => {
     process.env.OPENBOT_FAKE_GROK_MODE = "opencode-request-error";

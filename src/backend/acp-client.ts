@@ -26,6 +26,7 @@ import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
+import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
@@ -1182,10 +1183,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #openCodeRequestFailure(error: unknown, detail: string): string {
     if (this.provider !== "opencode" || !(error instanceof RequestError) || error.code !== -32603) return detail;
     const reason = error.message.replace(/^Internal error:\s*/u, "");
+    // The usage notice reports an exhausted usage limit, and it reads the whole text to find one.
+    if (isUsageLimitDiagnostic(reason)) return detail;
     const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
     if (!key) return detail;
     // The renderer shows its generic sentence for text over 400 characters.
-    return sourceText(key, { detail: this.#redact(reason).slice(0, OPENCODE_FAILURE_DETAIL_LIMIT) });
+    const characters = Array.from(this.#redact(reason));
+    const shown =
+      characters.length > OPENCODE_FAILURE_DETAIL_LIMIT
+        ? `${characters.slice(0, OPENCODE_FAILURE_DETAIL_LIMIT - 1).join("")}…`
+        : characters.join("");
+    return sourceText(key, { detail: shown });
   }
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -1554,24 +1562,25 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
 const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
 
 /**
- * The kind of a model request that OpenCode gave up on, first match wins. Billing comes before the
- * rate limit, and both before the provider's own failure: a provider gateway reports each of them
- * as `Upstream request failed: <reason>`. A usage limit is not here: `isUsageLimitDiagnostic` reads
- * it, and the usage notice reports it.
+ * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
+ * reports each kind as `Upstream request failed: <reason>`, so billing and the rate limit come
+ * first. The provider's own failure comes before the network: a gateway that could not reach its
+ * model was reached by this computer. Text that names no kind, such as OpenCode's own "Free usage
+ * exceeded, subscribe to Go", is shown as it is.
  */
 const OPENCODE_REQUEST_FAILURES = [
   [
     "error.provider.opencodeBilling",
-    /\bno payment method\b|\binsufficient (?:account )?(?:funds|balance)\b|\bpayment required\b|\bbilling\b/iu,
+    /\bno payment method\b|\binsufficient (?:account )?(?:funds|balance)\b|\bpayment required\b/iu,
   ],
-  ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b|\bfree usage exceeded\b/iu],
+  ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b/iu],
+  [
+    "error.provider.opencodeProviderFailed",
+    /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
+  ],
   [
     "error.provider.opencodeNetwork",
     /\b(?:cannot|unable to|could not) connect\b|\bfetch failed\b|\bfailed to fetch\b|\bgetaddrinfo\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT)\b|\bsocket hang up\b/iu,
-  ],
-  [
-    "error.provider.opencodeProviderFailed",
-    /\binternal server error\b|\bservice unavailable\b|\bis unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
   ],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
