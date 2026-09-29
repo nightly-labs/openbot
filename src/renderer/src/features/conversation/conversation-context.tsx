@@ -97,6 +97,7 @@ const Conversation = createSimpleContext({
     const {
       activeAgent,
       activeAgentId,
+      agentList,
       agentStatus,
       agentChatOpenRevision,
       setAgentChatOpenRevision,
@@ -844,9 +845,10 @@ const Conversation = createSimpleContext({
     /** Marks each unread agent chat read through its newest message, which may not be loaded yet. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
-      const unread = Object.entries(unreadReplies())
-        .filter(([, count]) => count > 0)
-        .map(([agentId]) => agentId);
+      // Only listed agents: a read of an id the host no longer knows creates that agent again.
+      const unread = agentList()
+        .map((agent) => agent.id)
+        .filter((agentId) => (unreadReplies()[agentId] ?? 0) > 0);
       await Promise.all(
         unread.map(async (agentId) => {
           try {

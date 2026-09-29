@@ -304,7 +304,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
   function markAllRead(): Promise<boolean> {
     const unread = state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
     return perform(async () => {
-      await Promise.all(
+      const results = await Promise.allSettled(
         unread.map(async (channelId) => {
           const page = await env.port().agent.readChannel({ channelId });
           await env.port().agent.channelCommand({
@@ -315,6 +315,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
           });
         }),
       );
+      // The other channels are read, so the list shows them before the first failure is reported.
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) {
+        await refreshAfter();
+        throw failure.reason;
+      }
     });
   }
   return {
