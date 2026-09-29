@@ -1298,6 +1298,15 @@ export class MailboxStore {
     });
   }
 
+  /** A delivery whose turn the provider refused before any work, back at its place in the queue. */
+  async requeueRefused(deliveryId: string): Promise<void> {
+    await this.#updateDelivery(deliveryId, ["starting", "running"], {
+      status: "queued",
+      turnId: null,
+      error: null,
+    });
+  }
+
   /**
    * Both guards that ask this - agent deletion and the provider switch - have to see a channel
    * delivery as well as a normal one, so neither can use {@link listQueue}, which hides channel

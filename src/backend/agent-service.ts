@@ -713,6 +713,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
+        dropRefusedSession: (agentId, externalThreadId) =>
+          this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),

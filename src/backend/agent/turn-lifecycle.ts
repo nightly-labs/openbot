@@ -9,6 +9,7 @@ import {
   conversationPlanText,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
@@ -34,7 +35,9 @@ import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import {
+  isForeignReasoningError,
   isNonActionableCodexWarning,
+  providerLabel,
   type ToolUsageSignal,
   toolProgressText,
   toolUsage,
@@ -61,6 +64,8 @@ export interface TurnHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
+  /** Closes a provider session the provider refuses; the next turn opens a new one with the transcript. */
+  dropRefusedSession(agentId: string, externalThreadId: string): void;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
   /** A finished tool step, for product analytics only. It never reaches a renderer or a remote client. */
@@ -113,11 +118,16 @@ export class TurnLifecycle {
    * reason once the banner that showed it is gone.
    */
   readonly #turnErrors = new Map<string, string>();
-  /** The client, provider thread and start time of each running turn, from its `turn/started`. */
+  /**
+   * The client, provider thread and start time of each running turn, from its `turn/started`.
+   * `produced` is set by the first item or delta: a refused turn is run again only without one.
+   */
   readonly #runningTurns = new Map<
     string,
-    { client: AgentClient; agentId: string; threadId: string; startedAt: number }
+    { client: AgentClient; agentId: string; threadId: string; startedAt: number; produced: boolean }
   >();
+  /** The deliveries run again after a refused session history. Each one gets a single retry. */
+  readonly #refusedRetries = new Set<string>();
   /**
    * The time of the last provider notification for each agent: a delta, a tool item, a usage
    * update. It is the only clock that moves while a turn works, and it is lost on restart.
@@ -173,6 +183,7 @@ export class TurnLifecycle {
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
     this.#runningTurns.clear();
+    this.#refusedRetries.clear();
     this.#lastEventAt.clear();
   }
 
@@ -230,7 +241,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         if (this.#compaction.claimTurn(agentId, threadId, turnId)) return;
-        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now() });
+        this.#runningTurns.set(turnId, { client: source, agentId, threadId, startedAt: Date.now(), produced: false });
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
@@ -255,6 +266,7 @@ export class TurnLifecycle {
         if (!turnId || !item) return;
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
+        this.#markProduced(turnId);
         if (item.type === "contextCompaction") {
           if (notification.method === "item/completed") {
             this.#compaction.markCompacted(threadId);
@@ -279,6 +291,7 @@ export class TurnLifecycle {
         const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
         if (!turnId || !itemId || delta === null) return;
         this.#itemTurns.set(itemId, turnId);
+        this.#markProduced(turnId);
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         let message = snapshot.messages.find((candidate) => candidate.id === itemId);
@@ -363,8 +376,11 @@ export class TurnLifecycle {
         if (isRecord(params) && params.willRetry === true) return;
         // A usage limit shows no banner, but the failed delivery still keeps it as the reason.
         const errorTurnId = getString(params, "turnId");
-        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId))
+        if (notification.method === "error" && message && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
+          // The turn's completion runs it again or reports it in words the user can act on.
+          if (isForeignReasoningError(message)) return;
+        }
         if (error?.codexErrorInfo === "usageLimitExceeded" || isUsageLimitDiagnostic(message)) {
           this.#providers.refreshUsageAfterLimit(source);
           return;
@@ -375,17 +391,37 @@ export class TurnLifecycle {
   }
 
   async #completeTurn(agentId: string, threadId: string, turnId: string, status: string): Promise<void> {
+    const running = this.#runningTurns.get(turnId);
     this.#runningTurns.delete(turnId);
     const reportedError = this.#turnErrors.get(turnId);
     this.#turnErrors.delete(turnId);
+    // The error is kept only while the turn runs, so a refused turn always has its entry.
+    const refused =
+      running !== undefined &&
+      status === "failed" &&
+      reportedError !== undefined &&
+      isForeignReasoningError(reportedError);
     this.#deltas.flushTurn(turnId);
     await this.#images.waitForOperations(threadId, turnId);
     await this.#turnAssociations.get(turnId)?.catch(() => undefined);
     this.#memories.finishTurn(turnId, status);
-    const shouldCompact = this.#compaction.reserve(agentId, threadId);
+    // A refused session is closed below, so it is not compacted.
+    const shouldCompact = !refused && this.#compaction.reserve(agentId, threadId);
     this.#browser.endControl(this.#conversation.publicThreadId(agentId, threadId), turnId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
     snapshot.activeTurnId = null;
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    // A channel task is not run again: an unfinished turn pauses it, and its Resume opens the new session.
+    const retry =
+      refused &&
+      !running.produced &&
+      deliveries.length > 0 &&
+      !this.#conversation.isExecutionThread(snapshot.threadId) &&
+      deliveries.every(({ delivery }) => !this.#refusedRetries.has(delivery.id));
+    if (retry) {
+      await this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
+      return;
+    }
     if (status === "failed") this.#failedTurns.set(agentId, turnId);
     else this.#failedTurns.delete(agentId);
     for (const message of snapshot.messages) {
@@ -393,7 +429,10 @@ export class TurnLifecycle {
       message.status = normalizeCompletionStatus(status);
       markIncompleteImageGeneration(message, message.status);
     }
-    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const failure = refused
+      ? sourceText("error.provider.foreignReasoning", { provider: providerLabel(running.client.provider) })
+      : reportedError;
+    if (refused) this.#hooks.emitError("agent_error", failure, agentId);
     if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
       dropPlaceholderAnswers(snapshot, turnId);
     }
@@ -411,7 +450,8 @@ export class TurnLifecycle {
     if (deliveries.length > 0) {
       const terminal = status === "failed" ? "failed" : status === "interrupted" ? "interrupted" : "completed";
       for (const delivery of deliveries) {
-        const reason = terminal === "failed" && reportedError ? this.#hooks.redactMcp(reportedError) : null;
+        this.#refusedRetries.delete(delivery.delivery.id);
+        const reason = terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null;
         await this.#mailbox.markTerminal(delivery.delivery.id, terminal, reason);
         this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.delivery.id);
       }
@@ -448,8 +488,51 @@ export class TurnLifecycle {
       status,
       origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
     });
+    if (refused) this.#hooks.dropRefusedSession(agentId, threadId);
     if (shouldCompact) await this.#compaction.request(agentId, threadId);
     else this.#hooks.scheduleDrain(agentId);
+  }
+
+  /**
+   * Queues the deliveries of a turn once more, after the provider refused the session's history.
+   * The refusal answers the first request of the turn, before the model did any work, so the new
+   * session repeats nothing. The turn ends as interrupted, which no one is told of as a failure,
+   * and the queued delivery starts again at once.
+   */
+  async #retryRefusedTurn(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    deliveries: readonly DeliveryContext[],
+  ): Promise<void> {
+    for (const { delivery } of deliveries) {
+      this.#refusedRetries.add(delivery.id);
+      await this.#mailbox.requeueRefused(delivery.id);
+      this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
+    }
+    this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: "interrupted" });
+    try {
+      this.#mailboxSync.emitQueue(agentId);
+    } catch (error) {
+      this.#hooks.emitError("delivery_reconciliation_pending", error, agentId);
+      this.#mailboxSync.retryDeliveryReconciliation(agentId);
+    }
+    this.#hooks.emit({
+      type: "turn-completed",
+      agentId,
+      threadId: this.#conversation.publicThreadId(agentId, threadId),
+      turnId,
+      status: "interrupted",
+      origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
+    });
+    this.#hooks.dropRefusedSession(agentId, threadId);
+    this.#hooks.scheduleDrain(agentId);
+  }
+
+  #markProduced(turnId: string): void {
+    const running = this.#runningTurns.get(turnId);
+    if (running) running.produced = true;
   }
 
   async #associateStartedTurn(agentId: string, turnId: string, snapshot: ConversationSnapshot): Promise<void> {

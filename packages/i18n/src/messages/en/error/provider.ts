@@ -163,6 +163,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.antigravityNotStarted": "The Gemini server was found, but its version cannot be read.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.foreignReasoning":
+    "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Send your message again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",

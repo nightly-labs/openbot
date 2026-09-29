@@ -564,6 +564,19 @@ export class ThreadLifecycle {
     this.#conversation.markThreadLoaded(externalThreadId, client);
   }
 
+  /**
+   * Closes one provider session that the provider refuses, and keeps the public thread. The next
+   * turn opens a new session, and `startProviderThread` gives it the OpenBot transcript.
+   */
+  dropRefusedProviderSession(agentId: string, externalThreadId: string): void {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return;
+    // The client first, while the routing entry that `retireProviderSession` removes still names it.
+    this.#releaseProviderSession(externalThreadId);
+    this.retireProviderSession(agent, externalThreadId);
+    this.#hooks.logRecovery(agentId, agent.provider, "replaced");
+  }
+
   retireProviderSession(agent: AgentSummary, externalThreadId: string): void {
     const publicThreadId = this.#conversation.publicThreadId(agent.id, externalThreadId);
     const session = this.#store.database.activeProviderSession(publicThreadId, agent.provider);

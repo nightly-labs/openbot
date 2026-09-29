@@ -11,6 +11,7 @@ import {
   type McpServerConfig,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { type AgentProvider, RequestTimeoutError } from "./agent-client";
 import type { AgentService } from "./agent-service";
@@ -1359,6 +1360,72 @@ describe.sequential("AgentService: providers", () => {
     );
     expect(sharedStarts()).toBe(1);
     expect(own?.client.running).toBe(false);
+  });
+
+  it("runs a message again on a new Grok session when xAI refuses the session's reasoning", async () => {
+    process.env.OPENBOT_GROK_PATH = await createFakeGrok(root);
+    const { store, mailbox } = stores(root);
+    const clients: FakeAgentClient[] = [];
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "grok",
+      clientFactory: (provider) => {
+        const client = new FakeAgentClient(provider, undefined, false);
+        clients.push(client);
+        return client;
+      },
+    });
+    // The client of each `turn/start`, in order: a new session can run on a new client.
+    const turnStarts = () =>
+      clients.flatMap((client) =>
+        client.requests.filter((request) => request.method === "turn/start").map(() => client),
+      );
+    const events: AgentEvent[] = [];
+    service.on("event", (event) => events.push(event));
+    await service.initialize();
+    await store.getOrCreate("chief");
+    await service.updateAgent({ agentId: "chief", provider: "grok", model: "grok-4.5" });
+    const refuse = async (session: string) => {
+      const started = [...events].reverse().find((event) => event.type === "turn-started");
+      if (started?.type !== "turn-started") throw new Error("The fake Grok turn did not start.");
+      const threadId = store.activeProviderSession("chief")?.externalSessionId;
+      expect(threadId).toBe(session);
+      const client = turnStarts().at(-1);
+      client?.emit(
+        "notification",
+        notification("error", {
+          threadId,
+          turnId: started.turnId,
+          message: "Internal error: reasoning `encrypted_content` was not issued to this caller",
+        }),
+      );
+      client?.emit(
+        "notification",
+        notification("turn/completed", { threadId, turn: { id: started.turnId, status: "failed" } }),
+      );
+    };
+
+    await service.sendMessage({ agentId: "chief", text: "Say hi" });
+    await waitFor(() => events.some((event) => event.type === "turn-started"));
+    await refuse("grok-session-1");
+
+    // The same message runs on a new session, and the refusal is not shown as a failure.
+    await waitFor(
+      () => turnStarts().length === 2 && events.filter((event) => event.type === "turn-started").length === 2,
+    );
+    expect(store.activeProviderSession("chief")?.externalSessionId).toBe("grok-session-2");
+    expect(turnStarts()[0]?.releasedThreads).toContain("grok-session-1");
+    expect(service.listQueue("chief").deliveries).toEqual([expect.objectContaining({ status: "running" })]);
+    expect(events.some((event) => event.type === "error")).toBe(false);
+
+    // A second refusal fails the message with text the user can act on.
+    await refuse("grok-session-2");
+    const reason = sourceText("error.provider.foreignReasoning", { provider: "Grok" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "failed");
+    expect(service.listQueue("chief").deliveries).toEqual([expect.objectContaining({ error: reason })]);
+    expect(events).toContainEqual(expect.objectContaining({ type: "error", agentId: "chief", message: reason }));
+    expect(store.activeProviderSession("chief")).toBeNull();
   });
 
   it("keeps the turn of a Workspace only agent when the shared Grok process exits", async () => {

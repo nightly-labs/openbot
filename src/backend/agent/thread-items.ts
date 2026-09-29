@@ -12,6 +12,16 @@ export function isArchivedThreadError(error: unknown): boolean {
   return error instanceof AppServerError && /\bis archived\b/i.test(error.message);
 }
 
+/**
+ * The provider refused the session's own history. Grok keeps the `encrypted_content` of each
+ * reasoning item in its session and sends it back on every request, and xAI accepts it only from
+ * the caller it was issued to. After a sign-in to another account or a new API key, each turn of
+ * that session fails the same way, so only a new session, given the OpenBot transcript, recovers.
+ */
+export function isForeignReasoningError(message: string): boolean {
+  return /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message);
+}
+
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
   if (
     (provider !== "grok" && provider !== "opencode" && provider !== "antigravity" && provider !== "acp") ||
