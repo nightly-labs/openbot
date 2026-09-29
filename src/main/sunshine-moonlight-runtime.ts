@@ -768,17 +768,23 @@ export class SunshineMoonlightRuntime {
       sunshineDisplaysSchema,
     );
     const local = this.#options.getDisplays();
-    if (native.displays.length === 0) return structuredClone(local);
-    return native.displays.map((display, index) => {
+    // Sunshine also lists outputs that have no monitor: an X server with a dummy driver has 16, and
+    // only one is connected. Electron lists only connected monitors, so an output with no match is
+    // not a screen to show, and its size is unknown.
+    const displays = native.displays.flatMap((display, index) => {
       const metadata = local.find((candidate) => candidate.id === display.id) ?? local[index];
-      return {
-        id: display.id,
-        label: metadata?.label ?? display.name,
-        width: metadata?.width ?? 0,
-        height: metadata?.height ?? 0,
-        primary: metadata?.primary ?? index === 0,
-      };
+      if (!metadata) return [];
+      return [
+        {
+          id: display.id,
+          label: metadata.label,
+          width: metadata.width,
+          height: metadata.height,
+          primary: metadata.primary,
+        },
+      ];
     });
+    return displays.length === 0 ? structuredClone(local) : displays;
   }
 
   async #waitForPairingRequest(): Promise<string> {
