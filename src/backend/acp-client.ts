@@ -22,7 +22,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
-import { sourceText } from "@openbot/i18n/source";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationOptions, elicitationValue, secretElicitationField } from "./agent/prompts";
@@ -1158,7 +1158,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
           : this.provider === "opencode" && isOpenCodeServiceFailure(error)
             ? sourceText("error.provider.opencodeServiceFailure")
-            : detail;
+            : this.#openCodeRequestFailure(error, detail);
       this.emit("notification", {
         method: "error",
         params: { threadId: thread.id, turnId: turn.id, message },
@@ -1171,6 +1171,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread.turns.push({ id: turn.id, status, items: turn.messages });
     thread.activeTurn = null;
     this.#threads.markIdle(thread);
+  }
+
+  /**
+   * OpenCode retries a rate limit or a provider failure by itself. When it stops, it fails the prompt
+   * with the provider's text behind `Internal error:`, so a billing refusal, a rate limit and an
+   * offline computer all read as one failure of OpenBot, and the user could not tell whether
+   * waiting helps (#1163). The kind comes first; the provider's own text follows it.
+   */
+  #openCodeRequestFailure(error: unknown, detail: string): string {
+    if (this.provider !== "opencode" || !(error instanceof RequestError) || error.code !== -32603) return detail;
+    const reason = error.message.replace(/^Internal error:\s*/u, "");
+    const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+    if (!key) return detail;
+    // The renderer shows its generic sentence for text over 400 characters.
+    return sourceText(key, { detail: this.#redact(reason).slice(0, OPENCODE_FAILURE_DETAIL_LIMIT) });
   }
 
   async #requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
@@ -1535,6 +1550,30 @@ class MissingOpenCodeSessionError extends Error {
 function isOpenCodeServiceFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
+
+const OPENCODE_FAILURE_DETAIL_LIMIT = 200;
+
+/**
+ * The kind of a model request that OpenCode gave up on, first match wins. Billing comes before the
+ * rate limit, and both before the provider's own failure: a provider gateway reports each of them
+ * as `Upstream request failed: <reason>`. A usage limit is not here: `isUsageLimitDiagnostic` reads
+ * it, and the usage notice reports it.
+ */
+const OPENCODE_REQUEST_FAILURES = [
+  [
+    "error.provider.opencodeBilling",
+    /\bno payment method\b|\binsufficient (?:account )?(?:funds|balance)\b|\bpayment required\b|\bbilling\b/iu,
+  ],
+  ["error.provider.opencodeRateLimited", /\brate[ _-]?limit|\btoo many requests\b|\bfree usage exceeded\b/iu],
+  [
+    "error.provider.opencodeNetwork",
+    /\b(?:cannot|unable to|could not) connect\b|\bfetch failed\b|\bfailed to fetch\b|\bgetaddrinfo\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT)\b|\bsocket hang up\b/iu,
+  ],
+  [
+    "error.provider.opencodeProviderFailed",
+    /\binternal server error\b|\bservice unavailable\b|\bis unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
+  ],
+] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 function isAuthenticationError(error: unknown): boolean {
   return /auth|login|credential|token|unauthori[sz]ed|api key/i.test(

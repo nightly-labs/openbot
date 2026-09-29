@@ -147,6 +147,14 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliBusyReconnect": "The {provider} CLI is working on a turn. Wait for it to finish, then reconnect.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
+  "error.provider.opencodeRateLimited":
+    "The model provider refused the request because of its rate limit. Wait a few minutes or choose another model, then try again.\n{detail}",
+  "error.provider.opencodeBilling":
+    "The model provider refused the request because of the account's billing. Waiting does not fix this. Add a payment method or funds in the provider account, or choose another model.\n{detail}",
+  "error.provider.opencodeProviderFailed":
+    "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
+  "error.provider.opencodeNetwork":
+    "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

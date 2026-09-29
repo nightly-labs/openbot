@@ -6,6 +6,7 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GrokAgentClient } from "./grok-client";
 import {
@@ -39,6 +40,7 @@ afterEach(async () => {
   client = null;
   delete process.env.OPENBOT_FAKE_GROK_LOG;
   delete process.env.OPENBOT_FAKE_GROK_MODE;
+  delete process.env.OPENBOT_FAKE_OPENCODE_ERROR;
   await rm(root, { recursive: true, force: true });
 });
 
@@ -167,6 +169,42 @@ describe.sequential("GrokAgentClient", () => {
     ]);
     const history = await client.request("thread/read", { threadId: thread.id }, decodeThreadResponse);
     expect(history.thread.turns?.map((turn) => turn.status)).toEqual(["failed", "completed"]);
+  });
+
+  // Only the kind decides whether waiting helps, so a refusal must not read as a lost connection (#1163).
+  it.each([
+    [
+      "Upstream request failed: [rate_limit_exceeded] Rate limit exceeded. Please retry after a brief wait.",
+      "opencodeRateLimited",
+    ],
+    ["Too Many Requests", "opencodeRateLimited"],
+    ["No payment method.", "opencodeBilling"],
+    ["Upstream request failed: Insufficient account funds", "opencodeBilling"],
+    ["Upstream request failed: Endpoint is unavailable.", "opencodeProviderFailed"],
+    ["Service Unavailable", "opencodeProviderFailed"],
+    ["Cannot connect to API: Unable to connect.", "opencodeNetwork"],
+  ] as const)("names the kind of the OpenCode request failure %s", async (reason, kind) => {
+    process.env.OPENBOT_FAKE_GROK_MODE = "opencode-request-error";
+    process.env.OPENBOT_FAKE_OPENCODE_ERROR = reason;
+    client = new AcpAgentClient({ executable, version: "1.18.30" }, 5_000, {
+      provider: "opencode",
+      argv: ["acp"],
+      env: {},
+      signInMessage: "Connect OpenCode.",
+    });
+    const notifications: AppServerNotification[] = [];
+    client.on("notification", (event) => notifications.push(event));
+    client.start();
+    const { thread } = await client.request("thread/start", { cwd: root }, decodeThreadResponse);
+    await client.request(
+      "turn/start",
+      { threadId: thread.id, input: [{ type: "text", text: "Try" }] },
+      decodeTurnResponse,
+    );
+    await waitFor(() => notifications.some((event) => event.method === "turn/completed"));
+    expect(notifications.filter((event) => event.method === "error").map((event) => event.params)).toEqual([
+      expect.objectContaining({ message: sourceText(`error.provider.${kind}`, { detail: reason }) }),
+    ]);
   });
 
   it.each(["grok", "opencode"] as const)("keeps %s tool names when completion updates omit them", async (provider) => {
@@ -928,6 +966,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
       promptCounter += 1;
       if (mode === "opencode-auth-error" && promptCounter === 1) {
         write({ id: message.id, error: { code: -32603, message: "Internal error: Invalid API key." } });
+        return;
+      }
+      if (mode === "opencode-request-error") {
+        write({ id: message.id, error: { code: -32603, message: "Internal error: " + process.env.OPENBOT_FAKE_OPENCODE_ERROR, data: { service: "session", errorName: "APIError" } } });
         return;
       }
       const update = promptCounter > 1
