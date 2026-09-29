@@ -7,7 +7,7 @@ import { ArrowDown } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, AppState, Keyboard, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { KeyboardGestureArea } from "react-native-keyboard-controller";
+import { KeyboardController, KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
@@ -85,8 +85,7 @@ export interface ChatViewProps {
 const CHAT_BACK_EDGE_WIDTH = 24;
 
 function leaveConversation(): void {
-  // The composer keeps the keyboard after the screen goes, and the list has no input to close it.
-  Keyboard.dismiss();
+  void KeyboardController.dismiss();
   if (router.canGoBack()) router.back();
   else router.replace("/connected");
 }
