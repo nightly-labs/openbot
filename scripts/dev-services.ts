@@ -311,6 +311,8 @@ async function main(): Promise<void> {
     sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL = TEST_ACCOUNT_API_URL;
     sharedEnvironment.OPENBOT_DEV_INSTANCE_ID ??= developmentInstanceIdForWorktree("openbot:hosting-test");
     sharedEnvironment.OPENBOT_HOSTING_DEVELOPER_KEY = await readHostingDeveloperKey();
+    // A dev role signs a throwaway account in with a code that only the local Worker returns.
+    sharedEnvironment.OPENBOT_DEV_REMOTE_ROLE = "none";
     logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
   }
   if (isolated) {
