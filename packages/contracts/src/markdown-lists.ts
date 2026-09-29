@@ -16,7 +16,7 @@ export interface MarkdownListEdit {
 
 const LIST_ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?/u;
 const THEMATIC_BREAK = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
-const CODE_FENCE = /^[ \t]*(?:```|~~~)/u;
+const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/u;
 
 /** The edit for a line break typed at `caret` in `text`, or null when the line break is plain. */
 export function markdownListLineBreak(text: string, caret: number): MarkdownListEdit | null {
@@ -38,5 +38,16 @@ export function markdownListLineBreak(text: string, caret: number): MarkdownList
 }
 
 function insideCodeFence(before: string): boolean {
-  return before.split("\n").filter((line) => CODE_FENCE.test(line)).length % 2 === 1;
+  let open: string | null = null;
+  for (const line of before.split("\n")) {
+    const fence = CODE_FENCE.exec(line);
+    if (!fence) continue;
+    const [, marks = "", rest = ""] = fence;
+    if (open === null) {
+      if (!(marks[0] === "`" && rest.includes("`"))) open = marks;
+    } else if (marks[0] === open[0] && marks.length >= open.length && !rest.trim()) {
+      open = null;
+    }
+  }
+  return open !== null;
 }
