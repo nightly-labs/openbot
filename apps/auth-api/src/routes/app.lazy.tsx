@@ -17,7 +17,7 @@ function BrowserAppPage() {
         when={mounted()}
         fallback={
           <div class="web-app">
-            <AppLoadingScreen variant={import.meta.env.DEV ? "dev" : "production"} />
+            <AppLoadingScreen />
           </div>
         }
       >

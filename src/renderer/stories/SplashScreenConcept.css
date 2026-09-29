@@ -1,0 +1,292 @@
+/*
+ * Splash screen concept. Intro: the tile lands, each eye is drawn as one pen stroke, the wordmark
+ * rises and the scribble loader starts. Idle: the mark floats and blinks over a slow glow. Exit: the
+ * tile dips, squints and opens towards the viewer while the screen fades out.
+ */
+
+.splash-screen {
+  --splash-accent: var(--openbot-logo-production);
+  position: absolute;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+  -webkit-app-region: drag;
+}
+
+.splash-screen[data-variant="dev"] {
+  --splash-accent: var(--openbot-logo-dev);
+}
+
+.splash-screen[data-variant="preview"] {
+  --splash-accent: var(--openbot-logo-preview);
+}
+
+.splash-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.splash-mark {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 6px;
+}
+
+.splash-mark::before {
+  position: absolute;
+  z-index: -1;
+  inset: -55%;
+  border-radius: var(--openbot-radius-pill);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--splash-accent) 34%, transparent),
+    color-mix(in srgb, var(--splash-accent) 10%, transparent) 55%,
+    transparent
+  );
+  content: "";
+}
+
+.splash-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.splash-logo .app-logo-eye-left {
+  --splash-eye-length: var(--splash-eye-left-length);
+}
+
+.splash-logo .app-logo-eye-right {
+  --splash-eye-length: var(--splash-eye-right-length);
+}
+
+.splash-wordmark {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-display);
+  font-weight: 620;
+  letter-spacing: -0.015em;
+  line-height: var(--openbot-leading-display);
+}
+
+.splash-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.splash-scribble {
+  width: 46px;
+  height: 14px;
+  overflow: visible;
+}
+
+.splash-scribble-stroke {
+  fill: none;
+  stroke: var(--splash-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4px;
+}
+
+.splash-label {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
+/* These two only fade, so they also run with reduced motion. Their animationend events move the
+ * splash from intro to idle and from exit to unmounted. */
+
+.splash-screen[data-phase="intro"] .splash-loader {
+  animation: splash-loader-in 360ms var(--openbot-ease-out) 1020ms backwards;
+}
+
+.splash-screen[data-phase="exit"] {
+  pointer-events: none;
+  animation: splash-screen-exit 420ms var(--openbot-ease-in-out) 240ms forwards;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Intro */
+
+  .splash-screen[data-phase="intro"] .splash-logo {
+    animation: splash-tile-in 620ms var(--openbot-ease-out) both;
+  }
+
+  .splash-screen[data-phase="intro"] .splash-logo .app-logo-eye {
+    stroke-dasharray: var(--splash-eye-length) calc(var(--splash-eye-length) + 24px);
+    animation: splash-eye-draw 460ms var(--openbot-ease-in-out) 320ms backwards;
+  }
+
+  .splash-screen[data-phase="intro"] .splash-logo .app-logo-eye-right {
+    animation-delay: 520ms;
+  }
+
+  .splash-screen[data-phase="intro"] .splash-mark::before {
+    animation: splash-glow-in 900ms var(--openbot-ease-out) 240ms backwards;
+  }
+
+  .splash-screen[data-phase="intro"] .splash-wordmark {
+    animation: splash-rise 520ms var(--openbot-ease-out) 780ms backwards;
+  }
+
+  .splash-scribble-stroke {
+    stroke-dasharray: 1 1.2;
+    animation: splash-scribble 1.8s var(--openbot-ease-in-out) infinite;
+  }
+
+  /* Idle */
+
+  .splash-screen[data-phase="idle"] .splash-mark {
+    animation: splash-float 3.2s var(--openbot-ease-in-out) infinite;
+  }
+
+  .splash-screen[data-phase="idle"] .splash-mark::before {
+    animation: splash-breathe 3.2s var(--openbot-ease-in-out) infinite;
+  }
+
+  /* Exit */
+
+  .splash-screen[data-phase="exit"] .splash-logo {
+    animation: splash-tile-exit 620ms var(--openbot-ease-in-out) forwards;
+  }
+
+  .splash-screen[data-phase="exit"] .splash-logo .app-logo-eye {
+    animation: splash-eye-squint 240ms var(--openbot-ease-out) forwards;
+  }
+
+  .splash-screen[data-phase="exit"] .splash-mark::before {
+    animation: splash-glow-exit 620ms var(--openbot-ease-in-out) forwards;
+  }
+
+  .splash-screen[data-phase="exit"] :is(.splash-wordmark, .splash-loader) {
+    animation: splash-sink 260ms var(--openbot-ease-in-out) forwards;
+  }
+}
+
+@keyframes splash-tile-in {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(14px) scale(0.72) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes splash-eye-draw {
+  from {
+    stroke-dashoffset: calc(var(--splash-eye-length) + 12px);
+  }
+  to {
+    stroke-dashoffset: 0px;
+  }
+}
+
+@keyframes splash-glow-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes splash-rise {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(10px);
+  }
+}
+
+@keyframes splash-loader-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes splash-scribble {
+  0% {
+    stroke-dashoffset: 1.1;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -1.1;
+  }
+}
+
+@keyframes splash-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes splash-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes splash-screen-exit {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes splash-tile-exit {
+  30% {
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(1.5);
+  }
+}
+
+@keyframes splash-eye-squint {
+  to {
+    transform: scaleY(0.3);
+  }
+}
+
+@keyframes splash-glow-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+@keyframes splash-sink {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

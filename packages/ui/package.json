@@ -241,6 +241,7 @@
     "./features/dynamic-island/dynamic-island.css": "./src/features/dynamic-island/dynamic-island.css",
     "./features/dynamic-island/dynamic-island-surface.css": "./src/features/dynamic-island/dynamic-island-surface.css",
     "./features/account/auth.css": "./src/features/account/auth.css",
+    "./features/account/app-loading-screen.css": "./src/features/account/app-loading-screen.css",
     "./features/agents/agent-template.css": "./src/features/agents/agent-template.css",
     "./features/agents/first-agent-setup.css": "./src/features/agents/first-agent-setup.css",
     "./styles/settings-panel.css": "./src/styles/settings-panel.css",

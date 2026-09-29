@@ -1,0 +1,353 @@
+/*
+ * The app loading screen. Three agents hop in a wave with squash and stretch, and their shadows shrink
+ * under them. A fourth agent sleeps: it breathes slowly and snores. Joke status lines change below.
+ * When the app is ready, the crew jumps out through the top of the screen, and the sleeper floats
+ * up after them, still asleep. When the app is ready very soon, the screen only fades.
+ * The component sets --app-loading-wave and --app-loading-stagger, so the hops keep time with its
+ * clock, and --app-loading-at, so every animation starts at the clock's time.
+ */
+
+.app-loading {
+  --app-loading-exit-delay: 0ms;
+  --app-loading-play: running;
+  --app-loading-at: 0s;
+  position: absolute;
+  z-index: var(--openbot-layer-dialog);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--openbot-bg-canvas);
+  -webkit-app-region: drag;
+}
+
+.app-loading-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.app-loading-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding-top: 48px;
+}
+
+.app-loading-agent {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+/* The shadow on the floor. */
+.app-loading-agent::after {
+  position: absolute;
+  z-index: -1;
+  bottom: -8px;
+  left: 50%;
+  width: 70%;
+  height: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-muted) 24%, transparent);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.app-loading-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+.app-loading-bot {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.app-loading[data-scrub] {
+  --app-loading-play: paused;
+}
+
+/* A point at the top right of the sleeper's head. The marks rise from it. */
+.app-loading-snore {
+  position: absolute;
+  top: 13px;
+  left: 37px;
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.app-loading:not([data-phase="loading"]) .app-loading-snore {
+  opacity: 0;
+}
+
+/* Without motion, the three marks make a small still staircase. */
+.app-loading-z {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  scale: calc(0.7 + var(--app-loading-z-index) * 0.15);
+  translate: calc(var(--app-loading-z-index) * 6px) calc(var(--app-loading-z-index) * -9px);
+}
+
+.app-loading-z-mark {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--openbot-text-muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2px;
+}
+
+.app-loading-status {
+  min-height: 20px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-md);
+}
+
+.app-loading-line {
+  display: block;
+}
+
+/* The fade also runs with reduced motion: its animationend removes the screen. */
+.app-loading:not([data-phase="loading"]) {
+  pointer-events: none;
+  animation: app-loading-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) var(--app-loading-exit-delay)
+    forwards;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The crew jumps out before the screen fades. */
+  .app-loading[data-phase="exit"] {
+    --app-loading-exit-delay: 760ms;
+  }
+
+  /* Loading. The stage waits before it shows, so a fast load does not flash the crew. */
+
+  .app-loading-stage {
+    animation: app-loading-enter var(--openbot-duration-overlay) var(--openbot-ease-out)
+      calc(250ms - var(--app-loading-at)) both var(--app-loading-play);
+  }
+
+  .app-loading-agent:not([data-sleeper]) .app-loading-body {
+    animation: app-loading-hop var(--app-loading-wave) var(--openbot-ease-in-out)
+      calc(var(--app-loading-index) * var(--app-loading-stagger) - var(--app-loading-at)) infinite
+      var(--app-loading-play);
+  }
+
+  .app-loading-agent:not([data-sleeper])::after {
+    animation: app-loading-shadow var(--app-loading-wave) var(--openbot-ease-in-out)
+      calc(var(--app-loading-index) * var(--app-loading-stagger) - var(--app-loading-at)) infinite
+      var(--app-loading-play);
+  }
+
+  /* One breath every 3.6s: in for 1.8s, out for 1.8s. */
+  .app-loading-agent[data-sleeper] .app-loading-body {
+    animation: app-loading-breathe 1.8s var(--openbot-ease-in-out) calc(0s - var(--app-loading-at)) infinite alternate
+      var(--app-loading-play);
+  }
+
+  /* Each mark rises on one long curve, so it does not stop between keyframes. A separate sway
+   * rocks it from side to side while it rises. */
+  .app-loading-z {
+    --app-loading-z-delay: calc(var(--app-loading-z-index) * 1.2s - var(--app-loading-at));
+    opacity: 0;
+    animation:
+      app-loading-z-rise 3.6s cubic-bezier(0.33, 0.1, 0.4, 1) var(--app-loading-z-delay) infinite
+      var(--app-loading-play),
+      app-loading-z-fade 3.6s linear var(--app-loading-z-delay) infinite var(--app-loading-play);
+  }
+
+  .app-loading-z-mark {
+    animation: app-loading-z-sway 0.9s var(--openbot-ease-in-out) var(--app-loading-z-delay) infinite alternate
+      var(--app-loading-play);
+  }
+
+  .app-loading-line {
+    animation: app-loading-line-in 280ms var(--openbot-ease-out);
+  }
+
+  .app-loading[data-scrub] .app-loading-line {
+    animation: none;
+  }
+
+  /* Exit: the sleeper leaves last. The "fade" phase keeps the loading animations. */
+
+  .app-loading[data-phase="exit"] .app-loading-body {
+    animation: app-loading-leap 640ms var(--openbot-ease-in-out) calc(var(--app-loading-index, 0) * 70ms) forwards;
+  }
+
+  /* The sleeper keeps breathing and floats up. `translate` adds to the breath's `transform`, so the
+   * body does not jump when the exit starts. */
+  .app-loading[data-phase="exit"] [data-sleeper] .app-loading-body {
+    animation:
+      app-loading-breathe 1.8s var(--openbot-ease-in-out) calc(0s - var(--app-loading-at)) infinite alternate,
+      app-loading-drift 720ms cubic-bezier(0.5, 0, 0.9, 0.5) 200ms forwards;
+  }
+
+  .app-loading[data-phase="exit"] .app-loading-agent::after {
+    animation: app-loading-shadow-out 320ms var(--openbot-ease-out) calc(var(--app-loading-index, 0) * 70ms + 120ms)
+      forwards;
+  }
+
+  .app-loading[data-phase="exit"] [data-sleeper]::after {
+    animation-delay: 480ms;
+  }
+
+  .app-loading:not([data-phase="loading"]) .app-loading-status {
+    animation: app-loading-fade 200ms var(--openbot-ease-out) forwards;
+  }
+}
+
+@keyframes app-loading-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes app-loading-hop {
+  0%,
+  78%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  10% {
+    transform: translateY(0) scale(1.14, 0.86);
+  }
+  28% {
+    transform: translateY(-30px) scale(0.9, 1.1);
+  }
+  44% {
+    transform: translateY(-40px) scale(1, 1);
+  }
+  62% {
+    transform: translateY(0) scale(0.94, 1.06);
+  }
+  68% {
+    transform: translateY(0) scale(1.16, 0.84);
+  }
+}
+
+@keyframes app-loading-shadow {
+  0%,
+  62%,
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1);
+  }
+  68% {
+    transform: translateX(-50%) scaleX(1.15);
+  }
+  44% {
+    opacity: 0.45;
+    transform: translateX(-50%) scaleX(0.55);
+  }
+}
+
+@keyframes app-loading-breathe {
+  from {
+    transform: scale(1, 1);
+  }
+  to {
+    transform: scale(0.97, 1.04) rotate(-1.5deg);
+  }
+}
+
+/* Starts at zero speed, so the lift has no jolt. */
+@keyframes app-loading-drift {
+  from {
+    opacity: 1;
+    translate: 0 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    translate: 0 -40vh;
+  }
+}
+
+@keyframes app-loading-z-rise {
+  from {
+    scale: 0.45;
+    translate: 0 0;
+  }
+  to {
+    scale: 1.1;
+    translate: 12px -30px;
+  }
+}
+
+@keyframes app-loading-z-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  18%,
+  60% {
+    opacity: 1;
+  }
+}
+
+@keyframes app-loading-z-sway {
+  from {
+    transform: translateX(-2px) rotate(-14deg);
+  }
+  to {
+    transform: translateX(2px) rotate(12deg);
+  }
+}
+
+@keyframes app-loading-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes app-loading-leap {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  25% {
+    transform: translateY(0) scale(1.2, 0.8);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-40px) scale(0.85, 1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-70vh) scale(0.85, 1.2);
+  }
+}
+
+@keyframes app-loading-shadow-out {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.3);
+  }
+}
+
+@keyframes app-loading-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes app-loading-exit {
+  to {
+    opacity: 0;
+  }
+}
