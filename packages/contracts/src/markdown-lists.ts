@@ -62,7 +62,12 @@ function insideCodeFence(lines: string): boolean {
       // A lead longer than the indent holds a list marker: the fence is on the item's line.
       const onItemLine = lead.length > indent ? lead.length : null;
       open = { marks, itemIndent: onItemLine ?? (itemIndent !== null && indent >= itemIndent ? itemIndent : 0) };
-    } else if (marks[0] === open.marks[0] && marks.length >= open.marks.length && !rest.trim()) {
+    } else if (
+      lead.length === indent &&
+      marks[0] === open.marks[0] &&
+      marks.length >= open.marks.length &&
+      !rest.trim()
+    ) {
       open = null;
     }
   }
