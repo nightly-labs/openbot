@@ -330,6 +330,7 @@ describe("Team API agent-publish-v1", () => {
       },
       publish: async ({ agentId, card }: PublishAgentTemplateInput) => {
         if (agentId === "leaky") throw new Error("Remove the API key from the instructions.");
+        if (agentId === "leaky-routine") throw new Error(`Remove the secret from the routine "${secret}".`);
         calls.push(`publish:${agentId}`);
         cards.push(card);
         return publication;
@@ -367,6 +368,9 @@ describe("Team API agent-publish-v1", () => {
     const refused = await post("/v1/admin/agents/template-publish", { agentId: "leaky", card: null });
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: "Remove the API key from the instructions." });
+    const named = await post("/v1/admin/agents/template-publish", { agentId: "leaky-routine", card: null });
+    expect(named.status).toBe(409);
+    expect(await named.text()).not.toContain(secret);
 
     expect(await (await post("/v1/admin/agents/template-unpublish", { agentId: "chief" })).json()).toEqual({});
     expect(calls).toEqual(["preview:chief", "publish:chief", "unpublish:chief"]);

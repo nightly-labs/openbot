@@ -35,8 +35,8 @@ export async function routeAgentPublish(
     return json(200, {});
   } catch (error) {
     // A signed-out host, a secret in the instructions or a failed upload is a sentence for the admin,
-    // not a host fault.
-    if (error instanceof Error && !(error instanceof HttpError)) throw new HttpError(409, error.message);
+    // not a host fault. It can name a routine or skill, and a name can hold the secret it reports.
+    if (error instanceof Error && !(error instanceof HttpError)) throw new HttpError(409, redactText(error.message));
     throw error;
   }
 }
