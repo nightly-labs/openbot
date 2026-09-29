@@ -91,7 +91,7 @@ import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
 import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
 import { createWebServerNotifications } from "./web-notification-preferences";
-import { requestWebNotificationPermission, showWebAgentNotification } from "./web-notifications";
+import { requestWebNotificationPermission, showWebAgentNotification, watchWebTabFocus } from "./web-notifications";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
@@ -411,7 +411,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (muted || level === "nothing") return;
     if (event.type === "turn-completed" && level === "all") playCompletionSoundForAgentEvent(event, agents);
     showWebAgentNotification({
-      hostId,
       event,
       agents,
       level,
@@ -437,18 +436,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (level !== "nothing") requestWebNotificationPermission(true);
     notifications.setLevel(hostId, level);
   }
-  // Safari starts audio only from a user action, so the first one starts the completion sound.
-  const unlockSound = () => {
-    unlockCompletionSound();
-    window.removeEventListener("pointerdown", unlockSound, true);
-    window.removeEventListener("keydown", unlockSound, true);
-  };
-  window.addEventListener("pointerdown", unlockSound, true);
-  window.addEventListener("keydown", unlockSound, true);
+  // Safari starts audio only from a user action, and can stop it again, so each action starts it.
+  window.addEventListener("pointerdown", unlockCompletionSound, true);
+  window.addEventListener("keydown", unlockCompletionSound, true);
   onCleanup(() => {
-    window.removeEventListener("pointerdown", unlockSound, true);
-    window.removeEventListener("keydown", unlockSound, true);
+    window.removeEventListener("pointerdown", unlockCompletionSound, true);
+    window.removeEventListener("keydown", unlockCompletionSound, true);
   });
+  onCleanup(watchWebTabFocus());
   onCleanup(workspace.onHostNotice(notify));
   onCleanup(
     workspace.onHostEvent((event) => {

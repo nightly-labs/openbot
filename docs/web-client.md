@@ -72,11 +72,13 @@ mock. The separate web preview implements the browser runtime with that same moc
   settings, Usage and Settings. Mute and notification level are kept in this browser, per account
   and host (`web-notification-preferences.ts`). They control browser notifications and the
   completion sound, with the same rules as the desktop (`@openbot/team-client/agent-notifications`).
-  A browser notification shows only while the tab is open and does not have focus. The browser asks
-  for permission on the first sent prompt, or when the user turns notifications on in the menu.
-  Status connections read the prompt, approval and turn-completed events and the agent list of
-  their host, so every connected host can notify. The first click or key press starts the audio
-  context, because Safari plays sound only after a user action.
+  A browser notification shows only while a tab is open and no tab of the app has focus; the tabs
+  share the focused tab in local storage, because the tab that speaks for a host is often in the
+  background. The browser asks for permission on the first prompt that the user sends, or when the
+  user turns notifications on in the menu. Status connections read the prompt, approval and
+  turn-completed events and the agent list of their host, so every connected host can notify. Each
+  click or key press starts the audio context again, because Safari plays sound only after a user
+  action and iOS can interrupt it.
 - Capability checks hide unavailable browser-view and creation-model controls. Hosts without
   pagination use their full conversation endpoint. Unsupported media and EML uploads are refused
   before transfer. Host authorization remains the final decision for every action.

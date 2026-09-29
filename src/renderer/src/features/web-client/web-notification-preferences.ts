@@ -4,16 +4,24 @@ import { z } from "zod";
 
 type NotificationStorage = Pick<Storage, "getItem" | "setItem">;
 
-/** `mutedUntil` null is a mute without an end. An absent `mutedUntil` is no mute. */
+/**
+ * `mutedUntil` null is a mute without an end. An absent `mutedUntil` is no mute. A value this build
+ * does not know, such as a level of a newer build, is dropped alone, so the other choices stay.
+ */
 const storedSchema = z.record(
   z.string(),
-  z.object({
-    level: z
-      .string()
-      .refine((value): value is ServerNotificationLevel => SERVER_NOTIFICATION_LEVELS.some((level) => level === value))
-      .optional(),
-    mutedUntil: z.number().nullable().optional(),
-  }),
+  z
+    .object({
+      level: z
+        .string()
+        .refine((value): value is ServerNotificationLevel =>
+          SERVER_NOTIFICATION_LEVELS.some((level) => level === value),
+        )
+        .optional()
+        .catch(undefined),
+      mutedUntil: z.number().nullable().optional().catch(undefined),
+    })
+    .catch({}),
 );
 type Stored = z.infer<typeof storedSchema>;
 
