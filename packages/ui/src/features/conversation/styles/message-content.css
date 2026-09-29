@@ -727,7 +727,9 @@
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
   line-height: 19px;
-  overscroll-behavior: contain;
+  /* Only the inline axis: Chromium stops a vertical wheel at a contained block even when the block
+     cannot scroll, so the chat would not scroll under the pointer. */
+  overscroll-behavior-x: contain;
   tab-size: 2;
 }
 
