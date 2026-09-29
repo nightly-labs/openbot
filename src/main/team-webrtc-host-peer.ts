@@ -4,13 +4,12 @@ import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
 } from "@openbot/contracts/team-protocol/current";
-import { hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { encodeTeamProtocolV1ClientEvent } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -534,9 +533,9 @@ export class TeamWebRtcHostPeer {
         // rejects it and the catch below would drop it without a trace: a remote client would
         // stop seeing incoming messages and task updates until its next refresh. The optional
         // protocol validates and envelopes its own event, exactly as the request path does. The
-        // `host-update-v1` restart notice takes the same path.
+        // `host-update-v1` restart notice and the `skills-events-v1` event take the same path.
         const event = JSON.parse(data.toString());
-        const channel = channelEvent(event) ?? hostRestartEvent(event);
+        const channel = optionalTeamEvent(event);
         frame = encodeTeamProtocolV2Frame(
           channel
             ? decodeTeamProtocolV2EventFrame({

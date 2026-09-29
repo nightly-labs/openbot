@@ -24,7 +24,7 @@ function storyReleaseNotesSkill(): MarketplaceSkillDetail {
   return skill;
 }
 /** The skills marketplace, local skills, and the skills installed on each agent. */
-export function createMockSkills(options: MockSkillsOptions) {
+export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId: string) => void = () => {}) {
   const marketplaceSkills = clone(STORY_MARKETPLACE_SKILLS);
   const localSkills = clone(
     options.localSkills ?? [
@@ -45,6 +45,12 @@ export function createMockSkills(options: MockSkillsOptions) {
 
   function readInstalledSkills(agentId: string): InstalledSkill[] {
     return installedSkills.get(agentId) ?? [];
+  }
+
+  /** Saves the skills of one agent and reports the change, as the desktop host does. */
+  function writeInstalled(agentId: string, next: InstalledSkill[]): void {
+    installedSkills.set(agentId, next);
+    onChanged(agentId);
   }
 
   const skills: OpenBotDesktopApi["skills"] = {
@@ -98,10 +104,7 @@ export function createMockSkills(options: MockSkillsOptions) {
         enabled: previous?.enabled !== false,
         description: skill.description,
       };
-      installedSkills.set(agentId, [
-        ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
-        installed,
-      ]);
+      writeInstalled(agentId, [...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId), installed]);
       return clone(installed);
     },
     list: async (query) => {
@@ -180,16 +183,13 @@ export function createMockSkills(options: MockSkillsOptions) {
         origin: previous?.origin ?? "marketplace",
         description: skill.description,
       };
-      installedSkills.set(agentId, [
-        ...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
-        installed,
-      ]);
+      writeInstalled(agentId, [...readInstalledSkills(agentId).filter((item) => item.skillId !== skillId), installed]);
       return clone(installed);
     },
     uninstall: async ({ agentId, skillId }) => {
       const skill = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
       if (skill?.origin === "managed") throw new Error("This skill is managed by OpenBot.");
-      installedSkills.set(
+      writeInstalled(
         agentId,
         readInstalledSkills(agentId).filter((item) => item.skillId !== skillId),
       );
@@ -200,7 +200,7 @@ export function createMockSkills(options: MockSkillsOptions) {
       if (!skill) throw new Error("Skill not found.");
       if (skill.origin === "managed") throw new Error("This skill is managed by OpenBot.");
       const next: InstalledSkill = { ...skill, enabled };
-      installedSkills.set(
+      writeInstalled(
         agentId,
         current.map((item) => (item.skillId === skillId ? next : item)),
       );

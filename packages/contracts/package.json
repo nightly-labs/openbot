@@ -51,6 +51,7 @@
     "./team-protocol/v5-webrtc-adapter": "./src/team-protocol/v5-webrtc-adapter.ts",
     "./validation": "./src/validation.ts",
     "./team-protocol/channels-v1": "./src/team-protocol/channels-v1.ts",
+    "./team-protocol/optional-events": "./src/team-protocol/optional-events.ts",
     "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",
     "./team-protocol/storage-v1": "./src/team-protocol/storage-v1.ts",
     "./team-protocol/agent-admin-v1": "./src/team-protocol/agent-admin-v1.ts",
@@ -63,6 +64,7 @@
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",
     "./team-protocol/shared-tables-v1": "./src/team-protocol/shared-tables-v1.ts",
     "./team-protocol/skills-admin-v1": "./src/team-protocol/skills-admin-v1.ts",
+    "./team-protocol/skills-events-v1": "./src/team-protocol/skills-events-v1.ts",
     "./team-protocol/optional-routes": "./src/team-protocol/optional-routes.ts",
     "./team-protocol/remote-stream-v1": "./src/team-protocol/remote-stream-v1.ts"
   },

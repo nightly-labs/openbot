@@ -861,7 +861,15 @@ export async function createApplicationServices({
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
-    async (agentId) => service.refreshAgentRuntime(agentId),
+    // Every skill change ends here: install, update, uninstall, turning one on or off, and a skill
+    // an agent creates. The event reaches this computer's windows and the joined clients.
+    async (agentId) => {
+      try {
+        await service.refreshAgentRuntime(agentId);
+      } finally {
+        service.notifySkillsChanged(agentId);
+      }
+    },
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
   const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);

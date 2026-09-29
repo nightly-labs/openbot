@@ -1,5 +1,5 @@
-import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
-import { type HostRestartEvent, hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
+import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { decodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
@@ -435,7 +435,7 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const optional = channelEvent(value) ?? hostRestartEvent(value);
+            const optional = optionalTeamEvent(value);
             const decoded = optional
               ? { kind: "known" as const, event: optional }
               : decodeTeamProtocolV5BaseCurrentEvent(value);

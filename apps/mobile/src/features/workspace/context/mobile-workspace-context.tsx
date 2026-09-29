@@ -627,7 +627,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ) {
         void refreshConversationReads(serverId).catch(() => undefined);
       }
-      if (event.type === "memories-changed" || event.type === "routines-changed" || event.type === "turn-completed") {
+      if (
+        event.type === "memories-changed" ||
+        event.type === "routines-changed" ||
+        event.type === "skills-changed" ||
+        event.type === "turn-completed"
+      ) {
         void queryClient.invalidateQueries({
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });

@@ -24,7 +24,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
@@ -38,6 +37,7 @@ import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
+  SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
   supportsTeamSemanticTags,
   TEAM_AGENT_ACTIVITY_CAPABILITY,
@@ -50,6 +50,7 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -747,10 +748,10 @@ export class TeamApiServer {
       let conversationInvalidation: string | undefined;
       let queueInvalidation: string | undefined;
       let outgoing: string;
-      const channel = channelEvent(event);
-      if (channel) {
-        if (!connection.capabilities.has("channel-chats-v1")) continue;
-        outgoing = JSON.stringify(channel);
+      // `eventCapability` above has already kept an optional event from a client without its capability.
+      const optional = optionalTeamEvent(event);
+      if (optional) {
+        outgoing = JSON.stringify(optional);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         conversationInvalidation ??=
           encodeEvent({
@@ -1172,6 +1173,7 @@ export class TeamApiServer {
         if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
         if (capability === AGENT_ADMIN_CAPABILITY) return this.#options.admin?.agents !== undefined;
         if (capability === SKILLS_ADMIN_CAPABILITY) return this.#options.admin?.skills !== undefined;
+        if (capability === SKILLS_EVENTS_CAPABILITY) return this.#options.skills !== undefined;
         if (capability === SHARED_TABLES_CAPABILITY) return this.#options.admin?.sharedTables !== undefined;
         if (capability === AGENT_INSTALL_CAPABILITY)
           return (
@@ -1299,6 +1301,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
     event.type === "channel-routines-changed"
   )
     return "channel-chats-v1";
+  if (event.type === "skills-changed") return SKILLS_EVENTS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

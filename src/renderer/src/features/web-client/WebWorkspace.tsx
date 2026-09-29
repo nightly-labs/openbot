@@ -462,6 +462,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.runtime,
     () => workspace.state.host?.hostId ?? "",
     workspace.runtime.admin ? () => hostRequest() : undefined,
+    workspace.onHostEvent,
   );
   const remoteAgentAdmin = createRemoteAgentAdmin(
     () => {

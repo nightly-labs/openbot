@@ -1106,6 +1106,16 @@ The next provider session gets a handoff of only the messages after the last mar
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
 
+### Skill events
+
+`skills-events-v1` adds one optional event, `skills-changed { agentId }`. The host sends it after
+each change to the installed skills of an agent: install, update, uninstall, turning a skill on or
+off, and a skill an agent creates. `SkillMarketplaceService` calls its refresh callback after every
+write, and that callback emits the event through `AgentService`, so this computer's windows get it
+too. The event carries no skill data: a client reads the list again through `installed-skills` or
+`skills-admin-v1`. `team-protocol/optional-events.ts` is the one place where each transport
+recognizes the optional events that the frozen base vocabularies reject.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.

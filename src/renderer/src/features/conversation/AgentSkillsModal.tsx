@@ -141,6 +141,17 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     },
   );
 
+  // A change made on another device, in the chat or in another window shows while the dialog is open.
+  createEffect(
+    () => [props.open, props.agentId, calls()] as const,
+    ([open, agentId, current]) => {
+      if (!open || !current.onChanged) return;
+      return current.onChanged((changedId) => {
+        if (changedId === agentId) void loadSkills(false);
+      });
+    },
+  );
+
   async function loadCatalog(): Promise<void> {
     const catalogPort = catalogCalls();
     if (!catalogPort) {

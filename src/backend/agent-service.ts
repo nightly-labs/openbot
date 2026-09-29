@@ -1021,6 +1021,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
   }
 
+  /** The installed skills of one agent changed, so every open skills list reads them again. */
+  notifySkillsChanged(agentId: string): void {
+    this.#emit({ type: "skills-changed", agentId });
+  }
+
   listModels(): AgentModelOption[] {
     return this.#endpoints.available();
   }

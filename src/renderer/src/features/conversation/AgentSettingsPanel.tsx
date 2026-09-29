@@ -122,6 +122,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
   );
 
+  // The count follows a skill change made anywhere, as the dialog does.
+  createEffect(
+    () => [props.agent.id, skillsMode(), skillCalls()] as const,
+    ([agentId, mode, calls]) => {
+      if (mode === "hidden" || !calls.onChanged) return;
+      return calls.onChanged((changedId) => {
+        if (changedId === agentId) void loadSkillsCount(agentId);
+      });
+    },
+  );
+
   async function loadSkillsCount(agentId: string): Promise<void> {
     if (skillsMode() === "hidden") {
       setDraft((state) => {
