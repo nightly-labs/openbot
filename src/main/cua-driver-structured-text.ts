@@ -30,7 +30,7 @@ const MAX_STRUCTURED_TEXT_CHARS = 65_536;
 
 /** How to act on an element when the copy holds no element tokens. */
 const ELEMENT_ADDRESS_NOTE =
-  "To act on an element, send this snapshot_id with the element_index that the tree in the result text shows.";
+  "To act on an element, send this pid, window_id and snapshot_id with the element_index that the tree in the result text shows.";
 
 /** A string this long that the result text already holds is not copied again. */
 const REPEATED_TEXT_MIN_CHARS = 256;
@@ -92,21 +92,33 @@ function withStructuredText(result: unknown): DynamicRecord | null {
  * The fields worth reading, without the data that is not.
  *
  * `elements` is left out, and a note says how to address an element instead. The tree in the
- * result text already names every element by its index, and the driver takes `snapshot_id` with an
- * `element_index` wherever it takes an element token. A map from each index to its token would add
- * three quarters of the tree's size again, and every result stays in the conversation, so each
- * later step would read it again. The driver's `_note` goes too, because it points at `elements`.
+ * result text already names every element by its index, and the driver takes `window_id` and
+ * `snapshot_id` with an `element_index` wherever it takes an element token. A map from each index to
+ * its token would add three quarters of the tree's size again, and every result stays in the
+ * conversation, so each later step would read it again. A result with no `snapshot_id` keeps that
+ * map as `element_tokens`, because the tokens are then its only element address. The driver's
+ * `_note` goes too, because it points at `elements`.
  * Base64 data anywhere below is left out when the copy is serialized; see `structuredText`.
  */
 function compactCopy(structured: DynamicRecord, texts: readonly string[]): DynamicRecord {
-  const hasElements = Array.isArray(structured.elements);
+  const elements = structured.elements;
+  const hasElements = Array.isArray(elements);
   const fields = Object.entries(structured)
     .filter(([key]) => !(hasElements && (key === "elements" || key === "_note")))
     .map(([key, value]) => [key, isRepeatedText(value, texts) ? "[the same text is in the result text above]" : value]);
-  return {
-    ...Object.fromEntries(fields),
-    ...(hasElements && typeof structured.snapshot_id === "string" ? { element_address: ELEMENT_ADDRESS_NOTE } : {}),
-  };
+  const address = hasElements && elements.length > 0 ? elementAddress(elements, structured.snapshot_id) : {};
+  return { ...Object.fromEntries(fields), ...address };
+}
+
+function elementAddress(elements: readonly unknown[], snapshotId: unknown): DynamicRecord {
+  if (typeof snapshotId === "string") return { element_address: ELEMENT_ADDRESS_NOTE };
+  const tokens: Record<string, string> = {};
+  for (const element of elements) {
+    if (!isDynamicRecord(element)) continue;
+    const { element_index: index, element_token: token } = element;
+    if (typeof index === "number" && typeof token === "string") tokens[String(index)] = token;
+  }
+  return Object.keys(tokens).length > 0 ? { element_tokens: tokens } : {};
 }
 
 function isRepeatedText(value: unknown, texts: readonly string[]): boolean {

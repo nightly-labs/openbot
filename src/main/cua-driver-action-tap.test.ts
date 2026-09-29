@@ -221,7 +221,7 @@ describe("CuaDriverActionTap", () => {
       tree_markdown: '- [0] AXButton "Send"',
       window_id: 7,
       element_address:
-        "To act on an element, send this snapshot_id with the element_index that the tree in the result text shows.",
+        "To act on an element, send this pid, window_id and snapshot_id with the element_index that the tree in the result text shows.",
     });
   });
 });
