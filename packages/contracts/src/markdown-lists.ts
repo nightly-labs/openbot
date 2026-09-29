@@ -40,17 +40,28 @@ export function markdownListLineBreak(text: string, caret: number): MarkdownList
 
 /*
  * A fence inside a list item also ends with that item: a later line with less indent than the
- * fence starts a new item or leaves the list.
+ * item's text starts a new item or leaves the list. A fence counts as inside an item when it is on
+ * the item's line, or indented at least to the text of the last item.
  */
 function insideCodeFence(lines: string): boolean {
-  let open: { marks: string; indent: number } | null = null;
+  let open: { marks: string; itemIndent: number } | null = null;
+  let itemIndent: number | null = null;
   for (const line of lines.split("\n")) {
-    if (open && open.indent > 0 && line.trim() && line.length - line.trimStart().length < open.indent) open = null;
+    const indent = line.length - line.trimStart().length;
+    if (open && open.itemIndent > 0 && line.trim() && indent < open.itemIndent) open = null;
     const fence = CODE_FENCE.exec(line);
+    if (!open) {
+      const item = LIST_ITEM.exec(line);
+      if (item) itemIndent = item[0].length - (item[6]?.length ?? 0);
+      else if (line.trim() && itemIndent !== null && indent < itemIndent) itemIndent = null;
+    }
     if (!fence) continue;
     const [, lead = "", marks = "", rest = ""] = fence;
     if (open === null) {
-      if (!(marks[0] === "`" && rest.includes("`"))) open = { marks, indent: lead.length };
+      if (marks[0] === "`" && rest.includes("`")) continue;
+      // A lead longer than the indent holds a list marker: the fence is on the item's line.
+      const onItemLine = lead.length > indent ? lead.length : null;
+      open = { marks, itemIndent: onItemLine ?? (itemIndent !== null && indent >= itemIndent ? itemIndent : 0) };
     } else if (marks[0] === open.marks[0] && marks.length >= open.marks.length && !rest.trim()) {
       open = null;
     }

@@ -37,5 +37,6 @@ describe("markdown list line breaks", () => {
     expect(breakAtEnd("~~~\n```\n- milk")).toBeNull();
     expect(breakAtEnd("- item\n\n    ```\n    - literal")).toBeNull();
     expect(breakAtEnd("- ```\n  - literal")).toBeNull();
+    expect(breakAtEnd("  ```\n- milk")).toBeNull();
   });
 });
