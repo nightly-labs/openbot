@@ -32,6 +32,15 @@ message content, file content, or search queries to telemetry.
 Production builds of OpenBot desktop, the configured mobile app, and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 
+The production account service also sends OpenPanel an event when a paid plan or a hosted server
+changes: a Checkout starts or expires, a plan starts, changes, is cancelled or ends, a payment
+succeeds or fails, the Customer Portal opens, or a hosted server is set up, fails to set up, stops
+after no use, starts, changes its machine, stops at the end of its plan, is renewed or is deleted.
+Each event has your account ID and only fixed values: the action, the plan, the billing period, the
+currency, the amount that Stripe reports, the server size, the start reason and an error code. It has
+no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
+because the account service sends them and not your computer.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,
@@ -80,8 +89,8 @@ Mobile never sends scanned QR values, install-referrer URLs or route identifiers
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
-search queries, embedded-browser URLs or page titles, file names, local paths, commands, raw error
-messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
+search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
+error messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
 Website page views carry the five standard campaign tags `utm_source`, `utm_medium`, `utm_campaign`,
 `utm_content`, and `utm_term` when a visitor arrives through a campaign link. Each tag is sent only
 as a lowercase label of at most 64 characters made of letters, digits, dots, hyphens, and
@@ -122,6 +131,30 @@ expiry, and process exit discard unclaimed events. The oldest event is removed w
 full. Sign-out ends the old account's operation scopes; later signed-out activity can be associated
 with the next account that signs in. No anonymous mobile event is sent before that association.
 
+The local host also records how the agents are used:
+
+- **Websites.** When a page in the embedded browser reaches a new registrable domain, the host sends
+  that domain (for example `linkedin.com` for `www.linkedin.com`) and whether the user or an agent
+  opened it. It never sends the subdomain, path, query, fragment or page title. A subdomain under a
+  shared suffix is reduced to that suffix, so `user.github.io` is sent as `github.io`. IP addresses,
+  single-label names, `localhost`, and names with no public suffix (for example `.local`, `.lan`,
+  `.internal` or `.home.arpa`) are not sent.
+- **Tools.** When a turn completes, the host sends one count per kind of tool the agent used (for
+  example command, file change, web search, browser, or MCP), how many of those calls failed (Claude
+  does not report failed tool calls, so its count is 0), and
+  the plugin: the slug of an OpenBot catalog plugin, `builtin` for OpenBot's own tools, or `custom`.
+  The tool name is sent only for OpenBot's own tools and catalog plugins. The name, address and
+  command of a server the user added, the tool arguments and the tool results are not sent.
+- **Routine runs.** The host sends the outcome of a routine run, whether it was scheduled or manual,
+  and its schedule type (for example daily or weekly). The routine name and instruction are not
+  sent.
+- **Setup.** At most once a day, the host sends counts of agents, enabled routines, custom MCP
+  servers, local skills and community skills; the slugs of enabled catalog plugins and of curated
+  skills and agents; the providers in use; and whether Computer Use is enabled.
+- **Agent source.** Turn events say whether the agent came from a curated listing, a community
+  listing, or neither, and name only a curated listing. Marketplace events name only a curated
+  skill, agent or catalog plugin.
+
 Hosted Site analytics records only the operation, entry point, result, and bounded failure code. It
 does not contain the site's URL, hostname, title, source path, site ID, or content. A one-time
 backfill may update the email trait of an existing OpenPanel profile matched to a current account; it
@@ -161,6 +194,10 @@ The service stores:
   the account ID, the local agent ID and the unpublish time, so publishing the same agent again
   gives back the same link. Deleting the account removes them. Templates do not include
   workspace files, memories, conversations, or integration credentials.
+- billing records when the account starts a paid plan: the Stripe customer ID, and for
+  each subscription the Stripe subscription ID, plan, billing period, currency, price, status, period end,
+  and whether it ends at the period end. The service also keeps the ID, type and receive time of each
+  Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -169,6 +206,31 @@ the token to disk.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
+
+## Hosted servers
+
+Each account can buy hosted servers. A hosted server is a Linux
+OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
+France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
+team data, the same as your own computer would. The server stops 15 to 20 minutes after its last use and
+starts again when you connect, or a few minutes before its next scheduled routine run. When boat stops the sandbox, boat keeps a snapshot of its disk until
+the server starts again. Deleting the server
+deletes the sandbox.
+
+For each hosted server, the account service stores the owner, name, size and the size of a pending
+plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
+and reported state, a reason code when the server fails to start, the reason for its last start, the
+boat sandbox ID, a hash of the setup claim with its expiry and first-use times, the ID of the account
+session that the server signed in with, the time of its last use, the end of its boat stop timer, the time of
+its next scheduled routine run (not the routine or its instructions), and creation, update and deletion times. After a
+server is deleted, its record stays so that the service never loses track of a sandbox. It also
+stores the ID and receive time of each boat webhook delivery for 7 days. The account service does
+not receive the server's conversations, files or commands, and its boat key cannot read them.
+
+The account service gives each sandbox a name in boat, so that an operator can find a server in the
+boat dashboard: `openbot-`, the plan, your account email with each other character as `-`, and the
+first 8 characters of the server ID, such as `openbot-starter-ada-example-com-1a2b3c4d`. boat keeps
+the name with the sandbox.
 
 ## Central data retention
 
@@ -242,6 +304,18 @@ Live Activity updates that it cannot read; see [iPhone Live Activity](#iphone-li
 Cloudflare and the email provider can keep their own security, delivery, and network logs under
 their own policies. These provider logs are outside the OpenBot application database and its daily
 maintenance task.
+
+Paid server plans use Stripe. You enter card and billing details on Stripe's pages, not in OpenBot.
+Stripe sends the account service the subscription state, the plan, its price, the period, and the
+account and server IDs that the subscription names, never the card number. When you choose a plan
+for a new hosted server, the account service sends Stripe your account email and account ID (to
+make the Stripe customer), and the server ID, the plan, the billing period and the currency (to
+open Stripe Checkout, `checkout.stripe.com`). When you delete a hosted server, the account service
+tells Stripe to cancel its plan. When you manage billing,
+the account service sends Stripe your Stripe customer ID, and the subscription ID of the plan you
+change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Stripe keeps the
+customer, invoices and payment records under its own policy, also after the subscription ends.
+Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
 
 ## Data stored on the OpenBot computer
 
@@ -400,6 +474,9 @@ CLI retention policies still apply.
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
 stops the publish when a text field looks like a secret. Workspace files and memories are not sent.
+An owner or admin of a server can also publish, update or unpublish an agent of that server from the
+browser client. The host sends the template content and the agent's avatar to that browser for the
+preview, and publishes with the account signed in on the host, so that account is the creator.
 
 Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 

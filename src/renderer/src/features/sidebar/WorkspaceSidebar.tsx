@@ -48,7 +48,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
   const { activeTurns, queues, failedTurns, pendingPrompts, pendingApprovals } = useTurns();
-  const { unreadReplies, recentReplies } = useConversation();
+  const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember } = useNavigation();
@@ -74,18 +74,29 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     channels.supported() ? channels.state.channels.filter((channel) => !channel.archived) : [],
   );
 
-  const sidebarAgentStates = createMemo(() =>
-    computeSidebarAgentStates({
+  /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
+   * thread stays out of "Needs you", because selecting the row cannot answer it. */
+  const sidebarAgentStates = createMemo(() => {
+    const agentThreads = new Map(agentList().map((agent) => [agent.id, agent.threadId]));
+    const inAgentThread = (agentId: string, threadId: string | undefined) =>
+      threadId !== undefined && agentThreads.get(agentId) === threadId;
+    return computeSidebarAgentStates({
       agentIds: agentList().map((agent) => agent.id),
       activeTurns: activeTurns(),
       queues: queues(),
       unreadReplies: unreadReplies(),
       recentReplies: recentReplies(),
-      pendingPrompts: pendingPrompts(),
-      pendingApprovals: pendingApprovals(),
+      pendingPrompts: Object.fromEntries(
+        Object.entries(pendingPrompts()).filter(([agentId, event]) =>
+          inAgentThread(agentId, event?.type === "prompt" ? event.threadId : event?.request.threadId),
+        ),
+      ),
+      pendingApprovals: Object.fromEntries(
+        Object.entries(pendingApprovals()).filter(([agentId, approval]) => inAgentThread(agentId, approval?.threadId)),
+      ),
       failedTurns: failedTurns(),
-    }),
-  );
+    });
+  });
 
   /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
    * shared, and a routine mark only replaces the badge for that same agent. */
@@ -112,6 +123,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       showingArchivedChannels={channels.state.archived}
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}
+      onMarkAllRead={() => {
+        void markAllAgentMessagesRead();
+        void channels.markAllRead();
+      }}
+      hasUnread={agentList().some((agent) => (unreadReplies()[agent.id] ?? 0) > 0) || channels.hasUnread()}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();
@@ -125,6 +141,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               onViewChange: layout.setServerView,
               onSelect: serverActions.select,
               onAdd: serverActions.add,
+              addCreatesServer: serverActions.addCreatesServer(),
               ...serverActions.callbacks,
             }
           : undefined

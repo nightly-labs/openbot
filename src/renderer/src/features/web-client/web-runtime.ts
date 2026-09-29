@@ -99,7 +99,7 @@ import {
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
 import type { ServerAdminPort } from "../servers/servers-port";
-import { createWebHostConnections, type WebHostConnections } from "./web-host-connections";
+import { createWebHostConnections, type WebHostConnections, type WebHostNotice } from "./web-host-connections";
 import {
   acquireOpenedWebHostLock,
   acquireWebHostLock,
@@ -153,6 +153,8 @@ export interface WebWorkspaceRuntime {
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
+  /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
+  conversationReads(): Promise<Record<string, ConversationReadState>>;
   send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
   stop(agentId: string, turnId: string): Promise<void>;
   /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
@@ -199,6 +201,8 @@ export interface WebRuntimeEvents {
   hostState?(hostId: string, state: WebHostState): void;
   /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
+  /** An event of a host this tab has not opened that a notification can show. */
+  hostNotice?(hostId: string, event: WebHostNotice, agents: AgentSummary[]): void;
 }
 
 /** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
@@ -288,6 +292,13 @@ export function createWebWorkspaceRuntime(
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
         onSessionRevoked: () => events.hostSessionRevoked?.(),
+        // Without a listener, the status connections read no agent list.
+        ...(events.hostNotice
+          ? {
+              onNotice: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) =>
+                events.hostNotice?.(hostId, event, agents),
+            }
+          : {}),
       })
     : undefined;
   // Another tab asks for the host that this tab has open: it stays here.
@@ -663,6 +674,15 @@ export function createWebWorkspaceRuntime(
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error("The host returned an invalid read state.");
       return value;
+    },
+    async conversationReads() {
+      const value = await request("GET", TEAM_API_ROUTES.agents.conversationReads);
+      const reads: Record<string, ConversationReadState> = {};
+      if (!isDynamicRecord(value)) return reads;
+      for (const [agentId, state] of Object.entries(value)) {
+        if (isConversationReadState(state)) reads[agentId] = state;
+      }
+      return reads;
     },
     async react(input) {
       await request("POST", TEAM_API_ROUTES.agent.reactions(input.agentId), {

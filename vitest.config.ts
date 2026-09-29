@@ -16,6 +16,12 @@ export default defineConfig({
     // Every spy, global patch and fake timer a test file installs is undone
     // after each test, in both projects, so nothing depends on file order.
     restoreMocks: true,
+    // A `vmThreads` worker keeps each file's module graph until it is recycled, and vitest recycles
+    // it only when its heap passes this limit. The default is system memory / workers: 3.5 GB on
+    // the 7 GB macOS release runner with two workers, above the ~1.75 GB heap that V8 gives a
+    // worker there. The worker then ran out of heap before it was recycled ("Worker exited
+    // unexpectedly") in the unsharded release run.
+    vmMemoryLimit: "1GiB",
     // Only `shard()` is overridden, so a local run orders files exactly as before. See the
     // sequencer for why `--shard` alone splits this suite badly.
     sequence: { sequencer: BalancedSequencer },

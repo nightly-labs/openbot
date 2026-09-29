@@ -1,0 +1,78 @@
+#!/bin/bash
+# openbot.service runs this as the sandbox user. It waits for the env file that openbot-hosted-env
+# writes, starts a D-Bus session with an unlocked keyring so that Electron `safeStorage` can keep
+# the account session, and runs OpenBot on a virtual display.
+set -euo pipefail
+umask 077
+state="$HOME/.config/openbot-hosted"
+
+if [ "${1:-}" != --in-session ]; then
+  # The setup script starts after the sandbox is ready, so on the first boot this runs first.
+  for _ in $(seq 1 300); do
+    [ -s "$state/env" ] && break
+    sleep 2
+  done
+  [ -s "$state/env" ] || { echo "The hosted server env file is missing." >&2; exit 1; }
+  exec dbus-run-session -- "$0" --in-session
+fi
+
+# Read only the expected keys. The file is data, not a script.
+while IFS='=' read -r key value; do
+  case $key in
+    OPENBOT_HOSTED_HOST_ID | OPENBOT_HOSTED_CLAIM) export "$key=$value" ;;
+  esac
+done <"$state/env"
+while IFS='=' read -r key value; do
+  [ "$key" = OPENBOT_AUTH_API_URL ] && export "$key=$value"
+done </opt/OpenBot/hosted/openbot.env
+export OPENBOT_HOSTED_SERVER=1
+
+# Each server makes its own keyring password on its first start, so no two servers share one.
+# The password only lets the daemon open the keyring without a person; the file is 0600.
+# A keyring with no password file is not new: a new password cannot open it, so the service stops
+# and systemd tries again after the home folder is back.
+if [ ! -s "$state/keyring-password" ] && [ -e /srv/openbot-hosted/keyrings/login.keyring ]; then
+  echo "The keyring exists, but its password file is missing." >&2
+  exit 1
+fi
+if [ ! -s "$state/keyring-password" ]; then
+  temporary=$(mktemp "$state/keyring-password.XXXXXX")
+  head -c 32 /dev/urandom | base64 | tr -d '\n' >"$temporary"
+  mv -f "$temporary" "$state/keyring-password"
+fi
+# The keyring files stay in /srv/openbot-hosted, which provision.sh makes for this user. They are
+# not in ~/.local/share/keyrings: the boat image has a `default` keyring there with a password that
+# this server does not know, and a snapshot restore resets that folder after this service starts.
+# They are also not in /home: after a resume, boat serves /home from a slow FUSE mount until the
+# disk is restored. There gnome-keyring does not see the new link count after its backup link, so
+# each keyring write added links until the mount went away, 16,000 to 31,000 `*.temp-*` files. The
+# next resume read that folder through the mount, and the start took 25 s longer. boat keeps
+# changes in /srv and restores them before this service starts. libsecret stores in the `default`
+# collection, so the alias points to the `login` keyring that the daemon unlocks.
+export XDG_DATA_HOME=/srv/openbot-hosted
+keyrings="$XDG_DATA_HOME/keyrings"
+mkdir -p "$keyrings"
+printf login >"$keyrings/default"
+# An assignment first, so `set -e` stops the start when the daemon fails. `eval "$(…)"` ignores it.
+unlocked=$(gnome-keyring-daemon --unlock --components=secrets <"$state/keyring-password")
+eval "$unlocked"
+started=$(gnome-keyring-daemon --start --components=secrets)
+eval "$started"
+unset XDG_DATA_HOME
+export GNOME_KEYRING_CONTROL
+
+# If boat ever serves /srv from the FUSE mount too, remove those links when the disk is back. A
+# link that is not to the current keyring file is not the backup of a write that is in progress.
+(
+  for _ in $(seq 1 300); do
+    case $(findmnt -n -o FSTYPE -T "$keyrings" || true) in fuse*) sleep 2 ;; *) break ;; esac
+  done
+  sleep 10
+  for keyring in "$keyrings"/*.keyring; do
+    [ -e "$keyring" ] || continue
+    find "$keyrings" -maxdepth 1 -name "${keyring##*/}.temp-*" ! -samefile "$keyring" -delete
+  done
+) &
+
+exec xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
+  /opt/OpenBot/app/openbot --password-store=gnome-libsecret

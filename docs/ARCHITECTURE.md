@@ -7,7 +7,7 @@ a self-hosted Signal service, and shared packages.
 
 ```text
 apps/
-  auth-api/          Public web and /app browser entry, accounts, memberships, and connection tickets
+  auth-api/          Public web and /app browser entry, accounts, memberships, connection tickets, and billing
   mobile/            Expo React Native client for remote team hosts
   site-router/       Cloudflare Worker that serves published sites from private R2 storage
 packages/
@@ -108,7 +108,10 @@ the host over `skills-admin-v1`, `agent-install-v1`, `agent-update-v1`, and `mcp
 prompt add a line to the agent's draft, as on desktop. A shared agent page also links
 `/app?agent=<id>`: `WebApp` reads the id once, removes the query, and keeps it through sign-in;
 `AgentTemplateInstall` then shows the preview, and the host adds the agent over `agent-install-v1`.
-A browser publishes nothing; publishing stays on the desktop. An agent that the host added from a
+A browser submits nothing to the marketplace. It can publish a host agent's share link over
+`agent-publish-v1`, in `ConversationRuntime.admin.agentTemplates`: the host builds the template,
+checks it for secrets and publishes it with the account signed in on the host; the browser draws only
+the share card from the preview. An agent that the host added from a
 listing gets Update when the host serves `agent-update-v1`; the host downloads the current version.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
 the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
@@ -149,6 +152,8 @@ the `media-attachments` capability; released protocol adapters keep their existi
 - `~/.codex`, `~/.claude`, `~/.grok`, and `~/.gemini` are provider-owned login and resume state. They are not OpenBot
   conversation storage.
 - D1 is the source of truth for central accounts, remote membership, invitations, and logical sessions.
+- Stripe is the source of truth for paid plans. D1 `billing_subscriptions` is a copy that the Stripe
+  webhook keeps current; see [Billing](#billing).
 - A local team host owns conversations, files, agents, and the local member projection used by Team API.
 - `openbot-approval-automation-v1.json` holds Turbo mode and the agents granted "Always allow". It
   belongs to the computer that runs the agent and never crosses the Team API, whose released
@@ -1509,6 +1514,49 @@ page links `/app` with the four invitation fields, and a plugin page links `/app
 browser client removes these fields after it reads them and opens the join dialog or the marketplace
 listing. It never joins or installs without a press.
 
+## Billing
+
+Billing is per server. One account can pay for several servers; each server has its own Stripe
+subscription. The Account Worker (`apps/auth-api/src/server/billing-service.ts`) talks to the Stripe
+REST API with `fetch`; there is no Stripe SDK. The plan catalog in `packages/contracts/src/billing.ts`
+holds only the plan IDs, storage and lookup keys. The amounts are six Stripe Prices with the lookup
+keys `openbot_{plan}_{interval}`. `bun run api:stripe:bootstrap` (`scripts/stripe-bootstrap.ts`)
+creates them and the Customer Portal settings.
+
+- The add server dialog starts a plan. The hosting service
+  (`apps/auth-api/src/server/hosted-billing.ts`) makes the Stripe customer before the Checkout, so
+  two open Checkouts use one customer. The Checkout sets the subscription metadata
+  `openbot_user_id` and `openbot_server_id` (`BILLING_METADATA`). The billing service calls the
+  `onSubscriptionSynced` hook after each subscription sync; the hosting side uses it to provision,
+  stop and resume servers, so billing does not know about boat. See
+  [hosted servers](hosted-servers.md#lifecycle). The webhook links a new Stripe customer to the
+  account from `openbot_user_id`. It never moves a known
+  customer to another account, and it skips a subscription that names no account.
+- Desktop Settings → Billing and the web Billing dialog render `@openbot/ui/features/billing`: one
+  row for each open plan, with the server name, the plan, its price, and a menu to change or cancel
+  it. The price is the list price of the Stripe Price in the subscription's currency (from
+  `currency_options` when that is not the Price's base currency), before discounts and tax. The
+  webhook stores it with the subscription. The
+  account button opens the Customer Portal for the payment method and invoices.
+- Desktop calls the `billing` IPC group; the main process gets a Customer Portal URL from the Worker,
+  checks that it is a `billing.stripe.com` page, and opens it with `shell.openExternal`. The IPC takes
+  no URL. The web client does the same check before `location.assign`. Checkout URLs get the same
+  check for `checkout.stripe.com` (`isStripeCheckoutUrl`).
+- The change and cancel actions open the Portal flow of one subscription. The Worker first checks
+  that the subscription belongs to the account.
+- The server name comes only from a `remote_hosts` row that the same account owns. A plan whose
+  server was removed stays in the list, because Stripe bills it until the account cancels it.
+- The webhook (`/v1/stripe/webhook`) checks the Stripe signature, records the event ID to ignore a
+  repeat, and gets the subscription from Stripe again before it writes the D1 row. So the order of
+  events has no effect.
+- Without `STRIPE_SECRET_KEY` billing is off: the state is `available: false`, and the Portal route
+  and the webhook answer 503.
+
+Rule: plan limits read `getServerEntitlement` (`apps/auth-api/src/server/billing-entitlement.ts`)
+only. It decides which statuses and grace periods give a server a plan, and it counts a plan only
+for a server that the paying account owns. Do not read `billing_subscriptions` or a Stripe status in
+another place.
+
 ## macOS Host Manager
 
 `scripts/macos-tenant-setup.swift` is a separate administrator command for new Standard accounts.
@@ -1574,6 +1622,18 @@ URL with GET to replace the document without replaying a form POST. Failure reta
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+
+## Hosted servers
+
+A hosted server is one [boat](https://boat.dev) sandbox for one account. It runs the Linux
+OpenBot build under Xvfb and is a normal Remote host after its first start. The account Worker
+owns the sandbox lifecycle: it creates, resumes and deletes sandboxes, and D1 keeps the desired
+and observed state. A server reports each minute while it is in use, and the Worker stops it after
+15 minutes with no report. boat also stops each sandbox at the end of a 2-hour lease that activity
+extends. When boat stops a server in use, the Worker resumes it, and clients ask the Worker to
+start a stopped server when a connection fails. No message
+waits in the Worker while a server is stopped; the client keeps it and connects again. The Worker's boat key cannot read files or run commands in a
+sandbox. See [hosted servers](hosted-servers.md) for the flow, the configuration and the template.
 
 ## Shared UI package
 

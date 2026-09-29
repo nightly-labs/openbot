@@ -60,6 +60,12 @@ SITE_REPORT_HASH_SECRET=${developmentSecret()}
 REMOTE_AUTH_WEBHOOK_SECRET=${developmentSecret()}
 REMOTE_TICKET_PRIVATE_JWK=${tickets.privateJwk}
 REMOTE_TICKET_PUBLIC_JWKS=${tickets.publicJwks}
+
+# The Stripe sandbox keys come from the encrypted \`.env.shared\`. A value here overrides it, and an
+# empty one turns billing off, so these stay commented. Put the signing secret that
+# \`stripe listen --forward-to localhost:<port>/v1/stripe/webhook\` prints in STRIPE_WEBHOOK_SECRET.
+# STRIPE_SECRET_KEY=sk_test_...
+# STRIPE_WEBHOOK_SECRET=whsec_...
 `;
 }
 

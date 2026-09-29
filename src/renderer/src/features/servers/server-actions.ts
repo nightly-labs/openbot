@@ -16,7 +16,15 @@ export function useServerActions() {
   const platform = usePlatform();
   const { t, errorMessage } = useText();
   const { openUsage } = useUsage();
-  const { servers, setServerMuted, setServerNotificationLevel, setJoinServerOpen } = useServers();
+  const {
+    servers,
+    setServerMuted,
+    setServerNotificationLevel,
+    setJoinServerOpen,
+    setAddServerOpen,
+    hostedServersAvailable,
+    refreshHostedServersAvailable,
+  } = useServers();
   const { selectServer } = useServerSelection();
   const { openServerSettings } = useServerSettings();
 
@@ -36,8 +44,16 @@ export function useServerActions() {
     });
   }
 
+  /**
+   * Opens the hosted server plans when the account can create a hosted server, otherwise the invite
+   * dialog. It uses the last answer, so the click does not wait for the network; the read after it is
+   * for the next click.
+   */
   function add(): void {
-    if (!platform.landingPreview) setJoinServerOpen(true);
+    if (platform.landingPreview) return;
+    if (hostedServersAvailable()) setAddServerOpen(true);
+    else setJoinServerOpen(true);
+    void refreshHostedServersAvailable();
   }
 
   const callbacks: Required<ServerActionCallbacks> = {
@@ -47,5 +63,5 @@ export function useServerActions() {
     onOpenSettings: openServerSettings,
   };
 
-  return { orderedServers, select, add, callbacks };
+  return { orderedServers, select, add, addCreatesServer: hostedServersAvailable, callbacks };
 }

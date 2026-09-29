@@ -27,6 +27,19 @@ export function playCompletionSoundForAgentEvent(
   void playCompletionSound();
 }
 
+/**
+ * Starts the audio context from a user action. Safari starts a context only from one, a turn can end
+ * long after the last action, and iOS can interrupt a running context.
+ */
+export function unlockCompletionSound(): void {
+  try {
+    completionAudioContext ??= new AudioContext();
+    if (completionAudioContext.state !== "running") void completionAudioContext.resume().catch(() => undefined);
+  } catch {
+    completionAudioContext = undefined;
+  }
+}
+
 async function playCompletionSound(): Promise<void> {
   try {
     completionAudioContext ??= new AudioContext();

@@ -5,11 +5,22 @@ import {
   type ConversationMessage,
   hostedSiteConversationEventItemType,
   hostedSiteConversationEventText,
+  type McpServerConfig,
+  routineRunConversationEventItemType,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { OpenPanelBase } from "@openpanel/web";
 import { describe, expect, it, vi } from "vitest";
-import { HostAnalytics, type HostOpenPanelClient, sanitizeHostEvent } from "./analytics";
+import {
+  type AnalyticsInventory,
+  type AnalyticsInventoryDayStore,
+  analyticsDomain,
+  HostAnalytics,
+  type HostAnalyticsOptions,
+  type HostOpenPanelClient,
+  sanitizeHostEvent,
+} from "./analytics";
+import { catalogPluginSlug, loadCatalogPluginServers } from "./analytics-plugin-catalog";
 
 const AGENT: AgentSummary = {
   id: "chief",
@@ -81,7 +92,7 @@ describe("host analytics", () => {
     );
 
     expect(client.setGlobalProperties).toHaveBeenCalledWith(
-      expect.objectContaining({ event_schema_version: 5, surface: "desktop_host" }),
+      expect.objectContaining({ event_schema_version: 6, surface: "desktop_host" }),
     );
 
     analytics.handleAgentEvent({
@@ -107,6 +118,7 @@ describe("host analytics", () => {
       provider: "codex",
       model: "gpt-5.6-luna",
       reasoning_effort: "medium",
+      agent_source: "custom",
       origin: "user",
       profileId: "owner-account",
     });
@@ -836,5 +848,251 @@ describe("host analytics", () => {
     analytics.setTrackingEnabled(false);
 
     expect(client.clear).toHaveBeenCalledOnce();
+  });
+});
+
+const OWNER = { id: "owner-account", email: "owner@example.com" };
+
+function usageAnalytics(options: Partial<HostAnalyticsOptions> = {}) {
+  const client = fakeClient();
+  const analytics = new HostAnalytics(
+    {
+      enabled: true,
+      appVersion: "1.2.3",
+      platform: "darwin",
+      resolveOwner: () => OWNER,
+      resolveAgent: () => AGENT,
+      ...options,
+    },
+    () => client,
+  );
+  const tracked = (name: string) =>
+    vi
+      .mocked(client.track)
+      .mock.calls.filter(([event]) => event === name)
+      .map(([, properties]) => properties);
+  return { analytics, client, tracked };
+}
+
+function routineRunMessage(id: string, status: "running" | "succeeded", runId: string): ConversationMessage {
+  return {
+    id,
+    author: "system",
+    source: "system",
+    text: "Private routine name",
+    createdAt: "2026-09-01T10:00:00.000Z",
+    status: "completed",
+    itemType: routineRunConversationEventItemType(status, "routine-1", runId),
+  };
+}
+
+function inventory(): AnalyticsInventory {
+  return {
+    agentCount: 2,
+    enabledRoutineCount: 1,
+    customMcpServerCount: 1,
+    plugins: ["github", "github", "Private Server"],
+    curatedSkills: ["pdf"],
+    curatedAgents: [],
+    localSkillCount: 3,
+    communitySkillCount: 0,
+    providers: ["codex", "private-provider"],
+    computerUseEnabled: false,
+  };
+}
+
+function dayStore(stored: string | "missing" | "malformed"): AnalyticsInventoryDayStore & { written: string[] } {
+  const written: string[] = [];
+  return {
+    written,
+    read: async () => written.at(-1) ?? stored,
+    write: async (day) => {
+      written.push(day);
+    },
+  };
+}
+
+describe("usage analytics", () => {
+  it("sends the registrable domain of a page and never a private or local host", () => {
+    expect(analyticsDomain("www.LinkedIn.com.")).toBe("linkedin.com");
+    expect(analyticsDomain("a.b.example.co.uk")).toBe("example.co.uk");
+    expect(analyticsDomain("private-user.github.io")).toBe("github.io");
+    for (const host of [
+      "localhost",
+      "intranet",
+      "192.168.1.10",
+      "[::1]",
+      "printer.local",
+      "nas.home.arpa",
+      "wiki.corp",
+    ]) {
+      expect(analyticsDomain(host)).toBeUndefined();
+    }
+  });
+
+  it("names a server as a catalog plugin only when its address or command matches the listing", async () => {
+    const servers = await loadCatalogPluginServers("resources/plugin-catalog");
+    const config = (fields: Partial<McpServerConfig>): McpServerConfig => ({
+      id: "server",
+      name: "github",
+      transport: "http",
+      enabled: true,
+      command: "",
+      args: [],
+      env: [],
+      envPassthrough: [],
+      workingDirectory: "",
+      url: "https://api.githubcopilot.com/mcp/",
+      headers: [],
+      ...fields,
+    });
+    expect(catalogPluginSlug(config({}), servers, "/home/user")).toBe("github");
+    expect(catalogPluginSlug(config({ url: "https://mcp.private.example/github" }), servers, "/home/user")).toBeNull();
+    expect(catalogPluginSlug(config({ name: "composio", url: "https://mcp.composio.dev/abc" }), servers, "/home")).toBe(
+      "composio",
+    );
+    const paper = { name: "paper", transport: "stdio" as const, url: "", args: ["mcp"] };
+    expect(catalogPluginSlug(config({ ...paper, command: "/home/user/.paper/bin/paper" }), servers, "/home/user")).toBe(
+      "paper",
+    );
+    expect(catalogPluginSlug(config({ ...paper, command: "/opt/private/paper" }), servers, "/home/user")).toBeNull();
+  });
+
+  it("reports a site visit once per tab and domain with its actor", () => {
+    const { analytics, tracked } = usageAnalytics();
+    analytics.handleSiteVisit({ tabId: "tab-1", hostname: "mail.google.com", actor: "user", agentId: null });
+    analytics.handleSiteVisit({ tabId: "tab-1", hostname: "docs.google.com", actor: "user", agentId: null });
+    analytics.handleSiteVisit({ tabId: "tab-1", hostname: "intranet", actor: "agent", agentId: AGENT.id });
+    analytics.handleSiteVisit({ tabId: "tab-1", hostname: "private.github.io", actor: "agent", agentId: AGENT.id });
+
+    expect(tracked("system_site_visited")).toEqual([
+      { domain: "google.com", actor: "user", profileId: OWNER.id },
+      expect.objectContaining({ domain: "github.io", actor: "agent", provider: "codex", agent_source: "custom" }),
+    ]);
+  });
+
+  it("names catalog plugins and built-in tools, and only counts a custom server", () => {
+    const { analytics, tracked } = usageAnalytics({
+      resolveMcpServer: (name) => {
+        if (name === "linear") return { slug: "linear" };
+        return name === "github" || name === "computer_use" ? { slug: null } : null;
+      },
+    });
+    const turn = { agentId: AGENT.id, turnId: "turn-tools" };
+    analytics.handleAgentEvent({ type: "turn-started", ...turn, threadId: "thread", origin: "user" });
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "linear", tool: "create_issue", failed: false });
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "linear", tool: "create_issue", failed: true });
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "openbot_browser", tool: "navigate", failed: false });
+    // A server the user named `github` that the catalog does not recognize is the user's own.
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "github", tool: "private_lookup", failed: false });
+    // A server the user named `computer use` reports under the built-in name, and stays custom.
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "computer_use", tool: "private_click", failed: false });
+    analytics.handleToolUsage({ ...turn, kind: "command", failed: false });
+    expect(tracked("system_tool_used")).toEqual([]);
+    analytics.handleAgentEvent({ type: "turn-completed", ...turn, threadId: "thread", status: "completed" });
+
+    const rows = tracked("system_tool_used");
+    expect(rows).toEqual([
+      expect.objectContaining({
+        tool_kind: "mcp",
+        plugin: "linear",
+        tool: "create_issue",
+        call_count: 2,
+        failed_count: 1,
+      }),
+      expect.objectContaining({ tool_kind: "browser", plugin: "builtin", tool: "navigate", call_count: 1 }),
+      expect.objectContaining({ tool_kind: "mcp", plugin: "custom", call_count: 2 }),
+      expect.objectContaining({ tool_kind: "command", call_count: 1, failed_count: 0 }),
+    ]);
+    expect(JSON.stringify(rows)).not.toContain("private_");
+    expect(JSON.stringify(rows)).not.toContain("github");
+  });
+
+  it("drops buffered tool use when the user turns analytics off", () => {
+    const { analytics, tracked } = usageAnalytics();
+    const turn = { agentId: AGENT.id, turnId: "turn-opt-out" };
+    analytics.handleAgentEvent({ type: "turn-started", ...turn, threadId: "thread", origin: "user" });
+    analytics.handleToolUsage({ ...turn, kind: "command", failed: false });
+    analytics.setTrackingEnabled(false);
+    analytics.setTrackingEnabled(true);
+    analytics.handleAgentEvent({ type: "turn-completed", ...turn, threadId: "thread", status: "completed" });
+
+    expect(tracked("system_tool_used")).toEqual([]);
+  });
+
+  it("reports a routine run that ran in this process and never a replayed one or its name", () => {
+    const { analytics, tracked } = usageAnalytics({
+      resolveRoutineRun: () => ({ runKind: "scheduled", triggerType: "daily" }),
+    });
+    const conversation = (messages: ConversationMessage[]) =>
+      analytics.handleAgentEvent({
+        type: "conversation",
+        snapshot: { agentId: AGENT.id, threadId: "thread", activeTurnId: null, revision: 1, messages },
+      });
+    const replayed = [routineRunMessage("m1", "running", "run-old"), routineRunMessage("m2", "succeeded", "run-old")];
+    conversation(replayed);
+    conversation([...replayed, routineRunMessage("m3", "running", "run-live")]);
+    conversation([
+      ...replayed,
+      routineRunMessage("m3", "running", "run-live"),
+      routineRunMessage("m4", "succeeded", "run-live"),
+    ]);
+    conversation([
+      ...replayed,
+      routineRunMessage("m3", "running", "run-live"),
+      routineRunMessage("m4", "succeeded", "run-live"),
+    ]);
+
+    const runs = tracked("system_routine_run");
+    expect(runs).toEqual([
+      expect.objectContaining({ status: "succeeded", run_kind: "scheduled", trigger_type: "daily", provider: "codex" }),
+    ]);
+    expect(JSON.stringify(runs)).not.toContain("Private routine name");
+  });
+
+  it("sends the inventory once per local day with only catalog names", async () => {
+    const store = dayStore("missing");
+    const resolveInventory = vi.fn(async () => inventory());
+    const { analytics, tracked } = usageAnalytics({ resolveInventory, inventoryDay: store });
+    analytics.flushPending();
+    await vi.waitFor(() => expect(tracked("system_inventory")).toHaveLength(1));
+    analytics.flushPending();
+    analytics.handleAgentEvent({ type: "turn-started", agentId: AGENT.id, threadId: "thread", turnId: "turn" });
+
+    expect(resolveInventory).toHaveBeenCalledOnce();
+    expect(store.written).toHaveLength(1);
+    expect(tracked("system_inventory")).toEqual([
+      expect.objectContaining({ plugins: ["github"], curated_skills: ["pdf"], providers: ["codex"], agent_count: 2 }),
+    ]);
+  });
+
+  it("treats a malformed inventory day as sent today, and repairs it for the next day", async () => {
+    const store = dayStore("malformed");
+    const resolveInventory = vi.fn(async () => inventory());
+    const { analytics } = usageAnalytics({ resolveInventory, inventoryDay: store });
+    analytics.flushPending();
+    await vi.waitFor(() => expect(store.written).toHaveLength(1));
+    analytics.flushPending();
+
+    expect(resolveInventory).not.toHaveBeenCalled();
+    expect(store.written).toHaveLength(1);
+  });
+
+  it("does not send the inventory when the user turns analytics off during the check", async () => {
+    const store = dayStore("missing");
+    const { analytics, tracked } = usageAnalytics({
+      resolveInventory: async () => inventory(),
+      inventoryDay: {
+        ...store,
+        write: async (day) => {
+          analytics.setTrackingEnabled(false);
+          await store.write(day);
+        },
+      },
+    });
+    analytics.flushPending();
+    await vi.waitFor(() => expect(store.written).toHaveLength(1));
+
+    expect(tracked("system_inventory")).toEqual([]);
   });
 });

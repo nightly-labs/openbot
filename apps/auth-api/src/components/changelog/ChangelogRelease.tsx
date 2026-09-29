@@ -20,6 +20,8 @@ function groupLabel(group: ChangelogGroup): string {
 
 export interface ChangelogReleaseProps {
   release: Release;
+  /** The app the release is of, such as "OpenBot". */
+  product: string;
   latest: boolean;
 }
 
@@ -53,7 +55,7 @@ export function ChangelogRelease(props: ChangelogReleaseProps) {
         </div>
         <h2 class="changelog-release-title" id={titleId()}>
           <a class="changelog-release-anchor" href={`#${props.release.anchor}`}>
-            OpenBot <span class="changelog-release-version">{props.release.version}</span>
+            {props.product} <span class="changelog-release-version">{props.release.version}</span>
           </a>
         </h2>
       </header>

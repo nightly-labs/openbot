@@ -33,7 +33,13 @@ import type { MailboxSync } from "./mailbox-sync";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import { isUsageLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
-import { isNonActionableCodexWarning, toolProgressText, toThreadItem } from "./thread-items";
+import {
+  isNonActionableCodexWarning,
+  type ToolUsageSignal,
+  toolProgressText,
+  toolUsage,
+  toThreadItem,
+} from "./thread-items";
 import { collectProviderUsage } from "./usage-collection";
 
 export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTarget {
@@ -57,6 +63,8 @@ export interface TurnHooks {
   scheduleDrain(agentId: string): void;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
+  /** A finished tool step, for product analytics only. It never reaches a renderer or a remote client. */
+  emitToolUsage(usage: ToolUsageSignal): void;
 }
 
 export interface TurnLifecycleOptions {
@@ -494,6 +502,8 @@ export class TurnLifecycle {
   }
 
   #applyItem(agentId: string, threadId: string, turnId: string, item: ThreadItem, completed: boolean): void {
+    const usage = completed ? toolUsage(item) : null;
+    if (usage) this.#hooks.emitToolUsage({ ...usage, agentId, turnId });
     if (this.#images.handleItem(agentId, threadId, turnId, item, completed)) return;
     const toolProgress = toolProgressText(item, completed);
     if (toolProgress) {

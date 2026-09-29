@@ -14,6 +14,8 @@ export function remoteServerSummaries(
   servers: readonly StoredRemoteServerView[],
   activeServerId: string,
   statusFor: (serverId: string) => RemoteServerConnectionStatus,
+  /** The member limit of this computer's own host, when the account server lists it. */
+  localMemberLimit: number | null = null,
 ): ServerSummary[] {
   return [
     // Always present and always reachable: it is this computer. It has no host to be incompatible
@@ -32,6 +34,7 @@ export function remoteServerSummaries(
       logoUrl: null,
       role: null,
       active: activeServerId === LOCAL_SERVER_ID,
+      ...(localMemberLimit === null ? {} : { memberLimit: localMemberLimit }),
       compatibility: null,
       issue: null,
     },
@@ -52,6 +55,7 @@ export function remoteServerSummaries(
         logoUrl: server.logoVersion ? remoteServerLogoUrl(server.id, server.logoVersion) : null,
         role: server.role,
         active: activeServerId === server.id,
+        ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
         compatibility: status.compatibility,
         issue: status.issue,
         connectionSequence: status.connectionSequence,

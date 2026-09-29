@@ -26,6 +26,7 @@ import {
   type RemoteWorkspacePreferences,
   readAgentAnalytics,
 } from "@openbot/team-client";
+import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { updateHostIdentity } from "@openbot/team-client/team-admin-requests";
@@ -265,6 +266,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             publicKey: previous?.publicKey ?? host.devicePublicKey,
             membershipId: host.membershipId,
             role: host.role,
+            ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
           };
         });
       });
@@ -511,11 +513,56 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     if (handle) connections.current.set(hostId, handle);
     else connections.current.delete(hostId);
   }, []);
-  const handleConnectionStatus = useCallback((hostId: string, status: RemoteRecoveryStatus, failure: string | null) => {
-    setServers((current) =>
-      current.map((server) => (server.id === hostId ? applyServerRecovery(server, status, failure) : server)),
-    );
-  }, []);
+  const wakeHostedServer = useMemo(
+    () =>
+      createHostedServerWake((hostId) =>
+        fetch(new URL(`/v2/hosting/servers/${encodeURIComponent(hostId)}/wake`, session.apiUrl).toString(), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.sessionToken}` },
+        }),
+      ),
+    [session.apiUrl, session.sessionToken],
+  );
+  const foregroundRef = useRef(foreground);
+  foregroundRef.current = foreground;
+  const wakeReconnect = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(wakeReconnect.current), []);
+  // A hosted server that stopped for no use starts again only for use: the selected server, with the
+  // app in the foreground. It connects again when the account server says that it starts.
+  const wakeSelectedServer = useCallback(
+    (hostId: string) => {
+      if (!foregroundRef.current || hostId !== activeServerIdRef.current) return;
+      void wakeHostedServer(hostId).then((waking) => {
+        if (!waking || hostId !== activeServerIdRef.current) return;
+        clearTimeout(wakeReconnect.current);
+        wakeReconnect.current = setTimeout(() => connections.current.get(hostId)?.refresh(), WAKE_RECONNECT_DELAY_MS);
+      });
+    },
+    [wakeHostedServer],
+  );
+  /** The last failed attempt of each server that asked for a wake. */
+  const wakeAttempts = useRef(new Map<string, number>());
+  const handleConnectionStatus = useCallback(
+    (hostId: string, status: RemoteRecoveryStatus, failure: string | null) => {
+      setServers((current) =>
+        current.map((server) => (server.id === hostId ? applyServerRecovery(server, status, failure) : server)),
+      );
+      // The status repeats each second while it waits, so each failed attempt asks once.
+      if (status.phase === "online") wakeAttempts.current.delete(hostId);
+      if (status.phase !== "waiting" && status.phase !== "cooldown") return;
+      if (wakeAttempts.current.get(hostId) === status.attempt) return;
+      wakeAttempts.current.set(hostId, status.attempt);
+      wakeSelectedServer(hostId);
+    },
+    [wakeSelectedServer],
+  );
+  // The next retry of an offline server can be two minutes away, so a server starts when it is selected.
+  useEffect(() => {
+    if (!foreground || !activeServerId) return;
+    if (serversRef.current.find((server) => server.id === activeServerId)?.state === "offline") {
+      wakeSelectedServer(activeServerId);
+    }
+  }, [foreground, activeServerId, wakeSelectedServer]);
 
   useEffect(() => {
     if (!foreground) {
@@ -965,6 +1012,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             publicKey: host.devicePublicKey,
             membershipId: host.membershipId,
             role: host.role,
+            ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
           },
         ]);
         setActiveServerId(host.hostId);

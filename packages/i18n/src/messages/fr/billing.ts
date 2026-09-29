@@ -1,0 +1,36 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/billing";
+
+export const messages = {
+  // The Billing tab in Settings and the Billing dialog in the web client.
+  "billing.title": "Facturation",
+  "billing.description": "Chaque serveur a sa propre offre. Stripe gère le paiement.",
+  "billing.loading": "Chargement de la facturation…",
+  "billing.unavailable": "La facturation n’est pas disponible sur ce serveur de comptes.",
+  "billing.loadFailed": "Impossible de charger la facturation.",
+  "billing.portalFailed": "Impossible d’ouvrir la gestion de la facturation.",
+  "billing.servers.title": "Offres des serveurs",
+  "billing.manage": "Moyen de paiement et factures",
+  "billing.opening": "Ouverture…",
+  "billing.empty": "Aucun de vos serveurs n’a d’offre.",
+  "billing.paymentFailed": "Un paiement a échoué. Mettez à jour le moyen de paiement pour conserver l’offre.",
+  "billing.interval.month": "Mensuel",
+  "billing.interval.year": "Annuel",
+  "billing.plan.starter": "Starter",
+  "billing.plan.standard": "Standard",
+  "billing.plan.pro": "Pro",
+  "billing.server.unnamed": "Serveur sans nom",
+  "billing.server.summary": "{plan} · {size} Go",
+  "billing.server.price.month": "{amount} / mois",
+  "billing.server.price.year": "{amount} / an",
+  "billing.server.renews": "Renouvellement le {date}",
+  "billing.server.ends": "Se termine le {date}",
+  "billing.status.trialing": "Essai",
+  "billing.status.paymentFailed": "Paiement échoué",
+  "billing.status.paused": "En pause",
+  "billing.action.menu": "Actions de l’offre pour {server}",
+  "billing.action.change": "Changer d’offre",
+  "billing.action.cancel": "Résilier l’offre",
+  "billing.action.renew": "Renouveler l’offre",
+  "billing.action.updatePayment": "Mettre à jour le moyen de paiement",
+} as const satisfies PartialTranslation<typeof source>;

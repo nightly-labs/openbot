@@ -46,8 +46,15 @@ if printf '%s\n' "$staged_paths" | grep -Fxq package.json; then
   bun scripts/check-release-notes.ts --staged
 fi
 
-# The release copies each fragment into CHANGELOG.md, so a malformed one stops it later.
-git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' ':(exclude)changelog.d/README.md' |
+# The iPhone app has its own version, in app.json, and its own notes: the Mobile tab of /changelog.
+if printf '%s\n' "$staged_paths" | grep -Fxq apps/mobile/app.json; then
+  echo "Checking the mobile release notes..."
+  bun scripts/check-release-notes.ts --staged --mobile
+fi
+
+# The release copies each fragment into its changelog, so a malformed one stops it later.
+git diff --cached --name-only -z --diff-filter=ACMR -- 'changelog.d/*.md' 'apps/mobile/changelog.d/*.md' \
+  ':(exclude)changelog.d/README.md' ':(exclude)apps/mobile/changelog.d/README.md' |
   xargs -0 -r bun scripts/check-release-notes.ts --staged --fragments
 
 # Text-only commits, such as docs and AGENTS.md, cannot change a type or a UI rule.

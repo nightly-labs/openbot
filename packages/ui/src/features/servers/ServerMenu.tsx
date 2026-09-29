@@ -42,6 +42,8 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   onViewChange: (view: ServerView) => void;
   onSelect: (serverId: string) => void;
   onAdd?: () => void;
+  /** True when `onAdd` opens the hosted server plans, where the user can also join with an invite. */
+  addCreatesServer?: boolean | undefined;
   /** The menu view has no room for the marketplace button on the sidebar title, so the menu holds it. */
   onOpenMarketplace?: (() => void) | undefined;
   /** The compact sidebar hides the server name. The rail stays visible then. */
@@ -220,7 +222,7 @@ export function ServerMenu(props: ServerMenuProps) {
                   <span class="server-menu-add-circle" aria-hidden="true">
                     <Plus />
                   </span>
-                  <span>{t("server.rail.addRemote")}</span>
+                  <span>{t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}</span>
                 </DropdownMenu.Item>
               </Show>
               <Show when={activeServer()}>

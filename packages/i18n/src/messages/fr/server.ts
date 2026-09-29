@@ -68,6 +68,7 @@ export const messages = {
   "server.rail.moved": "Serveur déplacé en position {position} sur {total}.",
   "server.rail.label": "Serveurs",
   "server.rail.addRemote": "Ajouter un serveur distant",
+  "server.rail.add": "Ajouter un serveur",
   "server.rail.buttonLabel": "Serveur {name}",
   "server.rail.notificationsMuted": "notifications en sourdine",
   "server.rail.actions": "Actions du serveur",

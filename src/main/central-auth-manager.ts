@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
   AvatarImageInput,
   CentralAuthIssue,
@@ -753,6 +754,44 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     }
   }
 
+  /** False when the session can live only in memory, so it would be lost at the next start. */
+  canPersistSession(): boolean {
+    return this.#options.canPersist();
+  }
+
+  /**
+   * Signs a new hosted server in with the claim that the account server put in its VM.
+   * The result names the host ID that the account server reserved for this account.
+   */
+  async redeemHostedServerClaim(claim: string): Promise<{ hostId: string; name: string; user: CentralAuthUser }> {
+    const redeemed = await this.#request(
+      "/v2/hosting/claims/redeem",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claim }) },
+      (value) => {
+        const parsed = parseHostedServerClaim(value);
+        if (!parsed) throw new Error("Invalid hosted server claim.");
+        return parsed;
+      },
+    );
+    if (this.#sessionAccountId !== null && this.#sessionAccountId !== redeemed.user.id) {
+      this.#teamHostTokens.clear();
+    }
+    const previousToken = this.#sessionToken;
+    this.#sessionToken = redeemed.sessionToken;
+    // The claim is spent. A session that is not stored ends at the next start, so a failed write fails
+    // the redeem, and the session is not kept in memory. The start retry redeems the claim again in its
+    // retry window.
+    try {
+      await this.#writeStoredSession({ required: true });
+    } catch (error) {
+      this.#sessionToken = previousToken;
+      throw error;
+    }
+    const user = this.#resolveUserAvatar(redeemed.user);
+    this.#setState({ status: "signed_in", user });
+    return { hostId: redeemed.hostId, name: redeemed.name, user };
+  }
+
   async logout(): Promise<CentralAuthState> {
     this.#emailCodeRequest = null;
     if (this.#sessionToken) {
@@ -881,20 +920,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     };
   }
 
-  #writeStoredSession(): Promise<void> {
+  #writeStoredSession(options: { required?: boolean } = {}): Promise<void> {
     // Serialized: two writes racing inside their filesystem awaits would let the earlier
     // one rename its snapshot over the later one, restoring a session the user has left.
     this.#sessionWriteChain = this.#sessionWriteChain.then(
-      () => this.#writeStoredSessionNow(),
-      () => this.#writeStoredSessionNow(),
+      () => this.#writeStoredSessionNow(options.required === true),
+      () => this.#writeStoredSessionNow(options.required === true),
     );
     return this.#sessionWriteChain;
   }
 
-  async #writeStoredSessionNow(): Promise<void> {
+  async #writeStoredSessionNow(required: boolean): Promise<void> {
     if (!this.#sessionToken) return;
     if (!this.#options.canPersist()) {
       await rm(this.#options.storagePath, { force: true });
+      if (required) throw new Error("The session could not be stored.");
       return;
     }
     const temporaryPath = `${this.#options.storagePath}.${randomUUID()}.tmp`;
@@ -909,8 +949,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       await writeFile(temporaryPath, encrypted, { mode: 0o600 });
       await chmod(temporaryPath, 0o600);
       await rename(temporaryPath, this.#options.storagePath);
-    } catch {
+    } catch (error) {
       await Promise.allSettled([rm(this.#options.storagePath, { force: true }), rm(temporaryPath, { force: true })]);
+      if (required) throw error;
     } finally {
       await Promise.allSettled([rm(temporaryPath, { force: true })]);
     }

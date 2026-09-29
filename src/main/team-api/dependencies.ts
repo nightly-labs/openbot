@@ -141,9 +141,10 @@ export interface TeamApiAdmin {
   /**
    * `agent-install-v1`: add an agent from a marketplace listing or a shared template. Both must be set.
    * `agent-update-v1`: update an agent from a listing; needs only `marketplaceAgents`.
+   * `agent-publish-v1`: publish, update and unpublish an agent's share link; needs only `agentTemplates`.
    */
   marketplaceAgents?: Pick<AgentMarketplaceService, "install">;
-  agentTemplates?: Pick<AgentTemplateService, "install">;
+  agentTemplates?: Pick<AgentTemplateService, "install" | "preview" | "publish" | "unpublish">;
   /** `providers-v1`: code sign-in, provider API keys, managed CLI runtimes and custom endpoints. */
   providers?: TeamApiProviders;
   /** `host-admin-v1`: the server name and logo. */

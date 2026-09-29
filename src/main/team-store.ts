@@ -439,6 +439,8 @@ export class TeamStore {
     serverName: string,
     user: CentralAuthUser,
     logo?: AvatarImageInput | null,
+    /** A hosted server gets its host ID from the account server, which reserves it for this account. */
+    options: { serverId?: string } = {},
   ): Promise<TeamIdentity> {
     const email = normalizeEmail(user.email);
     this.#assertNoHostFor(user.id, email);
@@ -467,7 +469,7 @@ export class TeamStore {
     }
     const created: StoredTeam = {
       version: 1,
-      serverId: randomUUID(),
+      serverId: options.serverId ?? randomUUID(),
       serverName: serverName.trim(),
       enabledOnLaunch: false,
       publicKey,

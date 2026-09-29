@@ -390,6 +390,14 @@ jobs:
           REMOTE_TICKET_PRIVATE_JWK: ${{ secrets.REMOTE_TICKET_PRIVATE_JWK }}
           REMOTE_TICKET_PUBLIC_JWKS: ${{ secrets.REMOTE_TICKET_PUBLIC_JWKS }}
           REMOTE_AUTH_WEBHOOK_SECRET: ${{ secrets.REMOTE_AUTH_WEBHOOK_SECRET }}
+          # Optional: an unset value keeps the value that the Worker has. See docs/hosted-servers.md.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          BOAT_API_KEY: ${{ secrets.BOAT_API_KEY }}
+          BOAT_WEBHOOK_SECRET: ${{ secrets.BOAT_WEBHOOK_SECRET }}
+          OPENPANEL_CLIENT_ID: ${{ secrets.OPENPANEL_CLIENT_ID }}
+          OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
+          HOSTED_SERVER_TEMPLATE: ${{ vars.HOSTED_SERVER_TEMPLATE }}
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
         run: |
@@ -403,8 +411,6 @@ jobs:
             const remotePrivateJwk = process.env.REMOTE_TICKET_PRIVATE_JWK;
             const remotePublicJwks = process.env.REMOTE_TICKET_PUBLIC_JWKS;
             const remoteWebhookSecret = process.env.REMOTE_AUTH_WEBHOOK_SECRET;
-            const apnsPrivateKey = process.env.APNS_PRIVATE_KEY;
-            const apnsKeyId = process.env.APNS_KEY_ID;
             const path = process.env.SECRETS_PATH;
             if (
               !smtp ||
@@ -417,7 +423,28 @@ jobs:
             ) {
               throw new Error("Required production secrets are missing.");
             }
+            // A Stripe or boat key without its webhook secret takes payments or makes sandboxes that
+            // the Worker never sees, so each pair is set together or not at all.
+            const optional = {};
+            for (const names of [
+              ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+              ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
+              ["OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET"],
+              ["HOSTED_SERVER_TEMPLATE"],
+              // The Live Activity relay stays off until both are set.
+              ["APNS_PRIVATE_KEY", "APNS_KEY_ID"],
+            ]) {
+              const present = names.filter((name) => process.env[name]?.trim());
+              if (present.length === 0) continue;
+              if (present.length !== names.length) throw new Error(`Set ${names.join(" and ")} together.`);
+              for (const name of names) optional[name] = process.env[name].trim();
+            }
+            const stripeKey = optional.STRIPE_SECRET_KEY;
+            if (stripeKey && !stripeKey.startsWith("sk_live_") && !stripeKey.startsWith("rk_live_")) {
+              throw new Error("STRIPE_SECRET_KEY is not a live key.");
+            }
             const secrets = {
+              ...optional,
               EMAIL_SMTP_PASSWORD: smtp,
               SKILLS_ADMIN_TOKEN: skillsAdmin,
               SITE_REPORT_HASH_SECRET: siteReportHash,
@@ -425,8 +452,6 @@ jobs:
               REMOTE_TICKET_PRIVATE_JWK: remotePrivateJwk,
               REMOTE_TICKET_PUBLIC_JWKS: remotePublicJwks,
               REMOTE_AUTH_WEBHOOK_SECRET: remoteWebhookSecret,
-              // The Live Activity relay stays off until both are set.
-              ...(apnsPrivateKey && apnsKeyId ? { APNS_PRIVATE_KEY: apnsPrivateKey, APNS_KEY_ID: apnsKeyId } : {}),
             };
             await Bun.write(path, JSON.stringify(secrets));
           '

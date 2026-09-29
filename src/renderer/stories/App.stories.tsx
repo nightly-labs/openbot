@@ -1,9 +1,10 @@
+import type { AgentEvent } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { App } from "../src/App";
 import { LEFT_PANEL_COLLAPSED_STORAGE_KEY, SERVER_VIEW_STORAGE_KEY } from "../src/layout-constants";
-import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
+import { createMockOpenBot, type MockOpenBotOptions } from "../src/preview/mock-openbot";
 import { OpenBotPlayground } from "../src/preview/OpenBotPlayground";
 import { STORY_AGENT_STATUS, STORY_AGENT_SUMMARIES, STORY_APP_INFO, STORY_SERVERS } from "./fixtures";
 
@@ -207,4 +208,88 @@ export const ProviderSignInRequired: Story = {
       }}
     />
   ),
+};
+
+/** One agent for each wait: a question, a command approval and a browser takeover. */
+const STORY_WAITING_EVENTS: AgentEvent[] = [
+  {
+    type: "prompt",
+    requestId: "story-question",
+    agentId: "research",
+    threadId: "thread-research",
+    turnId: "turn-research-wait",
+    questions: [
+      {
+        id: "region",
+        header: "Region",
+        question: "Which region should we launch in first?",
+        isSecret: false,
+        options: [
+          { label: "EU", description: "Start with the EU store." },
+          { label: "US", description: "Start with the US store." },
+        ],
+      },
+    ],
+  },
+  {
+    type: "approval",
+    approval: {
+      requestId: "story-approval",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-chief-wait",
+      kind: "command",
+      command: "bun run release:publish",
+      cwd: null,
+      reason: null,
+      grantRoot: null,
+      permissions: null,
+    },
+  },
+  {
+    type: "browser-takeover-requested",
+    request: {
+      requestId: "story-takeover",
+      agentId: "sales",
+      threadId: "thread-sales",
+      turnId: "turn-sales-wait",
+      tabId: "story-tab",
+    },
+  },
+];
+
+/**
+ * The "Needs you" group in the real shell. The waits arrive as agent events, so the sidebar reads
+ * them through the same bridge as on desktop. Each subscriber gets them again, which is harmless:
+ * a wait is kept per agent.
+ */
+function WaitingForInputPlayground(props: { compact: boolean }) {
+  useStoredLayoutValue(LEFT_PANEL_COLLAPSED_STORAGE_KEY, props.compact ? "true" : "false");
+  return (
+    <OpenBotPlayground
+      dependencies={{
+        createMock: (options) => {
+          const mock = createMockOpenBot(options);
+          const subscribe = mock.api.agent.onEvent;
+          mock.api.agent.onEvent = (listener) => {
+            const unsubscribe = subscribe(listener);
+            queueMicrotask(() => {
+              for (const event of STORY_WAITING_EVENTS) mock.emitAgentEvent(event);
+            });
+            return unsubscribe;
+          };
+          return mock;
+        },
+        renderApp: () => <App />,
+      }}
+    />
+  );
+}
+
+export const AgentsWaitingForInput: Story = {
+  render: () => <WaitingForInputPlayground compact={false} />,
+};
+
+export const CompactAgentsWaitingForInput: Story = {
+  render: () => <WaitingForInputPlayground compact />,
 };

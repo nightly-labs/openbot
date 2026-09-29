@@ -83,6 +83,8 @@ export const messages = {
   "settings.tab.updates.description": "Garder OpenBot à jour sur cet ordinateur.",
   "settings.tab.hostedSites.title": "Sites hébergés",
   "settings.tab.hostedSites.description": "Consulter et gérer les sites statiques publiés par vos agents.",
+  "settings.tab.billing.title": "Facturation",
+  "settings.tab.billing.description": "Offres des serveurs, moyen de paiement et factures.",
   "settings.sections.label": "Sections des réglages",
   "settings.save.region": "Modifications non enregistrées",
   "settings.save.notSaved": "Modifications non enregistrées",

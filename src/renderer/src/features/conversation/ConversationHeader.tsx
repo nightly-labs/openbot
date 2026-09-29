@@ -6,8 +6,10 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 import { toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo } from "solid-js";
+import { agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { serverHasStorage } from "../files/storage-usage";
+import { serverCanAdminister } from "../servers/server-capabilities";
 
 /** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
@@ -43,7 +45,15 @@ export function ConversationHeader() {
       });
     };
   });
-  const publishAgent = createPublishAgent();
+  const publishAgent = createPublishAgent(
+    () => props.runtime?.admin?.agentTemplates ?? agentTemplatesPort().agentTemplates,
+  );
+  // This computer reads the skills of its own agents from the workspace. A joined host publishes its
+  // own agents, for an owner or admin, when it serves `agent-publish-v1`.
+  const canPublish = () =>
+    props.runtime
+      ? props.runtime.admin !== undefined && serverCanAdminister(props.server, "agent-publish-v1")
+      : props.server?.kind === "local";
   return (
     <>
       <SharedConversationHeader
@@ -93,8 +103,7 @@ export function ConversationHeader() {
             : undefined
         }
         publish={
-          // Only an agent on this computer can be published: main reads its skills from the workspace.
-          !props.runtime && props.server?.kind === "local" && props.agent
+          canPublish() && props.agent
             ? {
                 onOpen: () => {
                   if (props.agent) publishAgent.open(props.agent.id);

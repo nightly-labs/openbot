@@ -13,8 +13,9 @@
   "observability": {
     "enabled": true
   },
-  // The outbox and the hosted-site cleanup are both retry paths: the request path schedules the
-  // first attempt itself. A run each minute only repeated empty reads.
+  // The outbox, the hosted-site cleanup and the hosted server checks are retry paths: the request path
+  // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
+  // stops 15 to 20 minutes after its last use.
   "triggers": {
     "crons": ["*/5 * * * *"]
   },
@@ -47,6 +48,11 @@
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
+    // Creates stay off until the boat and Stripe secrets and the template are set. "false" stops new
+    // servers only.
+    "HOSTED_SERVERS_ENABLED": "true",
+    // Each account can buy a server in production. Put account IDs here to limit creates to them.
+    "HOSTED_SERVERS_ALLOWED_USER_IDS": "*",
     "APNS_TEAM_ID": "ZTRDTUL87R",
     "APNS_TOPIC": "run.openbot.mobile"
   },
@@ -181,9 +187,15 @@
       "workers_dev": true,
       "preview_urls": false,
       "routes": [],
+      // Each minute: the cron starts hosted servers that stopped again, and checks servers that a webhook missed.
       "triggers": {
-        "crons": []
+        "crons": ["* * * * *"]
       },
+      // Hosted servers stay off until these are set. `api:deploy:test` sets the Stripe pair, BOAT_API_KEY,
+      // BOAT_WEBHOOK_SECRET and HOSTED_SERVERS_DEVELOPER_KEY from `.env.shared`, and
+      // HOSTED_SERVERS_ALLOWED_USER_IDS from its HOSTED_SERVERS_TEST_ALLOW_LIST.
+      // Set HOSTED_SERVER_TEMPLATE with `wrangler secret put <name> --env test`.
+      // They are not required, so the test Worker deploys without them. See docs/hosted-servers.md.
       "secrets": {
         "required": [
           "EMAIL_SMTP_PASSWORD",
@@ -205,6 +217,7 @@
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
         "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
         "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
+        "HOSTED_SERVERS_ENABLED": "true",
         "APNS_TEAM_ID": "ZTRDTUL87R",
         "APNS_TOPIC": "run.openbot.mobile"
       },

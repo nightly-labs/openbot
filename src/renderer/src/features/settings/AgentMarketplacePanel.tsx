@@ -127,6 +127,7 @@ export function AgentMarketplacePanel(props: {
     analytics.track("marketplace_action", {
       entity: "agent",
       action: "view",
+      listing_slug: agent.id,
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: "load_failed" }),
     });
@@ -166,6 +167,7 @@ export function AgentMarketplacePanel(props: {
     analytics.track("marketplace_action", {
       entity: "agent",
       action: updating ? "update" : "install",
+      listing_slug: agent.id,
       result: value ? "succeeded" : "failed",
       ...(value ? {} : { failure_code: updating ? "update_failed" : "install_failed" }),
     });

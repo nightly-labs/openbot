@@ -225,7 +225,8 @@
 
 .ui-action-menu [class~="lucide-chart-area"] > path:first-child,
 .ui-action-menu [class~="lucide-bell-off"] > path:nth-child(3),
-.ui-action-menu [class~="lucide-app-window"] > path {
+.ui-action-menu [class~="lucide-app-window"] > path,
+.ui-action-menu [class~="lucide-bot"] > * {
   fill: none;
 }
 

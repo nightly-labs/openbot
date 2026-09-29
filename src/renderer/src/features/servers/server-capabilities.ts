@@ -24,6 +24,7 @@ export function serverSupportsCapability(
       capability === "skills-admin-v1" ||
       capability === "shared-tables-v1" ||
       capability === "agent-install-v1" ||
+      capability === "agent-publish-v1" ||
       capability === "providers-v1" ||
       capability === "providers-v2" ||
       capability === "host-admin-v1" ||

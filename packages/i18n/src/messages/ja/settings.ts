@@ -76,6 +76,8 @@ export const messages = {
   "settings.tab.updates.description": "このコンピュータの OpenBot を最新に保ちます。",
   "settings.tab.hostedSites.title": "公開サイト",
   "settings.tab.hostedSites.description": "エージェントが公開した静的サイトを表示・管理します。",
+  "settings.tab.billing.title": "お支払い",
+  "settings.tab.billing.description": "サーバーのプラン、支払い方法、請求書。",
   "settings.sections.label": "設定のセクション",
   "settings.save.region": "未保存の変更",
   "settings.save.notSaved": "変更は保存されていません",

@@ -201,18 +201,18 @@ describe("computeSidebarAgentStates", () => {
     expect(started.chief).toEqual({ kind: "routine", phase: "running", count: 1 });
   });
 
-  it("shows needs attention when a prompt blocks the routine turn", () => {
+  it("shows the question an agent waits on, over its running routine", () => {
     const states = computeSidebarAgentStates(
       input({
         queues: { chief: snapshot("chief", routineDelivery("chief", "running")) },
-        pendingPrompts: { chief: { type: "prompt", turnId: "turn-1" } },
+        pendingPrompts: { chief: { type: "prompt", turnId: "turn-1", questions: [{ question: "Which region?" }] } },
         unreadReplies: { chief: 4 },
       }),
     );
 
-    expect(states.chief).toEqual({ kind: "routine", phase: "needs-attention", count: 1 });
+    expect(states.chief).toEqual({ kind: "waiting", reason: "question", detail: "Which region?" });
     assert(states.chief);
-    expect(sidebarAgentStateLabel(states.chief, translateFor("en"))).toBe("Routine needs attention");
+    expect(sidebarAgentStateLabel(states.chief, translateFor("en"))).toBe("Waiting for your answer: Which region?");
   });
 
   it("marks the current failed routine turn and ignores an older one", () => {

@@ -232,7 +232,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
+| `bun run dev` | Start the local Auth API, Signal service, and Electron client with renderer HMR on its app profile. Ports are allocated through the dev registry, so a sibling worktree never takes one this stack won. It refuses a second stack in the same worktree unless you pass `--force`, and `--isolated` gives the worktree a profile of its own keyed to its path instead of the shared `OpenBot Dev` one. `--hosting=test` signs the app in to the `test` account Worker, on a profile that all worktrees share, so that a hosted server is a real VM; see [docs/hosted-servers.md](docs/hosted-servers.md#real-servers-from-a-development-build). A profile that does not exist yet is seeded with the showcase data of `bun run dev:seed` before the client starts, so a first start never opens an empty app; an existing profile is left as it is. An isolated profile still shares the computer's provider CLI store, so it does not download the pinned CLIs again. |
 | `bun run preview` | Preview the built Electron client with the green preview icon. |
 | `bun run mobile:go` | Start the mobile app in Expo Go and clear the Metro cache. |
 | `bun mobile:ios` | Build and launch the iOS simulator app without RocketSim. |
@@ -247,7 +247,10 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run api:images` | Draw the article artwork into `apps/auth-api/content-art/` after you add an article or change a title. Commit the result; the site build fails until it matches. Needs Electron and a GPU, so run it on your own machine. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |
 | `bun run api:migrate:remote` | Apply D1 migrations to the configured remote database. |
-| `bun run api:deploy` | Build and deploy the account API to Cloudflare Workers. |
+| `bun run api:deploy` | Build and deploy the account API to Cloudflare Workers. It sets the Stripe, boat, claim and OpenPanel secret sets that are in the production environment. A set that is not there keeps the value that the Worker has. |
+| `bun run api:stripe:bootstrap` | Create or update the Stripe plan catalog and the Customer Portal settings from `STRIPE_SECRET_KEY` in the encrypted `apps/auth-api/.env.shared` (a value in `apps/auth-api/.env.dev` replaces it). It refuses a live key unless you add `--live`. For local webhooks, run `stripe listen --forward-to localhost:<API port>/v1/stripe/webhook` and put the signing secret in `STRIPE_WEBHOOK_SECRET`. See [Billing](docs/ARCHITECTURE.md#billing). |
+| `bun run hosting:setup --target=production\|test` | Set up the Stripe catalog, the Customer Portal, and the Stripe and boat webhooks of one account server, and store the webhook signing secrets: production in the `cloudflare-production` GitHub Environment, test in `apps/auth-api/.env.shared`. See [hosted servers](docs/hosted-servers.md#production). |
+| `bun run hosting:template` | Build the boat named snapshot that new hosted servers start from. Needs `BOAT_TEMPLATE_API_KEY` and `--version`, `--appimage-url`, `--appimage-sha256` and `--auth-api-url`. See [hosted servers](docs/hosted-servers.md). |
 | `bun run remote:up` | Build and start the self-hosted Signal, coturn, and ACME stack. |
 | `bun run remote:check` | Check the Remote API and both Docker Compose configurations. |
 | `bun run remote:check:compose` | Validate both Docker Compose configurations alone, without a running daemon. |
@@ -295,6 +298,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run dist:linux` | Build an unsigned Linux x64 AppImage on Linux. |
 | `bun run dist:linux:arm64` | Build an unsigned Linux arm64 AppImage on arm64 Linux. |
 | `bun run release:patch` | Create the next patch version commit and tag. |
+| `bun run mobile:release:patch` | Move the iPhone app notes from `apps/mobile/changelog.d` into `apps/mobile/CHANGELOG.md` and set the next patch version in `app.json`. Also `mobile:release:minor` and `mobile:release:major`. |
 | `bun run test:custom-agents` | Run two fake ACP agents through the agent store, Check agent and the `acp` provider router: equal session ids, restart and resume, switch, and delete. Offline; writes `.openbot-build/custom-acp-agent-e2e/report.json`. |
 | `bun run test:filesystem` | **Online/manual:** run real full-access Codex and Claude filesystem turns across private and shared workspaces. |
 | `bun run test:imagegen` | **Online/manual:** run a real full-access image-generation turn. |

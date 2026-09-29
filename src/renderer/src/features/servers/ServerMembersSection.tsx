@@ -138,8 +138,11 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
       panels.invite.result && !panels.invite.result.permanent && Date.parse(panels.invite.result.expiresAt) <= now(),
     );
   const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
-  /** This host or the account plane applies the limit. A legacy HTTP peer can be a version without it. */
-  const memberLimit = () => (permanentSupported() ? DEFAULT_TEAM_MEMBER_LIMIT : null);
+  /**
+   * This host or the account plane applies the limit, from the host's plan. A legacy HTTP peer can be
+   * a version without it.
+   */
+  const memberLimit = () => (permanentSupported() ? (props.server.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT) : null);
   const membersFull = () => {
     const limit = memberLimit();
     return limit !== null && activeMembers().length >= limit;
@@ -514,7 +517,7 @@ export function createServerMembersSection(host: ServerSettingsSectionHost): Ser
             </Show>
             <Show when={membersFull()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
-                {t("server.invite.full", { limit: DEFAULT_TEAM_MEMBER_LIMIT })}
+                {t("server.invite.full", { limit: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
             </Show>
             <Show

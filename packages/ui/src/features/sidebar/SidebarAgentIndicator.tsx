@@ -1,11 +1,11 @@
-import { Clock3, TriangleAlert, X } from "@openbot/ui";
+import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import { createEffect, createSignal, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
-import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
+import type { SidebarAgentState, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
 
 export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | undefined }) {
   const { t } = useText();
@@ -23,7 +23,8 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
         mounted = true;
         return;
       }
-      if (nextKind !== previousKind) setEntering(nextKind === "responded" || nextKind === "unread");
+      if (nextKind !== previousKind)
+        setEntering(nextKind === "responded" || nextKind === "unread" || nextKind === "waiting");
     },
   );
 
@@ -46,9 +47,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           <Show when={routinePhase(state()) === "running" || routinePhase(state()) === "queued"}>
             <Clock3 aria-hidden="true" />
           </Show>
-          <Show when={routinePhase(state()) === "needs-attention"}>
-            <TriangleAlert aria-hidden="true" />
-          </Show>
+          <Show when={waitReason(state())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
           <Show when={routinePhase(state()) === "failed"}>
             <X aria-hidden="true" />
           </Show>
@@ -69,6 +68,27 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
 
 function routinePhase(state: SidebarAgentState): SidebarRoutinePhase | undefined {
   return state.kind === "routine" ? state.phase : undefined;
+}
+
+function waitReason(state: SidebarAgentState): SidebarWaitReason | undefined {
+  return state.kind === "waiting" ? state.reason : undefined;
+}
+
+/** One icon per wait reason, shared by the badge, the action chip and the tooltip. */
+export function SidebarWaitIcon(props: { reason: SidebarWaitReason }) {
+  return (
+    <>
+      <Show when={props.reason === "question"}>
+        <MessageCircleQuestionMark aria-hidden="true" />
+      </Show>
+      <Show when={props.reason === "approval"}>
+        <ShieldCheck aria-hidden="true" />
+      </Show>
+      <Show when={props.reason === "takeover"}>
+        <MousePointer2 aria-hidden="true" />
+      </Show>
+    </>
+  );
 }
 
 export function SidebarPinnedAvatar(props: {

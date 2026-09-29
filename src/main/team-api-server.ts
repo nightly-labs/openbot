@@ -27,6 +27,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
@@ -93,6 +94,7 @@ import {
 } from "./team-api/request-helpers";
 import { routeAgentAdmin } from "./team-api/route-agent-admin";
 import { routeAgentInstall } from "./team-api/route-agent-install";
+import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
@@ -182,6 +184,7 @@ export class TeamApiServer {
   readonly #lifecycle = new LifecycleGate<number>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
+  #lastClientRequestAt: number | null = null;
   #agentListener: ((event: AgentEvent) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #localTypingAgentId: string | null = null;
@@ -340,6 +343,19 @@ export class TeamApiServer {
       }),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  /** Remote clients with an open event stream. Each WebRTC client opens one after it signs in. */
+  connectedClientCount(): number {
+    return this.#eventClients.size;
+  }
+
+  /**
+   * The last signed-in request or typing event from a client, or null for none. A client that is only
+   * open sends neither: it gets its updates on the event stream.
+   */
+  lastClientRequestAt(): number | null {
+    return this.#lastClientRequestAt;
   }
 
   setLocalTyping(agentId: string | null, typing: boolean): void {
@@ -561,6 +577,7 @@ export class TeamApiServer {
       if (!authenticated || !token) {
         return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
       }
+      this.#lastClientRequestAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
       const hidden = this.#hiddenAgentIds(context.protocol, context.capabilities);
       // Every protocol gets the projection, also with no hidden agent: a provider status row, a
@@ -600,6 +617,7 @@ export class TeamApiServer {
       if ((await routeSkillsAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeSharedTables(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentInstall(context, this.#options.admin)) === "handled") return;
+      if ((await routeAgentPublish(context, this.#options.admin)) === "handled") return;
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
@@ -969,6 +987,7 @@ export class TeamApiServer {
   }
 
   #setClientTyping(connection: EventClientState, agentId: string | null): void {
+    this.#lastClientRequestAt = Date.now();
     const changed = connection.typingAgentId !== agentId;
     connection.typingAgentId = agentId;
     if (connection.typingTimer) clearTimeout(connection.typingTimer);
@@ -985,6 +1004,7 @@ export class TeamApiServer {
   }
 
   #setClientDirectTyping(connection: EventClientState, recipientMemberId: string | null): void {
+    this.#lastClientRequestAt = Date.now();
     const previousRecipientId = connection.directTypingRecipientId;
     const changed = previousRecipientId !== recipientMemberId;
     const recipientAlreadyActive = recipientMemberId
@@ -1197,6 +1217,7 @@ export class TeamApiServer {
             this.#options.admin?.marketplaceAgents !== undefined && this.#options.admin?.agentTemplates !== undefined
           );
         if (capability === AGENT_UPDATE_CAPABILITY) return this.#options.admin?.marketplaceAgents !== undefined;
+        if (capability === AGENT_PUBLISH_CAPABILITY) return this.#options.admin?.agentTemplates !== undefined;
         if (capability === PROVIDERS_ADMIN_CAPABILITY || capability === PROVIDERS_RUNTIMES_V2_CAPABILITY)
           return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;

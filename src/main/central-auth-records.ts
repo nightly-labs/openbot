@@ -21,6 +21,8 @@ export interface RemoteHostSummary {
   authEpoch: number;
   membershipId: string;
   role: "owner" | "admin" | "member";
+  /** The active members that the host's plan allows. An account server from before plans sends none. */
+  memberLimit?: number;
 }
 
 export interface RemoteInviteRecord {
@@ -138,6 +140,9 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
     if (host.devicePublicKey !== null && !isString(host.devicePublicKey)) throw new Error("Invalid remote host key.");
     if (host.role !== "owner" && host.role !== "admin" && host.role !== "member")
       throw new Error("Invalid remote host role.");
+    // A bad limit drops only the limit, so the host list still loads.
+    const memberLimit = host.memberLimit;
+    const validLimit = isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1;
     return {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
@@ -146,6 +151,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       authEpoch: host.authEpoch,
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
+      ...(validLimit ? { memberLimit } : {}),
     };
   });
 }

@@ -13,6 +13,7 @@ import {
   buttonVariants,
   ChevronUp,
   CircleArrowDown,
+  CreditCard,
   Gauge,
   LogOut,
   Mail,
@@ -55,8 +56,11 @@ interface AccountDockProps {
   onOpenExternal: (destination: ExternalDestination) => Promise<void>;
   onOpenPermissions?: () => void;
   onOpenProfile?: (() => void) | undefined;
+  onOpenBilling?: (() => void) | undefined;
   onOpenSettings?: ((trigger: HTMLElement) => void) | undefined;
   onOpenSkills?: (() => void) | undefined;
+  /** Draws the shelf (identity, usage chip, settings) on any platform. By default only the macOS app does. */
+  shelf?: boolean;
 }
 
 const PRODUCT_NAME = "OpenBot";
@@ -129,7 +133,7 @@ export function AccountDock(props: AccountDockProps) {
   let usageTrigger: HTMLButtonElement | undefined;
   let settingsTrigger: HTMLButtonElement | undefined;
 
-  const hybridLayout = createMemo(() => props.appInfo?.platform === "darwin" && !props.compact);
+  const hybridLayout = createMemo(() => (props.shelf ?? props.appInfo?.platform === "darwin") && !props.compact);
   const accountName = createMemo(
     () => props.account.name?.trim() || props.account.email.split("@")[0] || props.account.email,
   );
@@ -338,7 +342,7 @@ export function AccountDock(props: AccountDockProps) {
           />
           <div class="account-menu-separator" />
         </Show>
-        <Show when={props.onOpenProfile || (includeDockActions && props.onOpenSettings)}>
+        <Show when={props.onOpenProfile || props.onOpenBilling || (includeDockActions && props.onOpenSettings)}>
           <section class="account-menu-group" aria-label={t("account.menu.account")}>
             <Show when={props.onOpenProfile}>
               <Button
@@ -352,6 +356,20 @@ export function AccountDock(props: AccountDockProps) {
               >
                 <UserRound class="account-menu-icon" aria-hidden="true" />
                 <span>{t("account.menu.profile")}</span>
+              </Button>
+            </Show>
+            <Show when={props.onOpenBilling}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenBilling?.();
+                }}
+              >
+                <CreditCard class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.billing")}</span>
               </Button>
             </Show>
             <Show when={includeDockActions && props.onOpenSettings}>

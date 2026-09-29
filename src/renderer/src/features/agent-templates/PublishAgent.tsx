@@ -5,7 +5,7 @@ import { currentText } from "@openbot/ui/text";
 import { createStore } from "solid-js";
 import { writeClipboardText } from "../../clipboard";
 import { renderAgentTemplateCard } from "./agent-template-card";
-import { agentTemplatesPort } from "./agent-templates-port";
+import { type AgentTemplatePublishCalls, agentTemplatesPort } from "./agent-templates-port";
 
 interface PublishState {
   open: boolean;
@@ -16,9 +16,10 @@ interface PublishState {
 
 /**
  * The publish dialog of the conversation header, and the calls behind it. `open` is what the header
- * button runs; `dialog` is mounted once beside the header.
+ * button runs; `dialog` is mounted once beside the header. `calls` is read on each call; by default
+ * it is this computer's.
  */
-export function createPublishAgent() {
+export function createPublishAgent(calls: () => AgentTemplatePublishCalls = () => agentTemplatesPort().agentTemplates) {
   const [state, setState] = createStore<PublishState>({
     open: false,
     agentId: null,
@@ -28,7 +29,7 @@ export function createPublishAgent() {
 
   async function load(agentId: string): Promise<void> {
     try {
-      const preview = await agentTemplatesPort().agentTemplates.preview(agentId);
+      const preview = await calls().preview(agentId);
       if (state.agentId !== agentId) return;
       setState((draft) => {
         draft.preview = preview;
@@ -82,7 +83,7 @@ export function createPublishAgent() {
     // Worker to accept, the agent is published without it.
     const drawn = await renderAgentTemplateCard(preview).catch(() => null);
     const card = drawn && isAgentTemplateCardPng(drawn) ? drawn : null;
-    const publication = await agentTemplatesPort().agentTemplates.publish({ agentId, card });
+    const publication = await calls().publish({ agentId, card });
     if (state.agentId !== agentId) return;
     setState((draft) => {
       if (draft.preview) draft.preview.publication = publication;
@@ -98,7 +99,7 @@ export function createPublishAgent() {
   async function unpublish(): Promise<void> {
     const agentId = state.agentId;
     if (!agentId) return;
-    await agentTemplatesPort().agentTemplates.unpublish(agentId);
+    await calls().unpublish(agentId);
     if (state.agentId !== agentId) return;
     setState((draft) => {
       if (draft.preview) draft.preview.publication = null;

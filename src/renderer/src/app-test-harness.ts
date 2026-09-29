@@ -570,6 +570,10 @@ export function installOpenbotStub(): void {
       listInstalled: vi.fn().mockResolvedValue([]),
     }),
     hostedSites: stubGroup(IPC_ENDPOINTS.hostedSites, "hostedSites", {}),
+    billing: stubGroup(IPC_ENDPOINTS.billing, "billing", {}),
+    hostedServers: stubGroup(IPC_ENDPOINTS.hostedServers, "hostedServers", {
+      list: vi.fn().mockResolvedValue({ available: false, servers: [] }),
+    }),
     marketplaceAgents: stubGroup(IPC_ENDPOINTS.marketplaceAgents, "marketplaceAgents", {}),
     agentTemplates: stubGroup(IPC_ENDPOINTS.agentTemplates, "agentTemplates", {
       takePendingLink: vi.fn().mockResolvedValue(null),

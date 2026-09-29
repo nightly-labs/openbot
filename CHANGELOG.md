@@ -6,6 +6,105 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-29
+
+### Added
+
+- Update OpenBot on a joined server from Server settings > Updates. Owners and admins can check for
+  an update, download it, and restart the host when its agents are idle, or restart it at once.
+  The version notice for a server has an "Update host" button.
+- Turn off updates from server admins in Settings > Updates on the computer that runs the server.
+  That computer shows who asked for an update and can cancel the restart.
+- Turn on automatic download and automatic install when idle for a joined server in Server
+  settings > Updates.
+- A notice shows the download percentage while a server updates, and tells admins when a server
+  has a new version.
+- All members of a server see a notice before and while it restarts into an update. OpenBot
+  connects again when the server is back.
+- Chat messages show LaTeX math as typeset formulas. Write inline math as `$...$` or `\(...\)`, and
+  display math as `$$...$$`, `\[...\]` or a `math` code block. A formula that does not parse shows
+  its source. Copying a formula gives its LaTeX source. Before, the formula showed as raw source
+  with its dollar signs and backslashes.
+- The page of a shared agent has an "open in browser" link below the card, next to "Download it" and
+  "open the app". It adds the agent from the browser client when you do not have the desktop app.
+- The sidebar shows agents that wait for you in a "Needs you" group at the top, with a count. Each row shows what the agent waits for, "Answer", "Review" or "Take over", and a tooltip shows the question or the command. The agent goes back to its section when you reply.
+- The message box continues a Markdown list. Press Shift+Enter after a `- `, `* ` or `1. ` item to start the next item. Press Shift+Enter on an empty item to end the list.
+- Your own messages show Markdown, such as lists, bold text and code, as on the iPhone app.
+- Show browser notifications in the web app when an agent finishes, stops with an error, or needs
+  your input or approval, on every connected server. The web app shows them while its tab is open
+  and does not have focus.
+- Mute a server and set its notification level in the web app, from the server menu or Server
+  settings. This browser keeps the choice.
+- Explain how to use the OpenBot Marketplace to install agents, plugins, and skills, and submit an agent for review.
+- Add "New agent" and "Mark all as read" to the sidebar menu that opens when you right-click an empty
+  part of the sidebar, on the desktop app and in the browser client. "Mark all as read" marks all
+  agent chats and channels as read.
+- Add a hosted server with the plus button in the server rail. Choose a plan and pay on the Stripe
+  page. OpenBot sets up the server when Stripe confirms the payment, and connects to it. Each hosted
+  server is a Linux machine.
+- Manage the plans of your servers. Desktop Settings has a Billing tab, and the web app has Billing in
+  the account menu. It shows the plan, the storage, the price and the renewal date of each server
+  that your account pays for, and a warning when a payment failed.
+- Each server has a menu to change or cancel its plan, or to renew a plan that ends. Payment method
+  and invoices opens the Stripe Customer Portal. You enter card details on the Stripe page, not in
+  OpenBot.
+- The plan of a server sets its member limit: Starter 3, Standard 10 and Pro 25 active members,
+  owner included. A server with no plan keeps 3. When a plan goes down or ends, no member is
+  removed, but no new member can join until there is a free seat.
+- A hosted server stops 15 to 20 minutes after its last use and keeps its data. It starts again when you
+  connect to it, and a few minutes before its next scheduled routine. An open app that sends no
+  request or message for 1 hour does not keep the server on.
+
+### Changed
+
+- Product analytics records which tools, catalog plugins, websites and routines the agents use, so we
+  can learn which tasks OpenBot is used for. A website is sent only as its registrable domain, such
+  as `linkedin.com`, never as a URL, path or page title. IP addresses and names with no public
+  suffix, such as `.local` hosts, are not sent. The name, address and command of a server that you
+  added are not sent. Once a day, the app also sends counts of your agents, routines, skills and
+  servers, and the names of the catalog plugins and curated listings that you use. You can turn off
+  product analytics in **Settings → General → Privacy**. See `PRIVACY.md`.
+- The browser client shows the account, usage and settings controls at the bottom of the sidebar, as
+  the desktop app does. Before, usage and settings were only in the account menu.
+- The account service sends product analytics events when a plan or a hosted server changes. The
+  events have your account ID and fixed values only, with no email, name or server ID. See
+  PRIVACY.md.
+
+### Fixed
+
+- A routine runs one time after the computer wakes from sleep. Before, each time missed during
+  sleep started its own run, one after another, and the first run often failed because the network
+  was not back yet. Routines now wait for the network after a wake, and an agent routine does not
+  add a new scheduled run while its previous run is still in the queue.
+- Close search with Escape or a click outside the search panel. Before, only Command K or a result
+  closed it.
+- Keep the search tabs in the same place when the result list changes height. Before, one click on
+  a tab could also open the agent that moved under the pointer.
+- In the desktop app, the live view of a remote host's browser now ends cleanly when the host sends a frame that it cannot show. Before, this caused a main-process error, and the live view did not stop.
+- The live view of a remote host's browser now ends when its connection closes abnormally. Before, the view could stay open with no new frames, and on the host the end of a live view could also stop a remote desktop session that was running at the same time.
+- The desktop app now releases the host's live view session when it cannot open the view. Before, the session stayed open on the host and counted against its limit.
+- The chat scrolls with the mouse wheel or trackpad when the pointer is on a code block. Before, the
+  chat did not scroll until the pointer left the block.
+- In "Providers & permissions", the "Try it free" arrow points at the OpenCode row. Before, its
+  position came from the screen layout, so it could point at a different row. The arrows of
+  "Try it free" and "Not in the list?" now point at the middle of their targets on both setup
+  screens.
+- Install updates on Linux again. Before, OpenBot always refused the install with "Another OpenBot
+  session is still running from this application", also when only one session was open.
+- OpenCode agents no longer stop with "Internal error: OpenCode service failure" after a reconnect
+  or a restart. OpenCode sends this error when it cannot find a stored session. OpenBot now reads
+  OpenCode's session list. If the list does not hold the session, OpenBot starts a new OpenCode
+  session with the conversation history. In all other cases OpenBot keeps the session, tries one
+  more time, and then tells you to try again or reconnect OpenCode.
+- Start the server list at the top of the web app. Before, the web app kept the empty space that
+  the desktop app keeps for the window controls.
+- In the agent avatar editor, the "Generated face" heading stays on one line. "Reset to ID" and "New
+  set" are now icon buttons with a tooltip. Before, the heading went onto two lines.
+- Play the completion sound in Safari in the web app. The sound now also follows the server's mute
+  and notification level.
+- Remote control connects at once to a computer or server that restarted with no clean
+  disconnect. Before, it waited until the old connection timed out.
+
 ## [0.24.0] - 2026-09-28
 
 ### Added

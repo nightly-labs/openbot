@@ -153,6 +153,19 @@ describe("SignalService", () => {
     expect(client.closed).toBe(false);
   });
 
+  it("sends a new client to the host socket that said hello last while the old socket is not closed", async () => {
+    const service = new SignalService(fakeTokens(), 8);
+    const stopped = socket("host-stopped");
+    await hello(service, stopped, "host-ticket", "host");
+    const restarted = socket("host-restarted");
+    await hello(service, restarted, "resume-host", "host");
+    const client = socket("client");
+    await hello(service, client, "client-ticket", "client");
+
+    expect(restarted.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(true);
+    expect(stopped.messages.some((message) => message.includes('"type":"peer-ready"'))).toBe(false);
+  });
+
   it("notifies the host when an interrupted client does not reconnect", async () => {
     vi.useFakeTimers();
     try {

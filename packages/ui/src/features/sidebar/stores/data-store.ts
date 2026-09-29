@@ -4,8 +4,9 @@
  * safe for the drag engine to hold - it satisfies the engine's list model and can do nothing else.
  */
 
-import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import { type ChannelSummary, SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
+import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
@@ -14,7 +15,12 @@ import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sideb
 
 type PinnedItemSource = SidebarProps["agents"][number] | NonNullable<SidebarProps["channels"]>[number];
 
-export function createSidebarDataStore(deps: { normalizedQuery: () => string; props: SidebarProps }) {
+export function createSidebarDataStore(deps: {
+  normalizedQuery: () => string;
+  props: SidebarProps;
+  /** True while a sidebar drag is in flight. */
+  dragActive: () => boolean;
+}) {
   const { normalizedQuery, props } = deps;
 
   const directThreadByMember = createMemo(
@@ -62,29 +68,44 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     pinnedItemCache = nextCache;
     return items;
   });
-  const filteredAgents = createMemo(() =>
+  const listedAgents = createMemo(() =>
     props.agents.filter(
       (agent) =>
         !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
         agentMatchesQuery(agent, normalizedQuery()),
     ),
   );
+  /**
+   * Agents that wait for the user leave their section for the "Needs you" group, the same way a
+   * pinned agent leaves it for the pinned strip. The layout keeps their place, so an agent goes back
+   * to it when the wait ends. A pinned agent stays in its tile, which shows the same badge.
+   *
+   * The set is keyed by a string so that a badge change that keeps the same agents waiting stops
+   * here. Without it, each new reply would rebuild the chat items and remount every row.
+   *
+   * The set holds still during a drag. The drag engine measures the rows when the drag starts, so a
+   * row that moved to the group after that would make the drop land at an old position, and the
+   * dragged row itself would leave the DOM.
+   */
+  let heldWaitingKey = "";
+  const waitingKey = createMemo(() => {
+    const next = Object.keys(props.agentStates)
+      .filter((agentId) => props.agentStates[agentId]?.kind === "waiting")
+      .sort()
+      .join("\n");
+    if (!deps.dragActive()) heldWaitingKey = next;
+    return heldWaitingKey;
+  });
+  const waitingIds = createMemo(() => new Set(waitingKey() ? waitingKey().split("\n") : []));
+  const agentWaits = (agentId: string) => waitingIds().has(agentId);
+  const waitingAgents = createMemo(() => sortByLayoutOrder(listedAgents().filter((agent) => agentWaits(agent.id))));
+  const filteredAgents = createMemo(() => listedAgents().filter((agent) => !agentWaits(agent.id)));
   const filteredChannels = createMemo(() =>
     matchingChannels().filter(
       (channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id })),
     ),
   );
-  /**
-   * Agents and channels as one ordered list, because the layout places them together: a channel is a
-   * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
-   * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
-   * first, which is where channels sat while they had a list of their own.
-   */
-  const filteredChats = createMemo<SidebarChatItem[]>(() => {
-    const items: SidebarChatItem[] = [
-      ...filteredChannels().map((channel) => ({ kind: "channel", id: channel.id, channel }) as const),
-      ...filteredAgents().map((agent) => ({ kind: "agent", id: agent.id, agent }) as const),
-    ];
+  function sortByLayoutOrder<T extends { id: string }>(items: T[]): T[] {
     const orderIndex = new Map(props.layout.agentOrder.map((chatId, index) => [chatId, index]));
     const naturalIndex = new Map(items.map((item, index) => [item.id, index]));
     return items.sort(
@@ -92,6 +113,30 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
         (orderIndex.get(left.id) ?? props.layout.agentOrder.length + (naturalIndex.get(left.id) ?? 0)) -
         (orderIndex.get(right.id) ?? props.layout.agentOrder.length + (naturalIndex.get(right.id) ?? 0)),
     );
+  }
+  /**
+   * Agents and channels as one ordered list, because the layout places them together: a channel is a
+   * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
+   * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
+   * first, which is where channels sat while they had a list of their own.
+   */
+  type ChatSource = AgentProfile | ChannelSummary;
+  let chatItemCache = new Map<ChatSource, SidebarChatItem>();
+  const filteredChats = createMemo<SidebarChatItem[]>(() => {
+    // Keep each wrapper while its chat is the same store, as `resolvedPinnedItems` does: an agent
+    // that starts or stops waiting must not remount the rows of every other agent.
+    const nextCache = new Map<ChatSource, SidebarChatItem>();
+    const keep = (source: ChatSource, item: () => SidebarChatItem) => {
+      const resolved = chatItemCache.get(source) ?? item();
+      nextCache.set(source, resolved);
+      return resolved;
+    };
+    const items = sortByLayoutOrder<SidebarChatItem>([
+      ...filteredChannels().map((channel) => keep(channel, () => ({ kind: "channel", id: channel.id, channel }))),
+      ...filteredAgents().map((agent) => keep(agent, () => ({ kind: "agent", id: agent.id, agent }))),
+    ]);
+    chatItemCache = nextCache;
+    return items;
   });
   const orderedPeople = createMemo(() => {
     const natural = [...props.people].sort((left, right) => {
@@ -219,5 +264,6 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     sectionPosition,
     visiblePinnedKeys,
     visibleSectionIds,
+    waitingAgents,
   };
 }

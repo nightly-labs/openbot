@@ -1,15 +1,19 @@
+import { IOS_TESTFLIGHT_URL } from "@openbot/ui/features/mobile-app/ios-testflight";
 import { prefersReducedMotion } from "@openbot/ui/utils";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
-import { CHANGELOG_ROUTE, type ChangelogRelease as Release } from "../../lib/changelog";
+import { CHANGELOG_ROUTE, type ChangelogPlatform, type ChangelogRelease as Release } from "../../lib/changelog";
 import { CHANGELOG_RELEASES } from "../../lib/changelog-releases";
 import { formatArticleDate } from "../../lib/content-collection";
+import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 import { ArticleGradient } from "../content/ArticleGradient";
 import { ContentCallToAction } from "../content/ContentCallToAction";
 import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
-import { ButtonLink } from "../ui/button";
+import { Button, ButtonLink } from "../ui/button";
+import { ChangelogPlatformTabs, PLATFORM_LABELS } from "./ChangelogPlatformTabs";
 import { ChangelogRelease } from "./ChangelogRelease";
+import { ChangelogSwap, createPlatformSwap } from "./ChangelogSwap";
 
 /** The seed for the hero's colours: the Sunset family, the one the featured article on /news uses. */
 const HERO_GRADIENT_SEED = "OpenBot releases";
@@ -27,6 +31,12 @@ interface ReleaseMonth {
   label: string;
   releases: Release[];
 }
+
+/** The name of the app in each release title. */
+const PRODUCT_NAMES: Record<ChangelogPlatform, string> = {
+  desktop: "OpenBot",
+  mobile: "OpenBot for iPhone",
+};
 
 /** The index in months, so 57 rows read as a few short runs rather than one column of numbers. */
 function releaseMonths(releases: readonly Release[]): ReleaseMonth[] {
@@ -54,12 +64,17 @@ function keepInView(container: HTMLElement, link: HTMLElement): void {
     container.scrollTo({ top: container.scrollTop + row.top - box.top - (box.height - row.height) / 2, behavior });
 }
 
-export function ChangelogPage() {
-  const releases = CHANGELOG_RELEASES;
-  const months = releaseMonths(releases);
-  const latest = releases[0];
-  const [active, setActive] = createSignal(latest?.anchor ?? "");
-  let index: HTMLDivElement | undefined;
+export interface ChangelogPageProps {
+  platform: ChangelogPlatform;
+}
+
+export function ChangelogPage(props: ChangelogPageProps) {
+  const [active, setActive] = createSignal(untrack(() => CHANGELOG_RELEASES[props.platform][0]?.anchor ?? ""));
+  const swap = createPlatformSwap(() => props.platform);
+  const indexes = new Map<ChangelogPlatform, HTMLDivElement>();
+  let layout: HTMLDivElement | undefined;
+  // Set once the page is on screen: finds the current release again after the list changes.
+  let track = () => {};
 
   onSettled(() => landingAnalytics.start(document, window.location.hostname, CHANGELOG_ROUTE));
 
@@ -67,40 +82,57 @@ export function ChangelogPage() {
   // Measured on scroll rather than with an observer: a jump from the index crosses many releases
   // at once, and only the position after it matters.
   onSettled(() => {
-    const articles = releases.flatMap((release) => {
-      const element = document.getElementById(release.anchor);
-      return element ? [{ anchor: release.anchor, element }] : [];
-    });
     let frame = 0;
     let shown = "";
 
     const update = () => {
       frame = 0;
       const line = window.innerHeight * ACTIVE_LINE;
-      let current = articles[0]?.anchor ?? "";
-      for (const { anchor, element } of articles) {
+      const list = CHANGELOG_RELEASES[swap.platform()];
+      let current = list[0]?.anchor ?? "";
+      for (const { anchor } of list) {
+        const element = document.getElementById(anchor);
+        if (!element) continue;
         if (element.getBoundingClientRect().top > line) break;
         current = anchor;
       }
       if (current === shown) return;
       shown = current;
       setActive(current);
+      const index = indexes.get(swap.platform());
       const link = index?.querySelector<HTMLElement>(`a[href="#${current}"]`);
       if (index && link) keepInView(index, link);
     };
     const schedule = () => {
       if (frame === 0) frame = requestAnimationFrame(update);
     };
+    track = schedule;
 
     update();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
+      track = () => {};
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
   });
+
+  createEffect(
+    () => props.platform,
+    (platform) => {
+      setActive(CHANGELOG_RELEASES[platform][0]?.anchor ?? "");
+      track();
+    },
+  );
+
+  // The other list starts at its newest release, so a reader deep in one list is taken back to
+  // the top of the lists. The tabs stay where they are: the index is held at the same place.
+  const showListStart = () => {
+    if (layout && layout.getBoundingClientRect().top < 0)
+      layout.scrollIntoView({ block: "start", behavior: "instant" });
+  };
 
   return (
     <div class="landing-page changelog-page">
@@ -124,70 +156,67 @@ export function ChangelogPage() {
             </div>
           </section>
 
-          <Show when={latest}>
-            {(release) => (
-              <div class="changelog-latest" data-enter="post-prose">
-                <p class="changelog-latest-text">
-                  <span class="changelog-latest-dot" aria-hidden="true" />
-                  Latest release
-                  <a class="changelog-latest-version" href={`#${release().anchor}`}>
-                    {release().version}
-                  </a>
-                  <Show when={release().date}>
-                    {(date) => <span class="changelog-latest-date">· {formatArticleDate(date())}</span>}
-                  </Show>
-                </p>
-                <ButtonLink to="/" hash="download" variant="secondary" size="sm" icon="download">
-                  Download
-                </ButtonLink>
-              </div>
-            )}
-          </Show>
+          <div class="changelog-latest" data-enter="post-prose">
+            <ChangelogSwap swap={swap} panelClass="changelog-latest-row">
+              {(platform) => <LatestRelease platform={platform} />}
+            </ChangelogSwap>
+          </div>
 
-          <div class="changelog-layout">
-            <nav class="changelog-index" aria-label="Releases">
-              <p class="changelog-index-title">
-                Releases <span class="changelog-index-count">{releases.length}</span>
-              </p>
-              <div ref={index} class="changelog-index-scroll">
-                <For each={months}>
-                  {(month) => (
-                    <div class="changelog-index-month">
-                      <Show when={month.label}>
-                        <p class="changelog-index-month-label">{month.label}</p>
-                      </Show>
-                      <ul class="changelog-index-list">
-                        <For each={month.releases}>
-                          {(release) => (
-                            <li class="changelog-index-item">
-                              <a
-                                class="changelog-index-link"
-                                href={`#${release.anchor}`}
-                                aria-current={active() === release.anchor ? "true" : undefined}
-                                onClick={() => setActive(release.anchor)}
-                              >
-                                <span class="changelog-index-version">{release.version}</span>
-                                <Show when={release.date}>
-                                  <time class="changelog-index-date" datetime={release.date}>
-                                    {DAY_FORMAT.format(utcDate(release.date))}
-                                  </time>
-                                </Show>
-                              </a>
-                            </li>
-                          )}
-                        </For>
-                      </ul>
+          <div ref={layout} class="changelog-layout">
+            <div class="changelog-index">
+              <ChangelogPlatformTabs platform={props.platform} onSelect={showListStart} />
+              <ChangelogSwap swap={swap}>
+                {(platform) => (
+                  <nav class="changelog-index-nav" aria-label={`${PLATFORM_LABELS[platform]} releases`}>
+                    <p class="changelog-index-title">
+                      Releases <span class="changelog-index-count">{CHANGELOG_RELEASES[platform].length}</span>
+                    </p>
+                    <div ref={(element) => indexes.set(platform, element)} class="changelog-index-scroll">
+                      <For each={releaseMonths(CHANGELOG_RELEASES[platform])}>
+                        {(month) => (
+                          <div class="changelog-index-month">
+                            <Show when={month.label}>
+                              <p class="changelog-index-month-label">{month.label}</p>
+                            </Show>
+                            <ul class="changelog-index-list">
+                              <For each={month.releases}>
+                                {(release) => (
+                                  <li class="changelog-index-item">
+                                    <a
+                                      class="changelog-index-link"
+                                      href={`#${release.anchor}`}
+                                      aria-current={active() === release.anchor ? "true" : undefined}
+                                      onClick={() => setActive(release.anchor)}
+                                    >
+                                      <span class="changelog-index-version">{release.version}</span>
+                                      <Show when={release.date}>
+                                        <time class="changelog-index-date" datetime={release.date}>
+                                          {DAY_FORMAT.format(utcDate(release.date))}
+                                        </time>
+                                      </Show>
+                                    </a>
+                                  </li>
+                                )}
+                              </For>
+                            </ul>
+                          </div>
+                        )}
+                      </For>
                     </div>
+                  </nav>
+                )}
+              </ChangelogSwap>
+            </div>
+
+            <ChangelogSwap swap={swap} class="changelog-releases">
+              {(platform) => (
+                <For each={CHANGELOG_RELEASES[platform]}>
+                  {(release, position) => (
+                    <ChangelogRelease release={release} product={PRODUCT_NAMES[platform]} latest={position() === 0} />
                   )}
                 </For>
-              </div>
-            </nav>
-
-            <div class="changelog-releases">
-              <For each={releases}>
-                {(release, position) => <ChangelogRelease release={release} latest={position() === 0} />}
-              </For>
-            </div>
+              )}
+            </ChangelogSwap>
           </div>
         </div>
 
@@ -196,5 +225,46 @@ export function ChangelogPage() {
 
       <LandingFooter />
     </div>
+  );
+}
+
+/** The newest release of one app, and where to get that app. */
+function LatestRelease(props: { platform: ChangelogPlatform }) {
+  return (
+    <Show when={CHANGELOG_RELEASES[props.platform][0]}>
+      {(release) => (
+        <>
+          <p class="changelog-latest-text">
+            <span class="changelog-latest-dot" aria-hidden="true" />
+            Latest release
+            <a class="changelog-latest-version" href={`#${release().anchor}`}>
+              {release().version}
+            </a>
+            <Show when={release().date}>
+              {(date) => <span class="changelog-latest-date">· {formatArticleDate(date())}</span>}
+            </Show>
+          </p>
+          <Show
+            when={props.platform === "mobile"}
+            fallback={
+              <ButtonLink to="/" hash="download" variant="secondary" size="sm" icon="download">
+                Download
+              </ButtonLink>
+            }
+          >
+            <Button
+              href={IOS_TESTFLIGHT_URL}
+              target="_blank"
+              rel={EXTERNAL_LINK_REL}
+              variant="secondary"
+              size="sm"
+              icon="open"
+            >
+              Join the TestFlight beta
+            </Button>
+          </Show>
+        </>
+      )}
+    </Show>
   );
 }

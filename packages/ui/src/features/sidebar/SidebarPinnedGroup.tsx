@@ -62,15 +62,16 @@ export function SidebarPinnedGroup() {
               const key = () => sidebarPinnedItemKey(item.ref);
               const name = () => chatName(item.chat);
               const active = () => chatIsActive(item.chat);
-              const routineLabel = () => {
+              // A pinned agent that waits stays in its tile, so the tile says what it waits for.
+              const stateLabel = () => {
                 if (item.chat.kind !== "agent") return "";
                 const state = props.agentStates[item.chat.id];
-                return state?.kind === "routine" ? sidebarAgentStateLabel(state, t) : "";
+                return state?.kind === "routine" || state?.kind === "waiting" ? sidebarAgentStateLabel(state, t) : "";
               };
               const rowLabel = () => {
                 if (item.chat.kind === "channel") return t("sidebar.pinned.channel", { name: name() });
-                return routineLabel()
-                  ? t("sidebar.pinned.agentWithState", { name: name(), state: routineLabel() })
+                return stateLabel()
+                  ? t("sidebar.pinned.agentWithState", { name: name(), state: stateLabel() })
                   : t("sidebar.pinned.agent", { name: name() });
               };
               return (
@@ -114,7 +115,7 @@ export function SidebarPinnedGroup() {
                         { "agent-row-active": active() },
                       ]}
                       aria-label={rowLabel()}
-                      title={routineLabel() || undefined}
+                      title={stateLabel() || undefined}
                       aria-pressed={active() ? "true" : "false"}
                       onClick={() => selectChat(item.chat)}
                     >

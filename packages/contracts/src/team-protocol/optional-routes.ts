@@ -4,6 +4,7 @@
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
 import { AGENT_INSTALL_CODECS } from "./agent-install-v1";
+import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
@@ -27,6 +28,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
+  ...AGENT_PUBLISH_CODECS,
   ...LIVE_ACTIVITY_PUSH_CODECS,
 ]);
 

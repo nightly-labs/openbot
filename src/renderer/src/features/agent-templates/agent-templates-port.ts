@@ -9,6 +9,9 @@ export interface AgentTemplatesPort {
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "get" | "install" | "preview" | "publish" | "unpublish">;
 }
 
+/** What the publish dialog reaches. The web client passes the host's. */
+export type AgentTemplatePublishCalls = Pick<AgentTemplatesPort["agentTemplates"], "preview" | "publish" | "unpublish">;
+
 /** What the install dialog reaches: reading a template, and adding its agent. The web client passes its own. */
 export interface AgentTemplateInstallCalls {
   agent: AgentTemplatesPort["agent"];

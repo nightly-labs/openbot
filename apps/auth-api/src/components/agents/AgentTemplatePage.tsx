@@ -23,7 +23,7 @@ export interface AgentTemplatePageProps {
  *
  * The card is tinted with the agent's own avatar colour, so each shared agent looks like itself.
  * The button opens `openbot://agents/<id>`, built from the id, and the app then shows its own preview
- * with Install; nothing here installs. The fallback line also links `/app?agent=<id>`, where the
+ * with Install; nothing here installs. The button below the card links `/app?agent=<id>`, where the
  * browser client shows the same preview.
  */
 export function AgentTemplatePage(props: AgentTemplatePageProps) {
@@ -96,7 +96,6 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
             <div class="agent-share-action">
               <PluginOpenButtons
                 href={openUrl()}
-                browserHref={createWebAppAgentTemplatePath(props.template.id)}
                 label="Add to OpenBot"
                 downloadCopy={`${props.template.name} is added from inside OpenBot. Get the app, then open this link again.`}
               />
@@ -107,7 +106,7 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
         <p class="agent-share-fallback">
           OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a>,{" "}
           <a href={openUrl()}>open the app</a>, or{" "}
-          <a href={createWebAppAgentTemplatePath(props.template.id)}>add it in your browser</a>.
+          <a href={createWebAppAgentTemplatePath(props.template.id)}>open in browser</a>.
         </p>
       </main>
     </div>

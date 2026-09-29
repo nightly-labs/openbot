@@ -19,6 +19,7 @@ import type {
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
@@ -28,7 +29,9 @@ import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
+import type { WebHostNotice } from "./web-host-connections";
 import type { WebHostState } from "./web-host-lock";
+import { createWebHostedServerWake } from "./web-hosted-server-wake";
 import {
   createWebWorkspaceRuntime,
   WebHostIncompatibleError,
@@ -173,10 +176,17 @@ export function createWebWorkspace(
   const conversationReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
+  const wakeHostedServer = createWebHostedServerWake(props.accountFetch);
+  let wakeReconnectTimer: number | undefined;
+  const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      hostNotice(id, event, agents) {
+        if (disposed) return;
+        for (const listener of hostNoticeListeners) listener(id, event, agents);
+      },
       hostState(id, hostState) {
         if (!disposed)
           setState((draft) => {
@@ -245,6 +255,8 @@ export function createWebWorkspace(
             .catch(report);
           return;
         }
+        // A host that announced a restart comes back by itself; a wake is only for a stopped server.
+        if (update.state === "offline" && !update.code && !state.hostRestart) wakeAndReconnect(update.hostId);
         if (update.state === "online") revokedReconnect = false;
         else if (state.hostRestart) retryAfterRestart();
         if (update.state === "online" && update.resync) {
@@ -544,6 +556,17 @@ export function createWebWorkspace(
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
   }
+  /** A hosted server that the provider stopped is offline until it starts. Ask for a start, then connect again. */
+  function wakeAndReconnect(id: string): void {
+    void wakeHostedServer(id).then((waking) => {
+      if (!waking || disposed || hostId !== id) return;
+      window.clearTimeout(wakeReconnectTimer);
+      wakeReconnectTimer = window.setTimeout(() => {
+        if (!disposed && hostId === id && state.status === "offline") void reconnect().catch(report);
+      }, WAKE_RECONNECT_DELAY_MS);
+    });
+  }
+
   /** `connect` clears `hostRestart`, so the retries count down instead of reading it again. */
   function retryAfterRestart(retries = HOST_RESTART_RETRY_LIMIT): void {
     if (restartRetry || disposed || retries <= 0) return;
@@ -675,7 +698,10 @@ export function createWebWorkspace(
             hostProtocol: { ...error.hostProtocol },
           };
       });
-      if (!(error instanceof WebHostIncompatibleError)) report(error);
+      if (!(error instanceof WebHostIncompatibleError)) {
+        report(error);
+        wakeAndReconnect(host.hostId);
+      }
     }
   }
   async function load(id: string, older = false) {
@@ -959,6 +985,35 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
+  /** Marks every agent with unread messages read through its newest one, loaded or not. */
+  async function markAllRead() {
+    if (state.status !== "online") return;
+    const current = generation;
+    const reads = await runtime.conversationReads();
+    if (disposed || current !== generation) return;
+    const unread = Object.entries(reads)
+      .filter(([, read]) => read.unreadCount > 0)
+      .map(([id]) => id);
+    const writes = unread.map((id) => {
+      const write = (readWrites.get(id) ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(async () => {
+          if (disposed || current !== generation) return;
+          const page = await runtime.conversation(id);
+          const latestMessageId = page.messages.at(-1)?.id;
+          if (!latestMessageId || disposed || current !== generation) return;
+          const readState = await runtime.markRead(id, latestMessageId);
+          if (disposed || current !== generation) return;
+          setState((draft) => {
+            const value = draft.conversations[id]?.page;
+            if (value?.threadId === page.threadId) value.readState = readState;
+          });
+        });
+      readWrites.set(id, write);
+      return write;
+    });
+    await Promise.all(writes);
+  }
   createHostRestartToasts(() =>
     state.host
       ? [
@@ -986,6 +1041,7 @@ export function createWebWorkspace(
     return () => {
       disposed = true;
       generation += 1;
+      window.clearTimeout(wakeReconnectTimer);
       acceptedInvite = null;
       if (restartRetry) clearTimeout(restartRetry);
       window.removeEventListener("focus", focus);
@@ -1009,6 +1065,13 @@ export function createWebWorkspace(
       hostEventListeners.add(listener);
       return () => {
         hostEventListeners.delete(listener);
+      };
+    },
+    /** The events of the hosts this tab has not opened that a notification can show. Returns the unsubscribe function. */
+    onHostNotice(listener: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void) {
+      hostNoticeListeners.add(listener);
+      return () => {
+        hostNoticeListeners.delete(listener);
       };
     },
     run,
@@ -1050,6 +1113,7 @@ export function createWebWorkspace(
       }
     },
     markRead,
+    markAllRead,
     async mutateSidebarLayout(action: SidebarLayoutAction) {
       if (state.status !== "online" || !state.capabilities.includes("sidebar-layout")) {
         throw new Error(currentText().t("webClient.error.sidebarLayout"));

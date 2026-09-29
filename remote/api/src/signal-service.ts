@@ -192,7 +192,7 @@ export class SignalService {
       if (clientPeer) clientPeer.connectionId = null;
     }
     if (peer.peer === "host") {
-      const replacement = this.#firstHost(peer.claims.hostId);
+      const replacement = this.#currentHost(peer.claims.hostId);
       if (replacement) void this.#restoreWaitingClients(replacement);
     }
     this.#metrics.activePeerConnections = this.#connections.size;
@@ -317,7 +317,7 @@ export class SignalService {
       await this.#restoreWaitingClients(peer);
       return;
     }
-    const host = this.#firstHost(claims.hostId);
+    const host = this.#currentHost(claims.hostId);
     if (!host) {
       this.#peers.delete(socket.id);
       this.#metrics.activeSockets = this.#sockets.size;
@@ -369,12 +369,15 @@ export class SignalService {
     });
   }
 
-  #firstHost(hostId: string): AuthenticatedPeer | null {
-    for (const socketId of this.#hosts.get(hostId) ?? []) {
-      const peer = this.#peers.get(socketId);
-      if (peer) return peer;
-    }
-    return null;
+  /**
+   * The host socket that said hello last. A host that stops with no close, such as a hosted server
+   * that its provider stops, keeps its old socket until the idle timeout. Its new socket is the one
+   * that answers.
+   */
+  #currentHost(hostId: string): AuthenticatedPeer | null {
+    let current: AuthenticatedPeer | null = null;
+    for (const socketId of this.#hosts.get(hostId) ?? []) current = this.#peers.get(socketId) ?? current;
+    return current;
   }
 
   #connectionForSession(hostId: string, sessionId: string): ActiveConnection | null {

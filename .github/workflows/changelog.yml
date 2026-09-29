@@ -1,8 +1,10 @@
 name: Changelog
 
 # Each pull request writes its release notes in its own `changelog.d` file, so two pull requests
-# never change the same lines. `bun run release:*` moves the files into CHANGELOG.md. The label
-# events run the check again: `ci.yml` does not run when a label changes.
+# never change the same lines. `bun run release:*` moves the files into CHANGELOG.md. The iPhone app
+# has its own files in `apps/mobile/changelog.d`, which `bun run mobile:release:*` moves into
+# apps/mobile/CHANGELOG.md. The label events run the check again: `ci.yml` does not run when a
+# label changes.
 on:
   pull_request:
     branches: [main]
@@ -32,22 +34,25 @@ jobs:
         with:
           install: none
 
-      # A change to CHANGELOG.md itself also passes: a release, or notes written before `changelog.d`.
+      # A change to a CHANGELOG.md itself also passes: a release, or notes written before `changelog.d`.
       - name: Require release notes
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
         shell: bash
         env:
           BRANCH: ${{ github.head_ref }}
+        # Not `grep -q`: it stops at the first match, and with a long file list the grep before it
+        # then fails with a broken pipe, which `pipefail` reports as no notes.
         run: |
           if ! git diff --name-only --diff-filter=ACMR HEAD^1 HEAD |
-            grep -vFx changelog.d/README.md |
-            grep -Eq '^(changelog\.d/.+\.md|CHANGELOG\.md)$'; then
-            echo "::error::Write the release notes in changelog.d/${BRANCH//\//-}.md (see docs/RELEASING.md#release-notes), or add the no-changelog label when a user sees no change."
+            grep -vFx -e changelog.d/README.md -e apps/mobile/changelog.d/README.md |
+            grep -E '^((apps/mobile/)?changelog\.d/.+\.md|(apps/mobile/)?CHANGELOG\.md)$' >/dev/null; then
+            echo "::error::Write the release notes in changelog.d/${BRANCH//\//-}.md, or in apps/mobile/changelog.d/${BRANCH//\//-}.md for the iPhone app (see docs/RELEASING.md#release-notes). Add the no-changelog label when a user sees no change."
             exit 1
           fi
 
       - name: Check changelog fragments
         shell: bash
         run: |
-          find changelog.d -name '*.md' ! -path changelog.d/README.md -print0 |
+          find changelog.d apps/mobile/changelog.d -name '*.md' \
+            ! -path changelog.d/README.md ! -path apps/mobile/changelog.d/README.md -print0 |
             xargs -0 -r bun scripts/check-release-notes.ts --fragments

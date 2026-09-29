@@ -392,53 +392,28 @@ export function MessageBody(props: {
                       )}
                     </Match>
                     <Match when={textContent(block())}>
-                      {(text) => {
-                        if (untrack(() => props.message.author) === "agent") {
-                          return (
-                            <div
-                              class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
-                              data-selection-message-id={
-                                props.message.streaming !== true ? props.message.id : undefined
-                              }
-                            >
-                              <MarkdownMessageText
-                                body={text().text}
-                                agents={props.agents}
-                                skills={props.skills}
-                                attachments={props.message.attachments}
-                                citations={props.message.citations}
-                                onSelectAgent={props.onSelectAgent}
-                                onOpenLink={props.onOpenLink}
-                                onOpenAttachment={openAttachment}
-                                onOpenSharedFile={props.onOpenSharedFile}
-                                onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                                showCitationFooter={index === lastTextBlockIndex()}
-                                streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
-                                streamingTailAfter={textTailAfter()[index]}
-                              />
-                            </div>
-                          );
-                        }
-                        return (
-                          <p
-                            class="message-copy"
-                            data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
-                          >
-                            <RichMessageText
-                              body={text().text}
-                              agents={props.agents}
-                              skills={props.skills}
-                              attachments={props.message.attachments}
-                              citations={props.message.citations}
-                              onSelectAgent={props.onSelectAgent}
-                              onOpenLink={props.onOpenLink}
-                              onOpenAttachment={openAttachment}
-                              onOpenSharedFile={props.onOpenSharedFile}
-                              onOpenWorkspaceFile={props.onOpenWorkspaceFile}
-                            />
-                          </p>
-                        );
-                      }}
+                      {(text) => (
+                        <div
+                          class={`message-copy message-markdown${streamingBody.animateTail() ? " t-stream" : ""}`}
+                          data-selection-message-id={props.message.streaming !== true ? props.message.id : undefined}
+                        >
+                          <MarkdownMessageText
+                            body={text().text}
+                            agents={props.agents}
+                            skills={props.skills}
+                            attachments={props.message.attachments}
+                            citations={props.message.citations}
+                            onSelectAgent={props.onSelectAgent}
+                            onOpenLink={props.onOpenLink}
+                            onOpenAttachment={openAttachment}
+                            onOpenSharedFile={props.onOpenSharedFile}
+                            onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                            showCitationFooter={index === lastTextBlockIndex()}
+                            streaming={streamingBody.revealing() && index === contentBlocks().length - 1}
+                            streamingTailAfter={textTailAfter()[index]}
+                          />
+                        </div>
+                      )}
                     </Match>
                   </Switch>
                 )}

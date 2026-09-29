@@ -12,6 +12,19 @@
   height: 100%;
 }
 
+/* The browser has no window controls, so the rail starts at the top. */
+.web-app-frame > .server-rail {
+  padding-top: var(--openbot-space-3);
+}
+
+.web-app-frame > .server-rail::before {
+  display: none;
+}
+
+.web-app-frame > .server-rail::after {
+  top: 0;
+}
+
 .web-mobile-navigation {
   display: none;
 }
@@ -60,7 +73,6 @@
     display: flex;
     grid-column: 1;
     grid-row: 1;
-    padding-top: var(--openbot-space-3);
   }
 
   .web-app-frame[data-web-mobile-pane="workspace"] > .sidebar {

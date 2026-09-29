@@ -47,3 +47,11 @@ export function clamp(value: number, minimum: number, maximum: number): number {
 export function mix(start: number, end: number, progress: number): number {
   return start + (end - start) * progress;
 }
+
+/** Reads a CSS time custom property from the root element, in milliseconds. */
+export function motionDuration(name: string, fallback: number): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
+  if (value.endsWith("s")) return (Number.parseFloat(value) || fallback / 1_000) * 1_000;
+  return Number.parseFloat(value) || fallback;
+}

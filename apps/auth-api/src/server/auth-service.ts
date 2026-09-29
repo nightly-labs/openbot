@@ -266,6 +266,11 @@ export class AuthService {
     await this.#enforceRateLimit(`team-tunnel:ip:${normalizeSourceIp(sourceIp)}`, 60, now);
   }
 
+  /** A claim is 32 random bytes; this limit stops a caller that guesses claims from many VMs. */
+  async enforceHostedServerClaimRateLimit(sourceIp: string): Promise<void> {
+    await this.#enforceRateLimit(`hosted-claim:ip:${normalizeSourceIp(sourceIp)}`, 30, this.#now());
+  }
+
   async issueTeamAuthTicket(
     sessionToken: string,
     serverId: string,

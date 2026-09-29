@@ -72,6 +72,8 @@ export interface ServerSummary {
   logoUrl: string | null;
   role: TeamRole | null;
   active: boolean;
+  /** The active members that the host allows. Absent when the account server did not give one. */
+  memberLimit?: number;
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;

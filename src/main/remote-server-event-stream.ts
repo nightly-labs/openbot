@@ -210,6 +210,11 @@ export class RemoteEventStream {
     this.#offlineHosts.delete(serverId);
   }
 
+  /** Signal said that this host is not connected, and no retry has run since. */
+  isHostOffline(serverId: string): boolean {
+    return this.#offlineHosts.has(serverId);
+  }
+
   /** The next retry for this host waits the offline delay, also over a shorter one already set. */
   markHostOffline(serverId: string): void {
     this.#offlineHosts.set(serverId, Date.now());

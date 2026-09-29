@@ -1,6 +1,6 @@
-// The release notes, read from the repository's own CHANGELOG.md. The file is written for
-// people already, in the Keep a Changelog shape, so the page reads it rather than asking a
-// release to be written twice. No JSX and no Vite imports here, so the parser runs in a plain
+// The release notes, read from the repository's own CHANGELOG.md and from apps/mobile/CHANGELOG.md
+// for the iPhone app. The files are written for people already, in the Keep a Changelog shape, so
+// the page reads them rather than asking a release to be written twice. No JSX and no Vite imports here, so the parser runs in a plain
 // Node test; the file itself is imported in `changelog-releases.ts`, which only the page and
 // the sitemap read.
 //
@@ -8,6 +8,7 @@
 // `### Added` style groups, `-` bullets with indented continuation lines, plain paragraphs
 // under a heading, and inline `**bold**`, `code` and [links](url).
 
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import {
   OPENBOT_SITE_URL,
   OPENBOT_SOCIAL_IMAGE_ALT,
@@ -19,6 +20,25 @@ export const CHANGELOG_ROUTE = "/changelog";
 const CHANGELOG_TITLE = "Changelog — OpenBot";
 export const CHANGELOG_DESCRIPTION =
   "Every OpenBot release, newest first: new features, improvements and fixes, with what to do after you upgrade.";
+
+/** The app a changelog covers. The web client ships with the desktop app, so it has no own list. */
+export type ChangelogPlatform = "desktop" | "mobile";
+
+/** In the order of the page's tabs, which is the direction a change of tab moves in. */
+export const CHANGELOG_PLATFORMS: readonly ChangelogPlatform[] = ["desktop", "mobile"];
+
+export interface ChangelogSearch {
+  /** Absent for the desktop list, so `/changelog` stays the address of the page. */
+  platform?: "mobile" | undefined;
+}
+
+/**
+ * Always sets `platform`: the router lays the validated search over the raw one, so a key left
+ * out keeps a value such as `?platform=tablet` that the page has no list for.
+ */
+export function changelogSearch(value: unknown): ChangelogSearch {
+  return { platform: isDynamicRecord(value) && value.platform === "mobile" ? "mobile" : undefined };
+}
 
 export type ChangelogGroupType = "added" | "changed" | "fixed" | "removed" | "security" | "deprecated" | "other";
 
@@ -70,8 +90,11 @@ function groupType(heading: string): ChangelogGroupType {
   return GROUP_TYPES[heading.trim().toLowerCase()] ?? "other";
 }
 
-/** Every released version, newest first as the file lists them. Unreleased notes are left out. */
-export function parseChangelog(markdown: string): ChangelogRelease[] {
+/**
+ * Every released version, newest first as the file lists them. Unreleased notes are left out.
+ * `anchorPrefix` keeps the anchors of two files apart when both have the same version.
+ */
+export function parseChangelog(markdown: string, anchorPrefix = ""): ChangelogRelease[] {
   const releases: ChangelogRelease[] = [];
   let release: ChangelogRelease | undefined;
   let group: ChangelogGroup | undefined;
@@ -100,7 +123,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       release =
         version.toLowerCase() === "unreleased"
           ? undefined
-          : { version, date, anchor: releaseAnchor(version), intro: [], notices: [], groups: [] };
+          : { version, date, anchor: `${anchorPrefix}${releaseAnchor(version)}`, intro: [], notices: [], groups: [] };
       if (release) releases.push(release);
       continue;
     }
@@ -163,12 +186,14 @@ export function parseInline(text: string): InlineSegment[] {
   return segments;
 }
 
-export function changelogUrl(siteUrl: string = OPENBOT_SITE_URL): string {
-  return new URL(CHANGELOG_ROUTE, siteUrl).toString();
+export function changelogUrl(siteUrl: string = OPENBOT_SITE_URL, platform: ChangelogPlatform = "desktop"): string {
+  const url = new URL(CHANGELOG_ROUTE, siteUrl);
+  if (platform === "mobile") url.searchParams.set("platform", platform);
+  return url.toString();
 }
 
-export function changelogHead(siteUrl: string) {
-  const url = changelogUrl(siteUrl);
+export function changelogHead(siteUrl: string, platform: ChangelogPlatform = "desktop") {
+  const url = changelogUrl(siteUrl, platform);
 
   return {
     meta: [

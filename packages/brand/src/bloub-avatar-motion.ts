@@ -45,8 +45,9 @@ export interface AvatarMoodPresentation {
  * How each mood reads on the face.
  *
  * Only `idle` and `swirl` carry `baseFace`, so only they wear the expression asked for here; the
- * others hold the face the pose was drawn with, which is the point of using them. `notify` is the
- * one state whose own face already says what the mood says, so it asks for nothing.
+ * others hold the face the pose was drawn with, which is the point of using them. `waiting` does
+ * not use `notify`: that pose draws a notification dot beside the body, which read as a stray
+ * blue badge on every avatar that waits.
  *
  * The expressions are chosen to agree with what the body is doing rather than to decorate it: an
  * agent that is working looks attentive, one that is waiting on an answer looks curious, a failed
@@ -55,7 +56,7 @@ export interface AvatarMoodPresentation {
 const MOOD_PRESENTATIONS: Readonly<Record<AvatarMood, AvatarMoodPresentation>> = {
   idle: { state: "idle", expression: null, rings: false, breathe: 0 },
   working: { state: "idle", expression: "attentif", rings: true, breathe: 0.03 },
-  waiting: { state: "notify", expression: null, rings: false, breathe: 0 },
+  waiting: { state: "idle", expression: "curieux", rings: false, breathe: 0 },
   failed: { state: "idle", expression: "triste", rings: false, breathe: 0 },
   responded: { state: "idle", expression: "heureux", rings: false, breathe: 0 },
   connecting: { state: "swirl", expression: "attentif", rings: true, breathe: 0 },

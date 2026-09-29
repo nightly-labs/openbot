@@ -4,12 +4,36 @@
  */
 
 import type { ChannelSummary, DirectThreadSummary, TeamPresenceMember } from "@openbot/contracts/ipc";
-import type { AppFormat, AppTranslate } from "@openbot/i18n";
+import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import type { AgentProfile } from "../../data";
 import { teamMemberName } from "../team/TeamPersonAvatar";
-import type { SidebarAgentState, SidebarRoutinePhase } from "./sidebar-types";
+import type { SidebarAgentState, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
+
+/** The state line a waiting row reads out and shows as its tooltip title. */
+export const SIDEBAR_WAIT_TITLE = {
+  question: "sidebar.state.waitingQuestion",
+  approval: "sidebar.state.waitingApproval",
+  takeover: "sidebar.state.waitingTakeover",
+} as const satisfies Record<SidebarWaitReason, AppTextKey>;
+
+/** The chip in the time slot: what the user does next. */
+export const SIDEBAR_WAIT_ACTION = {
+  question: "sidebar.waiting.action.question",
+  approval: "sidebar.waiting.action.approval",
+  takeover: "sidebar.waiting.action.takeover",
+} as const satisfies Record<SidebarWaitReason, AppTextKey>;
+
+export const SIDEBAR_WAIT_HINT = {
+  question: "sidebar.waiting.hint.question",
+  approval: "sidebar.waiting.hint.approval",
+  takeover: "sidebar.waiting.hint.takeover",
+} as const satisfies Record<SidebarWaitReason, AppTextKey>;
 
 export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate): string {
+  if (state.kind === "waiting") {
+    const title = t(SIDEBAR_WAIT_TITLE[state.reason]);
+    return state.detail ? t("sidebar.state.waitingDetail", { state: title, detail: state.detail }) : title;
+  }
   if (state.kind === "working") return t("sidebar.state.working");
   if (state.kind === "responded") return t("sidebar.state.responded");
   if (state.kind === "routine") return routineStateLabel(state.phase, state.count, t);
@@ -17,7 +41,6 @@ export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate
 }
 
 function routineStateLabel(phase: SidebarRoutinePhase, count: number, t: AppTranslate): string {
-  if (phase === "needs-attention") return t("sidebar.state.routineAttention", { count });
   if (phase === "failed") return t("sidebar.state.routineFailed", { count });
   if (phase === "queued") return t("sidebar.state.routineWaiting", { count });
   return t("sidebar.state.routineRunning", { count });

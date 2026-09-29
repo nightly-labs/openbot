@@ -64,6 +64,7 @@ export const messages = {
   "server.rail.moved": "サーバーを {total} 件中 {position} 番目に移動しました。",
   "server.rail.label": "サーバー",
   "server.rail.addRemote": "リモートサーバーを追加",
+  "server.rail.add": "サーバーを追加",
   "server.rail.buttonLabel": "{name} サーバー",
   "server.rail.notificationsMuted": "通知はミュート中",
   "server.rail.actions": "サーバーの操作",

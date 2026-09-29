@@ -125,6 +125,8 @@ interface AcpTurn {
   answerOptional: boolean;
   messages: ThreadItem[];
   toolNames: Map<string, string>;
+  /** The ACP `kind` of each tool call; a later update can omit it. */
+  toolKinds: Map<string, string>;
   task: Promise<void>;
 }
 
@@ -991,6 +993,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       answerOptional: isRecord(params) && params.answerOptional === true,
       messages: [],
       toolNames: new Map(),
+      toolKinds: new Map(),
       task: Promise.resolve(),
     };
     thread.activeTurn = turn;
@@ -1089,6 +1092,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // ACP updates are partial; OpenCode omits the name when a tool finishes.
       const name = update.name ?? update.title ?? turn.toolNames.get(update.toolCallId) ?? "tool";
       turn.toolNames.set(update.toolCallId, name);
+      const toolKind = update.kind ?? turn.toolKinds.get(update.toolCallId) ?? "other";
+      turn.toolKinds.set(update.toolCallId, toolKind);
       this.emit("notification", {
         method: update.status === "completed" || update.status === "failed" ? "item/completed" : "item/started",
         params: {
@@ -1098,6 +1103,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             id: update.toolCallId,
             type: "toolCall",
             name,
+            toolKind,
             status: update.status,
             arguments: update.rawInput,
             result: update.rawOutput,
