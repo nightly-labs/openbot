@@ -188,6 +188,8 @@ export class StripeClient {
       "line_items[0][price]": input.priceId,
       "line_items[0][quantity]": "1",
       currency: input.currency,
+      // Card collection stays on, so a plan that a code discounts only at the start can still renew.
+      allow_promotion_codes: "true",
       client_reference_id: input.serverId,
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
