@@ -85,6 +85,39 @@ describe.sequential("AgentService: routines", () => {
     ]);
   });
 
+  it("does not add a scheduled run while the routine's previous run is unfinished", async () => {
+    const { store, mailbox } = stores(root);
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "codex",
+      // Keep the first run's turn open, as a run that stalls during a sleep does.
+      clientFactory: (provider) => new FakeAgentClient(provider, "", false),
+    });
+    await service.initialize();
+    const agent = await store.getOrCreate("hourly");
+    vi.useFakeTimers({ now: new Date("2026-08-25T10:00:00.000Z") });
+    try {
+      const routine = service.createRoutine({
+        agentId: agent.id,
+        name: "Check for updates",
+        instruction: "Check for updates.",
+        active: true,
+        timezone: "UTC",
+        schedule: { kind: "interval", amount: 15, unit: "minutes", anchorAt: "2026-08-25T10:00:00.000Z" },
+      });
+      await vi.advanceTimersByTimeAsync(15 * 60_000);
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(45 * 60_000);
+      expect(service.listRoutineRuns({ agentId: agent.id, routineId: routine.id })).toEqual([
+        expect.objectContaining({ kind: "scheduled", scheduledFor: "2026-08-25T10:15:00.000Z" }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("persists routine lifecycle markers without adding unread or search results", async () => {
     const { store, mailbox } = stores(root);
     service = createTestService({ store, mailbox });

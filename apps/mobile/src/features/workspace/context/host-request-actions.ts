@@ -20,10 +20,17 @@ import {
   TEAM_SEMANTIC_TAGS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
-import { installAgentTemplate } from "@openbot/team-client/team-admin-requests";
+import {
+  installAgentTemplate,
+  listAgentSkills,
+  setAgentSkillEnabled,
+  uninstallAgentSkill,
+} from "@openbot/team-client/team-admin-requests";
+import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import type { QueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
@@ -56,6 +63,8 @@ type HostRequestActions = Pick<
   | "loadAgentRoutines"
   | "searchMessages"
   | "loadAgentSkills"
+  | "setAgentSkillEnabled"
+  | "uninstallAgentSkill"
   | "loadAgentStorage"
   | "loadAgentAdminSettings"
   | "updateAgentAdminSettings"
@@ -87,6 +96,12 @@ export function createHostRequestActions({
   capabilities: ReadonlyMap<string, string[]>;
   attachmentDownloads: { current: Promise<void> };
 }): HostRequestActions {
+  /** The shared admin requests, sent to one server that serves `skills-admin-v1`. */
+  function skillsAdmin(serverId: string): TeamApiRequest {
+    if (!capabilities.get(serverId)?.includes(SKILLS_ADMIN_CAPABILITY))
+      throw new Error(currentText().t("mobile.agent.skill.manageUnsupported"));
+    return (method, path, decode, body, upload) => request(method, path, decode, body, serverId, upload);
+  }
   return {
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, ["agent-info", ...queryScope, serverId, agentId, "memories"], () =>
@@ -203,10 +218,14 @@ export function createHostRequestActions({
         serverId,
       ),
     // A host too old to know the route answers 404, so ask its advertised capabilities first.
-    loadAgentSkills: async (agentId, serverId) =>
-      capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
+    loadAgentSkills: async (agentId, serverId, manage = false) => {
+      if (manage) return listAgentSkills(skillsAdmin(serverId), agentId);
+      return capabilities.get(serverId)?.includes(TEAM_SEMANTIC_TAGS_CAPABILITY)
         ? request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills, undefined, serverId)
-        : null,
+        : null;
+    },
+    setAgentSkillEnabled: async (input, serverId) => setAgentSkillEnabled(skillsAdmin(serverId), input),
+    uninstallAgentSkill: async (input, serverId) => uninstallAgentSkill(skillsAdmin(serverId), input),
     loadAgentStorage: async (agentId, serverId, force = false) => {
       if (!capabilities.get(serverId)?.includes(STORAGE_CAPABILITY)) return null;
       const input = { scope: "agent" as const, agentId, ...(force ? { force: true } : {}) };

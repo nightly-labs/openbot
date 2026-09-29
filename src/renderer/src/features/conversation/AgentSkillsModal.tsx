@@ -121,7 +121,8 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     } catch (caught) {
       if (request === listRequest) setError(errorMessage(caught, t("skill.loadFailed")));
     } finally {
-      if (showLoading && request === listRequest) setLoading(false);
+      // The latest request ends the wait, also when it replaced a first load that showed it.
+      if (request === listRequest) setLoading(false);
     }
   }
 
@@ -138,6 +139,18 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
       setFilter("all");
       void untrack(() => loadSkills());
       void untrack(loadCatalog);
+    },
+  );
+
+  // A change made on another device, in the chat or in another window shows while the dialog is open.
+  createEffect(
+    () => [props.open, props.agentId, calls()] as const,
+    ([open, agentId, current]) => {
+      if (!open || !current.onChanged) return;
+      return current.onChanged((changedId) => {
+        // During the first load, load in full again, so the skill the dialog was opened for still opens.
+        if (changedId === agentId) void loadSkills(untrack(loading));
+      });
     },
   );
 

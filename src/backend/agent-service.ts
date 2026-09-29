@@ -884,6 +884,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     await this.#tables.removeAsUser(input.name);
   }
 
+  /** Holds routine firing while the system sleeps. See RoutineTimer.suspend. */
+  suspendRoutines(): void {
+    this.#routineTimer.suspend();
+  }
+
+  resumeRoutines(): void {
+    this.#routineTimer.resume();
+  }
+
   listRoutines(agentId: string): Routine[] {
     return this.#routines.list(agentId);
   }
@@ -1019,6 +1028,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   notifyAgentsChanged(): void {
     this.#emit({ type: "agents-changed", agents: this.listAgents() });
+  }
+
+  /** The installed skills of one agent changed, so every open skills list reads them again. */
+  notifySkillsChanged(agentId: string): void {
+    this.#emit({ type: "skills-changed", agentId });
   }
 
   listModels(): AgentModelOption[] {

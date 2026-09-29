@@ -96,6 +96,7 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
             <div class="agent-share-action">
               <PluginOpenButtons
                 href={openUrl()}
+                browserHref={createWebAppAgentTemplatePath(props.template.id)}
                 label="Add to OpenBot"
                 downloadCopy={`${props.template.name} is added from inside OpenBot. Get the app, then open this link again.`}
               />

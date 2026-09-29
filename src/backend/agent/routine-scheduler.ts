@@ -477,10 +477,11 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.nextDueAt(this.#hooks.excludedAgents());
   }
 
-  async processDue(now = new Date()): Promise<void> {
+  async processDue(now = new Date(), active: () => boolean = () => true): Promise<void> {
     const changedAgents = new Set<string>();
     try {
       for (const due of this.#routines.due(now, this.#hooks.excludedAgents())) {
+        if (!active()) break;
         // A previous enqueue can yield while another agent starts deletion.
         if (this.#hooks.excludedAgents().has(due.routine.agentId)) continue;
         const { scheduledFor, nextRunAt } = collapseMissedOccurrences(
@@ -489,10 +490,14 @@ export class RoutineScheduler implements RoutineDueSource {
           new Date(due.nextRunAt),
           now,
         );
-        const run = this.#routines.createRun(due.routine, due.triggerId, "scheduled", scheduledFor.toISOString());
+        // A run that has not finished already does this routine's work. Another one would only
+        // queue behind it, and after a sleep the queue drains as a burst of identical runs.
+        const run = this.#hasLiveRun(due.routine.agentId, due.routine.id)
+          ? null
+          : this.#routines.createRun(due.routine, due.triggerId, "scheduled", scheduledFor.toISOString());
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changedAgents.add(due.routine.agentId);
-        if (!run.deliveryId) {
+        if (run && !run.deliveryId) {
           await this.#enqueueRun(run).catch((error) => {
             this.#hooks.emitError("routine_delivery_failed", error, due.routine.agentId);
           });
@@ -504,6 +509,18 @@ export class RoutineScheduler implements RoutineDueSource {
       // The shared timer re-arms after every source has run, so this must not arm on its own.
       for (const agentId of changedAgents) this.stateChanged(agentId);
     }
+  }
+
+  /**
+   * Whether an earlier run of this routine still holds a delivery in the queue. The run row alone is
+   * not enough: a row whose delivery is gone would stop the routine for good.
+   */
+  #hasLiveRun(agentId: string, routineId: string): boolean {
+    return this.#routines.activeRuns(agentId, routineId).some((run) => {
+      if (!run.deliveryId) return false;
+      const status = this.#mailbox.getDelivery(run.deliveryId)?.delivery.status;
+      return status === "queued" || status === "starting" || status === "running";
+    });
   }
 
   async #enqueueRun(run: RoutineRun): Promise<void> {

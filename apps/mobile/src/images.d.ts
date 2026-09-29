@@ -9,3 +9,9 @@ declare module "*.webp" {
   const asset: number;
   export default asset;
 }
+
+// KaTeX's fonts, which the native math renderer loads with expo-font.
+declare module "*.ttf" {
+  const asset: number;
+  export default asset;
+}

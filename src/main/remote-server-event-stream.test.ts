@@ -127,7 +127,7 @@ describe("remote event connections", () => {
     expect(sockets[0]?.sent).not.toContainEqual({ type: "runtime-snapshot-request" });
 
     sockets[2]?.dispatchEvent(new MessageEvent("message", { data: "x".repeat(1024 * 1024 + 1) }));
-    expect(sockets[2]?.close).toHaveBeenCalledWith(1009, "Event payload is too large");
+    expect(sockets[2]?.close).toHaveBeenCalledWith(1000, "Event payload is too large");
   });
 
   it("backs off short-lived event connections", async () => {

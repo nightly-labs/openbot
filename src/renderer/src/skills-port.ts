@@ -19,6 +19,7 @@ export interface SkillsPort {
     | "listAgentSkills"
     | "listInstalledSkills"
     | "listMcpServers"
+    | "onEvent"
     | "removeMcpServer"
     | "saveMcpServer"
     | "setAgentSkillEnabled"
@@ -60,6 +61,8 @@ export interface AgentSkillCalls {
   install(input: InstallSkillInput): Promise<InstalledSkill>;
   uninstall(input: UninstallSkillInput): Promise<void>;
   setEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill>;
+  /** Calls `listener` with the agent id each time the host reports that its skills changed. */
+  onChanged?(listener: (agentId: string) => void): () => void;
 }
 
 /**
@@ -68,11 +71,24 @@ export interface AgentSkillCalls {
  */
 export function agentSkillCalls(hostServerId?: string): AgentSkillCalls {
   const port = skillsPort();
-  if (!hostServerId) return port.skills;
+  // The events of the selected server: this computer, or the joined server the dialog is for.
+  const onChanged = (listener: (agentId: string) => void) =>
+    port.agent.onEvent((event) => {
+      if (event.type === "skills-changed") listener(event.agentId);
+    });
+  if (!hostServerId)
+    return {
+      listInstalled: (agentId) => port.skills.listInstalled(agentId),
+      install: (input) => port.skills.install(input),
+      uninstall: (input) => port.skills.uninstall(input),
+      setEnabled: (input) => port.skills.setEnabled(input),
+      onChanged,
+    };
   return {
     listInstalled: (agentId) => port.agent.listAgentSkills(agentId, hostServerId),
     install: (input) => port.agent.installAgentSkill(input, hostServerId),
     uninstall: (input) => port.agent.uninstallAgentSkill(input, hostServerId),
     setEnabled: (input) => port.agent.setAgentSkillEnabled(input, hostServerId),
+    onChanged,
   };
 }

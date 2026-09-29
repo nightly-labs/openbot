@@ -935,10 +935,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       { method: "POST", body: { tabId } },
     );
     if (server.transport === "webrtc-v2") {
-      if (!this.#remoteViewerProxy) throw new Error(sourceText("error.remote.viewerProxyUnavailable"));
-      const url = new URL(await this.#remoteViewerProxy.viewerUrl(serverId, session.streamPath));
-      url.protocol = "ws:";
-      return { sessionId: session.id, url: url.toString(), protocols: [] };
+      try {
+        if (!this.#remoteViewerProxy) throw new Error(sourceText("error.remote.viewerProxyUnavailable"));
+        const url = new URL(await this.#remoteViewerProxy.viewerUrl(serverId, session.streamPath));
+        url.protocol = "ws:";
+        return { sessionId: session.id, url: url.toString(), protocols: [] };
+      } catch (error) {
+        // The host counts this session against its limit until it is deleted.
+        void this.closeBrowserViewSession(serverId, session.id).catch(() => undefined);
+        throw error;
+      }
     }
     const url = new URL(session.streamPath, server.apiUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";

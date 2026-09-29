@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AttachmentImportEvent, AttachmentSummary } from "@openbot/contracts/ipc";
+import type { AgentEvent, AttachmentImportEvent, AttachmentSummary, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import {
   deleteSharedTable,
   installAgentSkill,
@@ -16,14 +16,28 @@ import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
+/** The events of the connected host. */
+type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
+
 /** Skills and shared tables on the connected host. The host answers only an owner or admin. */
-function webHostAdmin(request: () => TeamApiRequest): NonNullable<ConversationRuntime["admin"]> {
+function webHostAdmin(
+  request: () => TeamApiRequest,
+  onHostEvent?: HostEvents,
+): NonNullable<ConversationRuntime["admin"]> {
   return {
     skills: {
       listInstalled: (agentId) => listAgentSkills(request(), agentId),
       install: (input) => installAgentSkill(request(), input),
       uninstall: (input) => uninstallAgentSkill(request(), input),
       setEnabled: (input) => setAgentSkillEnabled(request(), input),
+      ...(onHostEvent
+        ? {
+            onChanged: (listener: (agentId: string) => void) =>
+              onHostEvent((event) => {
+                if (event.type === "skills-changed") listener(event.agentId);
+              }),
+          }
+        : {}),
     },
     sharedTables: {
       listTables: () => listSharedTables(request()),
@@ -36,6 +50,7 @@ export function createWebConversationRuntime(
   remote: WebWorkspaceRuntime,
   hostId: () => string,
   adminRequest?: () => TeamApiRequest,
+  onHostEvent?: HostEvents,
 ): ConversationRuntime {
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const files = createWebAttachmentFiles(remote);
@@ -143,6 +158,6 @@ export function createWebConversationRuntime(
       }
     },
     cancelImportFiles,
-    admin: adminRequest ? webHostAdmin(adminRequest) : undefined,
+    admin: adminRequest ? webHostAdmin(adminRequest, onHostEvent) : undefined,
   };
 }

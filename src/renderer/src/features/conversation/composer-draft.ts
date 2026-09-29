@@ -1,5 +1,5 @@
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
-import { isAttachmentSummary, type MarketplaceSkillDetail } from "@openbot/contracts/ipc";
+import { isAttachmentSummary, type MarketplaceSkillDetail, SKILL_CREATION_REQUEST } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { skillExamplePrompt } from "@openbot/ui/components/SkillPreview";
@@ -30,10 +30,7 @@ export function appendSkillExample(
 }
 
 export function appendSkillCreationRequest(draft: ComposerDraft): ComposerDraft {
-  return appendDraftLine(
-    draft,
-    "Help me create a new local skill. Use the skill-creation guide. Ask me what workflow it should support before you create it.",
-  );
+  return appendDraftLine(draft, SKILL_CREATION_REQUEST);
 }
 
 /**

@@ -22,9 +22,11 @@ import type {
   RespondToBrowserSecretInput,
   RespondToPromptInput,
   Routine,
+  SetEnabledSkillInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
   StorageUsage,
+  UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
   UpdateRoutineInput,
@@ -150,8 +152,17 @@ export interface MobileWorkspaceContextValue {
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadAgentAnalytics: (input: AgentAnalyticsInput, serverId: string) => Promise<AgentAnalytics | null>;
-  /** Null when the host does not advertise `installed-skills`. */
-  loadAgentSkills: (agentId: string, serverId: string) => Promise<InstalledSkill[] | null>;
+  /**
+   * Null when the host does not advertise `installed-skills`. With `manage`, reads the
+   * `skills-admin-v1` list, which has the enabled state and origin; the host refuses a member.
+   */
+  loadAgentSkills: (agentId: string, serverId: string, manage?: boolean) => Promise<InstalledSkill[] | null>;
+  /** An owner or admin of an online host that serves `skills-admin-v1`. The host checks the role again. */
+  canManageAgentSkills: (serverId: string) => boolean;
+  /** Owners and admins only; the host refuses a member. Resolves with the skill the host saved. */
+  setAgentSkillEnabled: (input: SetEnabledSkillInput, serverId: string) => Promise<InstalledSkill>;
+  /** Owners and admins only; the host refuses a member. */
+  uninstallAgentSkill: (input: UninstallSkillInput, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `storage-v1`. */
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */

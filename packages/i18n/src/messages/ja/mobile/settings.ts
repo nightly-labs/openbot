@@ -45,6 +45,9 @@ export const messages = {
   "mobile.settings.appearance.light": "ライト",
   "mobile.settings.appearance.dark": "ダーク",
   "mobile.settings.appearance.theme": "テーマ",
+  "mobile.settings.appearance.agentColorMessages": "自分のメッセージにエージェントの色を使う",
+  "mobile.settings.appearance.agentColorMessagesFooter":
+    "エージェントとのチャットで、自分のメッセージにそのエージェントの色を使います。文字が読みにくい場合はオフにしてください。",
   "mobile.settings.feedback.title": "フィードバック",
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",

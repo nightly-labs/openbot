@@ -1,5 +1,5 @@
 import { analyticsRange, type InstalledSkill, parseAnalyticsRange } from "@openbot/contracts/ipc";
-import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -14,6 +14,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { AgentFiles } from "./agent-files";
 import { MemoryEditor, RoutineEditor } from "./agent-record-editor";
+import { AgentSkills, CreateSkillAction } from "./agent-skills";
 import { AgentUsageReport } from "./agent-usage-report";
 
 type ListKind = "usage" | "memories" | "routines" | "skills" | "files";
@@ -127,12 +128,15 @@ export function AgentInformation({
     queryKey: [...key, "routines"],
     queryFn: () => workspace.loadAgentRoutines(agent.id, agent.serverId),
   });
+  // An owner or admin reads the admin list, which has the enabled state, and can change it.
+  const manageSkills = workspace.canManageAgentSkills(agent.serverId);
+  const skillsKey = [...key, "skills", manageSkills];
   const skills = useQuery({
     ...options,
     enabled: available && section === "skills",
-    queryKey: [...key, "skills"],
+    queryKey: skillsKey,
     queryFn: async () => {
-      const installed = await workspace.loadAgentSkills(agent.id, agent.serverId);
+      const installed = await workspace.loadAgentSkills(agent.id, agent.serverId, manageSkills);
       return installed && userAssignedSkills(installed);
     },
   });
@@ -331,6 +335,7 @@ export function AgentInformation({
       ) : null}
       {section === "skills" ? (
         <>
+          {available && manageSkills ? <CreateSkillAction agent={agent} /> : null}
           <InformationSection
             kind="skills"
             list
@@ -340,29 +345,18 @@ export function AgentInformation({
             retry={() => void skills.refetch()}
           >
             {skills.data === null ? (
-              <SettingsRow>
-                <Typography.Paragraph>{t("mobile.agent.info.skillsUnsupported")}</Typography.Paragraph>
-              </SettingsRow>
-            ) : null}
-            {skills.data?.map((skill) => (
-              <SettingsRow key={skill.skillId} supportingText={skillMeta(skill, t)}>
-                <Typography.Paragraph numberOfLines={1}>{skill.name}</Typography.Paragraph>
-                {skill.description ? (
-                  <Typography.Paragraph type="body-xs" numberOfLines={3} className="text-grouped-secondary">
-                    {skill.description}
-                  </Typography.Paragraph>
-                ) : null}
-              </SettingsRow>
-            ))}
-            {skills.data?.length === 0 ? (
-              <SettingsRow>
-                <Typography.Paragraph className="text-grouped-secondary">
-                  {t("mobile.agent.info.noSkills")}
-                </Typography.Paragraph>
-              </SettingsRow>
+              <SettingsSection>
+                <SettingsRow>
+                  <Typography.Paragraph>{t("mobile.agent.info.skillsUnsupported")}</Typography.Paragraph>
+                </SettingsRow>
+              </SettingsSection>
+            ) : skills.data ? (
+              <AgentSkills agent={agent} skills={skills.data} manage={manageSkills} queryKey={skillsKey} />
             ) : null}
           </InformationSection>
-          <SettingsNote>{t("mobile.agent.info.skillsManaged")}</SettingsNote>
+          <SettingsNote>
+            {t(manageSkills ? "mobile.agent.info.skillsAddOnComputer" : "mobile.agent.info.skillsManaged")}
+          </SettingsNote>
         </>
       ) : null}
       {section === "files" ? (
@@ -500,11 +494,7 @@ function InformationSection({
   const { t } = useText();
   const text = LIST_SECTION_TEXT[kind];
   if (list && available && !pending && !failed)
-    return kind === "memories" || kind === "routines" || kind === "skills" ? (
-      <SettingsSection>{children}</SettingsSection>
-    ) : (
-      children
-    );
+    return kind === "memories" || kind === "routines" ? <SettingsSection>{children}</SettingsSection> : children;
   return (
     <SettingsSection title={t(text.title)}>
       <SettingsRow>
@@ -537,19 +527,4 @@ function userAssignedSkills(skills: InstalledSkill[]): InstalledSkill[] {
         skill.origin !== "managed" && skill.slug !== "openbot-site-hosting" && skill.skillId !== "openbot-site-hosting",
     )
     .sort((left, right) => left.name.localeCompare(right.name));
-}
-
-function skillMeta(skill: InstalledSkill, t: MobileTranslate): string {
-  const parts = [
-    skill.origin === "workspace"
-      ? (skill.location ?? t("mobile.agent.skill.workspaceFolder"))
-      : `v${skill.installedVersion}`,
-    skill.state === "update-available"
-      ? t("mobile.agent.skill.updateAvailable", { version: skill.availableVersion })
-      : null,
-    skill.state === "needs-repair" ? t("mobile.agent.skill.needsRepair") : null,
-    skill.state === "modified" ? t("mobile.agent.skill.modified") : null,
-    skill.enabled === false ? t("mobile.agent.skill.disabled") : null,
-  ];
-  return parts.filter(Boolean).join(" · ");
 }

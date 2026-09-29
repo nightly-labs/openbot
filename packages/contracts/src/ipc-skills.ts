@@ -105,6 +105,13 @@ export interface SubmitSkillInput {
 export const INSTALLED_SKILL_ORIGINS = ["marketplace", "managed", "local", "workspace"] as const;
 export type InstalledSkillOrigin = (typeof INSTALLED_SKILL_ORIGINS)[number];
 
+/**
+ * The message a user sends to ask the agent for a new local skill, on desktop, web and mobile. The
+ * agent reads it, so it stays English and the same everywhere; it names the skill-creation guide.
+ */
+export const SKILL_CREATION_REQUEST =
+  "Help me create a new local skill. Use the skill-creation guide. Ask me what workflow it should support before you create it.";
+
 /** The Agent Skills specification limit for a SKILL.md `description`. */
 export const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
 

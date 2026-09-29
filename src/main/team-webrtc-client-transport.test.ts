@@ -599,6 +599,7 @@ describe("TeamWebRtcClientTransport", () => {
     for (const [sequence, payload] of [
       { type: "channel-memories-changed", channelId: "channel-1" },
       { type: "channel-routines-changed", channelId: "channel-1" },
+      { type: "skills-changed", agentId: "agent-1" },
     ].entries()) {
       bridge.emit(
         "data",

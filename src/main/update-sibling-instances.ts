@@ -24,11 +24,15 @@ interface SiblingScanInput {
  * another tenant's session; the uid is reported so the refusal can say so.
  *
  * A failed scan blocks installation: failure is not proof that the shared bundle is unused.
+ *
+ * macOS only. On Linux the Chromium zygote, renderer and GPU processes run this same executable
+ * with `--type=` arguments, so a scan there always finds this session's own children. An AppImage
+ * also mounts at a new path for each launch, so no other session can share the executable path.
  */
 export async function listSiblingOpenBotInstances(input: SiblingScanInput): Promise<OpenBotSiblingInstance[]> {
   const platform = input.platform ?? process.platform;
-  if (platform !== "darwin" && platform !== "linux") return [];
-  const output = await (input.listProcesses ?? (() => listProcessesWithPs(platform)))();
+  if (platform !== "darwin") return [];
+  const output = await (input.listProcesses ?? listProcessesWithPs)();
   return parseSiblingInstances(output, input);
 }
 
@@ -51,11 +55,10 @@ export function parseSiblingInstances(
   return siblings;
 }
 
-function listProcessesWithPs(platform: NodeJS.Platform): Promise<string> {
+function listProcessesWithPs(): Promise<string> {
   return new Promise((resolve, reject) => {
-    // macOS comm is the executable path; Linux comm is only a truncated name.
-    const columns = platform === "darwin" ? "pid=,uid=,comm=" : "pid=,uid=,args=";
-    execFile("/bin/ps", ["-ax", "-o", columns], (error, stdout) => {
+    // macOS comm is the executable path.
+    execFile("/bin/ps", ["-ax", "-o", "pid=,uid=,comm="], (error, stdout) => {
       if (error) reject(new Error(sourceText("error.update.siblingCheckFailed")));
       else resolve(stdout);
     });

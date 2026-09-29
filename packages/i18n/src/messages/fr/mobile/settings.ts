@@ -45,6 +45,9 @@ export const messages = {
   "mobile.settings.appearance.light": "Clair",
   "mobile.settings.appearance.dark": "Sombre",
   "mobile.settings.appearance.theme": "Thème",
+  "mobile.settings.appearance.agentColorMessages": "Couleur de l’agent sur mes messages",
+  "mobile.settings.appearance.agentColorMessagesFooter":
+    "Vos messages dans une conversation avec un agent prennent la couleur de cet agent. Désactivez cette option si le texte est difficile à lire.",
   "mobile.settings.feedback.title": "Retour",
   "mobile.settings.feedback.footer": "Retour tactile pour les actions de l’app sur cet appareil.",
   "mobile.settings.feedback.haptics": "Retour haptique",

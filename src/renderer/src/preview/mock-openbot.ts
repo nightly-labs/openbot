@@ -401,7 +401,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   );
   const mockProviderRuntimes = createMockProviderRuntimes(options, runtime);
   const mockAuth = createMockAuth(options, runtime);
-  const mockSkills = createMockSkills(options);
+  const mockSkills = createMockSkills(options, (agentId) => emitAgentEvent({ type: "skills-changed", agentId }));
   const { installedSkills, readInstalledSkills } = mockSkills;
   const mockBrowser = createMockBrowser(options, runtime, emitAgentEvent);
   const mockTeam = createMockTeam(options, runtime, emitAgentEvent, () => agents);

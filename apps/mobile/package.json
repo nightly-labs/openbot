@@ -61,6 +61,7 @@
     "expo-web-browser": "~57.0.3",
     "heroui-native": "^1.0.8",
     "lucide-react-native": "^1.38.0",
+    "katex": "catalog:",
     "marked": "catalog:",
     "react": "19.2.3",
     "react-dom": "19.2.3",

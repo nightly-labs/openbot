@@ -9,6 +9,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -627,7 +628,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       ) {
         void refreshConversationReads(serverId).catch(() => undefined);
       }
-      if (event.type === "memories-changed" || event.type === "routines-changed" || event.type === "turn-completed") {
+      if (
+        event.type === "memories-changed" ||
+        event.type === "routines-changed" ||
+        event.type === "skills-changed" ||
+        event.type === "turn-completed"
+      ) {
         void queryClient.invalidateQueries({
           queryKey: ["agent-info", session.apiUrl, session.user.id, sessionScope, serverId, event.agentId],
         });
@@ -763,6 +769,16 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<MobileWorkspaceContextValue>(() => {
     const activeServer = servers.find((server) => server.id === activeServerId) ?? EMPTY_SERVER;
+    /** An owner or admin of an online host that serves `capability`. The host checks the role again. */
+    const administers = (serverId: string, capability: string) => {
+      const server = servers.find((candidate) => candidate.id === serverId);
+      return Boolean(
+        server &&
+          server.state === "online" &&
+          (server.role === "owner" || server.role === "admin") &&
+          serverCapabilities.current.get(serverId)?.includes(capability),
+      );
+    };
     const workspace: MobileWorkspaceContextValue = {
       sidebarByServer,
       mutateSidebarLayout: async (serverId, action) => {
@@ -853,15 +869,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         connections.current.get(serverId)?.refresh();
         await refreshHosts();
       },
-      canEditServerIdentity: (serverId) => {
-        const server = servers.find((candidate) => candidate.id === serverId);
-        return Boolean(
-          server &&
-            server.state === "online" &&
-            (server.role === "owner" || server.role === "admin") &&
-            serverCapabilities.current.get(serverId)?.includes(HOST_ADMIN_CAPABILITY),
-        );
-      },
+      canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+      canManageAgentSkills: (serverId) => administers(serverId, SKILLS_ADMIN_CAPABILITY),
       updateServerIdentity: async (serverId, input) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
         if (!server || server.role === "member")

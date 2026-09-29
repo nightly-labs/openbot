@@ -43,6 +43,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.light": "Light",
   "mobile.settings.appearance.dark": "Dark",
   "mobile.settings.appearance.theme": "Theme",
+  "mobile.settings.appearance.agentColorMessages": "Agent color on my messages",
+  "mobile.settings.appearance.agentColorMessagesFooter":
+    "Your messages in an agent chat use that agent’s color. Turn off if the text is hard to read.",
   "mobile.settings.feedback.title": "Feedback",
   "mobile.settings.feedback.footer": "Touch feedback for actions in the app on this device.",
   "mobile.settings.feedback.haptics": "Haptics",

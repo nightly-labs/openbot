@@ -1,0 +1,13 @@
+/* KaTeX output. `katex.min.css` owns the formula layout; these rules only place it in a message. */
+.message-math-display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* KaTeX gives display math a vertical margin; the message already spaces its blocks. */
+.message-math-display > * {
+  margin: 0;
+  padding: var(--openbot-space-1) 0;
+}

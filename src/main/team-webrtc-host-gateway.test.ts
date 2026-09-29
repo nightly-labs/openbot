@@ -530,6 +530,7 @@ describe("TeamWebRtcHostGateway", () => {
     for (const event of [
       { type: "channel-memories-changed", channelId: "channel-1" },
       { type: "channel-routines-changed", channelId: "channel-1" },
+      { type: "skills-changed", agentId: "agent-1" },
     ] as const) {
       for (const client of eventsServer.clients) client.send(JSON.stringify(event));
       await vi.waitFor(() =>

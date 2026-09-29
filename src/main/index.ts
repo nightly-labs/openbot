@@ -4,7 +4,7 @@ import { type CentralAuthState, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { createRemoteDirectoryRefresh } from "@openbot/team-client/remote-directory";
-import { app, BrowserWindow, dialog, Notification, powerMonitor, protocol, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, Notification, net, powerMonitor, protocol, screen, shell } from "electron";
 import { readAppVariant, resolveAppIconPath } from "./app-icon";
 import { type ApplicationServices, createApplicationServices } from "./application-services";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
@@ -65,6 +65,7 @@ import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-windo
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
 import { sendToRenderer } from "./renderer-ipc";
+import { RoutineWake } from "./routine-wake";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
@@ -812,6 +813,10 @@ if (!hasSingleInstanceLock) {
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
       powerMonitor.on("resume", () => remoteServers.wake());
+      const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
+      powerMonitor.on("suspend", () => routineWake.suspend());
+      powerMonitor.on("resume", () => routineWake.resume());
+      teardown.push(0, "routine wake", () => routineWake.dispose());
       const teamIdentity = teamStore.getIdentity();
       if (
         shouldAutoStartHost({

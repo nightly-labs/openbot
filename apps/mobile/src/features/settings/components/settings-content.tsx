@@ -68,6 +68,7 @@ export function SettingsRow({
   disabled = false,
   leading,
   disclosure = true,
+  accessibilityLabel,
 }: PropsWithChildren<{
   supportingText?: string;
   onPress?: () => void;
@@ -75,6 +76,8 @@ export function SettingsRow({
   disabled?: boolean;
   leading?: ReactNode;
   disclosure?: boolean;
+  /** For an action row whose visible text needs its context, such as the item it acts on. */
+  accessibilityLabel?: string;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const content = (
@@ -94,6 +97,7 @@ export function SettingsRow({
   return onPress ? (
     <ListGroup.Item
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => {

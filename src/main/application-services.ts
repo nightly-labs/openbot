@@ -883,7 +883,15 @@ export async function createApplicationServices({
   const skills = new SkillMarketplaceService(
     centralAuth,
     () => service.listAgents(),
-    async (agentId) => service.refreshAgentRuntime(agentId),
+    // Every skill change ends here: install, update, uninstall, turning one on or off, and a skill
+    // an agent creates. The event reaches this computer's windows and the joined clients.
+    async (agentId) => {
+      try {
+        await service.refreshAgentRuntime(agentId);
+      } finally {
+        service.notifySkillsChanged(agentId);
+      }
+    },
     new LocalSkillLibrary(join(app.getPath("userData"), "local-skills"), () => service.listAgents()),
   );
   const marketplaceAgents = new AgentMarketplaceService(centralAuth, service, skills);
@@ -1223,12 +1231,18 @@ export async function createApplicationServices({
     // the service refuses the install until every sibling session stopped. Unpackaged runs never
     // enable updates, so there is nothing to guard there.
     checkSiblingInstances: app.isPackaged
-      ? () =>
-          listSiblingOpenBotInstances({
+      ? async () => {
+          const siblings = await listSiblingOpenBotInstances({
             executablePath: app.getPath("exe"),
             currentPid: process.pid,
             platform: process.platform,
-          })
+          });
+          if (siblings.length > 0) {
+            const list = siblings.map(({ pid, uid }) => `pid ${pid} (uid ${uid})`).join(", ");
+            logger.warn(`OpenBot update install refused: other OpenBot processes run from this application: ${list}`);
+          }
+          return siblings;
+        }
       : undefined,
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),

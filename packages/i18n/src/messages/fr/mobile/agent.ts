@@ -118,6 +118,8 @@ export const messages = {
     "Cet hôte ne prend pas en charge les compétences. Mettez à jour OpenBot sur l’hôte.",
   "mobile.agent.info.noSkills": "Aucune compétence pour l’instant.",
   "mobile.agent.info.skillsManaged": "Les compétences de cet agent sont gérées sur l’hôte.",
+  "mobile.agent.info.skillsAddOnComputer":
+    "Utilisez + pour créer une compétence avec cet agent. Ajoutez des compétences du marketplace dans OpenBot sur un ordinateur ou dans l’application web.",
   "mobile.agent.info.filesUnsupported":
     "Cet hôte ne prend pas en charge la gestion des fichiers. Mettez à jour OpenBot sur l’hôte.",
   "mobile.agent.info.memoryGone": "Ce souvenir n’est plus disponible.",
@@ -127,6 +129,20 @@ export const messages = {
   "mobile.agent.skill.needsRepair": "Réparation nécessaire",
   "mobile.agent.skill.modified": "Modifiée",
   "mobile.agent.skill.disabled": "Désactivée",
+  "mobile.agent.skill.create": "Créer une compétence",
+  "mobile.agent.skill.uninstall": "Désinstaller",
+  "mobile.agent.skill.uninstallNamed": "Désinstaller {name}",
+  "mobile.agent.skill.uninstallTitle": "Désinstaller {name} ?",
+  "mobile.agent.skill.uninstallBody":
+    "OpenBot va retirer cette compétence de l’agent. L’historique de discussion reste.",
+  "mobile.agent.skill.uninstallModifiedBody":
+    "Cette compétence a des modifications locales dans l’espace de travail de l’agent. La désinstallation supprime ces fichiers. L’historique de discussion reste.",
+  "mobile.agent.skill.uninstalling": "Désinstallation…",
+  "mobile.agent.skill.uninstallFailed": "Impossible de désinstaller {name}.",
+  "mobile.agent.skill.enableFailed": "Impossible d’activer {name}.",
+  "mobile.agent.skill.disableFailed": "Impossible de désactiver {name}.",
+  "mobile.agent.skill.manageUnsupported":
+    "Cet hôte ne peut pas modifier les compétences. Mettez à jour OpenBot sur l’hôte.",
   "mobile.agent.discard.title": "Abandonner les modifications ?",
   "mobile.agent.discard.body": "Vos modifications n’ont pas été enregistrées.",
   "mobile.agent.discard.keepEditing": "Continuer à modifier",
