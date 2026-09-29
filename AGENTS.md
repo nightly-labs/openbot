@@ -6,9 +6,6 @@ Use ASD-STE100 Simplified Technical English for all text you write: questions, u
 explanations, final answers, commit messages, PR descriptions, and review comments. Be as concise as
 possible. Keep quotations, code, commands, paths, identifiers, and required technical terms unchanged.
 
-Do not add an agent or model as author or co-author. Do not add `Co-Authored-By:` trailers or
-"Generated with" lines to commits or PRs.
-
 When a step doesn't need the developer's input, keep going. Put status notes in the same message as
 your next action. Stop and ask only when you can't continue without the developer, or before
 anything destructive: deleting data, force-pushing, or changing anything outside this repository.
