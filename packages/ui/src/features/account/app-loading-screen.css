@@ -121,6 +121,7 @@
 /* The fade also runs with reduced motion: its animationend removes the screen. */
 .app-loading:not([data-phase="loading"]) {
   pointer-events: none;
+  -webkit-app-region: no-drag;
   animation: app-loading-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) var(--app-loading-exit-delay)
     forwards;
 }

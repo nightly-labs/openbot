@@ -23,6 +23,7 @@
 /* The fade also runs with reduced motion: its animationend removes the splash. */
 .startup-splash[data-phase="exit"] {
   pointer-events: none;
+  -webkit-app-region: no-drag;
   animation: startup-splash-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) forwards;
 }
 
