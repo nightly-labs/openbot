@@ -66,7 +66,8 @@ const STATE_TONES: Record<HostedServerState, BadgeTone> = {
 export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   const { t } = useText();
   const state = () => props.store.state;
-  const planEnded = (server: HostedServerSummary) => server.state === "stopped" && server.error === "plan_ended";
+  // Also a server whose setup failed: it has no sandbox to stop, so it stays in `error`.
+  const planEnded = (server: HostedServerSummary) => server.error === "plan_ended";
   const description = (server: HostedServerSummary) => {
     if (server.state === "awaiting_payment") return t("settings.hostedServers.paymentDescription");
     if (planEnded(server)) return t("settings.hostedServers.planEndedDescription");
@@ -139,7 +140,7 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
                         : t(planEnded(server) ? "settings.hostedServers.renew" : "settings.hostedServers.pay")}
                     </Button>
                   </Show>
-                  <Show when={(server.state === "stopped" && !planEnded(server)) || server.state === "error"}>
+                  <Show when={(server.state === "stopped" || server.state === "error") && !planEnded(server)}>
                     <Button
                       variant="outline"
                       size="sm"
