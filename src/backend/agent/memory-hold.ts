@@ -59,8 +59,9 @@ export class MemoryHold {
     this.#hooks.emitError("host_memory_low", new Error(sourceText("error.agent.lowMemory")), agentId);
   }
 
-  reserveTurn(): void {
-    this.#memory?.reserveTurn();
+  /** Returns the release, for a start that ends with no turn. */
+  reserveTurn(): () => void {
+    return this.#memory?.reserveTurn() ?? (() => {});
   }
 
   /** The most turns that run at the same time, or null for no limit. */

@@ -18,8 +18,8 @@ const CHILD_OOM_SCORE_ADJ = 500;
 export interface HostedServerMemoryOptions {
   /** The Electron processes. Chromium sets their OOM values itself. */
   electronPids: () => readonly number[];
-  /** Called one time when the memory files cannot be read. The level then stays "ok". */
-  onReadError: (message: string) => void;
+  /** Called one time when the memory files cannot be read (the level then stays "ok"), and when a listener fails. */
+  onError: (message: string, error: unknown) => void;
   now?: () => number;
 }
 
@@ -36,7 +36,8 @@ interface MemorySample {
 export class HostedServerMemory implements HostMemory {
   readonly #options: HostedServerMemoryOptions;
   readonly #listeners = new Set<() => void>();
-  readonly #reservedAt: number[] = [];
+  /** The start times of the turns reserved in the last `TURN_RESERVE_MS`. Each one is its own object, so its release removes only it. */
+  readonly #reservations = new Set<{ at: number }>();
   #timer: ReturnType<typeof setInterval> | null = null;
   #pending: Promise<void> | null = null;
   #sample: MemorySample | null = null;
@@ -71,9 +72,13 @@ export class HostedServerMemory implements HostMemory {
     return 16;
   }
 
-  reserveTurn(): void {
-    this.#reservedAt.push(this.#now());
+  reserveTurn(): () => void {
+    const reservation = { at: this.#now() };
+    this.#reservations.add(reservation);
     this.#level = this.#nextLevel();
+    return () => {
+      if (this.#reservations.delete(reservation)) this.#level = this.#nextLevel();
+    };
   }
 
   subscribe(listener: () => void): () => void {
@@ -92,7 +97,13 @@ export class HostedServerMemory implements HostMemory {
     this.#sample = await this.#read();
     this.#level = this.#nextLevel();
     await raiseChildOomScores(new Set([process.pid, ...this.#options.electronPids()]));
-    for (const listener of this.#listeners) listener();
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.#options.onError("A hosted server memory listener failed.", error);
+      }
+    }
   }
 
   async #read(): Promise<MemorySample | null> {
@@ -107,8 +118,7 @@ export class HostedServerMemory implements HostMemory {
     } catch (error) {
       if (!this.#readErrorLogged) {
         this.#readErrorLogged = true;
-        const code = error instanceof Error && "code" in error ? String(error.code) : "unknown";
-        this.#options.onReadError(`The hosted server could not read its memory use (${code}).`);
+        this.#options.onError("The hosted server could not read its memory use.", error);
       }
       return null;
     }
@@ -118,11 +128,11 @@ export class HostedServerMemory implements HostMemory {
     const sample = this.#sample;
     if (!sample) return "ok";
     const now = this.#now();
-    while (this.#reservedAt.length > 0 && now - (this.#reservedAt[0] ?? now) >= TURN_RESERVE_MS) {
-      this.#reservedAt.shift();
+    for (const reservation of this.#reservations) {
+      if (now - reservation.at >= TURN_RESERVE_MS) this.#reservations.delete(reservation);
     }
     if (sample.available < Math.max(256 * MIB, sample.total * 0.06)) return "critical";
-    const free = sample.available - this.#reservedAt.length * TURN_RESERVE_BYTES;
+    const free = sample.available - this.#reservations.size * TURN_RESERVE_BYTES;
     const low = Math.max(512 * MIB, sample.total * 0.12);
     if (free < low) return "low";
     if (this.#level !== "ok" && free < low + RECOVER_MARGIN_BYTES) return "low";
@@ -143,15 +153,21 @@ function parseMeminfo(text: string): MemorySample {
   return { total: kib("MemTotal"), available: kib("MemAvailable") };
 }
 
-/** The limit and use of the unit's cgroup, or null when the unit has no limit or no cgroup v2. */
+/**
+ * The limit and the use of the unit's cgroup, with no reclaimable file cache, or null when the unit
+ * has no limit or no cgroup v2.
+ */
 async function readUnitMemory(): Promise<{ max: number; current: number } | null> {
   const cgroup = (await readFile("/proc/self/cgroup", "utf8")).split("\n").find((line) => line.startsWith("0::"));
   if (!cgroup) return null;
   const root = `/sys/fs/cgroup${cgroup.slice(3)}`;
   const max = (await readFile(`${root}/memory.max`, "utf8")).trim();
   if (max === "max") return null;
-  const current = (await readFile(`${root}/memory.current`, "utf8")).trim();
-  return { max: Number(max), current: Number(current) };
+  const current = Number((await readFile(`${root}/memory.current`, "utf8")).trim());
+  // `memory.current` counts the file cache too. The kernel takes the inactive part back before the
+  // OOM killer acts, so it is free memory, as it is in `MemAvailable`.
+  const inactiveFile = /^inactive_file (\d+)$/m.exec(await readFile(`${root}/memory.stat`, "utf8"))?.[1];
+  return { max: Number(max), current: current - Number(inactiveFile ?? 0) };
 }
 
 /**

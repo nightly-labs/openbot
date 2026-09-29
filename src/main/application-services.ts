@@ -488,7 +488,7 @@ export async function createApplicationServices({
   const hostMemory = hostedServer
     ? new HostedServerMemory({
         electronPids: () => app.getAppMetrics().map((metric) => metric.pid),
-        onReadError: (message) => logger.warn(message),
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
       })
     : null;
   if (hostMemory) {

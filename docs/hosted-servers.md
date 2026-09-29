@@ -343,9 +343,10 @@ The unit (`openbot.service`):
 - `provision.sh` adds compressed swap (zram, half of the memory) when the kernel has the module.
 
 The app (`HostedServerMemory`) reads the memory every 5 s. The free memory is the smaller of
-`MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`).
-Each turn that started in the last 60 s counts 300 MB more, so routines that start together do not
-all pass the check before their processes grow.
+`MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
+plus `inactive_file` from `memory.stat`: the kernel takes that file cache back before the OOM killer
+acts). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
+do not all pass the check before their processes grow. A start that fails counts nothing.
 
 | Level | When | What happens |
 | --- | --- | --- |

@@ -289,7 +289,9 @@ export class DrainScheduler {
     // afterwards runs where no completion can be delivered, holding the queue of this agent.
     let releaseRuntimeRefresh: () => void = () => {};
     // Synchronously, before the first await, so the next drain already counts this turn's memory.
-    this.#memory.reserveTurn();
+    // Released in the `finally` when no turn starts: a start that fails uses no provider memory.
+    const releaseReservation = this.#memory.reserveTurn();
+    let turnMayRun = false;
     try {
       for (const item of batch) await this.#mailbox.markStarting(item.delivery.id);
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
@@ -450,6 +452,7 @@ export class DrainScheduler {
         return;
       }
       if (isRequestTimeout(error, "turn/start")) {
+        turnMayRun = true;
         this.#channels?.deliveryUncertain(delivery.id);
         this.#hooks.emitError(
           "delivery_start_unconfirmed",
@@ -472,6 +475,7 @@ export class DrainScheduler {
       if (delivery.sender.kind === "agent") this.scheduleDrain(delivery.sender.agentId);
     } finally {
       releaseRuntimeRefresh();
+      if (!confirmedTurnId && !turnMayRun) releaseReservation();
       for (const provider of claimed) this.#startingDeliveries.set(provider, this.#starting(provider) - 1);
     }
   }
