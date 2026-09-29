@@ -5,6 +5,7 @@ import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
 import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
+import { LIVE_ACTIVITY_PUSH_ROUTES } from "./live-activity-push-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
 import { SHARED_TABLES_ROUTES } from "./shared-tables-v1";
@@ -243,5 +244,31 @@ describe("context-reset-v1", () => {
     });
     expect(() => codec(CONTEXT_RESET_ROUTES.clear).request({})).toThrow();
     expect(codec(CONTEXT_RESET_ROUTES.clear).response(200, {})).toEqual({});
+  });
+});
+
+describe("live-activity-push-v1", () => {
+  const registration = {
+    serverId: "server-1",
+    token: "ab".repeat(32),
+    environment: "production",
+    secret: "A".repeat(43),
+    locale: "fr",
+    away: true,
+    photos: [{ agentId: "chief", file: "avatar-server_2d_1-chief-3.jpg" }],
+  };
+
+  it("carries the push registration and nothing else", () => {
+    expect(codec(LIVE_ACTIVITY_PUSH_ROUTES.register).request({ ...registration, name: "Ada" })).toEqual(registration);
+    expect(codec(LIVE_ACTIVITY_PUSH_ROUTES.register).response(200, {})).toEqual({});
+    expect(codec(LIVE_ACTIVITY_PUSH_ROUTES.remove).request({})).toEqual({});
+  });
+
+  it("refuses a token, secret or file name that could reach a path or a header", () => {
+    const request = codec(LIVE_ACTIVITY_PUSH_ROUTES.register).request;
+    expect(() => request({ ...registration, token: "../../3/device" })).toThrow();
+    expect(() => request({ ...registration, secret: "short" })).toThrow();
+    expect(() => request({ ...registration, photos: [{ agentId: "chief", file: "../secret.png" }] })).toThrow();
+    expect(() => request({ ...registration, environment: "staging" })).toThrow();
   });
 });

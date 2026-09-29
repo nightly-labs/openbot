@@ -34,6 +34,9 @@ async function main(): Promise<void> {
   await putRequiredSecret("REMOTE_TICKET_PRIVATE_JWK");
   await putRequiredSecret("REMOTE_TICKET_PUBLIC_JWKS");
   await putRequiredSecret("REMOTE_AUTH_WEBHOOK_SECRET");
+  // The Live Activity relay stays off until the Apple key is in the environment.
+  await putOptionalSecret("APNS_PRIVATE_KEY");
+  await putOptionalSecret("APNS_KEY_ID");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
     label: "Remote D1 migrations",
   });
@@ -49,6 +52,15 @@ async function main(): Promise<void> {
 async function putRequiredSecret(name: string): Promise<void> {
   const value = process.env[name];
   if (!value?.trim()) throw new Error(`${name} is missing from the decrypted production environment.`);
+  await run(wranglerExecutable, ["secret", "put", name, ...environmentArgs], {
+    input: `${value}\n`,
+    label: `${name} secret`,
+  });
+}
+
+async function putOptionalSecret(name: string): Promise<void> {
+  const value = process.env[name];
+  if (!value?.trim()) return;
   await run(wranglerExecutable, ["secret", "put", name, ...environmentArgs], {
     input: `${value}\n`,
     label: `${name} secret`,

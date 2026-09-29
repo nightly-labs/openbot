@@ -92,6 +92,7 @@ import { Route as V1SkillsSkillIdVersionsVersionIdRouteImport } from './routes/v
 import { Route as V1SkillsAdminFeaturedSkillIdRouteImport } from './routes/v1/skills/admin/featured/$skillId'
 import { Route as V1SkillsAdminSubmissionsVersionIdRouteImport } from './routes/v1/skills/admin/submissions/$versionId'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
+import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
 import { Route as V2RemoteHostsHostIdLogoRouteImport } from './routes/v2/remote/hosts/$hostId/logo'
 import { Route as V2RemoteHostsHostIdTicketRouteImport } from './routes/v2/remote/hosts/$hostId/ticket'
 import { Route as V2RemoteSessionsSessionIdEndRouteImport } from './routes/v2/remote/sessions/$sessionId/end'
@@ -535,6 +536,12 @@ const V2RemoteHostsHostIdInvitesRoute =
     path: '/v2/remote/hosts/$hostId/invites',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdLiveActivityRoute =
+  V2RemoteHostsHostIdLiveActivityRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/live-activity',
+    path: '/v2/remote/hosts/$hostId/live-activity',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdLogoRoute = V2RemoteHostsHostIdLogoRouteImport.update({
   id: '/v2/remote/hosts/$hostId/logo',
   path: '/v2/remote/hosts/$hostId/logo',
@@ -673,6 +680,7 @@ export interface FileRoutesByFullPath {
   '/v1/skills/admin/featured/$skillId': typeof V1SkillsAdminFeaturedSkillIdRoute
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
+  '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -767,6 +775,7 @@ export interface FileRoutesByTo {
   '/v1/skills/admin/featured/$skillId': typeof V1SkillsAdminFeaturedSkillIdRoute
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
+  '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -862,6 +871,7 @@ export interface FileRoutesById {
   '/v1/skills/admin/featured/$skillId': typeof V1SkillsAdminFeaturedSkillIdRoute
   '/v1/skills/admin/submissions/$versionId': typeof V1SkillsAdminSubmissionsVersionIdRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
+  '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
   '/v2/remote/hosts/$hostId/logo': typeof V2RemoteHostsHostIdLogoRoute
   '/v2/remote/hosts/$hostId/ticket': typeof V2RemoteHostsHostIdTicketRoute
   '/v2/remote/sessions/$sessionId/end': typeof V2RemoteSessionsSessionIdEndRoute
@@ -958,6 +968,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/featured/$skillId'
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/remote/hosts/$hostId/invites'
+    | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/sessions/$sessionId/end'
@@ -1052,6 +1063,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/featured/$skillId'
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/remote/hosts/$hostId/invites'
+    | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/sessions/$sessionId/end'
@@ -1146,6 +1158,7 @@ export interface FileRouteTypes {
     | '/v1/skills/admin/featured/$skillId'
     | '/v1/skills/admin/submissions/$versionId'
     | '/v2/remote/hosts/$hostId/invites'
+    | '/v2/remote/hosts/$hostId/live-activity'
     | '/v2/remote/hosts/$hostId/logo'
     | '/v2/remote/hosts/$hostId/ticket'
     | '/v2/remote/sessions/$sessionId/end'
@@ -1229,6 +1242,7 @@ export interface RootRouteChildren {
   V1SitesUploadsUploadIdFileRoute: typeof V1SitesUploadsUploadIdFileRoute
   V1SkillsAdminFeaturedSkillIdRoute: typeof V1SkillsAdminFeaturedSkillIdRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
+  V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
   V2RemoteHostsHostIdLogoRoute: typeof V2RemoteHostsHostIdLogoRoute
   V2RemoteHostsHostIdTicketRoute: typeof V2RemoteHostsHostIdTicketRoute
   V2RemoteSessionsSessionIdEndRoute: typeof V2RemoteSessionsSessionIdEndRoute
@@ -1821,6 +1835,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdInvitesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/live-activity': {
+      id: '/v2/remote/hosts/$hostId/live-activity'
+      path: '/v2/remote/hosts/$hostId/live-activity'
+      fullPath: '/v2/remote/hosts/$hostId/live-activity'
+      preLoaderRoute: typeof V2RemoteHostsHostIdLiveActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/logo': {
       id: '/v2/remote/hosts/$hostId/logo'
       path: '/v2/remote/hosts/$hostId/logo'
@@ -2083,6 +2104,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1SitesUploadsUploadIdFileRoute: V1SitesUploadsUploadIdFileRoute,
   V1SkillsAdminFeaturedSkillIdRoute: V1SkillsAdminFeaturedSkillIdRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
+  V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,
   V2RemoteHostsHostIdLogoRoute: V2RemoteHostsHostIdLogoRoute,
   V2RemoteHostsHostIdTicketRoute: V2RemoteHostsHostIdTicketRoute,
   V2RemoteSessionsSessionIdEndRoute: V2RemoteSessionsSessionIdEndRoute,

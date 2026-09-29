@@ -8,6 +8,7 @@ import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { HostedSiteService } from "./hosted-site-service";
 import { JsonBodyError } from "./json-body";
+import { type ApnsLiveActivitySender, sharedApnsSender } from "./live-activity-relay";
 import { MarketplaceQueryError } from "./marketplace-pagination";
 import {
   enforceMarketplaceMutation,
@@ -93,6 +94,36 @@ export function requireIdempotencyKey(request: Request): string {
     throw new HostedSiteInputError(400, "invalid_idempotency_key", "A valid Idempotency-Key header is required.");
   }
   return key;
+}
+
+/**
+ * The Live Activity relay: the Apple sender and the limit for each host. `null` when this Worker has
+ * no Apple key or no limiter, so the relay is off.
+ */
+export function requestLiveActivityRelay(): {
+  sender: ApnsLiveActivitySender;
+  /** A host sends a few updates a minute for each phone. More is a fault or misuse. */
+  allow(hostId: string): Promise<boolean>;
+} | null {
+  const bindings = requireWorkerBindings(env);
+  const { APNS_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_ORIGIN, LIVE_ACTIVITY_RATE_LIMITER } = bindings;
+  if (!APNS_PRIVATE_KEY || !APNS_KEY_ID || !APNS_TEAM_ID || !APNS_TOPIC || !LIVE_ACTIVITY_RATE_LIMITER) return null;
+  return {
+    sender: sharedApnsSender({
+      // A deploy passes the key as one line, with `\n` for each line break.
+      privateKey: APNS_PRIVATE_KEY.replaceAll("\\n", "\n"),
+      keyId: APNS_KEY_ID,
+      teamId: APNS_TEAM_ID,
+      topic: APNS_TOPIC,
+      origin: developmentApnsOrigin(APNS_ORIGIN),
+    }),
+    allow: async (hostId) => (await LIVE_ACTIVITY_RATE_LIMITER.limit({ key: `host:${hostId}` })).success,
+  };
+}
+
+/** Only a development server on this computer can stand in for Apple. */
+function developmentApnsOrigin(value: string | undefined): string | undefined {
+  return value && /^http:\/\/127\.0\.0\.1:\d+\/__dev\/apns$/u.test(value) ? value : undefined;
 }
 
 export function enforceMarketplaceMutationRateLimit(kind: MarketplaceMutationKind, principal: string): Promise<void> {

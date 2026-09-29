@@ -959,6 +959,7 @@ export async function createApplicationServices({
     teamWebRtcBridge,
     registerRemoteHost: (input) => centralAuth.registerRemoteHost(input),
     issueRemoteHostTicket: (hostId) => centralAuth.issueRemoteHostTicket(hostId),
+    sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push),
     verifyRemoteSessionTicket: (ticket) => centralAuth.verifyRemoteSessionTicket(ticket),
     endRemoteSession: (sessionId) => centralAuth.endRemoteSession(sessionId),
     remoteControlPlaneUrl: centralAuth.resolveApiUrl("/"),

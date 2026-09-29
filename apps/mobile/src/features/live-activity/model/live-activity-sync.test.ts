@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { LIVE_ACTIVITY_URL } from "./live-activity-link";
 import { type LiveActivityInstance, type LiveActivityStarter, LiveActivitySync } from "./live-activity-sync";
 
 describe("LiveActivitySync", () => {
@@ -14,7 +13,7 @@ describe("LiveActivitySync", () => {
     await sync.show(null);
 
     expect(starter.start).toHaveBeenCalledTimes(1);
-    expect(starter.start).toHaveBeenCalledWith({ title: "Working" }, LIVE_ACTIVITY_URL, undefined);
+    expect(starter.start).toHaveBeenCalledWith({ title: "Working" }, undefined);
     expect(activity.update).toHaveBeenCalledTimes(1);
     expect(activity.update).toHaveBeenCalledWith({ title: "Approval" }, undefined);
     expect(activity.end).toHaveBeenCalledWith("immediate");
@@ -48,24 +47,52 @@ describe("LiveActivitySync", () => {
     expect(starter.start).toHaveBeenCalledTimes(2);
   });
 
-  it("starts a new activity when the user dismissed the previous one", async () => {
-    const dismissed = instance();
-    dismissed.update.mockRejectedValue(new Error("Live Activity not found."));
+  it("starts a new activity when the user or the host ended the previous one", async () => {
+    const ended = instance();
+    ended.update.mockRejectedValue(new Error("Live Activity not found."));
     const replacement = instance();
-    const starter = fakeStarter([dismissed], () => replacement);
+    const starter = fakeStarter([ended], () => replacement);
     const sync = new LiveActivitySync<{ title: string }>(starter);
 
     await sync.show({ title: "Working" });
-    await sync.show({ title: "Approval" });
 
-    expect(starter.start).toHaveBeenCalledWith({ title: "Approval" }, LIVE_ACTIVITY_URL, undefined);
+    expect(starter.start).toHaveBeenCalledWith({ title: "Working" }, undefined);
+  });
+
+  it("gives the push token of the activity it shows, so only that activity gets host updates", async () => {
+    const activity = instance("token-1");
+    const tokens = vi.fn<(token: string | null) => void>();
+    const sync = new LiveActivitySync<{ title: string }>(
+      fakeStarter([], () => activity),
+      tokens,
+    );
+
+    await sync.show({ title: "Working" });
+    expect(tokens).toHaveBeenLastCalledWith("token-1");
+    await sync.show(null);
+    expect(tokens).toHaveBeenLastCalledWith(null);
+  });
+
+  it("shows the app state again after the host changed the activity", async () => {
+    const activity = instance();
+    const sync = new LiveActivitySync<{ title: string }>(fakeStarter([], () => activity));
+
+    await sync.show({ title: "Working" });
+    sync.forget();
+    await sync.show({ title: "Working" });
+
+    expect(activity.update).toHaveBeenCalledWith({ title: "Working" }, undefined);
   });
 });
 
-function instance() {
+function instance(token?: string) {
   return {
     update: vi.fn<LiveActivityInstance<{ title: string }>["update"]>(async () => undefined),
     end: vi.fn<LiveActivityInstance<{ title: string }>["end"]>(async () => undefined),
+    watchPushToken(receive: (token: string) => void) {
+      if (token) receive(token);
+      return () => undefined;
+    },
   };
 }
 

@@ -1,57 +1,44 @@
-import type { DynamicIslandAction } from "@openbot/contracts/ipc";
+import {
+  type LiveActivityAction,
+  type LiveActivityLink,
+  readLiveActivityLink,
+} from "@openbot/team-client/live-activity-props";
+import type { LiveActivityKeys } from "@openbot/team-client/live-activity-seal";
 
-/** What a tap on the activity or on one of its buttons does after the app opens. */
-export type LiveActivityAction = Extract<
-  DynamicIslandAction,
-  { type: "open-agent" | "open-failure" | "answer-prompt" | "respond-approval" }
->;
-
-/**
- * ActivityKit fixes the URL of an activity when it starts, but the activity shows different chats
- * over its life. So the URL names no chat, and the app does the tap action of the current state.
- */
-export const LIVE_ACTIVITY_URL = "openbot://live-activity";
-/** Opens the chat list. It starts no action, so it needs no token. */
-export const LIVE_ACTIVITY_LIST_URL = `${LIVE_ACTIVITY_URL}?list=1`;
-
-let tapAction: LiveActivityAction | null = null;
-/** Button URLs carry only a random token. Other apps can open `openbot://` links but cannot guess one. */
-let buttons = new Map<string, LiveActivityAction>();
-let listener: ((action: LiveActivityAction) => void) | null = null;
-let navigate: ((agentId: string | null) => void) | null = null;
-let pending: LiveActivityAction | null = null;
-
-/**
- * Sets the actions of the state the activity shows now and returns the URL of each button. A button
- * keeps its URL while its action stays, so an unchanged state gives unchanged props. Actions of
- * earlier states stop working, so an old button cannot answer a newer request.
- */
-export function setLiveActivityActions(
-  tap: LiveActivityAction | null,
-  actions: readonly LiveActivityAction[],
-  newToken: () => string,
-): string[] {
-  tapAction = tap;
-  const tokens = new Map([...buttons].map(([token, action]) => [JSON.stringify(action), token]));
-  const next = new Map<string, LiveActivityAction>();
-  const urls = actions.map((action) => {
-    const token = tokens.get(JSON.stringify(action)) ?? newToken();
-    next.set(token, action);
-    return `${LIVE_ACTIVITY_URL}?${new URLSearchParams({ action: token })}`;
-  });
-  buttons = next;
-  return urls;
+/** An action from a signed button link. `command` is the command that Approve runs, shown again first. */
+export interface LiveActivityRequest {
+  action: LiveActivityAction;
+  command: string | null;
 }
+
+let listener: ((request: LiveActivityRequest) => void) | null = null;
+let navigate: ((agentId: string | null) => void) | null = null;
+let pending: LiveActivityRequest | null = null;
+let keys: LiveActivityKeys | null = null;
+/** A button link that came before the keys loaded. It is checked when they load. */
+let unchecked: string | null = null;
 
 /** Sign-out removes the workspace, so no action of it can run after. */
 export function resetLiveActivityActions(): void {
-  tapAction = null;
-  buttons = new Map();
   pending = null;
+  unchecked = null;
+  keys = null;
+}
+
+/** The keys that check the button links. A link from before they load is checked then. */
+export function setLiveActivityLinkKeys(loaded: LiveActivityKeys): void {
+  keys = loaded;
+  const path = unchecked;
+  unchecked = null;
+  if (path === null) return;
+  const link = readLiveActivityLink(path, loaded.action);
+  if (link.type !== "action") return;
+  receive(link);
+  navigate?.(link.action.agentId);
 }
 
 /** Receives the actions that need the host. A listener that starts later receives the last one. */
-export function onLiveActivityAction(receive: (action: LiveActivityAction) => void): () => void {
+export function onLiveActivityAction(receive: (request: LiveActivityRequest) => void): () => void {
   listener = receive;
   const waiting = pending;
   pending = null;
@@ -79,30 +66,46 @@ export function isLiveActivityLink(path: string): boolean {
 }
 
 /**
- * Starts the action of a Live Activity link and returns the route to open. A cold start knows no
- * action yet, and an unknown token can come from another app, so both open the chat list only.
+ * Starts the action of a Live Activity link and returns the route to open. Any app can open an
+ * `openbot://` link, so only a link with a valid signature starts an action, and an other link opens
+ * a chat or the chat list only.
  *
  * While the app runs, a returned route pushes a new screen, so a chat that is open already mounts
  * again and loads again. So the running app opens the route itself and this returns `null`.
  */
 export function liveActivityRoute(path: string, initial = true): string | null {
-  const agentId = targetAgent(path);
+  if (!keys && new URL(path).searchParams.has("sig")) {
+    // At launch the link can come before the keys load. It is checked when they do.
+    unchecked = path;
+    return open(null, initial);
+  }
+  const link = readLiveActivityLink(path, keys?.action ?? null);
+  if (link.type === "action") receive(link);
+  return open(targetAgent(link), initial);
+}
+
+function receive(link: Extract<LiveActivityLink, { type: "action" }>): void {
+  // A tap on the same button again sends the answer again. The host refuses an answer to a request
+  // that is gone, and a cancelled or failed answer leaves the same state, so the button still works.
+  if (link.action.type === "open-agent") return;
+  const request = { action: link.action, command: link.command };
+  if (listener) listener(request);
+  else pending = request;
+}
+
+function open(agentId: string | null, initial: boolean): string | null {
   if (initial || !navigate) return agentId === null ? "/" : `/chat/${encodeURIComponent(agentId)}`;
   navigate(agentId);
   return null;
 }
 
-function targetAgent(path: string): string | null {
-  const params = new URL(path).searchParams;
-  if (params.has("list")) return null;
-  const token = params.get("action");
-  const action = token === null ? tapAction : (buttons.get(token) ?? null);
-  if (!action) return null;
-  // The tap URL has no token, and any app can open it, so it only opens a chat. The token stays
-  // after a tap: a cancelled or failed answer leaves the same state, and the button must still work.
-  if (token !== null && action.type !== "open-agent") {
-    if (listener) listener(action);
-    else pending = action;
+function targetAgent(link: LiveActivityLink): string | null {
+  switch (link.type) {
+    case "list":
+      return null;
+    case "open":
+      return link.agentId;
+    case "action":
+      return link.action.agentId;
   }
-  return action.agentId;
 }

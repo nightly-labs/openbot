@@ -10,7 +10,7 @@ export default defineConfig({
     // Workspace sources ship as TypeScript and must be bundled for the packaged app.
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@openbot/contracts", "@openbot/i18n", "@openbot/logging", "@openbot/team-client"],
+        exclude: ["@openbot/brand", "@openbot/contracts", "@openbot/i18n", "@openbot/logging", "@openbot/team-client"],
       }),
     ],
     build: {

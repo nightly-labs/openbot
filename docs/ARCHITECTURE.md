@@ -1279,7 +1279,32 @@ reconciliation. The server context menu controls mute for local and remote serve
 `renderer-forwarders.ts` continues to deliver live events for muted servers, but suppresses
 system notifications. Remote notification content uses the source server's agent list. Both
 server mute and per-agent notification settings apply. Unread state is unchanged. Mobile does
-not yet deliver system notifications; mute settings are not synchronized between devices.
+not deliver system notifications; it shows agent state in its Live Activity. Mute settings are not
+synchronized between devices.
+
+## iPhone Live Activity updates
+
+The phone and a host build the same Live Activity view with `@openbot/team-client`:
+`dynamic-island-coordinator.ts` gives the state, and `live-activity-props.ts` turns it into the props
+that the widget shows. While the app runs, `use-live-activity.ts` publishes them itself.
+
+iOS stops the app and its connections in the background. So the phone registers the push token of
+its activity with the active host (`live-activity-push-v1`, `POST /v1/live-activity/registration`),
+with `away: true` when it leaves the foreground. `LiveActivityPushService` in `src/main` keeps the
+registration in memory for that session. While the phone is away, each agent event (at most once a
+second) reads the runtime snapshot of the agents the member can see and the member's read state,
+builds the props, and sends a change. A change of state has priority 10; a change inside a state
+waits 5 seconds and has priority 5. An unchanged state is sent again every 10 minutes, so its stale
+date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
+state ends the activity.
+
+`live-activity-seal.ts` seals the props with keys derived from a secret that the phone makes. The
+host sends the sealed text to `POST /v2/remote/hosts/:hostId/live-activity` with its machine
+credential. The Worker checks the credential and a per-host rate limit, makes the APNs payload and
+provider token itself, and forwards the request. It stores and logs nothing. The widget cannot load a
+library, so the phone composes its layout with the two widget keys and the App Group folder, and
+`live-activity-open.ts` opens the sealed props with its own SHA-256. Button links that change host
+state carry an HMAC signature, which the app checks before it acts.
 
 ## Shared channel chats
 

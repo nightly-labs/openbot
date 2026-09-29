@@ -1034,6 +1034,20 @@ export class RemoteControlPlane {
     });
   }
 
+  /** Checks the credential that a host received when it registered. */
+  async authenticateHost(hostId: string, machineToken: string): Promise<void> {
+    const host = await this.#host(hostId);
+    const expected = host?.machine_token_hash ?? "";
+    const provided = await sha256(machineToken);
+    let difference = expected.length ^ provided.length;
+    for (let index = 0; index < provided.length; index += 1) {
+      difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
+    }
+    if (!expected || difference !== 0) {
+      throw new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    }
+  }
+
   async #requireRole(hostId: string, userId: string, roles: RemoteMemberRole[]): Promise<RemoteMembershipRow> {
     return this.#assertRole(
       await this.#database

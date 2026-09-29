@@ -11,6 +11,7 @@
         "@fontsource-variable/inter": "catalog:",
         "@kobalte/core": "catalog:",
         "@modelcontextprotocol/sdk": "1.30.0",
+        "@noble/hashes": "2.3.0",
         "@norbert_bodziony/bloub": "catalog:",
         "@openbot/brand": "workspace:*",
         "@openbot/contracts": "workspace:*",

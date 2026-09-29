@@ -1,9 +1,18 @@
 import type { DynamicIslandApprovalItem, DynamicIslandPresentation } from "@openbot/contracts/ipc";
 import { mobileTranslateFor } from "@openbot/i18n/mobile";
 import { describe, expect, it } from "vitest";
-import { liveActivityButtons, liveActivityProps, liveActivityTapAction } from "./live-activity-props";
+import {
+  LIVE_ACTIVITY_LIST_URL,
+  liveActivityButtons,
+  liveActivityProps,
+  liveActivityView,
+  readLiveActivityLink,
+} from "./live-activity-props";
+import { LIVE_ACTIVITY_SECRET_BYTES, liveActivityKeys } from "./live-activity-seal";
 
 const t = mobileTranslateFor("en");
+const text = { t, agentColor: () => "#8b5cf6" };
+const keys = liveActivityKeys(new Uint8Array(LIVE_ACTIVITY_SECRET_BYTES).fill(7));
 const agent = { id: "agent-1", name: "Ada", avatarSeed: "ada", avatarHue: null, avatarUrl: null };
 
 describe("Live Activity buttons", () => {
@@ -63,20 +72,25 @@ describe("Live Activity buttons", () => {
       unreadCount: 3,
       message: { agent, messageId: "message-1", text: "Hej!", createdAt: "2026-09-24T10:00:00.000Z" },
     };
-    const row = (name: string) => ({ name, count: 1, avatar: "", url: `openbot://live-activity?action=${name}` });
-    const rows = (count: number) =>
+    const row = (name: string) => ({ name, count: 1, avatar: "", url: `openbot://live-activity?agent=${name}` });
+    const view = (count: number) =>
       liveActivityProps(
         message,
         {
           avatar: "",
+          tapUrl: LIVE_ACTIVITY_LIST_URL,
           buttons: [],
           agents: Array.from({ length: count }, (_, i) => row(`a${i}`)),
           agentCount: count,
         },
-        t,
-      )?.agents.map((agent) => agent.name);
+        text,
+      );
+    const rows = (count: number) => view(count)?.agents.map((agent) => agent.name);
 
     expect(rows(1)).toEqual([]);
+    // One agent's count takes its color. A count for several agents is white.
+    expect(view(1)?.compactTint).toBe("#8b5cf6");
+    expect(view(2)?.compactTint).toBe("#FFFFFF");
     expect(rows(2)).toEqual(["a0", "a1"]);
     expect(rows(6)).toEqual(["a0", "a1", "a2", "a3"]);
   });
@@ -88,10 +102,46 @@ describe("Live Activity buttons", () => {
       item: { turnId: "turn-1", agent, title: "Task failed", detail: null },
     };
 
-    expect(liveActivityTapAction(failed)).toEqual({ type: "open-agent", serverId: "server-1", agentId: "agent-1" });
-    expect(liveActivityButtons(failed, t).map((button) => button.action)).toEqual([
-      { type: "open-failure", serverId: "server-1", agentId: "agent-1", turnId: "turn-1" },
+    const props = liveActivityView(failed, {
+      ...text,
+      avatar: () => "",
+      unreadAgents: [],
+      actionKey: keys.action,
+    });
+
+    expect(props && readLiveActivityLink(props.tapUrl, keys.action)).toEqual({
+      type: "open",
+      serverId: "server-1",
+      agentId: "agent-1",
+    });
+    expect(props?.buttons.map((button) => readLiveActivityLink(button.url, keys.action))).toEqual([
+      {
+        type: "action",
+        action: { type: "open-failure", serverId: "server-1", agentId: "agent-1", turnId: "turn-1" },
+        command: null,
+      },
     ]);
+  });
+});
+
+describe("Live Activity links", () => {
+  it("accepts an answer only with the signature of the phone key, as any app can open the link", () => {
+    const presentation = approval({}, "npm test");
+    const input = { ...text, avatar: () => "", unreadAgents: [], actionKey: keys.action };
+    const [, approve] = liveActivityView(presentation, input)?.buttons ?? [];
+    const url = approve?.url ?? "";
+
+    expect(readLiveActivityLink(url, keys.action)).toEqual({
+      type: "action",
+      action: { type: "respond-approval", serverId: "server-1", agentId: "agent-1", requestId: 7, decision: "accept" },
+      command: "npm test",
+    });
+    const other = liveActivityKeys(new Uint8Array(LIVE_ACTIVITY_SECRET_BYTES).fill(8));
+    expect(readLiveActivityLink(url, other.action)).toEqual({ type: "list" });
+    expect(readLiveActivityLink(url, null)).toEqual({ type: "list" });
+    const changed = new URL(url);
+    changed.searchParams.set("action", (changed.searchParams.get("action") ?? "").replace("accept", "decline"));
+    expect(readLiveActivityLink(changed.toString(), keys.action)).toEqual({ type: "list" });
   });
 });
 

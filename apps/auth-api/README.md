@@ -150,3 +150,22 @@ Set the private JWK, public JWKS, active key ID, Signal URL, and webhook secret 
 the encrypted environment. The private and public keys must use ES256. The Signal
 URL must point to a DNS-only host. Cloudflare carries only account and configuration
 requests. It does not carry Team API or Remote Desktop data.
+
+### Live Activity relay
+
+`POST /v2/remote/hosts/:hostId/live-activity` forwards a sealed iPhone Live Activity update from a
+host to Apple Push Notification service. The host seals the content for the phone, so the Worker
+cannot read it. The Worker checks the host credential and `LIVE_ACTIVITY_RATE_LIMITER`, makes the
+APNs payload itself with no alert text, and stores and logs nothing.
+
+The relay is off until `APNS_PRIVATE_KEY` (the `.p8` key text) and `APNS_KEY_ID` are set. Create
+the key in Apple Developer > Keys with the Apple Push Notifications service, then add both to the
+encrypted environment and to the `cloudflare-production` GitHub environment. `APNS_TEAM_ID` and
+`APNS_TOPIC` are in `wrangler.jsonc`.
+
+For local development, run `bun run dev:apns-key -- ~/Downloads/AuthKey_<KEY_ID>.p8`. It saves the
+key in `.env.dev`. The local Worker runtime cannot open HTTP/2, which APNs requires, so `vite dev`
+sets `APNS_ORIGIN` and forwards the Worker's request to Apple from Node
+(`dev-apns-proxy.ts`). The Worker still checks the host and the limit, makes the payload and signs
+the token. Only a loopback caller can use the forwarder, and the Worker accepts only a loopback
+`APNS_ORIGIN`.

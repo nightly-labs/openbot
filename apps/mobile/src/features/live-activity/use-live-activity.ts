@@ -1,36 +1,46 @@
-import type { AvatarMood } from "@openbot/brand/bloub-avatar-motion";
 import type { AgentEvent, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  LIVE_ACTIVITY_PUSH_ROUTES,
+  type LiveActivityPushRegistration,
+} from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
-import type { DynamicIslandText } from "@openbot/team-client/dynamic-island-presentation";
-import * as Crypto from "expo-crypto";
+import {
+  type AgentLiveActivityProps,
+  LIVE_ACTIVITY_LIST_URL,
+  LIVE_ACTIVITY_MOODS,
+  type LiveActivityAction,
+  type LiveActivityMood,
+  liveActivityBloubFile,
+  liveActivityFileName,
+  liveActivityIslandText,
+  liveActivityView,
+} from "@openbot/team-client/live-activity-props";
+import { encodeLiveActivityBytes } from "@openbot/team-client/live-activity-seal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
+import { getBloubAvatarColor } from "@/features/agents/model/bloub-activity";
 import { useLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import type { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-store";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
-import { currentText } from "@/shared/lib/text";
+import { currentLocale, currentText } from "@/shared/lib/text";
 import { agentLiveActivity } from "./agent-live-activity";
+import type { AgentLiveActivityNative } from "./agent-live-activity.types";
+import { loadLiveActivitySecret, resetLiveActivitySecret } from "./model/live-activity-keys";
 import {
-  type LiveActivityAction,
+  type LiveActivityRequest,
   onLiveActivityAction,
   resetLiveActivityActions,
-  setLiveActivityActions,
+  setLiveActivityLinkKeys,
 } from "./model/live-activity-link";
-import {
-  type AgentLiveActivityProps,
-  liveActivityAgent,
-  liveActivityButtons,
-  liveActivityMood,
-  liveActivityProps,
-  liveActivityTapAction,
-  UNREAD_AGENT_ROWS,
-} from "./model/live-activity-props";
 import { LiveActivitySync } from "./model/live-activity-sync";
 
-/** How long content stays current after the app leaves the foreground and stops its connections. */
+/**
+ * How long content stays current after the app leaves the foreground. A host that sends updates
+ * moves the date on with each one. Without them, the content then looks out of date.
+ */
 const STALE_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
 /** Streaming replies change the island many times a second. iOS throttles faster updates anyway. */
 const PUBLISH_DELAY_MS = 1000;
@@ -40,6 +50,8 @@ const PUBLISH_DELAY_MS = 1000;
  * publishes at most once in this time.
  */
 const BACKGROUND_PUBLISH_INTERVAL_MS = 1000;
+/** Pictures drawn between two pauses, so a long agent list does not stop the interface. */
+const BLOUBS_PER_PAUSE = 4;
 
 interface LiveActivityInput {
   servers: readonly Pick<MobileServer, "id" | "state">[];
@@ -50,13 +62,16 @@ interface LiveActivityInput {
   foreground: boolean;
   post: (serverId: string, path: string, body: TeamProtocolV2Json) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
+  /** Whether the host can update the activity while iOS suspends the app. */
+  supportsPush: (serverId: string) => boolean;
 }
 
 /**
  * Shows the desktop Dynamic Island state as an iOS Live Activity. The desktop island logic reads the
  * same team events, so both show the same event for the same state. Returns the handler for those
- * events. The phone updates the activity only while it runs: iOS stops the app and its connections
- * in the background, so the activity then shows the last state and marks it stale.
+ * events. The phone updates the activity while it runs. iOS then suspends it and its connections,
+ * so the phone gives the active host the push token of the activity, and that host updates it
+ * through Apple with content sealed for this phone.
  */
 export function useLiveActivity({
   servers,
@@ -66,12 +81,19 @@ export function useLiveActivity({
   foreground,
   post,
   loadAgentAvatar,
+  supportsPush,
 }: LiveActivityInput): (serverId: string, event: AgentEvent | TeamRealtimeEvent) => void {
   const live = useMemo(() => {
     const native = agentLiveActivity();
-    return native ? { native, coordinator: new DynamicIslandCoordinator(islandText) } : null;
+    return native
+      ? { native, coordinator: new DynamicIslandCoordinator(() => liveActivityIslandText(currentText().t)) }
+      : null;
   }, []);
   const sync = useRef<LiveActivitySync<AgentLiveActivityProps> | null>(null);
+  const [pushToken, setPushToken] = useState<string | null>(null);
+  const [secret, setSecret] = useState<{ value: string; action: Uint8Array } | null>(null);
+  const secretRef = useRef(secret);
+  secretRef.current = secret;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Nothing is known before the first event. Publishing then would end the activity from the last launch.
   const received = useRef(false);
@@ -89,22 +111,66 @@ export function useLiveActivity({
   // An answer waits for that render, so it is not sent on a connection that only looks online.
   const [resumed, setResumed] = useState(foreground);
   useEffect(() => setResumed(foreground), [foreground]);
-  /** Photo file URLs by photo name. `null` while the photo loads or when it failed. */
+  /** Picture file names by picture name. `null` while the picture loads or when it failed. */
   const avatars = useRef(new Map<string, string | null>());
+  /** The photo files by photo name, which the host names in its updates. */
+  const [photos, setPhotos] = useState<Readonly<Record<string, string>>>({});
   const agentsRef = useRef(agents);
   agentsRef.current = agents;
   const loadAvatarRef = useRef(loadAgentAvatar);
   loadAvatarRef.current = loadAgentAvatar;
-  const [action, setAction] = useState<LiveActivityAction | null>(null);
+  // `publish` loads photos through this, and the photo loader publishes, so neither depends on the other.
+  const loadPhotoRef = useRef<(serverId: string, agentId: string, avatarUrl: string) => void>(() => undefined);
+  const postRef = useRef(post);
+  postRef.current = post;
+  const [request, setRequest] = useState<LiveActivityRequest | null>(null);
   /**
    * Set after sign-out. An avatar load or an answer can finish later, and must not start the
    * activity again with the agents and messages of the removed workspace.
    */
   const disposed = useRef(false);
-  /** The command of the approval the activity shows, keyed by server and request. */
-  const approvalCommand = useRef<{ key: string; command: string } | null>(null);
+  /** The host that has the push token, and what it has. */
+  const registered = useRef<{ serverId: string; key: string } | null>(null);
 
-  /** `force` skips the background interval, for the stale date that the app must send before iOS suspends it. */
+  const syncFor = useCallback((native: AgentLiveActivityNative) => {
+    sync.current ??= new LiveActivitySync(native.starter, (token) => {
+      if (!disposed.current) setPushToken(token);
+    });
+    return sync.current;
+  }, []);
+
+  /** The number of pictures when old files were last deleted. */
+  const keptAvatars = useRef(0);
+  const keepAvatars = useCallback(() => {
+    keptAvatars.current = avatars.current.size;
+    live?.native.removeAvatars(new Set([...avatars.current.values()].filter((file) => file !== null)));
+  }, [live]);
+
+  /** The file of a drawn bloub. It draws the picture the first time. */
+  const bloubFile = useCallback(
+    (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
+      if (!live) return "";
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+      const saved = avatars.current.get(file);
+      if (saved !== undefined) return saved ?? "";
+      let written: string | null = null;
+      try {
+        if (live.native.hasAvatar(file)) written = file;
+        else {
+          const dataUrl = live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
+          const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
+          written = dataUrl ? live.native.saveAvatar(base, dataUrl) : null;
+        }
+      } catch {
+        // Without the picture the activity shows the mode symbol.
+      }
+      avatars.current.set(file, written);
+      return written ?? "";
+    },
+    [live],
+  );
+
+  /** The `force` skips the background interval, for the stale date that the app must send before iOS suspends it. */
   const publish = useCallback(
     (force = false) => {
       if (timer.current) clearTimeout(timer.current);
@@ -114,67 +180,21 @@ export function useLiveActivity({
       // Wait for the stored choice, so a user who turned them off sees no activity at launch.
       if (!preference.ready) return;
       if (!preference.enabled) {
-        setLiveActivityActions(null, [], Crypto.randomUUID);
-        sync.current ??= new LiveActivitySync(live.native.starter);
-        void sync.current.show(null);
+        void syncFor(live.native).show(null);
         return;
       }
+      // The buttons need the keys. Their load publishes again.
+      const actionKey = secretRef.current?.action;
+      if (!actionKey) return;
       const presentation = live.coordinator.presentation(serverOrder.current);
-      const { t } = currentText();
-      const buttons = liveActivityButtons(presentation, t);
-      approvalCommand.current =
-        presentation.mode === "approval" && presentation.item.approval.command
-          ? {
-              key: requestKey(presentation.serverId, presentation.item.requestId),
-              command: presentation.item.approval.command,
-            }
-          : null;
-      const allUnread = presentation.mode === "message" ? unreadAgents(presentation.message.agent.id) : [];
-      const unread = allUnread.slice(0, UNREAD_AGENT_ROWS);
-      const urls = setLiveActivityActions(
-        // Several chats have replies, so a tap opens the agent list and the user chooses one.
-        allUnread.length > 1 ? null : liveActivityTapAction(presentation),
-        [
-          ...buttons.map((button) => button.action),
-          ...unread.map((agent) => ({ type: "open-agent" as const, serverId: agent.serverId, agentId: agent.id })),
-        ],
-        Crypto.randomUUID,
-      );
-      const props = liveActivityProps(
-        presentation,
-        {
-          avatar: avatar(presentation.serverId, liveActivityAgent(presentation), liveActivityMood(presentation)),
-          buttons: buttons.flatMap((button, index) => {
-            const url = urls[index];
-            return url ? [{ label: button.label, prominent: button.prominent, url }] : [];
-          }),
-          agents: unread.flatMap((agent, index) => {
-            const url = urls[buttons.length + index];
-            return url
-              ? [{ name: agent.name, count: agent.count, avatar: avatar(agent.serverId, agent, "responded"), url }]
-              : [];
-          }),
-          agentCount: allUnread.length,
-        },
-        t,
-      );
-      const mode = props?.mode ?? null;
-      const wait = lastPublish.current.at + BACKGROUND_PUBLISH_INTERVAL_MS - Date.now();
-      // A change of mode, such as the end of a turn, is the update that matters most. It never waits.
-      if (!force && !foregroundRef.current && mode === lastPublish.current.mode && wait > 0) {
-        timer.current = setTimeout(() => publish(), wait);
-        return;
-      }
-      lastPublish.current = { mode, at: Date.now() };
-      sync.current ??= new LiveActivitySync(live.native.starter);
-      void sync.current.show(props, foregroundRef.current ? undefined : staleDate.current);
-
-      /** The agents with unread replies, the one the island shows first, then the most unread. */
-      function unreadAgents(firstId: string) {
-        const { unreadAgentIds, unreadCounts } = liveState.get();
-        const unread = new Set(unreadAgentIds);
-        const servers = new Set(serverOrder.current);
-        return agentsRef.current
+      const { unreadAgentIds, unreadCounts } = liveState.get();
+      const unread = new Set(unreadAgentIds);
+      const servers = new Set(serverOrder.current);
+      const props = liveActivityView(presentation, {
+        t: currentText().t,
+        agentColor: getBloubAvatarColor,
+        avatar,
+        unreadAgents: agentsRef.current
           .filter((agent) => unread.has(agent.id) && servers.has(agent.serverId))
           .map((agent) => ({
             id: agent.id,
@@ -184,52 +204,59 @@ export function useLiveActivity({
             avatarHue: agent.avatarHue,
             avatarUrl: agent.avatarUrl ?? null,
             count: Math.max(1, unreadCounts[agent.id] ?? 1),
-          }))
-          .sort((a, b) => Number(b.id === firstId) - Number(a.id === firstId) || b.count - a.count);
+          })),
+        actionKey,
+      });
+      if (avatars.current.size !== keptAvatars.current) keepAvatars();
+      const mode = props?.mode ?? null;
+      const wait = lastPublish.current.at + BACKGROUND_PUBLISH_INTERVAL_MS - Date.now();
+      // A change of mode, such as the end of a turn, is the update that matters most. It never waits.
+      if (!force && !foregroundRef.current && mode === lastPublish.current.mode && wait > 0) {
+        timer.current = setTimeout(() => publish(), wait);
+        return;
       }
+      lastPublish.current = { mode, at: Date.now() };
+      void syncFor(live.native).show(props, foregroundRef.current ? undefined : staleDate.current);
 
-      function avatar(serverId: string, agent: DynamicIslandAgentIdentity | null, mood: AvatarMood): string {
-        if (!live || !agent) return "";
-        const keep = () =>
-          live.native.removeAvatars(new Set([...avatars.current].filter(([, file]) => file).map(([key]) => key)));
-        if (!agent.avatarUrl) {
-          // The app avatar without a photo is the bloub. Its picture is drawn once for each face.
-          const name = fileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
-          const saved = avatars.current.get(name);
-          if (saved !== undefined) return saved ?? "";
-          let uri: string | null = null;
-          try {
-            const dataUrl = live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
-            uri = dataUrl ? live.native.saveAvatar(name, dataUrl) : null;
-          } catch {
-            // Without the picture the activity shows the mode symbol.
-          }
-          avatars.current.set(name, uri);
-          keep();
-          return uri ?? "";
-        }
-        const name = fileName([serverId, agent.id, avatarVersion(agent.avatarUrl)]);
+      function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
+        if (!live) return "";
+        // The app avatar without a photo is the bloub. Its picture is drawn once for each face.
+        if (!agent.avatarUrl) return bloubFile(agent, mood);
+        const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
         if (saved !== undefined) return saved ?? "";
-        avatars.current.set(name, null);
-        void loadAvatarRef
-          .current(agent.id, agent.avatarUrl, serverId)
-          .then((dataUrl) => {
-            if (disposed.current) return;
-            const uri = live.native.saveAvatar(name, dataUrl);
-            avatars.current.set(name, uri);
-            keep();
-            if (!uri) return;
-            if (!foregroundRef.current) publish();
-            else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
-          })
-          // Without the photo the activity shows the mode symbol.
-          .catch(() => undefined);
+        loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
         return "";
       }
     },
-    [live, liveState],
+    [live, liveState, syncFor, bloubFile, keepAvatars],
   );
+
+  /** Loads an agent photo into the App Group, then publishes again with it. */
+  const loadPhoto = useCallback(
+    (serverId: string, agentId: string, avatarUrl: string) => {
+      if (!live) return;
+      const name = photoName(serverId, agentId, avatarUrl);
+      if (avatars.current.has(name)) return;
+      avatars.current.set(name, null);
+      void loadAvatarRef
+        .current(agentId, avatarUrl, serverId)
+        .then((dataUrl) => {
+          if (disposed.current) return;
+          const file = live.native.saveAvatar(name, dataUrl);
+          avatars.current.set(name, file);
+          keepAvatars();
+          if (!file) return;
+          setPhotos((current) => ({ ...current, [name]: file }));
+          if (!foregroundRef.current) publish();
+          else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
+        })
+        // Without the photo the activity shows the mode symbol.
+        .catch(() => undefined);
+    },
+    [live, keepAvatars, publish],
+  );
+  loadPhotoRef.current = loadPhoto;
 
   const schedule = useCallback(() => {
     // In the background iOS can suspend the app before a timer fires, and the last event, such as
@@ -248,6 +275,33 @@ export function useLiveActivity({
     },
     [live, schedule],
   );
+
+  // The keys seal host updates and sign the buttons. The widget gets its two keys in its layout.
+  useEffect(() => {
+    if (!live) return;
+    let cancelled = false;
+    void loadLiveActivitySecret().then(
+      ({ secret: value, keys }) => {
+        if (cancelled || disposed.current) return;
+        const { t } = currentText();
+        live.native.setSealKeys(
+          { seal: encodeLiveActivityBytes(keys.seal), tag: encodeLiveActivityBytes(keys.tag) },
+          unreadableProps(t),
+        );
+        setSecret({ value: encodeLiveActivityBytes(value), action: keys.action });
+        setLiveActivityLinkKeys(keys);
+      },
+      // Without the keys the activity has no buttons, and only this app updates it.
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [live]);
+
+  useEffect(() => {
+    if (secret) publish();
+  }, [secret, publish]);
 
   useEffect(() => {
     if (!live) return;
@@ -278,14 +332,15 @@ export function useLiveActivity({
     });
   }, [live, liveState, serverIds, agents, schedule]);
 
-  useEffect(() => (live ? onLiveActivityAction(setAction) : undefined), [live]);
+  useEffect(() => (live ? onLiveActivityAction(setRequest) : undefined), [live]);
 
   // A button opens the app, which reconnects first. The answer waits for its server to be online.
   useEffect(() => {
-    if (!live || !action || !foreground || !resumed) return;
+    if (!live || !request || !foreground || !resumed) return;
+    const { action, command } = request;
     const server = servers.find((candidate) => candidate.id === action.serverId);
     if (server && server.state !== "online") return;
-    setAction(null);
+    setRequest(null);
     // The user removed the server after the activity showed it.
     if (!server) return;
     const perform = () =>
@@ -307,25 +362,31 @@ export function useLiveActivity({
       return;
     }
     // iOS can hide the command on a locked screen, and the tap then unlocks straight into the app.
-    // So the user sees the command here before the host runs it.
+    // So the user sees the command here before the host runs it. The signed link carries it.
     const { t } = currentText();
-    const shown = approvalCommand.current;
-    if (shown?.key !== requestKey(action.serverId, action.requestId)) {
+    if (!command) {
       Alert.alert(t("mobile.liveActivity.error.decision"), t("mobile.liveActivity.requestChanged"));
       return;
     }
-    Alert.alert(t("mobile.liveActivity.confirm.title"), shown.command, [
+    Alert.alert(t("mobile.liveActivity.confirm.title"), command, [
       { text: t("mobile.liveActivity.confirm.cancel"), style: "cancel" },
       { text: t("mobile.liveActivity.confirm.approve"), onPress: perform },
     ]);
-  }, [live, action, servers, post, schedule, foreground, resumed]);
+  }, [live, request, servers, post, schedule, foreground, resumed]);
 
   // Settings can turn Live Activities off and on. The change shows at once.
   // A subscription, not a hook: the setting must not re-render the workspace.
+  const [enabled, setEnabled] = useState(() => {
+    const preference = useLiveActivitiesPreference.getState();
+    return preference.ready && preference.enabled;
+  });
   useEffect(
     () =>
       useLiveActivitiesPreference.subscribe((state, previous) => {
-        if (state.ready !== previous.ready || state.enabled !== previous.enabled) publish();
+        if (state.ready !== previous.ready || state.enabled !== previous.enabled) {
+          setEnabled(state.ready && state.enabled);
+          publish();
+        }
       }),
     [publish],
   );
@@ -333,8 +394,71 @@ export function useLiveActivity({
   // The app can be suspended at any moment after it leaves the foreground: publish the stale date now.
   useEffect(() => {
     staleDate.current = foreground ? undefined : new Date(Date.now() + STALE_AFTER_BACKGROUND_MS);
-    if (!foreground) publish(true);
+    // The host could update or end the activity while the app was away. Show the app state again.
+    if (foreground) sync.current?.forget();
+    publish(!foreground);
   }, [foreground, publish]);
+
+  // The active host gets the push token while the app runs, and a flag when the app goes away.
+  // A server that goes offline keeps the token: in the background the app stops its connections,
+  // and that is when the host needs the token. The request then fails, and the host also counts the
+  // closed connection as away.
+  const pushServerId =
+    live && enabled && pushToken && secret && activeServerId && supportsPush(activeServerId) ? activeServerId : null;
+  // The request needs the connection. When it comes back, the phone tells the host again.
+  const pushServerOnline = servers.some((server) => server.id === pushServerId && server.state === "online");
+  useEffect(() => {
+    if (!live) return;
+    const previous = registered.current;
+    if (previous && previous.serverId !== pushServerId) {
+      registered.current = null;
+      // The host also forgets it when the session ends, so a failed request leaves nothing behind.
+      void post(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
+    }
+    if (!pushServerId || !pushServerOnline || !pushToken || !secret) return;
+    let cancelled = false;
+    const serverAgents = agentsRef.current.filter((agent) => agent.serverId === pushServerId);
+    void (async () => {
+      // The host names only pictures that exist, so the phone draws each face before the host needs it.
+      let drawn = 0;
+      for (const agent of serverAgents) {
+        if (agent.avatarUrl) {
+          loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
+          continue;
+        }
+        for (const mood of LIVE_ACTIVITY_MOODS) {
+          if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood))) continue;
+          bloubFile(agent, mood);
+          drawn += 1;
+          if (drawn % BLOUBS_PER_PAUSE === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+          if (cancelled) return;
+        }
+      }
+      keepAvatars();
+      const registration: LiveActivityPushRegistration = {
+        serverId: pushServerId,
+        token: pushToken,
+        environment: pushEnvironment(),
+        secret: secret.value,
+        locale: currentLocale(),
+        away: !foreground,
+        photos: serverAgents.flatMap((agent) => {
+          const file = agent.avatarUrl ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)] : undefined;
+          return file ? [{ agentId: agent.id, file }] : [];
+        }),
+      };
+      const key = JSON.stringify(registration);
+      if (cancelled || disposed.current || registered.current?.key === key) return;
+      await post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.register, { ...registration });
+      if (!disposed.current) registered.current = { serverId: pushServerId, key };
+    })().catch(() => {
+      // The activity then shows its last state until the app returns, and marks it out of date.
+      registered.current = null;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [live, pushServerId, pushServerOnline, pushToken, secret, foreground, photos, post, bloubFile, keepAvatars]);
 
   useEffect(() => {
     disposed.current = false;
@@ -342,16 +466,50 @@ export function useLiveActivity({
       disposed.current = true;
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
-      // Sign-out removes the workspace. The activity must not keep its agents, messages, and actions.
+      // Sign-out removes the workspace. The activity must not keep its agents, messages, and actions,
+      // and the host of that workspace must not update the next one.
       resetLiveActivityActions();
+      const previous = registered.current;
+      registered.current = null;
+      if (previous) {
+        void postRef.current(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
+      }
+      void resetLiveActivitySecret().catch(() => undefined);
       if (!live) return;
       live.native.removeAvatars(new Set());
-      sync.current ??= new LiveActivitySync(live.native.starter);
-      void sync.current.show(null);
+      void syncFor(live.native).show(null);
     };
-  }, [live]);
+  }, [live, syncFor]);
 
   return applyTeamEvent;
+}
+
+/** The view the widget shows when it cannot open a host update, such as after sign-out. */
+function unreadableProps(t: MobileTranslate): AgentLiveActivityProps {
+  return {
+    mode: "working",
+    label: t("mobile.liveActivity.stale.label"),
+    symbol: "sparkles",
+    tint: "#8E8E93",
+    title: t("mobile.liveActivity.appName"),
+    detail: t("mobile.liveActivity.stale.detail"),
+    compact: "",
+    compactTint: "#8E8E93",
+    footer: "",
+    detailLines: 2,
+    detailMarkdown: false,
+    rows: [],
+    avatar: "",
+    tapUrl: LIVE_ACTIVITY_LIST_URL,
+    buttons: [],
+    agents: [],
+    agentCount: 0,
+    listUrl: LIVE_ACTIVITY_LIST_URL,
+    moreLabel: "",
+    appName: t("mobile.liveActivity.appName"),
+    staleLabel: t("mobile.liveActivity.stale.label"),
+    staleDetail: t("mobile.liveActivity.stale.detail"),
+  };
 }
 
 /** The Alert title and the fallback message for an action that the host did not accept. */
@@ -361,25 +519,6 @@ const ACTION_FAILURES: Record<LiveActivityAction["type"], readonly [MobileTextKe
   "answer-prompt": ["mobile.liveActivity.error.answer", "mobile.liveActivity.error.answerFallback"],
   "respond-approval": ["mobile.liveActivity.error.decision", "mobile.liveActivity.error.decisionFallback"],
 };
-
-/** The island text in the interface language, read for each presentation. */
-function islandText(): DynamicIslandText {
-  const { t, errorMessage } = currentText();
-  return {
-    taskWorking: t("mobile.liveActivity.island.taskWorking"),
-    questionHeader: t("mobile.liveActivity.island.questionHeader"),
-    questionText: t("mobile.liveActivity.island.questionText"),
-    optionFallback: (number) => t("mobile.liveActivity.island.optionFallback", { number }),
-    takeoverTitle: t("mobile.liveActivity.island.takeoverTitle"),
-    takeoverDetail: t("mobile.liveActivity.island.takeoverDetail"),
-    failureTitle: t("mobile.liveActivity.island.failureTitle"),
-    failureDetail: t("mobile.liveActivity.island.failureDetail"),
-    approvalCommand: t("mobile.liveActivity.island.approvalCommand"),
-    approvalFileChange: t("mobile.liveActivity.island.approvalFileChange"),
-    approvalPermissions: t("mobile.liveActivity.island.approvalPermissions"),
-    errorMessage,
-  };
-}
 
 function performAction(
   action: LiveActivityAction,
@@ -405,8 +544,14 @@ function performAction(
   }
 }
 
-function requestKey(serverId: string, requestId: string | number): string {
-  return JSON.stringify([serverId, String(requestId)]);
+/** Development builds get their push tokens from the APNs sandbox. */
+function pushEnvironment(): LiveActivityPushRegistration["environment"] {
+  return __DEV__ || process.env.EXPO_PUBLIC_APP_ENV === "development" ? "development" : "production";
+}
+
+/** The picture name of an agent photo. It changes with the photo version. */
+function photoName(serverId: string, agentId: string, avatarUrl: string): string {
+  return liveActivityFileName([serverId, agentId, avatarVersion(avatarUrl)]);
 }
 
 function avatarVersion(avatarUrl: string): string {
@@ -416,13 +561,6 @@ function avatarVersion(avatarUrl: string): string {
     // The host sends a URL. Without a version, the photo is not loaded again after a change.
     return "";
   }
-}
-
-/** A file name that is different for each different list of parts. */
-function fileName(parts: readonly string[]): string {
-  return parts
-    .map((part) => part.replace(/[^A-Za-z0-9]/gu, (character) => `_${character.codePointAt(0)?.toString(16)}_`))
-    .join("-");
 }
 
 function isAgentEvent(event: AgentEvent | TeamRealtimeEvent): event is AgentEvent {

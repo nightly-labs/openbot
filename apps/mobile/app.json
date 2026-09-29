@@ -99,7 +99,9 @@
         "expo-widgets",
         {
           "bundleIdentifier": "run.openbot.mobile.ExpoWidgetsTarget",
-          "groupIdentifier": "group.run.openbot.mobile"
+          "groupIdentifier": "group.run.openbot.mobile",
+          "enablePushNotifications": true,
+          "frequentUpdates": true
         }
       ]
     ],

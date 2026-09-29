@@ -11,6 +11,7 @@ import type {
   MobileConnectTicket,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import { createMobileConnectUrl, type MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import {
   decodeRemoteSession,
@@ -334,6 +335,31 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
       decodeRemoteSessionTicket,
     );
+  }
+
+  /**
+   * Sends one Live Activity update through the account service to Apple. The host sealed the
+   * content with keys that only the phone has, so the service forwards bytes it cannot read.
+   * Returns `gone` when Apple refused the token.
+   */
+  async sendLiveActivityPush(hostId: string, push: LiveActivityRelayPush): Promise<"sent" | "gone"> {
+    const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
+    if (!machineToken) throw new Error(sourceText("error.auth.hostCredentialUnavailable"));
+    try {
+      await this.#request(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/live-activity`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, ...push }),
+        },
+        () => undefined,
+      );
+      return "sent";
+    } catch (error) {
+      if (error instanceof AuthApiError && error.status === 410) return "gone";
+      throw error;
+    }
   }
 
   async startRemoteSession(hostId: string): Promise<RemoteSession> {

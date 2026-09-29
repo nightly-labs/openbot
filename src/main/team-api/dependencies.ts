@@ -36,6 +36,7 @@ import type { StorageUsageService } from "../../backend/storage-usage";
 import type { TeamChatStore } from "../../backend/team-chat-store";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
+import type { LiveActivityPushService } from "../live-activity-push";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 
@@ -231,6 +232,8 @@ export interface TeamApiOptions {
   onDirectTyping?: (event: DirectTypingRealtimeEvent) => void;
   createInvite?: (input: CreateTeamInviteInput) => Promise<InviteSummary>;
   onSessionRevoked?: (sessionId: string) => Promise<void> | void;
+  /** Sends Live Activity updates to members' phones. Absent when this host has no account credential. */
+  liveActivityPush?: LiveActivityPushService;
   rateLimitCapacity?: number;
   now?: () => number;
   logger?: Logger;

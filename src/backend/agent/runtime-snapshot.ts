@@ -158,16 +158,16 @@ export function buildRuntimeSnapshot({
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
     const live = conversation.snapshot(agent.id);
-    const liveLatest = [...(live?.messages ?? [])]
-      .reverse()
-      .find(
-        (message) =>
-          (message.author === "assistant" || message.author === "agent") &&
-          message.itemType !== "commentary" &&
-          message.itemType !== "question_prompt" &&
-          message.itemType !== "agent_attachment" &&
-          message.itemType !== CONVERSATION_PLAN_ITEM_TYPE,
-      );
+    const liveLatest = [...(live?.messages ?? [])].reverse().find(
+      (message) =>
+        (message.author === "assistant" || message.author === "agent") &&
+        // A message that another agent sent to this one is not a reply to the user.
+        !message.senderAgentId &&
+        message.itemType !== "commentary" &&
+        message.itemType !== "question_prompt" &&
+        message.itemType !== "agent_attachment" &&
+        message.itemType !== CONVERSATION_PLAN_ITEM_TYPE,
+    );
     const persisted =
       !live || !liveLatest
         ? database.readConversationRuntime(agent.id, agent.threadId)

@@ -242,6 +242,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun mobile:ios:rocketsim` | Start RocketSim and build and launch the iOS simulator app with RocketSim Connect. See [mobile setup](apps/mobile/README.md#development). |
 | `bun run mobile:go:tunnel` | Start the mobile app in Expo Go through a Metro tunnel and clear the cache. The OpenBot API and Signal still need their own reachable addresses. |
 | `bun run dev:api` | Start the TanStack Start API and its local D1 database on `127.0.0.1:3100`. |
+| `bun run dev:apns-key -- <AuthKey_ID.p8> [KEY_ID]` | Save an Apple Push Notification service key in `apps/auth-api/.env.dev`, so the local Auth API sends iPhone Live Activity updates. The local server forwards them to Apple over HTTP/2. Restart `bun run dev` after it. |
 | `bun run api:start` | Build and preview the Cloudflare Worker locally. |
 | `bun run api:images` | Draw the article artwork into `apps/auth-api/content-art/` after you add an article or change a title. Commit the result; the site build fails until it matches. Needs Electron and a GPU, so run it on your own machine. |
 | `bun run api:migrate:local` | Apply D1 migrations to the local development database. |

@@ -509,6 +509,8 @@ function toDynamicIslandMessage(
 ) {
   if (
     (message.author !== "assistant" && message.author !== "agent") ||
+    // A message that another agent sent to this one is not a reply to the user.
+    message.senderAgentId ||
     message.itemType === "commentary" ||
     message.itemType === "question_prompt" ||
     message.itemType === "agent_attachment" ||

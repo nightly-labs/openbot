@@ -32,6 +32,7 @@ import {
   HOST_ADMIN_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   isTeamCurrentCapability,
+  LIVE_ACTIVITY_PUSH_CAPABILITY,
   MCP_SERVERS_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -100,6 +101,7 @@ import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
 import { routeHostAdmin } from "./team-api/route-host-admin";
 import { routeHostUpdate } from "./team-api/route-host-update";
+import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { routeMcpServers } from "./team-api/route-mcp";
 import { routeProviders } from "./team-api/route-providers";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
@@ -560,14 +562,7 @@ export class TeamApiServer {
         return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
       }
       const context = this.#requestContext(request, response, url, token, authenticated);
-      const agents = this.#options.agents.listAgents();
-      const hidden = hiddenProviderAgentIds(agents, context.protocol);
-      for (const id of this.#unrepresentableAgentIds(
-        agents.filter((agent) => !hidden.has(agent.id)),
-        context.protocol,
-        context.capabilities,
-      ))
-        hidden.add(id);
+      const hidden = this.#hiddenAgentIds(context.protocol, context.capabilities);
       // Every protocol gets the projection, also with no hidden agent: a provider status row, a
       // model or an auth state of a local-only provider can be in the response.
       const responseRoute = this.#responseRoutes.get(response);
@@ -609,6 +604,12 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if (
+        (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>
+          this.#hiddenAgentIds(context.protocol, context.capabilities),
+        )) === "handled"
+      )
+        return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -906,7 +907,10 @@ export class TeamApiServer {
         client.close(1003, "Invalid team event payload");
       }
     });
+    // iOS can suspend a phone before it says that it goes away. Its closed connection says so.
+    const sessionId = this.#options.store.authenticateSession(token)?.sessionId;
     client.once("close", () => {
+      if (sessionId) this.#options.liveActivityPush?.disconnected(sessionId);
       if (connection.typingTimer) clearTimeout(connection.typingTimer);
       if (connection.directTypingTimer) clearTimeout(connection.directTypingTimer);
       const directTypingRecipientId = connection.directTypingRecipientId;
@@ -1158,6 +1162,19 @@ export class TeamApiServer {
     return hidden;
   }
 
+  /** The agents this client cannot see: a provider its protocol does not know, or one it cannot describe. */
+  #hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>): Set<string> {
+    const agents = this.#options.agents.listAgents();
+    const hidden = hiddenProviderAgentIds(agents, protocol);
+    for (const id of this.#unrepresentableAgentIds(
+      agents.filter((agent) => !hidden.has(agent.id)),
+      protocol,
+      capabilities,
+    ))
+      hidden.add(id);
+    return hidden;
+  }
+
   #protocolSupport(): TeamProtocolSupportV1 {
     return {
       appVersion: this.#options.appVersion ?? "0.0.0",
@@ -1184,6 +1201,7 @@ export class TeamApiServer {
           return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
+        if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
         return true;
       }),
     };

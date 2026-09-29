@@ -1,12 +1,12 @@
-import { LIVE_ACTIVITY_URL } from "./live-activity-link";
-
 export interface LiveActivityInstance<Props> {
   update(props: Props, staleDate?: Date): Promise<void>;
   end(dismissalPolicy: "default" | "immediate"): Promise<void>;
+  /** Calls `receive` with the push token of this activity, now and each time iOS changes it. */
+  watchPushToken(receive: (token: string) => void): () => void;
 }
 
 export interface LiveActivityStarter<Props> {
-  start(props: Props, url: string, staleDate?: Date): LiveActivityInstance<Props>;
+  start(props: Props, staleDate?: Date): LiveActivityInstance<Props>;
   getInstances(): LiveActivityInstance<Props>[];
 }
 
@@ -16,16 +16,20 @@ export interface LiveActivityStarter<Props> {
  */
 export class LiveActivitySync<Props> {
   readonly #starter: LiveActivityStarter<Props>;
-  #activity: LiveActivityInstance<Props> | null;
+  readonly #onPushToken: (token: string | null) => void;
+  #activity: LiveActivityInstance<Props> | null = null;
+  #stopWatch: (() => void) | null = null;
   /** The state the activity shows, or `null` when it is not known. */
   #shown: string | null;
   #queue: Promise<void> = Promise.resolve();
 
-  constructor(starter: LiveActivityStarter<Props>) {
+  /** `onPushToken` receives the token the host updates the activity with, or `null` when there is no activity. */
+  constructor(starter: LiveActivityStarter<Props>, onPushToken: (token: string | null) => void = () => undefined) {
     this.#starter = starter;
+    this.#onPushToken = onPushToken;
     // An activity from an earlier launch shows old state. Keep one to update and end the others.
     const [current = null, ...extra] = starter.getInstances();
-    this.#activity = current;
+    this.#setActivity(current);
     this.#shown = current ? null : stateKey(null, undefined);
     for (const activity of extra) void activity.end("immediate").catch(() => undefined);
   }
@@ -47,10 +51,15 @@ export class LiveActivitySync<Props> {
     return this.#queue;
   }
 
+  /** The host updated or ended the activity while the app was away, so the app no longer knows what it shows. */
+  forget(): void {
+    this.#shown = null;
+  }
+
   async #apply(props: Props | null, staleDate: Date | undefined): Promise<void> {
     const activity = this.#activity;
     if (props === null) {
-      this.#activity = null;
+      this.#setActivity(null);
       await activity?.end("immediate");
       return;
     }
@@ -58,13 +67,20 @@ export class LiveActivitySync<Props> {
       try {
         await activity.update(props, staleDate);
         return;
-      } catch (error) {
-        // The user can dismiss the activity. Start a new one on the next change.
-        this.#activity = null;
-        throw error;
+      } catch {
+        // The user or the host can end the activity. Start a new one.
+        this.#setActivity(null);
       }
     }
-    this.#activity = this.#starter.start(props, LIVE_ACTIVITY_URL, staleDate);
+    this.#setActivity(this.#starter.start(props, staleDate));
+  }
+
+  #setActivity(activity: LiveActivityInstance<Props> | null): void {
+    this.#stopWatch?.();
+    this.#stopWatch = null;
+    this.#activity = activity;
+    this.#onPushToken(null);
+    if (activity) this.#stopWatch = activity.watchPushToken((token) => this.#onPushToken(token));
   }
 }
 

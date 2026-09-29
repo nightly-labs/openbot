@@ -390,6 +390,8 @@ jobs:
           REMOTE_TICKET_PRIVATE_JWK: ${{ secrets.REMOTE_TICKET_PRIVATE_JWK }}
           REMOTE_TICKET_PUBLIC_JWKS: ${{ secrets.REMOTE_TICKET_PUBLIC_JWKS }}
           REMOTE_AUTH_WEBHOOK_SECRET: ${{ secrets.REMOTE_AUTH_WEBHOOK_SECRET }}
+          APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -401,6 +403,8 @@ jobs:
             const remotePrivateJwk = process.env.REMOTE_TICKET_PRIVATE_JWK;
             const remotePublicJwks = process.env.REMOTE_TICKET_PUBLIC_JWKS;
             const remoteWebhookSecret = process.env.REMOTE_AUTH_WEBHOOK_SECRET;
+            const apnsPrivateKey = process.env.APNS_PRIVATE_KEY;
+            const apnsKeyId = process.env.APNS_KEY_ID;
             const path = process.env.SECRETS_PATH;
             if (
               !smtp ||
@@ -421,6 +425,8 @@ jobs:
               REMOTE_TICKET_PRIVATE_JWK: remotePrivateJwk,
               REMOTE_TICKET_PUBLIC_JWKS: remotePublicJwks,
               REMOTE_AUTH_WEBHOOK_SECRET: remoteWebhookSecret,
+              // The Live Activity relay stays off until both are set.
+              ...(apnsPrivateKey && apnsKeyId ? { APNS_PRIVATE_KEY: apnsPrivateKey, APNS_KEY_ID: apnsKeyId } : {}),
             };
             await Bun.write(path, JSON.stringify(secrets));
           '

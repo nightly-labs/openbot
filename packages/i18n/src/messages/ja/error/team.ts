@@ -61,6 +61,7 @@ export const messages = {
   "error.team.agentInstallUnsupported": "この接続ではエージェントを追加できません。",
   "error.team.agentUpdateUnsupported": "この接続ではエージェントを更新できません。",
   "error.team.contextResetUnsupported": "この接続では新しいチャットを始められません。",
+  "error.team.liveActivityUnsupported": "このホストはスマートフォンのライブアクティビティを更新できません。",
   "error.team.agentUpdateTargetRequired": "更新するエージェントを指定してください。",
   "error.team.queueEditUnsupported": "このクライアントはキューの編集に対応していません。",
   "error.team.skillsUnsupported": "この接続ではスキルを利用できません。",

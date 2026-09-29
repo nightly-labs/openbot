@@ -19,7 +19,9 @@
     "./marketplace-catalog": "./src/marketplace-catalog.ts",
     "./agent-message-text": "./src/agent-message-text.ts",
     "./dynamic-island-coordinator": "./src/dynamic-island-coordinator.ts",
-    "./dynamic-island-presentation": "./src/dynamic-island-presentation.ts"
+    "./dynamic-island-presentation": "./src/dynamic-island-presentation.ts",
+    "./live-activity-props": "./src/live-activity-props.ts",
+    "./live-activity-seal": "./src/live-activity-seal.ts"
   },
   "scripts": {
     "typecheck": "bun ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"

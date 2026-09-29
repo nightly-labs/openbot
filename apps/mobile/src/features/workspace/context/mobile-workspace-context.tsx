@@ -9,6 +9,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_CONVERSATION_UNREAD_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { decodeTeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -341,6 +342,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, path: string, body: TeamProtocolV2Json) => request("POST", path, ignoreResponse, body, serverId),
     [request],
   );
+  const supportsLiveActivityPush = useCallback(
+    (serverId: string) => serverCapabilities.current.get(serverId)?.includes(LIVE_ACTIVITY_PUSH_CAPABILITY) === true,
+    [],
+  );
   const applyLiveActivityEvent = useLiveActivity({
     servers,
     activeServerId,
@@ -349,6 +354,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     foreground,
     post: postLiveActivityAction,
     loadAgentAvatar,
+    supportsPush: supportsLiveActivityPush,
   });
   /** The shared Team API requests, sent to one server. */
   const teamApi = useCallback(
