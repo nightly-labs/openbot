@@ -45,7 +45,7 @@ export function parseInstallAgentTemplate(input: unknown): InstallAgentTemplateI
   };
 }
 
-function parsePublishAgentTemplate(input: unknown): PublishAgentTemplateInput {
+export function parsePublishAgentTemplate(input: unknown): PublishAgentTemplateInput {
   if (!isObject(input)) throw new Error("Invalid agent publication.");
   const card = input.card;
   if (card !== null && !(card instanceof Uint8Array && isAgentTemplateCardPng(card)))

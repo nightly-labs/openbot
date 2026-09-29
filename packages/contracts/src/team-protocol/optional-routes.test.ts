@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
+import { AGENT_PUBLISH_ROUTES } from "./agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
@@ -243,5 +244,69 @@ describe("context-reset-v1", () => {
     });
     expect(() => codec(CONTEXT_RESET_ROUTES.clear).request({})).toThrow();
     expect(codec(CONTEXT_RESET_ROUTES.clear).response(200, {})).toEqual({});
+  });
+});
+
+describe("agent-publish-v1", () => {
+  const publication = {
+    templateId: "tpl_chief",
+    shareUrl: "https://openbot.run/agents/tpl_chief",
+    publishedAt: "2026-09-29T00:00:00Z",
+  };
+  const preview = {
+    agentId: "chief",
+    name: "Chief",
+    title: "Chief of staff",
+    description: "Plan the week.",
+    avatarSeed: "chief",
+    avatarHue: 30,
+    avatarImage: { mimeType: "image/png", data: "iVBORw0KGgo=" },
+    skills: [
+      { kind: "marketplace", skillId: "s1", versionId: "v1", slug: "notes", name: "Notes", version: 2 },
+      { kind: "embedded", slug: "brief", name: "Brief", markdown: "# Brief" },
+    ],
+    routines: [
+      {
+        name: "Weekly plan",
+        instruction: "Plan the week.",
+        active: true,
+        schedule: {
+          kind: "advanced",
+          months: [1, 6],
+          days: { kind: "days-of-week", days: [1] },
+          time: { kind: "at-time", time: "09:00" },
+        },
+      },
+    ],
+    updatedAt: null,
+    publication,
+    skillsError: null,
+  };
+
+  it("carries the agent id and a card to the host, and the preview and link back", () => {
+    expect(codec(AGENT_PUBLISH_ROUTES.preview).response(200, { ...preview, avatarUrl: "file:///a.png" })).toEqual(
+      preview,
+    );
+    expect(codec(AGENT_PUBLISH_ROUTES.publish).request({ agentId: "chief", card: null, snapshot: {} })).toEqual({
+      agentId: "chief",
+      card: null,
+    });
+    expect(codec(AGENT_PUBLISH_ROUTES.publish).response(200, publication)).toEqual(publication);
+    expect(codec(AGENT_PUBLISH_ROUTES.unpublish).response(200, {})).toEqual({});
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(() =>
+      codec(AGENT_PUBLISH_ROUTES.publish).request({ agentId: "chief", card: "A".repeat(699_053) }),
+    ).toThrow();
+    expect(() =>
+      codec(AGENT_PUBLISH_ROUTES.preview).response(200, { ...preview, skills: [{ kind: "folder", slug: "x" }] }),
+    ).toThrow();
+    expect(() =>
+      codec(AGENT_PUBLISH_ROUTES.preview).response(200, {
+        ...preview,
+        routines: [{ ...preview.routines[0], schedule: { kind: "yearly" } }],
+      }),
+    ).toThrow();
   });
 });

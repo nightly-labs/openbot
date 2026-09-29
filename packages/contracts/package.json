@@ -58,6 +58,7 @@
     "./team-protocol/storage-v1": "./src/team-protocol/storage-v1.ts",
     "./team-protocol/agent-admin-v1": "./src/team-protocol/agent-admin-v1.ts",
     "./team-protocol/agent-install-v1": "./src/team-protocol/agent-install-v1.ts",
+    "./team-protocol/agent-publish-v1": "./src/team-protocol/agent-publish-v1.ts",
     "./team-protocol/agent-update-v1": "./src/team-protocol/agent-update-v1.ts",
     "./team-protocol/context-reset-v1": "./src/team-protocol/context-reset-v1.ts",
     "./team-protocol/providers-v1": "./src/team-protocol/providers-v1.ts",

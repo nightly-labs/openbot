@@ -1,4 +1,5 @@
-import { isAgentTemplateId } from "./agent-template-links";
+import { createAgentTemplateShareUrl, isAgentTemplateId, isAgentTemplateShareOrigin } from "./agent-template-links";
+import { isAvatarMimeType, isValidAvatarImage } from "./avatar-images";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
 import type { AgentSummary, AvatarImageInput } from "./ipc-agents";
@@ -254,4 +255,79 @@ export function toAgentTemplateSnapshot(value: AgentTemplateSnapshot): AgentTemp
       schedule: structuredClone(schedule),
     })),
   };
+}
+
+/**
+ * The agent-publish-v1 preview a host sent. The host keeps `avatarUrl`, a file on it; the dialog
+ * does not read it, and the card draws the avatar from its bytes.
+ */
+export function decodeHostAgentTemplatePreview(value: unknown): AgentTemplatePreview {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.agentId) ||
+    !isString(value.name) ||
+    !isString(value.title) ||
+    !isString(value.description) ||
+    !isAvatarSeed(value.avatarSeed) ||
+    (value.avatarHue !== null && !isAvatarHue(value.avatarHue)) ||
+    !Array.isArray(value.skills) ||
+    !value.skills.every(isAgentTemplateSkill) ||
+    !Array.isArray(value.routines) ||
+    !value.routines.every(isAgentTemplateRoutine) ||
+    (value.updatedAt !== null && !isString(value.updatedAt)) ||
+    (value.skillsError !== null && !isString(value.skillsError))
+  )
+    throw new Error("The host returned an invalid agent preview.");
+  return {
+    ...toAgentTemplateSnapshot({
+      name: value.name,
+      title: value.title,
+      description: value.description,
+      avatarSeed: value.avatarSeed,
+      avatarHue: value.avatarHue,
+      skills: value.skills,
+      routines: value.routines,
+    }),
+    agentId: value.agentId,
+    avatarUrl: null,
+    avatarImage: decodeHostAvatarImage(value.avatarImage),
+    updatedAt: value.updatedAt,
+    publication: value.publication === null ? null : decodeHostAgentTemplatePublication(value.publication),
+    skillsError: value.skillsError,
+  };
+}
+
+/** The link is rebuilt from the id on `openbot.run` or the local Worker, so a host cannot name another address. */
+export function decodeHostAgentTemplatePublication(value: unknown): AgentTemplatePublication {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.templateId) ||
+    !isAgentTemplateId(value.templateId) ||
+    !isString(value.shareUrl) ||
+    !isString(value.publishedAt)
+  )
+    throw new Error("The host returned an invalid agent publication.");
+  let origin: string;
+  try {
+    origin = new URL(value.shareUrl).origin;
+  } catch {
+    throw new Error("The host returned an invalid agent link.");
+  }
+  if (!isAgentTemplateShareOrigin(origin)) throw new Error("The host returned an invalid agent link.");
+  return {
+    templateId: value.templateId,
+    shareUrl: createAgentTemplateShareUrl(value.templateId, origin),
+    publishedAt: value.publishedAt,
+  };
+}
+
+function decodeHostAvatarImage(value: unknown): AvatarImageInput | null {
+  if (value === null) return null;
+  if (!isDynamicRecord(value) || !isString(value.mimeType) || !isString(value.data))
+    throw new Error("The host returned an invalid agent avatar.");
+  const { mimeType } = value;
+  const bytes = Uint8Array.from(atob(value.data), (character) => character.charCodeAt(0));
+  if (!isAvatarMimeType(mimeType) || !isValidAvatarImage(mimeType, bytes))
+    throw new Error("The host returned an invalid agent avatar.");
+  return { mimeType, bytes };
 }

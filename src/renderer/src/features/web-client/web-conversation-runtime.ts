@@ -6,8 +6,11 @@ import {
   listAgentSkills,
   listMcpServers,
   listSharedTables,
+  previewAgentTemplate,
+  publishAgentTemplate,
   setAgentSkillEnabled,
   uninstallAgentSkill,
+  unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
 import { listInstalledSkills, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
@@ -19,7 +22,7 @@ import type { WebWorkspaceRuntime } from "./web-runtime";
 /** The events of the connected host. */
 type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
 
-/** Skills and shared tables on the connected host. The host answers only an owner or admin. */
+/** Skills, shared tables and agent share links on the connected host. The host answers only an owner or admin. */
 function webHostAdmin(
   request: () => TeamApiRequest,
   onHostEvent?: HostEvents,
@@ -42,6 +45,11 @@ function webHostAdmin(
     sharedTables: {
       listTables: () => listSharedTables(request()),
       deleteTable: ({ name }) => deleteSharedTable(request(), name),
+    },
+    agentTemplates: {
+      preview: (agentId) => previewAgentTemplate(request(), agentId),
+      publish: (input) => publishAgentTemplate(request(), input),
+      unpublish: (agentId) => unpublishAgentTemplate(request(), agentId),
     },
   };
 }

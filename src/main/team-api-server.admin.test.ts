@@ -7,6 +7,7 @@ import type {
   AgentAccess,
   AgentStatus,
   AgentSummary,
+  AgentTemplatePreview,
   ApprovalAutomationPreference,
   CustomProviderSummary,
   HostUpdateSettingsChange,
@@ -14,6 +15,7 @@ import type {
   InstalledSkill,
   ProviderRuntimeSnapshot,
   ProviderRuntimeStatus,
+  PublishAgentTemplateInput,
   SaveCustomProviderInput,
   SharedTable,
   UpdateHostIdentityInput,
@@ -52,7 +54,7 @@ async function signedIn(name: string, options: Partial<TeamApiOptions>) {
     Authorization: `Bearer ${await fixture.signIn()}`,
     "OpenBot-Protocol-Version": "3",
     "OpenBot-Capabilities":
-      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1",
+      "agent-admin-v1, skills-admin-v1, shared-tables-v1, agent-install-v1, agent-update-v1, providers-v1, host-admin-v1, host-update-v1, agent-publish-v1",
     "Content-Type": "application/json",
   };
   const invite = await fixture.store.createInvite("member");
@@ -237,6 +239,7 @@ describe("Team API agent-install-v1", () => {
         added.push(input.templateId);
         return { agent: { ...CHIEF, id: `from-${input.templateId}`, name: "Writer" } };
       },
+      ...NO_PUBLISHING,
     };
     const { base, admin, asMember, post } = await signedIn("agent-install", {
       admin: { marketplaceAgents, agentTemplates },
@@ -265,6 +268,99 @@ describe("Team API agent-install-v1", () => {
 
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("agent-install-v1");
+  });
+});
+
+const NO_PUBLISHING = {
+  preview: async (): Promise<AgentTemplatePreview> => {
+    throw new Error("Not published in this test.");
+  },
+  publish: async () => {
+    throw new Error("Not published in this test.");
+  },
+  unpublish: async () => {},
+};
+
+/** The PNG signature and an IHDR chunk of the share card size: what the host checks of a card. */
+const CARD = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0x04, 0xb0, 0, 0, 0x02,
+  0x76,
+]);
+
+describe("Team API agent-publish-v1", () => {
+  it("lets only an admin publish a host agent, and keeps the host's avatar path on the host", async () => {
+    const publication = {
+      templateId: "tpl_chief",
+      shareUrl: "https://openbot.run/agents/tpl_chief",
+      publishedAt: "2026-09-29T00:00:00Z",
+    };
+    const calls: string[] = [];
+    const cards: Array<Uint8Array | null> = [];
+    const agentTemplates = {
+      install: async () => {
+        throw new Error("Not installed in this test.");
+      },
+      preview: async (agentId: string): Promise<AgentTemplatePreview> => {
+        calls.push(`preview:${agentId}`);
+        return {
+          name: "Chief",
+          title: "Chief of staff",
+          description: "Plan the week.",
+          avatarSeed: "chief",
+          avatarHue: null,
+          skills: [],
+          routines: [],
+          agentId,
+          avatarUrl: "file:///private/avatars/chief.png",
+          avatarImage: { mimeType: "image/png", bytes: CARD },
+          updatedAt: null,
+          publication,
+          skillsError: null,
+        };
+      },
+      publish: async ({ agentId, card }: PublishAgentTemplateInput) => {
+        if (agentId === "leaky") throw new Error("Remove the API key from the instructions.");
+        calls.push(`publish:${agentId}`);
+        cards.push(card);
+        return publication;
+      },
+      unpublish: async (agentId: string) => {
+        calls.push(`unpublish:${agentId}`);
+      },
+    };
+    const { base, admin, asMember, post } = await signedIn("agent-publish", { admin: { agentTemplates } });
+    const card = Buffer.from(CARD).toString("base64");
+
+    expect(
+      (await post("/v1/admin/agents/template-preview", { agentId: "chief" }, { ...admin, "OpenBot-Capabilities": "" }))
+        .status,
+    ).toBe(400);
+    expect((await post("/v1/admin/agents/template-preview", { agentId: "chief" }, asMember)).status).toBe(403);
+    expect((await post("/v1/admin/agents/template-publish", { agentId: "chief", card }, asMember)).status).toBe(403);
+    expect((await post("/v1/admin/agents/template-unpublish", { agentId: "chief" }, asMember)).status).toBe(403);
+    expect(calls).toEqual([]);
+
+    const preview = await (await post("/v1/admin/agents/template-preview", { agentId: "chief" })).json();
+    expect(preview.avatarUrl).toBeUndefined();
+    expect(preview.avatarImage).toEqual({ mimeType: "image/png", data: card });
+    expect(preview.publication).toEqual(publication);
+
+    expect(await (await post("/v1/admin/agents/template-publish", { agentId: "chief", card })).json()).toEqual(
+      publication,
+    );
+    expect(cards).toEqual([CARD]);
+    const badCard = Buffer.from("not a card").toString("base64");
+    expect((await post("/v1/admin/agents/template-publish", { agentId: "chief", card: badCard })).status).toBe(400);
+
+    const refused = await post("/v1/admin/agents/template-publish", { agentId: "leaky", card: null });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: "Remove the API key from the instructions." });
+
+    expect(await (await post("/v1/admin/agents/template-unpublish", { agentId: "chief" })).json()).toEqual({});
+    expect(calls).toEqual(["preview:chief", "publish:chief", "unpublish:chief"]);
+
+    const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
+    expect(compatibility.capabilities).toContain("agent-publish-v1");
   });
 });
 

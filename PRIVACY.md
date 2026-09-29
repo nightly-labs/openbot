@@ -422,6 +422,9 @@ CLI retention policies still apply.
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
 stops the publish when a text field looks like a secret. Workspace files and memories are not sent.
+An owner or admin of a server can also publish, update or unpublish an agent of that server from the
+browser client. The host sends the template content and the agent's avatar to that browser for the
+preview, and publishes with the account signed in on the host, so that account is the creator.
 
 Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 

@@ -89,7 +89,9 @@ mock. The separate web preview implements the browser runtime with that same moc
 - The marketplace reads the public catalog on its own origin. An owner or admin installs skills,
   plugin apps, and new agents on the connected host, and adds Try skill examples and plugin prompts
   to an agent's draft. An agent that the host added from a listing gets Update when the host serves
-  `agent-update-v1`. Publishing (submissions and package choice) is desktop only. A plugin app
+  `agent-update-v1`. Marketplace submissions and package choice are desktop only. An owner or admin
+  publishes, updates and unpublishes an agent's share link from the conversation header when the host
+  serves `agent-publish-v1`; the host publishes with its own account. A plugin app
   that needs a browser sign-in is installed on the host computer, as for a desktop remote admin.
 - Join, marketplace, shared agent, server settings, global search and channel creation use the
   shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay or

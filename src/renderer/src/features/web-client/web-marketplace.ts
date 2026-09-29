@@ -22,7 +22,8 @@ const noAgentInstall = () => currentText().t("webClient.error.agentInstallNotAll
 /**
  * The marketplace of the browser client. The catalog comes from the account service that serves
  * `/app`; installs go to the connected host, which answers only an owner or admin. Nothing is
- * published from a browser, so there are no publishing calls.
+ * submitted to the marketplace from a browser, so there are no publishing calls. A share link is
+ * published by the host (`agent-publish-v1`).
  *
  * Make it once: the dialog keeps its overview cache for each `list` function.
  */
