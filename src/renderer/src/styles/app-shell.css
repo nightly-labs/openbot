@@ -104,7 +104,7 @@
   top: 112px;
   left: 50%;
   width: min(560px, calc(100vw - 48px));
-  max-height: calc(100vh - 136px);
+  max-height: calc(100dvh - 136px);
   overflow: hidden;
   outline: 0;
   background: var(--openbot-bg-control);
@@ -198,7 +198,7 @@
   position: relative;
   inset: auto;
   width: 100%;
-  max-height: min(430px, calc(100vh - 240px));
+  max-height: min(430px, calc(100dvh - 240px));
   overflow-y: auto;
   background: transparent;
   padding: var(--openbot-space-2);
@@ -317,7 +317,7 @@
 @media (max-width: 640px) {
   .global-search-dialog {
     width: calc(100vw - 24px);
-    max-height: calc(100vh - 124px);
+    max-height: calc(100dvh - 124px);
   }
 
   .global-search-result-shortcut {

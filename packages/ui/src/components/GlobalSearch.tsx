@@ -250,12 +250,15 @@ export function GlobalSearch(props: GlobalSearchProps) {
               </Tabs.List>
             </Tabs.Root>
 
-            {/* The always-open results are the top Kobalte layer, so they get outside presses, not the dialog. */}
+            {/* The always-open results are the top Kobalte layer, so they get outside presses, not the dialog.
+                Close as the modal Dialog does: not for a context menu, a press inside, or a toast. */}
             <Combobox.Content
               class="global-search-results"
               onPointerDownOutside={(event) => {
                 const target = event.detail.originalEvent.target;
-                if (!(target instanceof Node && dialog?.contains(target))) props.onOpenChange(false);
+                if (event.detail.isContextMenu || !(target instanceof Element)) return;
+                if (dialog?.contains(target) || target.closest("[data-kb-top-layer]")) return;
+                props.onOpenChange(false);
               }}
             >
               <Combobox.Listbox aria-label={t("conversation.globalSearch.results")} />
