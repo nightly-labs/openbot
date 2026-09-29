@@ -51,6 +51,8 @@ import { HiddenChatsScreen } from "./hidden-chats-screen";
 vi.mock("expo-crypto", () => ({ randomUUID: () => mocks.uuid() }));
 
 vi.mock("expo-secure-store", () => ({}));
+// The agent chat preview draws math with the KaTeX fonts; the test does not load fonts.
+vi.mock("expo-font", () => ({ useFonts: () => [true, null] }));
 vi.mock("expo-image", () => ({
   Image: ({ source }: { source: { uri: string } }) => <img alt="Agent avatar" src={source.uri} />,
 }));

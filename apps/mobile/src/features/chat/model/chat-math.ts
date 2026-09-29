@@ -109,7 +109,7 @@ function supported(node: MathNode): boolean {
  * Reads the markup that KaTeX writes: elements, double-quoted attributes, self-closing elements and
  * escaped text. It is not a general XML parser.
  */
-export function parseMathMl(markup: string): MathElement {
+function parseMathMl(markup: string): MathElement {
   const root: MathElement & { children: MathNode[] } = { tag: "#root", attributes: {}, children: [] };
   const stack: (MathElement & { children: MathNode[] })[] = [root];
   const pattern = /<(\/?)([a-zA-Z][\w:-]*)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>|([^<]+)/gu;

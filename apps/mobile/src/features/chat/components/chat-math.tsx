@@ -312,6 +312,8 @@ const ARROWS_RIGHT = new Set([..."→⟶⇒⟹↦⟼"]);
 const ARROWS_LEFT = new Set([..."←⟵⇐⟸"]);
 const ARROWS_BOTH = new Set([..."↔⟷⇔⟺"]);
 const BRACES = new Set([..."⏞⏟⎴⎵"]);
+/** The marks of `\overline` and `\underline`, which are drawn as a rule as wide as the formula. */
+const RULES = new Set([..."‾¯_―─"]);
 
 function isArrow(text: string): boolean {
   return ARROWS_RIGHT.has(text) || ARROWS_LEFT.has(text) || ARROWS_BOTH.has(text);
@@ -321,7 +323,8 @@ function stretchyHeight(text: string, context: MathContext): number {
   const { size, line, rule } = metrics(context);
   if (isArrow(text)) return line;
   if (BRACES.has(text)) return size * 0.25;
-  return rule + 2 * size * 0.08;
+  if (RULES.has(text)) return rule + 2 * size * 0.08;
+  return line;
 }
 
 function underOverLayout(node: MathElement, context: MathContext) {
@@ -761,9 +764,16 @@ function StretchyMark({ text, context, over }: { text: string; context: MathCont
       />
     );
   }
-  return (
-    <View style={{ alignSelf: "stretch", height: rule, marginVertical: size * 0.08, backgroundColor: context.color }} />
-  );
+  if (RULES.has(text)) {
+    return (
+      <View
+        style={{ alignSelf: "stretch", height: rule, marginVertical: size * 0.08, backgroundColor: context.color }}
+      />
+    );
+  }
+  // Other marks, such as the hat of `\widehat` or the tilde of `\widetilde`, keep their glyph at its
+  // own width, so the notation stays the same.
+  return <Glyph text={text} font="KaTeX_Main-Regular" context={context} />;
 }
 
 function UnderOver({ node, context }: { node: MathElement; context: MathContext }) {

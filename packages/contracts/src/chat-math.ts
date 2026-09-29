@@ -77,11 +77,16 @@ export function blockChatMath(source: string): ChatMath | null {
 
 function delimitedMath(source: string, open: string, close: string, display: boolean): ChatMath | null {
   for (let index = open.length; index < source.length; index += 1) {
+    // `\\` is a LaTeX line break, so its second backslash does not start `\)` or `\]`.
+    if (source.startsWith("\\\\", index)) {
+      index += 1;
+      continue;
+    }
     if (source.startsWith(close, index)) {
       const tex = source.slice(open.length, index);
       return tex.trim() ? { raw: source.slice(0, index + close.length), tex: tex.trim(), display } : null;
     }
-    // `\\` is a LaTeX line break and `\$` a dollar sign, not the start of a delimiter.
+    // `\$` is a dollar sign, not the end of `$$`.
     if (source[index] === "\\" && close.startsWith("$")) index += 1;
   }
   return null;
