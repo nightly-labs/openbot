@@ -670,7 +670,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     unreadReplies: {},
     recentReplies: {},
     failedTurns: {},
-    pendingPrompts: Object.fromEntries(workspace.state.prompts.map((prompt) => [prompt.agentId, prompt])),
+    // One wait per agent: a question replaces a browser takeover for the same agent.
+    pendingPrompts: Object.fromEntries([
+      ...workspace.state.takeovers.map(
+        (request) => [request.agentId, { type: "browser-takeover-requested", request } as const] as const,
+      ),
+      ...workspace.state.prompts.map((prompt) => [prompt.agentId, prompt] as const),
+    ]),
     pendingApprovals: Object.fromEntries(workspace.state.approvals.map((approval) => [approval.agentId, approval])),
   }));
   const sidebarAgentStates = createMemo(() => computeSidebarAgentStates(sidebarActivity()));

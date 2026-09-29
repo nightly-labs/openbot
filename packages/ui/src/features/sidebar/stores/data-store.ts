@@ -62,29 +62,37 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     pinnedItemCache = nextCache;
     return items;
   });
-  const filteredAgents = createMemo(() =>
+  const listedAgents = createMemo(() =>
     props.agents.filter(
       (agent) =>
         !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })) &&
         agentMatchesQuery(agent, normalizedQuery()),
     ),
   );
+  /**
+   * Agents that wait for the user leave their section for the "Needs you" group, the same way a
+   * pinned agent leaves it for the pinned strip. The layout keeps their place, so an agent goes back
+   * to it when the wait ends. A pinned agent stays in its tile, which shows the same badge.
+   *
+   * The set is keyed by a string so that a badge change that keeps the same agents waiting stops
+   * here. Without it, each new reply would rebuild the chat items and remount every row.
+   */
+  const waitingKey = createMemo(() =>
+    Object.keys(props.agentStates)
+      .filter((agentId) => props.agentStates[agentId]?.kind === "waiting")
+      .sort()
+      .join("\n"),
+  );
+  const waitingIds = createMemo(() => new Set(waitingKey() ? waitingKey().split("\n") : []));
+  const agentWaits = (agentId: string) => waitingIds().has(agentId);
+  const waitingAgents = createMemo(() => sortByLayoutOrder(listedAgents().filter((agent) => agentWaits(agent.id))));
+  const filteredAgents = createMemo(() => listedAgents().filter((agent) => !agentWaits(agent.id)));
   const filteredChannels = createMemo(() =>
     matchingChannels().filter(
       (channel) => !pinnedKeys().has(sidebarPinnedItemKey({ kind: "channel", id: channel.id })),
     ),
   );
-  /**
-   * Agents and channels as one ordered list, because the layout places them together: a channel is a
-   * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
-   * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
-   * first, which is where channels sat while they had a list of their own.
-   */
-  const filteredChats = createMemo<SidebarChatItem[]>(() => {
-    const items: SidebarChatItem[] = [
-      ...filteredChannels().map((channel) => ({ kind: "channel", id: channel.id, channel }) as const),
-      ...filteredAgents().map((agent) => ({ kind: "agent", id: agent.id, agent }) as const),
-    ];
+  function sortByLayoutOrder<T extends { id: string }>(items: T[]): T[] {
     const orderIndex = new Map(props.layout.agentOrder.map((chatId, index) => [chatId, index]));
     const naturalIndex = new Map(items.map((item, index) => [item.id, index]));
     return items.sort(
@@ -92,6 +100,18 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
         (orderIndex.get(left.id) ?? props.layout.agentOrder.length + (naturalIndex.get(left.id) ?? 0)) -
         (orderIndex.get(right.id) ?? props.layout.agentOrder.length + (naturalIndex.get(right.id) ?? 0)),
     );
+  }
+  /**
+   * Agents and channels as one ordered list, because the layout places them together: a channel is a
+   * chat the user files and drags exactly like an agent. `agentOrder` is the persisted sequence and
+   * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
+   * first, which is where channels sat while they had a list of their own.
+   */
+  const filteredChats = createMemo<SidebarChatItem[]>(() => {
+    return sortByLayoutOrder<SidebarChatItem>([
+      ...filteredChannels().map((channel) => ({ kind: "channel", id: channel.id, channel }) as const),
+      ...filteredAgents().map((agent) => ({ kind: "agent", id: agent.id, agent }) as const),
+    ]);
   });
   const orderedPeople = createMemo(() => {
     const natural = [...props.people].sort((left, right) => {
@@ -219,5 +239,6 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
     sectionPosition,
     visiblePinnedKeys,
     visibleSectionIds,
+    waitingAgents,
   };
 }

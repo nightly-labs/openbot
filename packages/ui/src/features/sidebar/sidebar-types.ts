@@ -81,9 +81,14 @@ export interface SidebarProps {
     | undefined;
 }
 
-export type SidebarRoutinePhase = "running" | "queued" | "needs-attention" | "failed";
+export type SidebarRoutinePhase = "running" | "queued" | "failed";
+
+/** What an agent waits for: an answer to its question, an approval, or the user in the browser. */
+export type SidebarWaitReason = "question" | "approval" | "takeover";
 
 export type SidebarAgentState =
+  /** `detail` is the question or the command, for the row tooltip. `null` when there is none. */
+  | { kind: "waiting"; reason: SidebarWaitReason; detail: string | null }
   | { kind: "working" }
   | { kind: "responded" }
   | { kind: "unread"; count: number }
