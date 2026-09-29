@@ -905,8 +905,11 @@ describe("OpenCode ACP session loading", () => {
   it.each([
     ["its list fails", "fail"],
     ["it lists the session", "paged"],
+    // An older OpenCode cannot show that a session is missing.
+    ["it has no session list", ""],
   ])("keeps the session and explains the fault when OpenCode fails the load and %s", async (_, list) => {
     const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
     vi.stubEnv("OPENBOT_FAKE_ACP_LIST", list);
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
     const client = startOpencode(fake.cli, () => null, fake.envLog);

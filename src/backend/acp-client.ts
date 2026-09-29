@@ -849,9 +849,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
    * failure" as a fault of its internal server. Only a `session/list` that answers in full without
    * the session shows it is missing: the caller then replaces it and hands it the transcript. A
-   * session that is listed, or a list that fails, means a fault, and the session is kept: one more
-   * attempt, then the fault is reported. An OpenCode without `session/list` cannot tell the two
-   * apart, and a second failure is taken as the missing session it most often is.
+   * session that is listed, a list that fails, or an OpenCode without `session/list` leaves the
+   * session kept: one more attempt, then the fault is reported.
    */
   async #loadSession(connection: ClientSideConnection, request: LoadSessionRequest): Promise<LoadSessionResponse> {
     let failure: unknown;
@@ -869,7 +868,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return await this.#requireConnection().loadSession(request);
     } catch (error) {
       if (!isOpenCodeServiceFailure(error)) throw error;
-      if (listing === "unsupported") throw new MissingOpenCodeSessionError(request.sessionId, error);
       throw new Error(sourceText("error.provider.opencodeServiceFailure"), { cause: error });
     }
   }
@@ -878,8 +876,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   async #sessionListing(
     connection: ClientSideConnection,
     request: LoadSessionRequest,
-  ): Promise<"listed" | "absent" | "unknown" | "unsupported"> {
-    if (!this.#initialization?.agentCapabilities?.sessionCapabilities?.list) return "unsupported";
+  ): Promise<"listed" | "absent" | "unknown"> {
+    if (!this.#initialization?.agentCapabilities?.sessionCapabilities?.list) return "unknown";
     let cursor: string | undefined;
     try {
       for (let page = 0; page < OPENCODE_SESSION_LIST_PAGES; page += 1) {
