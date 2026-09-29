@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Server,
   UsersRound,
 } from "@openbot/ui";
 import { createDigitRoll } from "@openbot/ui/digit-roll";
@@ -305,6 +306,10 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                 {t("server.add.choosePlan", { plan: t(PLAN_TEXT[plan.id].name) })}
               </Button>
               <ul class="hosted-plan-facts">
+                <li>
+                  <Server aria-hidden="true" />
+                  {t("settings.hostedServers.plan.linux")}
+                </li>
                 <li>
                   <Clock3 aria-hidden="true" />
                   {t("settings.hostedServers.plan.alwaysOn")}

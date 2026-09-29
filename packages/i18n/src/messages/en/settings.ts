@@ -286,6 +286,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.recommended": "Best value",
   "settings.hostedServers.plan.perMonth": "/ month",
   "settings.hostedServers.plan.disk": "{count} GB storage",
+  // Each plan is a Linux virtual machine. Agents run Linux commands and apps there, not macOS or Windows ones.
+  "settings.hostedServers.plan.linux": "Linux machine",
   "settings.hostedServers.plan.alwaysOn": "Always on, 24/7",
   // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "Up to {count} member", other: "Up to {count} members" },
