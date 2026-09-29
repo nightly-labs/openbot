@@ -19,7 +19,7 @@ import { AddServerDialog } from "../../lazy-views";
 /** How often the dialog reads the new server while it waits for the payment and the setup. */
 const SETUP_POLL_INTERVAL_MS = 3_000;
 
-export type AddServerCalls = Pick<HostedServersDesktopApi, "list" | "plans" | "create" | "openCheckout" | "wake">;
+type AddServerCalls = Pick<HostedServersDesktopApi, "list" | "plans" | "create" | "openCheckout" | "wake">;
 
 /** A server that the user created before the dialog opened, such as on a return from the payment page. */
 export interface AddServerResume {
