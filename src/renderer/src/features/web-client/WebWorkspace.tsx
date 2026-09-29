@@ -947,8 +947,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                     : undefined
                 }
-                // The browser sidebar shows no agent unread counts, so only the open chat's count is known here.
-                hasUnread={(readState()?.unreadCount ?? 0) > 0 || channels.hasUnread()}
+                // The browser client does not know the unread counts of agent chats it has not opened.
+                hasUnread
                 serverName={workspace.state.host?.name ?? "OpenBot"}
                 serverMenu={{
                   servers: servers(),
