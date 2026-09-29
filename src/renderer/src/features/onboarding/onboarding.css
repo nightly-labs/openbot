@@ -675,3 +675,10 @@
     display: none;
   }
 }
+
+/* The setup dialog is 620px wide, and a note needs 160px on each side of it. */
+@media (max-width: 960px) {
+  .setup-local-content .provider-picker-callout {
+    display: none;
+  }
+}
