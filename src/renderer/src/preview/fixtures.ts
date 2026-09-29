@@ -389,7 +389,7 @@ export const STORY_QUEUES: Record<string, QueueDelivery[]> = {
 };
 
 /** A chat where several team members write to one agent. Each human message names its sender. */
-export const STORY_TEAM_CONVERSATION_MESSAGES: ConversationMessage[] = [
+const STORY_TEAM_CONVERSATION_MESSAGES: ConversationMessage[] = [
   {
     id: "team-message-self",
     author: "user",
