@@ -18,6 +18,7 @@ const MAX_DELAY = 2_147_000_000;
 export class RoutineTimer {
   #timer: NodeJS.Timeout | null = null;
   #firing = false;
+  #suspended = false;
 
   constructor(
     private readonly sources: () => Iterable<RoutineDueSource>,
@@ -33,7 +34,7 @@ export class RoutineTimer {
     if (this.#firing) return;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
-    if (!this.isRunning()) return;
+    if (this.#suspended || !this.isRunning()) return;
     let earliest: string | null = null;
     for (const source of this.sources()) {
       const dueAt = source.nextDueAt();
@@ -46,6 +47,22 @@ export class RoutineTimer {
       void this.#fire();
     }, delay);
     this.#timer.unref?.();
+  }
+
+  /**
+   * The system is going to sleep. A timer left armed can still fire in a dark wake, where the
+   * network is down and the run waits until the full wake, so each one becomes a queued duplicate.
+   */
+  suspend(): void {
+    this.#suspended = true;
+    if (this.#timer) clearTimeout(this.#timer);
+    this.#timer = null;
+  }
+
+  /** Every occurrence missed while suspended collapses into one run in the next pass. */
+  resume(): void {
+    this.#suspended = false;
+    this.arm();
   }
 
   dispose(): void {

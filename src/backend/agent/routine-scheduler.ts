@@ -489,6 +489,13 @@ export class RoutineScheduler implements RoutineDueSource {
           new Date(due.nextRunAt),
           now,
         );
+        // A run that has not finished already does this routine's work. Another one would only
+        // queue behind it, and after a sleep the queue drains as a burst of identical runs.
+        if (this.#routines.activeRuns(due.routine.agentId, due.routine.id).length > 0) {
+          this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
+          changedAgents.add(due.routine.agentId);
+          continue;
+        }
         const run = this.#routines.createRun(due.routine, due.triggerId, "scheduled", scheduledFor.toISOString());
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changedAgents.add(due.routine.agentId);

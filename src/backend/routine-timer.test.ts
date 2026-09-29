@@ -140,3 +140,24 @@ it("asks each owner once for a wake a fire arms again", async () => {
   expect(behind.asked).toBe(1);
   timer.dispose();
 });
+
+it("holds a due routine while suspended and fires it once on resume", async () => {
+  const pending = source("2026-08-25T10:01:00.000Z");
+  const timer = new RoutineTimer(
+    () => [pending.record],
+    () => true,
+    () => undefined,
+  );
+  timer.arm();
+  timer.suspend();
+  // A write during sleep arms the timer again; a dark wake must still not fire it.
+  timer.arm();
+  await vi.advanceTimersByTimeAsync(3 * 60 * 60_000);
+  expect(pending.asked).toBe(0);
+
+  timer.resume();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(pending.fired).toEqual(["2026-08-25T10:01:00.000Z"]);
+  expect(pending.asked).toBe(1);
+  timer.dispose();
+});
