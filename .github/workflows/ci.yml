@@ -398,7 +398,6 @@ jobs:
           OPENPANEL_CLIENT_ID: ${{ secrets.OPENPANEL_CLIENT_ID }}
           OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
           HOSTED_SERVER_TEMPLATE: ${{ vars.HOSTED_SERVER_TEMPLATE }}
-          HOSTED_SERVERS_ALLOWED_USER_IDS: ${{ secrets.HOSTED_SERVERS_ALLOWED_USER_IDS }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -430,7 +429,6 @@ jobs:
               ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
               ["OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET"],
               ["HOSTED_SERVER_TEMPLATE"],
-              ["HOSTED_SERVERS_ALLOWED_USER_IDS"],
             ]) {
               const present = names.filter((name) => process.env[name]?.trim());
               if (present.length === 0) continue;

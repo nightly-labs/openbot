@@ -3,7 +3,7 @@
  * it makes. Run it again at any time: it changes only what differs.
  *
  *   read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
- *   bun run hosting:setup --target=production [--template=<snapshot>] [--allowed-user-ids=<ids>]
+ *   bun run hosting:setup --target=production [--template=<snapshot>]
  *
  *   bun run hosting:setup --target=test
  *
@@ -166,7 +166,6 @@ async function main(args: string[]): Promise<void> {
       api: { type: "string" },
       "replace-webhooks": { type: "boolean", default: false },
       template: { type: "string" },
-      "allowed-user-ids": { type: "string" },
     },
     strict: true,
   });
@@ -222,10 +221,6 @@ async function main(args: string[]): Promise<void> {
     ]);
     written.push("HOSTED_SERVER_TEMPLATE");
   }
-  if (values["allowed-user-ids"]) {
-    if (!live) throw new Error("--allowed-user-ids is for production. Set the test list on the test Worker.");
-    await put("HOSTED_SERVERS_ALLOWED_USER_IDS", values["allowed-user-ids"]);
-  }
 
   logger.info(written.length ? `Wrote ${written.join(", ")} to ${store.label}.` : `${store.label} did not change.`);
   const next: string[] = [];
@@ -242,9 +237,6 @@ async function main(args: string[]): Promise<void> {
   if (live) {
     if (!values.template)
       next.push("Set HOSTED_SERVER_TEMPLATE with --template=<snapshot> (bun run hosting:template).");
-    if (!values["allowed-user-ids"] && !(await store.has("HOSTED_SERVERS_ALLOWED_USER_IDS"))) {
-      next.push("Set the allow list with --allowed-user-ids=<account IDs, or *>.");
-    }
     if (!(await store.has("OPENPANEL_CLIENT_ID"))) {
       next.push("Optional: set OPENPANEL_CLIENT_ID and OPENPANEL_CLIENT_SECRET with gh secret set --env.");
     }

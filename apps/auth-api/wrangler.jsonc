@@ -48,9 +48,11 @@
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
-    // Creates stay off until the boat, claim and Stripe secrets, the template and the allow list are
-    // set. "false" stops new servers only.
-    "HOSTED_SERVERS_ENABLED": "true"
+    // Creates stay off until the boat and Stripe secrets and the template are set. "false" stops new
+    // servers only.
+    "HOSTED_SERVERS_ENABLED": "true",
+    // Each account can buy a server in production. Put account IDs here to limit creates to them.
+    "HOSTED_SERVERS_ALLOWED_USER_IDS": "*"
   },
   "d1_databases": [
     {

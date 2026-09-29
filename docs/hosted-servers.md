@@ -8,9 +8,10 @@ counts as use, also a member's desktop app that is open in the background: the a
 connection to each stored server and starts a stopped one again. This is a product decision: a fast
 answer is more important than the cost of a server that stays on.
 
-The Worker enables hosted servers only when it has the boat, claim and Stripe secrets and
+The Worker enables hosted servers only when it has the boat and Stripe secrets and
 `HOSTED_SERVER_TEMPLATE`, and only for the account IDs in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
-allows each account). See [Production](#production). An account can have 3 servers that are not
+allows each account; with no value, no account can create a server). Production sets `*` in
+`wrangler.jsonc`, so each account can buy a server. See [Production](#production). An account can have 3 servers that are not
 deleted (`MAX_SERVERS_PER_ACCOUNT`); a server that waits for its first payment counts. Each server
 has its own Stripe plan. Its machine comes from the plan
 (`HOSTED_PLAN_SIZE`): Starter is boat `small`, Standard is `default`, and Pro is `large`.
@@ -151,7 +152,7 @@ from `apps/auth-api`:
 | Name | Value |
 | --- | --- |
 | `HOSTED_SERVER_TEMPLATE` | The named snapshot from the template build, such as `openbot-server-0-9-0`. |
-| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs that can create servers. |
+| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs that can create servers. Keep it set: the test Worker is public, and its boat account is a trial. |
 
 The `BOAT_API_KEY` in `.env.shared` is the development key of the boat test account. It also has
 command access, because the e2e script (`scripts/stripe-flows-e2e.ts`) reads the VM with it. Use it
@@ -182,12 +183,11 @@ servers, their webhooks and the cron continue.
 
    ```sh
    read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
-   bun run hosting:setup --target=production --template=<snapshot from step 2> --allowed-user-ids=<IDs, or *>
+   bun run hosting:setup --target=production --template=<snapshot from step 2>
    ```
 
    It makes the six Prices, the Customer Portal settings, the Stripe webhook endpoint and the boat
-   webhook. It writes the two keys, the two webhook signing secrets, the allow list and the
-   template to the `cloudflare-production` GitHub Environment. Run it again at any time: it keeps
+   webhook. It writes the two keys, the two webhook signing secrets and the template to the `cloudflare-production` GitHub Environment. Run it again at any time: it keeps
    a secret that the Environment has. `--replace-webhooks` makes new signing secrets.
 4. **Stripe Dashboard.** In live mode, in the failed-payment settings for subscriptions (Revenue
    recovery → Retries), set "If all retries for a payment fail" to cancel the subscription or to
@@ -205,7 +205,6 @@ servers, their webhooks and the cron continue.
    | `BOAT_API_KEY`, `BOAT_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
    | `OPENPANEL_CLIENT_ID`, `OPENPANEL_CLIENT_SECRET` | secrets, a pair | The client from step 5 |
    | `HOSTED_SERVER_TEMPLATE` | variable | Step 3 (`--template`) writes the snapshot name from step 2 |
-   | `HOSTED_SERVERS_ALLOWED_USER_IDS` | secret | Step 3 (`--allowed-user-ids`) writes it: account IDs, or `*` for each account. A secret, so the IDs do not show in the public job log |
 
    The CI deploy is the production path: `.env.production` does not have all the values that it
    needs, such as `SITE_REPORT_HASH_SECRET`. `bun run api:deploy` sends the same names from

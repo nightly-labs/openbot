@@ -16,8 +16,9 @@ fork needs no key from anyone. Delete the file and rerun to get a fresh set.
 
 `.env.shared` holds encrypted development values that all maintainers share: the Stripe
 sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test` Worker. The boat key creates real
-VMs, but only when the Worker also has `HOSTED_SERVER_TEMPLATE` and the account is in
-`HOSTED_SERVERS_ALLOWED_USER_IDS`. `HOSTED_SERVERS_ENABLED` is `true` in `wrangler.jsonc`. `bun run dev:api` decrypts it in memory. Ask a maintainer for
+VMs, but only when the Worker also has `HOSTED_SERVER_TEMPLATE`. `wrangler.jsonc` sets
+`HOSTED_SERVERS_ENABLED` to `true` and `HOSTED_SERVERS_ALLOWED_USER_IDS` to `*`, so a local Worker
+with a template lets each local account create one; put account IDs in `.env.dev` to limit it. `bun run dev:api` decrypts it in memory. Ask a maintainer for
 `DOTENV_PRIVATE_KEY_SHARED`, then export it in your shell profile or add it to the root
 `.env.keys`. The shell profile works in every worktree. Without the key, the Worker runs with no
 Stripe or boat keys. A value in `.env.dev` overrides the shared value. To change a value, run
