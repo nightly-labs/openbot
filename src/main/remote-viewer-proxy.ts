@@ -19,7 +19,7 @@ import {
   encodeRemoteDesktopSignalBinary,
   encodeRemoteDesktopSignalControl,
 } from "./remote-desktop-signal";
-import { rawDataBytes, rawDataSize, rawDataText } from "./ws-raw-data";
+import { rawDataBytes, rawDataSize, rawDataText, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -275,7 +275,7 @@ export class RemoteViewerProxy {
       } else if (control.type === "text" && stream.socket.readyState === webSockets.WebSocket.OPEN) {
         stream.socket.send(control.data);
       } else if (control.type === "close") {
-        stream.socket.close(control.code ?? 1000, control.reason);
+        stream.socket.close(sendableCloseCode(control.code), control.reason);
       } else if (control.type === "error") {
         stream.socket.close(1011, control.message);
       }

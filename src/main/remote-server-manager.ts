@@ -930,7 +930,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         return { sessionId: session.id, url: url.toString(), protocols: [] };
       } catch (error) {
         // The host counts this session against its limit until it is deleted.
-        await this.closeBrowserViewSession(serverId, session.id).catch(() => undefined);
+        void this.closeBrowserViewSession(serverId, session.id).catch(() => undefined);
         throw error;
       }
     }

@@ -52,7 +52,7 @@ import {
 import type { TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
-import { rawDataBytes } from "./ws-raw-data";
+import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -650,7 +650,7 @@ export class TeamWebRtcHostPeer {
     if (control.type === "text" && socket.readyState === webSockets.WebSocket.OPEN) {
       socket.send(control.data);
     } else if (control.type === "close") {
-      socket.close(control.code ?? 1000, control.reason);
+      socket.close(sendableCloseCode(control.code), control.reason);
     }
   }
 
