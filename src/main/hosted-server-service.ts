@@ -1,6 +1,7 @@
 import {
   type CreateHostedServerInput,
   type DeleteHostedServerInput,
+  HOSTING_DEVELOPER_KEY_HEADER,
   type HostedServerCatalog,
   type HostedServerCheckout,
   type HostedServerList,
@@ -20,6 +21,29 @@ const RUNNING_REFRESH_INTERVAL_MS = 15_000;
 
 export interface HostedServerAuthClient {
   requestAuthorized<T>(path: string, init: RequestInit, decoder: (value: unknown) => T, timeoutMs?: number): Promise<T>;
+}
+
+/**
+ * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.shared`. This
+ * removes it from `environment`, because agents and their tools inherit the environment of this
+ * process. A packaged build never sends it.
+ */
+export function takeHostingDeveloperKey(environment: NodeJS.ProcessEnv, isPackaged: boolean): string | null {
+  const key = environment.OPENBOT_HOSTING_DEVELOPER_KEY?.trim() || null;
+  delete environment.OPENBOT_HOSTING_DEVELOPER_KEY;
+  return isPackaged ? null : key;
+}
+
+/** Sends the developer key with each hosted server request, so the test Worker lets the account create servers. */
+export function withHostingDeveloperKey(auth: HostedServerAuthClient, key: string | null): HostedServerAuthClient {
+  if (!key) return auth;
+  return {
+    requestAuthorized(path, init, decoder, timeoutMs) {
+      const headers = new Headers(init.headers);
+      headers.set(HOSTING_DEVELOPER_KEY_HEADER, key);
+      return auth.requestAuthorized(path, { ...init, headers }, decoder, timeoutMs);
+    },
+  };
 }
 
 /**

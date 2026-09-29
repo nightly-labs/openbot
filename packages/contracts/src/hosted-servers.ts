@@ -73,6 +73,11 @@ export function parseHostedServerName(value: string): string | null {
 
 /** "Contact us" in the add server dialog, for a plan that the dialog does not have. */
 export const HOSTED_SERVER_CONTACT_URL = "mailto:hello@openbot.run";
+/**
+ * A development build sends the shared developer key in this header. A Worker with the same
+ * `HOSTED_SERVERS_DEVELOPER_KEY` lets the account create servers, as the allow list does.
+ */
+export const HOSTING_DEVELOPER_KEY_HEADER = "OpenBot-Hosting-Developer-Key";
 
 export interface HostedServerSummary {
   /** The same value as the Remote host id of the server. */

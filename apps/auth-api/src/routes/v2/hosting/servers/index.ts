@@ -15,7 +15,7 @@ export const Route = createFileRoute("/v2/hosting/servers/")({
         try {
           const user = await requestUser(request);
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json(await requestHostedServerService().list(user));
+          return json(await requestHostedServerService(request).list(user));
         } catch (error) {
           return hostedServerErrorResponse(error);
         }
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/v2/hosting/servers/")({
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
           const body = await readJsonObject(request);
           return json(
-            await requestHostedServerService().create(
+            await requestHostedServerService(request).create(
               user,
               { name: body.name, plan: body.plan, interval: body.interval, currency: body.currency },
               request.headers.get("Idempotency-Key"),

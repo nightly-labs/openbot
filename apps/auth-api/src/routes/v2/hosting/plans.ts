@@ -14,7 +14,7 @@ export const Route = createFileRoute("/v2/hosting/plans")({
         try {
           const user = await requestUser(request);
           if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-          return json(await requestHostedServerService().plans(user));
+          return json(await requestHostedServerService(request).plans(user));
         } catch (error) {
           return hostedServerErrorResponse(error);
         }

@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthService, AuthServiceError } from "./auth-service";
@@ -166,15 +167,17 @@ export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule: waitUntil });
 }
 
-export function requestHostedServerService(): HostedServerService {
-  return requestHostedBilling().hosting;
+/** Pass the request when the call checks who can create servers, so its developer key counts. */
+export function requestHostedServerService(request?: Request): HostedServerService {
+  return requestHostedBilling(request?.headers.get(HOSTING_DEVELOPER_KEY_HEADER) ?? null).hosting;
 }
 
-function requestHostedBilling() {
+function requestHostedBilling(developerKey: string | null = null) {
   const bindings = requireWorkerBindings(env);
   const remote = new RemoteControlPlane(bindings, { schedule: waitUntil });
   return createHostedBilling(bindings, {
     removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+    developerKey,
     planChanged: (hostId) => remote.planChanged(hostId),
     schedule: waitUntil,
   });

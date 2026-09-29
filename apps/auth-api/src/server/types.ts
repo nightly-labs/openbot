@@ -36,6 +36,8 @@ export interface WorkerBindings {
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
+  /** A request with this key in `OpenBot-Hosting-Developer-Key` can create hosted servers. Test Worker only. */
+  HOSTED_SERVERS_DEVELOPER_KEY?: string;
   /** The boat named snapshot that new hosted servers start from. */
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;

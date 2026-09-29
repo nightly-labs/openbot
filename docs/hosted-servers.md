@@ -185,17 +185,21 @@ signs in to the test Worker, and the test Worker makes the VM. The local Worker 
 start, but the app does not use them for its account. The app uses its own profile for the test
 Worker, and all worktrees share it, so you sign in one time.
 
-Only the developers on the allow list can create a server. Only a developer with
-`DOTENV_PRIVATE_KEY_SHARED` can read or change it, so a clone of the repository cannot add an account.
-To add a developer, add their sign-in email and deploy:
+Each developer who has `DOTENV_PRIVATE_KEY_SHARED` can create a server with any account. The
+command decrypts `HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`, and main sends it in the
+`OpenBot-Hosting-Developer-Key` header of each hosted server request. The test Worker has the same
+key and lets the account create servers. A clone of the repository cannot decrypt the key. Main
+removes the key from its environment at the start, so agents do not get it, and a packaged build
+never sends it. To change the key, set a new one and deploy:
 
 ```bash
-bunx dotenvx set HOSTED_SERVERS_TEST_ALLOW_LIST "<list>,dev@example.com" -f apps/auth-api/.env.shared -fk .env.keys
+bunx dotenvx set HOSTED_SERVERS_DEVELOPER_KEY "$(openssl rand -hex 32)" -f apps/auth-api/.env.shared -fk .env.keys
 bun run api:deploy:test
 ```
 
-Keep the account IDs of `bun scripts/stripe-flows-e2e.ts --print-user-ids` in the list, so the e2e
-scenarios can create servers. Use Starter or Standard: the boat trial account has no `large` machine
+`HOSTED_SERVERS_TEST_ALLOW_LIST` has the account IDs of
+`bun scripts/stripe-flows-e2e.ts --print-user-ids`, so the e2e scenarios, which send no key, can
+create servers. Use Starter or Standard: the boat trial account has no `large` machine
 and allows 75 sandbox starts each day.
 
 ## Production

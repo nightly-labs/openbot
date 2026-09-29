@@ -94,6 +94,7 @@ export type HostedServerBindings = Pick<
   | "DB"
   | "HOSTED_SERVERS_ENABLED"
   | "HOSTED_SERVERS_ALLOWED_USER_IDS"
+  | "HOSTED_SERVERS_DEVELOPER_KEY"
   | "HOSTED_SERVER_TEMPLATE"
   | "BOAT_API_KEY"
   | "BOAT_WEBHOOK_SECRET"
@@ -160,6 +161,8 @@ export interface HostedServerServiceOptions {
   /** Null when the deployment has no Stripe key. Then no server can be created, and plans are not checked. */
   billing?: HostedServerBilling | null;
   analytics?: AccountAnalytics;
+  /** The developer key that the request sent. It lets the account create servers when it is the Worker's key. */
+  developerKey?: string | null;
 }
 
 /** Where Stripe sends the user back after Checkout. */
@@ -191,6 +194,7 @@ export class HostedServerService {
   readonly #enabled: boolean;
   /** Account IDs and emails (lowercase) that can create servers. `*` allows each account. */
   readonly #allowed: ReadonlySet<string>;
+  readonly #developerAccess: boolean;
   readonly #now: () => number;
   readonly #removeHost: ((ownerUserId: string, hostId: string) => Promise<void>) | null;
   readonly #billing: HostedServerBilling | null;
@@ -214,6 +218,7 @@ export class HostedServerService {
         .map((value) => (value.includes("@") ? value.trim().toLowerCase() : value.trim()))
         .filter(Boolean),
     );
+    this.#developerAccess = isDeveloperKey(bindings.HOSTED_SERVERS_DEVELOPER_KEY, options.developerKey);
     this.#now = options.now ?? Date.now;
     this.#removeHost = options.removeHost ?? null;
     this.#billing = options.billing ?? null;
@@ -221,7 +226,11 @@ export class HostedServerService {
   }
 
   isAvailableFor(user: Pick<AuthUser, "id" | "email">): boolean {
-    const allowed = this.#allowed.has("*") || this.#allowed.has(user.id) || this.#allowed.has(user.email.toLowerCase());
+    const allowed =
+      this.#developerAccess ||
+      this.#allowed.has("*") ||
+      this.#allowed.has(user.id) ||
+      this.#allowed.has(user.email.toLowerCase());
     return this.#enabled && this.#billing !== null && allowed;
   }
 
@@ -1390,6 +1399,19 @@ function ticketPrivateValue(jwk: string): string {
     throw new Error("REMOTE_TICKET_PRIVATE_JWK is invalid.");
   }
   return parsed.d;
+}
+
+/** A key shorter than 32 characters is not a key: the Worker then gives no developer access. */
+function isDeveloperKey(expected: string | undefined, provided: string | null | undefined): boolean {
+  const key = expected?.trim() ?? "";
+  if (key.length < 32 || !provided) return false;
+  const encoder = new TextEncoder();
+  const left = encoder.encode(key);
+  const right = encoder.encode(provided.trim());
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  return difference === 0;
 }
 
 async function hostedClaim(secret: string, serverId: string): Promise<string> {

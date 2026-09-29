@@ -19,6 +19,7 @@ import { migratedDatabase, sqliteD1 } from "./sqlite-d1";
 
 const owner = { id: "owner", email: "owner@example.test", name: null, avatarUrl: null };
 const member = { id: "member", email: "member@example.test", name: null, avatarUrl: null };
+const DEVELOPER_KEY = "developer-key-0123456789abcdef0123456789";
 const stranger = { id: "stranger", email: "stranger@example.test", name: null, avatarUrl: null };
 const BOAT_WEBHOOK_SECRET = "whsec_boat";
 const STRIPE_WEBHOOK_SECRET = "whsec_stripe";
@@ -110,6 +111,7 @@ async function setup() {
     HOSTED_SERVER_TEMPLATE: "openbot-server-test",
     BOAT_API_KEY: "boat-key",
     BOAT_WEBHOOK_SECRET: BOAT_WEBHOOK_SECRET,
+    HOSTED_SERVERS_DEVELOPER_KEY: DEVELOPER_KEY,
   };
   const stripe = new FakeStripe();
   const events: { accountId: string; event: AccountAnalyticsEvent }[] = [];
@@ -125,13 +127,17 @@ async function setup() {
     onSubscriptionSynced: (sync) => service.onSubscriptionSynced(sync),
     analytics,
   });
-  const service = new HostedServerService(bindings, {
-    fetch: boatFetch,
-    now: () => clock.now,
-    removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
-    billing,
-    analytics,
-  });
+  /** The service for one request, with the developer key that the request sent. */
+  const serviceFor = (developerKey: string | null) =>
+    new HostedServerService(bindings, {
+      fetch: boatFetch,
+      now: () => clock.now,
+      removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+      billing,
+      analytics,
+      developerKey,
+    });
+  const service = serviceFor(null);
   let delivery = 0;
   const boatWebhook = (
     type: string,
@@ -188,6 +194,7 @@ async function setup() {
     stripe,
     remote,
     service,
+    serviceFor,
     boatWebhook,
     stripeSync,
     state,
@@ -305,6 +312,17 @@ describe("hosted servers", () => {
     await context.stripeSync("sub_1", "active", server.serverId, "cus_owner");
     await context.service.tick(context.clock.now + 5 * MINUTE);
     expect(context.sandboxCreates()).toHaveLength(0);
+    expect(context.state(server.serverId)).toMatchObject({ observed_state: "awaiting_payment" });
+  });
+
+  it("lets an account that is not on the allow list create a server only with the developer key", async () => {
+    const context = await setup();
+    for (const key of [null, "wrong-key-0123456789abcdef0123456789ab", DEVELOPER_KEY.slice(0, -1)]) {
+      await expect(
+        context.serviceFor(key).create(stranger, STARTER, "create-key-0000001", RETURN),
+      ).rejects.toMatchObject({ status: 403, code: "hosting_unavailable" });
+    }
+    const { server } = await context.serviceFor(DEVELOPER_KEY).create(stranger, STARTER, "create-key-0000001", RETURN);
     expect(context.state(server.serverId)).toMatchObject({ observed_state: "awaiting_payment" });
   });
 

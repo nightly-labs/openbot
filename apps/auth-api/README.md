@@ -42,7 +42,8 @@ stripe listen --forward-to http://127.0.0.1:3100/v1/stripe/webhook
 
 For the `test` Worker, `bun run hosting:setup --target=test` makes or updates its Stripe and boat
 webhooks and writes their signing secrets to `.env.shared`. Then run `bun run api:deploy:test`. It
-also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` in `.env.shared`.
+also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer key
+`HOSTED_SERVERS_DEVELOPER_KEY` from `.env.shared`.
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, and a

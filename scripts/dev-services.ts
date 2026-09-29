@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { type NetworkInterfaceInfo, networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { get as getEncryptedValue } from "@dotenvx/dotenvx";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import {
   developmentInstanceIdForWorktree,
@@ -279,6 +280,25 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
   };
 }
 
+/**
+ * The test Worker lets an account create servers when the app sends this key. It is in the encrypted
+ * `.env.shared`, so only a developer with `DOTENV_PRIVATE_KEY_SHARED` can read it. Never log it.
+ */
+async function readHostingDeveloperKey(): Promise<string> {
+  const missing =
+    "--hosting=test needs DOTENV_PRIVATE_KEY_SHARED in .env.keys or the environment, to read HOSTED_SERVERS_DEVELOPER_KEY.";
+  const value = await getEncryptedValue("HOSTED_SERVERS_DEVELOPER_KEY", {
+    path: join(projectRoot, "apps", "auth-api", ".env.shared"),
+    envKeysFile: join(projectRoot, ".env.keys"),
+    strict: true,
+  }).catch((error: unknown) => {
+    throw new Error(missing, { cause: error });
+  });
+  const key = value?.trim() ?? "";
+  if (!key || key.startsWith("encrypted:")) throw new Error(missing);
+  return key;
+}
+
 async function main(): Promise<void> {
   const { target, dryRun, force, isolated, hostingTest } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
@@ -290,6 +310,7 @@ async function main(): Promise<void> {
     sharedEnvironment.OPENBOT_AUTH_API_URL = TEST_ACCOUNT_API_URL;
     sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL = TEST_ACCOUNT_API_URL;
     sharedEnvironment.OPENBOT_DEV_INSTANCE_ID ??= developmentInstanceIdForWorktree("openbot:hosting-test");
+    sharedEnvironment.OPENBOT_HOSTING_DEVELOPER_KEY = await readHostingDeveloperKey();
     logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
   }
   if (isolated) {

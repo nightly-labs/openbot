@@ -93,7 +93,7 @@ import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
-import { HostedServerDesktopService } from "./hosted-server-service";
+import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
@@ -229,6 +229,8 @@ export interface ApplicationServiceContext {
   developmentTestClientEnabled: boolean;
   /** Set only in a hosted server VM. */
   hostedServer: HostedServerEnvironment | null;
+  /** Set only by `bun run dev --hosting=test`. */
+  hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -328,6 +330,7 @@ export async function createApplicationServices({
   developmentRemoteRole,
   developmentTestClientEnabled,
   hostedServer,
+  hostingDeveloperKey,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -440,7 +443,7 @@ export async function createApplicationServices({
   const hostedSites = new HostedSiteDesktopService(centralAuth);
   const billing = new BillingDesktopService(centralAuth, (url) => shell.openExternal(url));
   const hostedServers = new HostedServerDesktopService(
-    centralAuth,
+    withHostingDeveloperKey(centralAuth, hostingDeveloperKey),
     (url) => shell.openExternal(url),
     Date.now,
     // A new server is running, but the joined list has no entry for it yet: read the list again.

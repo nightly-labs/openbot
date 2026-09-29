@@ -21,7 +21,7 @@ export type HostedBillingBindings = HostedServerBindings &
  */
 export function createHostedBilling(
   bindings: HostedBillingBindings,
-  options: Pick<HostedServerServiceOptions, "removeHost"> & {
+  options: Pick<HostedServerServiceOptions, "removeHost" | "developerKey"> & {
     /** Tells the members of a host that its plan, and so its member limit, can be different. */
     planChanged: (hostId: string) => Promise<void>;
     /** Keeps the Worker alive until an analytics send ends (`waitUntil`). */
@@ -48,6 +48,11 @@ export function createHostedBilling(
         },
       })
     : null;
-  const hosting = new HostedServerService(bindings, { removeHost: options.removeHost, billing, analytics });
+  const hosting = new HostedServerService(bindings, {
+    removeHost: options.removeHost,
+    developerKey: options.developerKey,
+    billing,
+    analytics,
+  });
   return { billing, hosting };
 }

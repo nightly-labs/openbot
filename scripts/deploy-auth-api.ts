@@ -27,7 +27,11 @@ async function main(): Promise<void> {
   await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
   // An unset value keeps the value that the Worker has: a new template is set for each release.
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
-  if (cloudflareEnvironment === "test") await putTestAllowList();
+  if (cloudflareEnvironment === "test") {
+    await putTestAllowList();
+    // The key is in the encrypted .env.shared. Each developer who can decrypt it can create servers.
+    await putOptionalSecret("HOSTED_SERVERS_DEVELOPER_KEY");
+  }
   // Only production sends account events, so a test Worker does not add events to the production project.
   if (!cloudflareEnvironment) await putOptionalSecretSet("OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
@@ -66,8 +70,9 @@ function assertStripeKeyMode(): void {
 }
 
 /**
- * The test Worker is public and its boat account is a trial, so only the developers in the encrypted
- * `HOSTED_SERVERS_TEST_ALLOW_LIST` (account IDs or emails) can create servers there. Production allows
+ * The test Worker is public and its boat account is a trial, so only the accounts in the encrypted
+ * `HOSTED_SERVERS_TEST_ALLOW_LIST` (account IDs or emails), and a request with the developer key, can
+ * create servers there. Production allows
  * each account with a var in wrangler.jsonc, and a var and a secret cannot have one name.
  */
 async function putTestAllowList(): Promise<void> {
