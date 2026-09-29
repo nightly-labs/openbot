@@ -37,9 +37,12 @@ export interface ComputerUseHighlightTarget {
  * How long after its last action a session still counts as holding the desktop.
  *
  * The daemon keeps a lease alive for five minutes after the last call, which is far longer than the
- * rim should outlive the work. The rim is a claim about now, so it follows the last action closely.
+ * rim should outlive the work. It must also outlast the model's thinking between two actions: a
+ * model step can take longer than fifteen seconds, and a rim that drops out between steps flickers
+ * through the whole turn. The rim goes down with the turn in any case, so this only
+ * limits how long an idle agent inside a running turn keeps it.
  */
-const LIVE_SESSION_IDLE_SECONDS = 15;
+const LIVE_SESSION_IDLE_SECONDS = 60;
 
 /**
  * How recently a session must have acted for a change of front window to count as the agent's.

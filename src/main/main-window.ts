@@ -19,7 +19,7 @@ import {
   type MacPermissionId,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { app, BrowserWindow, clipboard, type Display, Menu, type Rectangle, screen } from "electron";
+import { app, BrowserWindow, clipboard, type Display, Menu, type Point, type Rectangle, screen } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import {
@@ -486,6 +486,23 @@ export function loadComputerUseHighlightRenderer(window: BrowserWindow): Promise
  */
 export function computerUseDisplays(): HighlightDisplay[] {
   return screen.getAllDisplays().map((display) => ({ id: display.id, bounds: display.bounds }));
+}
+
+/**
+ * One rectangle the driver reports, in the units the displays above are measured in.
+ *
+ * On Windows the driver is Per-Monitor V2 DPI aware and reports physical pixels, while Electron
+ * places every window in DIP. At 125% scaling a maximized window would otherwise be drawn a
+ * quarter larger than the display, with its right and bottom edges past the overlay. macOS reports
+ * points, which are what Electron uses there. Electron has `screenToDipRect` on Windows only.
+ */
+export function computerUseDesktopRect(rect: Rectangle): Rectangle {
+  return process.platform === "win32" ? screen.screenToDipRect(null, rect) : rect;
+}
+
+/** One point the driver was asked for, in the same units as `computerUseDesktopRect`. */
+export function computerUseDesktopPoint(point: Point): Point {
+  return process.platform === "win32" ? screen.screenToDipPoint(point) : point;
 }
 
 /** Where the overlay draws the rim. Sent on every placement, and read by that surface only. */

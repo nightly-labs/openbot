@@ -110,6 +110,8 @@ import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import {
+  computerUseDesktopPoint,
+  computerUseDesktopRect,
   computerUseDisplays,
   createComputerUseHighlightWindow,
   createComputerUsePermissionHelpWindow,
@@ -726,14 +728,27 @@ export async function createApplicationServices({
     displays: computerUseDisplays,
     // The driver's own cursor on one screen, OpenBot's inside this overlay on more than one. The
     // runtime answers `null` for the screen it draws itself, so only one cursor is ever drawn.
-    readPointer: () => cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS),
+    readPointer: () => {
+      const pointer = cuaDriver.lastPointer(COMPUTER_USE_CURSOR_MAX_AGE_MS);
+      return pointer ? computerUseDesktopPoint(pointer) : null;
+    },
     readTarget: async (previous) => {
       if (!cuaDriver.mcpServerForProviders()) return null;
+      // The rim marks work in progress, so it goes down with the last turn: completed, failed or
+      // cancelled. The driver's lease outlives the turn, and would hold the rim up for no one.
+      // `service` is built below; the controller starts only after it exists.
+      if (!service.hasRunningTurns()) return null;
       const session = liveSession(await computerUseReads.sessions());
       if (!session) return null;
       const windows = await computerUseReads.listWindows();
       const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
-      return chooseTarget({ windows, session, action, ownPid: process.pid, previous });
+      const target = chooseTarget({ windows, session, action, ownPid: process.pid, previous });
+      if (!target) return null;
+      return {
+        ...target,
+        bounds: computerUseDesktopRect(target.bounds),
+        covered: target.covered.map(computerUseDesktopRect),
+      };
     },
   });
   // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and

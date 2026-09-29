@@ -153,6 +153,11 @@ export class TurnLifecycle {
     return this.#runningTurns.get(turnId)?.startedAt ?? null;
   }
 
+  /** Whether any turn has sent `turn/started` and not yet completed. A compaction turn does not count. */
+  hasRunningTurns(): boolean {
+    return this.#runningTurns.size > 0;
+  }
+
   /** When the provider last reported anything for this agent since OpenBot started. */
   lastEventAt(agentId: string): number | null {
     return this.#lastEventAt.get(agentId) ?? null;
