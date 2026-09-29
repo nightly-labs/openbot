@@ -106,7 +106,9 @@ export function ServerImportPanel(props: ServerImportOptions & { serverId: strin
       const preview = (await calls.choose(serverId)) ?? open;
       show({ phase: preview ? "review" : "idle", error: null, preview, result: null });
     } catch (error) {
-      // Main released the open export when it started to read the new one.
+      // A check before the host read the new export can fail with the old one still open there.
+      // A released token makes the discard do nothing.
+      if (open) void calls.discard(open.token, serverId).catch(() => undefined);
       show({ phase: "idle", error: errorMessage(error, t("server.import.readFailed")), preview: null, result: null });
     }
   };

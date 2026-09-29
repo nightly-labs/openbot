@@ -97,7 +97,8 @@ interface StagedSlot {
   value: StagedImport;
   /** An uploaded export: the service wrote the file and removes it. */
   temporary: boolean;
-  stagedAt: number;
+  /** Releases an uploaded export nobody applied or discarded. */
+  expiry: ReturnType<typeof setTimeout> | null;
 }
 
 /** Who applies an export: the local user, or a member of a joined client. */
@@ -125,7 +126,8 @@ const UPLOAD_TTL_MS = 30 * 60_000;
 
 export class AgentImportService {
   readonly #staged = new Map<string, StagedSlot>();
-  #uploads = 0;
+  /** Uploaded files that are not in `#staged`: being staged, or being applied. */
+  #busyUploads = 0;
   /** Files left by an earlier run are removed before the first upload. */
   #uploadDirectoryReady: Promise<void> | null = null;
 
@@ -148,14 +150,17 @@ export class AgentImportService {
     const directory = this.uploadDirectory;
     if (!directory) throw new Error("Agent import uploads are not available.");
     this.#release(owner);
-    this.#expireUploads();
     const held = [...this.#staged.values()].filter((slot) => slot.temporary).length;
-    if (held + this.#uploads >= UPLOAD_SLOTS) throw new Error(sourceText("error.import.hostBusy"));
-    this.#uploads += 1;
+    if (held + this.#busyUploads >= UPLOAD_SLOTS) throw new Error(sourceText("error.import.hostBusy"));
+    this.#busyUploads += 1;
     try {
-      this.#uploadDirectoryReady ??= rm(directory, { recursive: true, force: true }).then(() =>
-        mkdir(directory, { recursive: true, mode: 0o700 }).then(() => undefined),
-      );
+      this.#uploadDirectoryReady ??= rm(directory, { recursive: true, force: true })
+        .then(() => mkdir(directory, { recursive: true, mode: 0o700 }).then(() => undefined))
+        .catch((error: unknown) => {
+          // A failed setup is tried again by the next upload.
+          this.#uploadDirectoryReady = null;
+          throw error;
+        });
       await this.#uploadDirectoryReady;
       const path = join(directory, `${randomUUID()}.zip`);
       await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
@@ -166,7 +171,7 @@ export class AgentImportService {
         throw error;
       }
     } finally {
-      this.#uploads -= 1;
+      this.#busyUploads -= 1;
     }
   }
 
@@ -200,12 +205,17 @@ export class AgentImportService {
     const token = randomUUID();
     // A second stage by the same owner can finish first: the owner keeps one export.
     this.#release(owner);
-    this.#staged.set(token, {
+    const slot: StagedSlot = {
       owner,
       value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
       temporary,
-      stagedAt: Date.now(),
-    });
+      expiry: null,
+    };
+    if (temporary) {
+      slot.expiry = setTimeout(() => this.#drop(token, slot), UPLOAD_TTL_MS);
+      slot.expiry.unref();
+    }
+    this.#staged.set(token, slot);
     return {
       token,
       sourceApp: manifest.sourceApp,
@@ -251,6 +261,9 @@ export class AgentImportService {
     if (!slot || slot.owner !== (caller?.owner ?? LOCAL_IMPORT_OWNER))
       throw new Error(sourceText("error.import.exportClosed"));
     this.#staged.delete(input.token);
+    if (slot.expiry) clearTimeout(slot.expiry);
+    // The file stays on disk until the import ends, so it keeps its upload slot until then.
+    if (slot.temporary) this.#busyUploads += 1;
     try {
       return await this.#apply(slot.value, input, {
         actor: caller?.actor ?? this.channelActor(),
@@ -258,7 +271,10 @@ export class AgentImportService {
         reviseSkills: caller?.reviseSkills ?? true,
       });
     } finally {
-      if (slot.temporary) await rm(slot.value.path, { force: true }).catch(() => undefined);
+      if (slot.temporary) {
+        await rm(slot.value.path, { force: true }).catch(() => undefined);
+        this.#busyUploads -= 1;
+      }
     }
   }
 
@@ -266,13 +282,10 @@ export class AgentImportService {
     for (const [token, slot] of this.#staged) if (slot.owner === owner) this.#drop(token, slot);
   }
 
-  #expireUploads(): void {
-    const oldest = Date.now() - UPLOAD_TTL_MS;
-    for (const [token, slot] of this.#staged) if (slot.temporary && slot.stagedAt < oldest) this.#drop(token, slot);
-  }
-
   #drop(token: string, slot: StagedSlot): void {
+    if (this.#staged.get(token) !== slot) return;
     this.#staged.delete(token);
+    if (slot.expiry) clearTimeout(slot.expiry);
     if (slot.temporary) void rm(slot.value.path, { force: true }).catch(() => undefined);
   }
 

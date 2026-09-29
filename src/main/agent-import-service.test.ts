@@ -558,6 +558,23 @@ describe("AgentImportService", () => {
     await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
   });
 
+  it("releases a member's upload that nobody applies after 30 minutes", async () => {
+    const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    const uploads = join(root, "uploads");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const staged = await service.stageUpload(bytes, "member-a");
+      expect(await readdir(uploads)).toHaveLength(1);
+      vi.advanceTimersByTime(30 * 60_000);
+      await expect(
+        service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a")),
+      ).rejects.toThrow("no longer open");
+    } finally {
+      vi.useRealTimers();
+    }
+    await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
+  });
+
   it("installs a skill the server already has as it is when a member imports", async () => {
     const files = {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
