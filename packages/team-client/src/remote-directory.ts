@@ -21,6 +21,8 @@ export interface RemoteTeamHost {
   devicePublicKey: string;
   membershipId: string;
   role: "owner" | "admin" | "member";
+  /** The active members that the host's plan allows. An account server from before plans sends none. */
+  memberLimit?: number;
 }
 
 export interface RemoteTeamMember {
@@ -124,7 +126,10 @@ export class RemoteTeamDirectoryClient {
       value.hosts.map(async (candidate): Promise<RemoteTeamHost[]> => {
         if (!isDynamicRecord(candidate) || !isString(candidate.devicePublicKey) || !candidate.devicePublicKey)
           return [];
+        const memberLimit = candidate.memberLimit;
         if (
+          (memberLimit !== undefined &&
+            (!isNumber(memberLimit) || !Number.isSafeInteger(memberLimit) || memberLimit < 1)) ||
           !isString(candidate.hostId) ||
           !isString(candidate.name) ||
           (candidate.logoKey !== null && !isString(candidate.logoKey)) ||
@@ -145,6 +150,7 @@ export class RemoteTeamDirectoryClient {
             devicePublicKey: pinnedKey ?? candidate.devicePublicKey,
             membershipId: candidate.membershipId,
             role: candidate.role,
+            ...(memberLimit === undefined ? {} : { memberLimit }),
           },
         ];
       }),

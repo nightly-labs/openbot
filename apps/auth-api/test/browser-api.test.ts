@@ -39,6 +39,10 @@ const avatars: R2Bucket = {
   resumeMultipartUpload: unusedBucketMethod,
 };
 function setup() {
+  const billing = {
+    getState: vi.fn(),
+    createPortal: vi.fn().mockResolvedValue("https://billing.stripe.com/p/session/portal"),
+  };
   const services: BrowserApiServices = {
     auth: {
       startEmailSignIn: vi.fn().mockResolvedValue({ challengeId: "challenge", expiresAt: 100, resendAt: 50 }),
@@ -67,6 +71,15 @@ function setup() {
       hostAsset: vi.fn().mockResolvedValue({ logoKey: logoVersion }),
     },
     hostLogo: vi.fn().mockResolvedValue(new Response("logo", { headers: { "Content-Type": "image/png" } })),
+    billing: () => billing,
+    hosting: () => ({
+      list: vi.fn(),
+      plans: vi.fn(),
+      create: vi.fn(),
+      checkout: vi.fn(),
+      delete: vi.fn(),
+      wake: vi.fn(),
+    }),
     inviteEmailDelivery: () => ({ send: vi.fn().mockResolvedValue(undefined) }),
     signalUrl: () => "wss://signal.example.test",
     sourceIp: () => "127.0.0.1",
@@ -79,7 +92,7 @@ function setup() {
         },
       ),
   };
-  return services;
+  return Object.assign(services, { billingService: billing });
 }
 function request(
   path: string,
@@ -426,6 +439,46 @@ describe("browser account boundary", () => {
       );
       expect(revoked.status).toBe(204);
       expect(services.auth.revokeAccountSession).toHaveBeenCalledWith(token, sessionId);
+    });
+  });
+  describe("billing", () => {
+    const cookie = `__Host-openbot-web=${token}`;
+    const cancel = { flow: "cancel", subscriptionId: "sub_1" };
+
+    it("refuses a cross-origin Portal request before it calls Stripe", async () => {
+      const services = setup();
+      for (const refused of [{ origin: "https://attacker.test" }, { csrf: "" }]) {
+        const response = await handleBrowserApi(
+          request("v1/me/billing/portal", { body: cancel, cookie, ...refused }),
+          services,
+        );
+        expect(response.status).toBe(403);
+      }
+      expect(services.billingService.createPortal).not.toHaveBeenCalled();
+    });
+
+    it("sends Stripe back to the web client, refuses a bad flow, and answers 503 without a Stripe key", async () => {
+      const services = setup();
+      const opened = await handleBrowserApi(
+        request("v1/me/billing/portal", { body: { ...cancel, extra: "x" }, cookie }),
+        services,
+      );
+      expect(await opened.json()).toEqual({ url: "https://billing.stripe.com/p/session/portal" });
+      expect(services.billingService.createPortal).toHaveBeenCalledWith(user.id, cancel, "web", "https://openbot.test");
+      const invalid = await handleBrowserApi(
+        request("v1/me/billing/portal", { body: { flow: "update", subscriptionId: "cus_1" }, cookie }),
+        services,
+      );
+      expect(invalid.status).toBe(400);
+
+      services.billing = () => null;
+      const state = await handleBrowserApi(request("v1/me/billing", { cookie }), services);
+      expect(await state.json()).toMatchObject({ available: false });
+      const refused = await handleBrowserApi(
+        request("v1/me/billing/portal", { body: { flow: "manage" }, cookie }),
+        services,
+      );
+      expect(refused.status).toBe(503);
     });
   });
 });

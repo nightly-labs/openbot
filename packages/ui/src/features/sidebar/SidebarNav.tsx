@@ -4,7 +4,7 @@
  * the scroll fades in that order.
  */
 
-import { ContextMenu, FolderPlus, Hash } from "@openbot/ui";
+import { Bot, CheckCheck, ContextMenu, FolderPlus, Hash } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { SidebarChannelRow } from "./SidebarChannelRow";
@@ -71,11 +71,25 @@ export function SidebarNav() {
           {reorderAnnouncement()}
         </span>
       </div>
-      <Show when={props.onCreateChannel || layoutMutable() || props.onToggleArchivedChannels}>
+      <Show
+        when={
+          props.createSupported !== false ||
+          props.onCreateChannel ||
+          layoutMutable() ||
+          props.onMarkAllRead ||
+          props.onToggleArchivedChannels
+        }
+      >
         <ContextMenu.Root modal={false}>
           <ContextMenu.Trigger class="sidebar-list-context-trigger" aria-label={t("sidebar.nav.freeArea")} />
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.nav.actions")}>
+              <Show when={props.createSupported !== false}>
+                <ContextMenu.Item onSelect={() => props.onCreateAgent()}>
+                  <Bot class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("sidebar.new.agent")}</span>
+                </ContextMenu.Item>
+              </Show>
               <Show when={props.onCreateChannel}>
                 <ContextMenu.Item onSelect={() => props.onCreateChannel?.()}>
                   <Hash class="agent-context-icon size-4" aria-hidden="true" />
@@ -86,6 +100,12 @@ export function SidebarNav() {
                 <ContextMenu.Item onSelect={() => startCreateSection()}>
                   <FolderPlus class="agent-context-icon size-4" aria-hidden="true" />
                   <span>{t("sidebar.new.section")}</span>
+                </ContextMenu.Item>
+              </Show>
+              <Show when={props.onMarkAllRead}>
+                <ContextMenu.Item disabled={!props.hasUnread} onSelect={() => props.onMarkAllRead?.()}>
+                  <CheckCheck class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("sidebar.markAllRead")}</span>
                 </ContextMenu.Item>
               </Show>
               <Show when={props.onToggleArchivedChannels}>

@@ -1,9 +1,13 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { AuthService, AuthServiceError } from "./auth-service";
+import { BillingError, type BillingService } from "./billing-service";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import { createHostedBilling } from "./hosted-billing";
+import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { HostedSiteService } from "./hosted-site-service";
@@ -66,6 +70,16 @@ export function requestHostedSiteService(): HostedSiteService {
     bindings.SITE_REPORT_HASH_SECRET,
     bindings.SITE_LOCAL_ORIGIN,
   );
+}
+
+/** The billing service, or null when this deployment has no Stripe key. */
+export function requestBillingService(): BillingService | null {
+  return requestHostedBilling().billing;
+}
+
+export function billingErrorResponse(error: unknown): Response {
+  if (error instanceof BillingError) return apiError(error.status, error.code, error.message);
+  return authErrorResponse(error);
 }
 
 export function requireSitePublishingEnabled(): void {
@@ -151,6 +165,29 @@ export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null
 
 export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule: waitUntil });
+}
+
+/** Pass the request when the call checks who can create servers, so its developer key counts. */
+export function requestHostedServerService(request?: Request): HostedServerService {
+  return requestHostedBilling(request?.headers.get(HOSTING_DEVELOPER_KEY_HEADER) ?? null).hosting;
+}
+
+function requestHostedBilling(developerKey: string | null = null) {
+  const bindings = requireWorkerBindings(env);
+  const remote = new RemoteControlPlane(bindings, { schedule: waitUntil });
+  return createHostedBilling(bindings, {
+    removeHost: (ownerUserId, hostId) => remote.deleteHost(ownerUserId, hostId),
+    developerKey,
+    planChanged: (hostId) => remote.planChanged(hostId),
+    schedule: waitUntil,
+  });
+}
+
+export function hostedServerErrorResponse(error: unknown): Response {
+  if (error instanceof HostedServerServiceError) return apiError(error.status, error.code, error.message);
+  if (error instanceof BillingError) return apiError(error.status, error.code, error.message);
+  if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
+  return remoteControlPlaneErrorResponse(error);
 }
 
 export function verifyRemoteServiceRequest(request: Request, body: string): Promise<boolean> {

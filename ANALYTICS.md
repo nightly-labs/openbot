@@ -16,10 +16,10 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, or `mobile`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `mobile`, or `account_api`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `6` on `desktop`
-  and `desktop_host`, `8` on `landing`, and `1` on `mobile`;
+  and `desktop_host`, `8` on `landing` and `account_api`, and `1` on `mobile`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
@@ -42,6 +42,12 @@ be mixed into current conversion or reliability metrics.
 - A local host emits one lifecycle event under its owner's account.
 - Clients observing a remote host do not re-emit host lifecycle.
 - Landing, invitation, and pre-authentication events are anonymous.
+- The account service (`account_api`) sends billing and hosted server events from the Worker, with
+  the account ID as `profileId`. It never sends an email, a Stripe ID, a server ID, a name or an
+  amount in another currency. It uses an OpenPanel server client (`OPENPANEL_CLIENT_ID` and
+  `OPENPANEL_CLIENT_SECRET`) of the same project, and only production has these secrets. The desktop
+  analytics preference does not apply to these events: the account service records a payment or a
+  server change, not a UI action on the computer.
 - OpenPanel receives the central account ID as `profileId` and the normalized account email as the
   profile email. Email is not copied into individual event properties.
 - Existing profiles are repaired by the controlled identity backfill when their `profileId` matches
@@ -103,6 +109,8 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `content_article_opened` | Which news article or guide does a reader choose, and from where? | A link to a published article was clicked; `placement` separates an index card from the related row |
 | `content_article_read` | Is an article read or abandoned? | The body reached `start`, `half`, or `end` in the viewport, at most once each per view. It measures position, not attention, and never elapsed time |
 | `join_page_action` | Does the invitation web flow reach the app? | Anonymous view, download, or app-open action |
+| `billing_action` | Do accounts start, pay for, change and keep paid plans? | `action`: `checkout_started`, `checkout_expired`, `plan_started`, `payment_succeeded`, `payment_failed`, `plan_changed`, `cancel_scheduled`, `cancel_withdrawn`, `plan_ended`, or `portal_opened`, as the account service stores it. Optional `plan`, `interval`, `currency`, `amount` (minor units of `currency`, from Stripe) and `flow` (Portal) |
+| `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message`, `restart` or `schedule`) and `error` (an allowlisted hosted server error code) |
 
 ## Privacy and runtime validation
 

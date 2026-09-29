@@ -252,11 +252,15 @@ export function decodeRemoteDesktopConnectResult(value: unknown): RemoteDesktopC
 }
 
 function server(summary: DynamicRecord): ServerSummary {
-  const { notificationLevel, kind, state, role, compatibility, issue, connectionSequence, hostRestart } = summary;
+  const { notificationLevel, kind, state, role, compatibility, issue, connectionSequence, hostRestart, memberLimit } =
+    summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
   if (!isOneOf(SERVER_STATES, state)) throw new Error("Invalid state.");
   if (connectionSequence !== undefined && !isNumber(connectionSequence)) throw new Error("Invalid connectionSequence.");
+  if (memberLimit !== undefined && !(isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1)) {
+    throw new Error("Invalid memberLimit.");
+  }
   return {
     notificationsMuted: requiredBoolean(summary, "notificationsMuted"),
     notificationsMutedUntil: nullableNumber(summary, "notificationsMutedUntil"),
@@ -276,6 +280,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
+    ...(memberLimit === undefined ? {} : { memberLimit }),
   };
 }
 

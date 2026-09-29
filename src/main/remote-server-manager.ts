@@ -118,6 +118,8 @@ interface RemoteServerManagerOptions {
   appVersion?: string;
   webrtcTransport?: TeamWebRtcClientTransport;
   getLocalHostId?: () => string | null;
+  /** Signal answered that the host is not connected. A hosted server that stopped is started here. */
+  onHostUnavailable?: (serverId: string) => void;
 }
 
 export interface DevelopmentRemoteServerConnection {
@@ -153,6 +155,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
   readonly #getLocalHostId: () => string | null;
+  /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
+  #localMemberLimit: number | null = null;
+  readonly #onHostUnavailable: (serverId: string) => void;
+  #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selectChain = Promise.resolve();
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -177,6 +183,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#allowLocalDevelopmentInvites = options.allowLocalDevelopmentInvites ?? false;
     this.#webrtcTransport = options.webrtcTransport ?? null;
     this.#getLocalHostId = options.getLocalHostId ?? (() => null);
+    this.#onHostUnavailable = options.onHostUnavailable ?? (() => undefined);
     this.#client = new RemoteServerClient({
       appVersion: this.#appVersion,
       servers: this.#store,
@@ -260,7 +267,12 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     this.#webrtcTransport?.on("event", (serverId, event) => this.#handleWebRtcEvent(serverId, event));
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
-      if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId)) this.#events.markHostOffline(serverId);
+      if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId)) {
+        this.#events.markHostOffline(serverId);
+        // A hosted server that stopped for no use starts again only for use: the selected server with
+        // the app in focus. A reconnect in the background does not start it.
+        if (this.#appFocused && serverId === this.#store.activeServerId) this.#onHostUnavailable(serverId);
+      }
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
     });
@@ -290,8 +302,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   }
 
   list(): ServerSummary[] {
-    return remoteServerSummaries(this.#store.servers, this.#store.activeServerId, (serverId) =>
-      this.#connections.statusFor(serverId),
+    return remoteServerSummaries(
+      this.#store.servers,
+      this.#store.activeServerId,
+      (serverId) => this.#connections.statusFor(serverId),
+      this.#localMemberLimit,
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
       return {
@@ -315,6 +330,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   setAppFocused(focused: boolean): void {
+    this.#appFocused = focused;
     this.#events.setAppFocused(focused);
   }
 
@@ -373,6 +389,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       }
       this.#emitChanged();
       this.startEventConnections();
+      // The next retry of an offline host can be minutes away, so a selected hosted server starts now.
+      if (this.#events.isHostOffline(serverId)) this.#onHostUnavailable(serverId);
       return this.list();
     });
     this.#selectChain = operation.then(
@@ -1127,12 +1145,15 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   async #syncWebRtcHosts(): Promise<void> {
     const transport = this.#webrtcTransport;
     if (!transport) return;
+    const hosts = await transport.listHosts();
+    const localHostId = this.#getLocalHostId();
+    this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
     const { servers, removedHostIds, staleTransportHostIds, pinnedKeys } = reconcileWebRtcHosts({
-      hosts: await transport.listHosts(),
+      hosts,
       isConnected: (hostId) => transport.isConnected(hostId),
       servers: this.#store.servers,
       preservedIdentities: this.#store.preservedIdentities,
-      localHostId: this.#getLocalHostId(),
+      localHostId,
       isHiddenHost: (hostId) => this.#store.isHiddenHost(hostId),
       username: this.#centralAccount.getEmail().trim().toLowerCase(),
       keepOtherTransports: this.#allowLocalDevelopmentInvites,

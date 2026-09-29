@@ -57,6 +57,8 @@ export interface MobileServer {
   publicKey: string;
   membershipId: string;
   role: "owner" | "admin" | "member";
+  /** The active members that the host's plan allows. Absent when the account server gave none. */
+  memberLimit?: number;
 }
 
 export interface MobileAgent {

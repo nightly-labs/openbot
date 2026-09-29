@@ -830,6 +830,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * agrees with what stopping would interrupt. Scheduled future routine runs do not count; they
    * resume from durable rows after a restart.
    */
+  /** The next scheduled routine run of any agent or channel, or null when none is scheduled. */
+  nextRoutineDueAt(): string | null {
+    return this.#routineTimer.nextDueAt();
+  }
+
   hasActiveWork(): string[] {
     const reasons: string[] = [];
     for (const [, snapshot] of this.#conversation.activeSnapshots()) {

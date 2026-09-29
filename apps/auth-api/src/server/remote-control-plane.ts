@@ -1,4 +1,4 @@
-import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
+import { memberLimitForPlan } from "@openbot/contracts/billing";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
@@ -9,6 +9,7 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import { importJWK, type JWK, SignJWT } from "jose";
+import { getServerEntitlement } from "./billing-entitlement";
 import { hmacSha256, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
@@ -251,6 +252,14 @@ export class RemoteControlPlane {
     if (existing && existing.owner_user_id !== user.id) {
       throw new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
     }
+    // The account server creates hosted server IDs, so only the account it created one for can publish it.
+    const reservation = await this.#database
+      .prepare("SELECT owner_user_id, desired_state FROM hosted_servers WHERE server_id = ? LIMIT 1")
+      .bind(hostId)
+      .first<{ owner_user_id: string; desired_state: string }>();
+    if (reservation && (reservation.owner_user_id !== user.id || reservation.desired_state === "deleted")) {
+      throw new RemoteControlPlaneError(403, "host_owner_mismatch", "This host belongs to another account.");
+    }
     const now = this.#now();
     const devicePublicKey = input.devicePublicKey ?? null;
     const providedMachineTokenHash = input.machineToken ? await sha256(input.machineToken) : null;
@@ -368,15 +377,18 @@ export class RemoteControlPlane {
         membership_id: string;
         role: RemoteMemberRole;
       }>();
-    return (result.results ?? []).map((row) => ({
-      hostId: row.host_id,
-      name: row.name,
-      logoKey: row.logo_key,
-      devicePublicKey: row.device_public_key,
-      authEpoch: row.auth_epoch,
-      membershipId: row.membership_id,
-      role: row.role,
-    }));
+    return Promise.all(
+      (result.results ?? []).map(async (row) => ({
+        hostId: row.host_id,
+        name: row.name,
+        logoKey: row.logo_key,
+        devicePublicKey: row.device_public_key,
+        authEpoch: row.auth_epoch,
+        membershipId: row.membership_id,
+        role: row.role,
+        memberLimit: await this.#memberLimit(row.host_id),
+      })),
+    );
   }
 
   async createInvite(
@@ -612,9 +624,10 @@ export class RemoteControlPlane {
         "The owner cannot accept a member invitation.",
       );
     }
-    await this.#requireMemberSeat(invite.host_id, user.id);
+    const limit = await this.#memberLimit(invite.host_id);
+    await this.#requireMemberSeat(invite.host_id, user.id, limit);
     const membershipId = crypto.randomUUID();
-    const seat = [invite.host_id, user.id, invite.host_id, DEFAULT_TEAM_MEMBER_LIMIT] as const;
+    const seat = [invite.host_id, user.id, invite.host_id, limit] as const;
     const accepted = await this.#database.batch([
       this.#database
         .prepare(
@@ -671,7 +684,7 @@ export class RemoteControlPlane {
       this.#authEventStatement({ type: "account-servers-changed", userId: user.id }, now),
     ]);
     if ((accepted[2]?.meta.changes ?? 0) !== 1 || (accepted[3]?.meta.changes ?? 0) !== 1) {
-      await this.#requireMemberSeat(invite.host_id, user.id);
+      await this.#requireMemberSeat(invite.host_id, user.id, limit);
       throw new RemoteControlPlaneError(409, "invite_already_used", "The invitation was already used.");
     }
     const membership = await this.#database
@@ -729,7 +742,10 @@ export class RemoteControlPlane {
     if (input.revoke && input.reactivate) throw invalid("member status");
     // A role change keeps an active member active, so it needs the seat as a reactivation does.
     const activating = !input.revoke && (input.reactivate === true || membership.status === "active");
-    if (activating && membership.status !== "active") await this.#requireMemberSeat(input.hostId, membership.user_id);
+    const limit = await this.#memberLimit(input.hostId);
+    if (activating && membership.status !== "active") {
+      await this.#requireMemberSeat(input.hostId, membership.user_id, limit);
+    }
     const now = this.#now();
     const activeSessions = await this.#database
       .prepare("SELECT session_id FROM remote_sessions WHERE host_id = ? AND user_id = ? AND ended_at IS NULL")
@@ -754,7 +770,7 @@ export class RemoteControlPlane {
           input.revoke ? "revoked" : activating ? "active" : membership.status,
           now,
           input.membershipId,
-          ...(activating ? [input.hostId, membership.user_id, input.hostId, DEFAULT_TEAM_MEMBER_LIMIT] : []),
+          ...(activating ? [input.hostId, membership.user_id, input.hostId, limit] : []),
         ),
       this.#database
         .prepare(
@@ -782,7 +798,7 @@ export class RemoteControlPlane {
     ]);
     await this.#flushAuthEvents();
     // A concurrent join, reactivation or revoke took the seat after the check above.
-    if (activating && (changed[0]?.meta.changes ?? 0) !== 1) throw memberLimitReached();
+    if (activating && (changed[0]?.meta.changes ?? 0) !== 1) throw memberLimitReached(limit);
   }
 
   async validateMobileConnectHost(userId: string, binding: MobileConnectHostBinding): Promise<void> {
@@ -1017,6 +1033,63 @@ export class RemoteControlPlane {
     });
   }
 
+  /** The plan of a host changed, so each member's devices read the server list, with its member limit, again. */
+  async planChanged(hostId: string): Promise<void> {
+    const now = this.#now();
+    await this.#database
+      .prepare(
+        `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+         SELECT lower(hex(randomblob(16))),
+                json_object('type', 'account-servers-changed', 'userId', user_id),
+                ?, 0, ?
+           FROM remote_memberships
+          WHERE host_id = ? AND status = 'active'`,
+      )
+      .bind(now, now, hostId)
+      .run();
+    await this.#flushAuthEvents();
+  }
+
+  /**
+   * Removes a host and its memberships, invites and sessions. Signal closes the host and client
+   * sockets, and each member's devices re-read their server list.
+   */
+  async deleteHost(ownerUserId: string, hostId: string): Promise<void> {
+    const now = this.#now();
+    await this.#database.batch([
+      this.#database
+        .prepare(
+          `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+           SELECT lower(hex(randomblob(16))),
+                  json_object('type', 'remote-session-ended', 'hostId', host_id, 'sessionId', session_id),
+                  ?, 0, ?
+             FROM remote_sessions
+            WHERE host_id = ? AND ended_at IS NULL`,
+        )
+        .bind(now, now, hostId),
+      this.#database
+        .prepare(
+          `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+           SELECT lower(hex(randomblob(16))),
+                  json_object('type', 'account-servers-changed', 'userId', user_id),
+                  ?, 0, ?
+             FROM remote_memberships
+            WHERE host_id = ? AND status = 'active'`,
+        )
+        .bind(now, now, hostId),
+      this.#database
+        .prepare(
+          "UPDATE remote_hosts SET auth_epoch = auth_epoch + 1, updated_at = ? WHERE host_id = ? AND owner_user_id = ?",
+        )
+        .bind(now, hostId, ownerUserId),
+      this.#authEpochEventStatement(hostId, now, ownerUserId),
+      this.#database
+        .prepare("DELETE FROM remote_hosts WHERE host_id = ? AND owner_user_id = ?")
+        .bind(hostId, ownerUserId),
+    ]);
+    await this.#flushAuthEvents();
+  }
+
   async issueHostTicket(hostId: string, machineToken: string) {
     const host = await this.#host(hostId);
     if (!host?.machine_token_hash || host.machine_token_hash !== (await sha256(machineToken))) {
@@ -1047,12 +1120,20 @@ export class RemoteControlPlane {
     );
   }
 
-  async #requireMemberSeat(hostId: string, userId: string): Promise<void> {
+  async #requireMemberSeat(hostId: string, userId: string, limit: number): Promise<void> {
     const seat = await this.#database
       .prepare(`SELECT ${MEMBER_SEAT_AVAILABLE_SQL} AS available`)
-      .bind(hostId, userId, hostId, DEFAULT_TEAM_MEMBER_LIMIT)
+      .bind(hostId, userId, hostId, limit)
       .first<{ available: number }>();
-    if (!seat?.available) throw memberLimitReached();
+    if (!seat?.available) throw memberLimitReached(limit);
+  }
+
+  /**
+   * The active members that the host's plan allows, or the default for a host with no plan. A lower
+   * limit after a plan change removes no one: members who are active keep their seats.
+   */
+  async #memberLimit(hostId: string): Promise<number> {
+    return memberLimitForPlan((await getServerEntitlement(this.#database, hostId, this.#now()))?.plan ?? null);
   }
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {
@@ -1148,12 +1229,8 @@ function authEventStatement(
     .bind(crypto.randomUUID(), JSON.stringify(event), now, now, ...(condition?.binds ?? []));
 }
 
-function memberLimitReached(): RemoteControlPlaneError {
-  return new RemoteControlPlaneError(
-    409,
-    "member_limit_reached",
-    `A host can have up to ${DEFAULT_TEAM_MEMBER_LIMIT} members.`,
-  );
+function memberLimitReached(limit: number): RemoteControlPlaneError {
+  return new RemoteControlPlaneError(409, "member_limit_reached", `A host can have up to ${limit} members.`);
 }
 
 export async function deliverPendingRemoteAuthEvents(

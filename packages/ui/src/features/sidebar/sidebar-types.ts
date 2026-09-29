@@ -29,6 +29,9 @@ export interface SidebarProps {
   showingArchivedChannels?: boolean;
   onToggleArchivedChannels?: (() => void) | undefined;
   onCreateChannel?: (() => void) | undefined;
+  /** Marks every agent chat and channel read. The free-area menu offers it while `hasUnread` is set. */
+  onMarkAllRead?: (() => void) | undefined;
+  hasUnread?: boolean;
   onEditChannel?: (channelId: string) => void;
   onDeleteChannel?: ((channelId: string) => Promise<void>) | undefined;
   serverName: string;

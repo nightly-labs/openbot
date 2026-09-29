@@ -10,6 +10,7 @@ export const messages = defineMessages("error.auth", {
   "error.auth.hostCredentialUnavailable": "The remote host credential is unavailable. Register the host again.",
   "error.auth.codeNotVerified": "The sign-in code could not be verified.",
   "error.auth.serviceError": "The account service returned an error.",
+  "error.auth.invalidHostedServer": "The account service returned an invalid hosted server.",
   "error.auth.codeNotSent": "OpenBot could not send the sign-in code.",
   "error.auth.deliveryTimeout":
     "OpenBot could not confirm delivery in time. The code may still arrive; check delivery before sending again.",

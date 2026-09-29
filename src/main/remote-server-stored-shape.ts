@@ -26,7 +26,14 @@
 
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID, SERVER_NOTIFICATION_LEVELS } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isBoolean, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import {
+  type DynamicRecord,
+  isBoolean,
+  isDynamicRecord,
+  isNumber,
+  isOneOf,
+  isString,
+} from "@openbot/contracts/runtime-values";
 
 export interface StoredRemoteServer {
   id: string;
@@ -40,6 +47,8 @@ export interface StoredRemoteServer {
   logoVersion?: string | null;
   role: TeamRole;
   transport?: "webrtc-v2";
+  /** The active members that the host's plan allows, from the account server's host list. */
+  memberLimit?: number;
 }
 
 // An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
@@ -248,5 +257,11 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     ...(value.logoVersion === undefined ? {} : { logoVersion: value.logoVersion }),
     role: value.role,
     ...(value.transport === undefined ? {} : { transport: value.transport }),
+    // A bad limit drops only the limit: the next host list writes it again.
+    ...(isMemberLimit(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
   };
+}
+
+function isMemberLimit(value: unknown): value is number {
+  return isNumber(value) && Number.isSafeInteger(value) && value >= 1;
 }

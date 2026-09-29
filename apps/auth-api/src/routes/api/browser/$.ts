@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { handleBrowserApi } from "../../../server/browser-api";
 import { readHostLogo } from "../../../server/host-logo";
 import {
-  remoteControlPlaneErrorResponse,
+  hostedServerErrorResponse,
   requestAuthService,
   requestAvatarBucket,
+  requestBillingService,
+  requestHostedServerService,
   requestRemoteControlPlane,
   requestRemoteSignalUrl,
   requestSourceIp,
@@ -16,11 +18,13 @@ function handle({ request }: { request: Request }) {
     auth: requestAuthService(),
     remote: requestRemoteControlPlane(),
     hostLogo: (hostId, version) => readHostLogo(requestAvatarBucket(), hostId, version),
+    hosting: requestHostedServerService,
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
+    billing: requestBillingService,
     avatarBucket: requestAvatarBucket,
     signalUrl: requestRemoteSignalUrl,
     sourceIp: requestSourceIp,
-    errorResponse: remoteControlPlaneErrorResponse,
+    errorResponse: hostedServerErrorResponse,
   });
 }
 

@@ -16,6 +16,7 @@ coverage/
 .dev.vars.*
 !.env.example
 !apps/auth-api/.env.production
+!apps/auth-api/.env.shared
 !remote/.env.production
 *.key
 *.p12

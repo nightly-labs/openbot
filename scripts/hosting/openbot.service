@@ -1,0 +1,20 @@
+# OpenBot on a hosted server. provision.sh replaces @SERVICE_USER@ and enables this unit. boat
+# stop and resume work like a reboot, so the unit starts again on each wake.
+[Unit]
+Description=OpenBot hosted server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+RuntimeDirectory=openbot
+RuntimeDirectoryMode=0700
+Environment=XDG_RUNTIME_DIR=/run/openbot
+ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
+Restart=always
+RestartSec=10
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

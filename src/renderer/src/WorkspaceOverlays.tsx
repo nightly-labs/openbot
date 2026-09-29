@@ -12,7 +12,9 @@ import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
+import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import { useServerActions } from "./features/servers/server-actions";
 import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
@@ -60,6 +62,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <SkillsMarketplace />
       <SharedAgentInstall />
       <JoinServer account={props.account} />
+      <AddServer />
       <ServerSettings />
       <AppSettings account={props.account} />
       <GlobalMessageSearch />
@@ -164,6 +167,30 @@ function JoinServer(props: AccountProps) {
       }}
       onPreview={setup.previewInvite}
       onJoin={joinServer}
+    />
+  );
+}
+
+/** A hosted server: the plans, the payment, then the setup. */
+function AddServer() {
+  const { servers, addServerOpen, setAddServerOpen, setJoinServerOpen } = useServers();
+  const { select } = useServerActions();
+
+  return (
+    <AddServerOverlay
+      open={addServerOpen()}
+      calls={appPort().hostedServers}
+      servers={servers()}
+      onClose={() => setAddServerOpen(false)}
+      onOpenServer={(serverId) => {
+        setAddServerOpen(false);
+        void select(serverId);
+      }}
+      onContactUs={() => void appPort().openExternal("hosted-server-contact")}
+      onJoinWithInvite={() => {
+        setAddServerOpen(false);
+        setJoinServerOpen(true);
+      }}
     />
   );
 }
@@ -300,7 +327,7 @@ function AppSettings(props: AccountProps) {
   const auth = useAuth();
   const updates = useUpdates();
   const { agentStatus } = useAgents();
-  const { activeServer } = useServers();
+  const { activeServer, setAddServerOpen } = useServers();
   const {
     appSettingsOpen,
     setAppSettingsOpen,
@@ -402,6 +429,12 @@ function AppSettings(props: AccountProps) {
         providerHostName={providerAdminServerId() === undefined ? undefined : activeServer()?.name}
         codeLogin={providerDownloads() ? codeLogin : undefined}
         hostedSitesApi={appPort().hostedSites}
+        billingApi={appPort().billing}
+        hostedServersApi={appPort().hostedServers}
+        onAddHostedServer={() => {
+          setAppSettingsOpen(false);
+          setAddServerOpen(true);
+        }}
         turboModePending={turboModePending()}
         onTestNotification={sendTestNotification}
         onOpenNotificationSettings={openNotificationSettings}

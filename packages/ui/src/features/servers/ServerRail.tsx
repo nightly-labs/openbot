@@ -33,6 +33,8 @@ interface ServerRailProps extends ServerActionCallbacks {
   onSelect: (serverId: string) => void;
   onReorder: (serverIds: string[]) => void;
   onAdd: () => void;
+  /** True when the plus button opens the hosted server plans, where the user can also join with an invite. */
+  addCreatesServer?: boolean | undefined;
 }
 
 interface DragSlot {
@@ -303,13 +305,15 @@ export function ServerRail(props: ServerRailProps) {
           <Tooltip.Trigger
             type="button"
             class={`${buttonVariants({ variant: "outline", size: "sm" })} server-rail-button server-rail-action`}
-            aria-label={t("server.rail.addRemote")}
+            aria-label={t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}
             onClick={props.onAdd}
           >
             <span class="server-rail-monogram">+</span>
           </Tooltip.Trigger>
           <Tooltip.Portal>
-            <Tooltip.Content class="server-rail-tooltip">{t("server.rail.addRemote")}</Tooltip.Content>
+            <Tooltip.Content class="server-rail-tooltip">
+              {t(props.addCreatesServer ? "server.rail.add" : "server.rail.addRemote")}
+            </Tooltip.Content>
           </Tooltip.Portal>
         </Tooltip.Root>
         <span class="sr-only" aria-live="polite">

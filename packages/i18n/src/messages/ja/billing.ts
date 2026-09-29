@@ -1,0 +1,36 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/billing";
+
+export const messages = {
+  // The Billing tab in Settings and the Billing dialog in the web client.
+  "billing.title": "お支払い",
+  "billing.description": "サーバーごとにプランがあります。お支払いは Stripe が処理します。",
+  "billing.loading": "お支払い情報を読み込んでいます…",
+  "billing.unavailable": "このアカウントサーバーではお支払いを利用できません。",
+  "billing.loadFailed": "お支払い情報を読み込めませんでした。",
+  "billing.portalFailed": "お支払いの管理画面を開けませんでした。",
+  "billing.servers.title": "サーバーのプラン",
+  "billing.manage": "支払い方法と請求書",
+  "billing.opening": "開いています…",
+  "billing.empty": "プランのあるサーバーはありません。",
+  "billing.paymentFailed": "お支払いに失敗しました。プランを維持するには支払い方法を更新してください。",
+  "billing.interval.month": "月払い",
+  "billing.interval.year": "年払い",
+  "billing.plan.starter": "Starter",
+  "billing.plan.standard": "Standard",
+  "billing.plan.pro": "Pro",
+  "billing.server.unnamed": "名前のないサーバー",
+  "billing.server.summary": "{plan} · {size} GB",
+  "billing.server.price.month": "{amount} / 月",
+  "billing.server.price.year": "{amount} / 年",
+  "billing.server.renews": "{date}に更新",
+  "billing.server.ends": "{date}に終了",
+  "billing.status.trialing": "トライアル",
+  "billing.status.paymentFailed": "支払い失敗",
+  "billing.status.paused": "一時停止中",
+  "billing.action.menu": "{server} のプラン操作",
+  "billing.action.change": "プランを変更",
+  "billing.action.cancel": "プランを解約",
+  "billing.action.renew": "プランを再開",
+  "billing.action.updatePayment": "支払い方法を更新",
+} as const satisfies PartialTranslation<typeof source>;

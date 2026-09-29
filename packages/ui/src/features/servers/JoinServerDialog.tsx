@@ -19,7 +19,7 @@ import {
   Text,
   X,
 } from "@openbot/ui";
-import { prefersReducedMotion } from "@openbot/ui/utils";
+import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
 import { createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
@@ -393,13 +393,6 @@ export function InvitePreviewCard(props: InvitePreviewCardProps) {
       </Show>
     </section>
   );
-}
-
-function motionDuration(name: string, fallback: number): number {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  if (value.endsWith("ms")) return Number.parseFloat(value) || fallback;
-  if (value.endsWith("s")) return (Number.parseFloat(value) || fallback / 1_000) * 1_000;
-  return Number.parseFloat(value) || fallback;
 }
 
 function shakeDuration(): number {

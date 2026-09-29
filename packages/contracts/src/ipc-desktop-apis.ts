@@ -81,6 +81,9 @@ export type VoiceDesktopApi = GroupApi<IpcEndpoints["voice"]>;
 export type SkillsDesktopApi = GroupApi<IpcEndpoints["skills"]>;
 
 export type HostedSitesDesktopApi = GroupApi<IpcEndpoints["hostedSites"]>;
+export type BillingDesktopApi = GroupApi<IpcEndpoints["billing"]>;
+
+export type HostedServersDesktopApi = GroupApi<IpcEndpoints["hostedServers"]>;
 
 /**
  * The user's own model endpoints. `save` and `delete` both answer with the whole list plus how the
@@ -136,6 +139,8 @@ export interface OpenBotDesktopApi extends GroupApi<IpcEndpoints["app"]>, GroupA
   storage: StorageDesktopApi;
   agentImport: AgentImportDesktopApi;
   hostedSites: HostedSitesDesktopApi;
+  billing: BillingDesktopApi;
+  hostedServers: HostedServersDesktopApi;
   marketplaceAgents: MarketplaceAgentsDesktopApi;
   agentTemplates: AgentTemplatesDesktopApi;
   auth: CentralAuthDesktopApi;

@@ -69,7 +69,8 @@ export function ServerMembersScreen() {
   const permanentCount = pendingInvites?.filter((invite) => invite.permanent).length ?? 0;
   const permanentLimitReached = inviteMode === "permanent" && permanentCount >= INPUT_LIMITS.maxPermanentInvites;
   const activeMembers = members.data?.filter((member) => member.status === "active");
-  const membersFull = (activeMembers?.length ?? 0) >= DEFAULT_TEAM_MEMBER_LIMIT;
+  const memberLimit = server?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
+  const membersFull = (activeMembers?.length ?? 0) >= memberLimit;
   const createdPermanent = Boolean(created && created.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS);
   const action = useMutation({
     mutationFn: (operation: () => Promise<void>) => operation(),
@@ -227,9 +228,7 @@ export function ServerMembersScreen() {
             </SettingsRow>
           </SettingsSection>
           {permanentLimitReached ? <SettingsNote>{t("mobile.server.members.permanentLimit")}</SettingsNote> : null}
-          {membersFull ? (
-            <SettingsNote>{t("mobile.server.members.full", { limit: DEFAULT_TEAM_MEMBER_LIMIT })}</SettingsNote>
-          ) : null}
+          {membersFull ? <SettingsNote>{t("mobile.server.members.full", { limit: memberLimit })}</SettingsNote> : null}
           {created ? (
             <>
               <SettingsNote>
@@ -292,7 +291,7 @@ export function ServerMembersScreen() {
         title={t("mobile.server.members.title")}
         footer={
           activeMembers
-            ? t("mobile.server.members.limitCount", { count: activeMembers.length, limit: DEFAULT_TEAM_MEMBER_LIMIT })
+            ? t("mobile.server.members.limitCount", { count: activeMembers.length, limit: memberLimit })
             : null
         }
       >

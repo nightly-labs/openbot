@@ -18,6 +18,21 @@ export async function hmacSha256(secret: string, value: string): Promise<string>
   return base64Url(new Uint8Array(digest));
 }
 
+/**
+ * Derives a key for one use from a secret that has another use. A different label gives an unrelated
+ * key, so the derived key tells nothing about the secret or about a key with another label.
+ */
+export async function deriveSecret(secret: string, label: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(), info: encoder.encode(label) },
+    key,
+    256,
+  );
+  return base64Url(new Uint8Array(bits));
+}
+
 function base64Url(value: Uint8Array): string {
   let binary = "";
   for (const byte of value) binary += String.fromCharCode(byte);

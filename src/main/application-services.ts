@@ -68,6 +68,7 @@ import {
 } from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
+import { BillingDesktopService } from "./billing-service";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
 import { BrowserViewClient } from "./browser-view-client";
 import { CentralAuthManager, readCentralAuthApiUrl, readMobileConnectApiUrl } from "./central-auth-manager";
@@ -97,6 +98,10 @@ import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
+import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
+import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
+import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
+import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
 import { LanguageService } from "./language-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -197,6 +202,8 @@ const TEARDOWN_ORDER = {
   updater: 10,
   hostUpdateCoordinator: 12,
   requestedUpdate: 13,
+  hostedServerStartRetry: 14,
+  hostedServerActivity: 15,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -228,6 +235,10 @@ export interface ApplicationServiceContext {
   appVariant: AppVariant;
   developmentRemoteRole: DevelopmentRemoteRole | null;
   developmentTestClientEnabled: boolean;
+  /** Set only in a hosted server VM. */
+  hostedServer: HostedServerEnvironment | null;
+  /** Set only by `bun run dev --hosting=test`. */
+  hostingDeveloperKey: string | null;
   macHapticFeedback: MacHapticFeedback;
   teardown: TeardownRegistry;
   forwardCentralAuth: (state: CentralAuthState) => void;
@@ -270,6 +281,8 @@ export interface ApplicationServices {
   centralAuth: CentralAuthManager;
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
+  billing: BillingDesktopService;
+  hostedServers: HostedServerDesktopService;
   customProviders: CustomProviderStore;
   customProviderChanges: CustomProviderChanges;
   customAgentChanges: CustomAgentChanges;
@@ -324,6 +337,8 @@ export async function createApplicationServices({
   appVariant,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  hostedServer,
+  hostingDeveloperKey,
   macHapticFeedback,
   teardown,
   forwardCentralAuth,
@@ -434,6 +449,16 @@ export async function createApplicationServices({
   await skillCreator.syncAll(store.list());
   await dataSkill.syncAll(store.list());
   const hostedSites = new HostedSiteDesktopService(centralAuth);
+  const billing = new BillingDesktopService(centralAuth, (url) => shell.openExternal(url));
+  const hostedServers = new HostedServerDesktopService(
+    withHostingDeveloperKey(centralAuth, hostingDeveloperKey),
+    (url) => shell.openExternal(url),
+    Date.now,
+    // A new server is running, but the joined list has no entry for it yet: read the list again.
+    (serverId) => {
+      if (!remoteServers.list().some((server) => server.id === serverId)) remoteServers.invalidateDirectory();
+    },
+  );
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await sidebarLayout.initialize();
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
@@ -903,6 +928,21 @@ export async function createApplicationServices({
       setupCompleted: setupState.completed,
     });
   }
+  // At the same position. A failure leaves the host unconfigured and the app running, so the log
+  // shows why; a throw here would make systemd restart the app with a claim that may be spent.
+  let hostedServerSignedIn = false;
+  const signInHostedServer = async (
+    environment: HostedServerEnvironment,
+    initialization: Promise<CentralAuthState>,
+  ): Promise<void> => {
+    await applyHostedServerAccount({ environment, centralAuth, centralAuthInitialization: initialization, teamStore });
+    hostedServerSignedIn = true;
+  };
+  if (hostedServer) {
+    await signInHostedServer(hostedServer, centralAuthInitialization).catch((error) =>
+      logger.error("The hosted server could not sign in:", toLogValue(error)),
+    );
+  }
   const teamChatStore = new TeamChatStore(store.database);
   const remoteDesktopRuntime = await resolveRemoteDesktopRuntime({
     isPackaged: app.isPackaged,
@@ -1127,6 +1167,7 @@ export async function createApplicationServices({
       allowLocalDevelopmentInvites: developmentRemoteRole !== null,
       appVersion: app.getVersion(),
       getLocalHostId: () => teamStore.getIdentity()?.serverId ?? null,
+      onHostUnavailable: (serverId) => void hostedServers.wakeUnavailableHost(serverId),
       webrtcTransport: new TeamWebRtcClientTransport({
         bridge: teamWebRtcBridge,
         listHosts: () => centralAuth.listRemoteHosts(),
@@ -1306,6 +1347,45 @@ export async function createApplicationServices({
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () => remoteUpdate.dispose());
+  if (hostedServer) {
+    const hostedServerStartRetry = new HostedServerStartRetry({
+      hostPhase: () => host.getStatus().phase,
+      startHost: async () => {
+        // A start with no answer from the account server ends in the auth error state, and only a
+        // retry reads the stored session again.
+        if (centralAuth.getState().status !== "signed_in") await centralAuth.retry();
+        if (!hostedServerSignedIn) await signInHostedServer(hostedServer, Promise.resolve(centralAuth.getState()));
+        return host.start();
+      },
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    hostedServerStartRetry.start();
+    teardown.push(TEARDOWN_ORDER.hostedServerStartRetry, "the hosted server start retry", () =>
+      hostedServerStartRetry.stop(),
+    );
+    const hostedServerActivity = new HostedServerActivity({
+      hostId: hostedServer.hostId,
+      inUse: () =>
+        service.hasActiveWork().length > 0 ||
+        host.describeRestartBlockers().length > 0 ||
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+      nextRunAt: () => {
+        const dueAt = service.nextRoutineDueAt();
+        return dueAt ? Date.parse(dueAt) : null;
+      },
+      report: async (path, report) =>
+        centralAuth.requestAuthorized(
+          path,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) },
+          () => undefined,
+        ),
+      onError: (message, error) => logger.warn(message, toLogValue(error)),
+    });
+    hostedServerActivity.start();
+    teardown.push(TEARDOWN_ORDER.hostedServerActivity, "the hosted server activity report", () =>
+      hostedServerActivity.stop(),
+    );
+  }
   await hostUpdateCoordinator.tick();
   hostUpdateCoordinator.start();
   teardown.push(TEARDOWN_ORDER.hostUpdateCoordinator, "the host update coordinator", () =>
@@ -1341,6 +1421,8 @@ export async function createApplicationServices({
     centralAuth,
     skills,
     hostedSites,
+    billing,
+    hostedServers,
     customProviders,
     customProviderChanges,
     customAgentChanges,

@@ -95,6 +95,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         remoteDesktopAvailable: false,
         logoVersion: host.logoKey,
         role: host.role,
+        ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         transport: "webrtc-v2",
       };
     });

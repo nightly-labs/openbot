@@ -78,8 +78,8 @@ export const INPUT_LIMITS = {
   sessionsPerMember: 10,
 } as const;
 
-// Active members of one host, owner included: the owner and two others. Paid tiers will
-// raise it per host. `INPUT_LIMITS.teamMembers` stays the wire cap for stored members.
+// Active members of one host with no plan, owner included: the owner and two others. A plan sets
+// its own limit (`memberLimitForPlan`). `INPUT_LIMITS.teamMembers` stays the wire cap for stored members.
 export const DEFAULT_TEAM_MEMBER_LIMIT = 3;
 
 export const ATTACHMENT_LIMITS = {

@@ -47,6 +47,9 @@ const Servers = createSimpleContext({
     const [servers, setServers] = createSignal<ServerSummary[]>([]);
     const [hostStatus, setHostStatus] = createSignal<HostStatus>(FALLBACK_HOST_STATUS);
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
+    const [addServerOpen, setAddServerOpen] = createSignal(false);
+    // True when the account can create hosted servers. The plus button then opens the plans.
+    const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
     const [serverLoadRequest, setServerLoadRequest] = createSignal<{ serverId: string; nonce: number } | null>(null);
     let loadRequestNonce = 0;
     let pendingCompatibilityRetryServerId: string | null = null;
@@ -196,11 +199,36 @@ const Servers = createSimpleContext({
         .host.getStatus()
         .then(setHostStatus)
         .catch(() => undefined);
+      void refreshHostedServersAvailable();
+      // Another account can sign in after the start, so the plus button reads its access again.
+      let signedInUserId: string | null = null;
+      const unsubscribeAuth = serversPort().auth.onEvent((state) => {
+        if (state.status !== "signed_in" && state.status !== "signed_out") return;
+        const userId = state.status === "signed_in" ? state.user.id : null;
+        if (userId === signedInUserId) return;
+        signedInUserId = userId;
+        if (userId) void refreshHostedServersAvailable();
+        else setHostedServersAvailable(false);
+      });
       return () => {
         unsubscribeServers();
         unsubscribeHost();
+        unsubscribeAuth();
       };
     });
+
+    /** Reads again whether the account can create hosted servers. The account can change after the start. */
+    async function refreshHostedServersAvailable(): Promise<boolean> {
+      // A failed read keeps the last answer: a network error does not turn the plans off.
+      const available = await serversPort()
+        .hostedServers.list()
+        .then(
+          (list) => list.available,
+          () => hostedServersAvailable(),
+        );
+      setHostedServersAvailable(available);
+      return available;
+    }
 
     async function retryServerConnection(serverId: string): Promise<void> {
       pendingCompatibilityRetryServerId = serverId;
@@ -287,6 +315,10 @@ const Servers = createSimpleContext({
       setHostStatus,
       joinServerOpen,
       setJoinServerOpen,
+      addServerOpen,
+      setAddServerOpen,
+      hostedServersAvailable,
+      refreshHostedServersAvailable,
       reorderServers,
       setServerMuted,
       setServerNotificationLevel,

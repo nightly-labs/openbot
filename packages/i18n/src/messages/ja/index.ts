@@ -6,6 +6,7 @@ import { messages as agentSettings } from "./agentSettings";
 import { messages as agentTemplate } from "./agentTemplate";
 import { messages as app } from "./app";
 import { messages as attachment } from "./attachment";
+import { messages as billing } from "./billing";
 import { messages as browser } from "./browser";
 import { messages as channel } from "./channel";
 import { messages as chat } from "./chat";
@@ -64,6 +65,7 @@ export const ja = {
   ...startup,
   ...window,
   ...settings,
+  ...billing,
   ...provider,
   ...app,
   ...composer,

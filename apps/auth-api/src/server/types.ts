@@ -30,6 +30,21 @@ export interface WorkerBindings {
   REMOTE_SIGNAL_URL?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
   REMOTE_AUTH_WEBHOOK_SECRET?: string;
+  /** A Stripe sandbox (`sk_test_`) key in development and test. */
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  HOSTED_SERVERS_ENABLED?: string;
+  /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
+  HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
+  /** A request with this key in `OpenBot-Hosting-Developer-Key` can create hosted servers. Test Worker only. */
+  HOSTED_SERVERS_DEVELOPER_KEY?: string;
+  /** The boat named snapshot that new hosted servers start from. */
+  HOSTED_SERVER_TEMPLATE?: string;
+  BOAT_API_KEY?: string;
+  BOAT_WEBHOOK_SECRET?: string;
+  /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
+  OPENPANEL_CLIENT_ID?: string;
+  OPENPANEL_CLIENT_SECRET?: string;
 }
 
 function isWorkerBindings(value: unknown): value is WorkerBindings {

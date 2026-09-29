@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { exportJWK, generateKeyPair, importJWK, jwtVerify } from "jose";
 import { describe, expect, it, vi } from "vitest";
 import { AuthService } from "../src/server/auth-service";
@@ -13,6 +13,14 @@ import {
   RemoteTicketSigner,
   verifyRemoteServiceSignature,
 } from "../src/server/remote-control-plane";
+import { sqliteD1 } from "./sqlite-d1";
+
+/** The account server reads the plan of a host for its member limit. */
+function applyPlanMigrations(database: DatabaseSync): void {
+  for (const name of ["0022_billing.sql", "0023_hosted_servers.sql"]) {
+    database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+  }
+}
 
 describe("remote control plane migration", () => {
   it("keeps each tunnel owner and does not import other members", () => {
@@ -397,6 +405,7 @@ describe("RemoteControlPlane", () => {
     database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
+    applyPlanMigrations(database);
     database
       .prepare(
         `INSERT INTO remote_memberships(
@@ -497,6 +506,7 @@ describe("RemoteControlPlane", () => {
     database.exec(readFileSync(new URL("../migrations/0017_mobile_session_security.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0018_remote_device_sessions.sql", import.meta.url), "utf8"));
     database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
+    applyPlanMigrations(database);
     const pair = await generateKeyPair("ES256", { extractable: true });
     const privateJwk = await exportJWK(pair.privateKey);
     const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
@@ -925,6 +935,7 @@ describe("permanent invitation links", () => {
       database.exec(readFileSync(new URL("../migrations/0012_remote_control_plane.sql", import.meta.url), "utf8"));
       database.exec(readFileSync(new URL("../migrations/0013_remote_session_lifecycle.sql", import.meta.url), "utf8"));
       database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
+      applyPlanMigrations(database);
       const pair = await generateKeyPair("ES256", { extractable: true });
       const privateJwk = await exportJWK(pair.privateKey);
       const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
@@ -999,62 +1010,124 @@ describe("permanent invitation links", () => {
   });
 });
 
-function sqliteD1(database: DatabaseSync): D1Database {
-  class Statement {
-    readonly sql: string;
-    readonly values: SQLInputValue[];
+describe("member limits per plan", () => {
+  it("lets a host have the members of its plan and keeps active members after a downgrade", async () => {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec("PRAGMA foreign_keys = ON");
+      const users = Array.from({ length: 10 }, (_, index) => `user-${index + 1}`);
+      database.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY);
+        CREATE TABLE team_tunnels (
+          server_id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id),
+          tunnel_name TEXT NOT NULL,
+          api_hostname TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          machine_token_hash TEXT
+        );
+        INSERT INTO users(id) VALUES ('owner'), ('stranger'), ${users.map((id) => `('${id}')`).join(", ")};
+        INSERT INTO team_tunnels(
+          server_id, user_id, tunnel_name, api_hostname, status, created_at, updated_at, machine_token_hash
+        ) VALUES ('host-1', 'owner', 'Cloud server', 'old.example.test', 'active', 100, 200, 'machine-hash');
+      `);
+      for (const name of [
+        "0012_remote_control_plane.sql",
+        "0013_remote_session_lifecycle.sql",
+        "0020_permanent_invites.sql",
+      ]) {
+        database.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), "utf8"));
+      }
+      applyPlanMigrations(database);
+      const pair = await generateKeyPair("ES256", { extractable: true });
+      const privateJwk = await exportJWK(pair.privateKey);
+      const publicJwk = { ...(await exportJWK(pair.publicKey)), kid: "test-key", use: "sig", alg: "ES256" };
+      const controlPlane = new RemoteControlPlane(
+        {
+          DB: sqliteD1(database),
+          REMOTE_TICKET_PRIVATE_JWK: JSON.stringify({ ...privateJwk, kid: "test-key", alg: "ES256" }),
+          REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [publicJwk] }),
+          REMOTE_TICKET_KEY_ID: "test-key",
+        },
+        { now: () => 1_000 },
+      );
+      const owner = { id: "owner", email: "owner@example.com", name: null, avatarUrl: null };
+      const member = (id: string) => ({ id, email: `${id}@example.com`, name: null, avatarUrl: null });
+      const subscribe = (subscriptionId: string, userId: string, plan: string, status: string) =>
+        database
+          .prepare(
+            `INSERT INTO billing_subscriptions(
+               stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval, currency, status,
+               current_period_end, updated_at
+             ) VALUES (?, ?, 'cus_1', 'host-1', ?, 'month', 'eur', ?, 5_000, ?)
+             ON CONFLICT(stripe_subscription_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+          )
+          .run(subscriptionId, userId, plan, status, Date.now());
+      const limit = async () => (await controlPlane.listHosts("owner"))[0]?.memberLimit;
+      const invite = await controlPlane.createInvite(owner, { hostId: "host-1", role: "member", permanent: true });
 
-    constructor(sql: string, values: SQLInputValue[] = []) {
-      this.sql = sql;
-      this.values = values;
-    }
-
-    bind(...values: SQLInputValue[]) {
-      return new Statement(this.sql, values);
-    }
-
-    async first<Value>() {
-      // biome-ignore lint/nursery/noUnsafeTypeAssertion: The test adapter must implement D1's generic result contract.
-      return (database.prepare(this.sql).get(...this.values) as Value | undefined) ?? null;
-    }
-
-    async all<Value>() {
-      // biome-ignore lint/nursery/noUnsafeTypeAssertion: The test adapter must implement D1's generic result contract.
-      return { success: true, results: database.prepare(this.sql).all(...this.values) as Value[] };
-    }
-
-    async run() {
-      // D1 counts the rows that triggers change too, like SQLite total_changes().
-      const before = totalChanges();
-      database.prepare(this.sql).run(...this.values);
-      return { success: true, meta: { changes: totalChanges() - before }, results: [] };
-    }
-  }
-
-  function totalChanges() {
-    return Number(database.prepare("SELECT total_changes() AS changes").get()?.changes);
-  }
-
-  let batchChain = Promise.resolve();
-  const adapter = {
-    prepare: (sql: string) => new Statement(sql),
-    batch: (statements: Statement[]) => {
-      const operation = batchChain.then(async () => {
-        database.exec("BEGIN");
-        try {
-          const results = [];
-          for (const statement of statements) results.push(await statement.run());
-          database.exec("COMMIT");
-          return results;
-        } catch (error) {
-          database.exec("ROLLBACK");
-          throw error;
-        }
+      // No plan: the owner and two members.
+      for (const id of users.slice(0, 2)) await controlPlane.acceptInvite(member(id), invite.token);
+      await expect(controlPlane.acceptInvite(member("user-3"), invite.token)).rejects.toMatchObject({
+        code: "member_limit_reached",
+        message: "A host can have up to 3 members.",
       });
-      batchChain = operation.then(() => undefined).catch(() => undefined);
-      return operation;
-    },
-  };
-  // biome-ignore lint/nursery/noUnsafeTypeAssertion: This focused adapter implements only the D1 methods used by this test.
-  return adapter as unknown as D1Database;
-}
+      expect(await limit()).toBe(3);
+
+      // A plan of another account names this host, so it gives the host nothing.
+      subscribe("sub_stranger", "stranger", "pro", "active");
+      expect(await limit()).toBe(3);
+
+      // Standard: ten active members, owner included.
+      subscribe("sub_owner", "owner", "standard", "active");
+      expect(await limit()).toBe(10);
+      for (const id of users.slice(2, 9)) await controlPlane.acceptInvite(member(id), invite.token);
+      await expect(controlPlane.acceptInvite(member("user-10"), invite.token)).rejects.toMatchObject({
+        code: "member_limit_reached",
+        message: "A host can have up to 10 members.",
+      });
+
+      // The plan ends. No member loses the seat, but a revoked member cannot come back.
+      subscribe("sub_owner", "owner", "standard", "canceled");
+      expect(await limit()).toBe(3);
+      const active = () =>
+        database.prepare("SELECT COUNT(*) AS count FROM remote_memberships WHERE status = 'active'").get();
+      expect(active()).toEqual({ count: 10 });
+      const membershipId = String(
+        database.prepare("SELECT membership_id FROM remote_memberships WHERE user_id = 'user-9'").get()?.membership_id,
+      );
+      await controlPlane.changeMembership("owner", {
+        hostId: "host-1",
+        membershipId,
+        role: "admin",
+      });
+      await controlPlane.changeMembership("owner", {
+        hostId: "host-1",
+        membershipId,
+        revoke: true,
+      });
+      await expect(
+        controlPlane.changeMembership("owner", {
+          hostId: "host-1",
+          membershipId,
+          reactivate: true,
+        }),
+      ).rejects.toMatchObject({ code: "member_limit_reached" });
+      expect(active()).toEqual({ count: 9 });
+
+      // Each active member's devices read the server list again after a plan change.
+      database.exec("DELETE FROM remote_auth_events");
+      await controlPlane.planChanged("host-1");
+      expect(
+        database
+          .prepare("SELECT json_extract(payload, '$.userId') AS userId FROM remote_auth_events ORDER BY userId")
+          .all()
+          .map((row) => row.userId),
+      ).toEqual(["owner", ...users.slice(0, 8)].sort());
+    } finally {
+      database.close();
+    }
+  });
+});

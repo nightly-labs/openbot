@@ -1,10 +1,19 @@
 // What main answers for the app shell, the account, the updater, notifications, voice, exports,
-// hosted sites, custom providers and remote desktop.
+// hosted sites, hosted servers, custom providers and remote desktop.
 //
 // Each decoder checks every field the contract type requires and keeps each optional field it
 // carries, so a value the renderer reads always has the shape its type says.
 
 import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
+import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
+import {
+  type HostedServerCatalog,
+  type HostedServerList,
+  type HostedServerSummary,
+  parseHostedServerCatalog,
+  parseHostedServerList,
+  parseHostedServerSummary,
+} from "@openbot/contracts/hosted-servers";
 import { parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
 import {
   type AccountSession,
@@ -276,6 +285,30 @@ export function decodeHostedSite(value: unknown): HostedSiteSummary {
 export function decodeHostedSites(value: unknown): HostedSiteSummary[] {
   if (!Array.isArray(value)) throw new Error("Invalid hosted site list response.");
   return value.map(decodeHostedSite);
+}
+
+export function decodeBillingState(value: unknown): BillingState {
+  const state = parseBillingState(value);
+  if (!state) throw new Error("Invalid billing state response.");
+  return state;
+}
+
+export function decodeHostedServer(value: unknown): HostedServerSummary {
+  const server = parseHostedServerSummary(value);
+  if (!server) throw new Error("Invalid hosted server response.");
+  return server;
+}
+
+export function decodeHostedServerCatalog(value: unknown): HostedServerCatalog {
+  const catalog = parseHostedServerCatalog(value);
+  if (!catalog) throw new Error("Invalid hosted server plans response.");
+  return catalog;
+}
+
+export function decodeHostedServerList(value: unknown): HostedServerList {
+  const list = parseHostedServerList(value);
+  if (!list) throw new Error("Invalid hosted server list response.");
+  return list;
 }
 
 /**

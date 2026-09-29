@@ -1,3 +1,4 @@
+import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type AccountUsage,
   type AddedAgent,
@@ -44,7 +45,10 @@ import type { AgentMessage } from "@openbot/ui/data";
 import { AccountDock } from "@openbot/ui/features/account/AccountDock";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
+import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
+import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
+import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
@@ -75,6 +79,7 @@ import { clearStoredQueueEdit } from "../conversation/composer-draft";
 import { ConversationControllerProvider } from "../conversation/conversation-controller-context";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { FilesPort } from "../files/files-port";
+import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { watchHostUpdate } from "../servers/host-update-toast";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
@@ -87,10 +92,12 @@ import { WebHostOffline } from "./WebHostOffline";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebAccountCalls } from "./web-account";
 import { createWebAgentImportCalls } from "./web-agent-import";
+import { createWebBillingCalls } from "./web-billing";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
+import { createWebHostedServerCalls } from "./web-hosted-servers";
 import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
 import { createWebServerNotifications } from "./web-notification-preferences";
 import { requestWebNotificationPermission, showWebAgentNotification, watchWebTabFocus } from "./web-notifications";
@@ -146,6 +153,12 @@ type WebWorkspaceProps = {
   /** A plugin listing that a `/app?plugin=<slug>` link named. The marketplace opens on it. */
   pluginSlug?: string | null;
   onPluginSlugConsumed?: () => void;
+  /** True on a return from the Stripe Customer Portal. The Billing dialog opens on it. */
+  billingReturn?: boolean;
+  onBillingReturnConsumed?: () => void;
+  /** The server of a return from Stripe Checkout. The add server dialog opens on its progress. */
+  hostingReturn?: AddServerResume | null;
+  onHostingReturnConsumed?: () => void;
 };
 
 export function WebWorkspace(props: WebWorkspaceProps) {
@@ -261,6 +274,38 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [accountUsage, setAccountUsage] = createSignal<AccountUsage | null>(null);
   let usageGeneration = 0;
   const [joinOpen, setJoinOpen] = createSignal(false);
+  const hostedServerCalls = createWebHostedServerCalls(props.accountFetch);
+  const [addServer, setAddServer] = createSignal<{ resume: AddServerResume | null } | null>(null);
+  // True when the account can create hosted servers. The plus button then opens the plans.
+  const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
+  async function refreshHostedServersAvailable(): Promise<boolean> {
+    // A failed read keeps the last answer: a network error does not turn the plans off.
+    const available = await hostedServerCalls.list().then(
+      (list) => list.available,
+      () => hostedServersAvailable(),
+    );
+    setHostedServersAvailable(available);
+    return available;
+  }
+  void refreshHostedServersAvailable();
+  /**
+   * The plus button opens the add server dialog when the account can create hosted servers, else the
+   * join dialog. It uses the last answer, so the click does not wait for the network; the read after it
+   * is for the next click.
+   */
+  function openAddServer(): void {
+    if (hostedServersAvailable()) setAddServer({ resume: null });
+    else setJoinOpen(true);
+    void refreshHostedServersAvailable();
+  }
+  createEffect(
+    () => props.hostingReturn,
+    (resume) => {
+      if (!resume) return;
+      setAddServer({ resume });
+      props.onHostingReturnConsumed?.();
+    },
+  );
   const [creating, setCreating] = createSignal(false);
   /** The new agent form's avatar. The first-agent row in an empty sidebar shows it. */
   const [agentAvatar, setAgentAvatar] = createSignal(newAgentAvatar());
@@ -333,6 +378,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         notificationsMutedUntil: notice.mutedUntil,
         notificationLevel: notice.level,
         remoteDesktopAvailable: false,
+        ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         compatibility: {
           localAppVersion: "web",
           hostAppVersion: incompatibility?.hostAppVersion ?? null,
@@ -551,6 +597,27 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => props.pluginSlug,
     (slug) => {
       if (slug) setMarketplaceOpen(true);
+    },
+  );
+  const [billingOpen, setBillingOpen] = createSignal(false);
+  const billingCalls = createWebBillingCalls(props.accountFetch);
+  const billing = createBillingStore(() => billingCalls, billingOpen);
+  // The web client has no Settings dialog, so a server whose plan ended is renewed or deleted in Billing.
+  const hostedServers = createSettingsHostedServersStore(
+    {
+      get open() {
+        return billingOpen();
+      },
+      hostedServersApi: hostedServerCalls,
+    },
+    billingOpen,
+  );
+  createEffect(
+    () => props.billingReturn,
+    (billingReturn) => {
+      if (!billingReturn) return;
+      setBillingOpen(true);
+      props.onBillingReturnConsumed?.();
     },
   );
   const saveFile = createWebFileSaver();
@@ -971,7 +1038,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   servers={servers()}
                   onSelect={selectServer}
                   onReorder={workspace.reorderHosts}
-                  onAdd={() => setJoinOpen(true)}
+                  onAdd={openAddServer}
+                  addCreatesServer={hostedServersAvailable()}
                   onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
                   onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
                   onSetMuted={setMuted}
@@ -996,13 +1064,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 showingArchivedChannels={channels.state.archived}
                 onToggleArchivedChannels={channelsSupported() ? channels.toggleArchived : undefined}
                 onCreateChannel={channelsSupported() ? channels.create : undefined}
+                onMarkAllRead={
+                  workspace.state.status === "online"
+                    ? () => {
+                        void workspace.markAllRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
+                        if (channelsSupported()) void channels.markAllRead();
+                      }
+                    : undefined
+                }
+                // The browser client does not know the unread counts of agent chats it has not opened.
+                hasUnread
                 serverName={workspace.state.host?.name ?? "OpenBot"}
                 serverMenu={{
                   servers: servers(),
                   view: layout.serverView(),
                   onViewChange: layout.setServerView,
                   onSelect: selectServer,
-                  onAdd: () => setJoinOpen(true),
+                  onAdd: openAddServer,
+                  addCreatesServer: hostedServersAvailable(),
                   onOpenSettings: (id, trigger) => void openServerSettings(id, trigger),
                   onOpenUsage: (id, trigger) => void openUsage(id, trigger),
                   onSetMuted: setMuted,
@@ -1094,6 +1173,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onLogout={signOut}
                 onOpenExternal={openWebDestination}
                 onOpenProfile={profileAgentId() ? openProfile : undefined}
+                onOpenBilling={() => setBillingOpen(true)}
                 onOpenSettings={
                   workspace.state.host
                     ? (trigger) => {
@@ -1109,6 +1189,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           }
           after={
             <>
+              <AddServerOverlay
+                open={addServer() !== null}
+                calls={hostedServerCalls}
+                servers={servers()}
+                onRefreshServers={workspace.retryHosts}
+                resume={addServer()?.resume}
+                onClose={() => setAddServer(null)}
+                onOpenServer={(serverId) => {
+                  setAddServer(null);
+                  selectServer(serverId);
+                }}
+                onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}
+                onJoinWithInvite={() => {
+                  setAddServer(null);
+                  setJoinOpen(true);
+                }}
+              />
               <JoinServerOverlay
                 open={joinOpen()}
                 inviteUrl={props.inviteUrl ?? ""}
@@ -1219,6 +1316,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   />
                 )}
               </Show>
+              <BillingDialog
+                open={billingOpen()}
+                onOpenChange={setBillingOpen}
+                store={billing}
+                hostedServers={hostedServers}
+              />
               <ChannelCreateOverlay />
               <GlobalSearchOverlay
                 open={searchOpen()}

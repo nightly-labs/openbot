@@ -1,0 +1,33 @@
+.hosted-servers-add {
+  display: flex;
+}
+
+.hosted-servers-list .hosted-servers-row {
+  min-height: 64px;
+  align-items: center;
+}
+
+.hosted-servers-list .ui-item-content {
+  min-width: 0;
+}
+
+.hosted-servers-list .ui-item-title {
+  gap: var(--openbot-space-2);
+}
+
+.hosted-servers-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .hosted-servers-list .hosted-servers-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hosted-servers-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

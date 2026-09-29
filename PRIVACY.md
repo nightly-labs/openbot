@@ -35,6 +35,15 @@ message content, file content, or search queries to telemetry.
 Production builds of OpenBot desktop, the configured mobile app, and the website use a self-hosted OpenPanel service for product
 analytics. Development builds, previews, tests, and Storybook do not send analytics.
 
+The production account service also sends OpenPanel an event when a paid plan or a hosted server
+changes: a Checkout starts or expires, a plan starts, changes, is cancelled or ends, a payment
+succeeds or fails, the Customer Portal opens, or a hosted server is set up, fails to set up, stops
+after no use, starts, changes its machine, stops at the end of its plan, is renewed or is deleted.
+Each event has your account ID and only fixed values: the action, the plan, the billing period, the
+currency, the amount that Stripe reports, the server size, the start reason and an error code. It has
+no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
+because the account service sends them and not your computer.
+
 ## Agent and host usage
 
 The Usage view stores numeric token counts, activity counts, provider and model identifiers,
@@ -188,6 +197,10 @@ The service stores:
   the account ID, the local agent ID and the unpublish time, so publishing the same agent again
   gives back the same link. Deleting the account removes them. Templates do not include
   workspace files, memories, conversations, or integration credentials.
+- billing records when the account starts a paid plan: the Stripe customer ID, and for
+  each subscription the Stripe subscription ID, plan, billing period, currency, price, status, period end,
+  and whether it ends at the period end. The service also keeps the ID, type and receive time of each
+  Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
 
 The service does not store plaintext one-time codes, account session tokens, or team authentication
 tickets in D1. It returns a new plaintext secret only to the client that requested it. The desktop
@@ -196,6 +209,31 @@ the token to disk.
 
 Account avatar URLs are public, long-lived resources. A person who has the complete URL can request
 the avatar without an account session.
+
+## Hosted servers
+
+Each account can buy hosted servers. A hosted server is a Linux
+OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
+France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
+team data, the same as your own computer would. The server stops 15 to 20 minutes after its last use and
+starts again when you connect, or a few minutes before its next scheduled routine run. When boat stops the sandbox, boat keeps a snapshot of its disk until
+the server starts again. Deleting the server
+deletes the sandbox.
+
+For each hosted server, the account service stores the owner, name, size and the size of a pending
+plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
+and reported state, a reason code when the server fails to start, the reason for its last start, the
+boat sandbox ID, a hash of the setup claim with its expiry and first-use times, the ID of the account
+session that the server signed in with, the time of its last use, the end of its boat stop timer, the time of
+its next scheduled routine run (not the routine or its instructions), and creation, update and deletion times. After a
+server is deleted, its record stays so that the service never loses track of a sandbox. It also
+stores the ID and receive time of each boat webhook delivery for 7 days. The account service does
+not receive the server's conversations, files or commands, and its boat key cannot read them.
+
+The account service gives each sandbox a name in boat, so that an operator can find a server in the
+boat dashboard: `openbot-`, the plan, your account email with each other character as `-`, and the
+first 8 characters of the server ID, such as `openbot-starter-ada-example-com-1a2b3c4d`. boat keeps
+the name with the sandbox.
 
 ## Central data retention
 
@@ -267,6 +305,18 @@ Cloudflare processes account and configuration API requests. It does not carry T
 message, command, Remote Desktop media, or Remote Desktop input traffic. Cloudflare and the email
 provider can keep their own security, delivery, and network logs under their own policies. These
 provider logs are outside the OpenBot application database and its daily maintenance task.
+
+Paid server plans use Stripe. You enter card and billing details on Stripe's pages, not in OpenBot.
+Stripe sends the account service the subscription state, the plan, its price, the period, and the
+account and server IDs that the subscription names, never the card number. When you choose a plan
+for a new hosted server, the account service sends Stripe your account email and account ID (to
+make the Stripe customer), and the server ID, the plan, the billing period and the currency (to
+open Stripe Checkout, `checkout.stripe.com`). When you delete a hosted server, the account service
+tells Stripe to cancel its plan. When you manage billing,
+the account service sends Stripe your Stripe customer ID, and the subscription ID of the plan you
+change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Stripe keeps the
+customer, invoices and payment records under its own policy, also after the subscription ends.
+Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
 
 ## Data stored on the OpenBot computer
 

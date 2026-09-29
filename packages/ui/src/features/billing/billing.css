@@ -1,0 +1,107 @@
+/* The Billing panel in desktop Settings and the web Billing dialog: one row for each server that has
+ * a plan, and the Customer Portal button above them. */
+
+.billing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+.billing-loading {
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-8);
+}
+
+.billing-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  min-height: 32px;
+}
+
+.billing-empty {
+  padding: var(--openbot-space-6) var(--openbot-space-4);
+  border: 1px dashed var(--openbot-border);
+  border-radius: var(--openbot-radius-card);
+  text-align: center;
+}
+
+.billing-server-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--openbot-radius-md);
+}
+
+.billing-server-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.billing-server .ui-item-actions {
+  gap: var(--openbot-space-2);
+}
+
+.billing-server-price {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The web client's Billing dialog. */
+.billing-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--openbot-layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  background: var(--openbot-bg-overlay);
+}
+
+.billing-dialog {
+  position: relative;
+  display: flex;
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 2 * var(--openbot-space-6));
+  flex-direction: column;
+  overflow: hidden;
+  outline: 0;
+  border-radius: var(--openbot-radius-modal);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.billing-dialog-close {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: var(--openbot-space-3);
+  inset-inline-end: var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+}
+
+.billing-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-6) var(--openbot-space-6) var(--openbot-space-4);
+}
+
+.billing-dialog-header p {
+  margin: 0;
+}
+
+.billing-dialog-title {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+  font-weight: var(--openbot-weight-bold);
+  line-height: var(--openbot-leading-2xl);
+}
+
+.billing-dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--openbot-space-6) var(--openbot-space-6);
+}
