@@ -30,7 +30,8 @@ const runtime = new SunshineMoonlightRuntime({
     username: process.env.OPENBOT_SMOKE_USERNAME ?? `openbot-${randomBytes(8).toString("hex")}`,
     password: process.env.OPENBOT_SMOKE_PASSWORD ?? randomBytes(24).toString("base64url"),
   },
-  getDisplays: () => [],
+  // The runtime shows only the Sunshine displays that match a local display, as Electron lists them.
+  getDisplays: () => [{ id: "1", label: "Primary display", width: 1920, height: 1080, primary: true }],
   getIceServers: async () => [{ urls: "stun:127.0.0.1:3478" }],
   onDiagnostic: (source, message) => process.stderr.write(`[${source}] ${message}`),
 });
