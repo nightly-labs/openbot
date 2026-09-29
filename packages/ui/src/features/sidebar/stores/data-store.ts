@@ -4,8 +4,9 @@
  * safe for the drag engine to hold - it satisfies the engine's list model and can do nothing else.
  */
 
-import { SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
+import { type ChannelSummary, SIDEBAR_PEOPLE_SECTION_ID, SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { createMemo } from "solid-js";
+import type { AgentProfile } from "../../../data";
 import { currentText } from "../../../text";
 import { teamMemberName } from "../../team/TeamPersonAvatar";
 import { agentMatchesQuery, channelMatchesQuery, personMatchesQuery } from "../sidebar-filtering";
@@ -14,7 +15,12 @@ import type { ResolvedPinnedItem, SidebarChatItem, SidebarProps } from "../sideb
 
 type PinnedItemSource = SidebarProps["agents"][number] | NonNullable<SidebarProps["channels"]>[number];
 
-export function createSidebarDataStore(deps: { normalizedQuery: () => string; props: SidebarProps }) {
+export function createSidebarDataStore(deps: {
+  normalizedQuery: () => string;
+  props: SidebarProps;
+  /** True while a sidebar drag is in flight. */
+  dragActive: () => boolean;
+}) {
   const { normalizedQuery, props } = deps;
 
   const directThreadByMember = createMemo(
@@ -76,13 +82,20 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
    *
    * The set is keyed by a string so that a badge change that keeps the same agents waiting stops
    * here. Without it, each new reply would rebuild the chat items and remount every row.
+   *
+   * The set holds still during a drag. The drag engine measures the rows when the drag starts, so a
+   * row that moved to the group after that would make the drop land at an old position, and the
+   * dragged row itself would leave the DOM.
    */
-  const waitingKey = createMemo(() =>
-    Object.keys(props.agentStates)
+  let heldWaitingKey = "";
+  const waitingKey = createMemo(() => {
+    const next = Object.keys(props.agentStates)
       .filter((agentId) => props.agentStates[agentId]?.kind === "waiting")
       .sort()
-      .join("\n"),
-  );
+      .join("\n");
+    if (!deps.dragActive()) heldWaitingKey = next;
+    return heldWaitingKey;
+  });
   const waitingIds = createMemo(() => new Set(waitingKey() ? waitingKey().split("\n") : []));
   const agentWaits = (agentId: string) => waitingIds().has(agentId);
   const waitingAgents = createMemo(() => sortByLayoutOrder(listedAgents().filter((agent) => agentWaits(agent.id))));
@@ -107,11 +120,23 @@ export function createSidebarDataStore(deps: { normalizedQuery: () => string; pr
    * keeps its released name; an id it does not carry yet falls in behind the ones it does, channels
    * first, which is where channels sat while they had a list of their own.
    */
+  type ChatSource = AgentProfile | ChannelSummary;
+  let chatItemCache = new Map<ChatSource, SidebarChatItem>();
   const filteredChats = createMemo<SidebarChatItem[]>(() => {
-    return sortByLayoutOrder<SidebarChatItem>([
-      ...filteredChannels().map((channel) => ({ kind: "channel", id: channel.id, channel }) as const),
-      ...filteredAgents().map((agent) => ({ kind: "agent", id: agent.id, agent }) as const),
+    // Keep each wrapper while its chat is the same store, as `resolvedPinnedItems` does: an agent
+    // that starts or stops waiting must not remount the rows of every other agent.
+    const nextCache = new Map<ChatSource, SidebarChatItem>();
+    const keep = (source: ChatSource, item: () => SidebarChatItem) => {
+      const resolved = chatItemCache.get(source) ?? item();
+      nextCache.set(source, resolved);
+      return resolved;
+    };
+    const items = sortByLayoutOrder<SidebarChatItem>([
+      ...filteredChannels().map((channel) => keep(channel, () => ({ kind: "channel", id: channel.id, channel }))),
+      ...filteredAgents().map((agent) => keep(agent, () => ({ kind: "agent", id: agent.id, agent }))),
     ]);
+    chatItemCache = nextCache;
+    return items;
   });
   const orderedPeople = createMemo(() => {
     const natural = [...props.people].sort((left, right) => {

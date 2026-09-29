@@ -31,9 +31,8 @@ export const SIDEBAR_WAIT_HINT = {
 
 export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate): string {
   if (state.kind === "waiting") {
-    return state.detail
-      ? `${t(SIDEBAR_WAIT_TITLE[state.reason])}: ${state.detail}`
-      : t(SIDEBAR_WAIT_TITLE[state.reason]);
+    const title = t(SIDEBAR_WAIT_TITLE[state.reason]);
+    return state.detail ? t("sidebar.state.waitingDetail", { state: title, detail: state.detail }) : title;
   }
   if (state.kind === "working") return t("sidebar.state.working");
   if (state.kind === "responded") return t("sidebar.state.responded");

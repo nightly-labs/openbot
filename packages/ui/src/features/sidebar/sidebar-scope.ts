@@ -26,6 +26,9 @@ export function createSidebarScope(props: SidebarProps) {
   const { expandToSearch, normalizedQuery, query, setQuery, setSearchInputElement } = createSidebarSearchStore({
     props,
   });
+  // The drag state is built from the data store, so the data store reads it through this reference,
+  // which is set once the drag state exists.
+  let dragActive = () => false;
   const {
     assignedSectionId,
     chatKind,
@@ -47,7 +50,7 @@ export function createSidebarScope(props: SidebarProps) {
     visiblePinnedKeys,
     visibleSectionIds,
     waitingAgents,
-  } = createSidebarDataStore({ normalizedQuery, props });
+  } = createSidebarDataStore({ normalizedQuery, props, dragActive: () => dragActive() });
   const {
     cancelSectionEditor,
     closeDelete,
@@ -70,6 +73,7 @@ export function createSidebarScope(props: SidebarProps) {
   let agentList: HTMLElement | undefined;
 
   const dragState = createSidebarDragStateStore({ chatKind, sectionAcceptsChat });
+  dragActive = () => dragState.draggingKind() !== undefined;
   const { assignChatSection, commitSidebarDrop, movePersonByKeyboard, movePinnedItem, moveSection } =
     createSidebarLayoutActions({
       announce,

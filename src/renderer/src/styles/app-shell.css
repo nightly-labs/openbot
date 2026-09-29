@@ -2629,6 +2629,11 @@ textarea {
   margin-inline: 0;
 }
 
+/* A waiting row does not drag, so it does not show the grab cursor. */
+.sidebar-waiting-group .sidebar-agent-item .agent-row {
+  cursor: default;
+}
+
 .sidebar:not(.sidebar-compact) .sidebar-pinned-row.agent-row {
   width: 72px;
   margin-inline: 0;

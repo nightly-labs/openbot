@@ -28,7 +28,7 @@ export function SidebarWaitingGroup() {
             </span>
           </h2>
         </header>
-        <For each={waitingAgents()}>{(agent) => <SidebarAgentRow agent={agent} />}</For>
+        <For each={waitingAgents()}>{(agent) => <SidebarAgentRow agent={agent} waiting />}</For>
       </section>
     </Show>
   );

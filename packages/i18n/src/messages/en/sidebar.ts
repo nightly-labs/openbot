@@ -61,6 +61,7 @@ export const messages = defineMessages("sidebar", {
   "sidebar.state.waitingQuestion": "Waiting for your answer",
   "sidebar.state.waitingApproval": "Waiting for your approval",
   "sidebar.state.waitingTakeover": "Waiting for you in the browser",
+  "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "Needs you",
   "sidebar.waiting.label": { one: "Needs you, {count} agent", other: "Needs you, {count} agents" },
   "sidebar.waiting.action.question": "Answer",

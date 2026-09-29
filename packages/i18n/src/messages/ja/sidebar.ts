@@ -62,6 +62,7 @@ export const messages = {
   "sidebar.state.waitingQuestion": "回答を待っています",
   "sidebar.state.waitingApproval": "承認を待っています",
   "sidebar.state.waitingTakeover": "ブラウザでの操作を待っています",
+  "sidebar.state.waitingDetail": "{state}：{detail}",
   "sidebar.waiting.title": "対応が必要",
   "sidebar.waiting.label": { other: "対応が必要なエージェント {count} 件" },
   "sidebar.waiting.action.question": "回答",
