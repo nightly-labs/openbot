@@ -1565,7 +1565,9 @@ export class BrowserHost {
             ? sourceText("error.backend.popupUnsupportedAddress")
             : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
               ? sourceText("error.backend.popupTabLimit")
-              : undefined;
+              : this.#memoryLow()
+                ? sourceText("error.backend.browserLowMemory")
+                : undefined;
       if (failure) {
         tab.popupFailure = { id: randomUUID(), message: failure };
         this.#emitChanged();

@@ -118,9 +118,11 @@ export class DrainScheduler {
     this.#slots = new TurnSlots({
       limit: () => this.#memory.turnLimit(),
       agentIds: () => this.#store.list().map((agent) => agent.id),
+      // A start whose `turn/start` timed out stays "starting" with no turn ID, and its turn can still run.
       isRunning: (agentId) =>
         this.#drainingAgents.has(agentId) ||
         Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId) ||
+        this.#mailbox.startingDeliveryForAgent(agentId) !== null ||
         !this.#compaction.mayDrain(agentId),
       isWaiting: (agentId) =>
         this.#mayStartNow(agentId) && this.#memory.mayDrain(agentId) && this.#mailbox.nextQueued(agentId) !== null,
