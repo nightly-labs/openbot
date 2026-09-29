@@ -1,3 +1,4 @@
+import type { AppLanguage } from "@openbot/contracts/app-language";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type AccountUsage,
@@ -51,7 +52,7 @@ import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, lazy, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
@@ -157,7 +158,12 @@ type WebWorkspaceProps = {
   /** The server of a return from Stripe Checkout. The add server dialog opens on its progress. */
   hostingReturn?: AddServerResume | null;
   onHostingReturnConsumed?: () => void;
+  /** The interface language this browser keeps. Account settings change it. */
+  language: AppLanguage;
+  onChangeLanguage: (language: AppLanguage) => void;
 };
+
+const WebAccountSettings = lazy(() => import("./WebAccountSettings"));
 
 export function WebWorkspace(props: WebWorkspaceProps) {
   return (
@@ -317,6 +323,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     avatarUrl: props.accountAvatarUrl ?? null,
   }));
   const accountCalls = createWebAccountCalls(props.accountFetch, props.onSessionCheck);
+  const [accountSettingsOpen, setAccountSettingsOpen] = createSignal(false);
   /* As in the desktop dock: the reading is taken again when a provider connects or disconnects. */
   const usageTargetKey = createMemo(() => {
     const hostId = workspace.state.host?.hostId;
@@ -1167,6 +1174,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 onOpenExternal={openWebDestination}
                 onOpenProfile={profileAgentId() ? openProfile : undefined}
                 onOpenBilling={() => setBillingOpen(true)}
+                onOpenAccountSettings={() => setAccountSettingsOpen(true)}
                 onOpenSettings={
                   workspace.state.host
                     ? (trigger) => {
@@ -1235,6 +1243,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 pluginSlug={props.pluginSlug}
                 onPluginSlugConsumed={() => props.onPluginSlugConsumed?.()}
               />
+              <Show when={accountSettingsOpen()}>
+                <Loading>
+                  <WebAccountSettings
+                    open={accountSettingsOpen()}
+                    onOpenChange={setAccountSettingsOpen}
+                    account={account()}
+                    calls={accountCalls}
+                    language={props.language}
+                    onChangeLanguage={props.onChangeLanguage}
+                  />
+                </Loading>
+              </Show>
               <SharedAgentInstallOverlay
                 templateId={props.agentTemplateId}
                 server={server()}

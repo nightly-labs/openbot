@@ -102,14 +102,6 @@ export function hostedSiteErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requireIdempotencyKey(request: Request): string {
-  const key = request.headers.get("Idempotency-Key")?.trim() ?? "";
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u.test(key)) {
-    throw new HostedSiteInputError(400, "invalid_idempotency_key", "A valid Idempotency-Key header is required.");
-  }
-  return key;
-}
-
 /**
  * The Live Activity relay: the Apple sender and the limit for each host. `null` when this Worker has
  * no Apple key or no limiter, so the relay is off.

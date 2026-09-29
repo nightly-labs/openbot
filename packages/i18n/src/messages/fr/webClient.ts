@@ -39,6 +39,8 @@ export const messages = {
   "webClient.error.hostStatus": "Impossible de lire l’état de l’hôte.",
   "webClient.error.usageOffline": "Connectez-vous à votre hôte pour voir l’utilisation.",
   "webClient.error.desktopOnly": "Cette action est disponible dans l’application de bureau.",
+  "webClient.settings.preferences.title": "Préférences",
+  "webClient.settings.preferences.description": "Choisissez la langue et les sons d’OpenBot dans ce navigateur.",
   "webClient.error.checkConversation": "Vérifiez la conversation avant d’envoyer à nouveau.",
   "webClient.error.hostReported": "L’hôte a signalé une erreur. Vérifiez la conversation et l’état de l’hôte.",
   "webClient.error.requestFailed": "La requête a échoué.",

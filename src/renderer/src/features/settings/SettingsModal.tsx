@@ -43,23 +43,28 @@ import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDi
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedServersTab } from "@openbot/ui/features/settings/SettingsHostedServersTab";
+import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
+import {
+  createSettingsHostedSitesStore,
+  type HostedSiteDeleteResult,
+} from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/stores/mobile-connect-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { desktopAnalytics } from "../../analytics";
+import { appPort } from "../../app-port";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { createProviderKeyState, ProviderSettingsDialogs, ProviderSettingsSection } from "./ProviderSettingsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
-import { SettingsHostedSitesTab } from "./SettingsHostedSitesTab";
 import { createSettingsGeneralStore } from "./stores/general-store";
-import { createSettingsHostedSitesStore } from "./stores/hosted-sites-store";
 
 export interface SettingsModalProps {
   open: boolean;
@@ -226,6 +231,18 @@ function navItem(tab: SettingsTab): SettingsNavItem {
   return found;
 }
 
+/** The account that starts a deletion gets its result event, as the scope is taken at the start. */
+function trackHostedSiteDelete(): (result: HostedSiteDeleteResult) => void {
+  const analytics = desktopAnalytics.scope();
+  return (result) =>
+    analytics.track("hosted_site_action", {
+      action: "delete",
+      entry_point: "settings",
+      result,
+      ...(result === "failed" ? { failure_code: "delete_failed" } : {}),
+    });
+}
+
 /**
  * The dialog shell: the tab list, the header, the footer save bar, and one delegation per panel.
  *
@@ -258,7 +275,18 @@ export function SettingsModal(props: SettingsModalProps) {
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
   const updates = createSettingsUpdatesStore(props);
-  const hostedSites = createSettingsHostedSitesStore(props, () => activeTab() === "hosted-sites");
+  const hostedSites = createSettingsHostedSitesStore(
+    {
+      get open() {
+        return props.open;
+      },
+      get hostedSitesApi() {
+        return props.hostedSitesApi;
+      },
+      trackDelete: trackHostedSiteDelete,
+    },
+    () => activeTab() === "hosted-sites",
+  );
   const billing = createBillingStore(
     () => props.billingApi,
     () => props.open && activeTab() === "billing",
@@ -454,7 +482,11 @@ export function SettingsModal(props: SettingsModalProps) {
           />
         </Tabs.Content>
         <Tabs.Content value="hosted-sites" class="settings-modal-tab-panel" data-tab="hosted-sites">
-          <SettingsHostedSitesTab store={hostedSites} available={Boolean(props.hostedSitesApi)} />
+          <SettingsHostedSitesTab
+            store={hostedSites}
+            available={Boolean(props.hostedSitesApi)}
+            onOpenSite={(url) => void appPort().openUrl(url)}
+          />
         </Tabs.Content>
         <Show when={hostedServersShown()}>
           <Tabs.Content value="hosted-servers" class="settings-modal-tab-panel" data-tab="hosted-servers">

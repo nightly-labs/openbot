@@ -36,6 +36,8 @@ export const messages = defineMessages("webClient", {
   "webClient.error.hostStatus": "The host status could not be read.",
   "webClient.error.usageOffline": "Connect to your host to view usage.",
   "webClient.error.desktopOnly": "This action is available in the desktop app.",
+  "webClient.settings.preferences.title": "Preferences",
+  "webClient.settings.preferences.description": "Choose the language and sounds of OpenBot in this browser.",
   "webClient.error.checkConversation": "Check the conversation before sending again.",
   "webClient.error.hostReported": "The host reported an error. Check the conversation and host status.",
   "webClient.error.requestFailed": "The request failed.",

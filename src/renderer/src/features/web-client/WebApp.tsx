@@ -17,6 +17,7 @@ import { WebWorkspace } from "./WebWorkspace";
 import { WEB_APP_BILLING_PARAM } from "./web-billing";
 import type { WebRuntimeFactory } from "./web-client-context";
 import { takeHostingReturn } from "./web-hosted-servers";
+import { createWebLanguagePreference } from "./web-language-preference";
 
 /** A sign-in refusal that the login form already shows. */
 class SignInIssueShown extends Error {}
@@ -269,11 +270,11 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     };
   });
   const variant: AppVariant = import.meta.env.DEV ? "dev" : "production";
-  // The web client has no saved language setting, so it follows the browser.
+  const languagePreference = createWebLanguagePreference();
   return (
     <StaticI18nProvider
-      locale={resolveLocale("system", navigator.language)}
-      formatLocale={formatLocale("system", navigator.language)}
+      locale={resolveLocale(languagePreference.language(), navigator.language)}
+      formatLocale={formatLocale(languagePreference.language(), navigator.language)}
     >
       <div class="web-app">
         <Toaster />
@@ -318,6 +319,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
                 onBillingReturnConsumed={() => setBillingReturn(false)}
                 hostingReturn={hostingReturn()}
                 onHostingReturnConsumed={() => setHostingReturn(null)}
+                language={languagePreference.language()}
+                onChangeLanguage={languagePreference.setLanguage}
               />
             )}
           </Show>

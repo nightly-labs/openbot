@@ -11,8 +11,9 @@ account Worker. The browser keeps chat pages, drafts, search results, and file p
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
 their browser. The host must stay online. An owner or admin can manage members and invitations from
 the browser; these requests go to the account Worker, as they do from the desktop app. A signed-in
-user can also change the display name and avatar and disconnect account sessions from the browser;
-these requests and the avatar image go to the same account Worker as from the desktop app. Host settings,
+user can also change the display name and avatar, disconnect account sessions, and list and delete
+the account's hosted sites from the browser; these requests and the avatar image go to the same
+account Worker as from the desktop app. Host settings,
 such as MCP servers, travel through the encrypted host connection.
 To show each server's state, the browser also keeps a status connection to each host of the account
 that no tab has open, as the mobile app does; the host then shows the member as present. Host logos
@@ -22,7 +23,8 @@ Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSit
 Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
 local storage separately for each account. The shared file preview can also store its panel width.
 The sidebar stores pinned agent and channel ids, collapsed section ids, and the selected channel id
-for each account and host. The server rail stores the order of host ids for each account. It stores
+for each account and host. The server rail stores the order of host ids for each account. The
+browser also stores the chosen interface language and whether the completion sound is on. It stores
 no message content.
 Signing out revokes that credential's remote sessions and tells other open tabs to clear private
 state. Host identity pins remain so a later sign-in cannot silently trust a replacement host key.

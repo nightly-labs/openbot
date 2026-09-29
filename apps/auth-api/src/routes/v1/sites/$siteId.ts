@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { requireIdempotencyKey } from "../../../server/hosted-site-contract";
 import {
   apiError,
   hostedSiteErrorResponse,
   json,
   requestHostedSiteService,
   requestUser,
-  requireIdempotencyKey,
 } from "../../../server/request-auth";
 
 export const Route = createFileRoute("/v1/sites/$siteId")({

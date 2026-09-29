@@ -4,6 +4,7 @@ import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -50,7 +51,10 @@ const Settings = createSimpleContext({
      */
     const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
-    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(DEFAULT_GENERAL_SETTINGS);
+    const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
+      ...DEFAULT_GENERAL_SETTINGS,
+      taskCompletionSound: isCompletionSoundEnabled(),
+    });
     const [approvalAutomation, setApprovalAutomation] = createSignal<ApprovalAutomationPreference>({
       turbo: false,
       defaultAutoApprove: false,
@@ -107,6 +111,9 @@ const Settings = createSimpleContext({
       const previous = generalSettings();
       const turboMode = turboModePending() ? previous.turboMode : value.turboMode;
       setGeneralSettings({ ...value, turboMode });
+      if (previous.taskCompletionSound !== value.taskCompletionSound) {
+        setCompletionSoundEnabled(value.taskCompletionSound);
+      }
       if (previous.productAnalytics !== value.productAnalytics) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics);
         setAnalyticsPreferenceLoaded(value.productAnalytics);

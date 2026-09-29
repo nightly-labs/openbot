@@ -1,11 +1,14 @@
 import type { HostedSiteSummary, HostedSitesDesktopApi } from "@openbot/contracts/ipc";
-import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
-import { desktopAnalytics } from "../../../analytics";
+import { currentText } from "../../../text";
+
+export type HostedSiteDeleteResult = "succeeded" | "failed";
 
 interface HostedSitesStoreProps {
   open: boolean;
-  hostedSitesApi?: HostedSitesDesktopApi;
+  hostedSitesApi?: Pick<HostedSitesDesktopApi, "list" | "delete"> | undefined;
+  /** Called as a deletion starts. It returns the call that records the result, for the account that started it. */
+  trackDelete?: () => (result: HostedSiteDeleteResult) => void;
 }
 
 interface HostedSitesPanel {
@@ -90,7 +93,7 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
   async function confirmDelete(): Promise<void> {
     const site = hosting.pendingDelete;
     if (!props.hostedSitesApi || !site || hosting.busy) return;
-    const analytics = desktopAnalytics.scope();
+    const track = props.trackDelete?.();
     const siteId = site.id;
     setHosting((state) => {
       state.busy = true;
@@ -101,23 +104,14 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
       try {
         await props.hostedSitesApi.delete({ siteId });
       } catch (error) {
-        analytics.track("hosted_site_action", {
-          action: "delete",
-          entry_point: "settings",
-          result: "failed",
-          failure_code: "delete_failed",
-        });
+        track?.("failed");
         setHosting((state) => {
           const text = currentText();
           state.deleteError = text.errorMessage(error, text.t("settings.hostedSites.deleteFailed"));
         });
         return;
       }
-      analytics.track("hosted_site_action", {
-        action: "delete",
-        entry_point: "settings",
-        result: "succeeded",
-      });
+      track?.("succeeded");
       setHosting((state) => {
         state.pendingDelete = null;
       });

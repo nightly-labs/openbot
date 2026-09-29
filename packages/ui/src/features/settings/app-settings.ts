@@ -39,7 +39,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   macBookNotchAdditionalDisplays: true,
   macBookNotchWidthPercent: 100,
   macBookNotchHeightPercent: 100,
-  taskCompletionSound: false,
+  taskCompletionSound: true,
   turboMode: false,
   autoDownloadUpdates: true,
   allowRemoteUpdates: true,

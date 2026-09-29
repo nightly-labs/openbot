@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthServiceError } from "../src/server/auth-service";
 import { type BrowserApiServices, browserSessionToken, handleBrowserApi } from "../src/server/browser-api";
 import { sha256 } from "../src/server/crypto";
+import { HostedSiteInputError } from "../src/server/hosted-site-contract";
 import { RemoteControlPlaneError } from "../src/server/remote-control-plane";
 
 const token = "a".repeat(43);
@@ -55,6 +56,7 @@ function setup() {
       revokeAccountSession: vi.fn().mockResolvedValue(undefined),
     },
     avatarBucket: () => avatars,
+    hostedSites: () => ({ list: vi.fn(), delete: vi.fn() }),
     remote: {
       listHosts: vi.fn().mockResolvedValue([]),
       startSession: vi.fn().mockResolvedValue({ sessionId: "session", hostId: "host", expiresAt: 100 }),
@@ -479,6 +481,65 @@ describe("browser account boundary", () => {
         services,
       );
       expect(refused.status).toBe(503);
+    });
+  });
+  describe("hosted sites", () => {
+    const cookie = `__Host-openbot-web=${token}`;
+    const idempotencyKey = "web:delete:4c7e2a91-3b5d-4f8e-a1c2-6d9e0f1a2b3c";
+    function deleteSite(options: { cookie?: string; origin?: string; csrf?: string; key?: string } = {}) {
+      return new Request("https://openbot.test/api/browser/v1/sites/site-one", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: options.origin ?? "https://openbot.test",
+          "X-OpenBot-Browser": options.csrf ?? "1",
+          "Idempotency-Key": options.key ?? idempotencyKey,
+          ...(options.cookie === undefined ? { Cookie: cookie } : options.cookie ? { Cookie: options.cookie } : {}),
+        },
+        body: "{}",
+      });
+    }
+    function withSites() {
+      const services = setup();
+      const hostedSites = { list: vi.fn().mockResolvedValue([]), delete: vi.fn().mockResolvedValue(undefined) };
+      services.hostedSites = () => hostedSites;
+      return { services, hostedSites };
+    }
+    it("requires the browser cookie", async () => {
+      const { services, hostedSites } = withSites();
+      expect((await handleBrowserApi(request("v1/sites"), services)).status).toBe(401);
+      expect((await handleBrowserApi(deleteSite({ cookie: "" }), services)).status).toBe(401);
+      expect(hostedSites.list).not.toHaveBeenCalled();
+      expect(hostedSites.delete).not.toHaveBeenCalled();
+    });
+    it("refuses a foreign origin or a missing CSRF header", async () => {
+      const { services, hostedSites } = withSites();
+      for (const refused of [deleteSite({ origin: "https://attacker.test" }), deleteSite({ csrf: "" })]) {
+        expect((await handleBrowserApi(refused, services)).status).toBe(403);
+      }
+      expect(hostedSites.delete).not.toHaveBeenCalled();
+    });
+    it("acts on the sites of the browser cookie's account", async () => {
+      const { services, hostedSites } = withSites();
+      const listed = await handleBrowserApi(request("v1/sites", { cookie }), services);
+      expect(await listed.json()).toEqual({ sites: [], limit: 10 });
+      expect(hostedSites.list).toHaveBeenCalledWith(user.id);
+
+      const deleted = await handleBrowserApi(deleteSite(), services);
+      expect(await deleted.json()).toEqual({ deleted: true });
+      expect(hostedSites.delete).toHaveBeenCalledWith(user.id, "site-one", idempotencyKey);
+    });
+    it("returns a hosted-site refusal with its own status", async () => {
+      const { services, hostedSites } = withSites();
+      const invalidKey = await handleBrowserApi(deleteSite({ key: "short" }), services);
+      expect(invalidKey.status).toBe(400);
+      expect(await invalidKey.json()).toMatchObject({ error: { code: "invalid_idempotency_key" } });
+      expect(hostedSites.delete).not.toHaveBeenCalled();
+
+      hostedSites.delete.mockRejectedValue(new HostedSiteInputError(409, "site_not_found", "The site was not found."));
+      const missing = await handleBrowserApi(deleteSite(), services);
+      expect(missing.status).toBe(409);
+      expect(await missing.json()).toMatchObject({ error: { code: "site_not_found" } });
     });
   });
 });
