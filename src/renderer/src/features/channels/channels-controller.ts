@@ -303,10 +303,13 @@ export function createChannelsController(env: ChannelsEnvironment) {
   /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
   function markAllRead(): Promise<boolean> {
     const unread = state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
+    const account = env.scopeKey();
     return perform(async () => {
       const results = await Promise.allSettled(
         unread.map(async (channelId) => {
           const page = await env.port().agent.readChannel({ channelId });
+          // The port follows the current server, so a read for the previous one must not reach it.
+          if (disposed || account !== env.scopeKey()) return;
           await env.port().agent.channelCommand({
             type: "read",
             channelId,
