@@ -6,7 +6,14 @@ import { emitAgentEvent, emitPresence, installOpenbotStub, presenceMember } from
 beforeEach(installOpenbotStub);
 
 function userMessage(id: string, text: string, createdAt: string, senderMember?: { id: string; name: string }) {
-  return { id, author: "user" as const, text, createdAt, status: "completed" as const, senderMember };
+  return {
+    id,
+    author: "user" as const,
+    text,
+    createdAt,
+    status: "completed" as const,
+    ...(senderMember ? { senderMember } : {}),
+  };
 }
 
 it("names the other people in an agent chat and keeps the reader's and the agent's rows as before", async () => {

@@ -1635,7 +1635,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     validateRecipient();
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "user" },
-      senderMember: sender,
+      ...(sender ? { senderMember: sender } : {}),
       recipientAgentIds: [agent.id],
       text: input.text,
       draftIds: input.attachmentDraftIds ?? [],

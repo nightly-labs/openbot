@@ -145,7 +145,8 @@ export function ConversationTimeline() {
   // A run of one sender breaks where another person starts to write.
   const senderRunRow = (message: AgentMessage) => {
     const sender = otherSender(message);
-    return { author: sender ? `member:${sender.id}` : message.author, createdAt: message.createdAt };
+    const author = sender ? `member:${sender.id}` : message.author;
+    return message.createdAt === undefined ? { author } : { author, createdAt: message.createdAt };
   };
   /**
    * An agent's record of a routine it created or changed is a card whose schedule the person can
@@ -516,7 +517,7 @@ export function ConversationTimeline() {
                           <ChatMessageRow
                             message={message() ?? initialMessage}
                             author={author()}
-                            showAuthor={author().kind === "member" ? !continuesRun() : undefined}
+                            showAuthor={author().kind === "member" && !continuesRun()}
                             showTime={!continuesRun()}
                             animate={animateEntrance}
                             agents={props.agents}
