@@ -88,6 +88,24 @@ development build asks for the grants as **Electron**, not as OpenBot, because t
 is the responsible process. For the same reason a development grant does not carry over to an
 installed release, and each build must be granted once.
 
+## Computer Use is slow
+
+A Computer Use step has two parts: the driver does the action, and then the model reads the result
+and chooses the next action. While the driver works, the chat shows **Using an app on this
+computer…**. While the model works, it shows **Deciding the next step in the app…**. After 5 seconds
+on one step, the time the step has run shows next to the text.
+
+A driver call usually takes a few seconds or less. To see the time of each call, start OpenBot from
+a terminal. Each driver call that takes 5 seconds or more shows in its output as `Computer Use
+driver answered`, with the tool name and the milliseconds. Set `OPENBOT_LOG_LEVEL=debug` to show
+every call. The log does not contain what the agent typed.
+
+Most of the time in a slow step is the model. Its time depends on the model and on the reasoning
+effort in the agent settings: a high effort can use tens of seconds before each action. For
+mechanical GUI tasks, select a lower effort or a faster model. Name the application and the action
+in your request, for example "In Safari, open https://example.com", so the agent does not look for
+the target first.
+
 ## A chat is missing after an update
 
 Do not follow the reset steps below. Your messages are stored in one SQLite file, nothing copies it

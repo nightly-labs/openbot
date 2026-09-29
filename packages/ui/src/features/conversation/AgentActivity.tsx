@@ -1,4 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -58,14 +59,35 @@ export function nextAgentActivityLabel(
   return pickActivityLabel(previous, random);
 }
 
+/**
+ * A step shorter than this shows no time. Most steps end sooner, and a counter that appears and
+ * goes away at once is only noise.
+ */
+const ELAPSED_VISIBLE_AFTER_MS = 5_000;
+
 export function AgentActivityIndicator(props: {
   agent: AgentProfile | undefined;
   detail?: string | null;
   label: AgentActivityLabel;
   phase?: "active" | "exiting";
+  /**
+   * When the current line started, from `Date.now()`. A long step then shows how long it has run,
+   * so a working agent reads differently from a stalled one.
+   */
+  since?: number;
 }) {
-  const { t } = useText();
+  const { t, format } = useText();
   const label = () => props.detail ?? t(agentActivityLabelKey(props.label));
+  const elapsedMs = createElapsed(() => (props.phase === "exiting" ? undefined : props.since));
+  const elapsed = createMemo(() => {
+    const ms = elapsedMs();
+    if (ms < ELAPSED_VISIBLE_AFTER_MS) return null;
+    const total = Math.floor(ms / 1_000);
+    const seconds = format.number(total % 60, { style: "unit", unit: "second", unitDisplay: "narrow" });
+    if (total < 60) return seconds;
+    const minutes = format.number(Math.floor(total / 60), { style: "unit", unit: "minute", unitDisplay: "narrow" });
+    return `${minutes} ${seconds}`;
+  });
   return (
     <div class="agent-activity-entry" data-state={props.phase ?? "active"}>
       <span
@@ -81,9 +103,28 @@ export function AgentActivityIndicator(props: {
       <section class="agent-activity-content" aria-label={t("chat.activity.current")}>
         <AgentAvatar agent={props.agent} mood="working" class="agent-activity-avatar" />
         <span class="agent-activity-label">{label()}</span>
+        <Show when={elapsed()}>{(time) => <span class="agent-activity-elapsed">{time()}</span>}</Show>
       </section>
     </div>
   );
+}
+
+/** Milliseconds since `since`, ticking each second while there is one, and 0 when there is not. */
+function createElapsed(since: () => number | undefined) {
+  const [now, setNow] = createSignal(Date.now());
+  createEffect(
+    () => since(),
+    (from) => {
+      if (from === undefined) return;
+      setNow(Date.now());
+      const clock = window.setInterval(() => setNow(Date.now()), 1_000);
+      return () => window.clearInterval(clock);
+    },
+  );
+  return createMemo(() => {
+    const from = since();
+    return from === undefined ? 0 : Math.max(0, now() - from);
+  });
 }
 
 function pickDifferent<T>(items: readonly T[], previous: T | undefined, random: () => number): T {

@@ -13,6 +13,8 @@ export interface RenderedAgentActivity {
   activityId: string;
   agent: AgentProfile | undefined;
   detail: string | null;
+  /** When the current line started, so the indicator can show how long a long step has run. */
+  since: number;
   phase: "active" | "exiting";
   label: AgentActivityLabel;
 }
@@ -123,6 +125,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
           activityId,
           agent,
           detail: untrack(activeActivityDetail),
+          since: Date.now(),
           phase: "active" as const,
           label,
         };
@@ -176,7 +179,9 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     ({ activityId, detail }) => {
       if (!activityId) return;
       setRenderedAgentActivity((current) =>
-        current?.activityId === activityId && current.detail !== detail ? { ...current, detail } : current,
+        current?.activityId === activityId && current.detail !== detail
+          ? { ...current, detail, since: Date.now() }
+          : current,
       );
     },
   );

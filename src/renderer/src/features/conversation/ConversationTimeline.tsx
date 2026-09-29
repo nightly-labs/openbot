@@ -575,6 +575,7 @@ export function ConversationTimeline() {
                   detail={activity().detail}
                   label={activity().label}
                   phase={activity().phase}
+                  since={activity().since}
                 />
               )}
             </Show>

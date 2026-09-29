@@ -455,6 +455,14 @@
   animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 }
 
+.agent-activity-elapsed {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
 .chat-action-marker {
   width: min(var(--openbot-chat-marker-width), calc(100% - var(--openbot-space-6)));
   min-height: var(--openbot-chat-marker-height);
