@@ -126,10 +126,21 @@ function handle(message) {
   if (message.method === "initialize") {
     const agentCapabilities = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
       ? { loadSession: true, sessionCapabilities: { close: {} } }
-      : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
-        ? { loadSession: true }
-        : {};
+      : process.env.OPENBOT_FAKE_ACP_LIST
+        ? { loadSession: true, sessionCapabilities: { list: {} } }
+        : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
+          ? { loadSession: true }
+          : {};
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
+    return;
+  }
+  // "fail" is an internal server that fails every call, as OpenCode reports it.
+  if (message.method === "session/list") {
+    if (process.env.OPENBOT_FAKE_ACP_LIST === "fail") {
+      write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
+      return;
+    }
+    write({ jsonrpc: "2.0", id: message.id, result: { sessions: [] } });
     return;
   }
   if (message.method === "session/load") {
@@ -154,10 +165,6 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const promptLog = process.env.OPENBOT_FAKE_ACP_PROMPT_LOG;
     if (promptLog) fs.appendFileSync(promptLog, JSON.stringify(message.params) + NL);
-    if (process.env.OPENBOT_FAKE_ACP_PROMPT_FAIL === "1") {
-      write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
-      return;
-    }
     write({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
     return;
   }
@@ -847,29 +854,17 @@ describe("OpenCode ACP session loading", () => {
     expect(await fake.readLoadedSessions()).toEqual([]);
   });
 
-  it("loads the session again after one OpenCode service failure", async () => {
+  // OpenCode answers a session missing from its store with the same error as a fault of its internal
+  // server. A missing session is replaced, and a server fault must not cost the agent its session.
+  it("reports a session as missing when OpenCode's server answers, without a diagnostic", async () => {
     const fake = await createFakeOpencodeAgent();
-    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "ok");
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
-    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "1");
-    const client = startOpencode(fake.cli, () => null, fake.envLog);
-
-    await client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse);
-
-    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored" }, { sessionId: "ses_stored" }]);
-  });
-
-  it("reports a session that OpenCode fails to load twice as missing, without a diagnostic", async () => {
-    const fake = await createFakeOpencodeAgent();
-    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
-    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
-    // Two failed attempts for the read and two for the resume.
-    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "4");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
     const diagnostics: string[] = [];
     client.on("diagnostic", (message) => diagnostics.push(message));
 
-    // OpenCode answers a session missing from its store with the same error as a transient fault.
     // The boot read shows nothing to the user, and the resume fails as a missing session, which is
     // what starts the replacement.
     const read = await client.request(
@@ -883,33 +878,32 @@ describe("OpenCode ACP session loading", () => {
       .catch((reason: unknown) => reason);
     expect(isMissingProviderSessionError(error, "opencode")).toBe(true);
     expect(diagnostics).toEqual([]);
-    expect(await fake.readLoadedSessions()).toHaveLength(4);
+    expect(await fake.readLoadedSessions()).toHaveLength(2);
   });
 
-  it("explains an OpenCode service failure on a prompt", async () => {
+  it("loads the session again after one failure while OpenCode's server fails", async () => {
     const fake = await createFakeOpencodeAgent();
-    vi.stubEnv("OPENBOT_FAKE_ACP_PROMPT_FAIL", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "fail");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "1");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
-    const errors: unknown[] = [];
-    client.on("notification", (notification) => {
-      if (notification.method === "error") errors.push(notification.params);
-    });
-    const thread = await client.request(
-      "thread/start",
-      { cwd: fake.directory, runtimeWorkspaceRoots: [fake.directory] },
-      decodeRecordResponse,
-    );
-    const threadId = isDynamicRecord(thread.thread) ? thread.thread.id : null;
-    if (typeof threadId !== "string") throw new Error("The fake agent opened no thread.");
 
-    await client.request(
-      "turn/start",
-      { threadId, clientUserMessageId: "turn-1", input: [{ type: "inputText", text: "Keep working" }] },
-      decodeRecordResponse,
-    );
+    await client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse);
 
-    await vi.waitFor(() =>
-      expect(errors).toMatchObject([{ threadId, message: sourceText("error.provider.opencodeServiceFailure") }]),
-    );
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored" }, { sessionId: "ses_stored" }]);
+  });
+
+  it("keeps the session and explains the fault while OpenCode's server keeps failing", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "fail");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const error = await client
+      .request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse)
+      .catch((reason: unknown) => reason);
+
+    expect(isMissingProviderSessionError(error, "opencode")).toBe(false);
+    expect(error).toHaveProperty("message", sourceText("error.provider.opencodeServiceFailure"));
   });
 });

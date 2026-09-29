@@ -844,22 +844,41 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /**
    * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
-   * failure" as a transient fault of its internal server. One more attempt covers the transient
-   * fault. A second failure is reported as a missing session, so the caller replaces the session
-   * and hands it the transcript, and the user does not see the error on each message.
+   * failure" as a fault of its internal server. `session/list` goes through that server too: when
+   * it answers, the server works, and the session is reported as missing, so the caller replaces it
+   * and hands it the transcript. When it fails too, the fault is the server's, and the session is
+   * kept: one more attempt, then the fault is reported. An OpenCode without `session/list` cannot
+   * tell the two apart, and a second failure is taken as the missing session it most often is.
    */
   async #loadSession(connection: ClientSideConnection, request: LoadSessionRequest): Promise<LoadSessionResponse> {
+    let failure: unknown;
     try {
       return await connection.loadSession(request);
     } catch (error) {
       if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) throw error;
+      failure = error;
     }
+    const serverAnswers = await this.#sessionListAnswers(connection, request.cwd);
+    if (serverAnswers) throw new MissingOpenCodeSessionError(request.sessionId, failure);
     await new Promise((resolve) => setTimeout(resolve, OPENCODE_LOAD_RETRY_MS));
     try {
-      return await connection.loadSession(request);
+      // The process can have stopped during the wait; this reports that instead of a closed stream.
+      return await this.#requireConnection().loadSession(request);
     } catch (error) {
       if (!isOpenCodeServiceFailure(error)) throw error;
-      throw new MissingOpenCodeSessionError(request.sessionId);
+      if (serverAnswers === null) throw new MissingOpenCodeSessionError(request.sessionId, error);
+      throw new Error(sourceText("error.provider.opencodeServiceFailure"), { cause: error });
+    }
+  }
+
+  /** Whether the agent answers `session/list`; `null` when it does not offer the method. */
+  async #sessionListAnswers(connection: ClientSideConnection, cwd: string): Promise<boolean | null> {
+    if (!this.#initialization?.agentCapabilities?.sessionCapabilities?.list) return null;
+    try {
+      await connection.listSessions({ cwd });
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -1484,27 +1503,21 @@ function isDynamicToolResult(value: unknown): value is DynamicToolResult {
   );
 }
 
-/** A session load that OpenCode failed twice, taken as a missing session. */
+/** A session load that OpenCode failed while its internal server worked. */
 class MissingOpenCodeSessionError extends Error {
-  constructor(sessionId: string) {
+  constructor(sessionId: string, cause: unknown) {
     // The wording is what `isMissingProviderSessionError` recognizes.
-    super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`);
+    super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`, { cause });
     this.name = "MissingOpenCodeSessionError";
   }
 }
 
 /**
- * OpenCode's `session/*` wrapper error. It carries no cause: OpenCode maps each failed call to its
- * internal server that is not an authentication error to this one.
+ * OpenCode's wrapper error for a failed call to its internal server. It carries no cause: OpenCode
+ * maps each such failure that is not an authentication error to this one.
  */
 function isOpenCodeServiceFailure(error: unknown): boolean {
-  return (
-    error instanceof RequestError &&
-    error.code === -32603 &&
-    /\bOpenCode service failure\b/.test(error.message) &&
-    isRecord(error.data) &&
-    error.data.service === "session"
-  );
+  return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
 
 function isAuthenticationError(error: unknown): boolean {
