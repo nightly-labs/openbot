@@ -1,8 +1,5 @@
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
-import { render } from "@solidjs/web";
-// Copying a selection with a formula in it gives its LaTeX source, not the typeset glyphs twice.
-import "katex/contrib/copy-tex";
-import { App } from "./App";
+import { type JSX, render } from "@solidjs/web";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
 import { ComputerUsePermissionHelp, permissionFromQuery } from "./features/computer-use/ComputerUsePermissionHelp";
 import { DynamicIslandSurface } from "./features/dynamic-island/DynamicIslandSurface";
@@ -17,31 +14,39 @@ if (!root) {
 
 installPointerFocusGuard();
 
-const surface = new URLSearchParams(window.location.search).get("surface");
+const query = new URLSearchParams(window.location.search);
+
 // The helper windows are not inside `App`, so each gets the language setting of its own. They use
 // the same preload and the same trusted-origin IPC gate as the main window, and main already sends
 // every language change to every window.
-render(() => {
-  if (surface === "dynamic-island")
-    return (
-      <I18nProvider>
-        <DynamicIslandSurface />
-      </I18nProvider>
-    );
-  if (surface === "computer-use-highlight")
-    return (
-      <I18nProvider>
-        <ComputerUseHighlightSurface />
-      </I18nProvider>
-    );
+function helperSurface(surface: string | null): (() => JSX.Element) | undefined {
+  if (surface === "dynamic-island") return () => <DynamicIslandSurface />;
+  if (surface === "computer-use-highlight") return () => <ComputerUseHighlightSurface />;
   if (surface === "computer-use-permission-help")
-    return (
-      <I18nProvider>
-        <ComputerUsePermissionHelp
-          permission={permissionFromQuery(window.location.search)}
-          sunshine={new URLSearchParams(window.location.search).get("application") === "sunshine"}
-        />
-      </I18nProvider>
+    return () => (
+      <ComputerUsePermissionHelp
+        permission={permissionFromQuery(window.location.search)}
+        sunshine={query.get("application") === "sunshine"}
+      />
     );
-  return <App />;
-}, root);
+  return undefined;
+}
+
+const Helper = helperSurface(query.get("surface"));
+if (Helper) {
+  render(
+    () => (
+      <I18nProvider>
+        <Helper />
+      </I18nProvider>
+    ),
+    root,
+  );
+} else {
+  // Only the main window loads `App`. A static import put the whole app in the heap of each
+  // Dynamic Island window, and there is one for each display.
+  // Copying a selection with a formula in it gives its LaTeX source, not the typeset glyphs twice.
+  void Promise.all([import("./App"), import("katex/contrib/copy-tex")]).then(([{ App }]) =>
+    render(() => <App />, root),
+  );
+}

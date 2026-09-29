@@ -1,15 +1,16 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  AgentApproval,
-  AgentEvent,
-  DynamicIslandAgentIdentity,
-  DynamicIslandApprovalItem,
-  DynamicIslandFailureItem,
-  DynamicIslandPresentation,
-  DynamicIslandPromptItem,
-  DynamicIslandQuestionItem,
-  DynamicIslandTakeoverItem,
-  QueueSnapshot,
+import {
+  type AgentApproval,
+  type AgentEvent,
+  DYNAMIC_ISLAND_MAX_COUNT,
+  type DynamicIslandAgentIdentity,
+  type DynamicIslandApprovalItem,
+  type DynamicIslandFailureItem,
+  type DynamicIslandPresentation,
+  type DynamicIslandPromptItem,
+  type DynamicIslandQuestionItem,
+  type DynamicIslandTakeoverItem,
+  type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
@@ -83,7 +84,12 @@ export function selectDynamicIslandPresentation(
   );
   if (!selected) return { serverId: "local", mode: "idle" };
   if (selected.mode !== "approval" && selected.mode !== "question") return selected;
-  return { ...selected, remainingCount: Math.max(0, attentionCount - 1) };
+  return { ...selected, remainingCount: islandCount(attentionCount - 1) };
+}
+
+/** A count that main accepts. Main rejects a presentation with more than 10,000 unread replies, so the island stopped updating. */
+function islandCount(count: number): number {
+  return Math.min(DYNAMIC_ISLAND_MAX_COUNT, Math.max(0, count));
 }
 
 export function countDynamicIslandAttention(input: DynamicIslandPresentationInput, text: DynamicIslandText): number {
@@ -107,7 +113,7 @@ export function createDynamicIslandPresentation(
       serverId: input.serverId,
       mode: "approval",
       item: attention.item,
-      remainingCount: Math.max(0, attentionItems.length - 1),
+      remainingCount: islandCount(attentionItems.length - 1),
     };
   }
   if (attention?.mode === "takeover") return { serverId: input.serverId, mode: "takeover", item: attention.item };
@@ -116,7 +122,7 @@ export function createDynamicIslandPresentation(
       serverId: input.serverId,
       mode: "question",
       item: attention.item,
-      remainingCount: Math.max(0, attentionItems.length - 1),
+      remainingCount: islandCount(attentionItems.length - 1),
     };
   }
   if (attention?.mode === "failed") return { serverId: input.serverId, mode: "failed", item: attention.item };
@@ -132,7 +138,9 @@ export function createDynamicIslandPresentation(
     return {
       serverId: input.serverId,
       mode: "message",
-      unreadCount: visibleAgents.reduce((total, agent) => total + Math.max(0, input.unreadReplies[agent.id] ?? 0), 0),
+      unreadCount: islandCount(
+        visibleAgents.reduce((total, agent) => total + Math.max(0, input.unreadReplies[agent.id] ?? 0), 0),
+      ),
       message,
     };
   }
