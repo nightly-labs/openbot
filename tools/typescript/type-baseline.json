@@ -36,7 +36,7 @@
     "packages/ui/src/features/conversation/ComposerNotice.tsx": 2,
     "packages/ui/src/features/conversation/ConversationPrompts.tsx": 4,
     "packages/ui/src/features/conversation/MarkdownMessageText.tsx": 10,
-    "packages/ui/src/features/conversation/MessageRendering.tsx": 6,
+    "packages/ui/src/features/conversation/MessageRendering.tsx": 5,
     "packages/ui/src/features/conversation/RichMessageText.tsx": 1,
     "packages/ui/src/features/conversation/RoutineChipSelect.tsx": 1,
     "packages/ui/src/features/conversation/RoutineDateField.tsx": 1,

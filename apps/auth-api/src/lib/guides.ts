@@ -24,6 +24,14 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "openbot-marketplace",
+      title: "How to Use the OpenBot Marketplace: Agents, Skills, and Plugins",
+      description:
+        "Browse the OpenBot Marketplace, install agents, plugins, and skills, and submit your own agent for review.",
+      publishedAt: "2026-09-29",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "what-are-ai-agents",
       title: "What Are AI Agents? How They Work and When to Use Them",
       description:

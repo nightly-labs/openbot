@@ -99,7 +99,7 @@ import {
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
 import type { ServerAdminPort } from "../servers/servers-port";
-import { createWebHostConnections, type WebHostConnections } from "./web-host-connections";
+import { createWebHostConnections, type WebHostConnections, type WebHostNotice } from "./web-host-connections";
 import {
   acquireOpenedWebHostLock,
   acquireWebHostLock,
@@ -199,6 +199,8 @@ export interface WebRuntimeEvents {
   hostState?(hostId: string, state: WebHostState): void;
   /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
+  /** An event of a host this tab has not opened that a notification can show. */
+  hostNotice?(hostId: string, event: WebHostNotice, agents: AgentSummary[]): void;
 }
 
 /** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
@@ -288,6 +290,13 @@ export function createWebWorkspaceRuntime(
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
         onSessionRevoked: () => events.hostSessionRevoked?.(),
+        // Without a listener, the status connections read no agent list.
+        ...(events.hostNotice
+          ? {
+              onNotice: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) =>
+                events.hostNotice?.(hostId, event, agents),
+            }
+          : {}),
       })
     : undefined;
   // Another tab asks for the host that this tab has open: it stays here.

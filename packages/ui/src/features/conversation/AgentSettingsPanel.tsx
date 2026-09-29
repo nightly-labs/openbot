@@ -21,8 +21,11 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   ConfirmDialog,
+  IconButton,
   Input,
   Popover,
+  RefreshCw,
+  RotateCcw,
   Select,
   SelectContent,
   SelectItem,
@@ -664,9 +667,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   <span>{t("agentSettings.avatar.generatedFace")}</span>
                   <div class="avatar-editor-actions">
                     <Show when={draft.avatar.seed !== props.agent.id}>
-                      <Button
+                      <IconButton
                         variant="outline"
                         type="button"
+                        label={t("agentSettings.avatar.resetToId")}
                         onClick={() => {
                           setDraft((state) => {
                             state.avatar.candidateSeed = props.agent.id;
@@ -675,12 +679,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                           void selectGeneratedAvatar(props.agent.id);
                         }}
                       >
-                        {t("agentSettings.avatar.resetToId")}
-                      </Button>
+                        <RotateCcw aria-hidden="true" />
+                      </IconButton>
                     </Show>
-                    <Button
+                    <IconButton
                       variant="outline"
                       type="button"
+                      label={t("agentSettings.avatar.newSet")}
                       onClick={() =>
                         setDraft((state) => {
                           state.avatar.candidateSeed = state.avatar.seed;
@@ -688,8 +693,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                         })
                       }
                     >
-                      {t("agentSettings.avatar.newSet")}
-                    </Button>
+                      <RefreshCw aria-hidden="true" />
+                    </IconButton>
                   </div>
                 </div>
                 <fieldset class="avatar-face-grid" aria-label={t("agentSettings.avatar.faces")}>

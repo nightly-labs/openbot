@@ -2,9 +2,9 @@
 
 import type { AgentEvent, AgentSummary, ServerSummary } from "@openbot/contracts/ipc";
 import { translateFor } from "@openbot/i18n";
+import type { AgentNotificationContent } from "@openbot/team-client/agent-notifications";
 import { BrowserWindow } from "electron";
 import { assert, beforeEach, expect, it, vi } from "vitest";
-import type { AgentNotificationContent } from "./agent-notifications";
 import { createRendererForwarders } from "./renderer-forwarders";
 
 const mocks = vi.hoisted(() => {

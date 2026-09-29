@@ -2,7 +2,8 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/notification";
 
 export const messages = {
-  // Desktop notifications, raised by the main process while the window may be closed.
+  // Desktop notifications, raised by the main process while the window may be closed, and browser
+  // notifications, raised by the web client while its tab is open.
   "notification.needsInput": "Nécessite votre réponse.",
   "notification.needsApproval": "Nécessite votre approbation.",
   "notification.finished": "Travail terminé.",

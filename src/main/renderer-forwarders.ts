@@ -23,9 +23,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { AppTranslate } from "@openbot/i18n";
+import { notificationForAgentEvent } from "@openbot/team-client/agent-notifications";
 import { BrowserWindow, Notification } from "electron";
 import type { AgentService } from "../backend/agent-service";
-import { notificationForAgentEvent } from "./agent-notifications";
 import type { HostAnalytics } from "./analytics";
 import { showRetainedNotification } from "./desktop-notifications";
 import type { HostService } from "./host-service";

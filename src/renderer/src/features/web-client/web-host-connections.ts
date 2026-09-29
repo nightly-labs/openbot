@@ -1,3 +1,5 @@
+import { type AgentEvent, type AgentSummary, isAgentSummary } from "@openbot/contracts/ipc";
+import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { decodeTeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -28,7 +30,14 @@ interface HostEntry {
   /** Session ends in progress. The peer starts some without waiting, for example after a protocol error. */
   endingSessions: Set<Promise<void>>;
   incompatible: boolean;
+  /** The host's agents, for the name and the notification switch of an event's agent. */
+  agents: AgentSummary[];
+  /** Counts `agents-changed` events, so a list read that started before one is dropped. */
+  agentsRevision: number;
 }
+
+/** The events of a host that this tab has not opened that a notification can show. */
+export type WebHostNotice = Extract<AgentEvent, { type: "prompt" | "approval" | "turn-completed" }>;
 
 export interface WebHostConnections {
   /** The hosts of the account. Every host that this tab has not opened gets a status connection. */
@@ -59,6 +68,8 @@ export function createWebHostConnections(options: {
   onState(hostId: string, state: WebHostState): void;
   /** The host revoked the session. The membership may have ended. */
   onSessionRevoked(): void;
+  /** An event of a host this tab has not opened, with the host's agents, for a notification. */
+  onNotice?(hostId: string, event: WebHostNotice, agents: AgentSummary[]): void;
 }): WebHostConnections {
   const { channel } = options;
   const entries = new Map<string, HostEntry>();
@@ -96,6 +107,8 @@ export function createWebHostConnections(options: {
       connecting: null,
       endingSessions: new Set(),
       incompatible: false,
+      agents: [],
+      agentsRevision: 0,
     };
     entries.set(host.hostId, entry);
     options.acquireHostLock(options.accountId, host.hostId, { wait: entry.stop.signal }).then(
@@ -128,13 +141,24 @@ export function createWebHostConnections(options: {
           return ending;
         },
         async onConnectionUpdate(update) {
-          if (entries.get(host.hostId) !== entry || update.state !== "offline") return;
+          if (entries.get(host.hostId) !== entry) return;
+          // A resync can follow lost events, an `agents-changed` among them.
+          if (update.state === "online" && update.resync && !entry.incompatible && options.onNotice)
+            void readAgents(entry);
+          if (update.state !== "offline") return;
           if (update.code === "session_revoked") options.onSessionRevoked();
           if (update.code === "protocol_error") entry.recovery?.suspend(failed(update.message));
           else entry.recovery?.offline(failed(update.message));
         },
-        // A status connection shows no workspace, so it reads no events.
-        onTeamEvent: async () => undefined,
+        // A status connection shows no workspace. It reads only the events that a notification needs.
+        async onTeamEvent(_hostId, event) {
+          if (entries.get(host.hostId) !== entry) return;
+          if (event.type === "agents-changed") {
+            entry.agents = event.agents;
+            entry.agentsRevision += 1;
+          } else if (event.type === "prompt" || event.type === "approval" || event.type === "turn-completed")
+            options.onNotice?.(host.hostId, event, entry.agents);
+        },
       },
     });
     entry.peer = peer;
@@ -169,7 +193,7 @@ export function createWebHostConnections(options: {
         if (teamProtocolUpdateDirection({ minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 }, support.protocol)) {
           entry.incompatible = true;
           recovery.suspend();
-        }
+        } else if (options.onNotice) void readAgents(entry);
       },
       () => undefined,
       (status) => {
@@ -191,6 +215,26 @@ export function createWebHostConnections(options: {
     entry.recovery = recovery;
     // Unlike mobile, a hidden tab keeps retrying: it holds the lock, so no other tab can take its place.
     recovery.setActive(true);
+  }
+
+  /** The status stays online without the list. Notifications then wait for the next `agents-changed`. */
+  async function readAgents(entry: HostEntry): Promise<void> {
+    const revision = entry.agentsRevision;
+    try {
+      const response = await entry.peer?.execute({
+        id: crypto.randomUUID(),
+        type: "request",
+        method: "GET",
+        path: TEAM_API_ROUTES.agents.all,
+        body: {},
+      });
+      if (entries.get(entry.host.hostId) !== entry || !response?.ok || (response.status ?? 500) >= 400) return;
+      // An `agents-changed` that arrived during the read is newer than the read.
+      if (entry.agentsRevision !== revision) return;
+      entry.agents = guardedListDecoder(isAgentSummary, "teammates")(response.body);
+    } catch {
+      // As above: the status does not depend on the list.
+    }
   }
 
   async function stop(hostId: string): Promise<void> {
