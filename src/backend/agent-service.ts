@@ -20,6 +20,7 @@ import type {
   ChannelRoutine,
   ChannelRoutineRun,
   ConversationMessage,
+  ConversationMessageSender,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -1608,7 +1609,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#queue.steer(input);
   }
 
-  async sendMessage(input: SendMessageInput): Promise<QueuedMessageReceipt> {
+  /**
+   * `sender` is the person the host saw send it. It is not part of `SendMessageInput`: the caller of
+   * that input, a renderer or a Team API body, never names who it is.
+   */
+  async sendMessage(input: SendMessageInput, sender?: ConversationMessageSender): Promise<QueuedMessageReceipt> {
     const validateRecipient = this.#mailbox.prepareDelivery([input.agentId]);
     if (this.#duplication.isPending(input.agentId))
       throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
@@ -1617,6 +1622,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     validateRecipient();
     const receipt = await this.#mailbox.enqueue({
       sender: { kind: "user" },
+      senderMember: sender,
       recipientAgentIds: [agent.id],
       text: input.text,
       draftIds: input.attachmentDraftIds ?? [],

@@ -6,7 +6,7 @@
 // pointing at something it cannot render and never catch up.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { isMessageReaction } from "@openbot/contracts/ipc";
+import { conversationMessageSender, isMessageReaction } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
@@ -82,12 +82,15 @@ export async function routeAgentConversation(
     const body = await readJson(request);
     return json(
       202,
-      await agents.sendMessage({
-        agentId,
-        text: stringField(body, "text", true, INPUT_LIMITS.messageText),
-        attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
-        replyToMessageId: nullableString(body, "replyToMessageId"),
-      }),
+      await agents.sendMessage(
+        {
+          agentId,
+          text: stringField(body, "text", true, INPUT_LIMITS.messageText),
+          attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
+          replyToMessageId: nullableString(body, "replyToMessageId"),
+        },
+        conversationMessageSender(member.id, member.name?.trim() || member.email || member.username),
+      ),
     );
   }
 

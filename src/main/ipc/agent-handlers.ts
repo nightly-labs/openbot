@@ -271,7 +271,7 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) => remoteServers.markAgentConversationRead(parsed, serverId),
       }),
       sendMessage: scopedHandler(parseSendMessage, {
-        local: (input) => service.sendMessage(input),
+        local: (input) => service.sendMessage(input, host.conversationSender()),
         remote: (input, serverId) =>
           remoteServers.request(serverId, TEAM_API_ROUTES.agent.messages(input.agentId), decodeQueuedMessageReceipt, {
             method: "POST",

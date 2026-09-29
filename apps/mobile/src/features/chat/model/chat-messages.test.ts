@@ -139,3 +139,34 @@ describe("withFailureReasons", () => {
     ]);
   });
 });
+
+describe("mobile message senders", () => {
+  const sent = (id: string, senderMember?: { id: string; name: string }) =>
+    ({
+      id,
+      author: "user",
+      text: `Message ${id}`,
+      createdAt: "2026-09-28T10:00:00.000Z",
+      status: "completed",
+      ...(senderMember ? { senderMember } : {}),
+    }) satisfies ConversationMessage;
+  const authors = (messages: ReturnType<typeof projectChatMessages>) =>
+    messages.flatMap((message) =>
+      message.kind === "message" ? [{ id: message.id, author: message.author, sender: message.sender }] : [],
+    );
+
+  it("names another member, and keeps the reader's own and older messages as the reader's", () => {
+    const messages = [
+      sent("mine", { id: "member-self", name: "Me" }),
+      sent("ada", { id: "member-ada", name: "Ada" }),
+      sent("old"),
+    ];
+    expect(authors(projectChatMessages(messages, "member-self"))).toEqual([
+      { id: "mine", author: "user", sender: undefined },
+      { id: "ada", author: "user", sender: { id: "member-ada", name: "Ada" } },
+      { id: "old", author: "user", sender: undefined },
+    ]);
+    // A server that is still connecting names no reader, so no message is shown as another person's.
+    expect(authors(projectChatMessages(messages, "")).every((message) => message.sender === undefined)).toBe(true);
+  });
+});

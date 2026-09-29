@@ -36,10 +36,14 @@ export function MobileChatView({ agent }: { agent: MobileAgent }) {
     [agents, agent.serverId],
   );
   const mentionAgents = useMemo(() => serverAgents.filter((item) => item.id !== agent.id), [serverAgents, agent.id]);
-  const projected = useMemo(() => projectChatMessages(conversation?.messages ?? []), [conversation?.messages]);
+  const memberId = servers.find((item) => item.id === agent.serverId)?.membershipId ?? null;
+  const projected = useMemo(
+    () => projectChatMessages(conversation?.messages ?? [], memberId),
+    [conversation?.messages, memberId],
+  );
   const references = useMemo(
-    () => projectChatMessages(Object.values(conversation?.references ?? {})),
-    [conversation?.references],
+    () => projectChatMessages(Object.values(conversation?.references ?? {}), memberId),
+    [conversation?.references, memberId],
   );
   const activity = useAgentActivity(agent.id);
   const online = servers.find((item) => item.id === agent.serverId)?.state === "online";

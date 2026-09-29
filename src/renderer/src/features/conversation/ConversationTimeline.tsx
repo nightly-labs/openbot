@@ -1,15 +1,17 @@
+import type { ConversationMessageSender } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
 import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
 import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
-import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import { MessageActions } from "@openbot/ui/features/conversation/MessageRendering";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/features/conversation/UnreadMessages";
+import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Loading, lazy, Show, untrack } from "solid-js";
 import { planItems, planTitle } from "../../app-message-projection";
@@ -121,6 +123,30 @@ export function ConversationTimeline() {
   } = useConversationViewScope();
   const { t, format } = useText();
   const runtime = conversationRuntime(props);
+  /**
+   * The other person who wrote a message. The reader's own message, an agent message, and a message
+   * from before senders were kept have none, so a chat with one person looks as it always did.
+   */
+  const otherSender = (message: AgentMessage | undefined): ConversationMessageSender | undefined => {
+    const sender = message?.author === "you" ? message.senderMember : undefined;
+    return sender && !props.isOwnSender(sender.id) ? sender : undefined;
+  };
+  // Live presence gives the current name; the name kept with the message covers a member who left
+  // the team. The member id seeds the colour of the name and the bubble, so it stays the same before
+  // presence loads, after the person leaves, and on mobile.
+  const memberAuthor = (sender: ConversationMessageSender): ChatMessageAuthor => {
+    const member = props.presence.members.find((candidate) => candidate.id === sender.id);
+    return {
+      kind: "member",
+      name: (member ? teamMemberName(member) : sender.name.trim()) || t("chat.message.memberFallback"),
+      avatarSeed: sender.id,
+    };
+  };
+  // A run of one sender breaks where another person starts to write.
+  const senderRunRow = (message: AgentMessage) => {
+    const sender = otherSender(message);
+    return { author: sender ? `member:${sender.id}` : message.author, createdAt: message.createdAt };
+  };
   /**
    * An agent's record of a routine it created or changed is a card whose schedule the person can
    * change. Only a record from an agent turn has a `turnId`. A change the person made in the app
@@ -254,11 +280,32 @@ export function ConversationTimeline() {
                   if (!current) return false;
                   if (current.id === props.firstUnreadMessageId || current.actionMarker) return false;
                   const previous = timelineMessages()[virtualRow.index - 1];
-                  return continuesSenderRun(previous, current, {
+                  return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
                     previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
                     startsDay: dayMarker() !== null,
                   });
                 });
+                const author = createMemo((): ChatMessageAuthor => {
+                  const current = message();
+                  const sender = otherSender(current);
+                  if (sender) return memberAuthor(sender);
+                  return current?.author === "you"
+                    ? { kind: "you", name: t("chat.message.you") }
+                    : { kind: "agent", name: props.agent?.name ?? t("chat.message.agentFallback") };
+                });
+                const referencedMessage = createMemo(() => {
+                  const replyToMessageId = message()?.replyToMessageId;
+                  if (!replyToMessageId) return undefined;
+                  return (
+                    timelineMessages().find((candidate) => candidate.id === replyToMessageId) ??
+                    props.messageReferences?.[replyToMessageId]
+                  );
+                });
+                // A quote of another person's message names them; any other quote keeps its label.
+                const referencedAuthorName = () => {
+                  const sender = otherSender(referencedMessage());
+                  return sender ? memberAuthor(sender).name : undefined;
+                };
                 const markerOnly = untrack(() => markerOnlyMessage(initialMessage));
                 // Consecutive markers keep the tighter marker gap so they read as one group.
                 const groupedWithMarker = createMemo(() => {
@@ -468,23 +515,14 @@ export function ConversationTimeline() {
                           </Show>
                           <ChatMessageRow
                             message={message() ?? initialMessage}
-                            author={{
-                              kind: message()?.author === "you" ? "you" : "agent",
-                              name:
-                                message()?.author === "you"
-                                  ? t("chat.message.you")
-                                  : (props.agent?.name ?? t("chat.message.agentFallback")),
-                            }}
+                            author={author()}
+                            showAuthor={author().kind === "member" ? !continuesRun() : undefined}
                             showTime={!continuesRun()}
                             animate={animateEntrance}
                             agents={props.agents}
                             skills={installedSkills()}
-                            referencedMessage={
-                              timelineMessages().find((candidate) => candidate.id === message()?.replyToMessageId) ??
-                              (message()?.replyToMessageId
-                                ? props.messageReferences?.[message()?.replyToMessageId ?? ""]
-                                : undefined)
-                            }
+                            referencedMessage={referencedMessage()}
+                            referencedAuthorName={referencedAuthorName()}
                             reactions={displayedReactions()}
                             reactionOverflowCount={message()?.reactionSummary?.overflowCount}
                             onRemoveReaction={() => {

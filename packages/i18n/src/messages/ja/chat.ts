@@ -160,6 +160,7 @@ export const messages = {
   "chat.image.lightbox.strip": "このメッセージの画像",
   "chat.message.you": "あなた",
   "chat.message.agentFallback": "エージェント",
+  "chat.message.memberFallback": "チームメンバー",
   "chat.message.attachment": "添付ファイル",
   "chat.actions.userLabel": "ユーザーのメッセージの操作",
   "chat.actions.label": "{name} のメッセージの操作",

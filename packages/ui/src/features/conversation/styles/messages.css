@@ -68,8 +68,11 @@
   grid-column: 2;
   grid-row: 1;
   padding-inline: var(--openbot-space-3);
+  min-width: 0;
   color: var(--message-author-color, var(--openbot-text-muted));
   font-weight: var(--openbot-weight-regular);
+  /* A long name with no space wraps instead of widening the row. */
+  overflow-wrap: anywhere;
 }
 
 .message-author-name-button {
@@ -167,6 +170,27 @@
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+/*
+ * Another person in an agent chat stands on the right, so the name ends with the bubble: a wrapped
+ * name aligns to the end, and the time, hidden until hover, goes before the name.
+ */
+.message-entry-user .message-author-name {
+  text-align: end;
+}
+
+.message-entry-user .message-author-name > .message-time {
+  order: -1;
+}
+
+/* Their bubble takes a tint of their name colour, so it does not read as the reader's own. */
+.ui-bubble.message-bubble-member > .ui-bubble-content {
+  background: color-mix(
+    in srgb,
+    var(--message-author-color, var(--openbot-accent)) 22%,
+    var(--openbot-bg-surface-raised)
+  );
 }
 
 .message-action-button {

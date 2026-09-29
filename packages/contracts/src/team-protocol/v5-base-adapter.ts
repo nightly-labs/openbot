@@ -4,6 +4,7 @@ import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
+import { withConversationSenders } from "./conversation-sender-v5";
 import {
   toCurrentAgentKeys,
   toCurrentAgentKeysObjectForPath,
@@ -62,7 +63,10 @@ export function encodeTeamProtocolV5BaseCurrentEvent(
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
 }
 
-/** Puts the plans of a conversation event beside its frozen projection. See `withConversationPlans`. */
+/**
+ * Puts the plans and the senders of a conversation event beside its frozen projection. See
+ * `withConversationPlans` and `withConversationSenders`.
+ */
 function withEventConversationPlans(
   projected: TeamProtocolV5BaseJsonValue,
   source: unknown,
@@ -72,7 +76,10 @@ function withEventConversationPlans(
   const key = eventConversationKey(projected.type);
   const conversation = key ? projected[key] : undefined;
   if (!key || conversation === undefined) return projected;
-  return { ...projected, [key]: withConversationPlans(conversation, source[key]) };
+  return {
+    ...projected,
+    [key]: withConversationSenders(withConversationPlans(conversation, source[key]), source[key]),
+  };
 }
 
 export function encodeTeamProtocolV5BaseCurrentHttpRequest(

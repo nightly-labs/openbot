@@ -6,6 +6,7 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   ConfigureHostInput,
+  ConversationMessageSender,
   ConversationPage,
   ConversationPageAnchor,
   ConversationReadState,
@@ -37,7 +38,7 @@ import type {
   UpdateHostIdentityInput,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import { conversationMessageSender, SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -1114,6 +1115,21 @@ export class HostService extends EventEmitter<HostEvents> {
       return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
     }
     return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
+  }
+
+  /**
+   * The host user as the sender of an agent message. Signed out there is none: a message with no
+   * sender is the reader's own, and the signed-out id would name this person as someone else to the
+   * members of a team they host later.
+   */
+  conversationSender(): ConversationMessageSender | undefined {
+    let user: CentralAuthUser;
+    try {
+      user = this.#options.getSignedInUser();
+    } catch {
+      return undefined;
+    }
+    return conversationMessageSender(this.#currentAgentReaderId(), user.name?.trim() || user.email);
   }
 
   #currentAgentReaderId(): string {

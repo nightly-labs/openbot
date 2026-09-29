@@ -8,6 +8,7 @@ import type {
   AttachmentDataInput,
   AttachmentSummary,
   ConversationMessage,
+  ConversationMessageSender,
   ConversationReaction,
   ConversationReactionActor,
   ConversationSnapshot,
@@ -22,6 +23,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  isConversationMessageSender,
   isMessageReaction,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -53,6 +55,11 @@ interface StoredMessage {
     | { kind: "user" }
     | { kind: "agent"; agentId: string }
     | { kind: "routine"; routineId: string; runId: string; routineName: string; scheduledFor: string };
+  /**
+   * The person who wrote a user message, stamped by the host. It sits beside `sender`, not in it,
+   * because `sender` is also the queue's and the transfer manifest's. Absent on older messages.
+   */
+  senderMember?: ConversationMessageSender;
   text: string;
   attachments: StoredAttachment[];
   replyToMessageId: string | null;
@@ -106,6 +113,7 @@ interface StoredReaction {
 interface EnqueueInput {
   channelId?: string;
   sender: StoredMessage["sender"];
+  senderMember?: ConversationMessageSender;
   recipientAgentIds: string[];
   text: string;
   replyToMessageId?: string | null;
@@ -300,6 +308,7 @@ export class MailboxStore {
       channelId: input.channelId,
       id: messageId,
       sender: input.sender,
+      ...(input.sender.kind === "user" && input.senderMember ? { senderMember: input.senderMember } : {}),
       text: rewriteAttachmentReferences(text, (reference) => {
         const attachment = committedByDraftId.get(reference.attachmentId);
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
@@ -547,6 +556,7 @@ export class MailboxStore {
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
           senderAgentId: message.sender.kind === "agent" ? message.sender.agentId : undefined,
+          ...(message.senderMember ? { senderMember: { ...message.senderMember } } : {}),
           attachments: message.attachments.map(toAttachmentSummary),
           replyToMessageId: message.replyToMessageId,
           delivery: {
@@ -1701,7 +1711,15 @@ function toCurrentGeneratedAttachment(value: unknown): DynamicRecord | null {
 }
 
 function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {
-  return isRecord(value) ? { ...value, sender: toCurrentMailboxActor(value.sender) } : null;
+  if (!isRecord(value)) return null;
+  const { senderMember, ...message } = value;
+  // A sender that does not decode only loses the name on its message; it must not stop the whole
+  // mailbox from loading.
+  return {
+    ...message,
+    sender: toCurrentMailboxActor(value.sender),
+    ...(isConversationMessageSender(senderMember) ? { senderMember } : {}),
+  };
 }
 
 function toCurrentMailboxReaction(value: unknown): DynamicRecord | null {
@@ -1802,6 +1820,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
         isString(value.sender.runId) &&
         isString(value.sender.routineName) &&
         isString(value.sender.scheduledFor))) &&
+    (value.senderMember === undefined || isConversationMessageSender(value.senderMember)) &&
     isString(value.text) &&
     Array.isArray(value.attachments) &&
     value.attachments.every(isStoredAttachment) &&

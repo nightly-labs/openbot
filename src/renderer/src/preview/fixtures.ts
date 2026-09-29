@@ -388,6 +388,46 @@ export const STORY_QUEUES: Record<string, QueueDelivery[]> = {
   ],
 };
 
+/** A chat where several team members write to one agent. Each human message names its sender. */
+export const STORY_TEAM_CONVERSATION_MESSAGES: ConversationMessage[] = [
+  {
+    id: "team-message-self",
+    author: "user",
+    source: "user",
+    text: "Can you check the sources for the launch notes?",
+    createdAt: "2026-08-19T10:00:00.000Z",
+    status: "completed",
+    senderMember: { id: "member-self", name: "Norbert" },
+  },
+  {
+    id: "team-message-alice",
+    author: "user",
+    source: "user",
+    text: "Please start with the pricing claims.",
+    createdAt: "2026-08-19T10:01:00.000Z",
+    status: "completed",
+    senderMember: { id: "member-alice", name: "Alice Chen" },
+  },
+  {
+    id: "team-message-jon",
+    author: "user",
+    source: "user",
+    text: "And the benchmark table.",
+    createdAt: "2026-08-19T10:02:00.000Z",
+    status: "completed",
+    senderMember: { id: "member-jon", name: "Jon Bell" },
+  },
+  {
+    id: "team-message-agent",
+    author: "assistant",
+    source: "assistant",
+    text: "I will check the pricing claims first, then the benchmark table.",
+    createdAt: "2026-08-19T10:03:00.000Z",
+    status: "completed",
+    replyToMessageId: "team-message-alice",
+  },
+];
+
 export const STORY_SNAPSHOTS: Record<string, ConversationSnapshot> = Object.fromEntries(
   STORY_AGENT_SUMMARIES.map((agent) => [
     agent.id,
@@ -396,7 +436,12 @@ export const STORY_SNAPSHOTS: Record<string, ConversationSnapshot> = Object.from
       threadId: agent.threadId,
       activeTurnId: null,
       revision: 1,
-      messages: agent.id === "chief" ? STORY_CONVERSATION_MESSAGES : [],
+      messages:
+        agent.id === "chief"
+          ? STORY_CONVERSATION_MESSAGES
+          : agent.id === "research"
+            ? STORY_TEAM_CONVERSATION_MESSAGES
+            : [],
     },
   ]),
 );

@@ -382,12 +382,11 @@ describe("TeamApiServer conversations", () => {
         replyToMessageId: null,
       },
     });
-    expect(sendMessage).toHaveBeenCalledWith({
-      agentId: "chief",
-      text: taggedMessage,
-      attachmentDraftIds: [],
-      replyToMessageId: null,
-    });
+    // The host names the member it authenticated; the request body cannot name a sender.
+    expect(sendMessage).toHaveBeenCalledWith(
+      { agentId: "chief", text: taggedMessage, attachmentDraftIds: [], replyToMessageId: null },
+      { id: listConversationReads.mock.calls.at(-1)?.[0], name: "owner" },
+    );
     await expect(
       jsonRequest(base, "/v1/agents/chief/conversation/read", {
         token: token,
