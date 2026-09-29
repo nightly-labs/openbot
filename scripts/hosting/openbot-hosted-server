@@ -1,7 +1,7 @@
 #!/bin/bash
 # openbot.service runs this as the sandbox user. It waits for the env file that openbot-hosted-env
 # writes, starts a D-Bus session with an unlocked keyring so that Electron `safeStorage` can keep
-# the account session, and runs OpenBot on a virtual display.
+# the account session, and runs OpenBot on the boat desktop.
 set -euo pipefail
 umask 077
 state="$HOME/.config/openbot-hosted"
@@ -74,5 +74,17 @@ export GNOME_KEYRING_CONTROL
   done
 ) &
 
+# The boat desktop is a lightdm session of this user on :0, with a window manager. OpenBot shows its
+# windows there, so boat's desktop viewer and OpenBot remote desktop show the same screen, and a click
+# moves the keyboard focus to another window. After a resume, boat can start that session after this
+# service. A sandbox that has no desktop session uses a virtual display.
+for _ in $(seq 1 60); do
+  if DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority" xdpyinfo >/dev/null 2>&1; then
+    export DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority"
+    exec /opt/OpenBot/app/openbot --password-store=gnome-libsecret
+  fi
+  sleep 2
+done
+echo "The boat desktop session did not start. OpenBot uses a virtual display." >&2
 exec xvfb-run -a -s "-screen 0 1280x800x24 -nolisten tcp" \
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret

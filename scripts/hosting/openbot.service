@@ -3,7 +3,7 @@
 [Unit]
 Description=OpenBot hosted server
 Wants=network-online.target
-After=network-online.target
+After=network-online.target display-manager.service
 
 [Service]
 Type=simple

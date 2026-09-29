@@ -27,7 +27,7 @@ INSTALL=/opt/OpenBot
 
 apt-get update
 apt-get install -y --no-install-recommends \
-  apparmor ca-certificates curl dbus dbus-x11 gnome-keyring libsecret-1-0 xauth xvfb \
+  apparmor ca-certificates curl dbus dbus-x11 gnome-keyring libsecret-1-0 x11-utils xauth xvfb \
   libasound2t64 libgbm1 libgtk-3-0t64 libnss3 libxss1 \
   libcap2 libcurl4t64 libevdev2 libglib2.0-0t64 libminiupnpc17 libpulse0 libssl3t64 libva2 \
   libx11-6 libxcb-shm0 libxcb-xfixes0 libxcb1 libxfixes3 libxrandr2 libxtst6

@@ -2,7 +2,7 @@
 
 A hosted server is an OpenBot server that runs in a [boat](https://boat.dev) sandbox, so it works
 when the user's computer is off. Each server is one boat sandbox for one account. The sandbox runs
-the Linux build of OpenBot under Xvfb. The server runs while it is in use. After 15 minutes with no
+the Linux build of OpenBot on the boat desktop. The server runs while it is in use. After 15 minutes with no
 use, the Worker stops it and keeps its data. The next client starts it again, and the Worker cron
 starts it before its next routine run. A connected client counts as use for 1 hour after its last
 request or typing event (`CLIENT_USE_WINDOW_MS`). A desktop app that is open in the background keeps
@@ -286,8 +286,11 @@ template applies only to new servers. boat keeps at most 10 named snapshots for 
 
 On a server, `openbot-hosted-server` starts a D-Bus session, unlocks a gnome-keyring with a
 random password for each server (so `safeStorage` can keep the account session), and runs OpenBot
-under `xvfb-run` with `--password-store=gnome-libsecret`. The keyring files are in
-`/srv/openbot-hosted/keyrings`:
+with `--password-store=gnome-libsecret`. OpenBot uses the boat desktop: the lightdm session of the
+sandbox user on `:0`, with openbox. So boat's desktop viewer and OpenBot remote desktop show the same
+screen, and a click moves the keyboard focus to another window. After a resume, the script waits up
+to 2 minutes for that session. With no session, OpenBot runs under `xvfb-run`. The keyring files are
+in `/srv/openbot-hosted/keyrings`:
 
 - not in `~/.local/share/keyrings`: the boat image has a locked `default` keyring there, and a
   snapshot restore resets that folder after the service starts;
