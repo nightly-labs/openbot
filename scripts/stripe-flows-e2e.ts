@@ -2,7 +2,8 @@
  * End-to-end check of the hosted server plan flows against the Stripe sandbox and a local account Worker.
  * Each scenario gets its own account and a Stripe test clock, so renewals and period ends happen at once.
  * A subscription made here with the server metadata stands for a paid Checkout page: the Worker reads
- * only the subscription webhooks. Local development data only.
+ * only the subscription webhooks. Local development data only. On the `test` Worker each paid server is
+ * a real boat VM, so the check deletes the servers of each scenario when it ends.
  *
  *   bunx dotenvx run -q -f apps/auth-api/.env.shared -fk .env.keys -- \
  *     bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
@@ -93,6 +94,10 @@ type Row = z.infer<typeof rowSchema>;
 
 const createdSchema = z.object({ server: z.object({ serverId: z.string() }), checkoutUrl: z.string().nullable() });
 const checkoutSchema = z.object({ checkoutUrl: z.string().nullable() });
+const serverListSchema = z.object({
+  servers: z.array(z.object({ serverId: z.string(), name: z.string(), state: z.string() })),
+});
+const sandboxIdSchema = z.object({ provider_sandbox_id: z.string() });
 const planSchema = z.object({
   subscriptionId: z.string(),
   plan: z.string(),
@@ -155,12 +160,21 @@ async function stripe<T>(
 }
 
 /** The `boat` scenario only. The development key from `.env.shared` reads the VM of the test server. */
-async function boat(method: "GET" | "POST", path: string, body?: { command: string; timeoutSeconds: number }) {
+async function boat(
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+  body?: { command: string; timeoutSeconds: number },
+) {
   const key = process.env.BOAT_API_KEY ?? "";
   if (!key.startsWith("boat_")) throw new Error("BOAT_API_KEY must be the development boat key.");
   const response = await fetch(`https://boat.dev/api/v1${path}`, {
     method,
-    headers: { Authorization: `Bearer ${key}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      // boat deletes a sandbox only when this header names it.
+      ...(method === "DELETE" ? { "X-Ascii-Confirm-Delete": path.split("/").at(-1) ?? "" } : {}),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   return { status: response.status, body: z.unknown().parse(await response.json().catch(() => null)) };
@@ -210,6 +224,13 @@ class Account {
     const now = Date.now();
     const hash = createHash("sha256").update(this.token).digest("base64url");
     const id = quote(this.id);
+    // A run that stopped early can leave a VM. Delete it before its row, so that no VM stays without a row.
+    const left = d1(
+      `SELECT provider_sandbox_id FROM hosted_servers
+       WHERE owner_user_id = ${id} AND provider_sandbox_id IS NOT NULL AND deleted_at IS NULL`,
+      sandboxIdSchema,
+    );
+    for (const row of left) await boat("DELETE", `/sandboxes/${row.provider_sandbox_id}`);
     d1(
       [
         `DELETE FROM hosted_servers WHERE owner_user_id = ${id}`,
@@ -273,6 +294,18 @@ class Account {
     );
     if (response.status !== 201) throw new Error(`create ${response.status}: ${response.code}`);
     return createdSchema.parse(response.body);
+  }
+
+  /**
+   * Deletes the servers of this account through the Worker. On the `test` Worker a paid server is a real
+   * VM, so no VM or plan stays after the scenario.
+   */
+  async tearDown() {
+    const listed = serverListSchema.safeParse((await this.request("GET", "v2/hosting/servers")).body).data;
+    for (const server of listed?.servers ?? []) {
+      if (server.state === "deleted") continue;
+      await this.request("DELETE", `v2/hosting/servers/${server.serverId}`, { confirmName: server.name });
+    }
   }
 
   async checkout(serverId: string) {
@@ -735,7 +768,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async renew(account) {
-    const { server } = await account.createServer("Renew");
+    const { server } = await account.createServer("Renew plan");
     const sub = await account.pay(server.serverId);
     await provisioned(account, server.serverId);
     await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
@@ -823,6 +856,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { row, stored },
     );
     await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
+    await victim.tearDown();
     await stripe("DELETE", `/v1/test_helpers/test_clocks/${victim.clock}`, idSchema).catch(() => null);
   },
 
@@ -1150,12 +1184,17 @@ async function main(args: string[]) {
   const run = chosen.length > 0 ? chosen : SCENARIOS.filter((scenario) => scenario !== "boat");
   const clocks: string[] = [];
   for (const scenario of run) {
+    let account: Account | null = null;
     try {
-      const account = await new Account(scenario, api).setUp();
+      account = await new Account(scenario, api).setUp();
       clocks.push(account.clock);
       await scenarios[scenario](account);
     } catch (error) {
       record(scenario, "scenario finished", false, error instanceof Error ? error.message : String(error));
+    } finally {
+      await account?.tearDown().catch((error: unknown) => {
+        record(scenario, "servers deleted", false, error instanceof Error ? error.message : String(error));
+      });
     }
   }
   if (chrome) await (await chrome).close();
