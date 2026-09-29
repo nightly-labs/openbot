@@ -145,8 +145,12 @@ export class AgentImportService {
     return this.#stageFile(path, owner, false);
   }
 
-  /** Stages an export a member sent. The service keeps the file until apply, discard or expiry. */
-  async stageUpload(bytes: Uint8Array, owner: string): Promise<AgentImportPreview> {
+  /**
+   * Stages an export a member sends. The slot is taken before `read` receives the body, so parallel
+   * uploads cannot hold more than the limit in memory. The service keeps the file until apply,
+   * discard or expiry.
+   */
+  async stageUpload(read: () => Promise<Uint8Array>, owner: string): Promise<AgentImportPreview> {
     const directory = this.uploadDirectory;
     if (!directory) throw new Error("Agent import uploads are not available.");
     this.#release(owner);
@@ -154,6 +158,7 @@ export class AgentImportService {
     if (held + this.#busyUploads >= UPLOAD_SLOTS) throw new Error(sourceText("error.import.hostBusy"));
     this.#busyUploads += 1;
     try {
+      const bytes = await read();
       this.#uploadDirectoryReady ??= rm(directory, { recursive: true, force: true })
         .then(() => mkdir(directory, { recursive: true, mode: 0o700 }).then(() => undefined))
         .catch((error: unknown) => {

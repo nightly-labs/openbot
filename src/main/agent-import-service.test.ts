@@ -542,7 +542,7 @@ describe("AgentImportService", () => {
   it("keeps a member's upload to that member and removes its file when it closes", async () => {
     const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
     const uploads = join(root, "uploads");
-    const applied = await service.stageUpload(bytes, "member-a");
+    const applied = await service.stageUpload(async () => bytes, "member-a");
     const input = { token: applied.token, keys: ["research"], channelKeys: [] };
     // Another member, and the local user, read the token as closed and cannot release it.
     await expect(service.apply(input, member("member-b"))).rejects.toThrow("no longer open");
@@ -553,7 +553,7 @@ describe("AgentImportService", () => {
     expect((await service.apply(input, member("member-a"))).agents.map((agent) => agent.name)).toEqual(["Research"]);
     expect(await readdir(uploads)).toEqual([]);
 
-    const discarded = await service.stageUpload(bytes, "member-a");
+    const discarded = await service.stageUpload(async () => bytes, "member-a");
     service.discard(discarded.token, "member-a");
     await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
   });
@@ -563,7 +563,7 @@ describe("AgentImportService", () => {
     const uploads = join(root, "uploads");
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
-      const staged = await service.stageUpload(bytes, "member-a");
+      const staged = await service.stageUpload(async () => bytes, "member-a");
       expect(await readdir(uploads)).toHaveLength(1);
       vi.advanceTimersByTime(30 * 60_000);
       await expect(
@@ -575,6 +575,15 @@ describe("AgentImportService", () => {
     await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
   });
 
+  it("refuses a fifth upload before it reads the body", async () => {
+    const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    for (const owner of ["member-a", "member-b", "member-c", "member-d"])
+      await service.stageUpload(async () => bytes, owner);
+    const read = vi.fn(async () => bytes);
+    await expect(service.stageUpload(read, "member-e")).rejects.toThrow("reading other exports");
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it("installs a skill the server already has as it is when a member imports", async () => {
     const files = {
       "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
@@ -582,7 +591,7 @@ describe("AgentImportService", () => {
     };
     const local = await service.stage(await exportFile(files));
     await service.apply({ token: local.token, keys: ["research"], channelKeys: [] });
-    const upload = await service.stageUpload(zipSync(files), "member-a");
+    const upload = await service.stageUpload(async () => zipSync(files), "member-a");
     const result = await service.apply(
       { token: upload.token, keys: ["research"], channelKeys: [] },
       member("member-a"),

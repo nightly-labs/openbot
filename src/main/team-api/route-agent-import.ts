@@ -35,12 +35,13 @@ export async function routeAgentImport(
     return json(200, {});
   }
   if (route === AGENT_IMPORT_ROUTES.stage) {
-    const bytes = await readBinary(request, AGENT_IMPORT_UPLOAD_BYTES).catch((error: unknown) => {
-      if (error instanceof HttpError && error.status === 413)
-        throw new HttpError(413, sourceText("error.import.remoteZipTooLarge"));
-      throw error;
-    });
-    return json(200, await answer(() => agentImport.stageUpload(bytes, member.id), 400));
+    const read = () =>
+      readBinary(request, AGENT_IMPORT_UPLOAD_BYTES).catch((error: unknown) => {
+        if (error instanceof HttpError && error.status === 413)
+          throw new HttpError(413, sourceText("error.import.remoteZipTooLarge"));
+        throw error;
+      });
+    return json(200, await answer(() => agentImport.stageUpload(read, member.id), 400));
   }
   // `readJson` has already run the body through the agent-import wire codec.
   const body = await readJson(request);
@@ -75,6 +76,7 @@ async function answer<T>(run: () => Promise<T>, status: number): Promise<T> {
   try {
     return await run();
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     if (error instanceof Error && !("code" in error)) throw new HttpError(status, error.message);
     throw error;
   }

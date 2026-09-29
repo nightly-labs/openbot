@@ -42,8 +42,8 @@ function createAgentImport(): NonNullable<TeamApiOptions["agentImport"]> & {
   return {
     staged,
     applied,
-    stageUpload: async (bytes, owner) => {
-      staged.push({ bytes: [...bytes], owner });
+    stageUpload: async (read, owner) => {
+      staged.push({ bytes: [...(await read())], owner });
       return preview;
     },
     apply: async (_input, caller): Promise<AgentImportResult> => {
