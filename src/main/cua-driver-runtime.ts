@@ -785,18 +785,31 @@ async function assertPrivateDirectory(directory: string): Promise<void> {
   }
 }
 
-/** Whether something accepts on `path`. `message` is sent to it before the connection ends. */
+/**
+ * Whether something accepts on `path`. `message` is sent to it, and then the connection closes.
+ *
+ * A connect that does not finish in time counts as refused, so a daemon that hangs cannot hold the
+ * start past the deadline of its caller.
+ */
 function accepts(path: string, message = ""): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect(path);
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve(false);
+    }, READY_POLL_MS);
     socket.once("connect", () => {
-      socket.end(message);
-      // The reply is not read. Draining it lets the connection close when the daemon closes its end.
-      socket.resume();
+      clearTimeout(timer);
       resolve(true);
+      // The reply is not read. The message is in the daemon's buffer once it is written.
+      socket.end(message, () => socket.destroy());
     });
     // An error after the connection is up also ends up here, and changes nothing.
-    socket.on("error", () => resolve(false));
+    socket.on("error", () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(false);
+    });
   });
 }
 

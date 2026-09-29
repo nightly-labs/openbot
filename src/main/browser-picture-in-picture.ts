@@ -125,6 +125,8 @@ export class BrowserPictureInPicture {
     await (developmentUrl
       ? window.loadURL(new URL("browser-pip.html", `${developmentUrl}/`).toString())
       : window.loadURL("openbot-app://app/browser-pip.html"));
+    // The system can close the window during the load, and the `closed` handler closes the controls.
+    if (controlsView.webContents.isDestroyed()) return bounds;
     await (developmentUrl
       ? controlsView.webContents.loadURL(new URL("browser-pip-controls.html", `${developmentUrl}/`).toString())
       : controlsView.webContents.loadURL("openbot-app://app/browser-pip-controls.html"));

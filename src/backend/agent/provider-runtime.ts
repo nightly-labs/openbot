@@ -527,13 +527,13 @@ export class ProviderRuntime implements ProviderPort {
                 ),
               );
             } else {
-              if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return;
               const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) {
                 collected.set(provider, kept);
                 this.#emit({ type: "usage-changed", usage: { limits: [...collected.values()] } });
                 return;
               }
+              if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return;
               if (!this.#clients.has(provider)) await this.ensureProvider(provider);
               const client = this.#clients.get(provider);
               if (!client) return;
