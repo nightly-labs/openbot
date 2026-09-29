@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenBot host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=OPENBOT_HEADLESS=1
+Environment=OPENBOT_APPIMAGE=%h/OpenBot.AppImage
+ExecStart=%h/.local/bin/openbot-vps
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

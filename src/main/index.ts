@@ -17,6 +17,7 @@ import {
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { readHeadlessMode } from "./headless-mode";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
 import { accountIpcHandlers } from "./ipc/account-handlers";
 import { agentAdminIpcHandlers } from "./ipc/agent-admin-handlers";
@@ -91,6 +92,10 @@ const developmentRemoteRole =
     ? process.env.OPENBOT_DEV_REMOTE_ROLE
     : null;
 const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_TEST_CLIENT_ENABLED === "1";
+const headless = readHeadlessMode(process.env, process.argv);
+if (headless) {
+  logger.info("Headless host mode is on. The main window stays hidden; connect from another client.");
+}
 const developmentInviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
 };
@@ -258,6 +263,7 @@ const windows = createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  headless,
   isQuitting: () => isQuitting,
   getServices: () => services,
   getTranslate: () => services?.language.translate ?? translateFor(resolveLocale("system", app.getLocale())),
@@ -281,7 +287,7 @@ const windows = createMainWindowController({
  * and the driver running with no way back to them.
  */
 function attachQuitOnMainWindowClose(window: BrowserWindow): void {
-  if (process.platform === "darwin") return;
+  if (process.platform === "darwin" || headless) return;
   window.on("closed", () => {
     // `quit`, not a teardown of its own: `before-quit` below is what OpenBot shuts down through,
     // and it already ignores a second request while the first one runs.
@@ -657,8 +663,8 @@ if (!hasSingleInstanceLock) {
       hasMainWindow,
       started: services !== null,
     });
-    if (response === "present" && window) showMainWindow(window);
-    else if (response === "reopen") reopenMainWindow();
+    if (!headless && response === "present" && window) showMainWindow(window);
+    else if (!headless && response === "reopen") reopenMainWindow();
     else if (response === "relaunch" && !relaunchRequested) {
       relaunchRequested = true;
       // The new instance takes this launch's link, not the one this process may have started with.
@@ -872,6 +878,7 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on("window-all-closed", () => {
+  if (headless) return;
   if (process.platform !== "darwin") app.quit();
 });
 

@@ -73,6 +73,9 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 
 Voice prompts and remote desktop are not available on Linux.
 
+To leave the Linux app running on a VPS, see [VPS host](docs/vps-host.md). That path still runs this
+desktop app under Xvfb. It is not a separate server.
+
 > [!IMPORTANT]
 > The Windows preview is not code-signed. Windows can show an `Unknown publisher` or SmartScreen
 > warning. Check the release checksum or GitHub build attestation before you run the installer.
