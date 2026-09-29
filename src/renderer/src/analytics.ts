@@ -11,11 +11,14 @@ import {
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
+import { MARKETPLACE_PLUGINS } from "./features/settings/marketplace-plugin-catalog";
 
 export const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 const MAX_PENDING_EVENTS = 100;
-const ANALYTICS_SCHEMA_VERSION = 5;
+const ANALYTICS_SCHEMA_VERSION = 6;
+const CURATED_LISTING_PATTERN = /^openbot-curated-(?:skill|agent)-([a-z0-9][a-z0-9-]{0,63})$/u;
+const PLUGIN_SLUGS = new Set(MARKETPLACE_PLUGINS.map((plugin) => plugin.slug));
 
 type ServerKind = "local" | "remote" | "unknown";
 type AnalyticsResult = "succeeded" | "failed";
@@ -123,10 +126,12 @@ export interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   marketplace_action: {
-    entity: "skill" | "agent";
+    entity: "skill" | "agent" | "plugin";
     action: "view" | "install" | "update" | "uninstall" | "publish" | "enable" | "disable";
     result: AnalyticsResult;
     failure_code?: string;
+    /** A listing id or plugin slug. Only OpenBot's own curated listings and plugins are sent. */
+    listing_slug?: string;
   };
   memory_action: {
     action: "create" | "update" | "delete" | "clear";
@@ -220,7 +225,7 @@ const EVENT_PROPERTY_ALLOWLIST = {
   search_action: ["scope", "result", "result_count", "failure_code"],
   remote_desktop_action: ["action", "result", "transport", "failure_code"],
   update_action: ["action", "result", "phase", "failure_code"],
-  marketplace_action: ["entity", "action", "result", "failure_code"],
+  marketplace_action: ["entity", "action", "result", "failure_code", "listing_slug"],
   memory_action: ["action", "result", "failure_code"],
   provider_action: ["provider", "action", "result", "failure_code"],
   voice_transcription: ["result", "audio_duration_seconds", "duration_ms", "failure_code"],
@@ -416,6 +421,7 @@ function sanitizeDesktopProperty(
     if (!Array.isArray(value)) return undefined;
     return value.flatMap((item) => (isString(item) ? (CHANGED_FIELDS.get(item) ?? []) : [])).slice(0, 16);
   }
+  if (key === "listing_slug") return isString(value) ? listingSlug(value) : undefined;
   if (key === "trigger_type") return isString(value) && ROUTINE_TRIGGER_TYPES.has(value) ? value : undefined;
   if (key === "phase") return isString(value) && UPDATE_PHASES.has(value) ? value : undefined;
   if (key === "from_version" || key === "to_version") {
@@ -435,7 +441,7 @@ function sanitizeDesktopProperty(
   const enumValues: Record<string, readonly string[] | undefined> = {
     channel: ["agent", "direct"],
     decision: ["answered", "accept", "decline"],
-    entity: ["skill", "agent"],
+    entity: ["skill", "agent", "plugin"],
     kind: ["prompt", "approval"],
     role: ["admin", "member"],
     scope: ["global", "agent"],
@@ -443,6 +449,12 @@ function sanitizeDesktopProperty(
     transport: ["unknown", "p2p", "relay"],
   };
   return safeEnum(value, enumValues[key]);
+}
+
+/** The slug of a curated skill, agent or plugin. A community listing's id or slug is the author's. */
+function listingSlug(value: string): string | undefined {
+  if (PLUGIN_SLUGS.has(value)) return value;
+  return CURATED_LISTING_PATTERN.exec(value)?.[1];
 }
 
 function safeEnum(value: unknown, allowed: readonly string[] | undefined): string | undefined {

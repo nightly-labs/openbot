@@ -117,7 +117,7 @@ import { type RoutineMutationOptions, RoutineScheduler } from "./agent/routine-s
 import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
 import type { AgentSidebar } from "./agent/sidebar-tools";
 import type { LocalSkillTools } from "./agent/skill-tools";
-import { isRequestTimeout, providerForAgent, providerLabel } from "./agent/thread-items";
+import { isRequestTimeout, providerForAgent, providerLabel, type ToolUsageSignal } from "./agent/thread-items";
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
 import type { AgentProvider } from "./agent-client";
@@ -151,6 +151,8 @@ export type { ResolvedSharedFile } from "./workspace-paths";
 
 interface AgentServiceEvents {
   event: [event: AgentEvent];
+  /** Finished tool steps for the local host's product analytics. Never forwarded to a client. */
+  toolUsage: [usage: ToolUsageSignal];
 }
 
 export interface AgentServiceOptions {
@@ -713,6 +715,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
+        emitToolUsage: (usage) => this.emit("toolUsage", usage),
       },
     });
     this.#removal = new AgentRemoval({

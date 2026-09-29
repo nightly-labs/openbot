@@ -4,13 +4,19 @@ import {
   type AgentEvent,
   type AgentSummary,
   type CentralAuthUser,
+  COMPUTER_USE_MCP_SERVER_NAME,
   type ConversationMessage,
   hostedSiteConversationEvent,
   isAgentModel,
+  parseRoutineRunConversationEventItemType,
+  type RoutineRunConversationEventStatus,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isFunction, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
+import { parse as parseDomain } from "tldts";
+import type { ToolUsageSignal } from "../backend/agent/thread-items";
+import type { BrowserSiteVisit } from "../backend/browser-host";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
@@ -26,7 +32,46 @@ const MAX_PENDING_EVENTS = 100;
 const MAX_ACTIVE_TURNS = 1_000;
 const MAX_HOSTED_SITE_OPERATIONS = 10_000;
 const ACTIVE_TURN_TTL_MS = 24 * 60 * 60 * 1_000;
-const ANALYTICS_SCHEMA_VERSION = 5;
+const MAX_TOOL_ROWS_PER_TURN = 32;
+const MAX_SITE_TABS = 1_000;
+const MAX_ROUTINE_RUNS = 10_000;
+const MAX_INVENTORY_ITEMS = 32;
+const ANALYTICS_SCHEMA_VERSION = 6;
+const CURATED_AGENT_PREFIX = "openbot-curated-agent-";
+const LISTING_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+const TOOL_NAME_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/u;
+const TOOL_KINDS = [
+  "command",
+  "file_change",
+  "file_read",
+  "web_search",
+  "web_fetch",
+  "mcp",
+  "openbot",
+  "browser",
+  "computer_use",
+  "image_generation",
+  "subagent",
+  "other",
+] as const;
+// OpenBot's own tool servers. Every other server name is the user's, so only these and catalog
+// plugins keep their tool names.
+const BUILTIN_TOOL_SERVERS = new Map<string, (typeof TOOL_KINDS)[number]>([
+  ["openbot", "openbot"],
+  ["openbot_browser", "browser"],
+  [COMPUTER_USE_MCP_SERVER_NAME, "computer_use"],
+]);
+const ROUTINE_TERMINAL_STATUSES = ["succeeded", "failed", "interrupted", "cancelled"] as const;
+const ROUTINE_TRIGGER_TYPES = [
+  "hourly",
+  "daily",
+  "weekdays",
+  "weekly",
+  "monthly",
+  "interval",
+  "advanced",
+  "custom",
+] as const;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
 type AnalyticsOperationKind = "clear" | "identify" | "track";
@@ -37,6 +82,10 @@ type HostEventName =
   | "system_turn_completed"
   | "system_agent_input_requested"
   | "system_operation_failed"
+  | "system_tool_used"
+  | "system_site_visited"
+  | "system_routine_run"
+  | "system_inventory"
   | "hosted_site_action";
 export type HostOpenPanelClient = Pick<OpenPanelBase, "setGlobalProperties" | "track" | "identify" | "clear">;
 type ClientFactory = (options: OpenPanelOptions) => HostOpenPanelClient;
@@ -54,15 +103,45 @@ export interface HostAnalyticsOptions {
   platform: "darwin" | "win32" | "linux";
   resolveOwner: () => AnalyticsIdentity | null;
   resolveAgent: (agentId: string) => AgentSummary | null;
+  /** The catalog plugin slug of a user-configured MCP server, or `null` for a custom server. */
+  resolveMcpServer?: (name: string) => string | null;
+  resolveRoutineRun?: (agentId: string, routineId: string, runId: string) => AnalyticsRoutineRun | null;
+  resolveInventory?: () => Promise<AnalyticsInventory>;
+  inventoryDay?: AnalyticsInventoryDayStore;
 }
 
+export interface AnalyticsRoutineRun {
+  runKind: "scheduled" | "manual";
+  triggerType: string;
+}
+
+/** Counts and closed-set names only: never a user-authored name, URL or command. */
+export interface AnalyticsInventory {
+  agentCount: number;
+  enabledRoutineCount: number;
+  customMcpServerCount: number;
+  plugins: string[];
+  curatedSkills: string[];
+  curatedAgents: string[];
+  localSkillCount: number;
+  communitySkillCount: number;
+  providers: string[];
+  computerUseEnabled: boolean;
+}
+
+/** The local day of the last inventory event. `malformed` counts as sent today. */
+export interface AnalyticsInventoryDayStore {
+  read(): Promise<string | "missing" | "malformed">;
+  write(day: string): Promise<void>;
+}
+
+const AGENT_PROPERTY_NAMES = ["provider", "model", "reasoning_effort", "agent_source", "agent_listing"] as const;
+
 const HOST_ALLOWLIST = {
-  system_turn_started: ["provider", "model", "reasoning_effort", "origin"],
-  system_turn_completed: ["provider", "model", "reasoning_effort", "origin", "status", "duration_ms"],
+  system_turn_started: [...AGENT_PROPERTY_NAMES, "origin"],
+  system_turn_completed: [...AGENT_PROPERTY_NAMES, "origin", "status", "duration_ms"],
   system_agent_input_requested: [
-    "provider",
-    "model",
-    "reasoning_effort",
+    ...AGENT_PROPERTY_NAMES,
     "origin",
     "kind",
     "prompt_count",
@@ -70,22 +149,44 @@ const HOST_ALLOWLIST = {
     "approval_kind",
   ],
   system_operation_failed: ["provider", "model", "reasoning_effort", "area", "failure_code"],
+  system_tool_used: [...AGENT_PROPERTY_NAMES, "origin", "tool_kind", "plugin", "tool", "call_count", "failed_count"],
+  system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
+  system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "trigger_type"],
+  system_inventory: [
+    "agent_count",
+    "enabled_routine_count",
+    "custom_mcp_server_count",
+    "plugins",
+    "curated_skills",
+    "curated_agents",
+    "local_skill_count",
+    "community_skill_count",
+    "providers",
+    "computer_use_enabled",
+  ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
 
 type HostPropertyName = (typeof HOST_ALLOWLIST)[HostEventName][number];
-type HostProperties = Partial<Record<HostPropertyName, string | number | boolean>>;
+type HostPropertyValue = string | number | boolean | readonly string[];
+type HostProperties = Partial<Record<HostPropertyName, HostPropertyValue>>;
 type HostPendingEvent = { name: HostEventName; properties: HostProperties; timestamp: string };
+type ToolUseRow = { kind: string; plugin?: string; tool?: string; calls: number; failed: number };
 type ActiveTurn = {
   startedAt: number;
   origin: string;
   owner: AnalyticsIdentity | null;
   ownerResolutionPending: boolean;
+  tools: Map<string, ToolUseRow>;
 };
 
 export class HostAnalytics {
   readonly #resolveOwner: HostAnalyticsOptions["resolveOwner"];
   readonly #resolveAgent: HostAnalyticsOptions["resolveAgent"];
+  readonly #resolveMcpServer: NonNullable<HostAnalyticsOptions["resolveMcpServer"]>;
+  readonly #resolveRoutineRun: NonNullable<HostAnalyticsOptions["resolveRoutineRun"]>;
+  readonly #resolveInventory: HostAnalyticsOptions["resolveInventory"];
+  readonly #inventoryDayStore: HostAnalyticsOptions["inventoryDay"];
   readonly #client: HostOpenPanelClient | null;
   #identifiedOwner: AnalyticsIdentity | null = null;
   #trackingEnabled: boolean;
@@ -94,11 +195,20 @@ export class HostAnalytics {
   readonly #activeTurns = new Map<string, ActiveTurn>();
   readonly #hostedSiteOwners = new Map<string, AnalyticsIdentity | null>();
   readonly #hostedSiteTerminalOperations = new Set<string>();
+  readonly #siteDomains = new Map<string, string>();
+  readonly #routineRunOwners = new Map<string, AnalyticsIdentity | null>();
+  readonly #routineRunReports = new Set<string>();
+  #inventoryDay: string | null = null;
+  #inventoryCheck: Promise<void> | null = null;
   readonly #operationQueue: AnalyticsOperationQueue = { active: false, operations: [] };
 
   constructor(options: HostAnalyticsOptions, createClient: ClientFactory = createOpenPanelClient) {
     this.#resolveOwner = options.resolveOwner;
     this.#resolveAgent = options.resolveAgent;
+    this.#resolveMcpServer = options.resolveMcpServer ?? (() => null);
+    this.#resolveRoutineRun = options.resolveRoutineRun ?? (() => null);
+    this.#resolveInventory = options.resolveInventory;
+    this.#inventoryDayStore = options.inventoryDay;
     this.#trackingEnabled = options.trackingEnabled ?? true;
     if (!options.enabled) {
       this.#client = null;
@@ -122,6 +232,7 @@ export class HostAnalytics {
   handleAgentEvent(event: AgentEvent): void {
     if (event.type === "conversation" && this.#client && this.#trackingEnabled) {
       this.#handleHostedSiteConversation(event.snapshot.messages);
+      this.#handleRoutineRunConversation(event.snapshot.agentId, event.snapshot.messages);
     }
     if (!this.#client || !this.#trackingEnabled) return;
     switch (event.type) {
@@ -138,6 +249,7 @@ export class HostAnalytics {
           origin: event.origin ?? "unknown",
           owner,
           ownerResolutionPending: owner === null && this.#bufferOwnerlessEvents,
+          tools: new Map(),
         });
         this.#track(
           "system_turn_started",
@@ -147,6 +259,7 @@ export class HostAnalytics {
           },
           owner,
         );
+        this.#checkInventory();
         return;
       }
       case "turn-completed": {
@@ -166,6 +279,21 @@ export class HostAnalytics {
           },
           activeTurn?.owner,
         );
+        for (const row of activeTurn?.tools.values() ?? []) {
+          this.#track(
+            "system_tool_used",
+            {
+              ...this.#agentProperties(event.agentId),
+              origin,
+              tool_kind: row.kind,
+              ...(row.plugin ? { plugin: row.plugin } : {}),
+              ...(row.tool ? { tool: row.tool } : {}),
+              call_count: row.calls,
+              failed_count: row.failed,
+            },
+            activeTurn?.owner,
+          );
+        }
         return;
       }
       case "prompt":
@@ -205,6 +333,37 @@ export class HostAnalytics {
     }
   }
 
+  /** Counts one finished tool step. The turn's rows are sent when the turn completes. */
+  handleToolUsage(usage: ToolUsageSignal): void {
+    if (!this.#client || !this.#trackingEnabled) return;
+    const turn = this.#activeTurns.get(usage.turnId);
+    if (!turn) return;
+    const row = this.#toolUseRow(usage);
+    const key = `${row.kind}\u0000${row.plugin ?? ""}\u0000${row.tool ?? ""}`;
+    const existing = turn.tools.get(key);
+    if (!existing && turn.tools.size >= MAX_TOOL_ROWS_PER_TURN) return;
+    const target = existing ?? row;
+    target.calls += 1;
+    if (usage.failed) target.failed += 1;
+    if (!existing) turn.tools.set(key, target);
+  }
+
+  /** Reports a tab that reached a new registrable domain. The hostname itself is never sent. */
+  handleSiteVisit(visit: BrowserSiteVisit): void {
+    if (!this.#client || !this.#trackingEnabled) return;
+    const domain = analyticsDomain(visit.hostname);
+    if (!domain || this.#siteDomains.get(visit.tabId) === domain) return;
+    this.#siteDomains.delete(visit.tabId);
+    this.#siteDomains.set(visit.tabId, domain);
+    while (this.#siteDomains.size > MAX_SITE_TABS) {
+      const oldest = this.#siteDomains.keys().next();
+      if (oldest.done) break;
+      this.#siteDomains.delete(oldest.value);
+    }
+    const agentProperties = visit.actor === "agent" && visit.agentId ? this.#agentProperties(visit.agentId) : {};
+    this.#track("system_site_visited", { ...agentProperties, domain, actor: visit.actor });
+  }
+
   flushPending(): void {
     if (!this.#client || !this.#trackingEnabled) return;
     const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
@@ -216,6 +375,7 @@ export class HostAnalytics {
       activeTurn.ownerResolutionPending = false;
     }
     this.#flushPendingForOwner(owner);
+    this.#checkInventory();
   }
 
   clear(): void {
@@ -234,6 +394,8 @@ export class HostAnalytics {
     if (!enabled) {
       this.#hostedSiteOwners.clear();
       this.#activeTurns.clear();
+      this.#siteDomains.clear();
+      this.#routineRunOwners.clear();
       this.clear();
       this.#operationQueue.operations = [];
       this.#enqueue("clear", () => this.#client?.clear());
@@ -292,6 +454,109 @@ export class HostAnalytics {
     }
   }
 
+  /**
+   * Reports a routine run's outcome. Like hosted sites, only a run that this process saw running is
+   * reported, so a history replay after a restart sends nothing. The message text is the routine
+   * name and is never read.
+   */
+  #handleRoutineRunConversation(agentId: string, messages: readonly ConversationMessage[]): void {
+    const events = messages.flatMap((message) => {
+      if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return [];
+      const event = parseRoutineRunConversationEventItemType(message.itemType);
+      return event ? [event] : [];
+    });
+    const laterStatuses = new Set(events.filter((event) => event.status !== "running").map((event) => event.runId));
+    const observedRunning = new Set(this.#routineRunOwners.keys());
+    for (const event of events) {
+      if (event.status === "running") {
+        if (laterStatuses.has(event.runId) || this.#routineRunOwners.has(event.runId)) continue;
+        this.#routineRunOwners.set(event.runId, normalizeAnalyticsIdentity(this.#resolveOwner()));
+        continue;
+      }
+      if (!observedRunning.has(event.runId)) continue;
+      const reportKey = `${event.runId}:${event.status}`;
+      if (this.#routineRunReports.has(reportKey)) continue;
+      this.#routineRunReports.add(reportKey);
+      const owner = this.#routineRunOwners.get(event.runId) ?? null;
+      if (isRoutineRunFinished(event.status)) this.#routineRunOwners.delete(event.runId);
+      if (!owner) continue;
+      const run = safely(() => this.#resolveRoutineRun(agentId, event.routineId, event.runId));
+      this.#trackForOwner(
+        "system_routine_run",
+        {
+          ...this.#agentProperties(agentId),
+          status: event.status,
+          ...(run ? { run_kind: run.runKind, trigger_type: run.triggerType } : {}),
+        },
+        owner,
+        false,
+      );
+    }
+    while (this.#routineRunOwners.size > MAX_ROUTINE_RUNS) {
+      const oldest = this.#routineRunOwners.keys().next();
+      if (oldest.done) break;
+      this.#routineRunOwners.delete(oldest.value);
+    }
+    while (this.#routineRunReports.size > MAX_ROUTINE_RUNS) {
+      const oldest = this.#routineRunReports.values().next();
+      if (oldest.done) break;
+      this.#routineRunReports.delete(oldest.value);
+    }
+  }
+
+  #toolUseRow(usage: ToolUsageSignal): ToolUseRow {
+    const server = usage.server;
+    if (usage.kind !== "mcp" || !server) return { kind: usage.kind, calls: 0, failed: 0 };
+    const builtinKind = BUILTIN_TOOL_SERVERS.get(server);
+    const plugin = builtinKind ? "builtin" : (safely(() => this.#resolveMcpServer(server)) ?? "custom");
+    const tool = plugin !== "custom" && usage.tool && TOOL_NAME_PATTERN.test(usage.tool) ? usage.tool : undefined;
+    return { kind: builtinKind ?? "mcp", plugin, ...(tool ? { tool } : {}), calls: 0, failed: 0 };
+  }
+
+  /** Sends the inventory at most once per local day. It needs an owner, so it waits for sign-in. */
+  #checkInventory(): void {
+    const today = localDay(new Date());
+    if (this.#inventoryDay === today || this.#inventoryCheck) return;
+    const resolveInventory = this.#resolveInventory;
+    const store = this.#inventoryDayStore;
+    if (!this.#client || !this.#trackingEnabled || !resolveInventory || !store) return;
+    if (!normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+    this.#inventoryCheck = (async () => {
+      const stored = await store.read();
+      if (stored === today || stored === "malformed") {
+        this.#inventoryDay = today;
+        return;
+      }
+      const inventory = await resolveInventory();
+      const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
+      if (!owner || !this.#trackingEnabled) return;
+      this.#inventoryDay = today;
+      await store.write(today);
+      this.#trackForOwner(
+        "system_inventory",
+        {
+          agent_count: inventory.agentCount,
+          enabled_routine_count: inventory.enabledRoutineCount,
+          custom_mcp_server_count: inventory.customMcpServerCount,
+          plugins: inventory.plugins,
+          curated_skills: inventory.curatedSkills,
+          curated_agents: inventory.curatedAgents,
+          local_skill_count: inventory.localSkillCount,
+          community_skill_count: inventory.communitySkillCount,
+          providers: inventory.providers,
+          computer_use_enabled: inventory.computerUseEnabled,
+        },
+        owner,
+      );
+    })()
+      .catch(() => {
+        // Analytics must never change host behavior. The next check tries again.
+      })
+      .finally(() => {
+        this.#inventoryCheck = null;
+      });
+  }
+
   #trackForOwner(name: HostEventName, properties: HostProperties, owner: AnalyticsIdentity, flushPending = true): void {
     const sanitized = sanitizeHostEvent(name, properties);
     if (flushPending) this.#flushPendingForOwner(owner);
@@ -345,7 +610,16 @@ export class HostAnalytics {
 
   #agentProperties(agentId: string): HostProperties {
     const agent = this.#resolveAgent(agentId);
-    return agent ? { provider: agent.provider, model: agent.model, reasoning_effort: agent.reasoningEffort } : {};
+    if (!agent) return {};
+    const listingId = agent.marketplaceSource?.listingId;
+    const listing = listingId?.startsWith(CURATED_AGENT_PREFIX) ? listingId.slice(CURATED_AGENT_PREFIX.length) : null;
+    return {
+      provider: agent.provider,
+      model: agent.model,
+      reasoning_effort: agent.reasoningEffort,
+      agent_source: listing ? "curated" : listingId ? "community" : "custom",
+      ...(listing ? { agent_listing: listing } : {}),
+    };
   }
 
   #pruneActiveTurns(now: number): void {
@@ -398,6 +672,15 @@ export class HostAnalytics {
   }
 }
 
+/** Runs a resolver whose failure must not reach the host, which has already done its work. */
+function safely<T>(resolve: () => T | null): T | null {
+  try {
+    return resolve();
+  } catch {
+    return null;
+  }
+}
+
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return isDynamicRecord(value) && isFunction(value.then);
 }
@@ -420,7 +703,7 @@ export function sanitizeHostEvent(name: HostEventName, properties: HostPropertie
   );
 }
 
-function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): string | number | boolean | undefined {
+function sanitizeHostProperty(name: HostEventName, key: string, value: unknown): HostPropertyValue | undefined {
   if (key === "failure_code") {
     return isString(value)
       ? name === "hosted_site_action"
@@ -441,6 +724,37 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   if (key === "origin") {
     return isOneOf(["user", "routine", "agent", "unknown"] as const, value) ? value : undefined;
   }
+  if (name === "system_routine_run") {
+    if (key === "status") {
+      return isOneOf([...ROUTINE_TERMINAL_STATUSES, "needs-attention"] as const, value) ? value : undefined;
+    }
+    if (key === "run_kind") return isOneOf(["scheduled", "manual"] as const, value) ? value : undefined;
+    if (key === "trigger_type") return isOneOf(ROUTINE_TRIGGER_TYPES, value) ? value : undefined;
+  }
+  if (name === "system_tool_used") {
+    if (key === "tool_kind") return isOneOf(TOOL_KINDS, value) ? value : undefined;
+    if (key === "plugin") {
+      return isString(value) && (value === "builtin" || value === "custom" || LISTING_SLUG_PATTERN.test(value))
+        ? value
+        : undefined;
+    }
+    if (key === "tool") return isString(value) && TOOL_NAME_PATTERN.test(value) ? value : undefined;
+    if (key === "call_count" || key === "failed_count") return boundedCount(value, 100_000);
+  }
+  if (name === "system_site_visited") {
+    if (key === "domain") return isString(value) ? analyticsDomain(value) : undefined;
+    if (key === "actor") return isOneOf(["agent", "user"] as const, value) ? value : undefined;
+  }
+  if (name === "system_inventory") {
+    if (key === "plugins" || key === "curated_skills" || key === "curated_agents") {
+      return slugList(value, (item) => LISTING_SLUG_PATTERN.test(item));
+    }
+    if (key === "providers") return slugList(value, (item) => isOneOf(AGENT_PROVIDERS, item));
+    if (key === "computer_use_enabled") return isBoolean(value) ? value : undefined;
+    return boundedCount(value, 10_000);
+  }
+  if (key === "agent_source") return isOneOf(["curated", "community", "custom"] as const, value) ? value : undefined;
+  if (key === "agent_listing") return isString(value) && LISTING_SLUG_PATTERN.test(value) ? value : undefined;
   if (key === "status") return isString(value) ? normalizedTurnStatus(value) : undefined;
   if (key === "kind") return isOneOf(["prompt", "approval"] as const, value) ? value : undefined;
   if (key === "approval_kind") {
@@ -455,6 +769,44 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
   }
   if (key === "has_secret_prompt") return isBoolean(value) ? value : undefined;
   return undefined;
+}
+
+/**
+ * The registrable domain (eTLD+1) of a page, or `undefined` for a host that must not be sent: an IP
+ * address, a single-label or intranet name, or a name with no public ICANN suffix. Private suffixes
+ * are ignored on purpose, so `user.github.io` reports as `github.io` and never names the user.
+ */
+export function analyticsDomain(hostname: string): string | undefined {
+  const host = hostname.trim().toLowerCase().replace(/\.$/u, "");
+  if (!host || host.length > 253) return undefined;
+  const parsed = parseDomain(host, { allowPrivateDomains: false, extractHostname: false });
+  // `home.arpa` is on the ICANN list, but it names home networks (RFC 8375).
+  if (parsed.isIp || !parsed.isIcann || !parsed.domain || isHomeNetwork(parsed.domain)) return undefined;
+  return parsed.domain;
+}
+
+function isHomeNetwork(domain: string): boolean {
+  return domain === "home.arpa" || domain.endsWith(".home.arpa");
+}
+
+function boundedCount(value: unknown, max: number): number | undefined {
+  return isNumber(value) && Number.isInteger(value) && value >= 0 && value <= max ? value : undefined;
+}
+
+function slugList(value: unknown, allowed: (item: string) => boolean): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = [...new Set(value.filter((item): item is string => isString(item) && allowed(item)))];
+  return items.sort().slice(0, MAX_INVENTORY_ITEMS);
+}
+
+function isRoutineRunFinished(status: RoutineRunConversationEventStatus): boolean {
+  return isOneOf(ROUTINE_TERMINAL_STATUSES, status);
+}
+
+function localDay(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /**

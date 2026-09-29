@@ -49,7 +49,7 @@ describe("desktop analytics", () => {
       __referrer: "",
       surface: "desktop",
       environment: "production",
-      event_schema_version: 5,
+      event_schema_version: 6,
       app_version: "1.2.3",
       platform: "darwin",
     });
@@ -289,6 +289,21 @@ describe("desktop analytics", () => {
         ),
       ),
     ).toEqual({ action: "publish", entry_point: "agent", result: "succeeded" });
+  });
+
+  it("sends only curated listing slugs, never a community listing's id or slug", () => {
+    const listing = (listing_slug: string) =>
+      sanitizeDesktopAnalyticsEvent("marketplace_action", {
+        entity: "skill",
+        action: "install",
+        result: "succeeded",
+        listing_slug,
+      }).listing_slug;
+    expect(listing("openbot-curated-skill-pdf")).toBe("pdf");
+    expect(listing("openbot-curated-agent-chief-of-staff")).toBe("chief-of-staff");
+    expect(listing("github")).toBe("github");
+    expect(listing("4f1c2a8e-9b7d-4c3e-8a1f-2d6e5b9c0a7f")).toBeUndefined();
+    expect(listing("my-private-plugin")).toBeUndefined();
   });
 
   it("keeps only the newest 100 events buffered before configuration", () => {

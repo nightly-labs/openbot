@@ -59,6 +59,8 @@ import { AgentInitializationGate } from "./agent-initialization";
 import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
+import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
+import { type CatalogPluginServer, catalogPluginSlug, loadCatalogPluginServers } from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
@@ -150,6 +152,7 @@ import { VoiceTranscriptionService } from "./voice-transcription-service";
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
 const ANALYTICS_PREFERENCE_FILE = "openbot-analytics-preference-v1.json";
+const ANALYTICS_INVENTORY_FILE = "openbot-analytics-inventory-v1.json";
 const APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v2.json";
 const LEGACY_APPROVAL_AUTOMATION_FILE = "openbot-approval-automation-v1.json";
 const LANGUAGE_PREFERENCE_FILE = "openbot-language-preference-v1.json";
@@ -1043,6 +1046,15 @@ export async function createApplicationServices({
   if (analyticsPlatform !== "darwin" && analyticsPlatform !== "win32" && analyticsPlatform !== "linux") {
     throw new Error(`Unsupported analytics platform: ${analyticsPlatform}`);
   }
+  // The catalog is read in the background. Until it is ready, a configured server reports as custom.
+  let catalogPluginServers: CatalogPluginServer[] = [];
+  void loadCatalogPluginServers(
+    app.isPackaged
+      ? join(process.resourcesPath, "plugin-catalog")
+      : resolve(__dirname, "../../resources/plugin-catalog"),
+  ).then((servers) => {
+    catalogPluginServers = servers;
+  });
   const analytics = new HostAnalytics({
     enabled: app.isPackaged && appVariant === "production",
     trackingEnabled: analyticsPreference.enabled,
@@ -1061,6 +1073,25 @@ export async function createApplicationServices({
         : null;
     },
     resolveAgent: (agentId) => service.listAgents().find((agent) => agent.id === agentId) ?? null,
+    resolveMcpServer: (name) => {
+      const config = service.listMcpServers().find((server) => server.name === name);
+      return config ? catalogPluginSlug(config, catalogPluginServers, homedir()) : null;
+    },
+    resolveRoutineRun: (agentId, routineId, runId) => {
+      const run = service.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
+      const routine = service.listRoutines(agentId).find((item) => item.id === routineId);
+      return run && routine ? { runKind: run.kind, triggerType: routine.trigger.schedule.kind } : null;
+    },
+    resolveInventory: () =>
+      collectAnalyticsInventory({
+        agents: () => service.listAgents(),
+        routines: (agentId) => service.listRoutines(agentId),
+        skills: (agentId) => skills.listInstalled(agentId),
+        mcpServers: () => service.listMcpServers(),
+        pluginSlug: (config) => catalogPluginSlug(config, catalogPluginServers, homedir()),
+        computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
+      }),
+    inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
   });
   // Immediately after construction: this attributes buffered events to the current owner rather
   // than flushing a queue, so a later call would attribute them to nobody.

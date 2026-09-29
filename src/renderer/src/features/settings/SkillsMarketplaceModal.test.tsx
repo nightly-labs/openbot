@@ -262,6 +262,7 @@ describe("SkillsMarketplaceModal", () => {
     expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
       entity: "skill",
       action: "view",
+      listing_slug: expect.any(String),
       result: "succeeded",
     });
     screen.getByRole("button", { name: "Marketplace" }).click();
@@ -356,6 +357,7 @@ describe("SkillsMarketplaceModal", () => {
     expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
       entity: "agent",
       action: "install",
+      listing_slug: expect.any(String),
       result: "succeeded",
     });
     await waitFor(() => expect(screen.getByRole("button", { name: "Install agent" })).toBeEnabled());
@@ -409,6 +411,7 @@ describe("SkillsMarketplaceModal", () => {
       expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
         entity: "agent",
         action: "view",
+        listing_slug: expect.any(String),
         result: "failed",
         failure_code: "load_failed",
       }),
@@ -999,6 +1002,7 @@ describe("SkillsMarketplaceModal", () => {
       expect(trackMarketplaceAnalytics).toHaveBeenCalledWith("marketplace_action", {
         entity: "skill",
         action: "view",
+        listing_slug: expect.any(String),
         result: "succeeded",
       }),
     );

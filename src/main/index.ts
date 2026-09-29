@@ -746,6 +746,10 @@ if (!hasSingleInstanceLock) {
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
+      // Internal usage signals for analytics only. They are not agent events, so the renderer and
+      // Team API clients never receive them.
+      service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
+      built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
       built.approvalAutomation.subscribe((preference) => {
         for (const window of BrowserWindow.getAllWindows()) {

@@ -55,6 +55,108 @@ export function toThreadItem(value: DynamicRecord): ThreadItem | null {
   return type ? { ...value, type } : null;
 }
 
+/** What a tool step was, in the closed set product analytics reports. */
+export type ToolUsageKind =
+  | "command"
+  | "file_change"
+  | "file_read"
+  | "web_search"
+  | "web_fetch"
+  | "mcp"
+  | "image_generation"
+  | "subagent"
+  | "other";
+
+/**
+ * One finished tool step. `server` and `tool` are the provider's raw names, not yet safe to send:
+ * the main process keeps them only for OpenBot's own servers and catalog plugins.
+ */
+export interface ToolUsage {
+  kind: ToolUsageKind;
+  server?: string;
+  tool?: string;
+  failed: boolean;
+}
+
+/** A tool step and the turn it ran in. */
+export interface ToolUsageSignal extends ToolUsage {
+  agentId: string;
+  turnId: string;
+}
+
+const CODEX_ITEM_KINDS = new Map<string, ToolUsageKind>([
+  ["commandExecution", "command"],
+  ["fileChange", "file_change"],
+  ["imageView", "file_read"],
+  ["webSearch", "web_search"],
+  ["imageGeneration", "image_generation"],
+  ["image_generation_call", "image_generation"],
+  ["collabAgentToolCall", "subagent"],
+]);
+
+const CLAUDE_TOOL_KINDS = new Map<string, ToolUsageKind>([
+  ["Bash", "command"],
+  ["BashOutput", "command"],
+  ["KillShell", "command"],
+  ["Read", "file_read"],
+  ["Glob", "file_read"],
+  ["Grep", "file_read"],
+  ["LS", "file_read"],
+  ["NotebookRead", "file_read"],
+  ["Edit", "file_change"],
+  ["MultiEdit", "file_change"],
+  ["Write", "file_change"],
+  ["NotebookEdit", "file_change"],
+  ["WebSearch", "web_search"],
+  ["WebFetch", "web_fetch"],
+  ["Task", "subagent"],
+  ["Agent", "subagent"],
+]);
+
+const ACP_TOOL_KINDS = new Map<string, ToolUsageKind>([
+  ["execute", "command"],
+  ["read", "file_read"],
+  ["search", "file_read"],
+  ["edit", "file_change"],
+  ["delete", "file_change"],
+  ["move", "file_change"],
+  ["fetch", "web_fetch"],
+]);
+
+/**
+ * Classifies a completed tool item for analytics, or answers `null` for an item that is not a tool.
+ *
+ * Codex names its item types; Claude names a built-in tool or `mcp__<server>__<tool>`; an ACP agent
+ * sends a free-text title, so only its `toolKind` enum is read and the title never is.
+ */
+export function toolUsage(item: ThreadItem): ToolUsage | null {
+  const status = getString(item, "status");
+  const failed = status === "failed" || status === "declined";
+  const codexKind = CODEX_ITEM_KINDS.get(item.type);
+  if (codexKind) return { kind: codexKind, failed };
+  if (item.type === "mcpToolCall") {
+    const server = getString(item, "server");
+    const tool = getString(item, "tool");
+    return { kind: "mcp", ...(server ? { server } : {}), ...(tool ? { tool } : {}), failed };
+  }
+  if (item.type === "dynamicToolCall") {
+    const namespace = getString(item, "namespace");
+    const tool = getString(item, "tool");
+    return namespace
+      ? { kind: "mcp", server: namespace, ...(tool ? { tool } : {}), failed }
+      : { kind: "other", failed };
+  }
+  if (item.type !== "toolCall") return null;
+  const acpKind = getString(item, "toolKind");
+  if (acpKind !== null) return { kind: ACP_TOOL_KINDS.get(acpKind) ?? "other", failed };
+  const name = getString(item, "name") ?? "";
+  const claudeKind = CLAUDE_TOOL_KINDS.get(name);
+  if (claudeKind) return { kind: claudeKind, failed };
+  const mcp = /^mcp__(.+?)__(.+)$/u.exec(name);
+  if (mcp?.[1] && mcp[2]) return { kind: "mcp", server: mcp[1], tool: mcp[2], failed };
+  return { kind: "other", failed };
+}
+
 export function toolProgressText(item: ThreadItem, completed: boolean): string | null {
   const type = item.type.toLowerCase();
   if (!/(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(type)) return null;
