@@ -109,6 +109,8 @@ export class BrowserPictureInPicture {
       positionControls();
     });
     window.on("closed", () => {
+      // A child view's contents outlive its window. A window that the system closes skips `#close`.
+      if (!controlsView.webContents.isDestroyed()) controlsView.webContents.close();
       if (this.#window !== window) return;
       this.#stopHoverTracking();
       this.#window = null;

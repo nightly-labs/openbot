@@ -287,6 +287,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #lastUsed = new Map<AgentProvider, number>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
+  /**
+   * Providers whose last usage read returned no limit, such as custom ACP agents. The dock polls
+   * every five minutes, so starting a released one to ask again would keep its process running.
+   */
+  readonly #usageUnreported = new Set<AgentProvider>();
   #idleCheck: NodeJS.Timeout | null = null;
   #status: AgentStatus = structuredClone(INITIAL_STATUS);
   #providerRefresh: Promise<AgentStatus> | null = null;
@@ -522,6 +527,7 @@ export class ProviderRuntime implements ProviderPort {
                 ),
               );
             } else {
+              if (this.#released.has(provider) && this.#usageUnreported.has(provider)) return;
               const kept = this.#released.has(provider) ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) {
                 collected.set(provider, kept);
@@ -540,7 +546,11 @@ export class ProviderRuntime implements ProviderPort {
               );
             }
             const limit = usage.limits[0];
-            if (!limit || (!limit.primary && !limit.secondary)) return;
+            if (!limit || (!limit.primary && !limit.secondary)) {
+              this.#usageUnreported.add(provider);
+              return;
+            }
+            this.#usageUnreported.delete(provider);
             collected.set(provider, { ...limit, id: provider });
             this.#lastUsage.set(provider, { ...limit, id: provider });
             this.#emit({

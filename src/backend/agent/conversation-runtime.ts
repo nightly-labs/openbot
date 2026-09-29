@@ -292,8 +292,12 @@ export class ConversationRuntime {
 
   forgetAgent(agentId: string): void {
     for (const [id, snapshot] of this.#executionSnapshots) {
-      if (snapshot.agentId === agentId) this.#executionSnapshots.delete(id);
+      if (snapshot.agentId !== agentId) continue;
+      this.#executionSnapshots.delete(id);
+      this.#conversationSignatures.delete(id);
     }
+    const threadId = this.#snapshots.get(agentId)?.threadId;
+    if (threadId) this.#conversationSignatures.delete(threadId);
     this.#snapshots.delete(agentId);
     this.#conversationSignatures.delete(agentId);
   }
