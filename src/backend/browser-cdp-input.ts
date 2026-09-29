@@ -147,15 +147,13 @@ function normalizeKey(key: string): {
   text?: string;
 } {
   const alias = KEY_ALIASES[key.toLowerCase()];
-  const macNativeVirtualKeyCode =
-    process.platform === "darwin" ? { ArrowUp: 126, ArrowDown: 125, Home: 115 }[alias?.[0] ?? ""] : undefined;
   if (alias)
     return {
       ...(alias[3] === undefined ? {} : { text: alias[3] }),
       key: alias[0],
       code: alias[1],
       windowsVirtualKeyCode: alias[2],
-      nativeVirtualKeyCode: macNativeVirtualKeyCode,
+      nativeVirtualKeyCode: macNativeVirtualKeyCode(alias[0]),
     };
   if (!/^[\w\-.,/;='[\]`]{1,20}$/u.test(key)) throw new Error(`Unsupported browser key: ${key}`);
   const upper = key.length === 1 ? key.toUpperCase() : key;
@@ -167,10 +165,22 @@ function normalizeKey(key: string): {
  * editing command such as Backspace or an arrow from the key code, and submits a form from Enter's
  * character, so a named key that has neither does nothing in the page.
  */
-export function namedKey(key: string): { windowsVirtualKeyCode?: number; text?: string } {
+export function namedKey(key: string): {
+  windowsVirtualKeyCode?: number;
+  nativeVirtualKeyCode?: number;
+  text?: string;
+} {
   const alias = KEY_ALIASES[key.toLowerCase()];
   if (alias?.[0] !== key) return {};
-  return { windowsVirtualKeyCode: alias[2], ...(alias[3] === undefined ? {} : { text: alias[3] }) };
+  return {
+    windowsVirtualKeyCode: alias[2],
+    nativeVirtualKeyCode: macNativeVirtualKeyCode(key),
+    ...(alias[3] === undefined ? {} : { text: alias[3] }),
+  };
+}
+
+function macNativeVirtualKeyCode(key: string): number | undefined {
+  return process.platform === "darwin" ? { ArrowUp: 126, ArrowDown: 125, Home: 115 }[key] : undefined;
 }
 
 /** Chromium's `Input.dispatchKeyEvent` bit for Shift, the one modifier that still yields a character. */

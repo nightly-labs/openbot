@@ -74,6 +74,10 @@ export type BrowserViewInput =
       deltaY: number;
       modifiers: number;
     }
+  /**
+   * A client sends `char` only for a key whose `key` is one character. The host adds the character
+   * of a named key itself, such as the `\r` of Enter, so a client that also sends it types it twice.
+   */
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
   | { type: "ack"; sequence: number };
 

@@ -1103,14 +1103,14 @@ export class BrowserCdpEngine {
         }
         // A client sends a character event only for a printable key, so Enter's `\r` is added here.
         // A command modifier gets none, as in `dispatchShortcut`: `Ctrl+Enter` is not a line break.
-        const { text, windowsVirtualKeyCode } = namedKey(input.key);
+        const { text, ...keyCodes } = namedKey(input.key);
         const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
         await send("Input.dispatchKeyEvent", {
           type: input.action === "up" ? "keyUp" : character === undefined ? "rawKeyDown" : "keyDown",
           modifiers: input.modifiers,
           key: input.key,
           code: input.code,
-          windowsVirtualKeyCode,
+          ...keyCodes,
           ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
         });
         return;
