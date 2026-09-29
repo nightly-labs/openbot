@@ -177,6 +177,11 @@ export class LiveActivityPushService {
       this.#schedule(registration, EVENT_DELAY_MS);
       return;
     }
+    // A timer from before a failed send can fire early. `#schedule` moves the update to the retry time.
+    if (now < registration.retryAt) {
+      this.#schedule(registration, 0);
+      return;
+    }
     const props = this.#view(registration);
     const mode = props?.mode ?? null;
     const key = JSON.stringify(props);

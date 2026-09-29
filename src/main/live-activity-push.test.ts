@@ -134,15 +134,24 @@ describe("LiveActivityPushService", () => {
 
   it("sends nothing more after the member loses access, and tries a failed send again", async () => {
     snapshot.pendingApprovals.push(approval("ada", "npm test"));
+    let fail: (error: Error) => void = () => undefined;
     const send = vi
       .fn(async (_push: LiveActivityRelayPush) => "sent" as const)
-      .mockRejectedValueOnce(new Error("Apple did not answer."));
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            fail = reject;
+          }),
+      );
     const push = service(send);
 
     push.register("session-1", viewer, registration);
-    await vi.runOnlyPendingTimersAsync();
+    await vi.advanceTimersByTimeAsync(0);
     expect(send).toHaveBeenCalledTimes(1);
-    // An agent event during the wait does not send before the retry time.
+    // An agent event while the send waits, and one after it failed, do not send before the retry time.
+    listener?.({ type: "agents-changed", agents: [] });
+    fail(new Error("Apple did not answer."));
+    await vi.advanceTimersByTimeAsync(0);
     listener?.({ type: "agents-changed", agents: [] });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(send).toHaveBeenCalledTimes(1);

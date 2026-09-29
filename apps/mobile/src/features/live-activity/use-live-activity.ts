@@ -133,6 +133,15 @@ export function useLiveActivity({
   const disposed = useRef(false);
   /** The host that has the push token, and what it has. */
   const registered = useRef<{ serverId: string; key: string } | null>(null);
+  /**
+   * Registrations and removals run one at a time, in order. A removal then cannot reach a host
+   * before the registration that it removes.
+   */
+  const registrationQueue = useRef<Promise<void>>(Promise.resolve());
+  const enqueueRegistration = useCallback((run: () => Promise<void>) => {
+    registrationQueue.current = registrationQueue.current.then(run).catch(() => undefined);
+    return registrationQueue.current;
+  }, []);
 
   const syncFor = useCallback((native: AgentLiveActivityNative) => {
     sync.current ??= new LiveActivitySync(native.starter, (token) => {
@@ -433,7 +442,7 @@ export function useLiveActivity({
     if (previous && previous.serverId !== pushServerId) {
       registered.current = null;
       // The host also forgets it when the session ends, so a failed request leaves nothing behind.
-      void post(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
+      void enqueueRegistration(() => post(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}));
     }
     // A host that restarts keeps registrations in memory only, so a new connection registers again.
     if (!pushServerOnline && registered.current) registered.current = { ...registered.current, key: "" };
@@ -470,27 +479,38 @@ export function useLiveActivity({
         }),
       };
       const key = JSON.stringify(registration);
-      if (cancelled || disposed.current || registered.current?.key === key) return;
-      // Recorded before the request, so a change of host during it still removes this one.
-      registered.current = { serverId: pushServerId, key: "" };
-      await post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.register, { ...registration });
-      if (disposed.current) return;
-      if (registered.current?.serverId !== pushServerId) {
-        // The phone chose another host while this request ran, and its removal can arrive first.
-        void post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
-        return;
-      }
-      // A newer run of this effect sends its own registration and records it.
-      if (!cancelled) registered.current = { serverId: pushServerId, key };
-    })().catch(() => {
-      // The activity then shows its last state until the app returns, and marks it out of date. The
-      // host stays recorded, so a change of host still removes it.
-      if (registered.current?.serverId === pushServerId) registered.current = { serverId: pushServerId, key: "" };
-    });
+      await enqueueRegistration(async () => {
+        if (cancelled || disposed.current || registered.current?.key === key) return;
+        // Recorded before the request, so a change of host or a sign-out during it queues its removal.
+        registered.current = { serverId: pushServerId, key: "" };
+        try {
+          await post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.register, { ...registration });
+        } catch {
+          // The activity then shows its last state until the app returns, and marks it out of date.
+          return;
+        }
+        // A newer run of this effect sends its own registration and records it.
+        if (!cancelled && registered.current?.serverId === pushServerId) {
+          registered.current = { serverId: pushServerId, key };
+        }
+      });
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [live, pushServerId, pushServerOnline, pushToken, secret, foreground, photos, post, bloubFile, keepAvatars]);
+  }, [
+    live,
+    pushServerId,
+    pushServerOnline,
+    pushToken,
+    secret,
+    foreground,
+    photos,
+    post,
+    bloubFile,
+    keepAvatars,
+    enqueueRegistration,
+  ]);
 
   useEffect(() => {
     disposed.current = false;
@@ -504,14 +524,14 @@ export function useLiveActivity({
       const previous = registered.current;
       registered.current = null;
       if (previous) {
-        void postRef.current(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
+        void enqueueRegistration(() => postRef.current(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}));
       }
       void resetLiveActivitySecret().catch(() => undefined);
       if (!live) return;
       live.native.removeAvatars(new Set());
       void syncFor(live.native).show(null);
     };
-  }, [live, syncFor]);
+  }, [live, syncFor, enqueueRegistration]);
 
   return applyTeamEvent;
 }
