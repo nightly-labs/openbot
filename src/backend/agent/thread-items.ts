@@ -153,8 +153,11 @@ export function toolUsage(item: ThreadItem): ToolUsage | null {
   const claudeKind = CLAUDE_TOOL_KINDS.get(name);
   if (claudeKind) return { kind: claudeKind, failed };
   const mcp = /^mcp__(.+?)__(.+)$/u.exec(name);
-  if (mcp?.[1] && mcp[2]) return { kind: "mcp", server: mcp[1], tool: mcp[2], failed };
-  return { kind: "other", failed };
+  if (!mcp?.[1] || !mcp[2]) return { kind: "other", failed };
+  // A server name can contain `__`, so `mcp__openbot__acme__list` does not show where the server
+  // name stops. Such a step keeps no names: a user's server must never pass as a built-in one.
+  if (mcp[2].includes("__")) return { kind: "mcp", failed };
+  return { kind: "mcp", server: mcp[1], tool: mcp[2], failed };
 }
 
 export function toolProgressText(item: ThreadItem, completed: boolean): string | null {

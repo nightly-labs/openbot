@@ -57,6 +57,18 @@ function catalogServer(slug: string, app: unknown): CatalogPluginServer[] {
 }
 
 /**
+ * Whether a provider can report the server named `configured` as `reported`. Claude changes each
+ * character outside `[A-Za-z0-9_-]` to `_`, so this compares that form too, without case.
+ */
+export function isReportedMcpServerName(configured: string, reported: string): boolean {
+  return (
+    configured === reported ||
+    configured.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase() ===
+      reported.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase()
+  );
+}
+
+/**
  * The catalog slug of a configured server, or `null` for the user's own server. Like the listing's
  * own matcher, the name alone is not enough: a server the user named `github` that points elsewhere
  * is theirs. An http address matches exactly, or by an https host that is the listing's host or

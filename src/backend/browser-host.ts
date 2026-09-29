@@ -1537,7 +1537,6 @@ export class BrowserHost {
     contents.on("did-navigate-in-page", (_event, url) => {
       if (this.#tabs.get(tab.id) !== tab) return;
       if (isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
-      this.#noteSiteVisit(tab, url);
       tab.revision += 1;
       changed();
       this.#schedulePersist();
@@ -1898,7 +1897,13 @@ export class BrowserHost {
       actor: driven ? "agent" : "user",
       agentId: driven ? tab.ownerAgentId : null,
     };
-    for (const listener of this.#siteVisitListeners) listener(visit);
+    for (const listener of this.#siteVisitListeners) {
+      try {
+        listener(visit);
+      } catch {
+        // Analytics must never stop a navigation.
+      }
+    }
   }
 
   #emitChanged(): void {

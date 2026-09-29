@@ -60,7 +60,12 @@ import { AgentMarketplaceService } from "./agent-marketplace-service";
 import { AgentTemplateService } from "./agent-template-service";
 import { HostAnalytics } from "./analytics";
 import { analyticsInventoryDayStore, collectAnalyticsInventory } from "./analytics-inventory";
-import { type CatalogPluginServer, catalogPluginSlug, loadCatalogPluginServers } from "./analytics-plugin-catalog";
+import {
+  type CatalogPluginServer,
+  catalogPluginSlug,
+  isReportedMcpServerName,
+  loadCatalogPluginServers,
+} from "./analytics-plugin-catalog";
 import { readAnalyticsPreference } from "./analytics-preference-store";
 import { ApprovalAutomation, readApprovalAutomation } from "./approval-automation-store";
 import { BrowserPictureInPicture } from "./browser-picture-in-picture";
@@ -1046,9 +1051,10 @@ export async function createApplicationServices({
   if (analyticsPlatform !== "darwin" && analyticsPlatform !== "win32" && analyticsPlatform !== "linux") {
     throw new Error(`Unsupported analytics platform: ${analyticsPlatform}`);
   }
-  // The catalog is read in the background. Until it is ready, a configured server reports as custom.
+  // The catalog is read in the background. Until it is ready, a tool step reports its server as
+  // custom; the inventory waits for it, because it is sent only once a day.
   let catalogPluginServers: CatalogPluginServer[] = [];
-  void loadCatalogPluginServers(
+  const catalogPluginServersLoaded = loadCatalogPluginServers(
     app.isPackaged
       ? join(process.resourcesPath, "plugin-catalog")
       : resolve(__dirname, "../../resources/plugin-catalog"),
@@ -1074,23 +1080,28 @@ export async function createApplicationServices({
     },
     resolveAgent: (agentId) => service.listAgents().find((agent) => agent.id === agentId) ?? null,
     resolveMcpServer: (name) => {
-      const config = service.listMcpServers().find((server) => server.name === name);
-      return config ? catalogPluginSlug(config, catalogPluginServers, homedir()) : null;
+      const configs = service.listMcpServers().filter((server) => isReportedMcpServerName(server.name, name));
+      if (configs.length === 0) return null;
+      const slugs = new Set(configs.map((config) => catalogPluginSlug(config, catalogPluginServers, homedir())));
+      const [slug] = slugs;
+      return { slug: slugs.size === 1 && slug ? slug : null };
     },
     resolveRoutineRun: (agentId, routineId, runId) => {
       const run = service.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
       const routine = service.listRoutines(agentId).find((item) => item.id === routineId);
       return run && routine ? { runKind: run.kind, triggerType: routine.trigger.schedule.kind } : null;
     },
-    resolveInventory: () =>
-      collectAnalyticsInventory({
+    resolveInventory: async () => {
+      await catalogPluginServersLoaded;
+      return collectAnalyticsInventory({
         agents: () => service.listAgents(),
         routines: (agentId) => service.listRoutines(agentId),
         skills: (agentId) => skills.listInstalled(agentId),
         mcpServers: () => service.listMcpServers(),
         pluginSlug: (config) => catalogPluginSlug(config, catalogPluginServers, homedir()),
         computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
-      }),
+      });
+    },
     inventoryDay: analyticsInventoryDayStore(join(app.getPath("userData"), ANALYTICS_INVENTORY_FILE)),
   });
   // Immediately after construction: this attributes buffered events to the current owner rather

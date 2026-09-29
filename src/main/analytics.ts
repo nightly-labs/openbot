@@ -103,8 +103,11 @@ export interface HostAnalyticsOptions {
   platform: "darwin" | "win32" | "linux";
   resolveOwner: () => AnalyticsIdentity | null;
   resolveAgent: (agentId: string) => AgentSummary | null;
-  /** The catalog plugin slug of a user-configured MCP server, or `null` for a custom server. */
-  resolveMcpServer?: (name: string) => string | null;
+  /**
+   * The user's MCP servers that a provider reports under `name`: `null` when there is none, else the
+   * catalog plugin slug they all share, or `slug: null` for the user's own server.
+   */
+  resolveMcpServer?: (name: string) => { slug: string | null } | null;
   resolveRoutineRun?: (agentId: string, routineId: string, runId: string) => AnalyticsRoutineRun | null;
   resolveInventory?: () => Promise<AnalyticsInventory>;
   inventoryDay?: AnalyticsInventoryDayStore;
@@ -507,8 +510,16 @@ export class HostAnalytics {
   #toolUseRow(usage: ToolUsageSignal): ToolUseRow {
     const server = usage.server;
     if (usage.kind !== "mcp" || !server) return { kind: usage.kind, calls: 0, failed: 0 };
-    const builtinKind = BUILTIN_TOOL_SERVERS.get(server);
-    const plugin = builtinKind ? "builtin" : (safely(() => this.#resolveMcpServer(server)) ?? "custom");
+    // A user's server can report under a built-in name, such as `openbot browser` shown as
+    // `openbot_browser`. It then stays custom, and a resolver that fails also gives custom.
+    let configured: { slug: string | null } | null;
+    try {
+      configured = this.#resolveMcpServer(server);
+    } catch {
+      configured = { slug: null };
+    }
+    const builtinKind = configured ? undefined : BUILTIN_TOOL_SERVERS.get(server);
+    const plugin = builtinKind ? "builtin" : (configured?.slug ?? "custom");
     const tool = plugin !== "custom" && usage.tool && TOOL_NAME_PATTERN.test(usage.tool) ? usage.tool : undefined;
     return { kind: builtinKind ?? "mcp", plugin, ...(tool ? { tool } : {}), calls: 0, failed: 0 };
   }
@@ -523,15 +534,23 @@ export class HostAnalytics {
     if (!normalizeAnalyticsIdentity(this.#resolveOwner())) return;
     this.#inventoryCheck = (async () => {
       const stored = await store.read();
-      if (stored === today || stored === "malformed") {
+      if (stored === "malformed") {
+        // A damaged file counts as sent today. It is written again, so the next day sends.
+        await store.write(today);
+        this.#inventoryDay = today;
+        return;
+      }
+      if (stored === today) {
         this.#inventoryDay = today;
         return;
       }
       const inventory = await resolveInventory();
+      if (!this.#trackingEnabled || !normalizeAnalyticsIdentity(this.#resolveOwner())) return;
+      // The day is stored before the send, so a failed write sends nothing and a crash cannot send twice.
+      await store.write(today);
+      this.#inventoryDay = today;
       const owner = normalizeAnalyticsIdentity(this.#resolveOwner());
       if (!owner || !this.#trackingEnabled) return;
-      this.#inventoryDay = today;
-      await store.write(today);
       this.#trackForOwner(
         "system_inventory",
         {

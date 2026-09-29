@@ -77,8 +77,8 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `system_turn_completed` | Are turns reliable and fast? | Host emitted completion; status describes outcome |
 | `system_agent_input_requested` | Where do agents need human input? | Host requested a prompt answer or approval |
 | `system_operation_failed` | Which host/provider area fails? | Host emitted a safe, allowlisted failure code |
-| `system_tool_used` | Which tools and plugins do agents use for their tasks? | One row per tool kind, plugin and tool in a completed turn, with call and failure counts. `plugin` is a catalog slug, `builtin`, or `custom`; `tool` is sent only for `builtin` and catalog plugins. At most 32 rows per turn |
-| `system_site_visited` | Which websites do users and agents work on? | A browser tab reached a new registrable domain. `actor` is `user` or `agent`; only the eTLD+1 is sent, and IP, local and intranet hosts are dropped |
+| `system_tool_used` | Which tools and plugins do agents use for their tasks? | One row per tool kind, plugin and tool in a completed turn, with call and failure counts (Claude reports no tool failures, so its `failed_count` is 0). `plugin` is a catalog slug, `builtin`, or `custom`; `tool` is sent only for `builtin` and catalog plugins. At most 32 rows per turn |
+| `system_site_visited` | Which websites do users and agents work on? | A browser tab reached a new registrable domain. `actor` is `user` or `agent`; only the eTLD+1 is sent, and IP addresses, single-label names and names with no public suffix are dropped. An intranet host under a public domain is sent as that domain |
 | `system_routine_run` | Do routine runs succeed, and which schedules are used? | A routine run that this host saw running reached `succeeded`, `failed`, `needs-attention`, `interrupted`, or `cancelled` |
 | `system_inventory` | What have accounts set up? | At most once per local day: counts of agents, enabled routines, custom MCP servers, local and community skills, and the slugs of catalog plugins, curated skills and curated agents |
 | `agent_input_action` | Can users resolve prompts and approvals? | Response IPC completed |

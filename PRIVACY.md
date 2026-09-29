@@ -131,7 +131,8 @@ The local host also records how the agents are used:
   single-label names, `localhost`, and names with no public suffix (for example `.local`, `.lan`,
   `.internal` or `.home.arpa`) are not sent.
 - **Tools.** When a turn completes, the host sends one count per kind of tool the agent used (for
-  example command, file change, web search, browser, or MCP), how many of those calls failed, and
+  example command, file change, web search, browser, or MCP), how many of those calls failed (Claude
+  does not report failed tool calls, so its count is 0), and
   the plugin: the slug of an OpenBot catalog plugin, `builtin` for OpenBot's own tools, or `custom`.
   The tool name is sent only for OpenBot's own tools and catalog plugins. The name, address and
   command of a server the user added, the tool arguments and the tool results are not sent.

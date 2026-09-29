@@ -973,7 +973,10 @@ describe("usage analytics", () => {
 
   it("names catalog plugins and built-in tools, and only counts a custom server", () => {
     const { analytics, tracked } = usageAnalytics({
-      resolveMcpServer: (name) => (name === "linear" ? "linear" : null),
+      resolveMcpServer: (name) => {
+        if (name === "linear") return { slug: "linear" };
+        return name === "github" || name === "computer_use" ? { slug: null } : null;
+      },
     });
     const turn = { agentId: AGENT.id, turnId: "turn-tools" };
     analytics.handleAgentEvent({ type: "turn-started", ...turn, threadId: "thread", origin: "user" });
@@ -982,6 +985,8 @@ describe("usage analytics", () => {
     analytics.handleToolUsage({ ...turn, kind: "mcp", server: "openbot_browser", tool: "navigate", failed: false });
     // A server the user named `github` that the catalog does not recognize is the user's own.
     analytics.handleToolUsage({ ...turn, kind: "mcp", server: "github", tool: "private_lookup", failed: false });
+    // A server the user named `computer use` reports under the built-in name, and stays custom.
+    analytics.handleToolUsage({ ...turn, kind: "mcp", server: "computer_use", tool: "private_click", failed: false });
     analytics.handleToolUsage({ ...turn, kind: "command", failed: false });
     expect(tracked("system_tool_used")).toEqual([]);
     analytics.handleAgentEvent({ type: "turn-completed", ...turn, threadId: "thread", status: "completed" });
@@ -996,10 +1001,10 @@ describe("usage analytics", () => {
         failed_count: 1,
       }),
       expect.objectContaining({ tool_kind: "browser", plugin: "builtin", tool: "navigate", call_count: 1 }),
-      expect.objectContaining({ tool_kind: "mcp", plugin: "custom", call_count: 1 }),
+      expect.objectContaining({ tool_kind: "mcp", plugin: "custom", call_count: 2 }),
       expect.objectContaining({ tool_kind: "command", call_count: 1, failed_count: 0 }),
     ]);
-    expect(JSON.stringify(rows)).not.toContain("private_lookup");
+    expect(JSON.stringify(rows)).not.toContain("private_");
     expect(JSON.stringify(rows)).not.toContain("github");
   });
 
@@ -1061,16 +1066,33 @@ describe("usage analytics", () => {
     ]);
   });
 
-  it("treats a malformed inventory day as sent today", async () => {
+  it("treats a malformed inventory day as sent today, and repairs it for the next day", async () => {
     const store = dayStore("malformed");
-    const read = vi.spyOn(store, "read");
     const resolveInventory = vi.fn(async () => inventory());
     const { analytics } = usageAnalytics({ resolveInventory, inventoryDay: store });
     analytics.flushPending();
-    await vi.waitFor(() => expect(read).toHaveBeenCalled());
+    await vi.waitFor(() => expect(store.written).toHaveLength(1));
     analytics.flushPending();
 
     expect(resolveInventory).not.toHaveBeenCalled();
-    expect(store.written).toEqual([]);
+    expect(store.written).toHaveLength(1);
+  });
+
+  it("does not send the inventory when the user turns analytics off during the check", async () => {
+    const store = dayStore("missing");
+    const { analytics, tracked } = usageAnalytics({
+      resolveInventory: async () => inventory(),
+      inventoryDay: {
+        ...store,
+        write: async (day) => {
+          analytics.setTrackingEnabled(false);
+          await store.write(day);
+        },
+      },
+    });
+    analytics.flushPending();
+    await vi.waitFor(() => expect(store.written).toHaveLength(1));
+
+    expect(tracked("system_inventory")).toEqual([]);
   });
 });
