@@ -28,6 +28,10 @@ export const STRUCTURED_TEXT_LABEL = "structuredContent as JSON, copied by OpenB
  */
 const MAX_STRUCTURED_TEXT_CHARS = 65_536;
 
+/** How to act on an element when the copy holds no element tokens. */
+const ELEMENT_ADDRESS_NOTE =
+  "To act on an element, send this snapshot_id with the element_index that the tree in the result text shows.";
+
 /** A string this long that the result text already holds is not copied again. */
 const REPEATED_TEXT_MIN_CHARS = 256;
 /**
@@ -87,36 +91,26 @@ function withStructuredText(result: unknown): DynamicRecord | null {
 /**
  * The fields worth reading, without the data that is not.
  *
- * `elements` becomes `element_tokens`, a map from each element index to its token: the tree
- * already names every element by its index, and the full element objects are what make the
- * result megabytes long. The driver's `_note` goes with it, because it points at `elements`.
+ * `elements` is left out, and a note says how to address an element instead. The tree in the
+ * result text already names every element by its index, and the driver takes `snapshot_id` with an
+ * `element_index` wherever it takes an element token. A map from each index to its token would add
+ * three quarters of the tree's size again, and every result stays in the conversation, so each
+ * later step would read it again. The driver's `_note` goes too, because it points at `elements`.
  * Base64 data anywhere below is left out when the copy is serialized; see `structuredText`.
  */
 function compactCopy(structured: DynamicRecord, texts: readonly string[]): DynamicRecord {
-  const elements = structured.elements;
-  const hasElements = Array.isArray(elements);
+  const hasElements = Array.isArray(structured.elements);
   const fields = Object.entries(structured)
     .filter(([key]) => !(hasElements && (key === "elements" || key === "_note")))
     .map(([key, value]) => [key, isRepeatedText(value, texts) ? "[the same text is in the result text above]" : value]);
-  const tokens = hasElements ? elementTokens(elements) : {};
   return {
     ...Object.fromEntries(fields),
-    ...(Object.keys(tokens).length > 0 ? { element_tokens: tokens } : {}),
+    ...(hasElements && typeof structured.snapshot_id === "string" ? { element_address: ELEMENT_ADDRESS_NOTE } : {}),
   };
 }
 
 function isRepeatedText(value: unknown, texts: readonly string[]): boolean {
   return typeof value === "string" && value.length >= REPEATED_TEXT_MIN_CHARS && texts.some((t) => t.includes(value));
-}
-
-function elementTokens(elements: readonly unknown[]): Record<string, string> {
-  const tokens: Record<string, string> = {};
-  for (const element of elements) {
-    if (!isDynamicRecord(element)) continue;
-    const { element_index: index, element_token: token } = element;
-    if (typeof index === "number" && typeof token === "string") tokens[String(index)] = token;
-  }
-  return tokens;
 }
 
 /** A string to copy, or a short note in place of image or file data that nobody reads as text. */

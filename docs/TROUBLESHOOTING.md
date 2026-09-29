@@ -110,6 +110,14 @@ mechanical GUI tasks, select a lower effort or a faster model. Name the applicat
 in your request, for example "In Safari, open https://example.com", so the agent does not look for
 the target first.
 
+A step also gets slower as the conversation gets longer. The model reads the full conversation
+before each action, and each window read stays in it. When the conversation fills the model's
+context, the provider compacts it: it writes a summary, which can take minutes, and the chat
+shows no action in that time. A new conversation for a new GUI task does not have this cost, and the
+agent keeps its workspace. With OpenCode, OpenBot adds a JSON copy of each driver result
+to the result text, because OpenCode shows the model only the text. The copy leaves out the element
+list, because the tree in the text already names each element by its index.
+
 ## A chat is missing after an update
 
 Do not follow the reset steps below. Your messages are stored in one SQLite file, nothing copies it

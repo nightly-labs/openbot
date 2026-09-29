@@ -312,7 +312,7 @@ export class CuaDriverRuntime {
    * The tap forwards every request unchanged, so the agent gets the same tools either way - and a
    * tap that failed to listen costs the rim its answer, never the agent its tools. What it does
    * cost is the JSON copy the tap adds to each tool answer, which a provider that shows the model
-   * only the result text needs to read window ids and element tokens.
+   * only the result text needs to read window ids and snapshot ids.
    */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();
