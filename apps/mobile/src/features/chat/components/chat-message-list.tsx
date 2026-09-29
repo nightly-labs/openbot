@@ -52,6 +52,7 @@ import type { ChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { type ChatMessage, indexChatMessages, type RoutineMarkerEvent } from "@/features/chat/model/chat-messages";
+import { useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useConnectionAppearance } from "@/features/workspace/components/use-connection-appearance";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
@@ -241,14 +242,14 @@ type ChatUpload = NonNullable<ChatMessageListProps["upload"]>;
 interface MessageRowShared {
   agents: MobileAgent[];
   agentsById: ReadonlyMap<string, MobileAgent>;
-  targetKind: ChatTarget["kind"];
   serverId: string;
   canSend: boolean;
   muted: ViewStyle["backgroundColor"];
   themeMuted: string;
   foreground: ViewStyle["backgroundColor"];
   userForeground: string;
-  userBubbleStyle: ComponentProps<typeof Animated.View>["style"];
+  /** Unset when the user's messages do not use the agent color. */
+  userBubbleStyle: ComponentProps<typeof Animated.View>["style"] | undefined;
   firstMessageStyle: ComponentProps<typeof Animated.View>["style"];
   onUserLayout: ChatMotion["onUserLayout"];
   screenReaderEnabled: boolean;
@@ -367,7 +368,6 @@ const MessageRow = memo(function MessageRow({
   const {
     agents,
     agentsById,
-    targetKind,
     serverId,
     canSend,
     muted,
@@ -543,19 +543,19 @@ const MessageRow = memo(function MessageRow({
             collapsed={waiting}
             className={
               message.author === "user"
-                ? `self-end rounded-[30px] px-4 py-3 ${targetKind === "channel" ? "bg-control/60" : ""} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
+                ? `self-end rounded-[30px] px-4 py-3 ${userBubbleStyle ? "" : "bg-control/60"} ${message.attachments?.length ? "max-w-[88%]" : "max-w-full"}`
                 : `max-w-full self-start rounded-[30px] ${waiting ? "" : "px-4 py-3"}`
             }
             style={[
               { borderCurve: "circular", overflow: "hidden" },
-              message.author === "user" && targetKind === "agent" ? userBubbleStyle : undefined,
+              message.author === "user" ? userBubbleStyle : undefined,
             ]}
           >
             <ChatMarkdown
               agents={agents}
               body={message.body}
               selectable={message.author === "user"}
-              color={message.author === "user" && targetKind === "agent" ? userForeground : foreground}
+              color={message.author === "user" && userBubbleStyle ? userForeground : foreground}
               playback={playback}
               animationEnabled={shared.animationActive && arrivals.has(message.id)}
             />
@@ -718,6 +718,7 @@ export function ChatMessageList({
     [replySession],
   );
   const arrivals = useMessageArrivals(replySession.key, messages, animateMessages && historyState === "ready");
+  const agentColorMessages = useAgentColorMessages((state) => state.enabled);
   const userBubbleColor = getBloubAvatarColor(
     target.kind === "agent" ? target.avatarSeed : target.id,
     target.kind === "agent" ? target.avatarHue : null,
@@ -770,14 +771,13 @@ export function ChatMessageList({
     () => ({
       agents,
       agentsById,
-      targetKind: target.kind,
       serverId: target.serverId,
       canSend,
       muted,
       themeMuted,
       foreground,
       userForeground,
-      userBubbleStyle,
+      userBubbleStyle: target.kind === "agent" && agentColorMessages ? userBubbleStyle : undefined,
       firstMessageStyle: motion.firstMessageStyle,
       onUserLayout: motion.onUserLayout,
       screenReaderEnabled,
@@ -803,6 +803,7 @@ export function ChatMessageList({
       foreground,
       userForeground,
       userBubbleStyle,
+      agentColorMessages,
       motion.firstMessageStyle,
       motion.onUserLayout,
       screenReaderEnabled,

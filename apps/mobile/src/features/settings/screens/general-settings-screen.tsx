@@ -15,6 +15,7 @@ import {
   useDictationLanguage,
 } from "@/features/settings/model/dictation-language";
 import { saveHapticsPreference, useHapticsPreference } from "@/features/settings/model/haptics";
+import { saveAgentColorMessages, useAgentColorMessages } from "@/features/settings/model/message-color";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
@@ -140,6 +141,8 @@ export function GeneralSettingsScreen() {
   }
   const { value, ready, saving } = useAppearance();
   const [error, setError] = useState<string | null>(null);
+  const agentColorMessages = useAgentColorMessages();
+  const [agentColorError, setAgentColorError] = useState<string | null>(null);
   return (
     <SettingsContent>
       <SettingsSection
@@ -169,6 +172,28 @@ export function GeneralSettingsScreen() {
           }
         >
           <Typography.Paragraph>{t("mobile.settings.appearance.theme")}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={agentColorError ?? t("mobile.settings.appearance.agentColorMessagesFooter")}>
+        <SettingsRow>
+          <Host
+            matchContents={{ vertical: true }}
+            style={{ width: "100%" }}
+            colorScheme={theme === "dark" ? "dark" : "light"}
+          >
+            <Switch
+              value={agentColorMessages.enabled}
+              disabled={!agentColorMessages.ready || agentColorMessages.saving}
+              label={t("mobile.settings.appearance.agentColorMessages")}
+              onValueChange={(enabled) => {
+                setAgentColorError(null);
+                void saveAgentColorMessages(enabled).catch(() => {
+                  setAgentColorError(t("mobile.settings.saveFailed"));
+                  void haptics.notification("error");
+                });
+              }}
+            />
+          </Host>
         </SettingsRow>
       </SettingsSection>
       <LanguageSection dark={theme === "dark"} />
