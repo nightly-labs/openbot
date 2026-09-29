@@ -6,28 +6,29 @@ import {
   parseHostedServerList,
   parseHostedServerSummary,
 } from "@openbot/contracts/hosted-servers";
+import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
-import type { AddServerCalls, AddServerResume } from "../servers/AddServerOverlay";
+import type { AddServerResume } from "../servers/AddServerOverlay";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
- * The add server dialog calls for a signed-in browser. They use the `/api/browser/v2/hosting/...`
- * operations. The page goes only to a Stripe Checkout URL, which the contract parser checks.
+ * The hosted server calls for a signed-in browser: the add server dialog and the server list in
+ * Billing. They use the `/api/browser/v2/hosting/...` operations. The page goes only to a Stripe
+ * Checkout URL, which the contract parser checks.
  */
 export function createWebHostedServerCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
-): AddServerCalls {
-  async function request<T>(
+): HostedServersDesktopApi {
+  async function send(
     path: string,
-    decode: (value: unknown) => T | null,
-    init: { body?: string; headers?: Record<string, string> } = {},
-  ): Promise<T> {
+    init: { method?: "POST" | "DELETE"; body?: string; headers?: Record<string, string> } = {},
+  ): Promise<Response> {
     const post = init.body !== undefined;
     const response = await accountFetch(`/api/browser/v2/hosting/${path}`, {
-      method: post ? "POST" : "GET",
+      method: init.method ?? (post ? "POST" : "GET"),
       credentials: "same-origin",
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -36,8 +37,16 @@ export function createWebHostedServerCalls(
     }).catch(() => {
       throw new Error(errorMessage(null));
     });
-    const value = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(errorMessage(value));
+    if (!response.ok) throw new Error(errorMessage(await response.json().catch(() => null)));
+    return response;
+  }
+
+  async function request<T>(
+    path: string,
+    decode: (value: unknown) => T | null,
+    init: { body?: string; headers?: Record<string, string> } = {},
+  ): Promise<T> {
+    const value = await (await send(path, init)).json().catch(() => null);
     const decoded = decode(value);
     if (!decoded) throw new Error(currentText().sourceText("error.auth.invalidHostedServer"));
     return decoded;
@@ -63,6 +72,12 @@ export function createWebHostedServerCalls(
     openCheckout: async (serverId) =>
       open(await request(serverPath(serverId, "checkout"), parseHostedServerCheckout, { body: "{}" })),
     wake: (serverId) => request(serverPath(serverId, "wake"), parseHostedServerSummary, { body: "{}" }),
+    async delete({ serverId, confirmName }) {
+      await send(`servers/${encodeURIComponent(serverId)}`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirmName }),
+      });
+    },
   };
 }
 

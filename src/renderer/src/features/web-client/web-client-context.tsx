@@ -18,6 +18,7 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
+import { WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
@@ -96,8 +97,6 @@ interface WebWorkspaceState {
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
 }
-/** How long a waking hosted server gets before the next connection attempt. */
-const WAKE_RECONNECT_DELAY_MS = 5_000;
 /** A host restarts in under a minute; the retries stop after three. */
 const HOST_RESTART_RETRY_MS = 5_000;
 const HOST_RESTART_RETRY_LIMIT = 36;

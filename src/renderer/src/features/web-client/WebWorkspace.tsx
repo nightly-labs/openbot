@@ -47,6 +47,7 @@ import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/feature
 import { BillingDialog } from "@openbot/ui/features/billing/BillingDialog";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
+import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { useText } from "@openbot/ui/text";
@@ -599,6 +600,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [billingOpen, setBillingOpen] = createSignal(false);
   const billingCalls = createWebBillingCalls(props.accountFetch);
   const billing = createBillingStore(() => billingCalls, billingOpen);
+  // The web client has no Settings dialog, so a server whose plan ended is renewed or deleted in Billing.
+  const hostedServers = createSettingsHostedServersStore(
+    {
+      get open() {
+        return billingOpen();
+      },
+      hostedServersApi: hostedServerCalls,
+    },
+    billingOpen,
+  );
   createEffect(
     () => props.billingReturn,
     (billingReturn) => {
@@ -1274,7 +1285,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   />
                 )}
               </Show>
-              <BillingDialog open={billingOpen()} onOpenChange={setBillingOpen} store={billing} />
+              <BillingDialog
+                open={billingOpen()}
+                onOpenChange={setBillingOpen}
+                store={billing}
+                hostedServers={hostedServers}
+              />
               <ChannelCreateOverlay />
               <GlobalSearchOverlay
                 open={searchOpen()}

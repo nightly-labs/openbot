@@ -27,7 +27,9 @@ has its own Stripe plan. Its machine comes from the plan
 | Start retry | `src/main/hosted-server-start-retry.ts` | Publishes the host again after a failed start. |
 | Activity report | `src/main/hosted-server-activity.ts` | Tells the Worker that the server is in use, and when its next routine runs. |
 | Billing link | `apps/auth-api/src/server/hosted-billing.ts`, `billing-service.ts` | Opens Stripe Checkout for a new server. Tells the hosting service when a subscription changes. |
-| Desktop and web clients | `AddServerOverlay`, `SettingsHostedServersTab`, `hosted-server-service.ts`, `web-hosted-servers.ts`, `web-hosted-server-wake.ts` | Pick a plan, pay, list, start, renew and delete. Start a stopped server when a connection fails. |
+| Desktop and web clients | `AddServerOverlay`, `SettingsHostedServersTab`, `hosted-server-service.ts`, `web-hosted-servers.ts`, `web-hosted-server-wake.ts` | Pick a plan, pay, list, start, renew and delete. The web app shows the list in Billing. Start a stopped server when a connection fails. |
+| Mobile client | `mobile-workspace-context.tsx` | Starts the selected stopped server when a connection fails. |
+| Shared wake logic | `packages/team-client/src/hosted-server-wake.ts` | The web and mobile clients use it to ask for a wake and to limit the reconnects. |
 
 ## Lifecycle
 
@@ -98,7 +100,8 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    `POST /v2/hosting/servers/:id/wake` (owner or member; 404 for a host that is not a hosted
    server). This resumes a `stopped` sandbox or one in `error`. The desktop does this when Signal
    answers `host_unavailable`, at most once a minute for each host. The web client does this when a
-   connection fails, then connects again every 5 seconds. A server whose plan ended answers
+   connection fails, then connects again every 5 seconds. The mobile app does the same for the
+   selected server while the app is in the foreground. A server whose plan ended answers
    `402 plan_required`.
 
    A paid server whose setup failed has no sandbox. A wake (Retry in the add server dialog) sets
