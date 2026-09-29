@@ -115,5 +115,3 @@ export function createWebServerNotifications(accountId: string, storage: Notific
     },
   };
 }
-
-export type WebServerNotifications = ReturnType<typeof createWebServerNotifications>;
