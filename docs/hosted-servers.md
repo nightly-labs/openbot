@@ -210,7 +210,12 @@ the secrets below are set. Set `HOSTED_SERVERS_ENABLED` to `false` to stop new s
 servers, their webhooks and the cron continue.
 
 1. **boat.** Use a paid boat account: a trial allows 2 sandboxes and only `small` and `default`, so
-   Pro (`large`) fails. Make the Worker key with the scope in the table above.
+   Pro (`large`) fails. Make the Worker key with the scope in the table above. Turn on auto-pay in
+   the boat billing page: when the balance is empty for 24 hours, boat snapshots and stops each
+   running sandbox, including paid servers. boat charges only while a sandbox runs, per second:
+   `small` $0.018, `default` $0.036 and `large` $0.072 each hour (see
+   [boat pricing](https://docs.boat.dev/pricing)). `GET /limits` shows the balance in `default`
+   seconds.
 2. **Template.** Build it from the release AppImage with the production account service:
    `bun run hosting:template --version=<v> --appimage-url=<release AppImage URL>
    --appimage-sha256=<hex> --auth-api-url=https://api.openbot.run`. Build a new template for each
