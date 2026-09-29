@@ -2175,6 +2175,10 @@ textarea {
   text-transform: uppercase;
 }
 
+.avatar-editor-heading > span {
+  white-space: nowrap;
+}
+
 .avatar-editor-actions {
   display: flex;
   align-items: center;
@@ -2193,6 +2197,11 @@ textarea {
   transition-property: scale, background-color, color;
   transition-duration: var(--openbot-duration-normal), var(--openbot-duration-hover), var(--openbot-duration-hover);
   transition-timing-function: ease-out;
+}
+
+.avatar-editor-actions .ui-icon-button {
+  width: var(--openbot-control-xl);
+  padding: 0;
 }
 
 .avatar-editor-actions button:hover {
