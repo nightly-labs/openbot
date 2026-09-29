@@ -173,6 +173,7 @@ export const messages = {
   "server.members.saveIdentityFirst": "先に「一般」でサーバーの ID を保存してください。",
   "server.members.title": "サーバーのメンバー",
   "server.members.count": { other: "{count} 人のメンバー" },
+  "server.members.limitCount": { other: "メンバー {count} / {limit} 人" },
   "server.members.search": "メンバーを検索",
   "server.members.noMatch": "この検索に一致するメンバーはいません。",
   "server.members.inactiveTitle": "非アクティブなメンバー",
@@ -203,6 +204,8 @@ export const messages = {
   "server.invite.showQr": "招待の QR コードを表示",
   "server.invite.permaHint":
     "期限切れにならず、何度でも使用できます。このリンクを持つすべてのユーザーが参加できます。無効にするには取り消してください。",
+  "server.invite.full":
+    "このサーバーのメンバーは上限の {limit} 人です。新しい人を招待するには、メンバーを削除してください。",
   "server.invite.qrLabel": "招待の QR コード",
   "server.invite.qrDescription": "OpenBot Mobile でこのコードをスキャンすると、このサーバーに参加できます。",
   "server.invite.accepted": "招待が承諾されました",

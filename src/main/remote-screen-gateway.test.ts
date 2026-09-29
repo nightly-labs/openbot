@@ -45,7 +45,7 @@ describe("RemoteScreenGateway", () => {
         message:
           platform === "linux"
             ? "Remote desktop hosting is not supported on Linux."
-            : "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on an Apple silicon Mac or Windows x64 host, then restart OpenBot.",
+            : "The Sunshine and Moonlight Web runtime is missing or is not supported on this host. Install the full OpenBot release on a Mac or a Windows x64 host, then restart OpenBot.",
       });
       expect(gateway.list()).toEqual([]);
       await gateway.stop();

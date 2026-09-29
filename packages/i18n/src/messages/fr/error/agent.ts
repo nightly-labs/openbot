@@ -32,6 +32,8 @@ export const messages = {
     "{provider} n’a aucun modèle disponible, et aucun autre fournisseur connecté n’en a. Connectez-vous à un fournisseur, ou changez le fournisseur par défaut dans Fournisseurs et autorisations.",
   "error.agent.waitBeforeProviderChange":
     "Attendez la fin du tour actif et de la file d’attente avant de changer de fournisseur.",
+  "error.agent.waitBeforeClearContext":
+    "Attendez la fin du tour actif et de la file d’attente avant de commencer une nouvelle discussion.",
   "error.agent.unknown": "Agent inconnu : {id}",
   "error.agent.onlyUserWidensSettings":
     "Seul l’utilisateur peut donner à un agent l’accès complet ou activer Computer Use. Demandez à l’utilisateur de le modifier dans les réglages de l’agent.",

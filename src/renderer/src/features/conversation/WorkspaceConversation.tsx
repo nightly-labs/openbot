@@ -6,6 +6,7 @@ import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
+import { turnsPort } from "../../turns-port";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
@@ -13,6 +14,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -171,6 +173,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return (autoApprove: boolean) => writeAgentAutoApprove(agent.id, autoApprove);
   });
 
+  /** A new chat with the active agent, on this computer or on a host that serves `context-reset-v1`. */
+  const clearActiveAgentContext = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || !server || !serverSupportsCapability(server, "context-reset-v1")) return undefined;
+    return () => turnsPort().agent.clearContext(agent.id, server.id);
+  });
+
   /** The Team API agent summary has no access, so a joined server's agent shows the host's answer. */
   const conversationAgent = createMemo(() => {
     const agent = activeAgent();
@@ -296,6 +306,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           : (remoteAgentSettings()?.autoApproveLocked ?? false)
       }
       onSetAgentAutoApprove={setAgentAutoApproveForActiveAgent()}
+      onClearAgentContext={clearActiveAgentContext()}
       onRespondToBrowserTakeover={respondToBrowserTakeover}
       onCancelQueuedMessage={cancelQueuedMessage}
       onSteerQueuedMessage={steerQueuedMessage}

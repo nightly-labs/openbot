@@ -23,9 +23,11 @@ import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
+import { cleanAgentMessageText } from "../agents/agent-message-text";
 import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
+import { createHostRestartToasts } from "../updates/host-restart-toast";
 import type { WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
@@ -42,6 +44,8 @@ interface WebConversation {
   loading: boolean;
   sending: boolean;
   uncertain: boolean;
+  /** Why the last send failed. The composer shows it; it is not a workspace error. */
+  sendError: string | null;
 }
 interface WebWorkspaceState {
   hosts: RemoteTeamHost[];
@@ -55,6 +59,8 @@ interface WebWorkspaceState {
   queues: Record<string, QueueSnapshot>;
   approvals: Array<AgentApproval | AgentRuntimeApproval>;
   prompts: Array<Extract<AgentEvent, { type: "prompt" }>>;
+  /** The latest progress detail of each agent's running turn. */
+  progress: Record<string, { turnId: string; detail: string }>;
   takeovers: BrowserTakeoverRequest[];
   browserTabs: BrowserTab[];
   activeBrowserTabId: string | null;
@@ -63,6 +69,8 @@ interface WebWorkspaceState {
   presence: TeamPresenceSnapshot | null;
   capabilities: string[];
   status: "connecting" | "online" | "offline";
+  /** The opened host said it restarts into an update (`host-update-v1`). Cleared when it is online again. */
+  hostRestart: { state: "waiting" | "restarting"; version: string | null } | null;
   /** The state of each host that this tab has not opened, from its status connection. */
   hostStates: Record<string, WebHostState>;
   /** The last connection found that the host speaks no protocol this build speaks. */
@@ -86,6 +94,10 @@ interface WebWorkspaceState {
   duplicatingAgentIds: string[];
   sidebarLayout: SidebarLayoutSnapshot;
 }
+/** A host restarts in under a minute; the retries stop after three. */
+const HOST_RESTART_RETRY_MS = 5_000;
+const HOST_RESTART_RETRY_LIMIT = 36;
+
 export type WebRuntimeFactory = (
   accountId: string,
   events: WebRuntimeEvents,
@@ -116,6 +128,7 @@ export function createWebWorkspace(
     queues: {},
     approvals: [],
     prompts: [],
+    progress: {},
     takeovers: [],
     browserTabs: [],
     activeBrowserTabId: null,
@@ -123,6 +136,7 @@ export function createWebWorkspace(
     presence: null,
     capabilities: [],
     status: "offline",
+    hostRestart: null,
     hostStates: {},
     incompatibility: null,
     hostsLoaded: false,
@@ -148,11 +162,16 @@ export function createWebWorkspace(
   let acceptedInvite: { inviteUrl: string; host: RemoteTeamHost } | null = null;
   /** Set when a revoked session connects again by itself; cleared when the host is online. */
   let revokedReconnect = false;
+  /** The next reconnect to a host that restarts into an update. The opened host has no other retry. */
+  let restartRetry: ReturnType<typeof setTimeout> | null = null;
   /** The queue read in flight by agent. An event during a read asks for one more read. */
   const queueLoads = new Map<string, { generation: number; again: boolean }>();
   /** Counts queue snapshots from events by agent. A read that started before a newer snapshot is dropped. */
   const queueRevisions = new Map<string, number>();
   const readWrites = new Map<string, Promise<void>>();
+  /** The conversation reads in flight by agent, and the deltas that wait for them to finish. */
+  const conversationReads = new Map<string, number>();
+  const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
@@ -173,6 +192,7 @@ export function createWebWorkspace(
           if (update.state !== "online") {
             draft.approvals = [];
             draft.prompts = [];
+            draft.progress = {};
             draft.takeovers = [];
             draft.browserTabs = [];
             draft.activeBrowserTabId = null;
@@ -196,6 +216,7 @@ export function createWebWorkspace(
             draft.selectedId = null;
             draft.approvals = [];
             draft.prompts = [];
+            draft.progress = {};
             draft.takeovers = [];
             draft.browserTabs = [];
             draft.activeBrowserTabId = null;
@@ -225,7 +246,14 @@ export function createWebWorkspace(
           return;
         }
         if (update.state === "online") revokedReconnect = false;
-        if (update.state === "online" && update.resync) void resync();
+        else if (state.hostRestart) retryAfterRestart();
+        if (update.state === "online" && update.resync) {
+          // A host that still waits to restart says so again when the connection declares capabilities.
+          setState((draft) => {
+            draft.hostRestart = null;
+          });
+          void resync();
+        }
       },
       event(id, event) {
         if (disposed || id !== hostId) return;
@@ -233,6 +261,10 @@ export function createWebWorkspace(
         if (event.type === "team-presence")
           setState((draft) => {
             draft.presence = event.snapshot;
+          });
+        if (event.type === "host-restart")
+          setState((draft) => {
+            draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
         if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
@@ -270,8 +302,19 @@ export function createWebWorkspace(
             draft.approvals = draft.approvals.filter((item) => String(item.requestId) !== String(event.requestId));
             draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(event.requestId));
           });
+        } else if (event.type === "turn-progress") {
+          setState((draft) => {
+            draft.progress[event.agentId] = { turnId: event.turnId, detail: cleanAgentMessageText(event.detail) };
+          });
+        } else if (event.type === "turn-started") {
+          setState((draft) => {
+            delete draft.progress[event.agentId];
+          });
+        } else if (event.type === "conversation-delta") {
+          applyDelta(event);
         } else if (event.type === "turn-completed") {
           setState((draft) => {
+            if (draft.progress[event.agentId]?.turnId === event.turnId) delete draft.progress[event.agentId];
             draft.prompts = draft.prompts.filter(
               (item) =>
                 item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
@@ -324,7 +367,6 @@ export function createWebWorkspace(
             "conversation",
             "conversation-page",
             "conversation-invalidated",
-            "conversation-delta",
             "turn-started",
             "turn-completed",
             "prompt",
@@ -332,10 +374,6 @@ export function createWebWorkspace(
           ].includes(event.type)
         )
           void refresh();
-        if (event.type === "error")
-          setState((draft) => {
-            draft.error = currentText().t("webClient.error.hostReported");
-          });
       },
     },
     props.accountFetch,
@@ -404,6 +442,7 @@ export function createWebWorkspace(
       for (const id of removed) {
         delete draft.conversations[id];
         delete draft.queues[id];
+        delete draft.progress[id];
       }
       if (nextSelected === null) draft.selectedId = null;
       // The layout also orders channels, so only the agents that left may be dropped from it.
@@ -446,6 +485,7 @@ export function createWebWorkspace(
             draft.queues = {};
             draft.approvals = [];
             draft.prompts = [];
+            draft.progress = {};
             draft.takeovers = [];
             draft.browserTabs = [];
             draft.activeBrowserTabId = null;
@@ -504,6 +544,20 @@ export function createWebWorkspace(
   function retryHosts(): Promise<void> {
     return refreshHosts().catch(() => undefined);
   }
+  /** `connect` clears `hostRestart`, so the retries count down instead of reading it again. */
+  function retryAfterRestart(retries = HOST_RESTART_RETRY_LIMIT): void {
+    if (restartRetry || disposed || retries <= 0) return;
+    const retryHostId = hostId;
+    restartRetry = setTimeout(() => {
+      restartRetry = null;
+      if (disposed || hostId !== retryHostId || state.status === "online") return;
+      void reconnect()
+        .catch(() => undefined)
+        .then(() => {
+          if (!disposed && hostId === retryHostId && state.status !== "online") retryAfterRestart(retries - 1);
+        });
+    }, HOST_RESTART_RETRY_MS);
+  }
   async function reconnect(): Promise<void> {
     const host = state.hosts.find((listed) => listed.hostId === state.host?.hostId) ?? state.host;
     if (!host || state.status === "connecting") return;
@@ -532,6 +586,7 @@ export function createWebWorkspace(
     setState((draft) => {
       draft.host = host;
       draft.status = "connecting";
+      draft.hostRestart = null;
       draft.memberId = sameHost ? draft.memberId : null;
       draft.agents = [];
       draft.agentsLoaded = false;
@@ -550,6 +605,7 @@ export function createWebWorkspace(
       }
       draft.approvals = [];
       draft.prompts = [];
+      draft.progress = {};
       draft.takeovers = [];
       draft.browserTabs = [];
       draft.activeBrowserTabId = null;
@@ -627,35 +683,92 @@ export function createWebWorkspace(
     const previous = state.conversations[id];
     const before = older ? (previous?.page?.pageInfo.olderCursor ?? undefined) : undefined;
     if (older && !before) return;
-    const page = await runtime.conversation(id, before);
-    if (disposed || current !== generation) return;
-    if (page.agentId !== id) throw new Error(currentText().t("webClient.error.otherConversation"));
+    conversationReads.set(id, (conversationReads.get(id) ?? 0) + 1);
+    try {
+      const page = await runtime.conversation(id, before);
+      if (disposed || current !== generation) return;
+      if (page.agentId !== id) throw new Error(currentText().t("webClient.error.otherConversation"));
+      setState((draft) => {
+        const item = draft.conversations[id];
+        if (!item) return;
+        const old = item.page?.threadId === page.threadId ? item.page : null;
+        if (old && page.revision < old.revision) return;
+        const resolvedRequests = new Set(
+          page.messages.flatMap((message) =>
+            message.questionPrompt?.resolution ? [String(message.questionPrompt.requestId)] : [],
+          ),
+        );
+        draft.prompts = draft.prompts.filter(
+          (prompt) =>
+            prompt.agentId !== id ||
+            prompt.threadId !== page.threadId ||
+            !resolvedRequests.has(String(prompt.requestId)),
+        );
+        item.page = {
+          ...page,
+          messages: mergeConversationPage(
+            old?.messages ?? [],
+            page.messages,
+            older ? "older" : old ? "latest" : "replace",
+          ),
+          references: { ...old?.references, ...page.references },
+          pageInfo: !older && old ? old.pageInfo : page.pageInfo,
+          // An older page has the thread's current revision but not its newest messages. The loaded
+          // newest messages keep their revision, so a delta held during this read still applies.
+          revision: older && old ? old.revision : page.revision,
+        };
+        item.loading = false;
+      });
+    } finally {
+      const reads = (conversationReads.get(id) ?? 1) - 1;
+      if (reads > 0) conversationReads.set(id, reads);
+      else {
+        conversationReads.delete(id);
+        const held = heldDeltas.get(id) ?? [];
+        heldDeltas.delete(id);
+        for (const event of held) applyDelta(event);
+      }
+    }
+  }
+  /**
+   * Appends streamed text to the selected conversation without a read. A delta that arrives during
+   * a read waits for it: the page read may already hold the text, and its revision tells which
+   * deltas are newer. A delta for another thread asks for a read.
+   */
+  function applyDelta(event: Extract<AgentEvent, { type: "conversation-delta" }>) {
+    if (disposed || event.agentId !== selectedId) return;
+    if (conversationReads.has(event.agentId)) {
+      heldDeltas.set(event.agentId, [...(heldDeltas.get(event.agentId) ?? []), event]);
+      return;
+    }
+    let otherThread = false;
+    // The checks read the draft: a page that a read just wrote is not visible outside it until a flush.
     setState((draft) => {
-      const item = draft.conversations[id];
-      if (!item) return;
-      const old = item.page?.threadId === page.threadId ? item.page : null;
-      if (old && page.revision < old.revision) return;
-      const resolvedRequests = new Set(
-        page.messages.flatMap((message) =>
-          message.questionPrompt?.resolution ? [String(message.questionPrompt.requestId)] : [],
-        ),
-      );
-      draft.prompts = draft.prompts.filter(
-        (prompt) =>
-          prompt.agentId !== id || prompt.threadId !== page.threadId || !resolvedRequests.has(String(prompt.requestId)),
-      );
-      item.page = {
-        ...page,
-        messages: mergeConversationPage(
-          old?.messages ?? [],
-          page.messages,
-          older ? "older" : old ? "latest" : "replace",
-        ),
-        references: { ...old?.references, ...page.references },
-        pageInfo: !older && old ? old.pageInfo : page.pageInfo,
-      };
-      item.loading = false;
+      const value = draft.conversations[event.agentId]?.page;
+      if (!value) return;
+      if (value.threadId !== event.threadId) {
+        otherThread = true;
+        return;
+      }
+      if (event.revision <= value.revision) return;
+      const message = value.messages.find((item) => item.id === event.messageId);
+      if (message) {
+        message.text += event.delta;
+        message.status = "streaming";
+      } else
+        value.messages.push({
+          id: event.messageId,
+          turnId: event.turnId,
+          author: "assistant",
+          source: "assistant",
+          text: event.delta,
+          createdAt: event.createdAt,
+          status: "streaming",
+        });
+      value.revision = event.revision;
+      value.activeTurnId = event.turnId;
     });
+    if (otherThread) void refresh();
   }
   // Coalesce event bursts per agent, as `refresh` does for the conversation.
   function loadQueue(id: string): void {
@@ -705,6 +818,7 @@ export function createWebWorkspace(
         loading: true,
         sending: false,
         uncertain: false,
+        sendError: null,
       };
     });
     try {
@@ -776,13 +890,17 @@ export function createWebWorkspace(
     const current = generation;
     const text = textOverride ?? item.draft;
     if (text.length > INPUT_LIMITS.messageText) {
-      report(new Error(currentText().t("webClient.error.messageTooLong")));
+      setState((draft) => {
+        const conversation = draft.conversations[id];
+        if (conversation) conversation.sendError = currentText().t("webClient.error.messageTooLong");
+      });
       return false;
     }
     setState((draft) => {
       const conversation = draft.conversations[id];
-      if (conversation) conversation.sending = true;
-      draft.error = null;
+      if (!conversation) return;
+      conversation.sending = true;
+      conversation.sendError = null;
     });
     try {
       await runtime.send(
@@ -808,8 +926,9 @@ export function createWebWorkspace(
       if (current !== generation || disposed) return false;
       setState((draft) => {
         const conversation = draft.conversations[id];
-        if (conversation) conversation.uncertain = true;
-        draft.error = currentText().t("webClient.error.deliveryUnconfirmed");
+        if (!conversation) return;
+        conversation.uncertain = true;
+        conversation.sendError = currentText().t("webClient.error.deliveryUnconfirmed");
       });
       return false;
     } finally {
@@ -840,6 +959,19 @@ export function createWebWorkspace(
     readWrites.set(id, write);
     return write;
   }
+  createHostRestartToasts(() =>
+    state.host
+      ? [
+          {
+            id: state.host.hostId,
+            name: state.host.name,
+            online: state.status === "online",
+            restart: state.hostRestart?.state ?? null,
+            version: state.hostRestart?.version ?? null,
+          },
+        ]
+      : [],
+  );
   onSettled(() => {
     void refreshHosts().catch(report);
     const focus = () => {
@@ -855,6 +987,7 @@ export function createWebWorkspace(
       disposed = true;
       generation += 1;
       acceptedInvite = null;
+      if (restartRetry) clearTimeout(restartRetry);
       window.removeEventListener("focus", focus);
       void runtime.dispose({ sessionsEnded: props.accountSessionEnded?.() ?? false }).catch(() => undefined);
     };
@@ -1054,7 +1187,9 @@ export function createWebWorkspace(
       if (id)
         setState((draft) => {
           const conversation = draft.conversations[id];
-          if (conversation) conversation.uncertain = false;
+          if (!conversation) return;
+          conversation.uncertain = false;
+          conversation.sendError = null;
         });
     },
     async upload(file: File) {

@@ -125,6 +125,12 @@ export function createRendererForwarders({
     sendToRenderer(window, IPC_ENDPOINTS.update.event, status);
   }
 
+  function forwardUpdatePreference(preference: import("@openbot/contracts/ipc").UpdatePreference): void {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed()) return;
+    sendToRenderer(window, IPC_ENDPOINTS.update.preference, preference);
+  }
+
   function forwardVoiceModelStatus(status: VoiceModelStatus): void {
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
@@ -195,6 +201,7 @@ export function createRendererForwarders({
     forwardAgentEvent,
     forwardBrowserDisplayState,
     forwardUpdateStatus,
+    forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardProviderRuntimeStatus,
     forwardHostStatus,

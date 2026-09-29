@@ -1,4 +1,5 @@
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
+import { type HostRestartEvent, hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { decodeTeamProtocolV5BaseCurrentEvent } from "@openbot/contracts/team-protocol/v5-base-adapter";
 // The live event channel for HTTPS servers, and the reconnect policy both transports share.
 //
@@ -102,6 +103,7 @@ export interface RemoteEventStreamOptions {
   onPresence: (serverId: string, snapshot: TeamPresenceSnapshot) => void;
   onDirectMessage: (serverId: string, event: DirectMessageRealtimeEvent) => void;
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
+  onHostRestart: (serverId: string, event: HostRestartEvent) => void;
   onOffline: (serverId: string) => void;
   onChanged: () => void;
 }
@@ -117,6 +119,7 @@ export class RemoteEventStream {
   readonly #onPresence: RemoteEventStreamOptions["onPresence"];
   readonly #onDirectMessage: RemoteEventStreamOptions["onDirectMessage"];
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
+  readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
   readonly #onChanged: RemoteEventStreamOptions["onChanged"];
   readonly #controllers = new Map<string, AbortController>();
@@ -141,6 +144,7 @@ export class RemoteEventStream {
     this.#onPresence = options.onPresence;
     this.#onDirectMessage = options.onDirectMessage;
     this.#onDirectTyping = options.onDirectTyping;
+    this.#onHostRestart = options.onHostRestart;
     this.#onOffline = options.onOffline;
     this.#onChanged = options.onChanged;
   }
@@ -431,7 +435,7 @@ export class RemoteEventStream {
           }
           try {
             const value = JSON.parse(message.data);
-            const optional = channelEvent(value);
+            const optional = channelEvent(value) ?? hostRestartEvent(value);
             const decoded = optional
               ? { kind: "known" as const, event: optional }
               : decodeTeamProtocolV5BaseCurrentEvent(value);
@@ -454,6 +458,8 @@ export class RemoteEventStream {
               this.#onDirectMessage(serverId, event);
             } else if (event.type === "team-direct-typing") {
               this.#onDirectTyping(serverId, event);
+            } else if (event.type === "host-restart") {
+              this.#onHostRestart(serverId, event);
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {

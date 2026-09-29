@@ -69,6 +69,7 @@ function runtimeFixture(
     markRead: async () => ({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     send: async () => {},
     stop: async () => {},
+    setTyping: () => {},
     queue: async (agentId) => ({ agentId, deliveries: [] }),
     editQueue: async ({ agentId }) => ({ agentId, deliveries: [] }),
     cancelQueued: async () => {},
@@ -114,7 +115,9 @@ describe("WebAgentSettings", () => {
     const fixture = runtimeFixture();
     const onSaved = vi.fn(async () => {});
     const onClose = vi.fn();
-    render(() => <WebAgentSettings runtime={fixture.runtime} capabilities={[]} onSaved={onSaved} onClose={onClose} />);
+    render(() => (
+      <WebAgentSettings runtime={fixture.runtime} capabilities={[]} first={false} onSaved={onSaved} onClose={onClose} />
+    ));
 
     expect(fixture.models).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /Agent model:/ })).toBeNull();
@@ -137,7 +140,15 @@ describe("WebAgentSettings", () => {
     const onSaved = vi.fn(async () => {
       throw new Error("refresh failed");
     });
-    render(() => <WebAgentSettings runtime={fixture.runtime} capabilities={[]} onSaved={onSaved} onClose={() => {}} />);
+    render(() => (
+      <WebAgentSettings
+        runtime={fixture.runtime}
+        capabilities={[]}
+        first={false}
+        onSaved={onSaved}
+        onClose={() => {}}
+      />
+    ));
 
     await fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -161,6 +172,7 @@ describe("WebAgentSettings", () => {
       <WebAgentSettings
         runtime={fixture.runtime}
         capabilities={capabilities()}
+        first={false}
         onSaved={async () => {}}
         onClose={() => {}}
       />

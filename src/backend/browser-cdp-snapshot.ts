@@ -18,10 +18,16 @@ import {
 
 const MAX_SNAPSHOT_ELEMENTS = 200;
 const MAX_SNAPSHOT_CANDIDATES = MAX_SNAPSHOT_ELEMENTS * 2;
-const MAX_SNAPSHOT_TEXT = 100_000;
+/** How much page text a text wait scans for its needle. */
+const MAX_SCANNED_TEXT = 100_000;
+/**
+ * The page text a snapshot returns. Each action returns a fresh snapshot to the model, so this is
+ * paid again on every step; the text in the viewport comes first, and a truncated snapshot says so.
+ */
+const MAX_SNAPSHOT_TEXT = 20_000;
 export const MAX_SNAPSHOT_SCANNED_NODES = 10_000;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
-const MAX_SERIALIZED_SNAPSHOT_BYTES = 1024 * 1024;
+const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 
 const ACTIONABLE_ROLES = new Set([
   "button",
@@ -77,6 +83,7 @@ export async function collectBoundedSnapshot(
   let textLength = 0;
   let hasVisualSurface = false;
   let hasFrame = captures.length > 1;
+  let truncated = false;
   for (const capture of captures) {
     assertBeforeDeadline(deadline);
     if (includeText) {
@@ -87,6 +94,7 @@ export async function collectBoundedSnapshot(
           textParts.push(summary.text);
           textLength += summary.text.length;
         }
+        truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
       }
@@ -130,10 +138,12 @@ export async function collectBoundedSnapshot(
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
   }
+  const text = textParts.join(" ").replace(/\s+/g, " ").trim();
   return {
     targets,
     elements,
-    text: textParts.join(" ").replace(/\s+/g, " ").trim().slice(0, MAX_SNAPSHOT_TEXT),
+    text: text.slice(0, MAX_SNAPSHOT_TEXT),
+    truncated: truncated || text.length > MAX_SNAPSHOT_TEXT || elements.length >= MAX_SNAPSHOT_ELEMENTS,
     hasVisualSurface,
     hasFrame,
   };
@@ -143,7 +153,7 @@ async function collectPageSummary(
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
-): Promise<{ text: string; hasVisualSurface: boolean; hasFrame: boolean }> {
+): Promise<{ text: string; truncated: boolean; hasVisualSurface: boolean; hasFrame: boolean }> {
   const contextId = await automationContextId(send, sessionId);
   const result = await send(
     "Runtime.evaluate",
@@ -153,17 +163,20 @@ async function collectPageSummary(
         const maxText = ${maxText};
         const roots = [document];
         const seen = new Set();
-        const text = [];
-        let chars = 0;
+        // Text in the viewport comes first: a dialog is often the last child of the body, and the
+        // page behind it would otherwise fill the budget.
+        const inView = { parts: [], chars: 0 };
+        const outside = { parts: [], chars: 0 };
+        let truncated = false;
         let scanned = 0;
         let hasVisualSurface = false;
         let hasFrame = false;
-        const isVisibleText = node => {
+        const visibleRects = node => {
           let element = node.parentElement;
           while (element) {
-            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return false;
+            if (element.hidden || element.inert || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
             const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return false;
+            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
             const parent = element.parentElement;
             if (parent) element = parent;
             else {
@@ -173,7 +186,8 @@ async function collectPageSummary(
           }
           const range = node.ownerDocument.createRange();
           range.selectNodeContents(node);
-          return range.getClientRects().length > 0;
+          const rects = [...range.getClientRects()];
+          return rects.length > 0 ? rects : null;
         };
         while (roots.length && scanned < maxNodes) {
           const root = roots.shift();
@@ -183,16 +197,29 @@ async function collectPageSummary(
           let node;
           while ((node = walker.nextNode()) && scanned < maxNodes) {
             scanned++;
-            if (node.nodeType === Node.TEXT_NODE && chars < maxText) {
+            if (node.nodeType === Node.TEXT_NODE) {
+              if (inView.chars >= maxText) {
+                truncated = true;
+                continue;
+              }
               const parentTag = node.parentElement?.localName;
               if (parentTag === 'script' || parentTag === 'style' || parentTag === 'noscript' || parentTag === 'template') continue;
-              if (!isVisibleText(node)) continue;
               const value = String(node.nodeValue || '').replace(/\\s+/g, ' ').trim();
-              if (value) {
-                const part = value.slice(0, Math.max(0, maxText - chars));
-                text.push(part);
-                chars += part.length + 1;
+              if (!value) continue;
+              const rects = visibleRects(node);
+              if (!rects) continue;
+              const view = node.ownerDocument.defaultView;
+              const width = view?.innerWidth ?? 0;
+              const height = view?.innerHeight ?? 0;
+              const target = rects.some(rect => rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width) ? inView : outside;
+              if (target.chars >= maxText) {
+                truncated = true;
+                continue;
               }
+              const part = value.slice(0, maxText - target.chars);
+              if (part.length < value.length) truncated = true;
+              target.parts.push(part);
+              target.chars += part.length + 1;
               continue;
             }
             if (node.nodeType !== 1) continue;
@@ -205,7 +232,10 @@ async function collectPageSummary(
             if (node.shadowRoot) roots.push(node.shadowRoot);
           }
         }
-        return { text: text.join(' '), hasVisualSurface, hasFrame };
+        if (scanned >= maxNodes) truncated = true;
+        const text = [...inView.parts, ...outside.parts].join(' ');
+        if (text.length > maxText) truncated = true;
+        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame };
       })()`,
       contextId,
       returnByValue: true,
@@ -215,6 +245,7 @@ async function collectPageSummary(
   const value = recordValue(recordValue(result.result)?.value);
   return {
     text: stringValue(value?.text),
+    truncated: value?.truncated === true,
     hasVisualSurface: value?.hasVisualSurface === true,
     hasFrame: value?.hasFrame === true,
   };
@@ -306,7 +337,7 @@ export async function pageContainsText(
             range.selectNodeContents(node);
             return range.getClientRects().length > 0;
           };
-          while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && chars < ${MAX_SNAPSHOT_TEXT}) {
+          while (roots.length && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && chars < ${MAX_SCANNED_TEXT}) {
             if (performance.now() >= scanDeadline) return { matched: false, expired: true };
             const root = roots.shift();
             if (!root || seen.has(root)) continue;
@@ -322,7 +353,7 @@ export async function pageContainsText(
                 if (!isVisibleText(node)) continue;
                 const value = String(node.nodeValue || '').replace(/\\s+/g, ' ').trim();
                 if (value) {
-                  const part = value.slice(0, Math.max(0, ${MAX_SNAPSHOT_TEXT} - chars));
+                  const part = value.slice(0, Math.max(0, ${MAX_SCANNED_TEXT} - chars));
                   combined += (combined ? ' ' : '') + part;
                   chars += part.length + 1;
                   if (combined.includes(needle)) return { matched: true, expired: false };
@@ -734,12 +765,14 @@ function redactedMetadataUrl(value: string | undefined): string {
 export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
   let bytes = Buffer.byteLength(JSON.stringify(snapshot));
   while (bytes > MAX_SERIALIZED_SNAPSHOT_BYTES) {
-    if (snapshot.diagnostics.length > 20) snapshot.diagnostics.shift();
-    else if (snapshot.actions.length > 20) snapshot.actions.shift();
-    else if (snapshot.elements.length > 0) snapshot.elements.pop();
-    else if (snapshot.text.length > 0) {
+    // The text ends with what is outside the viewport; the elements are what the next action uses.
+    if (snapshot.text.length > 0) {
+      snapshot.truncated = true;
       const excess = bytes - MAX_SERIALIZED_SNAPSHOT_BYTES;
       snapshot.text = snapshot.text.slice(0, Math.max(0, snapshot.text.length - Math.max(1, excess)));
+    } else if (snapshot.elements.length > 0) {
+      snapshot.elements.pop();
+      snapshot.truncated = true;
     } else if (snapshot.diagnostics.length > 0) snapshot.diagnostics.shift();
     else if (snapshot.actions.length > 0) snapshot.actions.shift();
     else throw new Error("Browser snapshot exceeds its serialized size limit.");

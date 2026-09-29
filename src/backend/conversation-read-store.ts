@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   type AgentSummary,
+  CONTEXT_RESET_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   type ConversationReadState,
   type ConversationSnapshot,
@@ -200,7 +201,8 @@ export class ConversationReadStore {
       AND COALESCE(item_type, '') != 'agent_attachment'
       AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
       AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
-      AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'`;
+      AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
+      AND COALESCE(item_type, '') != '${CONTEXT_RESET_ITEM_TYPE}'`;
     const countRow = this.database.connection
       .prepare(
         `SELECT COUNT(*) AS unread_count FROM projection_thread_messages
@@ -306,7 +308,8 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
         !message.itemType?.startsWith(SKILL_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX) &&
         !message.itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX) &&
-        !message.itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX),
+        !message.itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX) &&
+        message.itemType !== CONTEXT_RESET_ITEM_TYPE,
     );
   return {
     unreadCount: unread.length,

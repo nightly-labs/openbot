@@ -81,6 +81,8 @@ export const messages = {
   "mobile.server.members.createAnother": "Créer un nouveau lien",
   "mobile.server.members.create": "Créer un lien d’invitation",
   "mobile.server.members.permanentLimit": "Révoquez un lien d’invitation permanent avant d’en créer un autre.",
+  "mobile.server.members.full":
+    "Ce serveur a atteint la limite de {limit} membres. Retirez un membre pour inviter une nouvelle personne.",
   "mobile.server.members.inviteUsed": "Invitation acceptée. Le membre a rejoint ce serveur.",
   "mobile.server.members.inviteSent": "Invitation envoyée à {email}.",
   "mobile.server.members.permanentCreated":
@@ -95,6 +97,7 @@ export const messages = {
   "mobile.server.members.linkHint": "Partagez un lien à usage unique pour inviter une personne sur ce serveur.",
   "mobile.server.members.updateFailed": "Impossible de mettre à jour ce membre. Réessayez.",
   "mobile.server.members.title": "Membres du serveur",
+  "mobile.server.members.limitCount": { one: "{count} membre sur {limit}", other: "{count} membres sur {limit}" },
   "mobile.server.members.loadFailed": "Impossible de charger les membres. Actualisez pour réessayer.",
   "mobile.server.members.accessRemoved": "Accès retiré",
   "mobile.server.members.empty": "Aucun membre.",

@@ -1,4 +1,5 @@
 import type { AttachmentImportEvent, AttachmentSummary, ConversationPage } from "@openbot/contracts/ipc";
+import { currentText } from "@openbot/ui/text";
 import { render, waitFor } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,6 +65,7 @@ function harness(overrides: Partial<WebWorkspaceRuntime> = {}) {
     markRead: vi.fn().mockResolvedValue({ unreadCount: 0, firstUnreadMessageId: null, throughMessageId: null }),
     send: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
+    setTyping: vi.fn(),
     queue: vi.fn(async (agentId: string) => ({ agentId, deliveries: [] })),
     editQueue: vi.fn(),
     cancelQueued: vi.fn(),
@@ -680,11 +682,129 @@ describe("web workspace state", () => {
     await waitFor(() => expect(workspace.conversation()?.draft).toBe("Keep this draft"));
     expect(await workspace.send()).toBe(false);
     expect(workspace.conversation()?.uncertain).toBe(true);
+    // The composer shows the failure; a workspace error would show it again as a toast.
+    expect(workspace.conversation()?.sendError).toBe(currentText().t("webClient.error.deliveryUnconfirmed"));
+    expect(workspace.state.error).toBeNull();
     expect(workspace.conversation()?.draft).toBe("Keep this draft");
     app.events().connection({ hostId: "host", state: "online", message: null, resync: true });
     await waitFor(() => expect(app.runtime.conversation).toHaveBeenCalledTimes(2));
     await workspace.send();
     expect(app.runtime.send).toHaveBeenCalledOnce();
+  });
+  it("streams deltas in place and applies the ones newer than a read in flight", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    const delta = (text: string, revision: number) =>
+      app.events().event("host", {
+        type: "conversation-delta",
+        agentId: "chief",
+        threadId: "thread-chief",
+        turnId: "turn-one",
+        messageId: "reply",
+        delta: text,
+        createdAt: "2026-09-28T10:00:00.000Z",
+        revision,
+      });
+    delta("Hel", 2);
+    delta("lo", 3);
+    await waitFor(() =>
+      expect(workspace.conversation()?.page?.messages).toMatchObject([
+        { id: "reply", author: "assistant", text: "Hello", status: "streaming" },
+      ]),
+    );
+    expect(workspace.conversation()?.page?.activeTurnId).toBe("turn-one");
+    expect(app.runtime.conversation).toHaveBeenCalledOnce();
+
+    let resolveRead: ((value: ConversationPage) => void) | undefined;
+    vi.mocked(app.runtime.conversation).mockImplementationOnce(
+      () =>
+        new Promise<ConversationPage>((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    void workspace.refresh();
+    await waitFor(() => expect(app.runtime.conversation).toHaveBeenCalledTimes(2));
+    delta(" world", 5);
+    delta("!", 7);
+    resolveRead?.({
+      ...page,
+      activeTurnId: "turn-one",
+      revision: 5,
+      messages: [
+        {
+          id: "reply",
+          turnId: "turn-one",
+          author: "assistant",
+          text: "Hello world",
+          createdAt: "2026-09-28T10:00:00.000Z",
+          status: "streaming",
+        },
+      ],
+    });
+    await waitFor(() => expect(workspace.conversation()?.page?.messages.at(-1)?.text).toBe("Hello world!"));
+    expect(workspace.conversation()?.page?.revision).toBe(7);
+    expect(app.runtime.conversation).toHaveBeenCalledTimes(2);
+  });
+  it("applies a delta that arrives while older messages load", async () => {
+    const reply = {
+      id: "reply",
+      turnId: "turn-one",
+      author: "assistant" as const,
+      text: "Hel",
+      createdAt: "2026-09-28T10:00:00.000Z",
+      status: "streaming" as const,
+    };
+    let resolveOlder: ((value: ConversationPage) => void) | undefined;
+    const conversation = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...page,
+        activeTurnId: "turn-one",
+        revision: 2,
+        messages: [reply],
+        pageInfo: { hasOlder: true, olderCursor: "cursor-one" },
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<ConversationPage>((resolve) => {
+            resolveOlder = resolve;
+          }),
+      );
+    const app = harness({ conversation });
+    await waitFor(() => expect(app.workspace().conversation()?.page?.revision).toBe(2));
+    const workspace = app.workspace();
+    const loading = workspace.older();
+    await waitFor(() => expect(conversation).toHaveBeenCalledTimes(2));
+    app.events().event("host", {
+      type: "conversation-delta",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-one",
+      messageId: "reply",
+      delta: "lo",
+      createdAt: reply.createdAt,
+      revision: 3,
+    });
+    // The older page carries the thread's current revision, but not the newest reply.
+    resolveOlder?.({
+      ...page,
+      activeTurnId: "turn-one",
+      revision: 4,
+      messages: [{ ...reply, id: "earlier", author: "user", text: "Earlier", status: "completed" }],
+    });
+    await loading;
+    await waitFor(() =>
+      expect(workspace.conversation()?.page?.messages.map((message) => message.text)).toEqual(["Earlier", "Hello"]),
+    );
+  });
+  it("keeps the progress detail of a running turn until it completes", async () => {
+    const app = harness();
+    const workspace = await connected(app);
+    const turn = { agentId: "chief", threadId: "thread-chief", turnId: "turn-one" };
+    app.events().event("host", { type: "turn-progress", ...turn, detail: "Reading files" });
+    await waitFor(() => expect(workspace.state.progress.chief?.detail).toBe("Reading files"));
+    app.events().event("host", { type: "turn-completed", ...turn, status: "completed" });
+    await waitFor(() => expect(workspace.state.progress.chief).toBeUndefined());
   });
   it("keeps a sent draft confirmed when the history refresh fails", async () => {
     const app = harness();

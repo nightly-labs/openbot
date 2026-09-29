@@ -14,6 +14,13 @@
         "installedBytes": 310000000,
         "executable": "bin/codex"
       },
+      "darwin-x64": {
+        "asset": "codex-package-x86_64-apple-darwin.tar.gz",
+        "assetSha256": "3ee638d7155c856ef31f3f4a85cb2195de1939962d3924c935b24f0514564a3d",
+        "downloadBytes": 121093282,
+        "installedBytes": 330000000,
+        "executable": "bin/codex"
+      },
       "linux-x64": {
         "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
         "assetSha256": "a822187e1a2420c61c5926721bfbd878701ed95547c9bb0d4de4498a16ba1821",
@@ -51,6 +58,16 @@
         "binarySha256": "ef5d2909c8af49f31ab6d5487e90316777bc2fac170adfe8160716caa8aaf4f9",
         "downloadBytes": 87267293,
         "installedBytes": 250000000,
+        "executable": "claude",
+        "platformDirectory": "mac"
+      },
+      "darwin-x64": {
+        "package": "@anthropic-ai/claude-agent-sdk-darwin-x64",
+        "asset": "claude-agent-sdk-darwin-x64-0.3.263.tgz",
+        "assetSha256": "4dfca0f909e135d737d33c58449830205f6e23a80a1451e393cd8984e714dea7",
+        "binarySha256": "a94a8b229fa85c3a316c6b4a35e0aa22bec1aabbd3d1422826ce1d10ddc88751",
+        "downloadBytes": 91268007,
+        "installedBytes": 260000000,
         "executable": "claude",
         "platformDirectory": "mac"
       },
@@ -103,6 +120,16 @@
         "executable": "opencode",
         "platformDirectory": "mac"
       },
+      "darwin-x64": {
+        "package": "opencode-darwin-x64",
+        "asset": "opencode-darwin-x64-1.18.30.tgz",
+        "assetSha256": "d7119bd0adbacf86c1176f07b35d429909d1d702ca0c90dcd31415e66220f590",
+        "binarySha256": "a0db851dd5c9538896aeecce1cd13af510d62a6873d2eb5030955548e5779156",
+        "downloadBytes": 48153052,
+        "installedBytes": 160000000,
+        "executable": "opencode",
+        "platformDirectory": "mac"
+      },
       "linux-x64": {
         "package": "opencode-linux-x64",
         "asset": "opencode-linux-x64-1.18.30.tgz",
@@ -149,6 +176,14 @@
         "assetSha256": "f17b8369d3283bb9ef3daa53bb95f68bfff91d605376eee1769dfbc798f7a9f6",
         "downloadBytes": 137281360,
         "installedBytes": 150000000,
+        "executable": "grok",
+        "platformDirectory": "mac"
+      },
+      "darwin-x64": {
+        "asset": "grok-1.0.22-macos-x86_64",
+        "assetSha256": "6236e8f5d973cce1ba8f1d86517913fa5df1177386a4e95fad5cf5be5b566b90",
+        "downloadBytes": 153979728,
+        "installedBytes": 170000000,
         "executable": "grok",
         "platformDirectory": "mac"
       },
@@ -215,6 +250,14 @@
           "cua-driver": "af30d29cf33bd3bbda1330be7225b18881ea4c5af6df374e08627914b5ac334d"
         }
       },
+      "darwin-x64": {
+        "asset": "cua-driver-rs-0.28.2-darwin-universal-binary.tar.gz",
+        "assetSha256": "386db225a3080714a0f9f935525e61efaf46709587ef8b94dd2df81aeb2f6daa",
+        "downloadBytes": 43629843,
+        "files": {
+          "cua-driver": "af30d29cf33bd3bbda1330be7225b18881ea4c5af6df374e08627914b5ac334d"
+        }
+      },
       "linux-x64": {
         "asset": "cua-driver-rs-0.28.2-linux-x86_64-binary.tar.gz",
         "assetSha256": "a1d99fd04bb4927ef5ffdbe60eb91ed8b51a2bab60e10fc604a75bd59ce69c3e",
@@ -250,7 +293,7 @@
     }
   },
   "remoteDesktop": {
-    "recipeVersion": 12,
+    "recipeVersion": 13,
     "sunshine": {
       "sourceMode": "upstream-with-patch",
       "repository": "https://github.com/LizardByte/Sunshine.git",
@@ -315,24 +358,29 @@
     },
     "targets": {
       "darwin-arm64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
+      "darwin-x64": ["Sunshine.app/Contents/MacOS/Sunshine", "web-server", "streamer"],
       "win32-x64": ["sunshine.exe", "web-server.exe", "streamer.exe"]
     },
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "e741eb66cc43094a146f595dcf3af5299912396bb42ed08789d2ec31af65b6cd"
+        "sha256": "8ad0a2a068eac7ecbf3dd64d547aa276be493411e2306aaefce3601b869ec51c"
+      },
+      "darwin-x64": {
+        "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
+        "sha256": "207b93603b864d330e4eacda77856dbf2e54ca70e830078d5842fd32406bfa1a"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "670ac2db0e56888bd76cc58f0cb8492f9f3ec6a580add7ba3b5ff6f13fe92531"
+        "sha256": "605047147429fa50a8330b7f550ebac08960c1925efbf743c6b5187b6ed341ea"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-25fa8888cc02cc67e42fb0c496955f2f7790ee19349b01aea792c2963def6d93",
-      "inputDigest": "25fa8888cc02cc67e42fb0c496955f2f7790ee19349b01aea792c2963def6d93",
+      "tag": "remote-desktop-runtime-29cff66db32af6debc1ff179dd754e953c6fb750b5155e17015cd7e54e66eb78",
+      "inputDigest": "29cff66db32af6debc1ff179dd754e953c6fb750b5155e17015cd7e54e66eb78",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "9250997b739dba859760e52b6b78f269df4b0418f9e0573ea0157a8cbac412c2"
+      "manifestSha256": "e400f94731c16f02d163cf30a0735a9b0a9181f966f78ffff9409254c6e9ec65"
     }
   },
   "bun": {
@@ -350,6 +398,15 @@
         "binarySha256": "35d20dd0263e5c950194434b925454fdfa9ba6e4467da960410fa05b08a7a5b5",
         "downloadBytes": 26145119,
         "installedBytes": 130000000,
+        "executable": "bun"
+      },
+      "darwin-x64": {
+        "package": "@oven/bun-darwin-x64-baseline",
+        "asset": "bun-darwin-x64-baseline-1.4.2.tgz",
+        "assetSha256": "625b1f4fd5460fcd62ef8e4b672f181ef22bcdf4a15275eeac790c708add4950",
+        "binarySha256": "2fa513af22ac59e03aae640cad302e73cb1ddb0f6398501e2ddccf7dcd613596",
+        "downloadBytes": 28732513,
+        "installedBytes": 150000000,
         "executable": "bun"
       },
       "linux-x64": {
@@ -397,6 +454,17 @@
         "executableSha256": "c93c86c0f505fcdf8b13c695bed26d306141ef5446189d591397074d324db34e",
         "harness": "localharness_external",
         "harnessSha256": "1b8a2b712ca312c9769e425b800bfbcceec4770f19736404474d1e8e50d65456",
+        "platformDirectory": "macos"
+      },
+      "darwin-x64": {
+        "asset": "agy-acp-server-1.2.1-darwin-x86_64.zip",
+        "assetSha256": "d09bf99bdea7b82021e1afcff829da35e4aa583d8f0984ef364dc3a7c064e07e",
+        "downloadBytes": 117493869,
+        "installedBytes": 430000000,
+        "executable": "agy_acp_server.par",
+        "executableSha256": "928d195a8600f649629c8b0e8ff5acbc84cb8dee7482e11d492e17c985fa3116",
+        "harness": "localharness_external",
+        "harnessSha256": "e92d5478a2a777f4e805aa525c3495e48d287381f59a0dee20616ef3c9f9b461",
         "platformDirectory": "macos"
       },
       "linux-x64": {

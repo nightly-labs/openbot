@@ -879,6 +879,32 @@ describe.sequential("AgentService: queue", () => {
     });
   });
 
+  it("starts a new provider session without the history before a new chat", async () => {
+    const { service: agentService, store, client } = await startService(root, { output: "FIRST_ANSWER" });
+    service = agentService;
+    await service.sendMessage({ agentId: "chief", text: "Remember the word PELICAN" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[0]?.status === "completed");
+    const threadId = service.listAgents().find((agent) => agent.id === "chief")?.threadId;
+    const firstSession = store.activeProviderSession("chief")?.externalSessionId;
+    if (!threadId || !firstSession) throw new Error("The first provider session was not created.");
+
+    service.clearAgentContext("chief");
+    await service.sendMessage({ agentId: "chief", text: "Which word did I give you?" });
+    await waitForQueue(service, "chief", (queue) => queue.deliveries[1]?.status === "completed");
+
+    expect(service.listAgents().find((agent) => agent.id === "chief")?.threadId).toBe(threadId);
+    expect(store.database.listProviderSessions(threadId)).toMatchObject([
+      { externalSessionId: firstSession, state: "inactive" },
+      { state: "active" },
+    ]);
+    const turns = client.requests.filter((request) => request.method === "turn/start");
+    expect(firstInputText(turns[1]?.params)).toContain("Which word did I give you?");
+    expect(firstInputText(turns[1]?.params)).not.toContain("PELICAN");
+    expect((await service.readConversation("chief")).messages.map((message) => message.text)).toEqual(
+      expect.arrayContaining(["Remember the word PELICAN", "Which word did I give you?"]),
+    );
+  });
+
   it("starts a new thread with the persisted onboarding remit", async () => {
     const { service: agentService, store } = await startService(root);
     service = agentService;

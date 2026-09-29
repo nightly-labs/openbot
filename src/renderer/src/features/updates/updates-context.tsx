@@ -3,6 +3,7 @@ import { createSignal, flush, onSettled } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { FALLBACK_UPDATE_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { createScheduledUpdateToast } from "./scheduled-update-toast";
 import { updatesPort } from "./updates-port";
 
 /**
@@ -83,7 +84,14 @@ const Updates = createSimpleContext({
       }
     }
 
-    return { status, runAction };
+    /** Removes a restart that a server admin asked for. The update stays downloaded. */
+    async function cancelScheduledRestart(): Promise<void> {
+      setStatus(await updatesPort().update.cancelScheduledRestart());
+    }
+
+    createScheduledUpdateToast({ status, cancel: cancelScheduledRestart });
+
+    return { status, runAction, cancelScheduledRestart };
   },
 });
 

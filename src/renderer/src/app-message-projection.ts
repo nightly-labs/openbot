@@ -2,6 +2,7 @@ import type { AgentSummary, ConversationMessage, QueueDeliveryStatus } from "@op
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
   hostedSiteConversationEvent,
+  isContextResetMarker,
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
@@ -259,6 +260,7 @@ function chatActionMarker(
       expectsReply: message.exchange.expectsReply !== false,
     };
   }
+  if (isContextResetMarker(message)) return { kind: "context-reset", timestamp: message.createdAt };
   const skillEvent = skillConversationEvent(message);
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   if (routineEvent) {

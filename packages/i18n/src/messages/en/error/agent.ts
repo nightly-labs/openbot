@@ -28,6 +28,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.noStartingModel":
     "{provider} has no model available, and no other signed-in provider has one. Sign in to a provider, or change the default provider in Providers & permissions.",
   "error.agent.waitBeforeProviderChange": "Wait for the active turn and queue to finish before changing provider.",
+  "error.agent.waitBeforeClearContext": "Wait for the active turn and queue to finish before starting a new chat.",
   "error.agent.unknown": "Unknown agent: {id}",
   "error.agent.onlyUserWidensSettings":
     "Only the user can give an agent Full access or turn Computer Use on. Ask the user to change it in the agent's settings.",

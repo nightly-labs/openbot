@@ -98,7 +98,7 @@ jobs:
             https://openbot.run/.well-known/apple-app-site-association)"
           test "$association_status" = "200"
           tr -d '\r' < "$verification_dir/association.headers" | grep -Eiq '^content-type: application/json'
-          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join"]}]' \
+          jq -e '.applinks.details == [{"appID":"ZTRDTUL87R.app.openbot.desktop","paths":["/join"]},{"appID":"ZTRDTUL87R.run.openbot.mobile","paths":["/join","/agents/*"]}]' \
             "$verification_dir/association.json" >/dev/null
 
   host-signing:
@@ -164,12 +164,30 @@ jobs:
           fi
           echo "This runner records no AppleDouble metadata entries."
 
+  # Each architecture builds on a runner of its own kind. The install scripts run every provider
+  # runtime they download, and Whisper and the remote desktop runtime are built or verified for the
+  # runner's architecture, so one runner cannot produce both. The ARM64 job keeps the asset names
+  # every earlier release used, and it alone builds the Host PKG, which is Apple silicon only.
   macos:
-    name: Build signed macOS ARM64 release
+    name: Build signed macOS ${{ matrix.label }} release
     needs: validate
     if: github.event_name == 'push'
-    runs-on: macos-14
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            label: ARM64
+            os: macos-14
+            app_dir: mac-arm64
+            suffix: macos
+          - arch: x64
+            label: x64
+            os: macos-15-intel
+            app_dir: mac
+            suffix: macos-x64
     environment: release
     permissions:
       attestations: write
@@ -214,7 +232,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The code is the same for both architectures, so the check runs once.
       - name: Run repository check
+        if: matrix.arch == 'arm64'
         run: |
           bun run check:desktop
           bun run test:desktop -- --maxWorkers=2
@@ -240,7 +260,7 @@ jobs:
           security cms -D -i "$profile_path" >/dev/null
           echo "OPENBOT_PROVISIONING_PROFILE=$profile_path" >> "$GITHUB_ENV"
 
-      - name: Build, sign, and notarize ARM64 update artifacts
+      - name: Build, sign, and notarize ${{ matrix.label }} update artifacts
         env:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -256,7 +276,7 @@ jobs:
           bun run build
           log="$RUNNER_TEMP/electron-builder-mac.log"
           for attempt in 1 2 3; do
-            if bun x electron-builder --mac --arm64 --publish never \
+            if bun x electron-builder --mac --${{ matrix.arch }} --publish never \
               --config.mac.provisioningProfile="$OPENBOT_PROVISIONING_PROFILE" 2>&1 | tee "$log"; then
               exit 0
             fi
@@ -274,10 +294,10 @@ jobs:
       - name: Verify application signature and notarization
         shell: bash
         run: |
-          app_path="dist/mac-arm64/OpenBot.app"
+          app_path="dist/${{ matrix.app_dir }}/OpenBot.app"
           test -d "$app_path"
           codesign --verify --deep --strict --verbose=2 "$app_path"
-          runtime_path="$app_path/Contents/Resources/remote-desktop-runtime/darwin/arm64"
+          runtime_path="$app_path/Contents/Resources/remote-desktop-runtime/darwin/${{ matrix.arch }}"
           codesign --verify --deep --strict --verbose=2 "$runtime_path/Sunshine.app"
           codesign --verify --strict --verbose=2 "$runtime_path/web-server"
           codesign --verify --strict --verbose=2 "$runtime_path/streamer"
@@ -287,9 +307,9 @@ jobs:
             codesign --verify --strict --verbose=2 "$executable"
             codesign -d --verbose=4 "$executable" 2>&1 | grep -Fx "TeamIdentifier=$team_id"
           }
-          verify_provider_signature build/codex/mac/arm64/bin/codex 2DC432GLL2
-          verify_provider_signature build/claude/mac/arm64/bin/claude Q6L2SF6YDW
-          verify_provider_signature build/grok/mac/arm64/bin/grok 5Y6N3AJ54S
+          verify_provider_signature build/codex/mac/${{ matrix.arch }}/bin/codex 2DC432GLL2
+          verify_provider_signature build/claude/mac/${{ matrix.arch }}/bin/claude Q6L2SF6YDW
+          verify_provider_signature build/grok/mac/${{ matrix.arch }}/bin/grok 5Y6N3AJ54S
           test -f "$app_path/Contents/embedded.provisionprofile"
           codesign -d --entitlements :- "$app_path" > "$RUNNER_TEMP/openbot-entitlements.plist"
           test -s "$RUNNER_TEMP/openbot-entitlements.plist"
@@ -328,6 +348,8 @@ jobs:
             echo "The macOS ZIP is ${current_size} bytes. The limit is 800000000 bytes." >&2
             exit 1
           fi
+          # v0.1.21 shipped only an ARM64 ZIP, so only that one has a size to stay under.
+          if [[ "${{ matrix.arch }}" != "arm64" ]]; then exit 0; fi
           mkdir -p "$RUNNER_TEMP/openbot-0.1.21"
           gh release download v0.1.21 --repo "$GITHUB_REPOSITORY" --pattern '*.zip' \
             --dir "$RUNNER_TEMP/openbot-0.1.21"
@@ -343,11 +365,13 @@ jobs:
           fi
 
       - name: Test native tenant setup
+        if: matrix.arch == 'arm64'
         run: |
           xcrun swiftc -parse-as-library -D TENANT_SETUP_TESTS scripts/macos-tenant-setup.swift scripts/macos-tenant-setup-tests.swift -o "$RUNNER_TEMP/openbot-tenant-setup-tests"
           "$RUNNER_TEMP/openbot-tenant-setup-tests"
 
       - name: Build, sign, notarize, and verify Host installer
+        if: matrix.arch == 'arm64'
         shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -377,20 +401,22 @@ jobs:
         run: |
           cd dist
           shopt -s nullglob
-          artifacts=("OpenBot-$RELEASE_VERSION-arm64.dmg" "OpenBot-$RELEASE_VERSION-arm64.zip" "OpenBot-Host-$RELEASE_VERSION-arm64.pkg")
-          shasum -a 256 "${artifacts[@]}" > SHA256SUMS-macos.txt
+          artifacts=("OpenBot-$RELEASE_VERSION-${{ matrix.arch }}.dmg" "OpenBot-$RELEASE_VERSION-${{ matrix.arch }}.zip")
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then artifacts+=("OpenBot-Host-$RELEASE_VERSION-arm64.pkg"); fi
+          shasum -a 256 "${artifacts[@]}" > "SHA256SUMS-${{ matrix.suffix }}.txt"
 
       - name: Generate macOS release SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
-          path: dist/mac-arm64/OpenBot.app
+          path: dist/${{ matrix.app_dir }}/OpenBot.app
           format: spdx-json
-          output-file: dist/OpenBot-${{ env.RELEASE_VERSION }}-macos.spdx.json
-          artifact-name: OpenBot-${{ env.RELEASE_VERSION }}-macOS-SBOM
+          output-file: dist/OpenBot-${{ env.RELEASE_VERSION }}-${{ matrix.suffix }}.spdx.json
+          artifact-name: OpenBot-${{ env.RELEASE_VERSION }}-${{ matrix.suffix }}-SBOM
           upload-artifact: false
           upload-release-assets: false
 
       - name: Generate Host package SBOM
+        if: matrix.arch == 'arm64'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: dist/host-sbom
@@ -404,17 +430,17 @@ jobs:
         id: macos-provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-checksums: dist/SHA256SUMS-macos.txt
+          subject-checksums: dist/SHA256SUMS-${{ matrix.suffix }}.txt
 
       - name: Include macOS provenance bundle
         env:
           BUNDLE_PATH: ${{ steps.macos-provenance.outputs.bundle-path }}
-        run: cp "$BUNDLE_PATH" "dist/OpenBot-$RELEASE_VERSION-macos.sigstore.json"
+        run: cp "$BUNDLE_PATH" "dist/OpenBot-$RELEASE_VERSION-${{ matrix.suffix }}.sigstore.json"
 
       - name: Upload macOS release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-macos
+          name: release-${{ matrix.suffix }}
           path: |
             dist/*.dmg
             dist/*.zip
@@ -422,8 +448,8 @@ jobs:
             dist/latest-mac.yml
             dist/*.blockmap
             dist/*.spdx.json
-            dist/*-macos.sigstore.json
-            dist/SHA256SUMS-macos.txt
+            dist/*-${{ matrix.suffix }}.sigstore.json
+            dist/SHA256SUMS-${{ matrix.suffix }}.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -714,14 +740,40 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
     steps:
-      - name: Download macOS release assets
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download macOS ARM64 release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-macos
           path: release-assets/macos
+
+      - name: Download macOS x64 release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-macos-x64
+          path: release-assets/macos-x64
+
+      # Both macOS jobs write a `latest-mac.yml`, and a release holds one asset of that name. The
+      # merged file lists both ZIPs; electron-updater picks the one for the Mac's architecture.
+      - name: Merge macOS update manifests
+        shell: bash
+        run: |
+          bun scripts/merge-mac-update-manifests.ts \
+            release-assets/macos/latest-mac.yml \
+            release-assets/macos-x64/latest-mac.yml \
+            release-assets/latest-mac.yml
+          rm release-assets/macos/latest-mac.yml release-assets/macos-x64/latest-mac.yml
 
       - name: Download Windows release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -745,16 +797,20 @@ jobs:
         shell: bash
         run: |
           cat release-assets/macos/SHA256SUMS-macos.txt \
+            release-assets/macos-x64/SHA256SUMS-macos-x64.txt \
             release-assets/windows/SHA256SUMS-windows.txt \
             release-assets/linux/SHA256SUMS-linux.txt \
             release-assets/linux-arm64/SHA256SUMS-linux-arm64.txt \
             > release-assets/SHA256SUMS.txt
 
+      # Only this step gets the write token: the steps before it run dependency code.
       - name: Publish GitHub Release
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          artifacts=(release-assets/macos/* release-assets/windows/* release-assets/linux/* release-assets/linux-arm64/* release-assets/SHA256SUMS.txt)
+          artifacts=(release-assets/macos/* release-assets/macos-x64/* release-assets/latest-mac.yml release-assets/windows/* release-assets/linux/* release-assets/linux-arm64/* release-assets/SHA256SUMS.txt)
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "${artifacts[@]}" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"

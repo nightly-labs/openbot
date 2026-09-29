@@ -15,6 +15,7 @@ import {
   isBrowserViewSessionRoute,
   isBrowserViewSessionsRoute,
 } from "./browser-view-v1";
+import { withConversationPlans } from "./conversation-plan-v4";
 import {
   isAgentAnalyticsRoute,
   isAgentCreateRoute,
@@ -51,29 +52,40 @@ import {
 } from "./v5-base-adapter";
 
 /**
- * `editing` rides beside the frozen queue projection: the shipped key lists drop it, so a client on
- * protocol 1-3 reads the queue exactly as it did before, and only the current protocol carries the
- * mark that another editor holds a message.
+ * `editing` and `expectsReply` ride beside the frozen queue projection: the shipped key lists drop
+ * them, so a client on protocol 1-3 reads the queue exactly as it did before, and only the current
+ * protocol carries the mark that another editor holds a message, or that a teammate's message
+ * needs no answer. A client uses the second mark to keep a teammate's answer out of the actions it
+ * offers on queued messages.
  *
- * A present mark must be a boolean. The projection removes the key, so an unchecked value would
- * reach the client as a message nobody holds, and enable the edit actions the hold disables.
- * Fail closed instead; an absent mark still means an older host that never sends one.
+ * A present mark must be a boolean. The projection removes the key, so an unchecked `editing` would
+ * reach the client as a message nobody holds, and enable the edit actions the hold disables; an
+ * unchecked `expectsReply` would reach it as a question. Fail closed instead; an absent mark still
+ * means an older host that never sends one: no hold, and an answer expected.
  */
-function withQueueEditing(projected: TeamProtocolV5BaseJsonValue, source: unknown): TeamProtocolV5BaseJsonValue {
+const QUEUE_MARKS = { editing: "Invalid queue edit mark.", expectsReply: "Invalid queue reply mark." } as const;
+
+function withQueueMarks(projected: TeamProtocolV5BaseJsonValue, source: unknown): TeamProtocolV5BaseJsonValue {
   if (!isDynamicRecord(projected) || !Array.isArray(projected.deliveries)) return projected;
   if (!isDynamicRecord(source) || !Array.isArray(source.deliveries)) return projected;
-  const marks = new Map<string, boolean>();
+  const marks = new Map<string, TeamProtocolV5BaseJsonObject>();
   for (const delivery of source.deliveries) {
-    if (!isDynamicRecord(delivery) || delivery.editing === undefined) continue;
-    if (!isBoolean(delivery.editing)) throw new Error("Invalid queue edit mark.");
-    if (isString(delivery.id)) marks.set(delivery.id, delivery.editing);
+    if (!isDynamicRecord(delivery)) continue;
+    const present: TeamProtocolV5BaseJsonObject = {};
+    for (const [key, error] of Object.entries(QUEUE_MARKS)) {
+      const mark = delivery[key];
+      if (mark === undefined) continue;
+      if (!isBoolean(mark)) throw new Error(error);
+      present[key] = mark;
+    }
+    if (isString(delivery.id) && Object.keys(present).length > 0) marks.set(delivery.id, present);
   }
   if (marks.size === 0) return projected;
   return {
     ...projected,
     deliveries: projected.deliveries.map((delivery) =>
       isDynamicRecord(delivery) && isString(delivery.id) && marks.has(delivery.id)
-        ? { ...delivery, editing: marks.get(delivery.id) ?? false }
+        ? { ...delivery, ...marks.get(delivery.id) }
         : delivery,
     ),
   };
@@ -123,7 +135,7 @@ function withExchangeExpectsReply(
 }
 
 function encodeQueueSnapshot(json: string, source: unknown): string {
-  return JSON.stringify(withQueueEditing(JSON.parse(json), source));
+  return JSON.stringify(withQueueMarks(JSON.parse(json), source));
 }
 
 const profile = currentProfileRoutes({
@@ -239,8 +251,11 @@ export function encodeTeamProtocolV5CurrentHttpResponse(
     );
   if (isConversationRoute(method, path) && status < 400)
     return JSON.stringify(
-      withExchangeExpectsReply(
-        JSON.parse(encodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value, options)),
+      withConversationPlans(
+        withExchangeExpectsReply(
+          JSON.parse(encodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value, options)),
+          value,
+        ),
         value,
       ),
     );
@@ -277,14 +292,17 @@ export function decodeTeamProtocolV5CurrentHttpResponse(
     return toCurrentAgentKeys(structuredClone(decodeBrowserDisplayResponse(value)));
   if (isQueueEditRoute(method, path) && status === 204) return {};
   if (isQueueEditRoute(method, path))
-    return withQueueEditing(
+    return withQueueMarks(
       decodeTeamProtocolV5BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
       value,
     );
   if (isQueueSnapshotRoute(method, path) && status < 400)
-    return withQueueEditing(decodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value), value);
+    return withQueueMarks(decodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value), value);
   if (isConversationRoute(method, path) && status < 400)
-    return withExchangeExpectsReply(decodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value), value);
+    return withConversationPlans(
+      withExchangeExpectsReply(decodeTeamProtocolV5BaseCurrentHttpResponse(method, path, status, value), value),
+      value,
+    );
   if (isConversationUnreadRoute(method, path))
     return decodeTeamProtocolV5BaseCurrentHttpResponse(method, readPath(path), status, value);
   if (scopedUsageRoute(method, path) || isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path)) {

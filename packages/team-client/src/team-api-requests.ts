@@ -17,6 +17,8 @@ import {
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
   decodeChannelSummaries,
+  decodeInstalledSkills,
+  type InstalledSkill,
   isAttachmentSummary,
   type OpenBotDesktopApi,
   type ReorderQueueInput,
@@ -27,6 +29,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
 
@@ -83,6 +86,16 @@ export function updateQueuedMessage(
 
 export function reorderQueue(request: TeamApiRequest, { agentId, deliveryIds }: ReorderQueueInput): Promise<void> {
   return request("POST", TEAM_API_ROUTES.agent.queueReorder(agentId), ignoreResponse, { deliveryIds });
+}
+
+/** Starts a new chat with the agent. Send it only to a host that serves `context-reset-v1`. */
+export function clearAgentContext(request: TeamApiRequest, agentId: string): Promise<void> {
+  return request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId });
+}
+
+/** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */
+export function listInstalledSkills(request: TeamApiRequest, agentId: string): Promise<InstalledSkill[]> {
+  return request("GET", TEAM_API_ROUTES.agent.skills(agentId), decodeInstalledSkills);
 }
 
 export function deleteAgent(request: TeamApiRequest, agentId: string): Promise<void> {

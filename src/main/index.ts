@@ -228,6 +228,7 @@ const {
   forwardAgentEvent,
   forwardBrowserDisplayState,
   forwardUpdateStatus,
+  forwardUpdatePreference,
   forwardVoiceModelStatus,
   forwardProviderRuntimeStatus,
   forwardHostStatus,
@@ -340,6 +341,7 @@ function registerIpcHandlers({
   setupFile,
   analyticsPreferenceFile,
   updatePreferenceFile,
+  requestedUpdate,
   approvalAutomation,
   agentAdminSettings,
   language,
@@ -417,7 +419,7 @@ function registerIpcHandlers({
         ? join(process.resourcesPath, "agent-import", "grok-bot", "SKILL.md")
         : resolve(__dirname, "../../resources/agent-import/grok-bot/SKILL.md"),
     }),
-    ...updateIpcHandlers({ updater, updatePreferenceFile }),
+    ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate }),
     ...notificationIpcHandlers({
       notificationPreference,
       translate: language.translate,
@@ -762,6 +764,7 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
       updater.on("status", forwardUpdateStatus);
+      built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {

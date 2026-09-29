@@ -162,6 +162,8 @@ export interface ConversationProps {
   agentAutoApproveLocked?: boolean;
   /** Absent for a remote agent: its own computer holds that choice. */
   onSetAgentAutoApprove?: (autoApprove: boolean) => Promise<void>;
+  /** Starts a new chat with the agent. Absent when its host does not serve `context-reset-v1`. */
+  onClearAgentContext?: () => Promise<void>;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel") => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string) => void;
   onSteerQueuedMessage: (deliveryId: string) => void;

@@ -198,6 +198,7 @@ export const messages = {
   "error.backend.authExpired": "認証要求の有効期限が切れました。",
   "error.backend.authDigitsRequired": "指定された桁数の数字を入力してください。",
   "error.backend.browserViewProtected": "認証中はブラウザービューが保護されています。",
+  "error.backend.browserPreviewPageChanged": "プレビュー中にブラウザーのページが変わりました。もう一度お試しください。",
   "error.backend.browserInputProtected": "認証中はブラウザーへの入力が保護されています。",
   "error.backend.mcpServerHttpCredentials":
     "サーバーは {status} を返しました。API キーまたはその他の認証情報を確認してください。",

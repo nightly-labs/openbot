@@ -23,7 +23,12 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
+import { hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  type TeamProtocolV1CurrentEventControl,
+  toWireTeamProtocolV1ClientEvent,
+} from "@openbot/contracts/team-protocol/v1-adapter";
 import { sourceText } from "@openbot/i18n/source";
 import { createEd25519Identity, type Ed25519Identity, signEd25519, verifyEd25519Pem } from "./ed25519";
 import { createRemoteFileReceiver } from "./file-download";
@@ -210,6 +215,12 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       await sendPayload(state, "desktop", data);
     },
     cancelUpload: () => files.cancelUpload(),
+    /** Tells the host which agent this member is writing to. The host clears it after a few seconds. */
+    setTyping(agentId: string | null, typing: boolean) {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) return;
+      void sendEventControl(state, { type: "team-typing", agentId, typing }).catch(() => undefined);
+    },
     execute: (command: RemoteTeamCommand) => executeCommand(command, actions),
     dispose: async () => {
       active = false;
@@ -718,7 +729,7 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       return;
     }
     if (frame.sequence !== state.lastEventSequence + 1) throw new Error(sourceText("error.remote.eventStreamGap"));
-    const channel = channelEvent(frame.payload);
+    const channel = channelEvent(frame.payload) ?? hostRestartEvent(frame.payload);
     const decoded = channel ? { status: "known" as const, event: channel } : decodeTeamProtocolV5CurrentEvent(frame);
     if (decoded.status === "invalid") throw new Error(sourceText("error.remote.malformedEvent"));
     state.lastEventSequence = frame.sequence;
@@ -905,6 +916,18 @@ export function createRemoteTeamPeer(actions: ActionsRef) {
       state,
       "events",
       encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: state.lastEventSequence }),
+    );
+  }
+
+  async function sendEventControl(state: PeerState, control: TeamProtocolV1CurrentEventControl): Promise<void> {
+    await sendPayload(
+      state,
+      "events",
+      encodeTeamProtocolV2Frame({
+        version: 2,
+        type: "event-control",
+        control: toWireTeamProtocolV1ClientEvent(control),
+      }),
     );
   }
 

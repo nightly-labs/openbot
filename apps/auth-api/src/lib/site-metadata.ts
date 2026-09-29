@@ -38,7 +38,7 @@ const OPENBOT_SOFTWARE_APPLICATION = {
   description: OPENBOT_SITE_DESCRIPTION,
   applicationCategory: "DeveloperApplication",
   applicationSubCategory: "AI agent app",
-  operatingSystem: ["macOS 13 or later (Apple silicon)", "Windows 10 or later", "Linux"],
+  operatingSystem: ["macOS 13 or later (Apple silicon or Intel)", "Windows 10 or later", "Linux"],
   downloadUrl: [
     `${OPENBOT_SITE_URL}download/macos`,
     `${OPENBOT_SITE_URL}download/windows`,

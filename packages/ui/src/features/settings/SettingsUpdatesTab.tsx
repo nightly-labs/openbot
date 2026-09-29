@@ -1,6 +1,13 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Alert,
+  AlertActions,
+  AlertContent,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
   Button,
+  Clock3,
   Item,
   ItemActions,
   ItemContent,
@@ -41,6 +48,36 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
 
   return (
     <SettingsSection title={t("settings.updates.title")}>
+      <Show when={props.store.scheduledRestart()}>
+        {(restart) => (
+          <Alert tone="neutral" role="status">
+            <AlertIcon>
+              <Clock3 />
+            </AlertIcon>
+            <AlertContent>
+              <AlertTitle>
+                {restart().requestedBy === null
+                  ? t("update.scheduled.automaticTitle")
+                  : t("update.scheduled.title", { name: restart().requestedBy ?? "" })}
+              </AlertTitle>
+              <AlertDescription>
+                {restart().mode === "now" ? t("update.scheduled.now") : t("update.scheduled.whenIdle")}
+              </AlertDescription>
+            </AlertContent>
+            <AlertActions>
+              <Button
+                variant="outline"
+                type="button"
+                size="sm"
+                loading={props.store.cancelling()}
+                onClick={() => void props.store.cancelScheduledRestart()}
+              >
+                {t("update.scheduled.cancel")}
+              </Button>
+            </AlertActions>
+          </Alert>
+        )}
+      </Show>
       <ItemGroup class="settings-modal-card">
         <Item class="settings-modal-row settings-modal-update-track-row">
           <ItemContent>
@@ -95,12 +132,26 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
         <Show
           when={managed()}
           fallback={
-            <SwitchField
-              checked={props.value.autoDownloadUpdates}
-              onChange={(checked) => props.onUpdateSetting("autoDownloadUpdates", checked)}
-              label={t("settings.updates.autoDownload.title")}
-              description={t("settings.updates.autoDownload.description")}
-            />
+            <>
+              <SwitchField
+                checked={props.value.autoDownloadUpdates}
+                onChange={(checked) => props.onUpdateSetting("autoDownloadUpdates", checked)}
+                label={t("settings.updates.autoDownload.title")}
+                description={t("settings.updates.autoDownload.description")}
+              />
+              <SwitchField
+                checked={props.value.autoInstallUpdates}
+                onChange={(checked) => props.onUpdateSetting("autoInstallUpdates", checked)}
+                label={t("settings.updates.autoInstall.title")}
+                description={t("settings.updates.autoInstall.description")}
+              />
+              <SwitchField
+                checked={props.value.allowRemoteUpdates}
+                onChange={(checked) => props.onUpdateSetting("allowRemoteUpdates", checked)}
+                label={t("settings.updates.allowRemote.title")}
+                description={t("settings.updates.allowRemote.description")}
+              />
+            </>
           }
         >
           {/* Host management is machine state an administrator owns. Report it; never offer it. */}

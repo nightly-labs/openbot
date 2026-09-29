@@ -1,5 +1,5 @@
 import { Host, Picker } from "@expo/ui";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { DEFAULT_TEAM_MEMBER_LIMIT, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { PERMANENT_INVITE_EXPIRES_AT_MS } from "@openbot/contracts/invite-links";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import type { RemoteTeamMember } from "@openbot/team-client";
@@ -68,6 +68,8 @@ export function ServerMembersScreen() {
   );
   const permanentCount = pendingInvites?.filter((invite) => invite.permanent).length ?? 0;
   const permanentLimitReached = inviteMode === "permanent" && permanentCount >= INPUT_LIMITS.maxPermanentInvites;
+  const activeMembers = members.data?.filter((member) => member.status === "active");
+  const membersFull = (activeMembers?.length ?? 0) >= DEFAULT_TEAM_MEMBER_LIMIT;
   const createdPermanent = Boolean(created && created.expiresAt >= PERMANENT_INVITE_EXPIRES_AT_MS);
   const action = useMutation({
     mutationFn: (operation: () => Promise<void>) => operation(),
@@ -192,7 +194,7 @@ export function ServerMembersScreen() {
             </SettingsRow>
             <SettingsRow
               disclosure={false}
-              disabled={action.isPending || permanentLimitReached}
+              disabled={action.isPending || permanentLimitReached || membersFull}
               onPress={() =>
                 perform(async () => {
                   const host = { hostId: server.id, devicePublicKey: server.publicKey, name: server.name };
@@ -225,6 +227,9 @@ export function ServerMembersScreen() {
             </SettingsRow>
           </SettingsSection>
           {permanentLimitReached ? <SettingsNote>{t("mobile.server.members.permanentLimit")}</SettingsNote> : null}
+          {membersFull ? (
+            <SettingsNote>{t("mobile.server.members.full", { limit: DEFAULT_TEAM_MEMBER_LIMIT })}</SettingsNote>
+          ) : null}
           {created ? (
             <>
               <SettingsNote>
@@ -283,7 +288,14 @@ export function ServerMembersScreen() {
       {action.error ? (
         <SettingsNote>{errorMessage(action.error, t("mobile.server.members.updateFailed"))}</SettingsNote>
       ) : null}
-      <SettingsSection title={t("mobile.server.members.title")}>
+      <SettingsSection
+        title={t("mobile.server.members.title")}
+        footer={
+          activeMembers
+            ? t("mobile.server.members.limitCount", { count: activeMembers.length, limit: DEFAULT_TEAM_MEMBER_LIMIT })
+            : null
+        }
+      >
         {members.isError ? (
           <SettingsRow disclosure={false}>
             <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
@@ -291,29 +303,27 @@ export function ServerMembersScreen() {
             </Typography.Paragraph>
           </SettingsRow>
         ) : null}
-        {members.data
-          ?.filter((member) => member.status === "active")
-          .map((member) => (
-            <SettingsRow
-              key={member.membershipId}
-              disabled={action.isPending}
-              disclosure={false}
-              leading={<ProfileAvatar neutral name={member.name || member.email} size={36} />}
-              supportingText={[
-                member.name && member.name !== member.email ? member.email : null,
-                t(SERVER_ROLE_LABEL_KEYS[member.role]),
-                member.status === "revoked" ? t("mobile.server.members.accessRemoved") : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-              onPress={server.role === "owner" && member.role !== "owner" ? () => manage(member) : undefined}
-            >
-              <Typography.Paragraph type="body-sm" numberOfLines={1}>
-                {member.name || member.email}
-              </Typography.Paragraph>
-            </SettingsRow>
-          ))}
-        {members.isSuccess && !members.data.some((member) => member.status === "active") ? (
+        {activeMembers?.map((member) => (
+          <SettingsRow
+            key={member.membershipId}
+            disabled={action.isPending}
+            disclosure={false}
+            leading={<ProfileAvatar neutral name={member.name || member.email} size={36} />}
+            supportingText={[
+              member.name && member.name !== member.email ? member.email : null,
+              t(SERVER_ROLE_LABEL_KEYS[member.role]),
+              member.status === "revoked" ? t("mobile.server.members.accessRemoved") : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            onPress={server.role === "owner" && member.role !== "owner" ? () => manage(member) : undefined}
+          >
+            <Typography.Paragraph type="body-sm" numberOfLines={1}>
+              {member.name || member.email}
+            </Typography.Paragraph>
+          </SettingsRow>
+        ))}
+        {members.isSuccess && activeMembers?.length === 0 ? (
           <SettingsRow disclosure={false}>
             <Typography.Paragraph type="body-sm" className="text-grouped-secondary">
               {t("mobile.server.members.empty")}

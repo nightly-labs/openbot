@@ -1,4 +1,4 @@
-import type { HostStatus } from "@openbot/contracts/ipc";
+import type { HostStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
 import { createSignal, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -155,11 +155,91 @@ export const RemoteMember: Story = {
   },
 };
 
-function RemoteSetupStory(props: { settings: ServerSettingsModalProps }) {
+const STORY_HOST_UPDATE: HostUpdateStatus = {
+  phase: "available",
+  currentVersion: "0.23.0",
+  availableVersion: "0.24.0",
+  progress: null,
+  errorCode: null,
+  remoteUpdates: "allowed",
+  autoDownload: true,
+  autoInstall: false,
+  restart: null,
+};
+
+const remoteUpdateArgs = {
+  server: { ...remoteServer, role: "admin" as const },
+  hostStatus: null,
+  hostUpdate: {},
+  initialSection: "updates" as const,
+};
+
+export const RemoteUpdateAvailable: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => <RemoteSetupStory settings={args} hostUpdate={STORY_HOST_UPDATE} />,
+};
+
+export const RemoteUpdateWaiting: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory
+      settings={args}
+      hostUpdate={{
+        ...STORY_HOST_UPDATE,
+        phase: "ready",
+        progress: 100,
+        restart: { requestedBy: "Ada Lovelace", mode: "when-idle", waitingFor: ["agent-turn", "routine-run"] },
+      }}
+    />
+  ),
+};
+
+export const RemoteUpdateDownloading: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory
+      settings={args}
+      hostUpdate={{
+        ...STORY_HOST_UPDATE,
+        phase: "downloading",
+        progress: 42,
+        restart: { requestedBy: "Ada Lovelace", mode: "when-idle", waitingFor: [] },
+      }}
+    />
+  ),
+};
+
+export const RemoteUpdateAutomatic: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory
+      settings={args}
+      hostUpdate={{
+        ...STORY_HOST_UPDATE,
+        phase: "ready",
+        progress: 100,
+        autoInstall: true,
+        restart: { requestedBy: null, mode: "when-idle", waitingFor: ["agent-turn"] },
+      }}
+    />
+  ),
+};
+
+export const RemoteUpdateDisabled: Story = {
+  args: remoteUpdateArgs,
+  render: (args) => (
+    <RemoteSetupStory settings={args} hostUpdate={{ ...STORY_HOST_UPDATE, remoteUpdates: "disabled" }} />
+  ),
+};
+
+function RemoteSetupStory(props: { settings: ServerSettingsModalProps; hostUpdate?: HostUpdateStatus }) {
   const previous = window.openbot;
   // Storybook passes the args as a store, and the mock copies its options with `structuredClone`.
   const hostStatus = props.settings.hostStatus;
-  const mock = createMockOpenBot(hostStatus ? { hostStatus: snapshot(hostStatus) } : {});
+  const mock = createMockOpenBot({
+    ...(hostStatus ? { hostStatus: snapshot(hostStatus) } : {}),
+    ...(props.hostUpdate ? { hostUpdate: props.hostUpdate } : {}),
+  });
   window.openbot = mock.api;
   onSettled(() => () => {
     mock.dispose();

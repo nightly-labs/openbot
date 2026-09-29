@@ -292,3 +292,21 @@ export function channelRoutingConversationEvent(message: ConversationMessage): C
   if (message.author !== "system" || message.status !== "completed") return null;
   return parseChannelRoutingConversationEventItemType(message.itemType);
 }
+
+/**
+ * The item type of the marker that clears the context of an agent's own thread.
+ *
+ * The messages before the marker stay visible, but a new provider session takes only the messages
+ * after it. The text is a readable sentence, so a client that does not know this item type still
+ * shows the user what happened.
+ */
+export const CONTEXT_RESET_ITEM_TYPE = "context-reset";
+
+export function isContextResetMarker(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === CONTEXT_RESET_ITEM_TYPE
+  );
+}

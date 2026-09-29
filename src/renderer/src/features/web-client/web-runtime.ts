@@ -155,6 +155,8 @@ export interface WebWorkspaceRuntime {
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   send(agentId: string, text: string, attachmentDraftIds: string[], replyToMessageId?: string | null): Promise<void>;
   stop(agentId: string, turnId: string): Promise<void>;
+  /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
+  setTyping(agentId: string | null, typing: boolean): void;
   queue(agentId: string): Promise<QueueSnapshot>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
   cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
@@ -730,6 +732,9 @@ export function createWebWorkspaceRuntime(
       trackCompletedDraft(value.id, uploadHostGeneration === generation ? lockedHostId : null);
       // The host names the draft's preview with the desktop `openbot-attachment:` scheme.
       return { ...value, previewUrl: null };
+    },
+    setTyping(agentId, typing) {
+      peer.setTyping(agentId, typing);
     },
     async cancelUpload() {
       uploadGeneration += 1;

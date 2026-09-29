@@ -3,6 +3,7 @@ import { type AgentEvent, isAgentEvent } from "../ipc-agent-events";
 import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
+import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
 import {
   toCurrentAgentKeys,
   toCurrentAgentKeysObjectForPath,
@@ -35,7 +36,7 @@ export function decodeTeamProtocolV5BaseCurrentEvent(value: unknown): TeamProtoc
   const decodedValue: TeamProtocolV5BaseJsonValue = JSON.parse(JSON.stringify(decoded.event));
   let current: unknown;
   try {
-    current = restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value);
+    current = withEventConversationPlans(restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value), value);
   } catch {
     return { kind: "invalid", type: decoded.event.type };
   }
@@ -56,9 +57,22 @@ export function encodeTeamProtocolV5BaseCurrentEvent(
   const decoded = decodeTeamProtocolV5BaseEvent(downconvertedValue);
   if (decoded.kind !== "known") return null;
   const encoded = encodeTeamProtocolV5BaseEvent(decoded.event);
-  if (!encoded || !options.preserveBrowserSecrets) return encoded;
-  const output = JSON.parse(encoded);
-  return JSON.stringify(restoreBrowserSecretMetadata(output, wireValue));
+  if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type))) return encoded;
+  const output = withEventConversationPlans(JSON.parse(encoded), wireValue);
+  return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
+}
+
+/** Puts the plans of a conversation event beside its frozen projection. See `withConversationPlans`. */
+function withEventConversationPlans(
+  projected: TeamProtocolV5BaseJsonValue,
+  source: unknown,
+): TeamProtocolV5BaseJsonValue {
+  if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
+  if (!isDynamicRecord(source)) return projected;
+  const key = eventConversationKey(projected.type);
+  const conversation = key ? projected[key] : undefined;
+  if (!key || conversation === undefined) return projected;
+  return { ...projected, [key]: withConversationPlans(conversation, source[key]) };
 }
 
 export function encodeTeamProtocolV5BaseCurrentHttpRequest(

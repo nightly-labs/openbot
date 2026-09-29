@@ -84,7 +84,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
     );
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
-    // The web client reaches a host through `runtime`, which has no storage methods.
+    // The web client shows host files in Server settings > Storage; its agent settings have no Files.
     if (props.runtime || !serverHasStorage(server)) return undefined;
     return {
       serverId: server.id,
@@ -275,6 +275,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: (trigger: HTMLBut
               accessEditable={props.server?.kind === "local" || serverCanAdministerAgents(props.server)}
               computerUseEditable={props.server?.kind === "local"}
               agents={props.agents}
+              onStartNewChat={props.onClearAgentContext}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&

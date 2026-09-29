@@ -2,6 +2,13 @@ import { OPENBOT_LINKS } from "../lib/landing-links";
 
 export type AvailableDownloadPlatform = "linux" | "macos" | "windows";
 
+/**
+ * `latest-mac.yml` lists the Apple silicon and the Intel installer, so a macOS download also names
+ * its architecture. electron-builder puts `arm64` in the Apple silicon asset name and no
+ * architecture suffix that contains it in the Intel one.
+ */
+export type MacDownloadArchitecture = "arm64" | "x64";
+
 interface DownloadManifestConfig {
   /**
    * Compared against a lowercased asset name, so it must be lowercase itself. The Linux asset is
@@ -29,11 +36,17 @@ function redirect(location: string): Response {
   });
 }
 
-function findInstaller(manifest: string, extension: DownloadManifestConfig["extension"]): string | undefined {
+function findInstaller(
+  manifest: string,
+  extension: DownloadManifestConfig["extension"],
+  macArchitecture: MacDownloadArchitecture | undefined,
+): string | undefined {
   const assetLines = manifest.matchAll(/^\s*-\s+url:\s*["']?([^\s"']+)["']?\s*$/gim);
   for (const match of assetLines) {
     const asset = match[1];
-    if (asset?.toLowerCase().endsWith(extension) && /^[a-z0-9][a-z0-9._+-]+$/i.test(asset)) return asset;
+    if (!asset?.toLowerCase().endsWith(extension) || !/^[a-z0-9][a-z0-9._+-]+$/i.test(asset)) continue;
+    if (macArchitecture && asset.toLowerCase().includes("arm64") !== (macArchitecture === "arm64")) continue;
+    return asset;
   }
   return undefined;
 }
@@ -51,6 +64,7 @@ function fallbackToReleases(platform: AvailableDownloadPlatform, reason: string)
 export async function latestDownloadResponse(
   platform: AvailableDownloadPlatform,
   fetcher: typeof fetch = fetch,
+  macArchitecture: MacDownloadArchitecture = "arm64",
 ): Promise<Response> {
   const config = DOWNLOAD_MANIFESTS[platform];
   const manifestUrl = `${RELEASES_BASE_URL}/latest/download/${config.manifest}`;
@@ -63,7 +77,11 @@ export async function latestDownloadResponse(
     });
     if (!response.ok) return fallbackToReleases(platform, `manifest status ${response.status}`);
 
-    const installer = findInstaller(await response.text(), config.extension);
+    const installer = findInstaller(
+      await response.text(),
+      config.extension,
+      platform === "macos" ? macArchitecture : undefined,
+    );
     if (!installer) return fallbackToReleases(platform, `no ${config.extension} asset in the manifest`);
 
     return redirect(`${RELEASES_BASE_URL}/latest/download/${encodeURIComponent(installer)}`);

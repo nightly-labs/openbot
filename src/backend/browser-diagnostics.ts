@@ -3,6 +3,14 @@ import { redactText } from "@openbot/logging";
 
 const DIAGNOSTIC_LIMIT = 100;
 const ACTION_LIMIT = 100;
+/**
+ * Every snapshot, and so every action, hands these to the model again. A single-page application
+ * that logs on each render fills the ring with long messages, so a snapshot takes the recent ones
+ * and each message is cut to a length that still names the failure.
+ */
+const SNAPSHOT_DIAGNOSTICS = 20;
+const SNAPSHOT_ACTIONS = 10;
+const MAX_ENTRY_TEXT = 500;
 
 /**
  * The bounded console/network/load and action rings for one browser tab. Every string here is
@@ -17,7 +25,7 @@ export class BrowserDiagnostics {
   add(entry: Omit<BrowserDiagnosticEntry, "timestamp">): void {
     pushRing(
       this.#diagnostics,
-      { ...entry, message: redactText(entry.message), timestamp: new Date().toISOString() },
+      { ...entry, message: boundedText(entry.message), timestamp: new Date().toISOString() },
       DIAGNOSTIC_LIMIT,
     );
   }
@@ -27,8 +35,8 @@ export class BrowserDiagnostics {
       this.#actions,
       {
         ...entry,
-        ...(entry.target === undefined ? {} : { target: redactText(entry.target) }),
-        ...(entry.detail === undefined ? {} : { detail: redactText(entry.detail) }),
+        ...(entry.target === undefined ? {} : { target: boundedText(entry.target) }),
+        ...(entry.detail === undefined ? {} : { detail: boundedText(entry.detail) }),
         timestamp: new Date().toISOString(),
       },
       ACTION_LIMIT,
@@ -36,7 +44,10 @@ export class BrowserDiagnostics {
   }
 
   snapshot(): { diagnostics: BrowserDiagnosticEntry[]; actions: BrowserActionHistoryEntry[] } {
-    return { diagnostics: this.#diagnostics.slice(-50), actions: this.#actions.slice(-50) };
+    return {
+      diagnostics: this.#diagnostics.slice(-SNAPSHOT_DIAGNOSTICS),
+      actions: this.#actions.slice(-SNAPSHOT_ACTIONS),
+    };
   }
 
   clearDiagnostics(): void {
@@ -46,6 +57,12 @@ export class BrowserDiagnostics {
   get errorCount(): number {
     return this.#diagnostics.filter((entry) => entry.level === "error").length;
   }
+}
+
+// Redact before cutting, so a cut cannot split a secret into a prefix the redactor no longer knows.
+function boundedText(value: string): string {
+  const redacted = redactText(value);
+  return redacted.length > MAX_ENTRY_TEXT ? `${redacted.slice(0, MAX_ENTRY_TEXT)}…` : redacted;
 }
 
 function pushRing<T>(entries: T[], entry: T, limit: number): void {

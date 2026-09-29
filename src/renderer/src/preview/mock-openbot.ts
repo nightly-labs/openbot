@@ -16,6 +16,7 @@ import {
   type AttachmentImportEvent,
   agentAutoApprovalEnabled,
   type CentralAuthState,
+  CONTEXT_RESET_ITEM_TYPE,
   type ComputerUseState,
   type ConversationMessage,
   type ConversationSnapshot,
@@ -62,9 +63,11 @@ import {
   sameCustomProviderOrigin,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
+  type UpdatePreference,
   type UpdateQueuedMessageInput,
   type UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { AGENT_IMPORT_PREVIEW, AGENT_IMPORT_SKILL } from "../../stories/agent-import-fixtures";
 import { filePreviewForPath } from "../../stories/file-previews";
 import { toggleChannelMember } from "../features/channels/channels-draft";
@@ -93,6 +96,7 @@ import { mockAgentAnalytics, mockHostAnalytics } from "./mock-agent-analytics";
 import { createMockAuth, type MockAuthOptions } from "./mock-auth";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels } from "./mock-channels";
+import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
@@ -105,7 +109,8 @@ export interface MockOpenBotOptions
     MockAuthOptions,
     MockBrowserOptions,
     MockTeamOptions,
-    MockSkillsOptions {
+    MockSkillsOptions,
+    MockHostUpdateOptions {
   appInfo?: AppInfo;
   analyticsPreference?: AnalyticsPreference;
   languagePreference?: AppLanguagePreference;
@@ -218,6 +223,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const models = clone(options.models ?? STORY_MODELS);
   const snapshots = clone(options.snapshots ?? STORY_SNAPSHOTS);
   let updateStatus = clone(options.updateStatus ?? STORY_UPDATE_STATUS);
+  let updatePreference: UpdatePreference = { autoDownload: true, allowRemoteUpdates: true, autoInstall: false };
   const usage = clone(options.usage ?? STORY_USAGE);
   let agentCounter = agents.length;
   let hostedSites = clone(STORY_HOSTED_SITES);
@@ -1443,6 +1449,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           status: "interrupted",
         });
       },
+      clearContext: async (agentId: string) => {
+        updateSnapshot(agentId, (snapshot) => {
+          snapshot.messages.push({
+            id: crypto.randomUUID(),
+            author: "system",
+            source: "system",
+            text: sourceText("status.agent.contextCleared"),
+            createdAt: new Date().toISOString(),
+            status: "completed",
+            itemType: CONTEXT_RESET_ITEM_TYPE,
+          });
+        });
+      },
       respondToPrompt: async (_input: RespondToPromptInput) => undefined,
       respondToApproval: async () => undefined,
       respondToBrowserSecret: async (input) => {
@@ -1489,12 +1508,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         updateStatus = { ...updateStatus, phase: "installing" };
         emit(updateListeners, updateStatus);
       },
-      getPreference: async () => ({ autoDownload: true }),
-      setPreference: async (input) => ({ ...input }),
+      getPreference: async () => clone(updatePreference),
+      setPreference: async (input) => {
+        updatePreference = { ...updatePreference, ...input };
+        return clone(updatePreference);
+      },
+      cancelScheduledRestart: async () => {
+        const { scheduledRestart: _cancelled, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
       onEvent: (listener) => {
         updateListeners.add(listener);
         return () => updateListeners.delete(listener);
       },
+      // The preview has no joined server whose admin could change it.
+      onPreference: () => () => undefined,
     },
     notifications: {
       getPreference: async () => ({ desktopNotifications: true }),
@@ -1525,6 +1555,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!server) throw new Error("Server not found");
         return server;
       },
+      ...createMockHostUpdate(options),
     },
     storage: createMockStorage(),
     agentImport: {

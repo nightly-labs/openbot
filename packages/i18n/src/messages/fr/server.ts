@@ -174,6 +174,7 @@ export const messages = {
   "server.members.saveIdentityFirst": "Enregistrez d’abord l’identité du serveur dans Général.",
   "server.members.title": "Membres du serveur",
   "server.members.count": { one: "{count} membre", other: "{count} membres" },
+  "server.members.limitCount": { one: "{count} membre sur {limit}", other: "{count} membres sur {limit}" },
   "server.members.search": "Rechercher des membres",
   "server.members.noMatch": "Aucun membre ne correspond à cette recherche.",
   "server.members.inactiveTitle": "Membres inactifs",
@@ -204,6 +205,8 @@ export const messages = {
   "server.invite.showQr": "Afficher le code QR de l’invitation",
   "server.invite.permaHint":
     "N’expire jamais et peut être utilisé plusieurs fois. Toute personne ayant ce lien peut rejoindre le serveur ; révoquez-le pour le désactiver.",
+  "server.invite.full":
+    "Ce serveur a atteint la limite de {limit} membres. Retirez un membre pour inviter une nouvelle personne.",
   "server.invite.qrLabel": "Code QR de l’invitation",
   "server.invite.qrDescription": "Scannez ce code dans OpenBot Mobile pour rejoindre ce serveur.",
   "server.invite.accepted": "Invitation acceptée",

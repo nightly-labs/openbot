@@ -61,6 +61,15 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.notifications.title": "Notifications",
   "agentSettings.notifications.description": "Get notified when this agent finishes or needs input",
 
+  "agentSettings.newChat.title": "New chat",
+  "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",
+  "agentSettings.newChat.button": "Start",
+  "agentSettings.newChat.confirmTitle": "Start a new chat with {name}?",
+  "agentSettings.newChat.confirmDescription":
+    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+  "agentSettings.newChat.confirm": "Start new chat",
+  "agentSettings.newChat.failed": "Could not start a new chat.",
+
   "agentSettings.fullAccess.title": "Give this agent full access?",
   "agentSettings.fullAccess.description":
     "The agent can then read, change and delete any file your user account can reach, run any command, and use the network. One misunderstood instruction or a malicious web page can reach your personal files.",

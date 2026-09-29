@@ -49,6 +49,7 @@ export type BlockedVersions = ReadonlyMap<ManagedProviderId, ReadonlySet<string>
 /** The ACP registry's name for each target. */
 const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
   "darwin-arm64": "darwin-aarch64",
+  "darwin-x64": "darwin-x86_64",
   "linux-x64": "linux-x86_64",
   "linux-arm64": "linux-aarch64",
   "win32-x64": "windows-x86_64",

@@ -54,6 +54,7 @@ export const messages = defineMessages("chat", {
   "chat.marker.openChat": "Open chat with {name}",
   "chat.marker.openRoutine": "Open routine {name}",
   "chat.marker.unavailable": "Unavailable",
+  "chat.marker.contextReset": "New chat started",
   "chat.marker.skill.created": "Created skill",
   "chat.marker.skill.revised": "Revised skill",
   "chat.marker.skill.installed": "Installed skill",

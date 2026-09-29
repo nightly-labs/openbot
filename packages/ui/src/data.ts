@@ -95,6 +95,8 @@ export type ChatActionMarkerModel =
       timestamp: string;
     }
   | (ChannelRoutingConversationEvent & { kind: "channel-routing"; timestamp: string })
+  /** The user started a new chat: the agent does not see the messages above this marker. */
+  | { kind: "context-reset"; timestamp: string }
   | {
       kind: "unavailable";
       label: string;

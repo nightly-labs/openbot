@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
+import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
 import { HOST_ADMIN_ROUTES } from "./host-admin-v1";
+import { HOST_UPDATE_ROUTES, hostRestartEvent } from "./host-update-v1";
 import { optionalRouteCodec } from "./optional-routes";
 import { PROVIDERS_ADMIN_ROUTES } from "./providers-v1";
 import { SHARED_TABLES_ROUTES } from "./shared-tables-v1";
@@ -176,5 +178,70 @@ describe("host-admin-v1", () => {
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ serverName: "s".repeat(33) })).toThrow();
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ logo: { ...logo, mimeType: "image/gif" } })).toThrow();
     expect(() => codec(HOST_ADMIN_ROUTES.identity).request({ logo: { ...logo, data: "A".repeat(699_053) } })).toThrow();
+  });
+});
+
+describe("host-update-v1", () => {
+  const snapshot = {
+    phase: "ready",
+    currentVersion: "0.24.0",
+    availableVersion: "0.25.0",
+    progress: 100,
+    errorCode: null,
+    remoteUpdates: "allowed",
+    autoDownload: true,
+    autoInstall: false,
+    restart: { requestedBy: "Ada", mode: "when-idle", waitingFor: ["agent-turn", "other"] },
+  };
+
+  it("sends only the restart mode and answers every route with one snapshot", () => {
+    expect(codec(HOST_UPDATE_ROUTES.start).request({ restart: "now", force: true })).toEqual({ restart: "now" });
+    for (const route of Object.values(HOST_UPDATE_ROUTES)) {
+      expect(codec(route).response(200, { ...snapshot, message: "/Users/ada/Library" })).toEqual(snapshot);
+    }
+    expect(
+      codec(HOST_UPDATE_ROUTES.status).response(200, {
+        ...snapshot,
+        restart: { ...snapshot.restart, requestedBy: null },
+      }),
+    ).toEqual({
+      ...snapshot,
+      restart: { ...snapshot.restart, requestedBy: null },
+    });
+    expect(codec(HOST_UPDATE_ROUTES.settings).request({ autoInstall: true, allowRemoteUpdates: true })).toEqual({
+      autoInstall: true,
+    });
+  });
+
+  it("tells members about the restart and fails closed on a malformed restart event", () => {
+    const event = { type: "host-restart", state: "waiting", version: "0.25.0" };
+    expect(hostRestartEvent({ ...event, requestedBy: "Ada" })).toEqual(event);
+    expect(hostRestartEvent({ type: "channels-changed", channelId: "c1", revision: 1 })).toBeNull();
+    expect(() => hostRestartEvent({ ...event, state: "paused" })).toThrow();
+    expect(() => hostRestartEvent({ ...event, version: "" })).toThrow();
+    expect(() => hostRestartEvent({ type: "host-restart", state: "none" })).toThrow();
+  });
+
+  it("rejects malformed payloads, including a wait reason the contract does not list", () => {
+    expect(() => codec(HOST_UPDATE_ROUTES.start).request({})).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.start).request({ restart: "later" })).toThrow();
+    const restart = (waitingFor: string[]) => ({ ...snapshot, restart: { ...snapshot.restart, waitingFor } });
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, restart(["new-blocker"]))).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, restart(Array(17).fill("other")))).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, { ...snapshot, progress: 12.5 })).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, { ...snapshot, phase: "paused" })).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, { ...snapshot, remoteUpdates: "maybe" })).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.status).response(200, { ...snapshot, autoInstall: undefined })).toThrow();
+    expect(() => codec(HOST_UPDATE_ROUTES.settings).request({ autoInstall: "yes" })).toThrow();
+  });
+});
+
+describe("context-reset-v1", () => {
+  it("carries only the agent id and sends nothing back", () => {
+    expect(codec(CONTEXT_RESET_ROUTES.clear).request({ agentId: "chief", threadId: "t1" })).toEqual({
+      agentId: "chief",
+    });
+    expect(() => codec(CONTEXT_RESET_ROUTES.clear).request({})).toThrow();
+    expect(codec(CONTEXT_RESET_ROUTES.clear).response(200, {})).toEqual({});
   });
 });

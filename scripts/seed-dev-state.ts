@@ -242,10 +242,10 @@ const SEED_SUMMARY = {
   agents: 4,
   conversations: 4,
   attachments: 10,
-  teamMembers: 4,
+  teamMembers: 2,
   activeInvites: 1,
-  sessions: 4,
-  directThreads: 3,
+  sessions: 2,
+  directThreads: 1,
   queuedDeliveries: 0,
   memories: 7,
   routines: 5,
@@ -1354,8 +1354,6 @@ async function seedTeam(profilePath: string, agentStore: AgentStore, clock: Seed
   const joined = [];
   for (const member of [
     { id: "openbot-dev-alice", email: "alice@example.com", name: "Alice Chen", role: "admin" as const },
-    { id: "openbot-dev-jon", email: "jon@example.com", name: "Jon Bell", role: "member" as const },
-    { id: "openbot-dev-maya", email: "maya@example.com", name: "Maya Singh", role: "member" as const },
   ]) {
     const invite = await team.createInvite(member.role, member.email);
     joined.push(
@@ -1371,8 +1369,9 @@ async function seedTeam(profilePath: string, agentStore: AgentStore, clock: Seed
   const ownerSession = await team.loginWithAccount(owner);
   await team.setEnabledOnLaunch(teamIdentity.serverId, true);
 
-  const [alice, jon, maya] = joined;
-  if (!alice || !jon || !maya) throw new Error("The development team members could not be created.");
+  // The owner and Alice leave the third seat of the default limit to the dev test client.
+  const [alice] = joined;
+  if (!alice) throw new Error("The development team members could not be created.");
   const chat = new TeamChatStore(agentStore.database);
   chat.sendMessage({
     clientMessageId: "dev-seed-dm-owner-alice-1",
@@ -1387,20 +1386,6 @@ async function seedTeam(profilePath: string, agentStore: AgentStore, clock: Seed
     recipientMemberId: ownerSession.member.id,
     text: "The notes look good. I left one comment on the rollout section.",
     createdAt: clock.at(2 * HOUR + 40 * MINUTE),
-  });
-  chat.sendMessage({
-    clientMessageId: "dev-seed-dm-jon-owner-1",
-    senderMemberId: jon.member.id,
-    recipientMemberId: ownerSession.member.id,
-    text: "The customer examples are ready for the release note.",
-    createdAt: clock.at(2 * HOUR),
-  });
-  chat.sendMessage({
-    clientMessageId: "dev-seed-dm-maya-owner-1",
-    senderMemberId: maya.member.id,
-    recipientMemberId: ownerSession.member.id,
-    text: "I checked the final asset sizes. Everything is within the limits.",
-    createdAt: clock.at(35 * MINUTE),
   });
 }
 

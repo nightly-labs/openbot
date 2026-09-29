@@ -210,6 +210,12 @@ export const messages = defineMessages("settings", {
   "settings.updates.status.checkFailed": "OpenBot could not check for updates. Try again.",
   "settings.updates.status.unsupported": "Updates are unavailable in this build.",
   "settings.updates.actionFailed": "Could not update OpenBot.",
+  "settings.updates.autoInstall.title": "Install updates automatically",
+  "settings.updates.autoInstall.description":
+    "OpenBot restarts into a downloaded update when the agents are idle. Members of your servers are disconnected for a short time.",
+  "settings.updates.allowRemote.title": "Allow updates from server admins",
+  "settings.updates.allowRemote.description":
+    "Owners and admins of this server can download an update and restart OpenBot on this computer.",
   // The Hosted sites tab.
   "settings.hostedSites.title": "Your sites",
   "settings.hostedSites.unavailable": "Site hosting is unavailable.",

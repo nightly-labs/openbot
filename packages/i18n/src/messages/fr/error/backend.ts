@@ -204,6 +204,7 @@ export const messages = {
   "error.backend.authExpired": "La demande d’authentification a expiré.",
   "error.backend.authDigitsRequired": "Saisissez le nombre de chiffres demandé.",
   "error.backend.browserViewProtected": "La vue du navigateur est protégée pendant l’authentification.",
+  "error.backend.browserPreviewPageChanged": "La page du navigateur a changé pendant l’aperçu. Réessayez.",
   "error.backend.browserInputProtected": "La saisie du navigateur est protégée pendant l’authentification.",
   "error.backend.mcpServerHttpCredentials":
     "Le serveur a répondu {status}. Vérifiez la clé d’API ou les autres identifiants.",

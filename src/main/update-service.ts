@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { appendFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
+import type { ScheduledUpdateRestart, UpdateBusyPhase, UpdateFailureCode, UpdateStatus } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
@@ -167,6 +167,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
   #managedByHost = false;
+  #scheduledRestart: ScheduledUpdateRestart | null = null;
   #cancellationToken: UpdateCancellationToken | null = null;
   #checkGeneration = 0;
   #downloadGeneration = 0;
@@ -258,7 +259,18 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   getStatus(): UpdateStatus {
     const status = { ...this.#status };
     if (this.#managedByHost) status.managedByHost = true;
+    if (this.#scheduledRestart)
+      status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     return status;
+  }
+
+  /**
+   * Shows the restart a joined server's admin asked for. `RequestedUpdate` owns the schedule; this
+   * only carries it to the renderer. It is not a phase change, so the phase deadline stays as it is.
+   */
+  setScheduledRestart(restart: ScheduledUpdateRestart | null): void {
+    this.#scheduledRestart = restart ? { ...restart, waitingFor: [...restart.waitingFor] } : null;
+    this.emit("status", this.getStatus());
   }
 
   getDiagnostics(): UpdateDiagnosticEvent[] {

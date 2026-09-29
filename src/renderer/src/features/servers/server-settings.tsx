@@ -8,9 +8,10 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, flush } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
+import type { ServerSettingsSection } from "./ServerSettingsModal";
 import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
@@ -36,8 +37,10 @@ import { serverAdminPort, serversPort } from "./servers-port";
 const ServerSettings = createSimpleContext({
   name: "Server settings",
   init: () => {
-    const { servers, setServers, hostStatus, setHostStatus } = useServers();
+    const { servers, setServers, hostStatus, setHostStatus, setHostUpdateOpener } = useServers();
     const [serverSettingsTargetId, setServerSettingsTargetId] = createSignal<string | null>(null);
+    /** The section an opener asked for, such as Updates from the host version notice. */
+    const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
     const [serverSettingsOpen, setServerSettingsOpen] = createSignal(false);
     const [serverSettingsMembers, setServerSettingsMembers] = createSignal<TeamPresenceMember[]>([]);
     const [serverSettingsInvites, setServerSettingsInvites] = createSignal<TeamInviteSummary[]>([]);
@@ -124,8 +127,13 @@ const ServerSettings = createSimpleContext({
       }
     }
 
-    function openServerSettings(serverId: string, trigger: HTMLElement | null): void {
+    function openServerSettings(
+      serverId: string,
+      trigger: HTMLElement | null,
+      section: ServerSettingsSection | null = null,
+    ): void {
       serverSettingsRequest += 1;
+      setServerSettingsSection(section);
       serverSettingsMcpRequest += 1;
       serverSettingsRestoreTarget = trigger;
       setServerSettingsTargetId(serverId);
@@ -442,8 +450,12 @@ const ServerSettings = createSimpleContext({
         throw error;
       }
     }
+    setHostUpdateOpener((serverId) => openServerSettings(serverId, null, "updates"));
+    onCleanup(() => setHostUpdateOpener(undefined));
+
     return {
       serverSettingsTarget,
+      serverSettingsSection,
       serverSettingsOpen,
       setServerSettingsOpen,
       serverSettingsRestoreTarget: () => serverSettingsRestoreTarget,

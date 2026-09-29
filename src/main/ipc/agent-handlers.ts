@@ -25,6 +25,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import { CONTEXT_RESET_CAPABILITY, CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { duplicateAgentIntoLayout } from "../../backend/agent/duplication-gate";
 import type { AgentService } from "../../backend/agent-service";
@@ -350,6 +351,18 @@ export function agentIpcHandlers({
             method: "POST",
             body: { turnId: parsed.turnId },
           }),
+      }),
+      clearContext: scopedHandler(parseAgentId, {
+        local: (agentId) => service.clearAgentContext(agentId),
+        remote: async (agentId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CONTEXT_RESET_CAPABILITY))
+            throw new Error(sourceText("error.team.contextResetUnsupported"));
+          // The context-reset-v1 codec has already checked the empty reply.
+          await remoteServers.request(serverId, CONTEXT_RESET_ROUTES.clear, () => undefined, {
+            method: "POST",
+            body: { agentId },
+          });
+        },
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
         local: (parsed) => service.respondToPrompt(parsed),

@@ -100,6 +100,7 @@ export const AllStates: Story = {
           agents={agents}
           onSelectAgent={onSelectAgent}
         />
+        <ChatActionMarker marker={{ kind: "context-reset", timestamp }} agents={agents} onSelectAgent={onSelectAgent} />
       </section>
     </main>
   ),

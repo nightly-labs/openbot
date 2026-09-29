@@ -1,4 +1,4 @@
-import type { BrowserEnvironment, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserEnvironment, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { BrowserWindow, type WebContents, type WebContentsView, webContents } from "electron";
 import type { BrowserCdpEngine } from "./browser-cdp";
 import type { BrowserDiagnostics } from "./browser-diagnostics";
@@ -8,6 +8,13 @@ import { isPersistableBrowserUrl } from "./browser-state";
  * One tab as `BrowserHost` holds it. The host owns every tab and its lifecycle; the tab operations in
  * `browser-tab-operations.ts` only read and advance its queue, revision and secret state.
  */
+/** The page a preview frame shows: its URL, its main-frame document, and the tab's capture generation. */
+export interface BrowserPreviewPage {
+  url: string;
+  document: number;
+  generation: number;
+}
+
 export interface BrowserHostTab {
   id: string;
   view: WebContentsView;
@@ -31,6 +38,17 @@ export interface BrowserHostTab {
   ownerAgentId: string | null;
   revision: number;
   queue: Promise<unknown>;
+  /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
+  pendingOperations: number;
+  /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
+  documents: number;
+  /**
+   * The last preview frame, with the page, document and capture generation it shows. A preview waits
+   * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.
+   */
+  preview?: (BrowserPreviewPage & { frame: BrowserPreview }) | undefined;
+  /** The preview capture on `queue`, so preview requests for the same page share one capture. */
+  previewCapture?: (BrowserPreviewPage & { frame: Promise<BrowserPreview> }) | undefined;
   /**
    * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
    * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.

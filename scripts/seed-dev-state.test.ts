@@ -49,10 +49,10 @@ describe("development state seed", () => {
       agents: 4,
       conversations: 4,
       attachments: 10,
-      teamMembers: 4,
+      teamMembers: 2,
       activeInvites: 1,
-      sessions: 4,
-      directThreads: 3,
+      sessions: 2,
+      directThreads: 1,
       queuedDeliveries: 0,
       memories: 7,
       routines: 5,
@@ -212,12 +212,12 @@ describe("development state seed", () => {
     const members = team.listMembers();
     const owner = members.find((member) => member.role === "owner");
     expect(owner?.email).toBe("openbot-dev-host@example.com");
-    expect(members).toHaveLength(4);
+    expect(members).toHaveLength(2);
     expect(team.listInvites().filter((invite) => invite.usedAt === null)).toHaveLength(1);
-    expect(team.listSessions()).toHaveLength(4);
+    expect(team.listSessions()).toHaveLength(2);
     const chat = new TeamChatStore(agents.database);
     const directThreads = chat.listThreads(owner?.id ?? "");
-    expect(directThreads).toHaveLength(3);
+    expect(directThreads).toHaveLength(1);
     expect(directThreads.reduce((total, thread) => total + thread.unreadCount, 0)).toBeGreaterThan(0);
     const channels = new ChannelStore(agents.database);
     const channelSummaries = channels.list("local");

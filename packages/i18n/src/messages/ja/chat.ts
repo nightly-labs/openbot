@@ -55,6 +55,7 @@ export const messages = {
   "chat.marker.openChat": "{name} とのチャットを開く",
   "chat.marker.openRoutine": "ルーティン {name} を開く",
   "chat.marker.unavailable": "利用不可",
+  "chat.marker.contextReset": "新しいチャットを開始しました",
   "chat.marker.skill.created": "スキルを作成しました",
   "chat.marker.skill.revised": "スキルを改訂しました",
   "chat.marker.skill.installed": "スキルをインストールしました",

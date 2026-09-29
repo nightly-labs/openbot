@@ -6,7 +6,7 @@ import { gzipSync } from "node:zlib";
 import { z } from "zod";
 import type { NativeRuntimeLock } from "./native-runtime-lock";
 
-export const remoteDesktopTargets = ["darwin-arm64", "win32-x64"] as const;
+export const remoteDesktopTargets = ["darwin-arm64", "darwin-x64", "win32-x64"] as const;
 export type RemoteDesktopTarget = (typeof remoteDesktopTargets)[number];
 
 const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -39,6 +39,7 @@ export const remoteDesktopReleaseManifestSchema = z.object({
   }),
   artifacts: z.object({
     "darwin-arm64": artifactSchema,
+    "darwin-x64": artifactSchema,
     "win32-x64": artifactSchema,
   }),
 });
@@ -50,6 +51,7 @@ export function runtimeTarget(
   architecture: string = process.arch,
 ): RemoteDesktopTarget {
   if (platform === "darwin" && architecture === "arm64") return "darwin-arm64";
+  if (platform === "darwin" && architecture === "x64") return "darwin-x64";
   if (platform === "win32" && architecture === "x64") return "win32-x64";
   throw new Error(`Unsupported remote desktop target: ${platform}-${architecture}.`);
 }
@@ -58,9 +60,9 @@ export function runtimeTargetParts(target: RemoteDesktopTarget): {
   platform: "darwin" | "win32";
   architecture: string;
 } {
-  return target === "darwin-arm64"
-    ? { platform: "darwin", architecture: "arm64" }
-    : { platform: "win32", architecture: "x64" };
+  if (target === "darwin-arm64") return { platform: "darwin", architecture: "arm64" };
+  if (target === "darwin-x64") return { platform: "darwin", architecture: "x64" };
+  return { platform: "win32", architecture: "x64" };
 }
 
 export function runtimeArtifactName(target: RemoteDesktopTarget): string {

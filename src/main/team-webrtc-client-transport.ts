@@ -4,6 +4,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { channelEvent } from "@openbot/contracts/team-protocol/channels-v1";
 import { TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
+import { hostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -773,7 +774,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.#failProtocol(hostId, sourceText("error.remote.eventGap"));
         return;
       }
-      const optional = frame.type === "event" ? channelEvent(frame.payload) : null;
+      const optional = frame.type === "event" ? (channelEvent(frame.payload) ?? hostRestartEvent(frame.payload)) : null;
       const decoded = optional
         ? { status: "known" as const, event: optional }
         : decodeTeamProtocolV5CurrentEvent(frame);

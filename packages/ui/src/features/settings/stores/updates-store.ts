@@ -8,6 +8,8 @@ interface UpdatesStoreProps {
   appInfo: AppInfo | null;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
+  /** Removes a restart that a server admin asked for. */
+  onCancelScheduledRestart?: () => Promise<void>;
 }
 
 /**
@@ -98,7 +100,35 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     }
   }
 
-  return { installedVersion, message, messageClass, presentation, runAction };
+  const [cancelling, setCancelling] = createSignal(false);
+  /** A restart that a server admin asked for, while it has not started. */
+  const scheduledRestart = () =>
+    props.updateStatus.phase === "installing" ? undefined : props.updateStatus.scheduledRestart;
+
+  async function cancelScheduledRestart(): Promise<void> {
+    if (cancelling() || !props.onCancelScheduledRestart) return;
+    setError(null);
+    setCancelling(true);
+    try {
+      await props.onCancelScheduledRestart();
+    } catch (failure) {
+      const text = currentText();
+      setError(text.errorMessage(failure, text.t("update.scheduled.cancelFailed")));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  return {
+    installedVersion,
+    message,
+    messageClass,
+    presentation,
+    runAction,
+    scheduledRestart,
+    cancelling,
+    cancelScheduledRestart,
+  };
 }
 
 export type SettingsUpdatesStore = ReturnType<typeof createSettingsUpdatesStore>;

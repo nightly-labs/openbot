@@ -11,6 +11,7 @@ import {
   bundledOpencodeExecutable,
   CodexCliError,
   cliSpawnTarget,
+  commandPathFromShellOutput,
   loginShellCommand,
   parseClaudeVersion,
   parseCodexVersion,
@@ -171,6 +172,14 @@ describe("login shell discovery", () => {
     const [pid, group] = (await runInLoginShell('echo "$$ $(ps -o pgid= -p $$)"', shell)).trim().split(/\s+/u);
     expect(group).toBe(pid);
     await expect(runInLoginShell("exit 3", shell)).rejects.toThrow("code 3");
+  });
+
+  it.runIf(process.platform !== "win32")("finds the path after a profile that prints a greeting", async () => {
+    // A `.bashrc` that prints text hid every system CLI on Linux (#1073).
+    const shell = { command: "/bin/sh", args: ["-c"] };
+    const stdout = await runInLoginShell("echo 'Welcome back'; echo; command -v sh", shell);
+    expect(commandPathFromShellOutput(stdout)).toMatch(/^\/.*\/sh$/u);
+    expect(commandPathFromShellOutput("Welcome back\nalias ll='ls -l'\n")).toBeNull();
   });
 });
 

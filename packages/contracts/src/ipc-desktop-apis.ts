@@ -104,8 +104,8 @@ export type CustomAgentsDesktopApi = GroupApi<IpcEndpoints["customAgents"]>;
 export type ProviderAdminDesktopApi = GroupApi<IpcEndpoints["providerAdmin"]>;
 
 /**
- * The server name and logo of one server's host. A remote host answers only an owner or admin, and
- * only when it advertises `host-admin-v1`.
+ * The server name, logo and app update of one server's host. A remote host answers only an owner or
+ * admin, and only when it advertises `host-admin-v1` (name and logo) or `host-update-v1` (update).
  */
 export type HostAdminDesktopApi = GroupApi<IpcEndpoints["hostAdmin"]>;
 

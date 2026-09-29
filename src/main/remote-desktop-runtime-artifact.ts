@@ -17,8 +17,9 @@ export async function resolveRemoteDesktopRuntime(input: {
 }): Promise<RemoteDesktopRuntimePaths | null> {
   if (input.platform === "linux") return null;
   const platformDirectory = input.platform;
-  const architecture = input.platform === "darwin" ? "arm64" : "x64";
-  if (input.architecture !== architecture) return null;
+  const architecture = input.architecture;
+  const architectures = input.platform === "darwin" ? ["arm64", "x64"] : ["x64"];
+  if (!architectures.includes(architecture)) return null;
   const root = input.overrideRoot
     ? input.overrideRoot
     : input.isPackaged

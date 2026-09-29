@@ -13,7 +13,7 @@ export interface SettingsPort {
   setApprovalAutomation: OpenBotDesktopApi["setApprovalAutomation"];
   dynamicIsland: Pick<OpenBotDesktopApi["dynamicIsland"], "getPreference" | "setPreference">;
   notifications: Pick<OpenBotDesktopApi["notifications"], "getPreference" | "openSettings" | "setPreference" | "test">;
-  update: Pick<OpenBotDesktopApi["update"], "getPreference" | "setPreference">;
+  update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

@@ -78,6 +78,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.members.createAnother": "Create new link",
   "mobile.server.members.create": "Create invite link",
   "mobile.server.members.permanentLimit": "Revoke a permanent invitation link before creating another one.",
+  "mobile.server.members.full":
+    "This server has the maximum of {limit} members. Remove a member to invite a new person.",
   "mobile.server.members.inviteUsed": "Invitation accepted. The member joined this server.",
   "mobile.server.members.inviteSent": "Invitation sent to {email}.",
   "mobile.server.members.permanentCreated":
@@ -92,6 +94,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.members.linkHint": "Share a one-time link to invite someone to this server.",
   "mobile.server.members.updateFailed": "Could not update this member. Try again.",
   "mobile.server.members.title": "Server members",
+  "mobile.server.members.limitCount": { other: "{count} of {limit} members" },
   "mobile.server.members.loadFailed": "Could not load members. Refresh to try again.",
   "mobile.server.members.accessRemoved": "Access removed",
   "mobile.server.members.empty": "No members.",

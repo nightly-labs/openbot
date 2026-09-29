@@ -63,6 +63,15 @@ export const messages = {
   "agentSettings.notifications.description":
     "Recevez une notification quand cet agent termine ou a besoin d’une réponse",
 
+  "agentSettings.newChat.title": "Nouvelle discussion",
+  "agentSettings.newChat.description": "L’agent oublie cette discussion. Sa configuration reste.",
+  "agentSettings.newChat.button": "Commencer",
+  "agentSettings.newChat.confirmTitle": "Commencer une nouvelle discussion avec {name} ?",
+  "agentSettings.newChat.confirmDescription":
+    "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
+  "agentSettings.newChat.confirm": "Nouvelle discussion",
+  "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+
   "agentSettings.fullAccess.title": "Donner un accès complet à cet agent ?",
   "agentSettings.fullAccess.description":
     "L’agent pourra alors lire, modifier et supprimer tout fichier accessible à votre compte utilisateur, exécuter n’importe quelle commande et utiliser le réseau. Une seule instruction mal comprise ou une page web malveillante peut atteindre vos fichiers personnels.",

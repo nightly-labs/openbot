@@ -45,6 +45,7 @@ import { BrowserControlSessions } from "./browser-control-sessions";
 import { BrowserDiagnostics } from "./browser-diagnostics";
 import {
   type BrowserHostTab,
+  type BrowserPreviewPage,
   currentTabUrl,
   type KeepQueueBlocked,
   restoreWebContentsFocus,
@@ -119,6 +120,12 @@ const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
  * it is queued on the tab, so whatever the agent does next waits behind it.
  */
 const DOCUMENT_ENUMERATION_TIMEOUT_MS = 10_000;
+/**
+ * How long a preview request waits for a new frame before it answers with the last one. The card
+ * asks again three seconds after each answer, and the capture keeps running, so the next request
+ * gets the frame that was late.
+ */
+const PREVIEW_STALE_AFTER_MS = 1_000;
 /**
  * The live view's frames. The quality is what a page of text survives on a slow link, and the size
  * is the client's panel rather than the host's monitor: a frame larger than the panel that draws it
@@ -790,8 +797,42 @@ export class BrowserHost {
     });
   }
 
+  /**
+   * A preview waits behind whatever the agent does on the tab, and its capture resizes the page twice,
+   * which a heavy single-page application answers slowly. So while the tab is busy, or while a capture
+   * takes longer than `PREVIEW_STALE_AFTER_MS`, the card gets the last frame of the same page instead.
+   */
   async capturePreview(tabId: string): Promise<BrowserPreview> {
-    return this.#enqueue(tabId, async (tab, keepQueueBlocked) => {
+    const tab = this.#requireTab(tabId);
+    if (tab.secret?.submitted) throw new Error("Browser inspection is protected during authentication. Use takeover.");
+    const cached = savedPreview(tab);
+    if (cached && tab.pendingOperations > 0) return cached;
+    const started = this.#previewCapture(tab);
+    // A navigation during the capture makes its frame show the page before it, so take one more,
+    // and fail rather than show the wrong page when that one is also out of date.
+    const capture = started.frame.then((frame) => {
+      if (showsCurrentPage(tab, started)) return frame;
+      const retry = this.#previewCapture(tab);
+      return retry.frame.then((retried) => {
+        if (!showsCurrentPage(tab, retry)) throw new Error(sourceText("error.backend.browserPreviewPageChanged"));
+        return retried;
+      });
+    });
+    if (!cached) return capture;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // After a navigation during the capture the saved frame shows the wrong page, so the preview waits.
+    const stale = new Promise<BrowserPreview>((resolve) => {
+      timer = setTimeout(() => {
+        if (savedPreview(tab) === cached) resolve(cached);
+      }, PREVIEW_STALE_AFTER_MS);
+    });
+    return Promise.race([capture, stale]).finally(() => clearTimeout(timer));
+  }
+
+  #previewCapture(tab: BrowserHostTab): BrowserPreviewPage & { frame: Promise<BrowserPreview> } {
+    if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
+    const page = currentPreviewPage(tab);
+    const frame = this.#enqueue(tab.id, async (_tab, keepQueueBlocked) => {
       const image = await boundEngineOperation(
         tab,
         tab.engine.screenshot(),
@@ -817,8 +858,18 @@ export class BrowserHost {
       });
       const preview = cropped.resize({ width: 960, height: 600, quality: "good" });
       const dataUrl = `data:image/jpeg;base64,${preview.toJPEG(72).toString("base64")}`;
-      return { dataUrl, width: 960, height: 600 };
+      const frame = { dataUrl, width: 960, height: 600 };
+      if (showsCurrentPage(tab, page)) tab.preview = { ...page, frame };
+      return frame;
     });
+    const capture = { ...page, frame };
+    tab.previewCapture = capture;
+    void frame
+      .finally(() => {
+        if (tab.previewCapture === capture) tab.previewCapture = undefined;
+      })
+      .catch(() => undefined);
+    return capture;
   }
 
   /**
@@ -1220,12 +1271,14 @@ export class BrowserHost {
       ownerAgentId,
       revision: 0,
       queue: Promise.resolve(),
+      pendingOperations: 0,
       focusOnVisible: false,
       environment,
       engine: new BrowserCdpEngine(view.webContents),
       diagnostics,
       recording: false,
       captureGeneration: 0,
+      documents: 0,
       viewInvalidations: new Set(),
     };
   }
@@ -1423,7 +1476,7 @@ export class BrowserHost {
       tab.diagnostics.add({
         kind: "console",
         level: details.level,
-        message: details.message.slice(0, 2_000),
+        message: details.message,
         url: diagnosticUrl(details.sourceId),
       });
       if (details.level === "error") this.#emitChanged();
@@ -1440,6 +1493,7 @@ export class BrowserHost {
     });
     contents.on("page-title-updated", changed);
     contents.on("did-navigate", (_event, url) => {
+      tab.documents += 1;
       if (tab.secretDocument) {
         tab.secretDocument = false;
         contents.navigationHistory.clear();
@@ -1831,6 +1885,20 @@ export class BrowserHost {
       });
     return this.#persistQueue;
   }
+}
+
+function currentPreviewPage(tab: BrowserHostTab): BrowserPreviewPage {
+  return { url: currentTabUrl(tab), document: tab.documents, generation: tab.captureGeneration };
+}
+
+function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolean {
+  const current = currentPreviewPage(tab);
+  return page.url === current.url && page.document === current.document && page.generation === current.generation;
+}
+
+/** The saved preview frame, when it still shows the tab's current page. */
+function savedPreview(tab: BrowserHostTab): BrowserPreview | null {
+  return tab.preview && showsCurrentPage(tab, tab.preview) ? tab.preview.frame : null;
 }
 
 function validateBounds(bounds: BrowserBounds): BrowserBounds {

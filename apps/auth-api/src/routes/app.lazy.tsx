@@ -1,3 +1,4 @@
+import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { createLazyFileRoute } from "@tanstack/solid-router";
 import { createSignal, lazy, onSettled, Show } from "solid-js";
 import "../../../../src/renderer/src/features/web-client/web-client.css";
@@ -16,7 +17,7 @@ function BrowserAppPage() {
         when={mounted()}
         fallback={
           <div class="web-app">
-            <main class="account-login-screen" role="status" aria-label="Loading OpenBot…" />
+            <AppLoadingScreen variant={import.meta.env.DEV ? "dev" : "production"} />
           </div>
         }
       >

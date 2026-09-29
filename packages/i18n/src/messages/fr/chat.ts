@@ -55,6 +55,7 @@ export const messages = {
   "chat.marker.openChat": "Ouvrir la discussion avec {name}",
   "chat.marker.openRoutine": "Ouvrir la routine {name}",
   "chat.marker.unavailable": "Indisponible",
+  "chat.marker.contextReset": "Nouvelle discussion commencée",
   "chat.marker.skill.created": "Compétence créée",
   "chat.marker.skill.revised": "Compétence révisée",
   "chat.marker.skill.installed": "Compétence installée",

@@ -854,6 +854,7 @@ export function installOpenbotStub(): void {
       updateQueuedMessage: vi.fn().mockResolvedValue(undefined),
       reorderQueue: vi.fn().mockResolvedValue(undefined),
       interrupt: vi.fn().mockResolvedValue(undefined),
+      clearContext: vi.fn().mockResolvedValue(undefined),
       respondToPrompt: vi.fn().mockResolvedValue(undefined),
       respondToApproval: vi.fn().mockResolvedValue(undefined),
       respondToBrowserSecret: vi.fn().mockResolvedValue(undefined),
@@ -915,8 +916,13 @@ export function installOpenbotStub(): void {
         message: null,
       }),
       install: vi.fn().mockResolvedValue(undefined),
-      getPreference: vi.fn().mockResolvedValue({ autoDownload: true }),
-      setPreference: vi.fn(async (input) => input),
+      getPreference: vi.fn().mockResolvedValue({ autoDownload: true, allowRemoteUpdates: true, autoInstall: false }),
+      setPreference: vi.fn(async (input) => ({
+        autoDownload: true,
+        allowRemoteUpdates: true,
+        autoInstall: false,
+        ...input,
+      })),
       onEvent: vi.fn(updateStatusBridge.subscribe),
     }),
     notifications: stubGroup(IPC_ENDPOINTS.notifications, "notifications", {

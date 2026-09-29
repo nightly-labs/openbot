@@ -127,6 +127,8 @@ function SettingsModalStory(props: {
   /** Where the scan looks. Without it the tab has no detection settings. */
   detectionSettings?: ProviderDetectionSettingsValue;
   initialTab?: SettingsTab;
+  /** A restart that a server admin asked for. */
+  scheduledRestart?: UpdateStatus["scheduledRestart"];
 }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({
@@ -148,7 +150,11 @@ function SettingsModalStory(props: {
   });
   const [open, setOpen] = createSignal(props.initialOpen);
   const [value, setValue] = createSignal({ ...DEFAULT_GENERAL_SETTINGS });
-  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyUpdateStatus);
+  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(
+    props.scheduledRestart
+      ? { ...storyUpdateStatus, phase: "ready", availableVersion: "0.3.0", scheduledRestart: props.scheduledRestart }
+      : storyUpdateStatus,
+  );
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
   const [mobileDevices, setMobileDevices] = createSignal<MobileConnectedDevice[]>([
     {
@@ -230,6 +236,10 @@ function SettingsModalStory(props: {
           onValueChange={setValue}
           appInfo={storyAppInfo}
           updateStatus={updateStatus()}
+          onCancelScheduledRestart={async () => {
+            const { scheduledRestart: _cancelled, ...rest } = updateStatus();
+            setUpdateStatus(rest);
+          }}
           account={account()}
           onUpdateAccountName={updateAccountName}
           onUpdateAccountAvatar={updateAccountAvatar}
@@ -444,6 +454,16 @@ export const ProviderUpdateAvailable: Story = {
 
 export const ProviderUpdateRetry: Story = {
   render: () => <SettingsModalStory initialOpen providerUpdate providerUpdateFailure initialTab="providers" />,
+};
+
+export const ScheduledRemoteUpdate: Story = {
+  render: () => (
+    <SettingsModalStory
+      initialOpen
+      initialTab="updates"
+      scheduledRestart={{ requestedBy: "Ada Lovelace", mode: "when-idle", waitingFor: ["agent-turn"] }}
+    />
+  ),
 };
 
 export const Interactive: Story = {

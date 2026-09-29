@@ -60,6 +60,8 @@ const Settings = createSimpleContext({
     let analyticsOpened = false;
     let analyticsVersionRecorded = false;
     let autoDownloadUpdatesChanged = false;
+    let allowRemoteUpdatesChanged = false;
+    let autoInstallUpdatesChanged = false;
     let desktopNotificationsChanged = false;
     let turboModeChanged = false;
     const [turboModePending, setTurboModePending] = createSignal(false);
@@ -146,6 +148,28 @@ const Settings = createSimpleContext({
           )
           .catch(() =>
             setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: previous.autoDownloadUpdates })),
+          );
+      }
+      if (previous.allowRemoteUpdates !== value.allowRemoteUpdates) {
+        allowRemoteUpdatesChanged = true;
+        void settingsPort()
+          .update.setPreference({ allowRemoteUpdates: value.allowRemoteUpdates })
+          .then((preference) =>
+            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: preference.allowRemoteUpdates })),
+          )
+          .catch(() =>
+            setGeneralSettings((current) => ({ ...current, allowRemoteUpdates: previous.allowRemoteUpdates })),
+          );
+      }
+      if (previous.autoInstallUpdates !== value.autoInstallUpdates) {
+        autoInstallUpdatesChanged = true;
+        void settingsPort()
+          .update.setPreference({ autoInstall: value.autoInstallUpdates })
+          .then((preference) =>
+            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: preference.autoInstall })),
+          )
+          .catch(() =>
+            setGeneralSettings((current) => ({ ...current, autoInstallUpdates: previous.autoInstallUpdates })),
           );
       }
       if (previous.desktopNotifications !== value.desktopNotifications) {
@@ -244,10 +268,21 @@ const Settings = createSimpleContext({
       const unsubscribe = settingsPort().onOpenSettings(() => openAppSettings());
       // A remote owner or admin can change an agent's grant from a phone or the web client.
       const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
+      // An admin of a joined server can change the update switches of this computer.
+      const unsubscribeUpdates = settingsPort().update.onPreference((preference) => {
+        autoDownloadUpdatesChanged = true;
+        autoInstallUpdatesChanged = true;
+        setGeneralSettings((current) => ({
+          ...current,
+          autoDownloadUpdates: preference.autoDownload,
+          autoInstallUpdates: preference.autoInstall,
+        }));
+      });
       return () => {
         window.removeEventListener("keydown", handleSettingsShortcut);
         unsubscribe();
         unsubscribeApprovals();
+        unsubscribeUpdates();
       };
     });
 
@@ -277,8 +312,12 @@ const Settings = createSimpleContext({
         .then((preference) => {
           // A toggle made before this read resolves has already been persisted, so the older value
           // must not be painted back over it.
-          if (autoDownloadUpdatesChanged) return;
-          setGeneralSettings((current) => ({ ...current, autoDownloadUpdates: preference.autoDownload }));
+          setGeneralSettings((current) => ({
+            ...current,
+            autoDownloadUpdates: autoDownloadUpdatesChanged ? current.autoDownloadUpdates : preference.autoDownload,
+            allowRemoteUpdates: allowRemoteUpdatesChanged ? current.allowRemoteUpdates : preference.allowRemoteUpdates,
+            autoInstallUpdates: autoInstallUpdatesChanged ? current.autoInstallUpdates : preference.autoInstall,
+          }));
         })
         .catch(() => undefined);
       void settingsPort()

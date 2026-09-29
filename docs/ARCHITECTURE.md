@@ -410,7 +410,7 @@ binary, never stops startup.
 ### Managed provider updates
 
 The main process offers the version that the section above selects. The lock pins each provider
-for `darwin-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
+for `darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, and `win32-x64`; a platform with no pinned artifact reports
 that it is not supported instead of offering a download. An older managed installation is display
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
@@ -1097,6 +1097,15 @@ without the capability answers 404, so the client only logs out: that token stop
 membership stays for an admin to remove. Either way the client removes the server, also when the host
 does not answer.
 
+### New chat
+
+`context-reset-v1` adds `POST /v1/agent-context/clear` with `{ agentId }`. Any member who can see the
+agent can send it. The host writes a system message with `itemType: "context-reset"` to the agent's own
+thread and ends that thread's provider sessions. The thread, its messages and the agent do not change.
+The next provider session gets a handoff of only the messages after the last marker. The host refuses
+the request while a turn runs or a message waits in the queue. A client without the capability shows
+the marker as its text. Channel execution threads are not reset.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
@@ -1113,11 +1122,31 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
+| `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
-sign-in, folder import and the host app update stay on the host.
+sign-in and folder import stay on the host.
+
+`host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
+keeps the schedule in memory: who asked, and whether the restart waits until
+`describeRestartReadiness` reports no running work or happens as soon as the update is ready. The
+host user can turn the routes off with "Allow updates from server admins" (`openbot-update-preference-v1.json`,
+default on) and can cancel a restart that waits. The host still advertises the capability when the
+setting is off, so the client can show why. A Host Manager tenant refuses the routes. The client
+reads the status again every second while a check, a download or a restart runs. An admin can also
+set the host's automatic download and automatic install when idle through the settings route; an
+automatic install is a schedule with no requester.
+
+When an admin connects, `host-update-toast.tsx` reads the status once: it offers a new version and
+shows a live percentage while the host downloads. All members get the `host-restart` event
+(`waiting`, `restarting`, `none`) from the host's event stream, and the host sends the current state
+again when a client declares the capability. Like `channelEvent`, the event skips the frozen v1-v3
+event encoders at each hop (host peer, client transport, `remote-peer.ts`, SSE stream). A client that
+loses the host while a restart waits treats it as the restart: desktop keeps the fast WebRTC retry
+instead of the `host_unavailable` wait for 10 minutes, and web tries again every 5 s for 3 minutes.
+`host-restart-toast.ts` shows the notice until the host is back, for 10 minutes at most.
 
 ## OpenCode and ACP
 

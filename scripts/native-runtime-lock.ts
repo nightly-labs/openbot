@@ -44,6 +44,8 @@ const sourceRuntimeSchema = z.object({
   submodules: z.record(z.string().min(1), commitSchema),
 });
 
+const REMOTE_DESKTOP_TARGETS = ["darwin-arm64", "darwin-x64", "win32-x64"] as const;
+
 const nativeRuntimeLockSchema = z.object({
   schemaVersion: z.literal(1),
   cloudflared: z.object({
@@ -61,9 +63,10 @@ const nativeRuntimeLockSchema = z.object({
     sunshine: sourceRuntimeSchema,
     moonlightWeb: sourceRuntimeSchema,
     artifactRelease: remoteDesktopArtifactReleaseSchema.optional(),
-    releaseArtifacts: z.partialRecord(z.enum(["darwin-arm64", "win32-x64"]), remoteDesktopReleaseArtifactSchema),
+    releaseArtifacts: z.partialRecord(z.enum(REMOTE_DESKTOP_TARGETS), remoteDesktopReleaseArtifactSchema),
     targets: z.object({
       "darwin-arm64": z.array(z.string().min(1)).min(1),
+      "darwin-x64": z.array(z.string().min(1)).min(1),
       "win32-x64": z.array(z.string().min(1)).min(1),
     }),
   }),
@@ -89,7 +92,7 @@ export function parseNativeRuntimeLock(value: unknown): NativeRuntimeLock {
     return lock;
   }
 
-  for (const target of ["darwin-arm64", "win32-x64"] as const) {
+  for (const target of REMOTE_DESKTOP_TARGETS) {
     if (!artifacts[target]) throw new Error(`The runtime lock is missing the ${target} artifact.`);
   }
   const expectedDigest = createRemoteDesktopInputDigest(lock);
@@ -118,8 +121,7 @@ export function createRemoteDesktopReleaseTag(inputDigest: string): string {
 export function hasPinnedRemoteDesktopArtifacts(lock: NativeRuntimeLock): boolean {
   return Boolean(
     lock.remoteDesktop.artifactRelease &&
-      lock.remoteDesktop.releaseArtifacts["darwin-arm64"] &&
-      lock.remoteDesktop.releaseArtifacts["win32-x64"],
+      REMOTE_DESKTOP_TARGETS.every((target) => lock.remoteDesktop.releaseArtifacts[target]),
   );
 }
 

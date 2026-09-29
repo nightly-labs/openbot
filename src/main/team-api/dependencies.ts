@@ -5,6 +5,7 @@ import type { AgentTemplateService } from "../agent-template-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
+import type { RequestedUpdate } from "../requested-update";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 // What `TeamApiServer` needs from the rest of the main process, and nothing else.
 //
@@ -101,6 +102,7 @@ type TeamApiAgentMethods = Pick<
   | "editQueuedMessage"
   | "reorderQueue"
   | "interrupt"
+  | "clearAgentContext"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"
@@ -145,6 +147,8 @@ export interface TeamApiAdmin {
   providers?: TeamApiProviders;
   /** `host-admin-v1`: the server name and logo. */
   identity?: TeamApiHostIdentity;
+  /** `host-update-v1`: the app update of this computer. Advertised also when the host user turned it off. */
+  update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "cancel" | "changeSettings">;
 }
 
 interface TeamApiHostIdentity {

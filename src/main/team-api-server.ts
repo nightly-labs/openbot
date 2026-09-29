@@ -31,6 +31,7 @@ import {
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
+  HOST_UPDATE_CAPABILITY,
   isTeamCurrentCapability,
   MCP_SERVERS_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
@@ -43,6 +44,11 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   type TeamCurrentCapability,
 } from "@openbot/contracts/team-protocol/current";
+import {
+  HOST_RESTART_EVENT,
+  type HostRestartEvent,
+  type HostRestartState,
+} from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
@@ -88,9 +94,11 @@ import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgents } from "./team-api/route-agents";
 import { routeBrowser } from "./team-api/route-browser";
 import { routeChannels } from "./team-api/route-channels";
+import { routeContextReset } from "./team-api/route-context-reset";
 import { routeDirect } from "./team-api/route-direct";
 import { routeFiles } from "./team-api/route-files";
 import { routeHostAdmin } from "./team-api/route-host-admin";
+import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeMcpServers } from "./team-api/route-mcp";
 import { routeProviders } from "./team-api/route-providers";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
@@ -147,6 +155,7 @@ export class TeamApiServer {
   readonly #options: Omit<TeamApiOptions, "sidebarLayout"> & { sidebarLayout: TeamApiSidebarLayout };
   readonly #rateLimits = new Map<string, RateEntry>();
   readonly #eventClients = new Map<Ws.WebSocket, EventClientState>();
+  #hostRestart: HostRestartEvent = { type: HOST_RESTART_EVENT, state: "none", version: null };
   readonly #responseRoutes = new WeakMap<
     ServerResponse,
     { method: string; path: string; protocol: number; capabilities: Set<string>; hiddenAgentIds?: ReadonlySet<string> }
@@ -359,6 +368,20 @@ export class TeamApiServer {
       const payload = this.#encodeProviderEvent(event, connection.capabilities);
       if (payload && client.readyState === webSockets.WebSocket.OPEN) client.send(payload);
     }
+  }
+
+  /**
+   * Tells every member with `host-update-v1` that this host restarts into an update. It is outside the
+   * frozen event vocabulary, so it bypasses the encoders like a channel event does.
+   */
+  announceHostRestart(state: HostRestartState, version: string | null): void {
+    this.#hostRestart = { type: HOST_RESTART_EVENT, state, version };
+    for (const [client, connection] of this.#eventClients) this.#sendHostRestart(client, connection);
+  }
+
+  #sendHostRestart(client: Ws.WebSocket, connection: EventClientState): void {
+    if (!connection.capabilities.has(HOST_UPDATE_CAPABILITY)) return;
+    if (client.readyState === webSockets.WebSocket.OPEN) client.send(JSON.stringify(this.#hostRestart));
   }
 
   listDirectThreads(memberId: string): DirectThreadSummary[] {
@@ -583,6 +606,8 @@ export class TeamApiServer {
       if ((await routeAgentInstall(context, this.#options.admin)) === "handled") return;
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
+      if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await this.#routeAgents(context)) === "handled") return;
 
       // The only 404 in the Team API.
@@ -845,10 +870,13 @@ export class TeamApiServer {
           if (acceptsCapabilityDeclaration) {
             if (!event.capabilities) throw new Error("Invalid client capabilities.");
             const snapshotsWereEnabled = connection.capabilities.has("agent-runtime-snapshots");
+            const restartWasSent = connection.capabilities.has(HOST_UPDATE_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
             }
+            // A member that connects while a restart waits learns about it here, not at the next change.
+            if (!restartWasSent && this.#hostRestart.state !== "none") this.#sendHostRestart(client, connection);
           }
           connection.includeConversationEvents = event.includeConversations;
           return;
@@ -1153,6 +1181,7 @@ export class TeamApiServer {
         if (capability === PROVIDERS_ADMIN_CAPABILITY || capability === PROVIDERS_RUNTIMES_V2_CAPABILITY)
           return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
+        if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
         return true;
       }),
     };

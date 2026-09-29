@@ -191,6 +191,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.authExpired": "Authentication request expired.",
   "error.backend.authDigitsRequired": "Enter the requested number of digits.",
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
+  "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
