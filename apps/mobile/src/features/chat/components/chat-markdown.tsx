@@ -150,8 +150,9 @@ function FileReference({ text, presentation }: { text: string; presentation: Tex
 // after a space or a separator, and a long run without one breaks after this many characters.
 const CODE_PIECE_MAX_LENGTH = 12;
 
-// Hermes may not have Intl.Segmenter. The fallback keeps marks, skin tones and joined emoji whole.
-const GRAPHEME_FALLBACK = /\P{M}[\p{M}\p{Emoji_Modifier}]*(?:\u200d\P{M}[\p{M}\p{Emoji_Modifier}]*)*/gu;
+// Hermes may not have Intl.Segmenter. The fallback keeps flags, marks, skin tones and joined emoji whole.
+const GRAPHEME_FALLBACK =
+  /\p{Regional_Indicator}{2}|\P{M}[\p{M}\p{Emoji_Modifier}]*(?:\u200d\P{M}[\p{M}\p{Emoji_Modifier}]*)*/gu;
 
 function graphemes(text: string): string[] {
   if (Intl.Segmenter) {
