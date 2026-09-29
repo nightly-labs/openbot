@@ -118,6 +118,9 @@ export function useChatMotion(
   const responseOpacity = useSharedValue(1);
   const revealed = useSharedValue(false);
   const [atLatest, setAtLatest] = useState(false);
+  // The opening position is not the user's choice. Until the user drags the
+  // list, the whole chat counts as seen, wherever the list lands.
+  const [userScrolled, setUserScrolled] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
   const pending = useRef<{ baseline: string | null; first: boolean } | null>(null);
@@ -373,6 +376,7 @@ export function useChatMotion(
     setResponseVisible(true);
   }
   function onScrollBeginDrag() {
+    setUserScrolled(true);
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
     pendingRequiredInput.current = null;
@@ -404,6 +408,7 @@ export function useChatMotion(
     ref,
     setScrollRef,
     atLatest,
+    userScrolled,
     historyVisible,
     responseVisible,
     composerHeight,

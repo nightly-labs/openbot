@@ -284,9 +284,11 @@ export function ChatView({
     };
   }, []);
 
+  // Opening a chat reads it, as on desktop. After the user scrolls away, only the latest message in view reads it.
+  const seesLatest = atLatest || (motion.historyVisible && !motion.userScrolled);
   useEffect(() => {
-    if (!pendingMessage && isFocused && appActive && atLatest && serverOnline && readBoundary) markRead();
-  }, [pendingMessage, isFocused, appActive, atLatest, serverOnline, readBoundary, markRead]);
+    if (!pendingMessage && isFocused && appActive && seesLatest && serverOnline && readBoundary) markRead();
+  }, [pendingMessage, isFocused, appActive, seesLatest, serverOnline, readBoundary, markRead]);
 
   // The attachment card must not rebuild this gesture. A new gesture object
   // makes GestureDetector re-attach around the whole chat, the input inside it
