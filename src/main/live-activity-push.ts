@@ -10,6 +10,7 @@ import {
   type LiveActivityUnreadAgent,
   liveActivityBloubFile,
   liveActivityIslandText,
+  liveActivityShorterProps,
   liveActivityView,
 } from "@openbot/team-client/live-activity-props";
 import {
@@ -30,6 +31,9 @@ const SAME_MODE_INTERVAL_MS = 5_000;
 const STALE_AFTER_MS = 15 * 60 * 1000;
 /** An unchanged state is sent again before it becomes out of date. */
 const KEEPALIVE_MS = 10 * 60 * 1000;
+/** A failed send is tried again, first after this time, and then after double the time. */
+const RETRY_MS = 15_000;
+const RETRY_MAX_MS = 5 * 60 * 1000;
 /** iOS ends a Live Activity after 8 hours, and removes it from the Lock Screen 4 hours later. */
 const REGISTRATION_LIFETIME_MS = 12 * 60 * 60 * 1000;
 
@@ -41,6 +45,8 @@ export interface LiveActivityPushOptions {
   send(push: LiveActivityRelayPush): Promise<"sent" | "gone">;
   now?: () => number;
   randomBytes(size: number): Uint8Array;
+  /** Whether the member is still a member and not disabled. A removed member gets no more updates. */
+  memberActive(memberId: string): boolean;
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
@@ -64,6 +70,8 @@ interface Registration {
   timer: { handle: ReturnType<typeof setTimeout>; at: number } | null;
   sent: { key: string; mode: string | null; at: number } | null;
   sending: boolean;
+  /** Sends that failed in a row, for the time before the next attempt. */
+  failures: number;
 }
 
 /**
@@ -114,6 +122,7 @@ export class LiveActivityPushService {
       // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
       sending: false,
+      failures: 0,
     };
     this.#registrations.set(sessionId, registration);
     this.#schedule(registration, 0);
@@ -156,7 +165,8 @@ export class LiveActivityPushService {
   async #update(registration: Registration): Promise<void> {
     if (this.#registrations.get(registration.sessionId) !== registration || !away(registration)) return;
     const now = this.#now();
-    if (now >= registration.expiresAt) {
+    // Access can end while the phone is away: a removed or disabled member gets no more content.
+    if (now >= registration.expiresAt || !this.#options.memberActive(registration.viewer.memberId)) {
       this.#stop(registration);
       return;
     }
@@ -189,30 +199,26 @@ export class LiveActivityPushService {
     registration.sent = { key, mode, at: now };
     try {
       const result = await this.#options.send(push);
+      registration.failures = 0;
       // Apple refused the token: the activity ended, or the app was removed.
       if (result === "gone" || !props) this.#stop(registration);
       else this.#schedule(registration, KEEPALIVE_MS);
     } catch (error) {
-      // The next change tries again. Without updates, iOS marks the content out of date.
+      // The network or Apple can fail for a time. Try again, less often each time. Without updates,
+      // iOS marks the content out of date.
       registration.sent = sent;
+      registration.failures += 1;
       this.#options.logger?.warn("Live Activity update was not sent:", toLogValue(error));
+      this.#schedule(registration, Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS));
     } finally {
       registration.sending = false;
     }
   }
 
-  /**
-   * Apple takes 4 KB for each update. Long names in a script with wide characters can pass that, so
-   * the lists go first, then the buttons: the app still shows them when the user opens it.
-   */
+  /** Apple takes 4 KB for each update, so the lists and then the buttons go when the seal is too long. */
   #sealToFit(props: AgentLiveActivityProps, keys: LiveActivityKeys): string {
-    const shorter: AgentLiveActivityProps[] = [
-      props,
-      { ...props, agents: [], agentCount: 0, moreLabel: "", rows: [] },
-      { ...props, agents: [], agentCount: 0, moreLabel: "", rows: [], buttons: [], detail: "" },
-    ];
     let sealed = "";
-    for (const candidate of shorter) {
+    for (const candidate of liveActivityShorterProps(props)) {
       sealed = sealLiveActivity(JSON.stringify(candidate), keys, this.#options.randomBytes(LIVE_ACTIVITY_NONCE_BYTES));
       if (sealed.length <= LIVE_ACTIVITY_SEALED_LIMIT) break;
     }

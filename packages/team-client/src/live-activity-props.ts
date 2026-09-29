@@ -396,6 +396,31 @@ export function liveActivityButtons(presentation: DynamicIslandPresentation, t: 
   return [];
 }
 
+/**
+ * ActivityKit takes 4 KB for each update. Long names in a script with wide characters can pass that,
+ * so these are the props in the order to try: the lists go first, then the buttons and the detail.
+ * The app still shows all of it when the user opens it.
+ */
+export function liveActivityShorterProps(props: AgentLiveActivityProps): AgentLiveActivityProps[] {
+  const withoutLists = { ...props, agents: [], agentCount: 0, moreLabel: "", rows: [] };
+  return [props, withoutLists, { ...withoutLists, buttons: [], detail: "" }];
+}
+
+/**
+ * The props that the phone gives ActivityKit itself. The content state also holds the name and
+ * escapes the JSON, so the props stay well under the 4 KB limit.
+ */
+export function fitLiveActivityProps(props: AgentLiveActivityProps): AgentLiveActivityProps {
+  const candidates = liveActivityShorterProps(props);
+  return (
+    candidates.find((candidate) => new TextEncoder().encode(JSON.stringify(candidate)).length <= LOCAL_PROPS_BYTES) ??
+    candidates.at(-1) ??
+    props
+  );
+}
+
+const LOCAL_PROPS_BYTES = 3_000;
+
 /** The island text in the phone language, for the coordinator that feeds `liveActivityView`. */
 export function liveActivityIslandText(
   t: MobileTranslate,

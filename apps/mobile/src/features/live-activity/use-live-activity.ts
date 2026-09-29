@@ -9,6 +9,7 @@ import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import {
   type AgentLiveActivityProps,
+  fitLiveActivityProps,
   LIVE_ACTIVITY_LIST_URL,
   LIVE_ACTIVITY_MOODS,
   type LiveActivityAction,
@@ -224,7 +225,10 @@ export function useLiveActivity({
         return;
       }
       lastPublish.current = { mode, at: Date.now() };
-      void syncFor(live.native).show(props, foregroundRef.current ? undefined : staleDate.current);
+      void syncFor(live.native).show(
+        props && fitLiveActivityProps(props),
+        foregroundRef.current ? undefined : staleDate.current,
+      );
 
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";

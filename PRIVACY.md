@@ -587,7 +587,8 @@ host secret from one random phone secret, so one host cannot seal an update or s
 another host. The phone keeps its secret in its secure storage and makes a new one when the user
 signs out. The host keeps these values in
 memory only, for the session that gave them. It forgets them when the phone removes them, when the
-session ends, when Apple refuses the token, after 12 hours, and when the host stops.
+session ends, when the member is removed or disabled, when Apple refuses the token, after 12 hours,
+and when the host stops.
 
 Each update contains the text that the view shows: agent names, the current task, the last reply,
 a question and its options, or a command that waits for approval. The host seals the update with

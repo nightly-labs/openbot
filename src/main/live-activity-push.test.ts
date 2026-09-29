@@ -55,6 +55,7 @@ const agents: LiveActivityPushAgents = {
 beforeEach(() => {
   vi.useFakeTimers();
   listener = null;
+  memberActive = true;
   snapshot = {
     agents: [agent("ada", "Ada"), agent("hidden", "Hidden")],
     activeTurns: [],
@@ -72,11 +73,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+let memberActive = true;
+
 function service(send: (push: LiveActivityRelayPush) => Promise<"sent" | "gone">) {
   return new LiveActivityPushService({
     agents,
     send,
     randomBytes: (size) => new Uint8Array(size).fill(4),
+    memberActive: () => memberActive,
   });
 }
 
@@ -126,5 +130,27 @@ describe("LiveActivityPushService", () => {
     listener?.({ type: "agents-changed", agents: [] });
     await vi.runOnlyPendingTimersAsync();
     expect(refused).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends nothing more after the member loses access, and tries a failed send again", async () => {
+    snapshot.pendingApprovals.push(approval("ada", "npm test"));
+    const send = vi
+      .fn(async (_push: LiveActivityRelayPush) => "sent" as const)
+      .mockRejectedValueOnce(new Error("Apple did not answer."));
+    const push = service(send);
+
+    push.register("session-1", viewer, registration);
+    await vi.runOnlyPendingTimersAsync();
+    expect(send).toHaveBeenCalledTimes(1);
+    // The approval did not change, so only the retry sends it.
+    await vi.runOnlyPendingTimersAsync();
+    expect(send).toHaveBeenCalledTimes(2);
+
+    memberActive = false;
+    snapshot.pendingApprovals.push(approval("ada", "rm -rf build"));
+    listener?.({ type: "agents-changed", agents: [] });
+    await vi.runOnlyPendingTimersAsync();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(listener).toBeNull();
   });
 });

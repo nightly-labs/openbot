@@ -239,6 +239,10 @@ export class HostService extends EventEmitter<HostEvents> {
             return sendLiveActivityPush(hostId, push);
           },
           randomBytes: (size) => new Uint8Array(randomBytes(size)),
+          memberActive: (memberId) => {
+            const member = options.store.getMember(memberId);
+            return member !== null && !member.disabled;
+          },
           logger,
         })
       : undefined;
