@@ -477,10 +477,11 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.nextDueAt(this.#hooks.excludedAgents());
   }
 
-  async processDue(now = new Date()): Promise<void> {
+  async processDue(now = new Date(), active: () => boolean = () => true): Promise<void> {
     const changedAgents = new Set<string>();
     try {
       for (const due of this.#routines.due(now, this.#hooks.excludedAgents())) {
+        if (!active()) break;
         // A previous enqueue can yield while another agent starts deletion.
         if (this.#hooks.excludedAgents().has(due.routine.agentId)) continue;
         const { scheduledFor, nextRunAt } = collapseMissedOccurrences(

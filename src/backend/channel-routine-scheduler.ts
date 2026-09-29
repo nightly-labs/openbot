@@ -160,10 +160,11 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return this.#routines.nextDueAt(this.#excluded());
   }
 
-  async processDue(now = new Date()): Promise<void> {
+  async processDue(now = new Date(), active: () => boolean = () => true): Promise<void> {
     const changed = new Set<string>();
     try {
       for (const due of this.#routines.due(now, this.#excluded())) {
+        if (!active()) break;
         // A previous fire can yield while the channel is archived.
         if (this.#excluded().has(due.routine.channelId)) continue;
         const { scheduledFor, nextRunAt } = collapseMissedOccurrences(

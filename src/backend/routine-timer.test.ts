@@ -161,3 +161,33 @@ it("holds a due routine while suspended and fires it once on resume", async () =
   expect(pending.asked).toBe(1);
   timer.dispose();
 });
+
+it("stops a pass that a suspend interrupts and finishes it on resume", async () => {
+  let active: (() => boolean) | undefined;
+  const first = source("2026-08-25T10:01:00.000Z");
+  const record = first.record;
+  first.record = {
+    ...record,
+    processDue: async (now, isActive) => {
+      await record.processDue(now, isActive);
+      if (active) return;
+      timer.suspend();
+      active = isActive;
+    },
+  };
+  const behind = source("2026-08-25T10:01:00.000Z");
+  const timer = new RoutineTimer(
+    () => [first.record, behind.record],
+    () => true,
+    () => undefined,
+  );
+  timer.arm();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(active?.()).toBe(false);
+  expect(behind.asked).toBe(0);
+
+  timer.resume();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(behind.fired).toEqual(["2026-08-25T10:01:00.000Z"]);
+  timer.dispose();
+});

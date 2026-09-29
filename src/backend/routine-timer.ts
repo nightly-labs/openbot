@@ -9,7 +9,8 @@
  */
 export interface RoutineDueSource {
   nextDueAt(): string | null;
-  processDue(now: Date): Promise<void>;
+  /** `active` turns false when the system suspends during the pass; stop before the next routine. */
+  processDue(now: Date, active: () => boolean): Promise<void>;
 }
 
 /** `setTimeout` rejects a delay above this and fires at once instead, which would spin. */
@@ -79,8 +80,10 @@ export class RoutineTimer {
     this.#firing = true;
     try {
       for (const source of this.sources()) {
+        // A suspend can arrive while an enqueue awaits. The rest stays due and fires on resume.
+        if (this.#suspended) break;
         try {
-          await source.processDue(now);
+          await source.processDue(now, () => !this.#suspended);
         } catch (error) {
           this.onError("routine_scheduler_failed", error);
         }
