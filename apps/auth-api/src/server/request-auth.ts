@@ -114,6 +114,7 @@ export function requestLiveActivityRelay(): {
   const bindings = requireWorkerBindings(env);
   const { APNS_PRIVATE_KEY, APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC, APNS_ORIGIN, LIVE_ACTIVITY_RATE_LIMITER } = bindings;
   if (!APNS_PRIVATE_KEY || !APNS_KEY_ID || !APNS_TEAM_ID || !APNS_TOPIC || !LIVE_ACTIVITY_RATE_LIMITER) return null;
+  const origin = developmentApnsOrigin(APNS_ORIGIN);
   return {
     sender: sharedApnsSender({
       // A deploy passes the key as one line, with `\n` for each line break.
@@ -121,7 +122,7 @@ export function requestLiveActivityRelay(): {
       keyId: APNS_KEY_ID,
       teamId: APNS_TEAM_ID,
       topic: APNS_TOPIC,
-      origin: developmentApnsOrigin(APNS_ORIGIN),
+      ...(origin ? { origin } : {}),
     }),
     allow: async (hostId) => (await LIVE_ACTIVITY_RATE_LIMITER.limit({ key: `host:${hostId}` })).success,
   };
