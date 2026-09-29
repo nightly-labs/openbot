@@ -160,7 +160,8 @@ Read the instruction file for each directory you change. Use the
 | [remote/api/AGENTS.md](remote/api/AGENTS.md) | Signal and TURN credentials |
 
 Write release notes in a new `changelog.d/<branch>.md` file, not in `CHANGELOG.md`, as
-[docs/RELEASING.md](docs/RELEASING.md#release-notes) says. CI fails a PR with no notes unless it
+[docs/RELEASING.md](docs/RELEASING.md#release-notes) says. Notes for the iPhone app go in
+`apps/mobile/changelog.d/<branch>.md`. CI fails a PR with no notes unless it
 has the `no-changelog` label. A version bump with no notes fails.
 
 Before a version bump or tag, use

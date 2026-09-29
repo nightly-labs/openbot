@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { ChangelogPage } from "../components/changelog/ChangelogPage";
-import { changelogHead } from "../lib/changelog";
+import { changelogHead, changelogSearch } from "../lib/changelog";
 
 export const Route = createFileRoute("/changelog")({
-  head: ({ match }) => changelogHead(match.context.siteUrl),
+  validateSearch: changelogSearch,
+  head: ({ match }) => changelogHead(match.context.siteUrl, match.search.platform),
   component: ChangelogRoute,
 });
 
 function ChangelogRoute() {
-  return <ChangelogPage />;
+  const search = Route.useSearch();
+  return <ChangelogPage platform={search().platform ?? "desktop"} />;
 }
