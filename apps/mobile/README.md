@@ -321,7 +321,7 @@ build can consume a number. The marketing version stays in `app.json` and is not
 To release a new marketing version, run `bun run mobile:release:patch`, `mobile:release:minor` or
 `mobile:release:major` first. It moves the notes in `apps/mobile/changelog.d` into
 `apps/mobile/CHANGELOG.md`, which the Mobile tab of the public `/changelog` page shows, and sets the
-version in `app.json` and `package.json`. Merge that change to `main`, then dispatch the release.
+version in `app.json`, `package.json` and `bun.lock`. Merge that change to `main`, then dispatch the release.
 The signed `.ipa` is saved as a GitHub Actions artifact for seven days before upload. If upload
 fails, download that artifact and retry with Transporter to avoid rebuilding. Re-running the full
 workflow creates a new build number.

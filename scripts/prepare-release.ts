@@ -26,6 +26,8 @@ interface ReleaseTarget {
   fragmentDir: string;
   /** Each file that holds the version. The first one is where the current version is read. */
   versionFiles: readonly string[];
+  /** The workspace whose copy of the version `bun.lock` keeps. Bun does not update that copy. */
+  lockWorkspace?: string;
   next: string;
 }
 
@@ -42,6 +44,7 @@ const MOBILE: ReleaseTarget = {
   changelog: MOBILE_CHANGELOG,
   fragmentDir: MOBILE_FRAGMENT_DIR,
   versionFiles: MOBILE_VERSION_FILES,
+  lockWorkspace: "apps/mobile",
   next: "commit the files, merge them to main, then run bun run mobile:ios:release:testflight",
 };
 
@@ -101,10 +104,19 @@ if (problems.length > 0) {
   );
 }
 
+// Every file is ready before the first write, so a version that cannot be set changes nothing.
+const versionWrites = target.versionFiles.map((path, index) => ({
+  path,
+  text: withVersion(versionSources[index] ?? "", path, nextVersion),
+}));
+if (target.lockWorkspace !== undefined) {
+  versionWrites.push({
+    path: "bun.lock",
+    text: withLockVersion(await readFile("bun.lock", "utf8"), target.lockWorkspace, nextVersion),
+  });
+}
 await Promise.all([
-  ...target.versionFiles.map((path, index) =>
-    writeFile(path, withVersion(versionSources[index] ?? "", path, nextVersion)),
-  ),
+  ...versionWrites.map(({ path, text }) => writeFile(path, text)),
   writeFile(target.changelog, nextChangelog),
 ]);
 // Only after the changelog holds their items.
@@ -129,6 +141,15 @@ function withVersion(source: string, path: string, version: string): string {
   const next = source.replace(VERSION_FIELD, `$1${version}$3`);
   if (fileVersion(next, path) !== version) throw new Error(`Could not set the version in ${path}.`);
   return next;
+}
+
+/** Sets the version that `bun.lock` keeps for `workspace`, the line after the workspace name. */
+function withLockVersion(lock: string, workspace: string, version: string): string {
+  const entry = new RegExp(
+    `("${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}": \\{\\s*"name": "[^"]*",\\s*"version": ")[^"]*(")`,
+  );
+  if (!entry.test(lock)) throw new Error(`bun.lock has no version for ${workspace}.`);
+  return lock.replace(entry, `$1${version}$2`);
 }
 
 /** The fragments in `directory`, oldest commit first. A fragment with no commit is last. */

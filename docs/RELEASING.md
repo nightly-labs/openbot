@@ -247,8 +247,8 @@ The iPhone app has its own versions and its own notes, in the Mobile tab of `/ch
 notes of a change to the iPhone app in `apps/mobile/changelog.d/<branch>.md`, with the same rules.
 A change to the desktop app or the web client and the iPhone app gets one file in each folder.
 `bun run mobile:release:patch`, `mobile:release:minor` and `mobile:release:major` move these files
-into `apps/mobile/CHANGELOG.md` and set the version in `apps/mobile/app.json` and
-`apps/mobile/package.json`. The pre-commit hook checks the new section when a commit changes the
+into `apps/mobile/CHANGELOG.md` and set the version in `apps/mobile/app.json`,
+`apps/mobile/package.json` and the copy of it in `bun.lock`. The pre-commit hook checks the new section when a commit changes the
 `app.json` version.
 
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two

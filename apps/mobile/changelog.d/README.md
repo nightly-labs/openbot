@@ -13,5 +13,5 @@ Use the groups and item rules of [the release notes](../../../docs/RELEASING.md#
 
 `bun run mobile:release:patch`, `mobile:release:minor` and `mobile:release:major` move the items of
 every file into the new version section of [`apps/mobile/CHANGELOG.md`](../CHANGELOG.md), set the
-new version in `apps/mobile/app.json` and `apps/mobile/package.json`, and delete the files. The
+new version in `apps/mobile/app.json`, `apps/mobile/package.json` and `bun.lock`, and delete the files. The
 pre-commit hook and the Changelog workflow check each file.
