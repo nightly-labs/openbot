@@ -117,7 +117,7 @@ export function presentChatMessages(
 }
 
 // The reader decides whether a user message is their own, so a bubble is kept for one reader.
-const projectedBubbles = new WeakMap<ConversationMessage, { memberId: string | null; bubble: ChatMessage }>();
+const projectedBubbles = new WeakMap<ConversationMessage, { readerKey: string; bubble: ChatMessage }>();
 const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
@@ -261,10 +261,19 @@ function sortedConversationMessages(messages: readonly ConversationMessage[]) {
  * `memberId` is the reader's membership on the server. A user message that another member wrote
  * gets their name. A message with no sender, from before senders
  * were kept, stays the reader's own, as it always showed.
+ *
+ * `accountUserId` is the reader's account. A host with no membership for its own user stamps
+ * `local-user:<account>`, so that sender is also the reader when they read their own server.
  */
-export function projectChatMessages(messages: ConversationMessage[], memberId: string | null = null): ChatMessage[] {
+export function projectChatMessages(
+  messages: ConversationMessage[],
+  memberId: string | null = null,
+  accountUserId: string | null = null,
+): ChatMessage[] {
   // A server that is still connecting has an empty membership, which names no reader.
   const reader = memberId || null;
+  const readerAccount = accountUserId ? `local-user:${accountUserId}` : null;
+  const readerKey = `${reader ?? ""}\n${readerAccount ?? ""}`;
   const result: ChatMessage[] = [];
   const thinkingByTurn = new Map<string, Extract<ChatMessage, { kind: "thinking" }>>();
   const sorted = sortedConversationMessages(messages);
@@ -317,10 +326,11 @@ export function projectChatMessages(messages: ConversationMessage[], memberId: s
       thinking.steps.push({ id: message.id, text: message.text });
     } else {
       const cached = projectedBubbles.get(message);
-      let bubble = cached?.memberId === reader ? cached.bubble : undefined;
+      let bubble = cached?.readerKey === readerKey ? cached.bubble : undefined;
       if (!bubble) {
         const sender = message.author === "user" ? message.senderMember : undefined;
-        const otherMember = sender !== undefined && reader !== null && sender.id !== reader;
+        const otherMember =
+          sender !== undefined && reader !== null && sender.id !== reader && sender.id !== readerAccount;
         bubble = projectPlan(message) ?? {
           id: message.id,
           kind: "message",
@@ -334,7 +344,7 @@ export function projectChatMessages(messages: ConversationMessage[], memberId: s
           imageGeneration: message.imageGeneration,
           replyToMessageId: message.replyToMessageId,
         };
-        projectedBubbles.set(message, { memberId: reader, bubble });
+        projectedBubbles.set(message, { readerKey, bubble });
       }
       result.push(bubble);
     }

@@ -6,7 +6,7 @@
 // pointing at something it cannot render and never catch up.
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { conversationMessageSender, isMessageReaction } from "@openbot/contracts/ipc";
+import { isMessageReaction } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
@@ -15,6 +15,7 @@ import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./re
 import {
   conversationForCapabilities,
   markerExclusionsForCapabilities,
+  memberSender,
   nullableString,
   pageAnchor,
   pageLimit,
@@ -89,7 +90,7 @@ export async function routeAgentConversation(
           attachmentDraftIds: stringArray(body, "attachmentDraftIds"),
           replyToMessageId: nullableString(body, "replyToMessageId"),
         },
-        conversationMessageSender(member.id, member.name?.trim() || member.email || member.username),
+        memberSender(member),
       ),
     );
   }

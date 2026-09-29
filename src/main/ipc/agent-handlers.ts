@@ -193,7 +193,7 @@ export function agentIpcHandlers({
           }),
       }),
       saveProfile: scopedHandler(parseSaveAgentProfile, {
-        local: (input) => service.saveProfile(input, sidebarLayout),
+        local: (input) => service.saveProfile(input, sidebarLayout, host.conversationSender()),
         remote: (input, serverId) =>
           remoteServers.request(serverId, TEAM_API_ROUTES.agents.saveProfile, decodeSaveAgentProfileResult, {
             method: "POST",
@@ -201,7 +201,7 @@ export function agentIpcHandlers({
           }),
       }),
       createAgent: scopedHandler(parseCreateAgent, {
-        local: (parsed) => service.createAgent(parsed),
+        local: (parsed) => service.createAgent(parsed, undefined, undefined, host.conversationSender()),
         remote: (parsed, serverId) =>
           remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummary, {
             method: "POST",
@@ -316,7 +316,7 @@ export function agentIpcHandlers({
           }),
       }),
       editQueuedMessage: scopedHandler(parseQueueEdit, {
-        local: ({ agentId, ...input }) => service.editQueuedMessage(agentId, input),
+        local: ({ agentId, ...input }) => service.editQueuedMessage(agentId, input, host.conversationSender()),
         remote: ({ agentId, ...input }, serverId) =>
           remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueEdit(agentId), decodeQueueSnapshot, {
             method: "POST",
@@ -324,7 +324,7 @@ export function agentIpcHandlers({
           }),
       }),
       updateQueuedMessage: scopedHandler(parseUpdateQueuedMessage, {
-        local: (parsed) => service.updateQueuedMessage(parsed),
+        local: (parsed) => service.updateQueuedMessage(parsed, host.conversationSender()),
         remote: (parsed, serverId) =>
           remoteServers.request(serverId, TEAM_API_ROUTES.agent.queueUpdate(parsed.agentId), decodeVoid, {
             method: "POST",

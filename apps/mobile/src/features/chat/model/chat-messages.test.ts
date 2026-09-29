@@ -166,6 +166,10 @@ describe("mobile message senders", () => {
       { id: "ada", author: "user", sender: { id: "member-ada", name: "Ada" } },
       { id: "old", author: "user", sender: undefined },
     ]);
+    // A host with no membership for its own user stamps its account, which is also the reader.
+    const host = sent("host", { id: "local-user:account-self", name: "Me" });
+    expect(authors(projectChatMessages([host], "member-self", "account-self"))[0]?.sender).toBeUndefined();
+    expect(authors(projectChatMessages([host], "member-self", "account-other"))[0]?.sender).toEqual(host.senderMember);
     // A server that is still connecting names no reader, so no message is shown as another person's.
     expect(authors(projectChatMessages(messages, "")).every((message) => message.sender === undefined)).toBe(true);
   });

@@ -1133,11 +1133,12 @@ export class MailboxStore {
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
     editId?: string,
+    sender?: ConversationMessageSender,
   ): Promise<void> {
     this.#assertQueueNotUpdating(deliveryId);
     this.#queueUpdates.add(deliveryId);
     try {
-      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId);
+      await this.#updateQueuedMessage(agentId, deliveryId, text, keepAttachmentIds, attachmentDraftIds, editId, sender);
     } finally {
       this.#queueUpdates.delete(deliveryId);
     }
@@ -1149,7 +1150,8 @@ export class MailboxStore {
     text: string,
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
-    editId?: string,
+    editId: string | undefined,
+    sender: ConversationMessageSender | undefined,
   ): Promise<void> {
     const delivery = this.#state.deliveries.find(
       (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
@@ -1220,6 +1222,9 @@ export class MailboxStore {
         return attachment ? { attachmentId: attachment.id, name: attachment.name } : null;
       });
       message.attachments = replacementAttachments;
+      // The saved text is the editor's, so the editor is its sender. A member can edit another
+      // member's queued message, and the first name must not stay on words that person did not write.
+      if (message.sender.kind === "user") setSenderMember(message, sender);
       if (editId) {
         delete delivery.editId;
         recordFinishedQueueEdit(delivery, editId, {
@@ -1243,6 +1248,7 @@ export class MailboxStore {
     } catch (error) {
       message.text = previous.text;
       message.attachments = previous.attachments;
+      setSenderMember(message, previous.senderMember);
       if (editId) {
         delivery.editId = editId;
         if (previousOutcomes) delivery.finishedEditOutcomes = previousOutcomes;
@@ -1708,6 +1714,11 @@ function toCurrentDelivery(value: unknown): DynamicRecord | null {
 
 function toCurrentGeneratedAttachment(value: unknown): DynamicRecord | null {
   return isRecord(value) ? withCurrentAgentKeys(value, { ownerBotId: "ownerAgentId" }) : null;
+}
+
+function setSenderMember(message: StoredMessage, sender: ConversationMessageSender | undefined): void {
+  if (sender) message.senderMember = sender;
+  else delete message.senderMember;
 }
 
 function toCurrentMailboxMessage(value: unknown): DynamicRecord | null {

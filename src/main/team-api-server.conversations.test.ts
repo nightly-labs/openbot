@@ -227,7 +227,13 @@ describe("TeamApiServer conversations", () => {
       description: "Builds practical itineraries.",
       title: "",
     });
-    expect(createAgent).toHaveBeenCalledWith(createInput);
+    // The first message of the new agent is the member's, as a message they send is.
+    expect(createAgent).toHaveBeenCalledWith(
+      createInput,
+      undefined,
+      undefined,
+      expect.objectContaining({ name: "owner" }),
+    );
     await expect(jsonRequest(base, "/v1/agents", { token: token })).resolves.toEqual(localAgents);
     await expect(
       jsonRequest(base, "/v1/agents/chief/usage", {
