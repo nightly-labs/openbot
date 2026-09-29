@@ -97,6 +97,9 @@ const EXIT_REPORT_WAIT_MS = 2_000;
 /** How long OpenCode's second `session/load` waits after an internal service failure. */
 const OPENCODE_LOAD_RETRY_MS = 500;
 
+/** How many `session/list` pages OpenBot reads to find a session before it stops looking. */
+const OPENCODE_SESSION_LIST_PAGES = 50;
+
 interface ClientEvents {
   notification: [notification: AppServerNotification];
   request: [request: AppServerRequest];
@@ -844,11 +847,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /**
    * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
-   * failure" as a fault of its internal server. `session/list` goes through that server too: when
-   * it answers, the server works, and the session is reported as missing, so the caller replaces it
-   * and hands it the transcript. When it fails too, the fault is the server's, and the session is
-   * kept: one more attempt, then the fault is reported. An OpenCode without `session/list` cannot
-   * tell the two apart, and a second failure is taken as the missing session it most often is.
+   * failure" as a fault of its internal server. Only a `session/list` that answers in full without
+   * the session shows it is missing: the caller then replaces it and hands it the transcript. A
+   * session that is listed, or a list that fails, means a fault, and the session is kept: one more
+   * attempt, then the fault is reported. An OpenCode without `session/list` cannot tell the two
+   * apart, and a second failure is taken as the missing session it most often is.
    */
   async #loadSession(connection: ClientSideConnection, request: LoadSessionRequest): Promise<LoadSessionResponse> {
     let failure: unknown;
@@ -858,28 +861,37 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) throw error;
       failure = error;
     }
-    const serverAnswers = await this.#sessionListAnswers(connection, request.cwd);
-    if (serverAnswers) throw new MissingOpenCodeSessionError(request.sessionId, failure);
+    const listing = await this.#sessionListing(connection, request);
+    if (listing === "absent") throw new MissingOpenCodeSessionError(request.sessionId, failure);
     await new Promise((resolve) => setTimeout(resolve, OPENCODE_LOAD_RETRY_MS));
     try {
       // The process can have stopped during the wait; this reports that instead of a closed stream.
       return await this.#requireConnection().loadSession(request);
     } catch (error) {
       if (!isOpenCodeServiceFailure(error)) throw error;
-      if (serverAnswers === null) throw new MissingOpenCodeSessionError(request.sessionId, error);
+      if (listing === "unsupported") throw new MissingOpenCodeSessionError(request.sessionId, error);
       throw new Error(sourceText("error.provider.opencodeServiceFailure"), { cause: error });
     }
   }
 
-  /** Whether the agent answers `session/list`; `null` when it does not offer the method. */
-  async #sessionListAnswers(connection: ClientSideConnection, cwd: string): Promise<boolean | null> {
-    if (!this.#initialization?.agentCapabilities?.sessionCapabilities?.list) return null;
+  /** Whether the agent's `session/list` for the session's directory holds the session. */
+  async #sessionListing(
+    connection: ClientSideConnection,
+    request: LoadSessionRequest,
+  ): Promise<"listed" | "absent" | "unknown" | "unsupported"> {
+    if (!this.#initialization?.agentCapabilities?.sessionCapabilities?.list) return "unsupported";
+    let cursor: string | undefined;
     try {
-      await connection.listSessions({ cwd });
-      return true;
+      for (let page = 0; page < OPENCODE_SESSION_LIST_PAGES; page += 1) {
+        const response = await connection.listSessions({ cwd: request.cwd, ...(cursor ? { cursor } : {}) });
+        if (response.sessions.some((session) => session.sessionId === request.sessionId)) return "listed";
+        cursor = response.nextCursor ?? undefined;
+        if (!cursor) return "absent";
+      }
     } catch {
-      return false;
+      return "unknown";
     }
+    return "unknown";
   }
 
   async #applyConfig(thread: AcpThread, model: string | null, effort: string | null): Promise<void> {

@@ -134,13 +134,22 @@ function handle(message) {
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
     return;
   }
-  // "fail" is an internal server that fails every call, as OpenCode reports it.
+  // "fail" is an internal server that fails every call, as OpenCode reports it. "paged" holds
+  // "ses_stored" on its second page.
   if (message.method === "session/list") {
-    if (process.env.OPENBOT_FAKE_ACP_LIST === "fail") {
+    const mode = process.env.OPENBOT_FAKE_ACP_LIST;
+    if (mode === "fail") {
       write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
       return;
     }
-    write({ jsonrpc: "2.0", id: message.id, result: { sessions: [] } });
+    const cwd = message.params.cwd;
+    const result =
+      mode !== "paged"
+        ? { sessions: [] }
+        : message.params.cursor === "page-2"
+          ? { sessions: [{ sessionId: "ses_stored", cwd }] }
+          : { sessions: [{ sessionId: "ses_other", cwd }], nextCursor: "page-2" };
+    write({ jsonrpc: "2.0", id: message.id, result });
     return;
   }
   if (message.method === "session/load") {
@@ -893,9 +902,12 @@ describe("OpenCode ACP session loading", () => {
     expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored" }, { sessionId: "ses_stored" }]);
   });
 
-  it("keeps the session and explains the fault while OpenCode's server keeps failing", async () => {
+  it.each([
+    ["its list fails", "fail"],
+    ["it lists the session", "paged"],
+  ])("keeps the session and explains the fault when OpenCode fails the load and %s", async (_, list) => {
     const fake = await createFakeOpencodeAgent();
-    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "fail");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", list);
     vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
     const client = startOpencode(fake.cli, () => null, fake.envLog);
 
