@@ -323,11 +323,17 @@ export function useChatMotion(
     [position],
   );
 
+  const lowestY = useRef(0);
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollY.set(event.nativeEvent.contentOffset.y);
+      const y = event.nativeEvent.contentOffset.y;
+      scrollY.set(y);
+      if (!revealed.get()) return;
+      // A status-bar tap or an assistive scroll moves the list up without a drag.
+      lowestY.current = Math.max(lowestY.current, y);
+      if (y < lowestY.current - 24) setUserScrolled(true);
     },
-    [scrollY],
+    [revealed, scrollY],
   );
   const updateAtLatest = useCallback((visible: boolean) => {
     setAtLatest(visible);
