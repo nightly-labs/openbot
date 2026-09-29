@@ -34,7 +34,7 @@ export interface WorkerBindings {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   HOSTED_SERVERS_ENABLED?: string;
-  /** Comma-separated account IDs that can create hosted servers. `*` allows each account. */
+  /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
   /** The boat named snapshot that new hosted servers start from. */
   HOSTED_SERVER_TEMPLATE?: string;

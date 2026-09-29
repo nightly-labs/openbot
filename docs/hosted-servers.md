@@ -10,7 +10,7 @@ a connection to each stored server but sends no request, so it does not keep the
 longer than that. When the user comes back, the app starts the stopped server again.
 
 The Worker enables hosted servers only when it has the boat and Stripe secrets and
-`HOSTED_SERVER_TEMPLATE`, and only for the account IDs in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
+`HOSTED_SERVER_TEMPLATE`, and only for the account IDs or emails in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
 allows each account; with no value, no account can create a server). Production sets `*` in
 `wrangler.jsonc`, so each account can buy a server. See [Production](#production). An account can have 3 servers that are not
 deleted (`MAX_SERVERS_PER_ACCOUNT`); a server that waits for its first payment counts. Each server
@@ -158,13 +158,14 @@ with `getServerEntitlement` when a member joins or is reactivated, and refuses a
 `bun run api:deploy:test` sets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
 `BOAT_WEBHOOK_SECRET` from the encrypted `apps/auth-api/.env.shared` on each deploy, so a value that
 you set by hand for these four is replaced. `bun run hosting:setup --target=test` makes the two
-webhooks and writes their secrets to that file. Set the rest with `wrangler secret put <name> --env test`
-from `apps/auth-api`:
+webhooks and writes their secrets to that file. It also sets the allow list from
+`HOSTED_SERVERS_TEST_ALLOW_LIST` in that file. Set the template with
+`wrangler secret put HOSTED_SERVER_TEMPLATE --env test` from `apps/auth-api`:
 
 | Name | Value |
 | --- | --- |
 | `HOSTED_SERVER_TEMPLATE` | The named snapshot from the template build, such as `openbot-server-0-9-0`. |
-| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs that can create servers. Keep it set: the test Worker is public, and its boat account is a trial. |
+| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs or emails that can create servers. `api:deploy:test` sets it from `HOSTED_SERVERS_TEST_ALLOW_LIST` and refuses `*`: the test Worker is public, and its boat account is a trial. |
 
 The `BOAT_API_KEY` in `.env.shared` is the development key of the boat test account. It also has
 command access, because the e2e script (`scripts/stripe-flows-e2e.ts`) reads the VM with it. Use it
@@ -176,7 +177,26 @@ The boat webhook goes to `https://<test Worker origin>/v2/hosting/boat/webhook` 
 `sandbox.ready`, `sandbox.error`, `sandbox.archived` and `sandbox.hydrated`. The Worker checks the
 HMAC signature, refuses a delivery older than 5 minutes, and ignores a delivery ID it has seen.
 
-Point your desktop development build at the test Worker with `OPENBOT_AUTH_API_URL`.
+### Real servers from a development build
+
+A local Worker does not make hosted servers: a boat VM cannot reach a Worker or a Signal service on
+your computer. To get a real server, start the app with `bun run dev --hosting=test`. The app then
+signs in to the test Worker, and the test Worker makes the VM. The local Worker and Signal still
+start, but the app does not use them for its account. The app uses its own profile for the test
+Worker, and all worktrees share it, so you sign in one time.
+
+Only the developers on the allow list can create a server. Only a developer with
+`DOTENV_PRIVATE_KEY_SHARED` can read or change it, so a clone of the repository cannot add an account.
+To add a developer, add their sign-in email and deploy:
+
+```bash
+bunx dotenvx set HOSTED_SERVERS_TEST_ALLOW_LIST "<list>,dev@example.com" -f apps/auth-api/.env.shared -fk .env.keys
+bun run api:deploy:test
+```
+
+Keep the account IDs of `bun scripts/stripe-flows-e2e.ts --print-user-ids` in the list, so the e2e
+scenarios can create servers. Use Starter or Standard: the boat trial account has no `large` machine
+and allows 75 sandbox starts each day.
 
 ## Production
 

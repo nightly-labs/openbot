@@ -18,7 +18,9 @@ fork needs no key from anyone. Delete the file and rerun to get a fresh set.
 sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test` Worker. The boat key creates real
 VMs, but only when the Worker also has `HOSTED_SERVER_TEMPLATE`. `wrangler.jsonc` sets
 `HOSTED_SERVERS_ENABLED` to `true` and `HOSTED_SERVERS_ALLOWED_USER_IDS` to `*`, so a local Worker
-with a template lets each local account create one; put account IDs in `.env.dev` to limit it. `bun run dev:api` decrypts it in memory. Ask a maintainer for
+with a template lets each local account create one; put account IDs in `.env.dev` to limit it. A VM
+cannot reach a local Worker, so use `bun run dev --hosting=test` for a real server (see
+[Real servers from a development build](../../docs/hosted-servers.md#real-servers-from-a-development-build)). `bun run dev:api` decrypts it in memory. Ask a maintainer for
 `DOTENV_PRIVATE_KEY_SHARED`, then export it in your shell profile or add it to the root
 `.env.keys`. The shell profile works in every worktree. Without the key, the Worker runs with no
 Stripe or boat keys. A value in `.env.dev` overrides the shared value. To change a value, run
@@ -39,7 +41,8 @@ stripe listen --forward-to http://127.0.0.1:3100/v1/stripe/webhook
 ```
 
 For the `test` Worker, `bun run hosting:setup --target=test` makes or updates its Stripe and boat
-webhooks and writes their signing secrets to `.env.shared`. Then run `bun run api:deploy:test`.
+webhooks and writes their signing secrets to `.env.shared`. Then run `bun run api:deploy:test`. It
+also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` in `.env.shared`.
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, and a

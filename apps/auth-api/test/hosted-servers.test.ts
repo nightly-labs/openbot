@@ -105,7 +105,8 @@ async function setup() {
     REMOTE_TICKET_PUBLIC_JWKS: JSON.stringify({ keys: [publicJwk] }),
     REMOTE_TICKET_KEY_ID: "test-key",
     HOSTED_SERVERS_ENABLED: "true",
-    HOSTED_SERVERS_ALLOWED_USER_IDS: "owner, member",
+    // An entry is an account ID or an email in any case.
+    HOSTED_SERVERS_ALLOWED_USER_IDS: "owner, Member@Example.test",
     HOSTED_SERVER_TEMPLATE: "openbot-server-test",
     BOAT_API_KEY: "boat-key",
     BOAT_WEBHOOK_SECRET: BOAT_WEBHOOK_SECRET,

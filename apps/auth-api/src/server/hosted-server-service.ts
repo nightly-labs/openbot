@@ -189,7 +189,8 @@ export class HostedServerService {
   readonly #ticketKey: string | null;
   #claimSecret: Promise<string> | null = null;
   readonly #enabled: boolean;
-  readonly #allowedUserIds: ReadonlySet<string>;
+  /** Account IDs and emails (lowercase) that can create servers. `*` allows each account. */
+  readonly #allowed: ReadonlySet<string>;
   readonly #now: () => number;
   readonly #removeHost: ((ownerUserId: string, hostId: string) => Promise<void>) | null;
   readonly #billing: HostedServerBilling | null;
@@ -207,10 +208,10 @@ export class HostedServerService {
       this.#boat !== null &&
       this.#template !== null &&
       this.#ticketKey !== null;
-    this.#allowedUserIds = new Set(
+    this.#allowed = new Set(
       (bindings.HOSTED_SERVERS_ALLOWED_USER_IDS ?? "")
         .split(",")
-        .map((value) => value.trim())
+        .map((value) => (value.includes("@") ? value.trim().toLowerCase() : value.trim()))
         .filter(Boolean),
     );
     this.#now = options.now ?? Date.now;
@@ -219,15 +220,14 @@ export class HostedServerService {
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
   }
 
-  isAvailableFor(userId: string): boolean {
-    return (
-      this.#enabled && this.#billing !== null && (this.#allowedUserIds.has("*") || this.#allowedUserIds.has(userId))
-    );
+  isAvailableFor(user: Pick<AuthUser, "id" | "email">): boolean {
+    const allowed = this.#allowed.has("*") || this.#allowed.has(user.id) || this.#allowed.has(user.email.toLowerCase());
+    return this.#enabled && this.#billing !== null && allowed;
   }
 
   /** The plans and prices that the create dialog shows. */
   plans(user: AuthUser): Promise<HostedServerCatalog> {
-    return this.#requireAvailable(user.id).billing.catalog();
+    return this.#requireAvailable(user).billing.catalog();
   }
 
   async list(user: AuthUser): Promise<HostedServerList> {
@@ -238,7 +238,7 @@ export class HostedServerService {
       )
       .bind(user.id)
       .all<HostedServerRow>();
-    return { available: this.isAvailableFor(user.id), servers: rows.results.map(summary) };
+    return { available: this.isAvailableFor(user), servers: rows.results.map(summary) };
   }
 
   /**
@@ -251,7 +251,7 @@ export class HostedServerService {
     idempotencyKeyHeader: string | null,
     returnTo: CheckoutReturn,
   ): Promise<HostedServerCheckout> {
-    const { billing } = this.#requireAvailable(user.id);
+    const { billing } = this.#requireAvailable(user);
     const idempotencyKey = idempotencyKeyHeader?.trim() ?? "";
     if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u.test(idempotencyKey)) {
       throw new HostedServerServiceError(400, "invalid_idempotency_key", "A valid Idempotency-Key header is required.");
@@ -308,7 +308,7 @@ export class HostedServerService {
 
   /** A new Checkout page for a server of the owner that still waits for its first payment. */
   async checkout(user: AuthUser, serverId: string, returnTo: CheckoutReturn): Promise<HostedServerCheckout> {
-    const { billing } = this.#requireAvailable(user.id);
+    const { billing } = this.#requireAvailable(user);
     const row = await this.#database
       .prepare(
         `SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND owner_user_id = ? AND desired_state != 'deleted'`,
@@ -1330,8 +1330,8 @@ export class HostedServerService {
     this.#analytics.track(row.owner_user_id, event);
   }
 
-  #requireAvailable(userId: string): { billing: HostedServerBilling } {
-    if (!this.isAvailableFor(userId) || !this.#billing) {
+  #requireAvailable(user: AuthUser): { billing: HostedServerBilling } {
+    if (!this.isAvailableFor(user) || !this.#billing) {
       throw new HostedServerServiceError(
         403,
         "hosting_unavailable",

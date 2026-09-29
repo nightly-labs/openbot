@@ -27,6 +27,7 @@ async function main(): Promise<void> {
   await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
   // An unset value keeps the value that the Worker has: a new template is set for each release.
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
+  if (cloudflareEnvironment === "test") await putTestAllowList();
   // Only production sends account events, so a test Worker does not add events to the production project.
   if (!cloudflareEnvironment) await putOptionalSecretSet("OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
@@ -62,6 +63,27 @@ function assertStripeKeyMode(): void {
   }
   if (!cloudflareEnvironment && !live)
     throw new Error("STRIPE_SECRET_KEY is not a live key. Production takes only live keys.");
+}
+
+/**
+ * The test Worker is public and its boat account is a trial, so only the developers in the encrypted
+ * `HOSTED_SERVERS_TEST_ALLOW_LIST` (account IDs or emails) can create servers there. Production allows
+ * each account with a var in wrangler.jsonc, and a var and a secret cannot have one name.
+ */
+async function putTestAllowList(): Promise<void> {
+  const value = process.env.HOSTED_SERVERS_TEST_ALLOW_LIST?.trim();
+  if (!value) {
+    logger.info("HOSTED_SERVERS_TEST_ALLOW_LIST is not set. The Worker keeps its current allow list.");
+    return;
+  }
+  if (value.startsWith("encrypted:")) throw new Error("HOSTED_SERVERS_TEST_ALLOW_LIST is not decrypted.");
+  if (value.split(",").some((entry) => entry.trim() === "*")) {
+    throw new Error("HOSTED_SERVERS_TEST_ALLOW_LIST must name accounts, not `*`.");
+  }
+  await run(wranglerExecutable, ["secret", "put", "HOSTED_SERVERS_ALLOWED_USER_IDS", ...environmentArgs], {
+    input: `${value}\n`,
+    label: "HOSTED_SERVERS_ALLOWED_USER_IDS secret",
+  });
 }
 
 async function putOptionalSecret(name: string): Promise<void> {

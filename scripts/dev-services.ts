@@ -238,7 +238,9 @@ function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv)
   });
 }
 
-const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated"] as const;
+const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--isolated", "--hosting=test"] as const;
+/** The deployed `test` account Worker. It creates real hosted server VMs for the accounts on its allow list. */
+const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
 
 export interface DevelopmentInvocation {
   target: DevelopmentTarget;
@@ -253,6 +255,10 @@ export interface DevelopmentInvocation {
   // worktrees must not see each other's conversations. Either way the profile
   // is seeded on the start that creates it.
   isolated: boolean;
+  // Sign the app in to the `test` account Worker instead of the local one, so that a hosted server
+  // is a real boat VM that can reach its Worker and Signal. The app gets one profile for this that
+  // all worktrees share: its account session belongs to the test Worker, not the local one.
+  hostingTest: boolean;
 }
 
 export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
@@ -269,16 +275,23 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     dryRun: args.includes("--dry-run"),
     force: args.includes("--force"),
     isolated: args.includes("--isolated"),
+    hostingTest: args.includes("--hosting=test"),
   };
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, isolated } = parseDevelopmentTarget(process.argv.slice(2));
+  const { target, dryRun, force, isolated, hostingTest } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Generated apps/auth-api/.env.dev for local development.");
   }
   const services = servicesForTarget(target);
   const sharedEnvironment = developmentEnvironmentForTarget(target);
+  if (hostingTest) {
+    sharedEnvironment.OPENBOT_AUTH_API_URL = TEST_ACCOUNT_API_URL;
+    sharedEnvironment.OPENBOT_MOBILE_AUTH_API_URL = TEST_ACCOUNT_API_URL;
+    sharedEnvironment.OPENBOT_DEV_INSTANCE_ID ??= developmentInstanceIdForWorktree("openbot:hosting-test");
+    logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
+  }
   if (isolated) {
     sharedEnvironment.OPENBOT_DEV_INSTANCE_ID ??= developmentInstanceIdForWorktree(projectRoot);
   }
