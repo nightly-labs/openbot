@@ -114,8 +114,14 @@ interface ChatComposerProps {
   replyFocusVersion: number;
   /** Focuses the field each time it changes after the first render, such as to type an answer. */
   focusVersion?: number;
+  /** Focuses the field after another screen, such as Agent info > Skills, handed text to it. */
+  handoffFocusVersion?: number;
   onCancelReply: () => void;
 }
+
+/** How long a handoff focus keeps asking for the keyboard, and how often. */
+const FOCUS_RETRY_MS = 1500;
+const FOCUS_RETRY_INTERVAL_MS = 100;
 
 export function ChatComposer({
   sendLabel,
@@ -145,6 +151,7 @@ export function ChatComposer({
   replyTarget,
   replyFocusVersion,
   focusVersion = 0,
+  handoffFocusVersion = 0,
   onCancelReply,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
@@ -198,6 +205,22 @@ export function ChatComposer({
       inputRef.current?.focus();
     }
   }, [isFocused, disabled, focusVersion]);
+  const focusedHandoffVersion = useRef(handoffFocusVersion);
+  useEffect(() => {
+    if (!isFocused || disabled || focusedHandoffVersion.current === handoffFocusVersion) return;
+    focusedHandoffVersion.current = handoffFocusVersion;
+    inputRef.current?.focus();
+    // The request comes from a native sheet above this chat that is closing. iOS then refuses the
+    // keyboard, or takes it back when the sheet is gone, so ask again until the field keeps it. A
+    // blur by the user in this short time is not told apart and gets the keyboard back once.
+    const started = Date.now();
+    const retry = setInterval(() => {
+      const input = inputRef.current;
+      if (!input || Date.now() - started > FOCUS_RETRY_MS) clearInterval(retry);
+      else if (!input.isFocused()) input.focus();
+    }, FOCUS_RETRY_INTERVAL_MS);
+    return () => clearInterval(retry);
+  }, [isFocused, disabled, handoffFocusVersion]);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;

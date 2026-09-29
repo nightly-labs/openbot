@@ -35,7 +35,7 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatHistoryReceipt } from "../model/chat-messages";
 import type { ChatTarget } from "../model/chat-target";
-import { takeComposerRequest, useComposerRequest } from "../model/composer-requests";
+import { takeComposerFocus, takeComposerRequest, useComposerRequest } from "../model/composer-requests";
 import { queueReceiptMessages } from "../model/queue-edit-draft";
 import { retainConfirmedAttachments } from "../model/upload-chat-attachments";
 import { rememberImageDimensions } from "./attachment-preview";
@@ -219,9 +219,9 @@ export function ChatView({
   const answersQuestion = Boolean(
     questionForm?.question && !questionForm.question.isSecret && questionForm.replyInChat,
   );
-  const [composerFocusVersion, setComposerFocusVersion] = useState(0);
+  const [answerFocusVersion, setAnswerFocusVersion] = useState(0);
   useEffect(() => {
-    if (answersQuestion) setComposerFocusVersion((version) => version + 1);
+    if (answersQuestion) setAnswerFocusVersion((version) => version + 1);
   }, [answersQuestion]);
   // Another screen, such as Agent info > Skills, can put text in this composer and close itself.
   // Only a chat in front takes it: a chat under that screen is not the one the user returns to.
@@ -231,8 +231,13 @@ export function ChatView({
     const text = takeComposerRequest(target.serverId, target.id);
     if (!text) return;
     setDraft((current) => (current ? `${current}\n${text}` : text));
-    setComposerFocusVersion((version) => version + 1);
   }, [isFocused, composerRequest, target.kind, target.serverId, target.id]);
+  const composerFocus = useComposerRequest((state) => state.focus);
+  const [handoffFocusVersion, setHandoffFocusVersion] = useState(0);
+  useEffect(() => {
+    if (!isFocused || !composerFocus || target.kind !== "agent") return;
+    if (takeComposerFocus(target.serverId, target.id)) setHandoffFocusVersion((version) => version + 1);
+  }, [isFocused, composerFocus, target.kind, target.serverId, target.id]);
   const lastUserId =
     messages.findLast((message) => message.kind === "message" && message.author === "user")?.id ?? null;
   const motion = useChatMotion(
@@ -634,7 +639,8 @@ export function ChatView({
                   sendRetryVersion={sendRetryVersion}
                   replyTarget={replyTarget}
                   replyFocusVersion={replyFocusVersion}
-                  focusVersion={composerFocusVersion}
+                  focusVersion={answerFocusVersion}
+                  handoffFocusVersion={handoffFocusVersion}
                   onCancelReply={() => setReplyTarget(null)}
                   mentionAgents={mentionAgents}
                   key={target.id}

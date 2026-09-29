@@ -29,7 +29,7 @@ import { act, isValidElement, type PropsWithChildren, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, assert, beforeEach, expect, it, vi } from "vitest";
 import type { ChatTarget } from "@/features/chat/model/chat-target";
-import { takeComposerRequest, useComposerRequest } from "@/features/chat/model/composer-requests";
+import { takeComposerFocus, takeComposerRequest, useComposerRequest } from "@/features/chat/model/composer-requests";
 import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { ChannelHistoryRefreshError, MobileChannelStore } from "../../channels/model/channel-store";
@@ -924,6 +924,13 @@ it("lets an admin start a new skill in the agent chat, as on desktop", async () 
   await click("Create skill");
   expect(mocks.sheetStack.goBack).toHaveBeenCalledOnce();
   expect(mocks.sheetStack.dispatch).not.toHaveBeenCalled();
+  // The keyboard is asked for only when the sheet is gone; during the dismissal iOS would drop it.
+  expect(useComposerRequest.getState().focus).toBeNull();
+  await act(() => root.unmount());
+  root = createRoot(container);
+  expect(takeComposerFocus("other-host", original.id)).toBe(false);
+  expect(takeComposerFocus(original.serverId, original.id)).toBe(true);
+  expect(useComposerRequest.getState().focus).toBeNull();
 });
 
 it("uninstalls a skill after confirmation and keeps it when the host refuses", async () => {

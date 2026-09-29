@@ -10,7 +10,12 @@ export interface ComposerRequest {
   text: string;
 }
 
-export const useComposerRequest = create<{ request: ComposerRequest | null }>(() => ({ request: null }));
+type ComposerTarget = Pick<ComposerRequest, "serverId" | "agentId">;
+
+export const useComposerRequest = create<{ request: ComposerRequest | null; focus: ComposerTarget | null }>(() => ({
+  request: null,
+  focus: null,
+}));
 
 export function requestComposerText(request: ComposerRequest): void {
   useComposerRequest.setState({ request });
@@ -22,4 +27,21 @@ export function takeComposerRequest(serverId: string, agentId: string): string |
   if (!request || request.serverId !== serverId || request.agentId !== agentId) return null;
   useComposerRequest.setState({ request: null });
   return request.text;
+}
+
+/**
+ * Asks that agent's chat to focus its composer and show the keyboard. Send it after the screen that
+ * sent the text has gone: iOS gives first responder back to the view it came from when a sheet
+ * finishes closing, so a focus during the dismissal is lost.
+ */
+export function requestComposerFocus(target: ComposerTarget): void {
+  useComposerRequest.setState({ focus: target });
+}
+
+/** Removes a focus request for this agent and tells whether there was one. */
+export function takeComposerFocus(serverId: string, agentId: string): boolean {
+  const { focus } = useComposerRequest.getState();
+  if (!focus || focus.serverId !== serverId || focus.agentId !== agentId) return false;
+  useComposerRequest.setState({ focus: null });
+  return true;
 }

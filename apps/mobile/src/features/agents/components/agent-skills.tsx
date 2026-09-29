@@ -5,10 +5,10 @@ import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { Stack, useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
-import { requestComposerText } from "@/features/chat/model/composer-requests";
+import { requestComposerFocus, requestComposerText } from "@/features/chat/model/composer-requests";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { type MobileAgent, useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
@@ -27,6 +27,15 @@ export function CreateSkillAction({ agent }: { agent: MobileAgent }) {
   // The stack that presents this sheet. The sheet has its own stack inside, so `router.dismissTo`
   // does not see the chat under it and would open a second, empty chat on top.
   const sheetStack = useNavigation().getParent();
+  // The native stack keeps a closing sheet mounted until its animation ends, so this cleanup runs
+  // after the dismissal, when the chat can keep the keyboard.
+  const sent = useRef(false);
+  useEffect(
+    () => () => {
+      if (sent.current) requestComposerFocus({ serverId: agent.serverId, agentId: agent.id });
+    },
+    [agent.serverId, agent.id],
+  );
   return (
     <Stack.Toolbar placement="right">
       <Stack.Toolbar.Button
@@ -36,6 +45,7 @@ export function CreateSkillAction({ agent }: { agent: MobileAgent }) {
           if (!sheetStack) return;
           void haptics.impact("light");
           requestComposerText({ serverId: agent.serverId, agentId: agent.id, text: SKILL_CREATION_REQUEST });
+          sent.current = true;
           const state = sheetStack.getState();
           const below = state?.routes[state.index - 1];
           const params = below?.params;
