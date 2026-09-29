@@ -17,7 +17,8 @@ import { z } from "zod";
  *
  * Without `--live` it refuses a live key. `--webhook-url` creates or updates the webhook endpoint at
  * that URL. Stripe shows the signing secret of an endpoint only when it creates the endpoint, so the
- * script prints it one time, for STRIPE_WEBHOOK_SECRET.
+ * script prints it one time, for STRIPE_WEBHOOK_SECRET. `bun run hosting:setup` calls
+ * `bootstrapStripe` and stores the secret itself.
  */
 
 const logger = createOpenBotLogger("stripe-bootstrap");
@@ -253,32 +254,42 @@ async function updatePortalConfiguration(stripe: StripeAdmin, prices: Record<Bil
   logger.info("Updated the default Customer Portal configuration.");
 }
 
-/** Returns the signing secret when this call created the endpoint, and null when it updated one. */
-async function ensureWebhookEndpoint(stripe: StripeAdmin, url: string): Promise<string | null> {
+/**
+ * Returns the signing secret when this call created the endpoint, and null when it updated one. Stripe
+ * cannot show the secret of an endpoint again, so `replace` deletes the endpoint and creates it again.
+ */
+async function ensureWebhookEndpoint(stripe: StripeAdmin, url: string, replace: boolean): Promise<string | null> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || !parsed.pathname.endsWith("/v1/stripe/webhook")) {
     throw new Error("--webhook-url must be an https URL that ends with /v1/stripe/webhook.");
   }
   const body = new URLSearchParams({ url: parsed.href, description: "OpenBot account server" });
   for (const event of BILLING_WEBHOOK_EVENTS) body.append("enabled_events[]", event);
+  let current: { id: string } | null = null;
   let startingAfter: string | null = null;
   for (;;) {
     const query = new URLSearchParams({ limit: "100", ...(startingAfter ? { starting_after: startingAfter } : {}) });
     const page = await stripe.request("GET", `/v1/webhook_endpoints?${query}`, null, webhookEndpointListSchema);
-    const current = page.data.find((endpoint) => endpoint.url === parsed.href);
-    if (current) {
-      await stripe.request("POST", `/v1/webhook_endpoints/${current.id}`, body, webhookEndpointSchema);
-      logger.info(`Webhook endpoint ${current.id} is up to date. Its signing secret did not change.`);
-      return null;
-    }
+    current = page.data.find((endpoint) => endpoint.url === parsed.href) ?? null;
     const last = page.data.at(-1);
-    if (!page.has_more || !last) break;
+    if (current || !page.has_more || !last) break;
     startingAfter = last.id;
+  }
+  if (current && !replace) {
+    await stripe.request("POST", `/v1/webhook_endpoints/${current.id}`, body, webhookEndpointSchema);
+    logger.info(`Webhook endpoint ${current.id} is up to date. Its signing secret did not change.`);
+    return null;
   }
   body.set("api_version", STRIPE_API_VERSION);
   const created = await stripe.request("POST", "/v1/webhook_endpoints", body, webhookEndpointSchema);
   logger.info(`Created webhook endpoint ${created.id}.`);
   if (!created.secret) throw new Error("Stripe did not return the signing secret of the new webhook endpoint.");
+  // The old endpoint goes only after the new one exists, so no event is made while no endpoint exists.
+  // Stripe retries the deliveries that fail until the Worker has the new secret.
+  if (current) {
+    await stripe.request("DELETE", `/v1/webhook_endpoints/${current.id}`, null, z.object({ id: z.string() }));
+    logger.info(`Deleted the old webhook endpoint ${current.id}.`);
+  }
   return created.secret;
 }
 
@@ -290,14 +301,22 @@ function optionValue(args: readonly string[], name: string): string | null {
   return value;
 }
 
-async function main(args: readonly string[]): Promise<void> {
-  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
-  if (!secretKey) throw new Error("Set STRIPE_SECRET_KEY to a Stripe secret key.");
-  const live = args.includes("--live");
+export interface StripeBootstrapOptions {
+  secretKey: string;
+  /** Without it, a live key is refused. */
+  live: boolean;
+  /** The webhook endpoint to create or update, or null for none. */
+  webhookUrl: string | null;
+  /** Deletes the endpoint at `webhookUrl` and creates it again, for a new signing secret. */
+  replaceWebhook?: boolean;
+}
+
+/** Returns the signing secret of the webhook endpoint when this call created it, else null. */
+export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<string | null> {
+  const { secretKey, live, webhookUrl } = options;
   if (!live && !/^(sk|rk)_test_/u.test(secretKey)) {
     throw new Error("STRIPE_SECRET_KEY is not a test-mode key. Add --live to change the live catalog.");
   }
-  const webhookUrl = optionValue(args, "--webhook-url");
   const stripe = new StripeAdmin(secretKey);
 
   const query = new URLSearchParams({ limit: "100" });
@@ -316,8 +335,15 @@ async function main(args: readonly string[]): Promise<void> {
   for (const plan of BILLING_PLAN_IDS) logger.info(`Prices ${productId(plan)}: ${prices[plan].join(", ")}`);
 
   await updatePortalConfiguration(stripe, prices);
+  return webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl, options.replaceWebhook ?? false) : null;
+}
+
+async function main(args: readonly string[]): Promise<void> {
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) throw new Error("Set STRIPE_SECRET_KEY to a Stripe secret key.");
+  const webhookUrl = optionValue(args, "--webhook-url");
+  const webhookSecret = await bootstrapStripe({ secretKey, live: args.includes("--live"), webhookUrl });
   const lines: string[] = [];
-  const webhookSecret = webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl) : null;
   if (webhookSecret) {
     // The operator asked for this secret, and Stripe never shows it again. Standard output only, not the log.
     process.stdout.write(`STRIPE_WEBHOOK_SECRET=${webhookSecret}\n`);

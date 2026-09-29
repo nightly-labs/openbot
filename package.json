@@ -81,6 +81,7 @@
     "api:images": "bun run --cwd apps/auth-api images",
     "api:deploy": "bun run --cwd apps/auth-api deploy",
     "hosting:template": "bun scripts/hosting/build-boat-template.ts",
+    "hosting:setup": "bun scripts/hosting/setup-account-server.ts",
     "api:deploy:test": "bun run --cwd apps/auth-api deploy:test",
     "sites:deploy": "bun run --cwd apps/site-router deploy",
     "sites:bucket:create": "bunx wrangler r2 bucket create openbot-sites --storage-class Standard",

@@ -395,7 +395,6 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           BOAT_API_KEY: ${{ secrets.BOAT_API_KEY }}
           BOAT_WEBHOOK_SECRET: ${{ secrets.BOAT_WEBHOOK_SECRET }}
-          HOSTED_CLAIM_SECRET: ${{ secrets.HOSTED_CLAIM_SECRET }}
           OPENPANEL_CLIENT_ID: ${{ secrets.OPENPANEL_CLIENT_ID }}
           OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
           HOSTED_SERVER_TEMPLATE: ${{ vars.HOSTED_SERVER_TEMPLATE }}
@@ -428,7 +427,7 @@ jobs:
             const optional = {};
             for (const names of [
               ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
-              ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET", "HOSTED_CLAIM_SECRET"],
+              ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
               ["OPENPANEL_CLIENT_ID", "OPENPANEL_CLIENT_SECRET"],
               ["HOSTED_SERVER_TEMPLATE"],
               ["HOSTED_SERVERS_ALLOWED_USER_IDS"],

@@ -40,8 +40,6 @@ export interface WorkerBindings {
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
-  /** Only the Worker holds it. It makes the setup claim of each hosted server from the server ID. */
-  HOSTED_CLAIM_SECRET?: string;
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;

@@ -15,7 +15,7 @@ checkout. Nothing in it is shared with production or with another machine, so a
 fork needs no key from anyone. Delete the file and rerun to get a fresh set.
 
 `.env.shared` holds encrypted development values that all maintainers share: the Stripe
-sandbox keys, the development `BOAT_API_KEY`, and `HOSTED_CLAIM_SECRET`. The boat key creates real
+sandbox keys, the development `BOAT_API_KEY`, and the webhook secrets of the `test` Worker. The boat key creates real
 VMs, but only when the Worker also has `HOSTED_SERVER_TEMPLATE` and the account is in
 `HOSTED_SERVERS_ALLOWED_USER_IDS`. `HOSTED_SERVERS_ENABLED` is `true` in `wrangler.jsonc`. `bun run dev:api` decrypts it in memory. Ask a maintainer for
 `DOTENV_PRIVATE_KEY_SHARED`, then export it in your shell profile or add it to the root
@@ -37,13 +37,8 @@ own `.env.dev` as `STRIPE_WEBHOOK_SECRET`:
 stripe listen --forward-to http://127.0.0.1:3100/v1/stripe/webhook
 ```
 
-For the `test` Worker, add `--webhook-url` to make or update its webhook endpoint. The command
-prints the signing secret one time; put it in `.env.shared`:
-
-```bash
-bun run api:stripe:bootstrap -- --webhook-url https://<test Worker origin>/v1/stripe/webhook
-bunx dotenvx set STRIPE_WEBHOOK_SECRET <whsec_...> -f apps/auth-api/.env.shared -fk .env.keys
-```
+For the `test` Worker, `bun run hosting:setup --target=test` makes or updates its Stripe and boat
+webhooks and writes their signing secrets to `.env.shared`. Then run `bun run api:deploy:test`.
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, and a

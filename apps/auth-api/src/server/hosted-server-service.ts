@@ -31,7 +31,7 @@ import {
   isBoatState,
   verifyBoatWebhookSignature,
 } from "./boat-client";
-import { hmacSha256, randomToken, sha256 } from "./crypto";
+import { deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import type { AuthUser, WorkerBindings } from "./types";
 
@@ -89,7 +89,7 @@ export type HostedServerBindings = Pick<
   | "HOSTED_SERVER_TEMPLATE"
   | "BOAT_API_KEY"
   | "BOAT_WEBHOOK_SECRET"
-  | "HOSTED_CLAIM_SECRET"
+  | "REMOTE_TICKET_PRIVATE_JWK"
 >;
 
 export class HostedServerServiceError extends Error {
@@ -176,7 +176,8 @@ export class HostedServerService {
   readonly #boat: BoatClient | null;
   readonly #template: string | null;
   readonly #webhookSecret: string | null;
-  readonly #claimSecret: string | null;
+  readonly #ticketKey: string | null;
+  #claimSecret: Promise<string> | null = null;
   readonly #enabled: boolean;
   readonly #allowedUserIds: ReadonlySet<string>;
   readonly #now: () => number;
@@ -190,12 +191,12 @@ export class HostedServerService {
     this.#boat = apiKey ? new BoatClient({ apiKey, fetch: options.fetch }) : null;
     this.#template = bindings.HOSTED_SERVER_TEMPLATE?.trim() || null;
     this.#webhookSecret = bindings.BOAT_WEBHOOK_SECRET?.trim() || null;
-    this.#claimSecret = bindings.HOSTED_CLAIM_SECRET?.trim() || null;
+    this.#ticketKey = bindings.REMOTE_TICKET_PRIVATE_JWK?.trim() || null;
     this.#enabled =
       bindings.HOSTED_SERVERS_ENABLED === "true" &&
       this.#boat !== null &&
       this.#template !== null &&
-      this.#claimSecret !== null;
+      this.#ticketKey !== null;
     this.#allowedUserIds = new Set(
       (bindings.HOSTED_SERVERS_ALLOWED_USER_IDS ?? "")
         .split(",")
@@ -772,7 +773,7 @@ export class HostedServerService {
   async #provision(row: HostedServerRow): Promise<void> {
     const boat = this.#boat;
     const template = this.#template;
-    const secret = this.#claimSecret;
+    const secret = await this.#claimKey();
     // Thrown before the row changes, so the webhook retry or the cron provisions it later.
     if (!boat || !template || !secret) {
       throw new HostedServerServiceError(503, "hosting_not_configured", "Hosted servers are not configured.");
@@ -1102,7 +1103,8 @@ export class HostedServerService {
     if (row.observed_state !== "stopped" && !(row.observed_state === "error" && row.provider_sandbox_id)) return;
     // A VM that never signed in, or whose session the owner revoked, has its claim in its env file. The
     // claim works again for this start.
-    const claimHash = this.#claimSecret ? await sha256(await hostedClaim(this.#claimSecret, row.server_id)) : null;
+    const secret = await this.#claimKey();
+    const claimHash = secret ? await sha256(await hostedClaim(secret, row.server_id)) : null;
     const waking = await this.#database
       .prepare(
         `UPDATE hosted_servers SET observed_state = 'waking', observed_error = NULL,
@@ -1250,7 +1252,7 @@ export class HostedServerService {
    */
   async #findLostSandbox(row: HostedServerRow): Promise<string | null> {
     const boat = this.#boat;
-    const secret = this.#claimSecret;
+    const secret = await this.#claimKey();
     if (!boat || !secret || !row.provider_template) return null;
     try {
       const request = createRequest(row, row.provider_template, await hostedClaim(secret, row.server_id));
@@ -1262,6 +1264,18 @@ export class HostedServerService {
       });
       return null;
     }
+  }
+
+  /**
+   * The key of the claims. It comes from the Remote ticket key, which only the Worker has, so hosting
+   * needs no secret of its own. It uses only the private value `d`: the same key in other JSON gives the
+   * same claims. A new ticket key changes each claim (see docs/hosted-servers.md).
+   */
+  async #claimKey(): Promise<string | null> {
+    const ticketKey = this.#ticketKey;
+    if (!ticketKey) return null;
+    this.#claimSecret ??= deriveSecret(ticketPrivateValue(ticketKey), "openbot-hosted-claim-key:v1");
+    return this.#claimSecret;
   }
 
   #track(row: HostedServerRow, event: AccountAnalyticsEvent): void {
@@ -1320,6 +1334,14 @@ function createRequest(row: HostedServerRow, from: string, claim: string) {
     ttlSeconds: LEASE_TTL_SECONDS,
     idempotencyKey: row.server_id,
   };
+}
+
+function ticketPrivateValue(jwk: string): string {
+  const parsed = JSON.parse(jwk);
+  if (!isDynamicRecord(parsed) || !isString(parsed.d) || !parsed.d) {
+    throw new Error("REMOTE_TICKET_PRIVATE_JWK is invalid.");
+  }
+  return parsed.d;
 }
 
 async function hostedClaim(secret: string, serverId: string): Promise<string> {

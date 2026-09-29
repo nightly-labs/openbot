@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   await putRequiredSecret("REMOTE_AUTH_WEBHOOK_SECRET");
   assertStripeKeyMode();
   await putOptionalSecretSet("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET");
-  await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET", "HOSTED_CLAIM_SECRET");
+  await putOptionalSecretSet("BOAT_API_KEY", "BOAT_WEBHOOK_SECRET");
   // An unset value keeps the value that the Worker has: a new template is set for each release.
   await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
   await putOptionalSecret("HOSTED_SERVERS_ALLOWED_USER_IDS");

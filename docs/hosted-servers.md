@@ -91,7 +91,8 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    A paid server whose setup failed has no sandbox. A wake (Retry in the add server dialog) sets
    it up again at once, and the cron does this 10 minutes after each failure. Each attempt sends
    the same request body and the same idempotency key, the host ID. The claim is an HMAC of the
-   host ID with `HOSTED_CLAIM_SECRET`, which only the Worker holds, so it is the same on each attempt. When a failed attempt made
+   host ID with a key that the Worker derives from `REMOTE_TICKET_PRIVATE_JWK` (HKDF), so it is the
+   same on each attempt and needs no secret of its own. When a failed attempt made
    a sandbox, boat returns that sandbox and the Worker stores it. A sandbox that a create returns
    after the cron gave up on that create is stored too; only a delete during the create removes it.
 7. **Plan ends.** When the subscription is cancelled or unpaid, or `past_due` after its period
@@ -141,9 +142,10 @@ with `getServerEntitlement` when a member joins or is reactivated, and refuses a
 ## Configure the test Worker
 
 `HOSTED_SERVERS_ENABLED` is `true` in `env.test` of `apps/auth-api/wrangler.jsonc`.
-`bun run api:deploy:test` sets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY`,
-`BOAT_WEBHOOK_SECRET` and `HOSTED_CLAIM_SECRET` from the encrypted `apps/auth-api/.env.shared` on each
-deploy, so a value that you set by hand for these five is replaced. Set the rest with `wrangler secret put <name> --env test`
+`bun run api:deploy:test` sets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BOAT_API_KEY` and
+`BOAT_WEBHOOK_SECRET` from the encrypted `apps/auth-api/.env.shared` on each deploy, so a value that
+you set by hand for these four is replaced. `bun run hosting:setup --target=test` makes the two
+webhooks and writes their secrets to that file. Set the rest with `wrangler secret put <name> --env test`
 from `apps/auth-api`:
 
 | Name | Value |
@@ -157,7 +159,7 @@ only with test data. The production key must be a boat key limited to sandbox cr
 update, stop, resume and delete. The Worker uses update (`PATCH`) for the lease and the name. Do not
 give it file, command, prompt or desktop access: this key must not read user data.
 
-Register a boat webhook to `https://<test Worker origin>/v2/hosting/boat/webhook` for
+The boat webhook goes to `https://<test Worker origin>/v2/hosting/boat/webhook` for
 `sandbox.ready`, `sandbox.error`, `sandbox.archived` and `sandbox.hydrated`. The Worker checks the
 HMAC signature, refuses a delivery older than 5 minutes, and ignores a delivery ID it has seen.
 
@@ -175,15 +177,21 @@ servers, their webhooks and the cron continue.
    `bun run hosting:template --version=<v> --appimage-url=<release AppImage URL>
    --appimage-sha256=<hex> --auth-api-url=https://api.openbot.run`. Build a new template for each
    release. A new template applies only to new servers.
-3. **boat webhook.** Register `https://api.openbot.run/v2/hosting/boat/webhook` for `sandbox.ready`,
-   `sandbox.error`, `sandbox.archived` and `sandbox.hydrated`, and keep its signing secret.
-4. **Stripe.** Put the live key in `.env.production` (`bunx dotenvx set STRIPE_SECRET_KEY <key> -f
-   apps/auth-api/.env.production -fk .env.keys`), so it is not in the shell history. Then run
-   `bunx dotenvx run -f apps/auth-api/.env.production -fk .env.keys -- bun scripts/stripe-bootstrap.ts
-   --live --webhook-url https://api.openbot.run/v1/stripe/webhook`. It makes the six Prices, the Customer Portal settings
-   and the webhook endpoint, and prints the signing secret one time. In the Stripe Dashboard (live
-   mode), in the failed-payment settings for subscriptions (Revenue recovery → Retries), set "If all
-   retries for a payment fail" to cancel the subscription or to mark it unpaid. Both stop the server.
+3. **Webhooks and secrets.** Put the live Stripe key and the Worker boat key in the shell, so they
+   are not in the history, and run the setup with `gh` signed in:
+
+   ```sh
+   read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
+   bun run hosting:setup --target=production --template=<snapshot from step 2> --allowed-user-ids=<IDs, or *>
+   ```
+
+   It makes the six Prices, the Customer Portal settings, the Stripe webhook endpoint and the boat
+   webhook. It writes the two keys, the two webhook signing secrets, the allow list and the
+   template to the `cloudflare-production` GitHub Environment. Run it again at any time: it keeps
+   a secret that the Environment has. `--replace-webhooks` makes new signing secrets.
+4. **Stripe Dashboard.** In live mode, in the failed-payment settings for subscriptions (Revenue
+   recovery → Retries), set "If all retries for a payment fail" to cancel the subscription or to
+   mark it unpaid. Both stop the server.
 5. **OpenPanel.** In the production project, make a server client. Its ID and secret send the
    billing and server events in [ANALYTICS.md](../ANALYTICS.md). Only production gets them.
 6. **Secrets.** The `Deploy Cloudflare production` job in `.github/workflows/ci.yml` sends these
@@ -193,11 +201,11 @@ servers, their webhooks and the cron continue.
 
    | Name | Kind | Value |
    | --- | --- | --- |
-   | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secrets, a pair | The live key and the secret from step 4 |
-   | `BOAT_API_KEY`, `BOAT_WEBHOOK_SECRET`, `HOSTED_CLAIM_SECRET` | secrets, a set | The key from step 1, the secret from step 3, and a new random value (`openssl rand -hex 32`) that only the Worker has |
+   | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
+   | `BOAT_API_KEY`, `BOAT_WEBHOOK_SECRET` | secrets, a pair | Step 3 writes them |
    | `OPENPANEL_CLIENT_ID`, `OPENPANEL_CLIENT_SECRET` | secrets, a pair | The client from step 5 |
-   | `HOSTED_SERVER_TEMPLATE` | variable | The snapshot name from step 2 |
-   | `HOSTED_SERVERS_ALLOWED_USER_IDS` | secret | Account IDs, or `*` for each account. A secret, so the IDs do not show in the public job log |
+   | `HOSTED_SERVER_TEMPLATE` | variable | Step 3 (`--template`) writes the snapshot name from step 2 |
+   | `HOSTED_SERVERS_ALLOWED_USER_IDS` | secret | Step 3 (`--allowed-user-ids`) writes it: account IDs, or `*` for each account. A secret, so the IDs do not show in the public job log |
 
    The CI deploy is the production path: `.env.production` does not have all the values that it
    needs, such as `SITE_REPORT_HASH_SECRET`. `bun run api:deploy` sends the same names from
@@ -254,7 +262,7 @@ A VM that never signed in keeps its claim in its env file. Each start of that se
 work again for one hour, so a VM that missed the first hour, or whose plan ended before it signed in,
 signs in at its next start. After the 10 minutes that follow the first redeem, the Worker never
 accepts the claim again, until the owner revokes the session of the server: then its next start makes
-the claim work again, and the server signs in with a new session. A new `HOSTED_CLAIM_SECRET` changes
+the claim work again, and the server signs in with a new session. A new `REMOTE_TICKET_PRIVATE_JWK` changes
 each claim, so a VM that has no working session cannot sign in after the change; delete that server.
 
 A start that cannot reach the account server does not use the claim. The start retry signs in

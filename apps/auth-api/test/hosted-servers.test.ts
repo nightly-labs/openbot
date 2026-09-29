@@ -109,7 +109,6 @@ async function setup() {
     HOSTED_SERVER_TEMPLATE: "openbot-server-test",
     BOAT_API_KEY: "boat-key",
     BOAT_WEBHOOK_SECRET: BOAT_WEBHOOK_SECRET,
-    HOSTED_CLAIM_SECRET: "hosted-claim-test-secret",
   };
   const stripe = new FakeStripe();
   const events: { accountId: string; event: AccountAnalyticsEvent }[] = [];
