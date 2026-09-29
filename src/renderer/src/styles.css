@@ -33,7 +33,7 @@
 @import "./features/settings/settings-modal.css";
 @import "./features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
-@import "./features/settings/settings-hosted-sites.css";
+@import "@openbot/ui/features/settings/settings-hosted-sites.css";
 @import "@openbot/ui/features/settings/hosted-servers.css";
 @import "./features/computer-use/computer-use.css";
 @import "./features/servers/server-settings-modal.css";

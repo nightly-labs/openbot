@@ -252,6 +252,7 @@
     "./features/channels/channel-activity.css": "./src/features/channels/channel-activity.css",
     "./features/usage/agent-usage-report.css": "./src/features/usage/agent-usage-report.css",
     "./features/settings/hosted-servers.css": "./src/features/settings/hosted-servers.css",
+    "./features/settings/settings-hosted-sites.css": "./src/features/settings/settings-hosted-sites.css",
     "./features/settings/marketplace-plugin-detail.css": "./src/features/settings/marketplace-plugin-detail.css",
     "./skill-preview.css": "./src/skill-preview.css",
     "./stagger.css": "./src/stagger.css",
