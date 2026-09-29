@@ -57,7 +57,7 @@ export async function routeAgentImport(
         owner: member.id,
         actor: { id: member.id, name: member.name ?? "Team member" },
         // The service checks the zone and uses the host's own when it is not valid.
-        timezone: typeof body.timezone === "string" ? body.timezone : undefined,
+        ...(typeof body.timezone === "string" ? { timezone: body.timezone } : {}),
         reviseSkills: member.role !== "member",
       }),
     409,

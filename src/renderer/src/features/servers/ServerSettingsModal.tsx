@@ -115,7 +115,7 @@ export interface ServerSettingsModalProps {
    * The Import section appears only when a caller supplies this: the local server, or a remote host
    * with `agent-import-v1`. Any member can import.
    */
-  agentImport?: ServerImportOptions;
+  agentImport?: ServerImportOptions | undefined;
   /**
    * The Updates section appears only when a caller supplies this: a remote host with
    * `host-update-v1` that this member administers.
