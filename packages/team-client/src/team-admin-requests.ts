@@ -1,4 +1,4 @@
-// Admin requests to one host: agent settings and skills, shared tables, the server name and logo,
+// Admin requests to one host: agent settings and skills, shared tables, agent share links, the server name and logo,
 // the app update, MCP servers, storage and providers.
 //
 // The desktop sends the same routes from the main process. The web client and the mobile app send
@@ -11,6 +11,8 @@ import {
   type AgentAdminSettings,
   type AgentProviderId,
   type AgentStatus,
+  type AgentTemplatePreview,
+  type AgentTemplatePublication,
   assertStorageUsageScope,
   type ClearStorageInput,
   type CustomProviderResult,
@@ -21,6 +23,8 @@ import {
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostAddedAgent,
+  decodeHostAgentTemplatePreview,
+  decodeHostAgentTemplatePublication,
   decodeHostUpdateStatus,
   decodeInstalledSkills,
   decodeMcpServerConfigs,
@@ -43,6 +47,7 @@ import {
   type ProviderApiKeyState,
   type ProviderCodeLoginStart,
   type ProviderRuntimeSnapshot,
+  type PublishAgentTemplateInput,
   type RemoveMcpServerInput,
   type SaveCustomProviderInput,
   type SaveMcpServerInput,
@@ -61,6 +66,7 @@ import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_INSTALL_ROUTES } from "@openbot/contracts/team-protocol/agent-install-v1";
+import { AGENT_PUBLISH_IMAGE_BYTES, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -155,6 +161,26 @@ export async function installAgentTemplate(
     timezone,
     expectedUpdatedAt,
   });
+}
+
+/** What the host would publish for one of its agents, and its link when it is published. */
+export function previewAgentTemplate(request: TeamApiRequest, agentId: string): Promise<AgentTemplatePreview> {
+  return request("POST", AGENT_PUBLISH_ROUTES.preview, decodeHostAgentTemplatePreview, { agentId });
+}
+
+/** The host publishes with its own account. A card too large for the wire is left out, as one that cannot be drawn. */
+export function publishAgentTemplate(
+  request: TeamApiRequest,
+  { agentId, card }: PublishAgentTemplateInput,
+): Promise<AgentTemplatePublication> {
+  return request("POST", AGENT_PUBLISH_ROUTES.publish, decodeHostAgentTemplatePublication, {
+    agentId,
+    card: card && card.byteLength <= AGENT_PUBLISH_IMAGE_BYTES ? bytesToBase64(card) : null,
+  });
+}
+
+export function unpublishAgentTemplate(request: TeamApiRequest, agentId: string): Promise<void> {
+  return request("POST", AGENT_PUBLISH_ROUTES.unpublish, ignoreResponse, { agentId });
 }
 
 export function uninstallAgentSkill(request: TeamApiRequest, input: UninstallSkillInput): Promise<void> {

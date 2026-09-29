@@ -5,6 +5,7 @@ import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
+import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY } from "./browser-view-v1";
@@ -43,6 +44,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
+  AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
@@ -95,6 +97,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CONTEXT_RESET_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
+  AGENT_PUBLISH_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];

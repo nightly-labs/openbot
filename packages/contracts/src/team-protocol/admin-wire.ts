@@ -67,6 +67,16 @@ export const fields =
   (value) =>
     sparseRecord(value, required, optional);
 
+/** One record decoder per `kind`; each case also decodes `kind`, so it stays in the result. */
+export const variant =
+  (cases: Record<string, AdminDecoder>): AdminDecoder =>
+  (value) => {
+    const decode =
+      isDynamicRecord(value) && isString(value.kind) ? new Map(Object.entries(cases)).get(value.kind) : undefined;
+    if (!decode) throw new Error("Invalid admin variant.");
+    return decode(value);
+  };
+
 export const empty: AdminDecoder = fields({});
 
 const errorEnvelope = fields({ error: string(100_000) }, { code: string(128) });

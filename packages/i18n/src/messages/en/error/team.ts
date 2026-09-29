@@ -58,6 +58,7 @@ export const messages = defineMessages("error.team", {
   "error.team.membersCannotArchiveChannels": "Members cannot archive channels.",
   "error.team.sharedDataUnsupported": "Shared data is not supported by this connection.",
   "error.team.agentInstallUnsupported": "Adding agents is not supported by this connection.",
+  "error.team.agentPublishUnsupported": "Publishing agents is not supported by this connection.",
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
   "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",
   "error.team.agentImportUnsupported": "Importing agents is not supported by this connection.",

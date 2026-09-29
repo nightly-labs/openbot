@@ -1,5 +1,6 @@
 import type { AttachmentSummary, FilePreview, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { AgentSkillCalls } from "../../skills-port";
+import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { SharedTableCalls } from "./conversation-port";
 import type { ConversationProps } from "./conversation-types";
 
@@ -36,8 +37,10 @@ export interface ConversationRuntime {
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   importFiles?: (files: File[]) => Promise<void>;
   cancelImportFiles?: () => Promise<void>;
-  /** The host admin calls of a client without the desktop port. Absent, skills and tables are hidden. */
-  admin?: { skills: AgentSkillCalls; sharedTables: SharedTableCalls } | undefined;
+  /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
+  admin?:
+    | { skills: AgentSkillCalls; sharedTables: SharedTableCalls; agentTemplates: AgentTemplatePublishCalls }
+    | undefined;
 }
 
 export function conversationRuntime(props: ConversationProps): ConversationRuntime {

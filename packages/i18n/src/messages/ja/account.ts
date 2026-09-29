@@ -16,6 +16,7 @@ export const messages = {
   "account.menu.profile": "プロフィール",
   "account.menu.settings": "設定",
   "account.menu.billing": "お支払い",
+  "account.menu.accountSettings": "アカウント設定",
   "account.menu.marketplace": "マーケットプレイス",
   "account.menu.providersPermissions": "プロバイダーと権限",
   "account.menu.help": "ヘルプ",

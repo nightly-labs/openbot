@@ -108,7 +108,10 @@ the host over `skills-admin-v1`, `agent-install-v1`, `agent-update-v1`, and `mcp
 prompt add a line to the agent's draft, as on desktop. A shared agent page also links
 `/app?agent=<id>`: `WebApp` reads the id once, removes the query, and keeps it through sign-in;
 `AgentTemplateInstall` then shows the preview, and the host adds the agent over `agent-install-v1`.
-A browser publishes nothing; publishing stays on the desktop. An agent that the host added from a
+A browser submits nothing to the marketplace. It can publish a host agent's share link over
+`agent-publish-v1`, in `ConversationRuntime.admin.agentTemplates`: the host builds the template,
+checks it for secrets and publishes it with the account signed in on the host; the browser draws only
+the share card from the preview. An agent that the host added from a
 listing gets Update when the host serves `agent-update-v1`; the host downloads the current version.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
 the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code

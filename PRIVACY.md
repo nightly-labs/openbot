@@ -11,8 +11,9 @@ account Worker. The browser keeps chat pages, drafts, search results, and file p
 it does not create a persistent offline chat cache. Files that the user downloads are saved by
 their browser. The host must stay online. An owner or admin can manage members and invitations from
 the browser; these requests go to the account Worker, as they do from the desktop app. A signed-in
-user can also change the display name and avatar and disconnect account sessions from the browser;
-these requests and the avatar image go to the same account Worker as from the desktop app. Host settings,
+user can also change the display name and avatar, disconnect account sessions, and list and delete
+the account's hosted sites from the browser; these requests and the avatar image go to the same
+account Worker as from the desktop app. Host settings,
 such as MCP servers, travel through the encrypted host connection.
 A Grok Bot export that a member imports into a joined server, from the desktop app or the browser, goes
 to the computer that runs that server through the same encrypted host connection, not through the
@@ -25,7 +26,8 @@ Browser email sign-in uses a persistent host-only `Secure`, `HttpOnly`, `SameSit
 Browser JavaScript cannot read the account credential. Trusted host public keys are stored in
 local storage separately for each account. The shared file preview can also store its panel width.
 The sidebar stores pinned agent and channel ids, collapsed section ids, and the selected channel id
-for each account and host. The server rail stores the order of host ids for each account. It stores
+for each account and host. The server rail stores the order of host ids for each account. The
+browser also stores the chosen interface language and whether the completion sound is on. It stores
 no message content.
 Signing out revokes that credential's remote sessions and tells other open tabs to clear private
 state. Host identity pins remain so a later sign-in cannot silently trust a replacement host key.
@@ -475,6 +477,9 @@ CLI retention policies still apply.
 Publishing an agent template from the chat makes its instructions, skills, and routines public to
 anyone with the link at `openbot.run/agents/<id>`, with your account name as the creator. OpenBot
 stops the publish when a text field looks like a secret. Workspace files and memories are not sent.
+An owner or admin of a server can also publish, update or unpublish an agent of that server from the
+browser client. The host sends the template content and the agent's avatar to that browser for the
+preview, and publishes with the account signed in on the host, so that account is the creator.
 
 Marketplace submissions from the desktop app show the publisher’s current account photo publicly on the listing. Account photo updates appear on the listing; removing the account photo removes it from the listing. Private memories and integration credentials are not included.
 
