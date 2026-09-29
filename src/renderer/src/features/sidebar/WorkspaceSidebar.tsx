@@ -48,7 +48,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { agentList, activeAgent, agentSetupDraft, duplicatingAgentIds, openBotSetup } = useAgents();
   const { editAgent, duplicateAgent, deleteAgent } = useAgentActions();
   const { activeTurns, queues, failedTurns, pendingPrompts, pendingApprovals } = useTurns();
-  const { unreadReplies, recentReplies } = useConversation();
+  const { unreadReplies, recentReplies, markAllAgentMessagesRead } = useConversation();
   const { directPeople } = usePresence();
   const { activeDirectMember, activeDirectMemberId, directThreads } = useDirectMessages();
   const { selectAgent, selectDirectMember } = useNavigation();
@@ -123,6 +123,11 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       showingArchivedChannels={channels.state.archived}
       onToggleArchivedChannels={channels.supported() ? channels.toggleArchived : undefined}
       onCreateChannel={channels.supported() ? channels.create : undefined}
+      onMarkAllRead={() => {
+        void markAllAgentMessagesRead();
+        void channels.markAllRead();
+      }}
+      hasUnread={agentList().some((agent) => (unreadReplies()[agent.id] ?? 0) > 0) || channels.hasUnread()}
       serverName={activeServer()?.name ?? "Local"}
       onOpenServerSettings={(trigger) => {
         const server = activeServer();

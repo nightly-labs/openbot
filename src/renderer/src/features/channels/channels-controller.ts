@@ -300,9 +300,28 @@ export function createChannelsController(env: ChannelsEnvironment) {
       window.removeEventListener("focus", focus);
     };
   });
+  /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
+  function markAllRead(): Promise<boolean> {
+    const unread = state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
+    return perform(async () => {
+      await Promise.all(
+        unread.map(async (channelId) => {
+          const page = await env.port().agent.readChannel({ channelId });
+          await env.port().agent.channelCommand({
+            type: "read",
+            channelId,
+            throughSequence: page.throughSequence,
+            operationId: crypto.randomUUID(),
+          });
+        }),
+      );
+    });
+  }
   return {
     state,
     port: env.port,
+    hasUnread: () => state.channels.some((channel) => channel.unreadCount > 0),
+    markAllRead,
     agents: env.agents,
     supported,
     deletionSupported: () => supported() && env.deletionSupported(),

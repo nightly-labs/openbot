@@ -13,6 +13,7 @@ export const messages = {
   "sidebar.new.channel": "新しいチャンネル",
   "sidebar.new.section": "新しいセクション",
   "sidebar.new.menu": "新しいエージェントまたはチャンネル",
+  "sidebar.markAllRead": "すべて既読にする",
   "sidebar.topbar.openSettings": "{name} の設定を開く",
   "sidebar.topbar.expand": "サイドバーを展開",
   "sidebar.topbar.openMarketplace": "Marketplace を開く",

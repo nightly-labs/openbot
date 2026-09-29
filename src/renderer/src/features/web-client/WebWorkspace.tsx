@@ -939,6 +939,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 showingArchivedChannels={channels.state.archived}
                 onToggleArchivedChannels={channelsSupported() ? channels.toggleArchived : undefined}
                 onCreateChannel={channelsSupported() ? channels.create : undefined}
+                onMarkAllRead={
+                  workspace.state.status === "online"
+                    ? () => {
+                        void workspace.markAllRead().catch(() => toast.error(t("chat.unread.markReadFailed")));
+                        if (channelsSupported()) void channels.markAllRead();
+                      }
+                    : undefined
+                }
+                // The browser sidebar shows no agent unread counts, so only the open chat's count is known here.
+                hasUnread={(readState()?.unreadCount ?? 0) > 0 || channels.hasUnread()}
                 serverName={workspace.state.host?.name ?? "OpenBot"}
                 serverMenu={{
                   servers: servers(),
