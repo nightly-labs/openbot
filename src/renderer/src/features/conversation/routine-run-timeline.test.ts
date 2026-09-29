@@ -10,7 +10,7 @@ describe("summarizeRoutineRunMessages", () => {
   });
 
   it.each(["succeeded", "failed", "interrupted", "cancelled"] as const)(
-    "shows one %s summary and keeps the routine instruction",
+    "shows one %s summary in place of the routine instruction",
     (terminalStatus) => {
       const instruction = routineMessage("queued", "run-1", true);
       const running = routineMessage("running", "run-1");
@@ -18,9 +18,8 @@ describe("summarizeRoutineRunMessages", () => {
 
       const result = summarizeRoutineRunMessages([instruction, running, terminal]);
 
-      expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject({ id: instruction.id, body: instruction.body, actionMarker: undefined });
-      expect(result[1]?.actionMarker).toMatchObject({
+      expect(result).toHaveLength(1);
+      expect(result[0]?.actionMarker).toMatchObject({
         kind: "routine-run",
         status: terminalStatus,
         previousTransitions: [

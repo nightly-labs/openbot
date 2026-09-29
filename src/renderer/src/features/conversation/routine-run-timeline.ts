@@ -39,9 +39,8 @@ export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): 
       ];
     }
 
-    // The queued marker shares a row with the routine instruction. Keep that user content, but
-    // remove its superseded status. Later transition messages contain no separate chat content.
-    if (message.routine) return [{ ...message, kind: "text", actionMarker: undefined }];
+    // The routine instruction shows only as its marker, so a superseded state has no row. The
+    // stored instruction stays unchanged.
     return [];
   });
 }

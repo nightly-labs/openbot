@@ -259,9 +259,10 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
   for (const message of sorted) {
-    // Routine events are system messages, skipped below. A routine instruction keeps its bubble below its marker.
+    // Routine events are system messages, skipped below. Like desktop, a routine instruction shows only as its marker.
     const routine = projectRoutineMarker(message, latestRuns);
     if (routine) result.push(routine);
+    if (message.routine) continue;
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine)
       continue;
     if (message.exchange) {
@@ -372,7 +373,7 @@ function projectChannelMessage(
   self: boolean,
   latestRuns: ReadonlySet<string>,
 ): ChatMessage | null {
-  const routine = entry.message.routine ? null : routineMarker(entry.message);
+  const routine = routineMarker(entry.message);
   if (routine) {
     if (routine.runId && !latestRuns.has(entry.message.id)) return null;
     return {
