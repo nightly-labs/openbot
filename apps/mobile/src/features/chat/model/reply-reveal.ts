@@ -22,6 +22,12 @@ function isList(token: Token): token is Tokens.List {
 function isTable(token: Token): token is Tokens.Table {
   return token.type === "table";
 }
+/** Tokens that the reveal shows at once, as one word. */
+function isWholeWord(token: Token): boolean {
+  return (
+    token.type === "agentMention" || token.type === "code" || token.type === "inlineMath" || token.type === "blockMath"
+  );
+}
 function hasChildren(token: Token): token is Token & { tokens: Token[] } {
   return "tokens" in token && Array.isArray(token.tokens);
 }
@@ -36,7 +42,7 @@ function collectWords(entries: Token[], words: string[]): void {
       for (const row of token.rows) {
         for (const cell of row) collectWords(cell.tokens, words);
       }
-    } else if (token.type === "agentMention" || token.type === "code") {
+    } else if (isWholeWord(token)) {
       words.push(token.type === "code" ? token.text : token.raw);
     } else if (hasChildren(token)) {
       collectWords(token.tokens, words);
@@ -73,9 +79,10 @@ export function createReplyReveal(tokens: Token[]) {
             rows.push(cells(row));
           }
           result.push({ ...token, header, rows });
-        } else if (token.type === "agentMention" || token.type === "code") {
+        } else if (isWholeWord(token)) {
           // Code uses StreamingBlock's entrance. Keep its source intact so Copy
           // never receives a prefix produced only by the playback animation.
+          // A formula is typeset whole: a prefix of it is not valid LaTeX.
           remaining -= 1;
           result.push(token);
         } else if (hasChildren(token)) {

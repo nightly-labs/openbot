@@ -10,6 +10,8 @@ import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { AppLoadingScreen } from "@openbot/ui/features/account/AppLoadingScreen";
 import { currentText } from "@openbot/ui/text";
 import { createSignal, createStore, onSettled, Show } from "solid-js";
+// Copying a selection with a formula in it gives its LaTeX source, as on desktop.
+import "katex/contrib/copy-tex";
 import { StaticI18nProvider } from "../../i18n-context";
 import { WebWorkspace } from "./WebWorkspace";
 import type { WebRuntimeFactory } from "./web-client-context";

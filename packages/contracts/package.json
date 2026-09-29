@@ -10,6 +10,7 @@
     "./attachment-files": "./src/attachment-files.ts",
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",
+    "./chat-math": "./src/chat-math.ts",
     "./chat-tag-references": "./src/chat-tag-references.ts",
     "./conversation-order": "./src/conversation-order.ts",
     "./hosted-sites": "./src/hosted-sites.ts",

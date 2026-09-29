@@ -1,12 +1,13 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
+import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
-import type { Token, Tokens, TokensList } from "marked";
-import { marked } from "marked";
+import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AttachmentReferenceVisual, attachmentReferenceTone } from "./AttachmentReference";
 import { CodeBlock } from "./CodeBlock";
+import { MathFormula } from "./MathFormula";
 import { MessageLink, RichMessageText, type RichMessageTextProps, safeBrowserUrl } from "./RichMessageText";
 import {
   sameStreamingTailOffsets,
@@ -49,7 +50,40 @@ interface MarkdownTokenByType {
   link: Tokens.Link;
   image: Tokens.Image;
   escape: Tokens.Escape;
+  blockMath: MathToken;
+  inlineMath: MathToken;
 }
+
+interface MathToken extends Tokens.Generic {
+  type: "blockMath" | "inlineMath";
+  text: string;
+  display: boolean;
+}
+
+const markdown = new Marked({
+  gfm: true,
+  breaks: true,
+  extensions: [
+    {
+      name: "blockMath",
+      level: "block",
+      start: chatMathBlockStart,
+      tokenizer(source): MathToken | undefined {
+        const math = blockChatMath(source);
+        if (math) return { type: "blockMath", raw: math.raw, text: math.tex, display: true };
+      },
+    },
+    {
+      name: "inlineMath",
+      level: "inline",
+      start: chatMathStart,
+      tokenizer(source): MathToken | undefined {
+        const math = inlineChatMath(source);
+        if (math) return { type: "inlineMath", raw: math.raw, text: math.tex, display: math.display };
+      },
+    },
+  ],
+});
 
 const VOID_HTML_ELEMENTS = new Set([
   "area",
@@ -88,10 +122,10 @@ const lexerCache = new Map<string, TokensList>();
 const inlineLexerCache = new Map<string, Token[]>();
 
 function lexBlockTokens(body: string, cache: boolean): TokensList {
-  if (!cache) return marked.lexer(body, { breaks: true, gfm: true });
+  if (!cache) return markdown.lexer(body);
   const cached = lexerCache.get(body);
   if (cached) return cached;
-  const tokens = marked.lexer(body, { breaks: true, gfm: true });
+  const tokens = markdown.lexer(body);
   if (lexerCache.size >= LEXER_CACHE_LIMIT) {
     const oldest = lexerCache.keys().next();
     if (!oldest.done) lexerCache.delete(oldest.value);
@@ -103,7 +137,7 @@ function lexBlockTokens(body: string, cache: boolean): TokensList {
 function lexInlineTokens(body: string): Token[] {
   const cached = inlineLexerCache.get(body);
   if (cached) return cached;
-  const tokens = marked.Lexer.lexInline(body, { breaks: true, gfm: true });
+  const tokens = markdown.Lexer.lexInline(body, markdown.defaults);
   if (inlineLexerCache.size >= LEXER_CACHE_LIMIT) {
     const oldest = inlineLexerCache.keys().next();
     if (!oldest.done) inlineLexerCache.delete(oldest.value);
@@ -307,9 +341,14 @@ function MarkdownBlock(props: {
         />
       );
     }
+    case "blockMath": {
+      if (!tokenIs(token, "blockMath")) return token.raw;
+      return <MathFormula tex={token.text} raw={token.raw} display block />;
+    }
     case "code": {
       if (!tokenIs(token, "code")) return token.raw;
       const language = token.lang?.trim().split(/\s+/u)[0] ?? "";
+      if (language.toLowerCase() === "math") return <MathFormula tex={token.text} raw={token.raw} display block />;
       return <CodeBlock block={{ type: "code", code: token.text, language }} streaming={props.streaming === true} />;
     }
     case "table": {
@@ -528,6 +567,9 @@ function MarkdownInline(props: {
           }
           case "br":
             return <br />;
+          case "inlineMath":
+            if (!tokenIs(token, "inlineMath")) return token.raw;
+            return <MathFormula tex={token.text} raw={token.raw} display={token.display} />;
           case "link": {
             if (!tokenIs(token, "link")) return token.raw;
             if (item.semanticTag) {
@@ -818,6 +860,7 @@ function markdownInlinePlainText(tokens: Token[]): string {
       if (tokenIs(token, "link")) return markdownInlinePlainText(token.tokens);
       if (tokenIs(token, "text")) return token.tokens ? markdownInlinePlainText(token.tokens) : token.text;
       if (tokenIs(token, "codespan") || tokenIs(token, "escape") || tokenIs(token, "image")) return token.text;
+      if (tokenIs(token, "inlineMath")) return token.raw;
       if (token.type === "br") return "\n";
       return token.raw;
     })
@@ -872,7 +915,7 @@ function repairEscapedLocalFileLinkTokens(tokens: Token[]): Token[] {
     const source = candidates.map((token) => token.raw).join("");
     const maskedSource = candidates.map(maskProtectedMarkdownToken).join("");
     const repaired = normalizeEscapedLocalFileLinkCandidate(source, maskedSource);
-    result.push(...(repaired === source ? candidates : marked.Lexer.lexInline(repaired, { breaks: true, gfm: true })));
+    result.push(...(repaired === source ? candidates : markdown.Lexer.lexInline(repaired, markdown.defaults)));
     candidates = [];
   };
   for (const token of tokens) {
@@ -894,7 +937,9 @@ function repairEscapedLocalFileLinkTokens(tokens: Token[]): Token[] {
 }
 
 function maskProtectedMarkdownToken(token: Token): string {
-  if (token.type === "html" || tokenIs(token, "codespan")) return " ".repeat(token.raw.length);
+  if (token.type === "html" || tokenIs(token, "codespan") || tokenIs(token, "inlineMath")) {
+    return " ".repeat(token.raw.length);
+  }
   const children =
     tokenIs(token, "strong") ||
     tokenIs(token, "em") ||

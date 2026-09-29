@@ -267,6 +267,7 @@
     "@norbert_bodziony/bloub": "catalog:",
     "@speed-highlight/core": "catalog:",
     "fflate": "catalog:",
+    "katex": "catalog:",
     "marked": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "zod": "catalog:",

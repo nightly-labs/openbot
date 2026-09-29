@@ -1,5 +1,7 @@
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import { render } from "@solidjs/web";
+// Copying a selection with a formula in it gives its LaTeX source, not the typeset glyphs twice.
+import "katex/contrib/copy-tex";
 import { App } from "./App";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
 import { ComputerUsePermissionHelp, permissionFromQuery } from "./features/computer-use/ComputerUsePermissionHelp";

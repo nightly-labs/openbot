@@ -5,6 +5,7 @@ import {
   fileReferenceTone,
   isFileReference,
 } from "@openbot/brand/file-reference";
+import { chatMathStart } from "@openbot/contracts/chat-math";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
@@ -30,6 +31,7 @@ import { parseChatMarkdown } from "../model/chat-markdown-parser";
 import { plainMentionParts } from "../model/chat-mentions";
 import { createReplyReveal } from "../model/reply-reveal";
 import { ChatCodeBlock } from "./chat-code-block";
+import { ChatMath } from "./chat-math";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
@@ -47,6 +49,14 @@ interface MarkdownTokenByType {
   codespan: Tokens.Codespan;
   link: Tokens.Link;
   image: Tokens.Image;
+  blockMath: MathToken;
+  inlineMath: MathToken;
+}
+
+interface MathToken extends Tokens.Generic {
+  type: "blockMath" | "inlineMath";
+  text: string;
+  display: boolean;
 }
 
 // Marked's public Token union includes extension tokens; narrow its built-in tokens here.
@@ -65,7 +75,15 @@ interface TextPresentation {
   animateTail: boolean;
   agents: readonly MobileAgent[];
   mentionOffset: number;
+  fontScale: number;
   t: MobileTranslate;
+}
+
+/** The HeroUI font size of each text type, in points, which inline math is sized against. */
+const TEXT_SIZES: Record<TextPresentation["type"], number> = { body: 16, "body-sm": 14, h4: 20, h5: 18 };
+
+function textSize(presentation: TextPresentation): number {
+  return TEXT_SIZES[presentation.type] * presentation.fontScale;
 }
 
 // The inline badge is shifted to align its label with native text. Reserve the
@@ -74,7 +92,9 @@ function textContainerStyle(source: string, presentation: TextPresentation): Tex
   const hasMention =
     chatTagReferences(source).some((reference) => reference.kind === "agent") ||
     plainMentionParts(source, presentation.agents).some((part) => part.agent);
-  return hasMention
+  // Inline math is moved down to the math axis in the same way.
+  const hasMath = chatMathStart(source) !== undefined;
+  return hasMention || hasMath
     ? { ...presentation.style, paddingBottom: presentation.mentionOffset, overflow: "visible" }
     : presentation.style;
 }
@@ -238,6 +258,19 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     if (token.type === "br") return "\n";
     // The list row draws the task mark, so the checkbox token adds nothing.
     if (token.type === "checkbox") return null;
+    if (tokenIs(token, "inlineMath")) {
+      return (
+        <ChatMath
+          key={offset}
+          tex={token.text}
+          display={token.display}
+          block={false}
+          textSize={textSize(presentation)}
+          color={presentation.style.color}
+          fallback={<CodeSpan text={token.raw} presentation={presentation} />}
+        />
+      );
+    }
     if (tokenIs(token, "text")) {
       if (token.tokens) return inline(token.tokens, presentation);
       return (
@@ -423,6 +456,20 @@ function MarkdownBlocks({
             </Typography.Heading>
           );
         }
+        if (tokenIs(token, "blockMath") || (tokenIs(token, "code") && token.lang?.trim().toLowerCase() === "math")) {
+          return (
+            <StreamingBlock key={offset} enabled={presentation.animateTail}>
+              <ChatMath
+                tex={token.text}
+                display
+                block
+                textSize={textSize(presentation)}
+                color={presentation.style.color}
+                fallback={<ChatCodeBlock selectable={presentation.selectable} text={token.text} language="latex" />}
+              />
+            </StreamingBlock>
+          );
+        }
         if (tokenIs(token, "code")) {
           return (
             <StreamingBlock key={offset} enabled={presentation.animateTail}>
@@ -551,6 +598,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
           codeColor,
           agents,
           mentionOffset: 4 * fontScale,
+          fontScale,
           t,
           animateTail: (streaming || Boolean(playback?.enabled)) && animationEnabled && !reducedMotion,
         }}
