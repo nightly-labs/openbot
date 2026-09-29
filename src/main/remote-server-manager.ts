@@ -5,6 +5,7 @@ import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
   AgentEvent,
+  AgentImportPreview,
   AgentSummary,
   AvatarImageInput,
   ConversationPage,
@@ -40,8 +41,14 @@ import type {
   TeamRealtimeEvent,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
-import { LOCAL_SERVER_ID, REMOTE_DESKTOP_SETUP_CAPABILITY, type RemoteDesktopTestInput } from "@openbot/contracts/ipc";
+import {
+  decodeRemoteAgentImportPreview,
+  LOCAL_SERVER_ID,
+  REMOTE_DESKTOP_SETUP_CAPABILITY,
+  type RemoteDesktopTestInput,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { decodeBrowserViewSessionResponse } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -124,6 +131,8 @@ export interface DevelopmentRemoteServerConnection {
 }
 
 const REMOTE_DUPLICATION_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
+/** An export of up to 100 MB goes up and is read in one request, and apply creates many agents. */
+export const AGENT_IMPORT_UPLOAD_TIMEOUT_MS = TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS;
 // How long a host that restarts into an update keeps the fast retry after Signal first misses it. A
 // host that is not back by then is offline, as any other host.
 const HOST_RESTART_RETRY_MS = 10 * 60_000;
@@ -973,6 +982,20 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
     const value = decodeTeamProtocolV1CurrentHttpResponse("POST", url.pathname, response.status, await response.json());
     return addRemotePreviewUrls(decodeDraftAttachment(value), server.id);
+  }
+
+  /** Sends a Grok Bot export to the host with `agent-import-v1` and answers its preview. */
+  async stageAgentImport(serverId: string, bytes: Uint8Array): Promise<AgentImportPreview> {
+    const server = this.#store.require(serverId);
+    const url = new URL(AGENT_IMPORT_ROUTES.stage, server.apiUrl);
+    const response = await this.#client.fetch(
+      server,
+      url,
+      { method: "POST", headers: { "Content-Type": "application/zip" }, body: Buffer.from(bytes) },
+      true,
+      AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+    );
+    return decodeRemoteAgentImportPreview(await response.json());
   }
 
   async setAgentAvatar(

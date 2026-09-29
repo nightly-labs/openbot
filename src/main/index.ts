@@ -414,6 +414,7 @@ function registerIpcHandlers({
     }),
     ...agentImportIpcHandlers({
       agentImport,
+      remoteServers,
       getMainWindow,
       translate: language.translate,
       exportSkillPath: app.isPackaged

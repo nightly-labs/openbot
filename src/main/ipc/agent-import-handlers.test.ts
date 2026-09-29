@@ -54,8 +54,13 @@ beforeEach(async () => {
   );
   registerIpcGroup(
     "agentImport",
-    agentImportIpcHandlers({ agentImport, getMainWindow: () => null, exportSkillPath, translate: translateFor("en") })
-      .agentImport,
+    agentImportIpcHandlers({
+      agentImport,
+      remoteServers: { supportsCapability: vi.fn(), request: vi.fn(), stageAgentImport: vi.fn() },
+      getMainWindow: () => null,
+      exportSkillPath,
+      translate: translateFor("en"),
+    }).agentImport,
   );
 });
 
@@ -67,9 +72,8 @@ describe("agentImportIpcHandlers", () => {
   it("refuses a channel selection it cannot read before the import starts", async () => {
     const apply = async (payload: { channelKeys?: string[] }) =>
       bound.get(IPC_ENDPOINTS.agentImport.apply.channel)?.(TRUSTED_EVENT, {
-        token: "token-1",
-        keys: ["research"],
-        ...payload,
+        serverId: "local",
+        payload: { token: "token-1", keys: ["research"], ...payload },
       });
     await expect(apply({})).rejects.toThrow("Invalid channel selection.");
     await expect(apply({ channelKeys: ["Not A Key"] })).rejects.toThrow("Invalid channel selection.");

@@ -40,4 +40,9 @@ export const messages = {
   "error.import.zipInvalid":
     "Le fichier choisi n’est pas un .zip valide. Si Grok Bot l’enregistre encore, attendez, puis choisissez-le de nouveau.",
   "error.import.empty": "L’exportation est vide.",
+  "error.import.remoteZipTooLarge":
+    "Pour importer dans un serveur rejoint, l’exportation doit être un fichier .zip de moins de 100 Mo.",
+  "error.import.hostBusy": "Le serveur lit d’autres exportations. Réessayez dans quelques minutes.",
+  "error.import.skillKept":
+    "{name} : le serveur a déjà la compétence « {skill} », l’agent utilise donc celle-ci. Demandez à un administrateur de la mettre à jour.",
 } as const satisfies PartialTranslation<typeof source>;

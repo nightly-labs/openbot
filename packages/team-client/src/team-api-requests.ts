@@ -5,6 +5,8 @@
 // stays at its call site.
 
 import {
+  type AgentImportPreview,
+  type ApplyAgentImportInput,
   type AttachmentSummary,
   BROWSER_SECRET_RESPONSE_PATH,
   type CancelQueuedMessageInput,
@@ -18,9 +20,12 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeRemoteAgentImportPreview,
+  decodeRemoteAgentImportResult,
   type InstalledSkill,
   isAttachmentSummary,
   type OpenBotDesktopApi,
+  type RemoteAgentImportResult,
   type ReorderQueueInput,
   type RespondToBrowserSecretInput,
   type RespondToBrowserTakeoverInput,
@@ -28,6 +33,7 @@ import {
   type UpdateQueuedMessageInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -91,6 +97,26 @@ export function reorderQueue(request: TeamApiRequest, { agentId, deliveryIds }: 
 /** Starts a new chat with the agent. Send it only to a host that serves `context-reset-v1`. */
 export function clearAgentContext(request: TeamApiRequest, agentId: string): Promise<void> {
   return request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId });
+}
+
+/** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */
+export function stageAgentImport(request: TeamApiRequest, upload: RemoteFileUpload): Promise<AgentImportPreview> {
+  return request("POST", AGENT_IMPORT_ROUTES.stage, decodeRemoteAgentImportPreview, undefined, {
+    ...upload,
+    maxBytes: AGENT_IMPORT_UPLOAD_BYTES,
+  });
+}
+
+export function applyAgentImport(
+  request: TeamApiRequest,
+  input: ApplyAgentImportInput,
+  timezone: string,
+): Promise<RemoteAgentImportResult> {
+  return request("POST", AGENT_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, { ...input, timezone });
+}
+
+export function discardAgentImport(request: TeamApiRequest, token: string): Promise<void> {
+  return request("POST", AGENT_IMPORT_ROUTES.discard, ignoreResponse, { token });
 }
 
 /** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */

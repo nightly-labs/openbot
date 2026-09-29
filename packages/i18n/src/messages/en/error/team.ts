@@ -60,6 +60,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentInstallUnsupported": "Adding agents is not supported by this connection.",
   "error.team.agentUpdateUnsupported": "Updating agents is not supported by this connection.",
   "error.team.contextResetUnsupported": "Starting a new chat is not supported by this connection.",
+  "error.team.agentImportUnsupported": "Importing agents is not supported by this connection.",
   "error.team.agentUpdateTargetRequired": "An agent to update is required.",
   "error.team.queueEditUnsupported": "This client does not support queue editing.",
   "error.team.skillsUnsupported": "Skills are not supported by this connection.",

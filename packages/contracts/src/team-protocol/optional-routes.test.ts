@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_ADMIN_ROUTES } from "./agent-admin-v1";
+import { AGENT_IMPORT_ROUTES } from "./agent-import-v1";
 import { AGENT_INSTALL_ROUTES } from "./agent-install-v1";
 import { AGENT_UPDATE_ROUTES } from "./agent-update-v1";
 import { CONTEXT_RESET_ROUTES } from "./context-reset-v1";
@@ -243,5 +244,65 @@ describe("context-reset-v1", () => {
     });
     expect(() => codec(CONTEXT_RESET_ROUTES.clear).request({})).toThrow();
     expect(codec(CONTEXT_RESET_ROUTES.clear).response(200, {})).toEqual({});
+  });
+});
+
+describe("agent-import-v1", () => {
+  const agent = {
+    key: "research",
+    name: "Research",
+    title: "Analyst",
+    description: "You are research.",
+    skillCount: 1,
+    routineCount: 0,
+    memoryCount: 2,
+    fileCount: 3,
+    fileBytes: 400,
+    nameExists: false,
+  };
+  const preview = {
+    token: "token-1",
+    sourceApp: "grok-bot",
+    exportedAt: null,
+    agents: [agent],
+    channels: [
+      {
+        key: "desk",
+        name: "Desk",
+        title: "",
+        memberKeys: ["research"],
+        leadKey: null,
+        memoryCount: 0,
+        routineCount: 0,
+      },
+    ],
+    warnings: [],
+  };
+
+  it("sends the preview without avatars and the result with only the new agents' ids and names", () => {
+    const withAvatar = { ...preview, agents: [{ ...agent, avatarUrl: "data:image/png;base64,AAAA" }] };
+    expect(codec(AGENT_IMPORT_ROUTES.stage).response(200, withAvatar)).toEqual(preview);
+    const result = {
+      agents: [{ agentId: "a1", name: "Research", workspacePath: "/Users/host/OpenBot/a1" }],
+      skipped: [],
+      channels: [{ id: "c1", name: "Desk" }],
+      skippedChannels: [],
+      warnings: [],
+    };
+    expect(codec(AGENT_IMPORT_ROUTES.apply).response(200, result)).toEqual({
+      ...result,
+      agents: [{ agentId: "a1", name: "Research" }],
+    });
+    const input = { token: "token-1", keys: ["research"], channelKeys: [], timezone: "Europe/Warsaw" };
+    expect(codec(AGENT_IMPORT_ROUTES.apply).request(input)).toEqual(input);
+    expect(codec(AGENT_IMPORT_ROUTES.discard).request({ token: "token-1" })).toEqual({ token: "token-1" });
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(() =>
+      codec(AGENT_IMPORT_ROUTES.stage).response(200, { ...preview, agents: [{ ...agent, key: 1 }] }),
+    ).toThrow();
+    expect(() => codec(AGENT_IMPORT_ROUTES.apply).request({ token: "token-1", keys: ["research"] })).toThrow();
+    expect(() => codec(AGENT_IMPORT_ROUTES.discard).request({})).toThrow();
   });
 });

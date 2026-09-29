@@ -10,11 +10,12 @@ const unavailable = async (): Promise<never> => {
 };
 
 /** The browser's file chooser. A dismissed chooser answers with no files. */
-function chooseFiles(): Promise<File[]> {
+export function chooseFiles(options: { multiple?: boolean; accept?: string } = {}): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.multiple = true;
+    input.multiple = options.multiple ?? true;
+    if (options.accept) input.accept = options.accept;
     input.addEventListener("change", () => resolve(Array.from(input.files ?? [])), { once: true });
     input.addEventListener("cancel", () => resolve([]), { once: true });
     // The chooser needs the click that started this call, so nothing may be awaited before it.

@@ -111,7 +111,10 @@ export interface ServerSettingsModalProps {
    * its own Settings holds the providers of every host it administers.
    */
   providers?: HostProviderSettings | undefined;
-  /** The Import section appears only when a caller supplies this: agents import into the local server. */
+  /**
+   * The Import section appears only when a caller supplies this: the local server, or a remote host
+   * with `agent-import-v1`. Any member can import.
+   */
   agentImport?: ServerImportOptions;
   /**
    * The Updates section appears only when a caller supplies this: a remote host with
@@ -538,7 +541,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.agentImport}>
           {(agentImport) => (
             <Tabs.Content value="import" class="settings-modal-tab-panel server-settings-panel" data-tab="import">
-              <ServerImportPanel {...agentImport()} />
+              {/* Keyed: an open export belongs to one server, so another server starts a new panel. */}
+              <Show when={props.server.id} keyed>
+                {(serverId) => <ServerImportPanel serverId={serverId} {...agentImport()} />}
+              </Show>
             </Tabs.Content>
           )}
         </Show>

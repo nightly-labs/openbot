@@ -34,6 +34,7 @@ import type { MailboxStore } from "../../backend/mailbox-store";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { StorageUsageService } from "../../backend/storage-usage";
 import type { TeamChatStore } from "../../backend/team-chat-store";
+import type { AgentImportService } from "../agent-import-service";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
 import type { RemoteScreenGateway } from "../remote-screen-gateway";
@@ -126,6 +127,9 @@ export type TeamApiMcpServers = Pick<
 /** Its presence is what `#protocolSupport` advertises `storage-v1` on. */
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear">;
 
+/** Its presence is what `#protocolSupport` advertises `agent-import-v1` on. Any member can use it. */
+export type TeamApiAgentImport = Pick<AgentImportService, "stageUpload" | "apply" | "discard">;
+
 /**
  * The admin routes, one member per optional capability. A member's presence is what
  * `#protocolSupport` advertises its capability on; every route behind it requires an owner or admin.
@@ -214,6 +218,7 @@ export interface TeamApiOptions {
   /** Starts and waits for the managed tool runtimes behind the MCP save, enable, and test routes. */
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
+  agentImport?: TeamApiAgentImport;
   admin?: TeamApiAdmin;
   appVersion?: string;
   store: TeamStore;

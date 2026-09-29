@@ -14,6 +14,9 @@ the browser; these requests go to the account Worker, as they do from the deskto
 user can also change the display name and avatar and disconnect account sessions from the browser;
 these requests and the avatar image go to the same account Worker as from the desktop app. Host settings,
 such as MCP servers, travel through the encrypted host connection.
+A Grok Bot export that a member imports into a joined server, from the desktop app or the browser, goes
+to the computer that runs that server through the same encrypted host connection, not through the
+account Worker. The host keeps the file only until the import ends, is cancelled, or expires.
 To show each server's state, the browser also keeps a status connection to each host of the account
 that no tab has open, as the mobile app does; the host then shows the member as present. Host logos
 come from the account Worker to members of the host, and the browser can cache them.

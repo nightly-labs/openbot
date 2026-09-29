@@ -1,4 +1,4 @@
-import type { AgentImportPreview, AgentImportResult } from "@openbot/contracts/ipc";
+import type { AgentImportPreview, AgentImportResult, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import {
   type AgentImportPhase,
@@ -19,11 +19,23 @@ function readSetup(): AgentImportSetup {
   }
 }
 
+export type AgentImportCalls = OpenBotDesktopApi["agentImport"] & {
+  /** Opens the ready export agent's Grok Bot page. */
+  openExportAgent(): void;
+};
+
 export interface ServerImportOptions {
   onOpenAgent: (agentId: string) => void;
   /** Closes the settings the panel is in. */
   onClose: () => void;
+  /** The calls of a client with no `window.openbot`, such as the web client. */
+  calls?: AgentImportCalls;
 }
+
+const desktopCalls = (): AgentImportCalls => ({
+  ...window.openbot.agentImport,
+  openExportAgent: () => void window.openbot.openExternal("grok-bot-export"),
+});
 
 interface ImportState {
   phase: AgentImportPhase;
@@ -33,12 +45,15 @@ interface ImportState {
 }
 
 /**
- * Server settings > Import, for the local server only. Main opens the file dialog and keeps the
- * export under a token, so the panel holds the preview and never a path. A preview left open when
- * the panel closes is released.
+ * Server settings > Import. On desktop, main opens the file dialog and the host keeps the export
+ * under a token, so the panel holds the preview and never a path. A preview left open when the panel
+ * closes is released.
  */
-export function ServerImportPanel(props: ServerImportOptions) {
+export function ServerImportPanel(props: ServerImportOptions & { serverId: string }) {
   const { t, errorMessage } = useText();
+  const calls = props.calls ?? desktopCalls();
+  // The server the preview's token belongs to, fixed for the life of the panel.
+  const serverId = props.serverId;
   const [state, setState] = createStore<ImportState>({ phase: "idle", error: null, preview: null, result: null });
   const show = (next: ImportState) =>
     setState((draft) => {
@@ -47,7 +62,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
 
   const release = () => {
     const token = state.preview?.token;
-    if (token) void window.openbot.agentImport.discard(token).catch(() => undefined);
+    if (token) void calls.discard(token, serverId).catch(() => undefined);
   };
   onSettled(() => release);
 
@@ -64,7 +79,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
   // Read once: the skill ships with the app and does not change while it runs.
   const [exportSkill, setExportSkill] = createSignal<string | null>(null);
   onSettled(() => {
-    void window.openbot.agentImport
+    void calls
       .readSkill()
       .then(setExportSkill)
       .catch(() => setExportSkill(null));
@@ -72,7 +87,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
 
   const saveSkill = async () => {
     try {
-      await window.openbot.agentImport.saveSkill();
+      await calls.saveSkill();
     } catch (error) {
       toast.error(t("server.import.skillSaveFailed"), {
         description: errorMessage(error, t("server.import.tryAgain")),
@@ -88,7 +103,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
     });
     try {
       // Null when the user cancels the dialog. Main keeps the export that was open until then.
-      const preview = (await window.openbot.agentImport.choose()) ?? open;
+      const preview = (await calls.choose(serverId)) ?? open;
       show({ phase: preview ? "review" : "idle", error: null, preview, result: null });
     } catch (error) {
       // Main released the open export when it started to read the new one.
@@ -104,7 +119,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       draft.error = null;
     });
     try {
-      const result = await window.openbot.agentImport.apply({ token: preview.token, keys, channelKeys });
+      const result = await calls.apply({ token: preview.token, keys, channelKeys }, serverId);
       show({ phase: "done", error: null, preview: null, result });
     } catch (error) {
       // The token is spent either way, so the user chooses the export again.
@@ -126,7 +141,7 @@ export function ServerImportPanel(props: ServerImportOptions) {
       setup={setup()}
       exportSkill={exportSkill()}
       onSetupChange={changeSetup}
-      onOpenExportAgent={() => void window.openbot.openExternal("grok-bot-export")}
+      onOpenExportAgent={() => calls.openExportAgent()}
       onSaveExportSkill={() => void saveSkill()}
       onChoose={() => void choose()}
       onImport={(keys, channelKeys) => void apply(keys, channelKeys)}

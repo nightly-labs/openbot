@@ -3,6 +3,7 @@ import {
   decodeTeamProtocolV2FileControlFrame,
   encodeTeamProtocolV2FileChunk,
   encodeTeamProtocolV2Frame,
+  TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
 } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 
@@ -12,7 +13,12 @@ export interface RemoteFileUpload {
   name: string;
   mimeType: string;
   base64: string;
+  /** A larger cap for one kind of upload, such as an agent export. The host's file limit still applies. */
+  maxBytes?: number;
 }
+
+/** The slowest upload rate a transfer waits for, in bytes per millisecond (256 KB/s). */
+const MINIMUM_UPLOAD_RATE = 256;
 
 export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Promise<void>, createId: () => string) {
   const pending = new Map<string, { opened: () => void; reject: (error: Error) => void; error: Error | null }>();
@@ -43,11 +49,12 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
     },
     /** `onProgress` hears the bytes sent after each chunk, for a person watching the file go. */
     async upload(input: RemoteFileUpload, onProgress?: (sent: number, total: number) => void) {
-      if (input.base64.length > Math.ceil(MOBILE_ATTACHMENT_BYTES / 3) * 4)
+      const maxBytes = Math.min(input.maxBytes ?? MOBILE_ATTACHMENT_BYTES, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+      if (input.base64.length > Math.ceil(maxBytes / 3) * 4)
         throw new Error(sourceText("error.remote.attachmentTooLarge"));
       const decoded = atob(input.base64);
       const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
-      if (bytes.length > MOBILE_ATTACHMENT_BYTES) throw new Error(sourceText("error.remote.attachmentTooLarge"));
+      if (bytes.length > maxBytes) throw new Error(sourceText("error.remote.attachmentTooLarge"));
       if (pending.size !== 0) throw new Error(sourceText("error.remote.attachmentBusy"));
       const transferId = createId();
       let opened = () => {};
@@ -62,10 +69,14 @@ export function createRemoteFileSender(send: (data: string | ArrayBuffer) => Pro
         error: null,
       };
       pending.set(transferId, transfer);
-      const timer = setTimeout(() => {
-        transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
-        reject(transfer.error);
-      }, 60_000);
+      // A file of up to about 15 MB has one minute; a larger one has the time 256 KB/s needs.
+      const timer = setTimeout(
+        () => {
+          transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
+          reject(transfer.error);
+        },
+        Math.max(60_000, bytes.length / MINIMUM_UPLOAD_RATE),
+      );
       try {
         // Observe rejection before starting I/O, including a synchronous native disconnect.
         await Promise.all([

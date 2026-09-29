@@ -13,6 +13,7 @@ import { useSetup } from "./features/onboarding/onboarding-context";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
@@ -274,9 +275,9 @@ function ServerSettings() {
           storage={storageOptions(server())}
           hostUpdate={{}}
           initialSection={serverSettingsSection()}
-          // Agents import into this computer only; a remote host has no Import section.
+          // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
-            server().kind === "local"
+            serverSupportsCapability(server(), "agent-import-v1")
               ? {
                   onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)),
                   onClose: () => setServerSettingsOpen(false),

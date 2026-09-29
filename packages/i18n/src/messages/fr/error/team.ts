@@ -65,6 +65,7 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "La mise à jour des agents n’est pas prise en charge par cette connexion.",
   "error.team.contextResetUnsupported":
     "Commencer une nouvelle discussion n’est pas pris en charge par cette connexion.",
+  "error.team.agentImportUnsupported": "L’importation d’agents n’est pas prise en charge par cette connexion.",
   "error.team.agentUpdateTargetRequired": "Un agent à mettre à jour est requis.",
   "error.team.queueEditUnsupported": "Ce client ne prend pas en charge la modification de la file d’attente.",
   "error.team.skillsUnsupported": "Les compétences ne sont pas prises en charge par cette connexion.",
