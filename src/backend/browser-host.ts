@@ -224,6 +224,8 @@ export class BrowserHost {
   readonly #takeoverTabIds = new Set<string>();
   #persistQueue: Promise<void> = Promise.resolve();
   #destroyPromise: Promise<void> | null = null;
+  /** Whether the machine is too low on memory for one more tab. Only a hosted server has a reading. */
+  readonly #memoryLow: () => boolean;
 
   constructor(
     window: BrowserWindow,
@@ -233,9 +235,11 @@ export class BrowserHost {
       recordingDurationMs?: number;
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
+      memoryLow?: () => boolean;
     } = {},
   ) {
     this.#window = window;
+    this.#memoryLow = options.memoryLow ?? (() => false);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
@@ -382,6 +386,8 @@ export class BrowserHost {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       throw new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs }));
     }
+    // Each tab is its own renderer process.
+    if (this.#memoryLow()) throw new Error(sourceText("error.backend.browserLowMemory"));
     const normalizedUrl = normalizeBrowserUrl(url);
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tab = this.#createTab(randomUUID(), normalizedUrl, ownerThreadId, ownerAgentId);

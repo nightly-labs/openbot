@@ -472,6 +472,12 @@ export class ProviderRuntime implements ProviderPort {
     }
   }
 
+  /** Closes the idle threads of each client and each Workspace only process, when memory is low. */
+  releaseIdleThreads(): void {
+    for (const client of this.#clients.values()) client.releaseIdleThreads?.();
+    for (const confined of this.#confined.values()) confined.client.releaseIdleThreads?.();
+  }
+
   listModels(): AgentModelOption[] {
     return structuredClone(this.#models);
   }

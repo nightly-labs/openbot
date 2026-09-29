@@ -31,6 +31,15 @@ apt-get install -y --no-install-recommends \
   libasound2t64 libgbm1 libgtk-3-0t64 libnss3 libxss1 \
   libcap2 libcurl4t64 libevdev2 libglib2.0-0t64 libminiupnpc17 libpulse0 libssl3t64 libva2 \
   libx11-6 libxcb-shm0 libxcb-xfixes0 libxcb1 libxfixes3 libxrandr2 libxtst6
+# Compressed swap in memory: it uses no disk and no snapshot space, and it gives a small server time
+# before the OOM killer acts. A kernel with no zram module gets none.
+if modprobe zram 2>/dev/null; then
+  apt-get install -y --no-install-recommends systemd-zram-generator
+  printf '[zram0]\nzram-size = ram / 2\n' >/etc/systemd/zram-generator.conf
+  chmod 0644 /etc/systemd/zram-generator.conf
+else
+  echo "This kernel has no zram module. The server has no compressed swap."
+fi
 apt-get clean
 
 work=$(mktemp -d)

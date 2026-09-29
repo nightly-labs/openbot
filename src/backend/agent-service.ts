@@ -100,6 +100,7 @@ import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-sit
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
+import { MemoryHold } from "./agent/memory-hold";
 import {
   creationModel,
   type ModelChoice,
@@ -127,6 +128,7 @@ import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
+import type { HostMemory } from "./host-memory";
 import type { MailboxStore } from "./mailbox-store";
 import { McpServerStore } from "./mcp-server-store";
 import { decodeRecordResponse } from "./protocol";
@@ -204,6 +206,11 @@ export interface AgentServiceOptions {
    * for the same reason as `computerUseMcpServer`: the user connects and disconnects while OpenBot runs.
    */
   githubConnector?: GitHubConnectorSource | null;
+  /**
+   * The memory of a hosted server, or `null` on each other computer. With it, no new turn starts
+   * while memory is low, and only a fixed number of turns run at the same time.
+   */
+  hostMemory?: HostMemory | null;
 }
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
@@ -228,6 +235,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #attention: AttentionRegistry;
   readonly #images: ImageGenRuntime;
   readonly #threads: ThreadLifecycle;
+  readonly #memoryHold: MemoryHold;
   readonly #drain: DrainScheduler;
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
@@ -265,6 +273,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       developmentDefaults = false,
       computerUseMcpServer = () => null,
       githubConnector = null,
+      hostMemory = null,
     } = options;
     this.#developmentDefaults = developmentDefaults;
     this.#localSkillTools = localSkillTools;
@@ -669,6 +678,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         excludedChannels: () => new Set(),
       },
     });
+    this.#memoryHold = new MemoryHold({
+      memory: hostMemory,
+      hooks: {
+        scheduleAll: () => {
+          for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
+        },
+        retryWaiting: () => this.#drain.retrySlotWaiters(),
+        releaseIdleThreads: () => this.#providers.releaseIdleThreads(),
+        emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      },
+    });
     this.#drain = new DrainScheduler({
       channels: this.channels,
       store,
@@ -681,6 +701,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       compaction: this.#compaction,
       routines: this.#routines,
       threads: this.#threads,
+      memory: this.#memoryHold,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
@@ -1376,6 +1397,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#routines.skipMissed(new Date());
     this.#channelRoutines.skipMissed(new Date());
     this.#initialized = true;
+    this.#memoryHold.start();
     await this.#providers.start();
     for (const agent of this.#store.list()) this.#mailboxSync.emitQueue(agent.id);
     await this.#routines.resumePendingRuns();
@@ -1489,6 +1511,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const channelStop = this.channels.stop();
     this.#initialized = false;
     this.#routineTimer.dispose();
+    this.#memoryHold.dispose();
     this.#hostedSites.dispose();
     this.#compaction.dispose();
     this.#deltas.dispose();

@@ -104,6 +104,7 @@ import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
+import { HostedServerMemory } from "./hosted-server-memory";
 import { HostedServerDesktopService, withHostingDeveloperKey } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
 import { HostedSiteDesktopService } from "./hosted-site-service";
@@ -212,6 +213,7 @@ const TEARDOWN_ORDER = {
   requestedUpdate: 13,
   hostedServerStartRetry: 14,
   hostedServerActivity: 15,
+  hostedServerMemory: 16,
   computerUseHighlight: 18,
   computerUsePermissionHelp: 19,
   dynamicIsland: 20,
@@ -482,7 +484,20 @@ export async function createApplicationServices({
   });
   teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () => teamWebRtcBridge.stop());
-  const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE));
+  // Only a hosted server: its machine is small, and one unit holds OpenBot and every agent process.
+  const hostMemory = hostedServer
+    ? new HostedServerMemory({
+        electronPids: () => app.getAppMetrics().map((metric) => metric.pid),
+        onReadError: (message) => logger.warn(message),
+      })
+    : null;
+  if (hostMemory) {
+    hostMemory.start();
+    teardown.push(TEARDOWN_ORDER.hostedServerMemory, "the hosted server memory reading", () => hostMemory.stop());
+  }
+  const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
+    memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+  });
   teardown.push(TEARDOWN_ORDER.browser, "the browser", () => browser.destroy());
   await browser.restore(store.list().map((agent) => ({ id: agent.id, threadId: agent.threadId })));
   const browserPictureInPicture = new BrowserPictureInPicture({
@@ -791,6 +806,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    hostMemory,
     requestTimeoutMs: 30_000,
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
