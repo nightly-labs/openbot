@@ -994,8 +994,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               />
               <AccountDock
                 account={account()}
-                // No platform: the macOS dock shelf is for the desktop app, so every browser gets the one-row dock.
+                // A browser has no app platform, but it draws the same shelf as the desktop app.
                 appInfo={null}
+                shelf
                 agentStatus={status()}
                 accountUsage={accountUsage()}
                 usageProvider={workspace.selected()?.provider ?? null}

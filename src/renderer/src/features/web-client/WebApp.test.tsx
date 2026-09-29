@@ -98,7 +98,7 @@ describe("browser account UI", () => {
     await fireEvent.input(code, { target: { value: "23456789" } });
     await screen.findByText("The sign-in code is incorrect.");
     await fireEvent.input(screen.getByRole("textbox", { name: "One-time code" }), { target: { value: "34567892" } });
-    await screen.findByRole("button", { name: "Open account menu" });
+    await screen.findByRole("button", { name: "Open account actions" });
     expect(screen.queryByText("The account session has ended.")).not.toBeInTheDocument();
     expect(mock.fetch).toHaveBeenCalledWith(
       "/api/browser/email/verify",
@@ -128,7 +128,7 @@ describe("browser account UI", () => {
   it("restores the protected session and clears private UI when another tab signs out", async () => {
     const mock = setup();
     const app = render(() => <WebApp createRuntime={createMockWebRuntime} />);
-    await screen.findByRole("button", { name: "Open account menu" });
+    await screen.findByRole("button", { name: "Open account actions" });
     expect(mock.fetch).toHaveBeenCalledWith(
       "/api/browser/session",
       expect.objectContaining({ credentials: "same-origin", cache: "no-store" }),
@@ -136,16 +136,16 @@ describe("browser account UI", () => {
     mock.fetch.mockResolvedValue(Response.json({ error: { message: "Sign in is required." } }, { status: 401 }));
     mock.changed();
     await screen.findByRole("textbox", { name: "Email" });
-    expect(screen.queryByRole("button", { name: "Open account menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open account actions" })).not.toBeInTheDocument();
     app.unmount();
     expect(mock.close).toHaveBeenCalledOnce();
   });
   it("revokes on sign-out and tells other tabs to clear their state", async () => {
     const mock = setup();
     render(() => <WebApp createRuntime={createMockWebRuntime} />);
-    await screen.findByRole("button", { name: "Open account menu" });
+    await screen.findByRole("button", { name: "Open account actions" });
     mock.fetch.mockResolvedValue(Response.json({ signedOut: true }));
-    await fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Open account actions" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
     await screen.findByRole("textbox", { name: "Email" });
     expect(mock.fetch).toHaveBeenLastCalledWith(
