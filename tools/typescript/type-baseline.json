@@ -110,6 +110,7 @@
     "src/main/central-auth-manager.ts": 3,
     "src/main/computer-use-highlight-window.test.ts": 1,
     "src/main/development-profile.test.ts": 3,
+    "src/main/github-mcp-proxy.ts": 2,
     "src/main/host-service.ts": 4,
     "src/main/ipc/agent-inputs.ts": 1,
     "src/main/ipc/browser-inputs.ts": 1,

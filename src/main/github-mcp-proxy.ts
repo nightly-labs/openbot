@@ -144,7 +144,8 @@ export class GitHubMcpProxy {
       response.end(JSON.stringify({ error: "github_unreachable" }));
       return;
     }
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    // No `sessionIdGenerator`: each POST is one stateless request.
+    const transport = new StreamableHTTPServerTransport({});
     try {
       await mcp.connect(transport);
       await transport.handleRequest(request, response, await readJsonBody(request, MAX_BODY_BYTES));
@@ -169,6 +170,7 @@ export class GitHubMcpProxy {
   async #serverFor(userToken: string): Promise<Server> {
     const user = await this.#upstream(userToken);
     const capabilities = user.getServerCapabilities() ?? {};
+    const instructions = user.getInstructions();
     const mcp = new Server(
       { name: "github", version: "1.0.0" },
       {
@@ -177,7 +179,7 @@ export class GitHubMcpProxy {
           ...(capabilities.prompts ? { prompts: {} } : {}),
           ...(capabilities.resources ? { resources: {} } : {}),
         },
-        instructions: user.getInstructions(),
+        ...(instructions ? { instructions } : {}),
       },
     );
     const forward = <T>(token: string, call: (client: Client) => Promise<T>) => this.#call(token, call);
