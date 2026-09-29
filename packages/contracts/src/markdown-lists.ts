@@ -17,7 +17,7 @@ export interface MarkdownListEdit {
 const LIST_ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\][ \t]+)?/u;
 const THEMATIC_BREAK = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/u;
 // Any indent, and a list marker before it, so a fence inside a list item counts too.
-const CODE_FENCE = /^[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}|~{3,})(.*)$/u;
+const CODE_FENCE = /^([ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?)(`{3,}|~{3,})(.*)$/u;
 
 /** The edit for a line break typed at `caret` in `text`, or null when the line break is plain. */
 export function markdownListLineBreak(text: string, caret: number): MarkdownListEdit | null {
@@ -25,7 +25,7 @@ export function markdownListLineBreak(text: string, caret: number): MarkdownList
   const nextBreak = text.indexOf("\n", caret);
   const lineEnd = nextBreak === -1 ? text.length : nextBreak;
   const line = text.slice(lineStart, lineEnd);
-  if (THEMATIC_BREAK.test(line) || insideCodeFence(text.slice(0, lineStart))) return null;
+  if (THEMATIC_BREAK.test(line) || insideCodeFence(text.slice(0, lineEnd))) return null;
   const item = LIST_ITEM.exec(line);
   if (!item || lineStart + item[0].length > caret) return null;
 
@@ -38,15 +38,20 @@ export function markdownListLineBreak(text: string, caret: number): MarkdownList
   return { text: text.slice(0, caret) + insert + text.slice(caret), caret: caret + insert.length };
 }
 
-function insideCodeFence(before: string): boolean {
-  let open: string | null = null;
-  for (const line of before.split("\n")) {
+/*
+ * A fence inside a list item also ends with that item: a later line with less indent than the
+ * fence starts a new item or leaves the list.
+ */
+function insideCodeFence(lines: string): boolean {
+  let open: { marks: string; indent: number } | null = null;
+  for (const line of lines.split("\n")) {
+    if (open && open.indent > 0 && line.trim() && line.length - line.trimStart().length < open.indent) open = null;
     const fence = CODE_FENCE.exec(line);
     if (!fence) continue;
-    const [, marks = "", rest = ""] = fence;
+    const [, lead = "", marks = "", rest = ""] = fence;
     if (open === null) {
-      if (!(marks[0] === "`" && rest.includes("`"))) open = marks;
-    } else if (marks[0] === open[0] && marks.length >= open.length && !rest.trim()) {
+      if (!(marks[0] === "`" && rest.includes("`"))) open = { marks, indent: lead.length };
+    } else if (marks[0] === open.marks[0] && marks.length >= open.marks.length && !rest.trim()) {
       open = null;
     }
   }
