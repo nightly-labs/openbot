@@ -13,6 +13,8 @@ import type { ProviderCodeLoginApi } from "../../components/provider-code-login-
 /** The computer that runs the providers: it issues the code, and a cancel goes to the same one. */
 interface ProviderCodeLoginTarget {
   start: (provider: AgentProviderId) => Promise<ProviderCodeLoginStart>;
+  /** Only a target that can start a `paste` sign-in has it. */
+  submit?: (provider: AgentProviderId, code: string) => Promise<AgentStatus>;
   cancel: (provider: AgentProviderId) => Promise<AgentStatus>;
 }
 
@@ -22,6 +24,8 @@ export interface ProviderCodeLoginOptions {
   applyStatus: (status: AgentStatus) => void;
   /** Read when a sign-in starts. The cancel of that sign-in goes to the same target. */
   target: () => ProviderCodeLoginTarget;
+  /** The providers the target signs in with a code. */
+  providers: () => readonly AgentProviderId[];
   openVerificationUrl: (url: string) => void;
   /**
    * A connect attempt, for analytics: begun when a sign-in starts, failed through the function it
@@ -78,12 +82,19 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
         return;
       }
       flush(() =>
-        setCodeLoginState({
-          phase: "waiting",
-          userCode: started.userCode,
-          verificationUrl: started.verificationUrl,
-          expiresAt: started.expiresAt,
-        }),
+        setCodeLoginState(
+          started.kind === "paste"
+            ? { phase: "paste", verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
+            : {
+                phase: "waiting",
+                userCode: started.userCode,
+                verificationUrl: started.verificationUrl,
+                ...(started.verificationUrlComplete === undefined
+                  ? {}
+                  : { verificationUrlComplete: started.verificationUrlComplete }),
+                expiresAt: started.expiresAt,
+              },
+        ),
       );
       // Main gives up on the same deadline and reports a failure, but the user is looking at a
       // countdown: when it reaches zero the screen has to say so without waiting for a round trip.
@@ -91,7 +102,7 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
         () => {
           if (generation !== codeLoginGeneration) return;
           codeLoginExpiry = undefined;
-          if (codeLoginState().phase === "waiting") endProviderCodeLogin(provider, { kind: "expired" });
+          if (isWaitingPhase(codeLoginState())) endProviderCodeLogin(provider, { kind: "expired" });
         },
         Math.max(0, started.expiresAt - Date.now()),
       );
@@ -106,6 +117,40 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
             : currentText().t("app.provider.connectFailedRetry", {
                 name: agentProviderDescriptor(provider).displayName,
               }),
+      });
+    }
+  }
+
+  /**
+   * Sends the code a `paste` sign-in's page showed. The code is a credential: it goes to the
+   * computer that runs the provider, and nothing here keeps it. How the sign-in ends arrives as a
+   * status, as for a device code.
+   */
+  async function submitProviderCodeLogin(code: string): Promise<void> {
+    const provider = codeLoginProvider();
+    const state = codeLoginState();
+    const target = codeLoginTarget;
+    if (!provider || state.phase !== "paste" || state.submitting || !target?.submit) return;
+    const generation = codeLoginGeneration;
+    setCodeLoginState({ ...state, submitting: true, error: undefined });
+    try {
+      const status = await target.submit(provider, code);
+      if (generation !== codeLoginGeneration) return;
+      flush(() => {
+        setCodeLoginState({ phase: "verifying" });
+        options.applyStatus(status);
+      });
+    } catch (error) {
+      if (generation !== codeLoginGeneration) return;
+      const { t, sourceText } = currentText();
+      // A refused code keeps the dialog open, so the user can fix what they pasted.
+      setCodeLoginState({
+        ...state,
+        submitting: false,
+        error:
+          error instanceof Error && error.message
+            ? sourceText(error.message)
+            : t("app.provider.connectFailedRetry", { name: agentProviderDescriptor(provider).displayName }),
       });
     }
   }
@@ -194,7 +239,7 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
       // The phase belongs in here rather than in the callback: a reactive read in an effect
       // callback is not tracked, so a dialog that reached `waiting` after the status did would
       // never be told about it.
-      if (provider === null || codeLoginState().phase !== "waiting") return null;
+      if (provider === null || !isWaitingPhase(codeLoginState())) return null;
       return options.agentStatus().providers?.find((row) => row.id === provider) ?? null;
     },
     (row) => {
@@ -226,10 +271,17 @@ export function createProviderCodeLogin(options: ProviderCodeLoginOptions): Prov
   });
 
   return {
+    providers: options.providers,
     provider: codeLoginProvider,
     state: codeLoginState,
     start: (provider) => void startProviderCodeLogin(provider),
+    submit: (code) => void submitProviderCodeLogin(code),
     cancel: cancelProviderCodeLogin,
     openVerificationUrl: options.openVerificationUrl,
   };
+}
+
+/** A phase in which the provider can end the sign-in: a code or a page is out, or a code was sent. */
+function isWaitingPhase(state: ProviderCodeLoginState): boolean {
+  return state.phase === "waiting" || state.phase === "paste" || state.phase === "verifying";
 }

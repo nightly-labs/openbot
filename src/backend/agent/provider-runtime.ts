@@ -48,6 +48,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { withTimeout } from "../with-timeout";
 import { normalizeAccountUsage } from "./account-usage";
+import { type CliCodeLogin, startCliCodeLogin } from "./cli-code-login";
 import { CodexLoginFlow } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
@@ -99,11 +100,13 @@ function usageWindowHasReset(limit: AccountUsage["limits"][number]): boolean {
   return [limit.primary, limit.secondary].some((window) => window?.resetsAt != null && window.resetsAt <= now);
 }
 
-/** A sign-in that is a CLI process the user completes in a browser the CLI opened. */
+/** A sign-in that is a CLI process the user completes in a browser the CLI opened, or on another device. */
 interface PendingCliLogin {
   child: ChildProcess;
   cli: AgentCliInfo;
   task: Promise<void> | null;
+  /** A code sign-in: what the CLI printed for the user, and the prompt a pasted code goes to. */
+  code?: Pick<CliCodeLogin, "prompt" | "submit">;
 }
 
 export type AgentClientFactory = (
@@ -683,22 +686,64 @@ export class ProviderRuntime implements ProviderPort {
    * account, and the one in use keeps working until the new sign-in finishes.
    */
   async startProviderCodeLogin(provider: AgentProvider): Promise<ProviderCodeLoginStart> {
-    if (!agentProviderDescriptor(provider).codeSignIn) {
+    const codeSignIn = requireProviderDriver(provider).codeSignIn;
+    if (!codeSignIn) {
       throw new Error(sourceText("error.provider.noCodeSignIn", { provider: providerLabel(provider) }));
     }
     const start = this.#providerStarts.get(provider);
     if (start) await start;
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#codexLogin.cancel(null);
-      return this.#codexLogin.startDevice();
+      if (codeSignIn.kind === "codex-device") {
+        await this.#codexLogin.cancel(null);
+        return this.#codexLogin.startDevice();
+      }
+      await this.#cancelCliLogin(provider, null);
+      const { command, flow } = codeSignIn;
+      await this.#startCliLogin(provider, (cli) =>
+        startCliCodeLogin({
+          flow,
+          executable: cli.executable,
+          argv: command.argv,
+          env: command.env(cli),
+          timeoutMs: command.timeoutMs,
+        }),
+      );
+      const pending = this.#cliLogins.get(provider);
+      if (!pending?.code) throw new Error(sourceText("error.provider.codeLoginNoLink"));
+      const expiresAt = Date.now() + command.timeoutMs;
+      // A CLI that exits or prints no link rejects here; its `done` then records the failure.
+      const prompt = await pending.code.prompt;
+      return prompt.flow === "paste"
+        ? { kind: "paste", verificationUrl: prompt.verificationUrl, expiresAt }
+        : {
+            kind: "code",
+            userCode: prompt.userCode,
+            verificationUrl: prompt.verificationUrl,
+            ...(prompt.verificationUrlComplete ? { verificationUrlComplete: prompt.verificationUrlComplete } : {}),
+            expiresAt,
+          };
     });
+  }
+
+  /**
+   * Types the code the provider's page showed into the CLI that is waiting for it. The code is a
+   * credential: it goes to the CLI's stdin and nowhere else. How the sign-in ends arrives as the
+   * provider's status.
+   */
+  submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {
+    const pending = this.#cliLogins.get(provider);
+    if (!pending?.code) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    pending.code.submit(code);
+    return this.status();
   }
 
   /** Abandons a code sign-in. The provider is told, so the code cannot be used after this returns. */
   async cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
-    if (!agentProviderDescriptor(provider).codeSignIn) return this.status();
+    const codeSignIn = requireProviderDriver(provider).codeSignIn;
+    if (!codeSignIn) return this.status();
     return this.#runProviderConnectionCommand(provider, async () => {
-      await this.#codexLogin.cancel(null);
+      if (codeSignIn.kind === "codex-device") await this.#codexLogin.cancel(null);
+      else await this.#cancelCliLogin(provider, null);
       return this.status();
     });
   }
@@ -1447,15 +1492,22 @@ export class ProviderRuntime implements ProviderPort {
 
   async #startCliLogin(
     provider: AgentProvider,
-    start: (cli: AgentCliInfo) => { child: ChildProcess; done: Promise<void> },
+    start: (
+      cli: AgentCliInfo,
+    ) => { child: ChildProcess; done: Promise<void> } & Partial<Pick<CliCodeLogin, "prompt" | "submit">>,
   ): Promise<AgentStatus> {
     let cli: AgentCliInfo | null = null;
     this.#setProviderConnectionState(provider, "connecting");
 
     try {
       cli = await this.#resolveProviderCli(provider);
-      const { child, done } = start(cli);
-      const pending: PendingCliLogin = { child, cli, task: null };
+      const { child, done, prompt, submit } = start(cli);
+      const pending: PendingCliLogin = {
+        child,
+        cli,
+        task: null,
+        ...(prompt && submit ? { code: { prompt, submit } } : {}),
+      };
       this.#cliLogins.set(provider, pending);
       recordRestartActivity();
       pending.task = done

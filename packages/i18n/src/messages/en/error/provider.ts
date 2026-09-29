@@ -132,6 +132,12 @@ export const messages = defineMessages("error.provider", {
   "error.provider.connectBeforeProfile": "Connect the selected provider before generating a profile.",
   "error.provider.cliNotReady": "{provider} CLI is not ready or signed in.",
   "error.provider.noCodeSignIn": "{provider} cannot be signed in with a code.",
+  "error.provider.codeLoginNoLink": "The provider did not show a sign-in link. Try again.",
+  "error.provider.codeLoginNotWaiting": "No sign-in is waiting for a code. Start the sign-in again.",
+  "error.provider.codeLoginBadCode": "Paste the code that the sign-in page shows.",
+  "error.provider.codeLoginRefused": "The provider did not accept the code. Start the sign-in again.",
+  "error.provider.codeLoginUnsupported":
+    "This server cannot sign in with a pasted code. Sign in on the server computer, in its browser.",
   "error.provider.cliBusyRetry": "The {provider} CLI is working on a turn. Wait for it to finish, then try again.",
   "error.provider.cliSigningIn": "The {provider} CLI is signing in. Finish or cancel sign-in, then update.",
   "error.provider.cliBusyUpdate": "The {provider} CLI is working on a turn. Wait for it to finish, then update.",

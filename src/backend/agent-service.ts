@@ -1381,6 +1381,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.startProviderCodeLogin(provider);
   }
 
+  submitProviderCodeLogin(provider: AgentProvider, code: string): AgentStatus {
+    return this.#providers.submitProviderCodeLogin(provider, code);
+  }
+
   cancelProviderCodeLogin(provider: AgentProvider): Promise<AgentStatus> {
     return this.#providers.cancelProviderCodeLogin(provider);
   }

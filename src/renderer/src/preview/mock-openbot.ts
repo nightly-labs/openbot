@@ -659,7 +659,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     // Preview has one host, so every server answers from the same providers as this computer.
     providerAdmin: {
-      startCodeLogin: (provider) => api.startProviderCodeLogin(provider),
+      // A host signs Claude in with a code its page shows, which the user pastes back.
+      startCodeLogin: async (provider) =>
+        provider === "claude"
+          ? {
+              kind: "paste",
+              verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+              expiresAt: Date.now() + 10 * 60_000,
+            }
+          : api.startProviderCodeLogin(provider),
+      // As with the code above, the preview has no provider to finish the sign-in.
+      submitCodeLogin: async () => clone(agentStatus),
       cancelCodeLogin: (provider) => api.cancelProviderCodeLogin(provider),
       getApiKeyState: (provider) => api.getProviderApiKeyState(provider),
       setApiKey: (input) => api.setProviderApiKey(input),

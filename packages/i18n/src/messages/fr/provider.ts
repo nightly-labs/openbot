@@ -71,6 +71,11 @@ export const messages = {
   "provider.codeLogin.expiresIn": "En attente. Le code expire dans {time}.",
   "provider.codeLogin.verifying": "Code accepté. Fin de la connexion à {name}…",
   "provider.codeLogin.closeLabel": "Fermer la connexion à {name}",
+  "provider.codeLogin.pasteStep": "Connectez-vous à {name}, puis copiez le code affiché par la page",
+  "provider.codeLogin.pasteLabel": "Code de la page",
+  "provider.codeLogin.pasteSubmit": "Continuer",
+  "provider.codeLogin.pasteExpired": "Cette connexion s’est arrêtée.",
+  "provider.codeLogin.pasteExpiresIn": "En attente. Cette connexion s’arrête dans {time}.",
 
   "provider.picker.noEndpoints": "Aucun point de terminaison pour l’instant",
   "provider.picker.customCounts": "{endpoints} · {agents}",

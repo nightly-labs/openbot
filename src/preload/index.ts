@@ -566,6 +566,7 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   providerAdmin: bridgeGroup(IPC_ENDPOINTS.providerAdmin, {
     startCodeLogin: decodeProviderCodeLoginStart,
+    submitCodeLogin: decodeAgentStatusFromMain,
     cancelCodeLogin: decodeAgentStatusFromMain,
     getApiKeyState: decodeProviderApiKeyState,
     setApiKey: decodeAgentStatusFromMain,

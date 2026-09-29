@@ -86,6 +86,16 @@ type ProviderSignIn =
   | { kind: "acp-authenticate"; methodId: string; argv: readonly string[]; timeoutMs: number };
 
 /**
+ * A sign-in the user finishes on another device, for a host with no browser the user can see.
+ * `codex-device` is the Codex app-server device code. `cli` spawns the provider's CLI and reads its
+ * link: `device` prints a code the user confirms, `paste` waits for the code the provider's page
+ * shows, which the user copies back.
+ */
+export type ProviderCodeSignIn =
+  | { kind: "codex-device" }
+  | { kind: "cli"; flow: "device" | "paste"; command: ProviderCliCommand };
+
+/**
  * Google's registry starts the Linux build with an empty `--uid=`, and the other builds with no
  * argument. OpenBot starts it the same way.
  */
@@ -164,6 +174,8 @@ export const NO_PROVIDER_CREDENTIALS: ProviderClientContext = {
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
+  /** Absent for a provider that has no sign-in on another device. */
+  codeSignIn?: ProviderCodeSignIn;
   resolveCli(options?: { bundledExecutable?: string | null }): Promise<AgentCliInfo>;
   createClient(
     cli: AgentCliInfo,
@@ -185,6 +197,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "codex",
     signIn: { kind: "browser" },
+    codeSignIn: { kind: "codex-device" },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs) => new CodexAppServerClient(cli.executable, requestTimeoutMs),
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
@@ -198,6 +211,16 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     id: "claude",
     signIn: {
       kind: "cli-command",
+      command: {
+        argv: ["auth", "login", "--claudeai"],
+        env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+    },
+    // With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only.
+    codeSignIn: {
+      kind: "cli",
+      flow: "paste",
       command: {
         argv: ["auth", "login", "--claudeai"],
         env: (cli): Record<string, string> => (cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}),
@@ -226,6 +249,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       kind: "cli-command",
       command: {
         argv: ["--no-auto-update", "login"],
+        env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+    },
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: ["--no-auto-update", "login", "--device-auth"],
         env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },

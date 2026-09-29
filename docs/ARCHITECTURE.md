@@ -1152,6 +1152,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-install-v1` | Add an agent from a listing or a shared template, by id | `agentAdmin` |
 | `agent-update-v1` | Update an agent added from a listing to the listing's current version, by id | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
+| `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 
@@ -1159,6 +1160,25 @@ These IPC groups take a required server id and route with `scopedHandler`. A key
 the host; no response carries one. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
 sign-in and folder import stay on the host.
+
+`providers-v1` signs in Codex only, with a device code. A host that serves `providers-v3` also signs
+in Grok (`grok login --device-auth`) and Claude (`claude auth login`), for a host with no visible
+browser, such as a hosted server. `src/backend/agent/cli-code-login.ts` reads the link, and for Grok
+the code, from the CLI output. The Claude CLI shows its paste prompt only on a terminal, so the host
+runs it under the util-linux `script`, and the admin sends back the code that the Claude page shows
+(`code-login/submit`). This flow runs only on a Linux host: the macOS `script` refuses a socket for
+stdin, and Windows has no `script`. The CLI output and the pasted code are secrets; no log line or
+error quotes them. How a sign-in ends arrives in the host's agent status, as for Codex.
+`codeSignInProviders` in `server-capabilities.ts` picks the providers that the Providers list offers
+for a code sign-in, from the host's capabilities.
+
+When the account is an owner or admin of the active remote server, the server serves `providers-v1`,
+and the server has no agent, the workspace shows `ServerOnboarding` before the first-agent form, on
+desktop (`WorkspaceServerOnboarding`) and on the web (`WebWorkspace`). It shows the host's providers
+through `hostSetupProviderProps`, and Continue stays blocked until a provider is connected. The form
+then opens with that provider. The choice stays in memory for the server; it is not written to the
+setup file of this computer. A member, the local server, and a host without `providers-v1` open the
+form directly.
 
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until

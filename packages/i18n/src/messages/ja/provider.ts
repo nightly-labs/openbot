@@ -62,6 +62,11 @@ export const messages = {
   "provider.codeLogin.expiresIn": "待機しています。コードの有効期限は残り {time} です。",
   "provider.codeLogin.verifying": "コードを確認しました。{name} へのサインインを完了しています…",
   "provider.codeLogin.closeLabel": "{name} へのログインを閉じる",
+  "provider.codeLogin.pasteStep": "{name} にログインし、ページに表示されたコードをコピーします",
+  "provider.codeLogin.pasteLabel": "ページのコード",
+  "provider.codeLogin.pasteSubmit": "続ける",
+  "provider.codeLogin.pasteExpired": "このログインは停止しました。",
+  "provider.codeLogin.pasteExpiresIn": "待機しています。このログインは残り {time} で停止します。",
 
   "provider.picker.noEndpoints": "エンドポイントはまだありません",
   "provider.picker.customCounts": "{endpoints} · {agents}",

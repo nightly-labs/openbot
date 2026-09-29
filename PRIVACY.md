@@ -371,8 +371,8 @@ R2. The Signal service does not proxy them or write them to logs. The host does 
 inbound port.
 
 An owner or admin of a joined server can manage its host from their own computer, or from the
-browser client at `/app`. A provider API key, a custom endpoint key or header, and a new server logo
-then travel from that computer or browser to the host over the same encrypted team connection. The
+browser client at `/app`. A provider API key, a custom endpoint key or header, the code that a
+provider sign-in page shows, and a new server logo then travel from that computer or browser to the host over the same encrypted team connection. The
 browser does not store a key. The host stores them as it stores a change made on the host.
 No response returns a key, and neither computer writes request bodies to its logs.
 

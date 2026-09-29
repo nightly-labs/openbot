@@ -18,6 +18,8 @@ export interface FakeCodeLoginOptions {
   /** Seconds the fake other device takes. 0 leaves the code on screen for as long as the story is open. */
   finishAfterMs?: number;
   userCode?: string;
+  /** The providers the rows offer a code sign-in for. Codex when not given. */
+  providers?: readonly AgentProviderId[];
 }
 
 export function createFakeCodeLogin(options: FakeCodeLoginOptions = {}): ProviderCodeLoginApi {
@@ -37,6 +39,15 @@ export function createFakeCodeLogin(options: FakeCodeLoginOptions = {}): Provide
     setState({ phase: "starting" });
     timers.push(
       window.setTimeout(() => {
+        // Claude shows its code on the page after the sign-in, and the user pastes it back.
+        if (next === "claude") {
+          setState({
+            phase: "paste",
+            verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+            expiresAt: Date.now() + 10 * 60_000,
+          });
+          return;
+        }
         setState({
           phase: "waiting",
           userCode,
@@ -66,5 +77,25 @@ export function createFakeCodeLogin(options: FakeCodeLoginOptions = {}): Provide
     setProvider(null);
   }
 
-  return { provider, state, start, cancel: close, openVerificationUrl: () => undefined };
+  return {
+    providers: () => options.providers ?? ["codex"],
+    provider,
+    state,
+    start,
+    submit: () => {
+      const current = provider();
+      setState({ phase: "verifying" });
+      if (!current) return;
+      timers.push(
+        window.setTimeout(() => {
+          close();
+          toast.success(`${agentProviderDescriptor(current).displayName} connected`, {
+            description: "Signed in as person@example.com.",
+          });
+        }, 1_200),
+      );
+    },
+    cancel: close,
+    openVerificationUrl: () => undefined,
+  };
 }

@@ -615,8 +615,10 @@ describe("OnboardingFlow", () => {
     const [state, setState] = createSignal<ProviderCodeLoginState>({ phase: "starting" });
     const [provider, setProvider] = createSignal<AgentProviderId | null>(null);
     const codeLogin = {
+      providers: () => ["codex" as const],
       provider,
       state,
+      submit: vi.fn(),
       start: vi.fn((id: AgentProviderId) => {
         setProvider(id);
         setState({

@@ -825,7 +825,7 @@ describe.sequential("ProviderRuntime: account checks and login", () => {
     });
     service = agentService;
 
-    await expect(service.startProviderCodeLogin("claude")).rejects.toThrow("cannot be signed in with a code");
+    await expect(service.startProviderCodeLogin("opencode")).rejects.toThrow("cannot be signed in with a code");
   });
 
   it("runs provider logins independently and Refresh cancels both generations", async () => {

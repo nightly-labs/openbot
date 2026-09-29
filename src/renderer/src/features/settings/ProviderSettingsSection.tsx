@@ -55,6 +55,8 @@ export interface ProviderSettingsSectionProps {
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Opens the code sign-in. Absent in the stories, where there is no provider to answer it. */
   onSignInWithCodeProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /** The providers the code sign-in reaches. Without it, the providers whose descriptor offers one. */
+  codeSignInProviders?: readonly AgentProviderId[] | undefined;
   /** Local model servers and ACP agents that the host found. Without it the section shows no such list. */
   providerDetection?: ProviderDetection | undefined;
   detectedProviderApi?: DetectedProviderApi | undefined;
@@ -116,6 +118,7 @@ export function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onManageCustomProviders={props.onAddCustomProvider ? host.openList : undefined}
         onSignInProvider={props.onSignInProvider}
         onSignInWithCodeProvider={props.onSignInWithCodeProvider}
+        codeSignInProviders={props.codeSignInProviders}
         menuMount={props.selectMount}
         detected={
           <Show when={props.providerDetection}>
@@ -268,6 +271,7 @@ export function ProviderSettingsDialogs(props: {
             state={api().state()}
             onOpenVerificationUrl={api().openVerificationUrl}
             onCancel={api().cancel}
+            onSubmitCode={api().submit}
           />
         )}
       </Show>
@@ -328,6 +332,7 @@ export function HostProviderSettingsPanel(
         onDeleteCustomProvider={props.onDeleteCustomProvider}
         onSignInProvider={props.providerKeys ? keys.openKeyDialog : undefined}
         onSignInWithCodeProvider={props.codeLogin?.start}
+        codeSignInProviders={props.codeLogin?.providers()}
       />
       <ProviderSettingsDialogs keys={keys} providerKeys={props.providerKeys} codeLogin={props.codeLogin} />
     </>

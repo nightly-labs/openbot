@@ -4,13 +4,16 @@
 
 import type { ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
+  type AgentProviderId,
   type AgentStatus,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderRuntimeSnapshot,
+  type SubmitProviderCodeLoginInput,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -18,7 +21,12 @@ import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v2";
+import {
+  PROVIDERS_SIGN_IN_V3_CAPABILITY,
+  PROVIDERS_SIGN_IN_V3_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v3";
 import { sourceText } from "@openbot/i18n/source";
+import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import type { AgentService } from "../../backend/agent-service";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { ProviderCredentialStore } from "../provider-credential-store";
@@ -38,7 +46,10 @@ interface ProviderAdminRemoteServers {
 }
 
 interface ProviderAdminIpcDependencies {
-  service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
+  service: Pick<
+    AgentService,
+    "startProviderCodeLogin" | "submitProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential"
+  >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
   customProviders: PeerCustomProviderChanges;
@@ -74,6 +85,17 @@ export function providerAdminIpcHandlers({
       : PROVIDERS_ADMIN_ROUTES;
   }
 
+  /**
+   * The sign-in routes of the host: `providers-v3` signs in Codex, Claude and Grok. An older host
+   * has `providers-v1` only, which signs in Codex, so another provider is refused here and not by
+   * the host.
+   */
+  function signInRoutes(serverId: string, provider: AgentProviderId) {
+    if (remoteServers.supportsCapability(serverId, PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_ROUTES;
+    if (provider !== "codex") throw new Error(sourceText("error.provider.localOnly"));
+    return PROVIDERS_ADMIN_ROUTES;
+  }
+
   const runtime = (route: "runtimesDownload" | "runtimesCancel") => (provider: ManagedProviderId, serverId: string) =>
     remote(serverId, runtimeRoutes(serverId)[route], { provider }, decodeProviderRuntimeSnapshot);
 
@@ -82,11 +104,20 @@ export function providerAdminIpcHandlers({
       startCodeLogin: scopedHandler(parseProviderId, {
         local: (provider) => service.startProviderCodeLogin(provider),
         remote: (provider, serverId) =>
-          remote(serverId, PROVIDERS_ADMIN_ROUTES.codeLoginStart, { provider }, decodeProviderCodeLoginStart),
+          remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
+      }),
+      submitCodeLogin: scopedHandler(parseSubmitCodeLoginInput, {
+        local: ({ provider, code }) => service.submitProviderCodeLogin(provider, code),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDERS_SIGN_IN_V3_CAPABILITY))
+            throw new Error(sourceText("error.provider.localOnly"));
+          return remoteChange(serverId, PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit, input);
+        },
       }),
       cancelCodeLogin: scopedHandler(parseProviderId, {
         local: (provider) => service.cancelProviderCodeLogin(provider),
-        remote: (provider, serverId) => remoteChange(serverId, PROVIDERS_ADMIN_ROUTES.codeLoginCancel, { provider }),
+        remote: (provider, serverId) =>
+          remoteChange(serverId, signInRoutes(serverId, provider).codeLoginCancel, { provider }),
       }),
       getApiKeyState: scopedHandler(parseProviderId, {
         local: (provider) => ({ provider, status: credentials.status(provider) }),
@@ -137,4 +168,10 @@ export function providerAdminIpcHandlers({
       }),
     },
   };
+}
+
+/** The error never quotes the code, which is a credential. */
+function parseSubmitCodeLoginInput(value: unknown): SubmitProviderCodeLoginInput {
+  if (!isDynamicRecord(value) || !isString(value.code)) throw new Error(sourceText("error.provider.codeLoginBadCode"));
+  return { provider: parseProviderId(value.provider), code: normalizePastedCode(value.code) };
 }

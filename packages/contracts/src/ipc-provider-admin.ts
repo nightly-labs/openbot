@@ -12,16 +12,28 @@ import {
   isCustomProviderResult,
   isCustomProviderSummary,
 } from "./ipc-custom-providers";
-import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "./runtime-values";
 
-/** The verification URL becomes a link the admin opens, so it is held to https here as well. */
+/** Each URL becomes a link the admin opens, so it is held to https here as well. */
 export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginStart {
   if (!isDynamicRecord(value)) throw new Error("Invalid code login.");
   if (value.kind === "connected") return { kind: "connected" };
-  if (!isString(value.userCode) || !isString(value.verificationUrl) || !isNumber(value.expiresAt))
+  if (!isHttpsUrl(value.verificationUrl) || !isNumber(value.expiresAt)) throw new Error("Invalid code login.");
+  if (value.kind === "paste")
+    return { kind: "paste", verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
+  if (
+    value.kind !== "code" ||
+    !isString(value.userCode) ||
+    (value.verificationUrlComplete !== undefined && !isHttpsUrl(value.verificationUrlComplete))
+  )
     throw new Error("Invalid code login.");
-  if (new URL(value.verificationUrl).protocol !== "https:") throw new Error("Invalid code login.");
-  return { kind: "code", userCode: value.userCode, verificationUrl: value.verificationUrl, expiresAt: value.expiresAt };
+  return {
+    kind: "code",
+    userCode: value.userCode,
+    verificationUrl: value.verificationUrl,
+    ...(value.verificationUrlComplete === undefined ? {} : { verificationUrlComplete: value.verificationUrlComplete }),
+    expiresAt: value.expiresAt,
+  };
 }
 
 export function decodeProviderApiKeyStatus(value: unknown): ProviderApiKeyStatus {

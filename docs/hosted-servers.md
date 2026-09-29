@@ -140,6 +140,16 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    the user does not pay for a deleted server. Then it deletes the sandbox and its Remote host. The D1 row stays with `desired_state = 'deleted'`, so a sandbox is never
    left without a record.
 
+## Providers
+
+OpenBot ships no AI subscription, so a new server has no provider connected. When its owner or an
+admin opens a server with no agent, the app shows a provider step before the first-agent form. The
+sandbox browser is on Xvfb, where nobody can see it, so each sign-in finishes on the user's own device
+over `providers-v3`: Codex and Grok show a device code, and Claude shows a page whose code the user
+pastes back into the app. The Claude sign-in runs under `script` from util-linux (package
+`bsdutils`, in every Ubuntu and Debian image). See
+[Admin capabilities](ARCHITECTURE.md#admin-capabilities) for the routes.
+
 ## Members
 
 The plan sets the number of active members, owner included: Starter 3, Standard 10 and Pro 25

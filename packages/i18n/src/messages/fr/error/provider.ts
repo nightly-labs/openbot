@@ -151,6 +151,12 @@ export const messages = {
   "error.provider.connectBeforeProfile": "Connectez le fournisseur sélectionné avant de générer un profil.",
   "error.provider.cliNotReady": "La CLI {provider} n’est pas prête ou n’est pas connectée.",
   "error.provider.noCodeSignIn": "{provider} ne permet pas de se connecter avec un code.",
+  "error.provider.codeLoginNoLink": "Le fournisseur n’a pas affiché de lien de connexion. Réessayez.",
+  "error.provider.codeLoginNotWaiting": "Aucune connexion n’attend de code. Relancez la connexion.",
+  "error.provider.codeLoginBadCode": "Collez le code affiché par la page de connexion.",
+  "error.provider.codeLoginRefused": "Le fournisseur n’a pas accepté le code. Relancez la connexion.",
+  "error.provider.codeLoginUnsupported":
+    "Ce serveur ne peut pas se connecter avec un code collé. Connectez-vous sur l’ordinateur du serveur, dans son navigateur.",
   "error.provider.cliBusyRetry": "La CLI {provider} traite un tour. Attendez la fin, puis réessayez.",
   "error.provider.cliSigningIn":
     "La CLI {provider} est en cours de connexion. Terminez ou annulez la connexion, puis mettez à jour.",

@@ -1,5 +1,11 @@
-import type { ServerSummary } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentProviderId,
+  agentProviderDescriptor,
+  type ServerSummary,
+} from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 
 /**
  * Whether a server can be asked for a capability-gated feature. A local server
@@ -27,6 +33,7 @@ export function serverSupportsCapability(
       capability === "agent-publish-v1" ||
       capability === "providers-v1" ||
       capability === "providers-v2" ||
+      capability === "providers-v3" ||
       capability === "host-admin-v1" ||
       capability === "host-update-v1" ||
       capability === "context-reset-v1" ||
@@ -55,6 +62,17 @@ export function serverCanAdminister(
   if (!server) return false;
   if (server.kind === "local") return true;
   return serverRoleCanAdminister(server) && (!capability || serverSupportsCapability(server, capability));
+}
+
+/**
+ * The providers that a code sign-in reaches on `server`. A host with `providers-v3` signs in Codex,
+ * Claude and Grok. This computer, and an older host, sign in with a code only the providers whose
+ * descriptor says so: this computer has a browser for the others.
+ */
+export function codeSignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
+  if (server?.kind === "remote" && serverSupportsCapability(server, "providers-v3"))
+    return PROVIDERS_SIGN_IN_V3_PROVIDERS;
+  return AGENT_PROVIDERS.filter((provider) => agentProviderDescriptor(provider).codeSignIn);
 }
 
 /** `server` when it is a joined server this account may manage through `capability`, otherwise undefined. */

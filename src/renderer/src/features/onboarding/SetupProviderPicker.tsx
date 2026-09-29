@@ -112,7 +112,7 @@ export function savedCustomModel(
   return (customProviders ?? []).some((endpoint) => model.startsWith(`${endpoint.id}/`)) ? model : null;
 }
 
-type SetupProviders = ReturnType<typeof createSetupProviders>;
+export type SetupProviders = ReturnType<typeof createSetupProviders>;
 
 /**
  * The provider step of setup: its rows, its choice, the actions on a row, and the errors those
@@ -551,6 +551,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
           source().onSignInProvider || source().providerKeys ? props.providers.signInProvider : undefined
         }
         onSignInWithCodeProvider={source().codeLogin?.start}
+        codeSignInProviders={source().codeLogin?.providers()}
         onUpdateProvider={source().onUpdateProvider}
         menuMount={props.menuMount}
         onRefreshProviders={
@@ -637,6 +638,7 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
             state={api().state()}
             onOpenVerificationUrl={api().openVerificationUrl}
             onCancel={api().cancel}
+            onSubmitCode={api().submit}
           />
         )}
       </Show>

@@ -68,6 +68,11 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.expiresIn": "Waiting for you. The code expires in {time}.",
   "provider.codeLogin.verifying": "Code accepted. Finishing the {name} sign-in…",
   "provider.codeLogin.closeLabel": "Close log in to {name}",
+  "provider.codeLogin.pasteStep": "Log in to {name}, then copy the code that the page shows",
+  "provider.codeLogin.pasteLabel": "Code from the page",
+  "provider.codeLogin.pasteSubmit": "Continue",
+  "provider.codeLogin.pasteExpired": "This login has stopped.",
+  "provider.codeLogin.pasteExpiresIn": "Waiting for you. This login stops in {time}.",
 
   // The agent model picker.
   "provider.picker.noEndpoints": "No endpoints yet",

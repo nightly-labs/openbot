@@ -162,7 +162,10 @@ interface TeamApiHostIdentity {
 }
 
 interface TeamApiProviders {
-  service: Pick<AgentService, "startProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential">;
+  service: Pick<
+    AgentService,
+    "startProviderCodeLogin" | "submitProviderCodeLogin" | "cancelProviderCodeLogin" | "changeProviderCredential"
+  >;
   credentials: Pick<ProviderCredentialStore, "status" | "set" | "clear">;
   runtimes: Pick<ProviderRuntimeManager, "getStatus" | "download" | "cancel" | "checkForUpdates">;
   customProviders: PeerCustomProviderChanges;

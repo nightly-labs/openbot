@@ -17,8 +17,10 @@ import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useUiErrors } from "../../ui-errors";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { remoteAdminServer } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
+import type { CreationPreference } from "./agent-creation-model";
 import { readAgentSelection, writeAgentSelection } from "./agent-selection";
 import { agentsPort } from "./agents-port";
 
@@ -78,6 +80,23 @@ const Agents = createSimpleContext({
     const [agentSetupDraft, setAgentSetupDraft] = createSignal<FirstAgentDraft>(createFirstAgentDraft());
     const [agentSetupError, setAgentSetupError] = createSignal<string | null>(null);
     const [creatingAgent, setCreatingAgent] = createSignal(false);
+    /**
+     * The provider that the provider step of this joined server chose, for the agent form after it.
+     * In memory only: the saved setup choice is of this computer, and this context is of one server.
+     */
+    const [serverSetupChoice, setServerSetupChoice] = createSignal<CreationPreference | null>(null);
+    /**
+     * A joined server with no agents shows the provider step before the agent form, when the account
+     * can sign its host in. OpenBot includes no AI subscription, so an agent made first could not
+     * answer. A member, an older host and this computer open the form as before.
+     */
+    const serverOnboardingOpen = createMemo(
+      () =>
+        agentSetupOpen() &&
+        agentList().length === 0 &&
+        serverSetupChoice() === null &&
+        remoteAdminServer(activeServer(), "providers-v1") !== undefined,
+    );
     const [settingsRequest, setSettingsRequest] = createSignal<{
       agentId: string;
       nonce: number;
@@ -249,6 +268,9 @@ const Agents = createSimpleContext({
       setUiErrors,
       appendUiError,
       agentSetupOpen,
+      serverOnboardingOpen,
+      serverSetupChoice,
+      setServerSetupChoice,
       setAgentSetupOpen,
       agentSetupDraft,
       setAgentSetupDraft,

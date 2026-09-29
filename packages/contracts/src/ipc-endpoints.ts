@@ -48,6 +48,7 @@ import type {
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   SetProviderApiKeyInput,
+  SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
 import type {
   AgentTemplateDetail,
@@ -521,6 +522,10 @@ export const IPC_ENDPOINTS = {
   providerAdmin: {
     startCodeLogin: scopedRequest<AgentProviderId, ProviderCodeLoginStart, "required">()(
       "provider-admin:start-code-login",
+    ),
+    // The code of a `paste` sign-in. The result is the status; how the sign-in ends arrives as one.
+    submitCodeLogin: scopedRequest<SubmitProviderCodeLoginInput, AgentStatus, "required">()(
+      "provider-admin:submit-code-login",
     ),
     cancelCodeLogin: scopedRequest<AgentProviderId, AgentStatus, "required">()("provider-admin:cancel-code-login"),
     getApiKeyState: scopedRequest<AgentProviderId, ProviderApiKeyState, "required">()(

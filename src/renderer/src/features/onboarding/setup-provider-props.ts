@@ -2,6 +2,7 @@ import { useProviders } from "../../providers";
 import { useAgents } from "../agents/agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useProviderDetection } from "../custom-providers/provider-detection-context";
+import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import { providerKeyApi } from "../settings/provider-key-api";
 import type { SetupProviderProps } from "./SetupProviderPicker";
 
@@ -83,4 +84,46 @@ export function useSetupProviderProps(local: () => boolean = () => true): SetupP
       return local() ? detection.takenAgentIds() : undefined;
     },
   };
+}
+
+/**
+ * The providers of the joined server's host that this window manages over `providers-v1`, or
+ * undefined for any other server. The same gates as the host's Settings tab.
+ */
+export function useHostProviderSettings(): () => HostProviderSettings | undefined {
+  const { agentStatus } = useAgents();
+  const providers = useProviders();
+  const downloads = () => providers.providerRuntimeDownloadsAvailable();
+  const settings: HostProviderSettings = {
+    get agentStatus() {
+      return agentStatus();
+    },
+    get providerRuntimeStatuses() {
+      return downloads() ? providers.providerRuntimeStatuses() : undefined;
+    },
+    get providerAvailableVersions() {
+      return downloads() ? providers.providerAvailableVersions() : undefined;
+    },
+    get onDownloadProvider() {
+      return downloads() ? providers.downloadProviderRuntime : undefined;
+    },
+    get onCancelProviderDownload() {
+      return downloads() ? providers.cancelProviderRuntimeDownload : undefined;
+    },
+    get onUpdateProvider() {
+      return downloads() ? providers.startProviderUpdate : undefined;
+    },
+    get customProviders() {
+      return providers.hostCustomProviders.customProviders();
+    },
+    onAddCustomProvider: (value) => providers.hostCustomProviders.saveCustomProvider(value),
+    onDeleteCustomProvider: (id) => providers.hostCustomProviders.deleteCustomProvider(id),
+    get providerKeys() {
+      return downloads() ? providers.providerKeys() : undefined;
+    },
+    get codeLogin() {
+      return downloads() ? providers.codeLogin : undefined;
+    },
+  };
+  return () => (providers.providerAdminServerId() ? settings : undefined);
 }

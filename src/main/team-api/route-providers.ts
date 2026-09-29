@@ -1,4 +1,8 @@
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderName,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import type { ProviderRuntimeSnapshot, ProviderRuntimeStatus } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
@@ -6,8 +10,13 @@ import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
   PROVIDERS_RUNTIMES_V2_ROUTES,
 } from "@openbot/contracts/team-protocol/providers-v2";
+import {
+  PROVIDERS_SIGN_IN_V3_CAPABILITY,
+  PROVIDERS_SIGN_IN_V3_PROVIDERS,
+  PROVIDERS_SIGN_IN_V3_ROUTES,
+} from "@openbot/contracts/team-protocol/providers-v3";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { redactText, registerSecretValue } from "@openbot/logging";
 import { parseProviderId } from "../ipc/app-inputs";
 import { parseDeleteCustomProvider, parseSaveCustomProvider } from "../ipc/custom-provider-inputs";
 import { parseProviderApiKeyInput } from "../ipc/provider-handlers";
@@ -21,8 +30,9 @@ const RUNTIME_MESSAGE_LIMIT = 1024;
 
 /**
  * The providers of this computer, managed from a joined server: sign-in with a device code, provider
- * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`, and by
- * `providers-v2` for the runtime routes that include Gemini.
+ * API keys, the managed CLI runtimes and the custom endpoints. Frozen by `providers-v1`, by
+ * `providers-v2` for the runtime routes that include Gemini, and by `providers-v3` for the Claude
+ * and Grok sign-in on another device.
  *
  * `requireAdmin` runs on every route. A key or a header value only arrives here; no response
  * carries one, and no error message quotes the request.
@@ -34,19 +44,42 @@ export async function routeProviders(
   const { method, url, capabilities, member, request, json } = context;
   if (method !== "POST" || !isProvidersRoute(url.pathname)) return "unmatched";
   const providers = admin?.providers;
-  const v2 = V2_ROUTES.has(url.pathname);
-  if (!providers || !capabilities.has(v2 ? PROVIDERS_RUNTIMES_V2_CAPABILITY : PROVIDERS_ADMIN_CAPABILITY))
+  const capability = V3_ROUTES.has(url.pathname)
+    ? PROVIDERS_SIGN_IN_V3_CAPABILITY
+    : V2_ROUTES.has(url.pathname)
+      ? PROVIDERS_RUNTIMES_V2_CAPABILITY
+      : PROVIDERS_ADMIN_CAPABILITY;
+  if (!providers || !capabilities.has(capability))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
   const { service, credentials, runtimes, customProviders } = providers;
   try {
     switch (url.pathname) {
-      case PROVIDERS_ADMIN_ROUTES.codeLoginStart:
+      case PROVIDERS_ADMIN_ROUTES.codeLoginStart: {
+        // `providers-v1` signs in Codex only; its response has no `paste` shape.
+        const id = parsed(provider, body);
+        if (id !== "codex")
+          throw new Error(sourceText("error.provider.noCodeSignIn", { provider: agentProviderName(id) }));
         // The admin types the code in their own browser; nothing it is traded for comes back.
-        return json(200, await service.startProviderCodeLogin(parsed(provider, body)));
-      case PROVIDERS_ADMIN_ROUTES.codeLoginCancel:
-        await service.cancelProviderCodeLogin(parsed(provider, body));
+        return json(200, await service.startProviderCodeLogin(id));
+      }
+      case PROVIDERS_ADMIN_ROUTES.codeLoginCancel: {
+        // A v1 client never started a Claude or Grok sign-in, so it cannot cancel one either.
+        const id = parsed(provider, body);
+        if (id === "codex") await service.cancelProviderCodeLogin(id);
+        return json(200, {});
+      }
+      case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginStart:
+        return json(200, await service.startProviderCodeLogin(parsed(signInProvider, body)));
+      case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginSubmit: {
+        // The code is a credential: it goes to the CLI's stdin, and no error quotes it.
+        const input = parsed(codeSubmitInput, body);
+        service.submitProviderCodeLogin(input.provider, input.code);
+        return json(200, {});
+      }
+      case PROVIDERS_SIGN_IN_V3_ROUTES.codeLoginCancel:
+        await service.cancelProviderCodeLogin(parsed(signInProvider, body));
         return json(200, {});
       case PROVIDERS_ADMIN_ROUTES.apiKeyState:
         return json(200, { status: credentials.status(parsed(provider, body)) });
@@ -94,7 +127,8 @@ export async function routeProviders(
 }
 
 const V2_ROUTES = new Set<string>(Object.values(PROVIDERS_RUNTIMES_V2_ROUTES));
-const ROUTES = new Set<string>([...Object.values(PROVIDERS_ADMIN_ROUTES), ...V2_ROUTES]);
+const V3_ROUTES = new Set<string>(Object.values(PROVIDERS_SIGN_IN_V3_ROUTES));
+const ROUTES = new Set<string>([...Object.values(PROVIDERS_ADMIN_ROUTES), ...V2_ROUTES, ...V3_ROUTES]);
 
 function isProvidersRoute(pathname: string): boolean {
   return ROUTES.has(pathname);
@@ -116,6 +150,24 @@ function provider(body: DynamicRecord): WireProviderId {
   const id = parseProviderId(body.provider);
   if (!isOneOf(WIRE_PROVIDERS, id)) throw new Error("Unknown provider.");
   return id;
+}
+
+type SignInProviderId = (typeof PROVIDERS_SIGN_IN_V3_PROVIDERS)[number];
+
+/** The providers `providers-v3` signs in. */
+function signInProvider(body: DynamicRecord): SignInProviderId {
+  const id = parseProviderId(body.provider);
+  if (!isOneOf(PROVIDERS_SIGN_IN_V3_PROVIDERS, id)) throw new Error("Unknown provider.");
+  return id;
+}
+
+/** The error never quotes the code. The CLI checks what the code is; this only bounds its size. */
+function codeSubmitInput(body: DynamicRecord): { provider: SignInProviderId; code: string } {
+  const code = body.code;
+  if (typeof code !== "string" || !code.trim() || code.length > 2048) throw new Error("Invalid sign-in code.");
+  // From here on, an error or a log line that quotes the code is masked, as for a provider key.
+  registerSecretValue(code.trim());
+  return { provider: signInProvider(body), code };
 }
 
 function wireApiKeyInput(body: DynamicRecord) {

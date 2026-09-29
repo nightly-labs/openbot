@@ -421,6 +421,8 @@ describe("Team API providers-v1", () => {
     const PROVIDER_KEY = "sk-remote-provider-key-1234";
     const ENDPOINT_KEY = "endpoint-secret-5678";
     const HEADER_VALUE = "header-secret-9012";
+    const PASTED_CODE = "pasted-code-3456#state-7890";
+    const REFUSED_CODE = "refused-code-2468#state-1357";
     const lines: string[] = [];
     const keys = new Map<string, string>();
     const status: AgentStatus = {
@@ -431,14 +433,32 @@ describe("Team API providers-v1", () => {
       message: null,
       fullAccess: true,
     };
+    const submitted: string[] = [];
+    const cancelled: string[] = [];
     const service = {
-      startProviderCodeLogin: async () => ({
-        kind: "code" as const,
-        userCode: "ABCD-1234",
-        verificationUrl: "https://auth.openai.com/codex/device",
-        expiresAt: 1_790_000_000_000,
-      }),
-      cancelProviderCodeLogin: async () => status,
+      startProviderCodeLogin: async (provider: string) =>
+        provider === "claude"
+          ? {
+              kind: "paste" as const,
+              verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+              expiresAt: 1_790_000_000_000,
+            }
+          : {
+              kind: "code" as const,
+              userCode: "ABCD-1234",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              expiresAt: 1_790_000_000_000,
+            },
+      submitProviderCodeLogin: (provider: string, code: string) => {
+        // A CLI can quote the code it refused.
+        if (code.includes("refused")) throw new Error(`Claude refused ${code}.`);
+        submitted.push(`${provider}:${code}`);
+        return status;
+      },
+      cancelProviderCodeLogin: async (provider: string) => {
+        cancelled.push(provider);
+        return status;
+      },
       changeProviderCredential: async (provider: string, change: () => Promise<void>) => {
         // A provider process can quote the key it failed with.
         if (provider === "grok") throw new Error(`Grok could not start with ${PROVIDER_KEY}.`);
@@ -528,6 +548,36 @@ describe("Team API providers-v1", () => {
       verificationUrl: "https://auth.openai.com/codex/device",
       expiresAt: 1_790_000_000_000,
     });
+    // providers-v1 signs in Codex only: its reply has no `paste` shape, and its cancel stays Codex's.
+    expect((await send("/v1/admin/providers/code-login/start", { provider: "claude" })).status).toBe(409);
+    expect(await (await send("/v1/admin/providers/code-login/cancel", { provider: "claude" })).json()).toEqual({});
+    expect(cancelled).toEqual([]);
+
+    // providers-v3 signs in Claude and Grok too, behind its own capability and the same admin gate.
+    const v3 = { ...admin, "OpenBot-Capabilities": "providers-v1, providers-v3" };
+    const claude = { provider: "claude" };
+    expect((await send("/v1/admin/providers/v3/code-login/start", claude)).status).toBe(400);
+    expect(
+      (await send("/v1/admin/providers/v3/code-login/start", claude, { ...v3, Authorization: asMember.Authorization }))
+        .status,
+    ).toBe(403);
+    expect(await (await send("/v1/admin/providers/v3/code-login/start", claude, v3)).json()).toEqual({
+      kind: "paste",
+      verificationUrl: "https://claude.com/cai/oauth/authorize?code=true",
+      expiresAt: 1_790_000_000_000,
+    });
+    expect((await send("/v1/admin/providers/v3/code-login/start", { provider: "opencode" }, v3)).status).toBe(400);
+    const submit = "/v1/admin/providers/v3/code-login/submit";
+    expect(
+      (await send(submit, { ...claude, code: PASTED_CODE }, { ...v3, Authorization: asMember.Authorization })).status,
+    ).toBe(403);
+    expect(await (await send(submit, { ...claude, code: PASTED_CODE }, v3)).json()).toEqual({});
+    expect(submitted).toEqual([`claude:${PASTED_CODE}`]);
+    expect((await send(submit, { ...claude, code: REFUSED_CODE }, v3)).status).toBe(409);
+    expect((await send(submit, { ...claude, code: "" }, v3)).status).toBe(400);
+    expect(await (await send("/v1/admin/providers/v3/code-login/cancel", claude, v3)).json()).toEqual({});
+    expect(cancelled).toEqual(["claude"]);
+
     const download = await (await send("/v1/admin/providers/runtimes/download", { provider: "claude" })).json();
     // A long download error is cut to the wire bound, so the client does not refuse the snapshot.
     expect(download.providers.claude.message).toHaveLength(1024);
@@ -578,12 +628,13 @@ describe("Team API providers-v1", () => {
       restart: "restarted",
     });
 
-    for (const secret of [PROVIDER_KEY, ENDPOINT_KEY, HEADER_VALUE]) {
+    for (const secret of [PROVIDER_KEY, ENDPOINT_KEY, HEADER_VALUE, PASTED_CODE, REFUSED_CODE]) {
       expect(bodies.some((body) => body.includes(secret))).toBe(false);
       expect(lines.some((line) => line.includes(secret))).toBe(false);
     }
     const compatibility = await (await fetch(`${base}/v1/compatibility`)).json();
     expect(compatibility.capabilities).toContain("providers-v1");
+    expect(compatibility.capabilities).toContain("providers-v3");
   });
 });
 
