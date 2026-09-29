@@ -153,7 +153,11 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   <ItemDescription>{t("settings.language.description")}</ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <LanguageSelect value={props.language} onChange={props.onChangeLanguage} mount={modalElement} />
+                  <LanguageSelect
+                    value={props.language}
+                    onChange={props.onChangeLanguage}
+                    {...(modalElement ? { mount: modalElement } : {})}
+                  />
                 </ItemActions>
               </Item>
             </ItemGroup>
