@@ -291,7 +291,12 @@ export function createWebWorkspaceRuntime(
         onState: (hostId, state) => events.hostState?.(hostId, state),
         onSessionRevoked: () => events.hostSessionRevoked?.(),
         // Without a listener, the status connections read no agent list.
-        onNotice: events.hostNotice ? (hostId, event, agents) => events.hostNotice?.(hostId, event, agents) : undefined,
+        ...(events.hostNotice
+          ? {
+              onNotice: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) =>
+                events.hostNotice?.(hostId, event, agents),
+            }
+          : {}),
       })
     : undefined;
   // Another tab asks for the host that this tab has open: it stays here.
