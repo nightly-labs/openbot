@@ -1039,11 +1039,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * When the most recent running agent turn started, or null while none runs. The Computer Use rim
-   * is up only for an action made since then.
+   * When the oldest running agent turn started, or null while none runs. The Computer Use rim is up
+   * only for an action made since then.
    */
-  latestRunningTurnStartedAt(): number | null {
-    return this.#turn.latestRunningTurnStartedAt();
+  earliestRunningTurnStartedAt(): number | null {
+    return this.#turn.earliestRunningTurnStartedAt();
   }
 
   /**

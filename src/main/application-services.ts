@@ -735,10 +735,12 @@ export async function createApplicationServices({
     readTarget: async (previous) => {
       if (!cuaDriver.mcpServerForProviders()) return null;
       // The rim marks work in progress, so it goes down with the last turn: completed, failed or
-      // cancelled. The driver's lease outlives the turn, so only an action made since the latest
-      // turn started counts: a lease left by the turn before would put the rim over a turn that
-      // does not touch the desktop. `service` is built below; the controller starts only after it.
-      const turnStartedAt = service.latestRunningTurnStartedAt();
+      // cancelled. The driver's lease outlives the turn, so only an action made while a turn that
+      // still runs was running counts: a lease left by the turn before would put the rim over a
+      // turn that does not touch the desktop. Neither a lease nor an action names its agent, so the
+      // oldest running turn is the bound: a newer turn of another agent does not hide this one's
+      // rim. `service` is built below; the controller starts only after it.
+      const turnStartedAt = service.earliestRunningTurnStartedAt();
       if (turnStartedAt === null) return null;
       const session = liveSession(await computerUseReads.sessions(), (Date.now() - turnStartedAt) / 1000);
       if (!session) return null;

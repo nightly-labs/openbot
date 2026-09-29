@@ -154,13 +154,13 @@ export class TurnLifecycle {
   }
 
   /**
-   * When the most recent of the running turns sent `turn/started`, in epoch milliseconds, or null
-   * while no turn runs. A compaction turn does not count.
+   * When the oldest of the running turns sent `turn/started`, in epoch milliseconds, or null while
+   * no turn runs. A compaction turn does not count.
    */
-  latestRunningTurnStartedAt(): number | null {
-    let latest: number | null = null;
-    for (const turn of this.#runningTurns.values()) latest = Math.max(latest ?? turn.startedAt, turn.startedAt);
-    return latest;
+  earliestRunningTurnStartedAt(): number | null {
+    let earliest: number | null = null;
+    for (const turn of this.#runningTurns.values()) earliest = Math.min(earliest ?? turn.startedAt, turn.startedAt);
+    return earliest;
   }
 
   /** When the provider last reported anything for this agent since OpenBot started. */
