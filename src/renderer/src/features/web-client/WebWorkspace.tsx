@@ -5,10 +5,12 @@ import {
   type AgentEvent,
   type AgentModelOption,
   type AgentStatus,
+  type AgentSummary,
   type AppInfo,
   type BrowserTakeoverRequest,
   CHANNEL_CHATS_CAPABILITY,
   type ServerConnectionState,
+  type ServerNotificationLevel,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -47,7 +49,7 @@ import { computeSidebarAgentStates } from "@openbot/ui/features/sidebar/sidebar-
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
-import { playCompletionSoundForAgentEvent } from "../../completion-sound";
+import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
 import { PlatformProvider } from "../../platform";
@@ -88,6 +90,8 @@ import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebFileSaver } from "./web-file-download";
 import { createWebAgentTemplateCalls, createWebMarketplaceCalls } from "./web-marketplace";
+import { createWebServerNotifications } from "./web-notification-preferences";
+import { requestWebNotificationPermission, showWebAgentNotification } from "./web-notifications";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
 import { createWebServerSettings } from "./web-server-settings";
 
@@ -182,6 +186,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       );
     },
   });
+  const notifications = createWebServerNotifications(props.accountId);
   // A stored queue edit holds message text of the account that opened it. Another account must not restore it.
   try {
     if (window.localStorage.getItem(QUEUE_EDIT_ACCOUNT_KEY) !== props.accountId) clearStoredQueueEdit();
@@ -310,6 +315,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const active = host.hostId === workspace.state.host?.hostId;
       const incompatibility =
         active && workspace.state.incompatibility?.hostId === host.hostId ? workspace.state.incompatibility : null;
+      const notice = notifications.state(host.hostId);
       return {
         id: host.hostId,
         name: host.name,
@@ -321,9 +327,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           : null,
         active,
         state: incompatibility ? "incompatible" : hostState(host.hostId),
-        notificationsMuted: false,
-        notificationsMutedUntil: null,
-        notificationLevel: "all",
+        notificationsMuted: notice.muted,
+        notificationsMutedUntil: notice.mutedUntil,
+        notificationLevel: notice.level,
         remoteDesktopAvailable: false,
         compatibility: {
           localAppVersion: "web",
@@ -399,9 +405,56 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     },
   };
+  /** As on desktop, mute and the notification level decide what a host's event says; the sound follows them too. */
+  function notify(hostId: string, event: AgentEvent, agents: AgentSummary[]): void {
+    const { muted, level } = untrack(() => notifications.state(hostId));
+    if (muted || level === "nothing") return;
+    if (event.type === "turn-completed" && level === "all") playCompletionSoundForAgentEvent(event, agents);
+    showWebAgentNotification({
+      hostId,
+      event,
+      agents,
+      level,
+      translate: t,
+      onOpen: (agentId) => void openNotified(hostId, agentId),
+    });
+  }
+  async function openNotified(hostId: string, agentId: string) {
+    setMobilePane("conversation");
+    if (hostId !== workspace.state.host?.hostId) {
+      const host = workspace.state.hosts.find((item) => item.hostId === hostId);
+      if (!host) return;
+      await workspace.connect(host);
+    }
+    if (workspace.state.host?.hostId === hostId && workspace.state.agents.some((agent) => agent.id === agentId))
+      await select(agentId);
+  }
+  function setMuted(hostId: string, muted: boolean, durationMs?: number) {
+    if (!muted) requestWebNotificationPermission(true);
+    notifications.setMuted(hostId, muted, durationMs);
+  }
+  function setNotificationLevel(hostId: string, level: ServerNotificationLevel) {
+    if (level !== "nothing") requestWebNotificationPermission(true);
+    notifications.setLevel(hostId, level);
+  }
+  // Safari starts audio only from a user action, so the first one starts the completion sound.
+  const unlockSound = () => {
+    unlockCompletionSound();
+    window.removeEventListener("pointerdown", unlockSound, true);
+    window.removeEventListener("keydown", unlockSound, true);
+  };
+  window.addEventListener("pointerdown", unlockSound, true);
+  window.addEventListener("keydown", unlockSound, true);
+  onCleanup(() => {
+    window.removeEventListener("pointerdown", unlockSound, true);
+    window.removeEventListener("keydown", unlockSound, true);
+  });
+  onCleanup(workspace.onHostNotice(notify));
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type === "turn-completed") playCompletionSoundForAgentEvent(event, workspace.state.agents);
+      const hostId = workspace.state.host?.hostId;
+      if (hostId && (event.type === "turn-completed" || event.type === "prompt" || event.type === "approval"))
+        notify(hostId, event, workspace.state.agents);
       // As on desktop: the host sends a new reading when a provider reports usage.
       if (event.type === "usage-changed" && untrack(usageTargetKey)) {
         usageGeneration += 1;
@@ -904,6 +957,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onAdd={() => setJoinOpen(true)}
                   onOpenSettings={(id, trigger) => void openServerSettings(id, trigger)}
                   onOpenUsage={(id, trigger) => void openUsage(id, trigger)}
+                  onSetMuted={setMuted}
+                  onSetNotificationLevel={setNotificationLevel}
                 />
               </Show>
               <Sidebar
@@ -933,6 +988,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onAdd: () => setJoinOpen(true),
                   onOpenSettings: (id, trigger) => void openServerSettings(id, trigger),
                   onOpenUsage: (id, trigger) => void openUsage(id, trigger),
+                  onSetMuted: setMuted,
+                  onSetNotificationLevel: setNotificationLevel,
                 }}
                 agents={workspace.profiles()}
                 activeAgentId={channelOpen() ? "" : (workspace.state.selectedId ?? "")}
@@ -1094,6 +1151,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     loadError={serverSettings.state.error}
                     onRetry={serverSettings.refresh}
                     onSaveIdentity={serverSettings.saveIdentity}
+                    onSetMuted={async (muted) => setMuted(target().id, muted)}
+                    onSetNotificationLevel={async (level) => setNotificationLevel(target().id, level)}
                     // Publication and screen recording belong to the computer that runs the server.
                     onSetPublished={unavailable}
                     onCreateInvite={serverSettings.createInvite}
@@ -1319,6 +1378,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 await workspace.refresh();
               }}
               onSendMessage={async (text, attachments, replyTo, target) => {
+                // A sent prompt is what a notification later reports, so the browser asks here, from the user's action.
+                requestWebNotificationPermission();
                 const id = target?.agentId ?? workspace.state.selectedId;
                 if (!id || (target && target.serverId !== server()?.id) || id !== workspace.state.selectedId)
                   return false;

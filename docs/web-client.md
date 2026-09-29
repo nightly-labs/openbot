@@ -68,8 +68,15 @@ mock. The separate web preview implements the browser runtime with that same moc
   host it has open reports that host's state. A hidden tab keeps retrying, unlike mobile, because it
   holds the lock and no other tab can take its place. Each status connection uses one Signal socket,
   and the host shows the user as present.
-- The rail order is kept in this browser, per account. The server menu has Usage and Settings.
-  Mute and notification level are desktop only, because they control desktop notifications.
+- The rail order is kept in this browser, per account. The server menu has Mute, Notification
+  settings, Usage and Settings. Mute and notification level are kept in this browser, per account
+  and host (`web-notification-preferences.ts`). They control browser notifications and the
+  completion sound, with the same rules as the desktop (`@openbot/team-client/agent-notifications`).
+  A browser notification shows only while the tab is open and does not have focus. The browser asks
+  for permission on the first sent prompt, or when the user turns notifications on in the menu.
+  Status connections read the prompt, approval and turn-completed events and the agent list of
+  their host, so every connected host can notify. The first click or key press starts the audio
+  context, because Safari plays sound only after a user action.
 - Capability checks hide unavailable browser-view and creation-model controls. Hosts without
   pagination use their full conversation endpoint. Unsupported media and EML uploads are refused
   before transfer. Host authorization remains the final decision for every action.
@@ -122,8 +129,7 @@ mock. The separate web preview implements the browser runtime with that same moc
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings dialog (Providers & permissions, app
-  updates), permissions review, hosted sites, marketplace publishing, server mute and notification
-  level, Picture in Picture, the Memories, Routines and Files sections of agent settings, the
+  updates), permissions review, hosted sites, marketplace publishing, Picture in Picture, the Memories, Routines and Files sections of agent settings, the
   conversation Files panel, and file reveal. The browser shows host files in Server settings >
   Storage.
 

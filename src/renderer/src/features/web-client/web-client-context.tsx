@@ -28,6 +28,7 @@ import { mergeConversationPage } from "../conversation/conversation-merge";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts } from "../updates/host-restart-toast";
+import type { WebHostNotice } from "./web-host-connections";
 import type { WebHostState } from "./web-host-lock";
 import {
   createWebWorkspaceRuntime,
@@ -173,10 +174,15 @@ export function createWebWorkspace(
   const conversationReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
+  const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void>();
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      hostNotice(id, event, agents) {
+        if (disposed) return;
+        for (const listener of hostNoticeListeners) listener(id, event, agents);
+      },
       hostState(id, hostState) {
         if (!disposed)
           setState((draft) => {
@@ -1009,6 +1015,13 @@ export function createWebWorkspace(
       hostEventListeners.add(listener);
       return () => {
         hostEventListeners.delete(listener);
+      };
+    },
+    /** The events of the hosts this tab has not opened that a notification can show. Returns the unsubscribe function. */
+    onHostNotice(listener: (hostId: string, event: WebHostNotice, agents: AgentSummary[]) => void) {
+      hostNoticeListeners.add(listener);
+      return () => {
+        hostNoticeListeners.delete(listener);
       };
     },
     run,
