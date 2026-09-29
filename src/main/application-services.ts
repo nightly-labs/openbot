@@ -1096,7 +1096,8 @@ export async function createApplicationServices({
       return collectAnalyticsInventory({
         agents: () => service.listAgents(),
         routines: (agentId) => service.listRoutines(agentId),
-        skills: (agentId) => skills.listInstalled(agentId),
+        // The local read: `listInstalled` asks the marketplace for each skill's latest version.
+        skills: (agentId) => skills.listInstalledForChatTags(agentId),
         mcpServers: () => service.listMcpServers(),
         pluginSlug: (config) => catalogPluginSlug(config, catalogPluginServers, homedir()),
         computerUseEnabled: () => cuaDriver.mcpServerForProviders() !== null,
