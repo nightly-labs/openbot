@@ -972,6 +972,7 @@ export function createWebWorkspace(
       const write = (readWrites.get(id) ?? Promise.resolve())
         .catch(() => undefined)
         .then(async () => {
+          if (disposed || current !== generation) return;
           const page = await runtime.conversation(id);
           const latestMessageId = page.messages.at(-1)?.id;
           if (!latestMessageId || disposed || current !== generation) return;
