@@ -63,6 +63,21 @@ export function releaseNotesProblems(changelog: string, version: string): string
 /** Where each pull request writes its own notes. The release moves them into CHANGELOG.md. */
 export const FRAGMENT_DIR = "changelog.d";
 
+/** The iPhone app has its own notes and versions. `/changelog` shows them in its Mobile tab. */
+export const MOBILE_CHANGELOG = "apps/mobile/CHANGELOG.md";
+export const MOBILE_FRAGMENT_DIR = "apps/mobile/changelog.d";
+/** `app.json` is the version that the App Store shows. The first file is where it is read. */
+export const MOBILE_VERSION_FILES = ["apps/mobile/app.json", "apps/mobile/package.json"] as const;
+
+/** The items under `## [Unreleased]`. A release moves them into its section. */
+export function unreleasedItems(changelog: string): string[] {
+  const lines = changelog.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.startsWith(`## [${UNRELEASED}]`));
+  if (start === -1) return [];
+  const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+  return lines.slice(start + 1, end === -1 ? undefined : end).filter((line) => line.startsWith("- "));
+}
+
 /** What stops one fragment in `changelog.d` from being released. Empty when it is ready. */
 export function fragmentProblems(fragment: string): string[] {
   const problems = releaseNotesProblems(`## [${UNRELEASED}]\n${fragment}`, UNRELEASED);

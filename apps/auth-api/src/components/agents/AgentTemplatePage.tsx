@@ -6,6 +6,7 @@ import { landingAnalytics } from "../../lib/analytics";
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { SiteHeader } from "../landing/SiteHeader";
 import { PluginOpenButtons } from "../plugins/PluginOpenButtons";
+import { Button } from "../ui/button";
 
 // The Bloub library, which draws the avatar and owns its colours, uses browser-only APIs as soon as
 // its module loads, so the Worker must never import it. The page loads both parts in the browser
@@ -23,7 +24,7 @@ export interface AgentTemplatePageProps {
  *
  * The card is tinted with the agent's own avatar colour, so each shared agent looks like itself.
  * The button opens `openbot://agents/<id>`, built from the id, and the app then shows its own preview
- * with Install; nothing here installs. The fallback line also links `/app?agent=<id>`, where the
+ * with Install; nothing here installs. The button below the card links `/app?agent=<id>`, where the
  * browser client shows the same preview.
  */
 export function AgentTemplatePage(props: AgentTemplatePageProps) {
@@ -96,7 +97,6 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
             <div class="agent-share-action">
               <PluginOpenButtons
                 href={openUrl()}
-                browserHref={createWebAppAgentTemplatePath(props.template.id)}
                 label="Add to OpenBot"
                 downloadCopy={`${props.template.name} is added from inside OpenBot. Get the app, then open this link again.`}
               />
@@ -104,10 +104,19 @@ export function AgentTemplatePage(props: AgentTemplatePageProps) {
           </div>
         </article>
 
+        <Button
+          href={createWebAppAgentTemplatePath(props.template.id)}
+          variant="secondary"
+          size="lg"
+          icon="arrow-right"
+          class="agent-share-browser"
+        >
+          Open in browser
+        </Button>
+
         <p class="agent-share-fallback">
-          OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a>,{" "}
-          <a href={openUrl()}>open the app</a>, or{" "}
-          <a href={createWebAppAgentTemplatePath(props.template.id)}>add it in your browser</a>.
+          OpenBot didn't open? <a href={OPENBOT_LINKS.downloadFromOtherPage}>Download it</a> or{" "}
+          <a href={openUrl()}>open the app</a>.
         </p>
       </main>
     </div>

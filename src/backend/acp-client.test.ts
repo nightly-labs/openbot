@@ -17,8 +17,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ACP_IDLE_SESSION_LIMIT } from "./acp-client";
+import { isMissingProviderSessionError } from "./agent/thread-items";
 import { type AgentClient, AgentProcessExitError } from "./agent-client";
 import type { OpencodeCliInfo } from "./cli";
 import type { CustomProviderConfig } from "./opencode-config";
@@ -70,6 +72,12 @@ const CONFIG_MODELS = [
 const THOUGHT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "default"];
 let selected = CONFIG_MODELS[0];
 let sessionCount = 0;
+let loadCount = 0;
+const SERVICE_FAILURE = {
+  code: -32603,
+  message: "Internal error: OpenCode service failure",
+  data: { service: "session" },
+};
 const configOptions = () => [
   {
     id: "model",
@@ -118,15 +126,42 @@ function handle(message) {
   if (message.method === "initialize") {
     const agentCapabilities = process.env.OPENBOT_FAKE_ACP_CLOSE_LOG
       ? { loadSession: true, sessionCapabilities: { close: {} } }
-      : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
-        ? { loadSession: true }
-        : {};
+      : process.env.OPENBOT_FAKE_ACP_LIST
+        ? { loadSession: true, sessionCapabilities: { list: {} } }
+        : process.env.OPENBOT_FAKE_ACP_LOAD_SESSION === "1"
+          ? { loadSession: true }
+          : {};
     write({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1, agentCapabilities } });
+    return;
+  }
+  // "fail" is an internal server that fails every call, as OpenCode reports it. "paged" holds
+  // "ses_stored" on its second page.
+  if (message.method === "session/list") {
+    const mode = process.env.OPENBOT_FAKE_ACP_LIST;
+    if (mode === "fail") {
+      write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
+      return;
+    }
+    const cwd = message.params.cwd;
+    const result =
+      mode !== "paged"
+        ? { sessions: [] }
+        : message.params.cursor === "page-2"
+          ? { sessions: [{ sessionId: "ses_stored", cwd }] }
+          : { sessions: [{ sessionId: "ses_other", cwd }], nextCursor: "page-2" };
+    write({ jsonrpc: "2.0", id: message.id, result });
     return;
   }
   if (message.method === "session/load") {
     const loadLog = process.env.OPENBOT_FAKE_ACP_LOAD_LOG;
     if (loadLog) fs.appendFileSync(loadLog, JSON.stringify(message.params) + NL);
+    // OpenCode's answer when its internal server fails the lookup, a session missing from its
+    // store included.
+    loadCount += 1;
+    if (loadCount <= Number(process.env.OPENBOT_FAKE_ACP_LOAD_FAIL ?? 0)) {
+      write({ jsonrpc: "2.0", id: message.id, error: SERVICE_FAILURE });
+      return;
+    }
     write({ jsonrpc: "2.0", id: message.id, result: {} });
     return;
   }
@@ -826,5 +861,64 @@ describe("OpenCode ACP session loading", () => {
       client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse),
     ).rejects.toThrow(/unknown acp session/i);
     expect(await fake.readLoadedSessions()).toEqual([]);
+  });
+
+  // OpenCode answers a session missing from its store with the same error as a fault of its internal
+  // server. A missing session is replaced, and a server fault must not cost the agent its session.
+  it("reports a session as missing when OpenCode's server answers, without a diagnostic", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "ok");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+    const diagnostics: string[] = [];
+    client.on("diagnostic", (message) => diagnostics.push(message));
+
+    // The boot read shows nothing to the user, and the resume fails as a missing session, which is
+    // what starts the replacement.
+    const read = await client.request(
+      "thread/read",
+      { threadId: "ses_stored", cwd: fake.directory, includeTurns: true },
+      decodeThreadResponse,
+    );
+    expect(read.thread.turns).toEqual([]);
+    const error = await client
+      .request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse)
+      .catch((reason: unknown) => reason);
+    expect(isMissingProviderSessionError(error, "opencode")).toBe(true);
+    expect(diagnostics).toEqual([]);
+    expect(await fake.readLoadedSessions()).toHaveLength(2);
+  });
+
+  it("loads the session again after one failure while OpenCode's server fails", async () => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", "fail");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_LOG", fake.loadLog);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "1");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    await client.request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse);
+
+    expect(await fake.readLoadedSessions()).toMatchObject([{ sessionId: "ses_stored" }, { sessionId: "ses_stored" }]);
+  });
+
+  it.each([
+    ["its list fails", "fail"],
+    ["it lists the session", "paged"],
+    // An older OpenCode cannot show that a session is missing.
+    ["it has no session list", ""],
+  ])("keeps the session and explains the fault when OpenCode fails the load and %s", async (_, list) => {
+    const fake = await createFakeOpencodeAgent();
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_SESSION", "1");
+    vi.stubEnv("OPENBOT_FAKE_ACP_LIST", list);
+    vi.stubEnv("OPENBOT_FAKE_ACP_LOAD_FAIL", "2");
+    const client = startOpencode(fake.cli, () => null, fake.envLog);
+
+    const error = await client
+      .request("thread/resume", { threadId: "ses_stored", cwd: fake.directory }, decodeRecordResponse)
+      .catch((reason: unknown) => reason);
+
+    expect(isMissingProviderSessionError(error, "opencode")).toBe(false);
+    expect(error).toHaveProperty("message", sourceText("error.provider.opencodeServiceFailure"));
   });
 });

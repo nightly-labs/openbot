@@ -5144,6 +5144,12 @@ a {
   justify-content: center;
 }
 
+/* Below the card, so the card holds one action: add the agent to the app. */
+.agent-share-browser {
+  position: relative;
+  z-index: 1;
+}
+
 .agent-share-fallback {
   position: relative;
   z-index: 1;
@@ -5862,6 +5868,10 @@ a {
 .changelog-page {
   --changelog-hairline: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
   --changelog-scroll-offset: 24px;
+  /* The header menu's motion, so a change of app reads as a change of menu section. */
+  --changelog-swap-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --changelog-swap-duration: 460ms;
+  --changelog-swap-quick: 300ms;
 }
 
 .changelog-hero {
@@ -5934,13 +5944,16 @@ a {
 }
 
 .changelog-latest {
+  padding: 0 clamp(24px, 4vw, 56px) 20px;
+  border-bottom: 1px solid var(--changelog-hairline);
+}
+
+.changelog-latest-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px 24px;
-  padding: 0 clamp(24px, 4vw, 56px) 20px;
-  border-bottom: 1px solid var(--changelog-hairline);
 }
 
 .changelog-latest-text {
@@ -6008,6 +6021,120 @@ a {
   align-items: start;
   gap: clamp(40px, 6vw, 96px);
   margin-top: clamp(36px, 4.5vw, 64px);
+  scroll-margin-top: var(--changelog-scroll-offset);
+}
+
+/* A change of app ---------------------------------------------------------- */
+
+.changelog-swap {
+  position: relative;
+  min-width: 0;
+}
+
+.changelog-swap-panel[data-motion] {
+  --site-nav-blur: 8px;
+  --site-nav-rise: 0px;
+  will-change: opacity, transform, filter;
+}
+
+.changelog-swap-panel[data-motion="from-start"],
+.changelog-swap-panel[data-motion="to-start"] {
+  --site-nav-shift: -40px;
+}
+
+.changelog-swap-panel[data-motion="from-end"],
+.changelog-swap-panel[data-motion="to-end"] {
+  --site-nav-shift: 40px;
+}
+
+.changelog-swap-panel[data-motion="from-start"],
+.changelog-swap-panel[data-motion="from-end"] {
+  animation: site-nav-panel-enter var(--changelog-swap-duration) var(--changelog-swap-ease) both;
+}
+
+/* The closed list leaves the flow, so the page takes the height of the open one at once. It is
+   cut at the height of the window: the rest is out of sight, and a blur over the whole desktop
+   list would cost more than a frame. */
+.changelog-swap-panel[data-motion="to-start"],
+.changelog-swap-panel[data-motion="to-end"] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  max-height: 100dvh;
+  overflow: clip;
+  pointer-events: none;
+  animation: site-nav-panel-leave var(--changelog-swap-quick) var(--changelog-swap-ease) both;
+}
+
+/* The apps ------------------------------------------------------------------ */
+
+.changelog-platforms {
+  margin: 0 0 22px;
+}
+
+.changelog-platforms-track {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow:
+    0 0 0 1px var(--changelog-hairline),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* The header menu's pill. `ChangelogPlatformTabs` measures the open link. */
+.changelog-platforms-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: var(--changelog-pill-width, 0);
+  border-radius: var(--openbot-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 1px 2px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--changelog-pill-x, 0));
+}
+
+.changelog-platforms-track[data-ready]::before {
+  opacity: 1;
+  transition:
+    transform var(--changelog-swap-quick) var(--changelog-swap-ease),
+    width var(--changelog-swap-quick) var(--changelog-swap-ease);
+}
+
+.changelog-platform {
+  position: relative;
+  z-index: 1;
+  padding: 5px 12px;
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--openbot-duration-normal) ease;
+}
+
+.changelog-platform[aria-current="page"] {
+  color: var(--openbot-text-primary);
+}
+
+/* Before the pill is measured, and with no script, the open link carries its own. */
+.changelog-platforms-track:not([data-ready]) .changelog-platform[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.changelog-platform:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--openbot-accent-strong);
 }
 
 /* The index -------------------------------------------------------------- */
@@ -6042,7 +6169,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-height: calc(100dvh - var(--changelog-scroll-offset) * 2 - 32px);
+  /* The window, less the apps and the title above the list. */
+  max-height: calc(100dvh - var(--changelog-scroll-offset) * 2 - 96px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 0 24px;
@@ -6404,6 +6532,12 @@ a {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     margin-top: 0;
+    scroll-margin-top: 0;
+  }
+
+  .changelog-platforms {
+    margin: 0 0 12px;
+    padding: 0 clamp(20px, 4vw, 48px);
   }
 
   .changelog-index {
@@ -6493,6 +6627,15 @@ a {
     opacity: 0;
   }
 
+  .changelog-swap-panel[data-motion] {
+    animation: none;
+  }
+
+  .changelog-platforms-track[data-ready]::before,
+  .changelog-platform {
+    transition: none;
+  }
+
   .changelog-release[data-revealed="true"] {
     animation: none;
   }
@@ -6506,7 +6649,8 @@ a {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .changelog-index-link:hover {
+  .changelog-index-link:hover,
+  .changelog-platform:not([aria-current="page"]):hover {
     color: var(--openbot-text-secondary);
   }
 
