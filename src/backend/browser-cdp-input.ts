@@ -115,6 +115,30 @@ export async function dispatchTextKey(send: SendCommand, character: string, sess
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: character, code }, sessionId);
 }
 
+// `text` is the character the key produces, and only the keys that produce one carry it. Chromium
+// decides implicit form submission and text insertion from the character event, not the key event:
+// without `\r` here, `press("Enter")` fires `keydown` and nothing else, so a plain `<form>` with no
+// script never submits and a textarea never gains a line. `Tab` stays characterless on purpose --
+// the browser moves focus on the key event, and a character dispatched afterwards would land in
+// whatever gained focus.
+const KEY_ALIASES: Record<string, [string, string, number?, string?]> = {
+  enter: ["Enter", "Enter", 13, "\r"],
+  tab: ["Tab", "Tab", 9],
+  escape: ["Escape", "Escape", 27],
+  esc: ["Escape", "Escape", 27],
+  backspace: ["Backspace", "Backspace", 8],
+  delete: ["Delete", "Delete", 46],
+  space: [" ", "Space", 32, " "],
+  arrowup: ["ArrowUp", "ArrowUp", 38],
+  arrowdown: ["ArrowDown", "ArrowDown", 40],
+  arrowleft: ["ArrowLeft", "ArrowLeft", 37],
+  arrowright: ["ArrowRight", "ArrowRight", 39],
+  home: ["Home", "Home", 36],
+  end: ["End", "End", 35],
+  pageup: ["PageUp", "PageUp", 33],
+  pagedown: ["PageDown", "PageDown", 34],
+};
+
 function normalizeKey(key: string): {
   key: string;
   code: string;
@@ -122,30 +146,7 @@ function normalizeKey(key: string): {
   nativeVirtualKeyCode?: number;
   text?: string;
 } {
-  // `text` is the character the key produces, and only the keys that produce one carry it. Chromium
-  // decides implicit form submission and text insertion from the character event, not the key event:
-  // without `\r` here, `press("Enter")` fires `keydown` and nothing else, so a plain `<form>` with no
-  // script never submits and a textarea never gains a line. `Tab` stays characterless on purpose --
-  // the browser moves focus on the key event, and a character dispatched afterwards would land in
-  // whatever gained focus.
-  const aliases: Record<string, [string, string, number?, string?]> = {
-    enter: ["Enter", "Enter", 13, "\r"],
-    tab: ["Tab", "Tab", 9],
-    escape: ["Escape", "Escape", 27],
-    esc: ["Escape", "Escape", 27],
-    backspace: ["Backspace", "Backspace", 8],
-    delete: ["Delete", "Delete", 46],
-    space: [" ", "Space", 32, " "],
-    arrowup: ["ArrowUp", "ArrowUp", 38],
-    arrowdown: ["ArrowDown", "ArrowDown", 40],
-    arrowleft: ["ArrowLeft", "ArrowLeft", 37],
-    arrowright: ["ArrowRight", "ArrowRight", 39],
-    home: ["Home", "Home", 36],
-    end: ["End", "End", 35],
-    pageup: ["PageUp", "PageUp", 33],
-    pagedown: ["PageDown", "PageDown", 34],
-  };
-  const alias = aliases[key.toLowerCase()];
+  const alias = KEY_ALIASES[key.toLowerCase()];
   const macNativeVirtualKeyCode =
     process.platform === "darwin" ? { ArrowUp: 126, ArrowDown: 125, Home: 115 }[alias?.[0] ?? ""] : undefined;
   if (alias)
@@ -161,8 +162,19 @@ function normalizeKey(key: string): {
   return { key, code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper };
 }
 
+/**
+ * The key code and character of a named key, as `KeyboardEvent.key` spells it. Chromium runs an
+ * editing command such as Backspace or an arrow from the key code, and submits a form from Enter's
+ * character, so a named key that has neither does nothing in the page.
+ */
+export function namedKey(key: string): { windowsVirtualKeyCode?: number; text?: string } {
+  const alias = KEY_ALIASES[key.toLowerCase()];
+  if (alias?.[0] !== key) return {};
+  return { windowsVirtualKeyCode: alias[2], ...(alias[3] === undefined ? {} : { text: alias[3] }) };
+}
+
 /** Chromium's `Input.dispatchKeyEvent` bit for Shift, the one modifier that still yields a character. */
-const SHIFT_MODIFIER = 8;
+export const SHIFT_MODIFIER = 8;
 
 function shiftedLetter(key: string): string | undefined {
   return /^[a-z]$/i.test(key) ? key.toUpperCase() : undefined;
