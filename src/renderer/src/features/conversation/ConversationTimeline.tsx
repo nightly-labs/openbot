@@ -498,7 +498,7 @@ export function ConversationTimeline() {
                         <ChatMessageRow
                           message={message() ?? initialMessage}
                           author={author()}
-                          showAuthor={author().kind === "member" && !continuesRun()}
+                          showAuthor={author().kind === "member" ? !continuesRun() : undefined}
                           showTime={!continuesRun()}
                           animate={animateEntrance}
                           agents={props.agents}

@@ -42,8 +42,9 @@ export interface ChatMessageRowProps {
    * Whether the face stands beside the bubble and the name above it. The agent chat never shows a
    * face - one chat has one agent, and its name is in the header - but names another person once
    * for a run of their messages. A channel shows both once for a run of messages by one author.
+   * `false` keeps an empty gutter where the face stands; leave it out when the row has no face.
    */
-  showAuthor?: boolean;
+  showAuthor?: boolean | undefined;
   showTime?: boolean;
   animate?: boolean;
   agents: AgentProfile[];
