@@ -37,4 +37,8 @@ export const messages = defineMessages("error.import", {
   "error.import.zipInvalid":
     "The selected file is not a valid .zip. If Grok Bot is still saving it, wait and choose it again.",
   "error.import.empty": "The export is empty.",
+  "error.import.remoteZipTooLarge": "To import into a joined server, the export must be a .zip under 100 MB.",
+  "error.import.hostBusy": "The server is reading other exports. Try again in a few minutes.",
+  "error.import.skillKept":
+    '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
 });

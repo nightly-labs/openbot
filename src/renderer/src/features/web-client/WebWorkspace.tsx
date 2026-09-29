@@ -15,6 +15,7 @@ import {
   type ServerNotificationLevel,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { readHostAnalytics } from "@openbot/team-client";
@@ -91,6 +92,7 @@ import { WebConnectComputer } from "./WebConnectComputer";
 import { WebHostOffline } from "./WebHostOffline";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
 import { createWebAccountCalls } from "./web-account";
+import { createWebAgentImportCalls } from "./web-agent-import";
 import { createWebBillingCalls } from "./web-billing";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
@@ -643,6 +645,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     },
   };
+  const agentImportCalls = createWebAgentImportCalls({
+    request: hostRequest,
+    listAgents: () => workspace.runtime.listAgents(),
+    saveFile,
+  });
   const hostUpdateCalls: HostUpdateCalls = {
     getUpdateStatus: async (serverId) => getHostUpdateStatus(hostRequest(serverId)),
     checkForUpdate: async (serverId) => checkHostForUpdate(hostRequest(serverId)),
@@ -1312,6 +1319,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     }}
                     providers={providerSettings()}
                     hostUpdate={{ calls: hostUpdateCalls }}
+                    // Any member imports into a host with `agent-import-v1`.
+                    agentImport={
+                      workspace.state.capabilities.includes(AGENT_IMPORT_CAPABILITY)
+                        ? {
+                            calls: agentImportCalls,
+                            onOpenAgent: (agentId) => {
+                              serverSettings.setOpen(false);
+                              setMobilePane("conversation");
+                              void select(agentId);
+                            },
+                            onClose: () => serverSettings.setOpen(false),
+                          }
+                        : undefined
+                    }
                   />
                 )}
               </Show>

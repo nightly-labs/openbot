@@ -3,6 +3,7 @@ import { CHANNEL_DELETE_CAPABILITY } from "../ipc-chat-channels";
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
+import { AGENT_IMPORT_CAPABILITY } from "./agent-import-v1";
 import { AGENT_INSTALL_CAPABILITY } from "./agent-install-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
@@ -42,6 +43,7 @@ export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_MEMBER_LEAVE_CAPABILITY = "member-leave-v1";
 export {
   AGENT_ADMIN_CAPABILITY,
+  AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
@@ -96,6 +98,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MEMBER_LEAVE_CAPABILITY,
   CONTEXT_RESET_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
+  AGENT_IMPORT_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
 ] as const;

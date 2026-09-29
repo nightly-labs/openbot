@@ -74,7 +74,7 @@ export function decodeImportManifest(
   const source = isDynamicRecord(value.source) ? value.source : {};
   const sourceApp = isBoundedString(source.app, AGENT_IMPORT_LIMITS.sourceApp) && source.app ? source.app : "unknown";
   const exportedAt =
-    isString(source.exportedAt) && !Number.isNaN(Date.parse(source.exportedAt)) ? source.exportedAt : null;
+    isBoundedString(source.exportedAt, 64) && !Number.isNaN(Date.parse(source.exportedAt)) ? source.exportedAt : null;
   if (!Array.isArray(value.agents) || value.agents.length === 0) throw new Error(sourceText("error.import.noAgents"));
   if (value.agents.length > INPUT_LIMITS.agents)
     throw new Error(sourceText("error.import.tooManyAgents", { limit: INPUT_LIMITS.agents }));

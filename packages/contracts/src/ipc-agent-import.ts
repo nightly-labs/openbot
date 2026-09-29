@@ -3,13 +3,17 @@
  *
  * The main process reads and checks the archive, keeps it under a token, and answers a preview.
  * The renderer never receives a path or the archive bytes: it names the token and the agents and
- * channels to import. Import goes to the local host only.
+ * channels to import. A remote host is reached with `agent-import-v1`: its preview has no avatars
+ * and its result names the new agents only, so the client reads them with the agent list.
  */
 
 import { INPUT_LIMITS } from "./input-limits";
 import { type AgentSummary, isAgentSummary } from "./ipc-agents";
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+
+/** The Grok Bot page of the ready export agent. */
+export const GROK_BOT_EXPORT_URL = "https://x.ai/bot/gI0XdhhDYPJeyQaqQBC0O";
 
 export const AGENT_IMPORT_LIMITS = {
   archiveBytes: 500 * 1024 * 1024,
@@ -238,4 +242,39 @@ export function decodeAgentImportResult(value: unknown): AgentImportResult {
     skippedChannels: decodeSkipped(result.skippedChannels, "skipped channel"),
     warnings: messages(result.warnings, "import warnings"),
   };
+}
+
+/** A remote host's preview: `agent-import-v1` carries no avatars. */
+export function decodeRemoteAgentImportPreview(value: unknown): AgentImportPreview {
+  const preview = record(value, "import preview");
+  if (!Array.isArray(preview.agents)) invalid("import preview");
+  const agents = preview.agents.map((agent) => ({ ...record(agent, "imported agent"), avatarUrl: null }));
+  const decoded = decodeAgentImportPreview({ ...preview, agents });
+  if (!decoded) invalid("import preview");
+  return decoded;
+}
+
+/** A remote host's result: the new agents by id and name. */
+export interface RemoteAgentImportResult extends Omit<AgentImportResult, "agents"> {
+  agents: { agentId: string; name: string }[];
+}
+
+export function decodeRemoteAgentImportResult(value: unknown): RemoteAgentImportResult {
+  const result = record(value, "import result");
+  if (!Array.isArray(result.agents)) invalid("import result");
+  const agents = result.agents.map((item) => {
+    const entry = record(item, "imported agent");
+    if (!isIdentifier(entry.agentId) || !isBoundedString(entry.name, INPUT_LIMITS.agentName)) invalid("imported agent");
+    return { agentId: entry.agentId, name: entry.name };
+  });
+  return { ...decodeAgentImportResult({ ...result, agents: [] }), agents };
+}
+
+/** The remote result, with the new agents read from the host's agent list. */
+export function resolveRemoteAgentImportResult(
+  result: RemoteAgentImportResult,
+  agents: readonly AgentSummary[],
+): AgentImportResult {
+  const ids = new Set(result.agents.map((agent) => agent.agentId));
+  return { ...result, agents: agents.filter((agent) => ids.has(agent.id)) };
 }

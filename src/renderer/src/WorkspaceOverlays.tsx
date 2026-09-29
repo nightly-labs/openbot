@@ -15,6 +15,7 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
+import { serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
@@ -301,9 +302,9 @@ function ServerSettings() {
           storage={storageOptions(server())}
           hostUpdate={{}}
           initialSection={serverSettingsSection()}
-          // Agents import into this computer only; a remote host has no Import section.
+          // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
-            server().kind === "local"
+            serverSupportsCapability(server(), "agent-import-v1")
               ? {
                   onOpenAgent: (agentId) => openOnServer(server(), agentId, () => selectAgent(agentId)),
                   onClose: () => setServerSettingsOpen(false),

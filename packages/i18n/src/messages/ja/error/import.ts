@@ -40,4 +40,9 @@ export const messages = {
   "error.import.zipInvalid":
     "選択したファイルは有効な .zip ではありません。Grok Bot がまだ保存中の場合は、待ってからもう一度選択してください。",
   "error.import.empty": "エクスポートが空です。",
+  "error.import.remoteZipTooLarge":
+    "参加しているサーバーにインポートするには、エクスポートは 100 MB 未満の .zip である必要があります。",
+  "error.import.hostBusy": "サーバーは他のエクスポートを読み込み中です。数分後にもう一度お試しください。",
+  "error.import.skillKept":
+    "{name}: サーバーにはすでにスキル「{skill}」があるため、エージェントはそのスキルを使います。更新は管理者に依頼してください。",
 } as const satisfies PartialTranslation<typeof source>;

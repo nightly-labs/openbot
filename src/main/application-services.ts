@@ -962,6 +962,18 @@ export async function createApplicationServices({
     if (!requestedUpdate) throw new RequestedUpdateRefusal("unsupported");
     return requestedUpdate;
   };
+  // Imported channels are created by the local user, as when they create one by hand. A member who
+  // imports from a joined client is named by the route instead. The host is read only on apply.
+  const agentImport = new AgentImportService(
+    service,
+    {
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    () => host.channelActor(),
+    undefined,
+    join(app.getPath("userData"), "agent-import-uploads"),
+  );
   const host = new HostService({
     appVersion: app.getVersion(),
     store: teamStore,
@@ -976,6 +988,8 @@ export async function createApplicationServices({
     mcpServers: service,
     // Present, so the host advertises `storage-v1`. Members read; only admins delete or clear.
     storage: storageUsage,
+    // Present, so the host advertises `agent-import-v1`. Any member can import.
+    agentImport,
     // Each member present advertises its admin capability. Every admin route requires an owner or admin.
     admin: {
       agents: agentAdminSettings,
@@ -1067,15 +1081,6 @@ export async function createApplicationServices({
       return Promise.resolve(iceServers);
     },
   });
-  // Imported channels are created by the local user, as when they create one by hand.
-  const agentImport = new AgentImportService(
-    service,
-    {
-      library: () => skills.requireLocalLibrary(),
-      installLocal: (input) => skills.installLocal(input),
-    },
-    () => host.channelActor(),
-  );
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => host.shutdown());
   const signedInState = centralAuth.getState();
   if (signedInState.status === "signed_in") {

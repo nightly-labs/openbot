@@ -847,11 +847,12 @@ export const IPC_ENDPOINTS = {
     openFile: scopedRequest<OpenStoredFileInput, void, "required">()("storage:open-file"),
     openLocation: request<OpenStorageLocationInput, void>()("storage:open-location"),
   },
-  // Bound against the agent import service, which holds the staged archives.
+  // Bound against the agent import service, which holds the staged archives. A remote server is
+  // reached with `agent-import-v1`; main still opens the file dialog and sends the file.
   agentImport: {
-    choose: request<undefined, AgentImportPreview | null>()("agent-import:choose"),
-    apply: request<ApplyAgentImportInput, AgentImportResult>()("agent-import:apply"),
-    discard: request<string, void>()("agent-import:discard"),
+    choose: scopedQuery<AgentImportPreview | null, "required">()("agent-import:choose"),
+    apply: scopedRequest<ApplyAgentImportInput, AgentImportResult, "required">()("agent-import:apply"),
+    discard: scopedRequest<string, void, "required">()("agent-import:discard"),
     // The export skill for a user who sets up the export agent in Grok Bot by hand. Main reads it
     // from the app's resources, and `saveSkill` asks where to write it.
     readSkill: request<undefined, string>()("agent-import:read-skill"),

@@ -6,6 +6,21 @@ All notable changes to OpenBot will be documented here. The project follows
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-09-29
+
+### Added
+
+- Publish an agent from the browser client. An owner or admin of a server can publish, update or
+  unpublish the share link of an agent on that server from the conversation header. The template
+  belongs to the account signed in on the host, and the host must run this version or later.
+- Open Account settings from the account menu in the web app. It has your profile, your hosted
+  sites (open or delete them), and preferences for the language and the completion sound.
+
+### Fixed
+
+- Save the "Play a sound when a task finishes" setting in the desktop app. Before, the sound played
+  when the setting showed off, and the setting did not stay after a restart.
+
 ## [0.25.0] - 2026-09-29
 
 ### Added

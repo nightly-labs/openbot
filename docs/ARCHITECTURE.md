@@ -1043,8 +1043,9 @@ Solid runtime. Chart colors use OpenBot tokens. Daily tables provide exact acces
 
 ## Agent import
 
-Server Settings > Import moves agents from a `.zip` export into the local host only; a remote host has
-no Import section and no Team API route. The format is `openbot-import.json` plus `agents/<key>/`
+Server Settings > Import moves agents from a `.zip` export into the local host, or into a remote host
+that serves `agent-import-v1` (see [Agent import from a joined server](#agent-import-from-a-joined-server)).
+The format is `openbot-import.json` plus `agents/<key>/`
 folders. `resources/agent-import/grok-bot/SKILL.md` writes it and `src/main/agent-import-manifest.ts`
 reads it; both are a product contract, so add only optional fields and raise `version` for a change
 of meaning. The renderer never names a path: `agent-import:choose` opens the dialog in main, and
@@ -1110,6 +1111,21 @@ thread and ends that thread's provider sessions. The thread, its messages and th
 The next provider session gets a handoff of only the messages after the last marker. The host refuses
 the request while a turn runs or a message waits in the queue. A client without the capability shows
 the marker as its text. Channel execution threads are not reset.
+
+### Agent import from a joined server
+
+`agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.
+`POST /v1/agent-import/stage` takes the raw `.zip` (at most 100 MB) and answers the preview without
+avatars, so the preview stays under the 2 MB WebRTC frame limit. `AgentImportService.stageUpload` writes
+the file to `agent-import-uploads/` in the host's user data and keeps it under a token that only the
+caller's member id can apply or discard. One member keeps one export, the host keeps four uploads at
+most, and an upload nobody applies is released after 30 minutes; the folder is cleared on the first
+upload after a restart. `POST /v1/agent-import/apply` takes `{ token, keys, channelKeys, timezone }` and
+answers the new agents by id and name, which the client reads with the agent list. Channels are created
+with the member as the actor. A member never revises a skill already in the host library: the agent
+gets the existing skill and the result warns. `POST /v1/agent-import/discard` releases the token. On
+desktop, main opens the dialog, reads the file and sends it (`agent-import:choose` is server-scoped);
+the web client uses the browser chooser and ships the export skill in its bundle.
 
 ### Skill events
 

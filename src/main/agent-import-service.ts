@@ -1,4 +1,5 @@
-// Agent import into the local host from one `.zip` export.
+// Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
+// of a joined client with `agent-import-v1`.
 //
 // `stage` reads only the manifest and the avatars and measures the other entries without
 // inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
@@ -65,7 +66,7 @@ export interface AgentImportAgents {
   deleteChannel(channelId: string): Promise<void>;
 }
 
-/** Who creates an imported channel: the local user, as when they create one by hand. */
+/** Who creates an imported channel: the local user or the member who imports, as when they create one by hand. */
 export interface ChannelActor {
   id: string;
   name: string;
@@ -90,19 +91,96 @@ interface StagedImport {
   avatars: Map<string, AvatarImageInput>;
 }
 
+interface StagedSlot {
+  /** Only the owner can apply or discard the token. */
+  owner: string;
+  value: StagedImport;
+  /** An uploaded export: the service wrote the file and removes it. */
+  temporary: boolean;
+  /** Releases an uploaded export nobody applied or discarded. */
+  expiry: ReturnType<typeof setTimeout> | null;
+}
+
+/** Who applies an export: the local user, or a member of a joined client. */
+export interface AgentImportCaller {
+  owner: string;
+  actor: ChannelActor;
+  /** The caller's zone, for a routine the export gives none. */
+  timezone?: string;
+  /** False for a member: a skill already in the library is installed as it is, never revised. */
+  reviseSkills: boolean;
+}
+
+interface ImportContext {
+  actor: ChannelActor;
+  timezone: string;
+  reviseSkills: boolean;
+}
+
+/** The owner of the exports the local user stages. A member's owner is the member id. */
+const LOCAL_IMPORT_OWNER = "local";
+/** Uploaded exports kept at one time, across all members. */
+const UPLOAD_SLOTS = 4;
+/** An uploaded export nobody applied is released after this. */
+const UPLOAD_TTL_MS = 30 * 60_000;
+
 export class AgentImportService {
-  #staged: { token: string; value: StagedImport } | null = null;
+  readonly #staged = new Map<string, StagedSlot>();
+  /** Uploaded files that are not in `#staged`: being staged, or being applied. */
+  #busyUploads = 0;
+  /** Files left by an earlier run are removed before the first upload. */
+  #uploadDirectoryReady: Promise<void> | null = null;
 
   constructor(
     private readonly agents: AgentImportAgents,
     private readonly skills: AgentImportSkills,
     private readonly channelActor: () => ChannelActor,
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    private readonly uploadDirectory: string | null = null,
   ) {}
 
-  /** Reads and checks an export. A new stage replaces the previous one. */
-  async stage(path: string): Promise<AgentImportPreview> {
-    this.#staged = null;
+  /** Reads and checks an export. A new stage by the same owner replaces the owner's previous one. */
+  stage(path: string, owner = LOCAL_IMPORT_OWNER): Promise<AgentImportPreview> {
+    this.#release(owner);
+    return this.#stageFile(path, owner, false);
+  }
+
+  /**
+   * Stages an export a member sends. The slot is taken before `read` receives the body, so parallel
+   * uploads cannot hold more than the limit in memory. The service keeps the file until apply,
+   * discard or expiry.
+   */
+  async stageUpload(read: () => Promise<Uint8Array>, owner: string): Promise<AgentImportPreview> {
+    const directory = this.uploadDirectory;
+    if (!directory) throw new Error("Agent import uploads are not available.");
+    this.#release(owner);
+    const held = [...this.#staged.values()].filter((slot) => slot.temporary).length;
+    if (held + this.#busyUploads >= UPLOAD_SLOTS) throw new Error(sourceText("error.import.hostBusy"));
+    this.#busyUploads += 1;
+    try {
+      const bytes = await read();
+      this.#uploadDirectoryReady ??= rm(directory, { recursive: true, force: true })
+        .then(() => mkdir(directory, { recursive: true, mode: 0o700 }).then(() => undefined))
+        .catch((error: unknown) => {
+          // A failed setup is tried again by the next upload.
+          this.#uploadDirectoryReady = null;
+          throw error;
+        });
+      await this.#uploadDirectoryReady;
+      const path = join(directory, `${randomUUID()}.zip`);
+      await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
+      try {
+        return await this.#stageFile(path, owner, true);
+      } catch (error) {
+        await rm(path, { force: true });
+        throw error;
+      }
+    } finally {
+      this.#busyUploads -= 1;
+    }
+  }
+
+  async #stageFile(path: string, owner: string, temporary: boolean): Promise<AgentImportPreview> {
     const bytes = await readArchive(path);
     const entries = listEntries(bytes);
     const wrapper = wrapperFolder([...entries.keys()]);
@@ -130,10 +208,19 @@ export class AgentImportService {
     }
 
     const token = randomUUID();
-    this.#staged = {
-      token,
+    // A second stage by the same owner can finish first: the owner keeps one export.
+    this.#release(owner);
+    const slot: StagedSlot = {
+      owner,
       value: { path, sha256: sha256(bytes), agents: manifest.agents, channels: manifest.channels, wrapper, avatars },
+      temporary,
+      expiry: null,
     };
+    if (temporary) {
+      slot.expiry = setTimeout(() => this.#drop(token, slot), UPLOAD_TTL_MS);
+      slot.expiry.unref();
+    }
+    this.#staged.set(token, slot);
     return {
       token,
       sourceApp: manifest.sourceApp,
@@ -168,14 +255,46 @@ export class AgentImportService {
     };
   }
 
-  discard(token: string): void {
-    if (this.#staged?.token === token) this.#staged = null;
+  discard(token: string, owner = LOCAL_IMPORT_OWNER): void {
+    const slot = this.#staged.get(token);
+    if (slot?.owner === owner) this.#drop(token, slot);
   }
 
-  async apply(input: ApplyAgentImportInput): Promise<AgentImportResult> {
-    const staged = this.#staged?.token === input.token ? this.#staged.value : null;
-    this.#staged = null;
-    if (!staged) throw new Error(sourceText("error.import.exportClosed"));
+  async apply(input: ApplyAgentImportInput, caller?: AgentImportCaller): Promise<AgentImportResult> {
+    const slot = this.#staged.get(input.token);
+    // Another member's token reads as a closed export, so the answer does not show that it exists.
+    if (!slot || slot.owner !== (caller?.owner ?? LOCAL_IMPORT_OWNER))
+      throw new Error(sourceText("error.import.exportClosed"));
+    this.#staged.delete(input.token);
+    if (slot.expiry) clearTimeout(slot.expiry);
+    // The file stays on disk until the import ends, so it keeps its upload slot until then.
+    if (slot.temporary) this.#busyUploads += 1;
+    try {
+      return await this.#apply(slot.value, input, {
+        actor: caller?.actor ?? this.channelActor(),
+        timezone: caller?.timezone && validTimezone(caller.timezone) ? caller.timezone : this.timezone(),
+        reviseSkills: caller?.reviseSkills ?? true,
+      });
+    } finally {
+      if (slot.temporary) {
+        await rm(slot.value.path, { force: true }).catch(() => undefined);
+        this.#busyUploads -= 1;
+      }
+    }
+  }
+
+  #release(owner: string): void {
+    for (const [token, slot] of this.#staged) if (slot.owner === owner) this.#drop(token, slot);
+  }
+
+  #drop(token: string, slot: StagedSlot): void {
+    if (this.#staged.get(token) !== slot) return;
+    this.#staged.delete(token);
+    if (slot.expiry) clearTimeout(slot.expiry);
+    if (slot.temporary) void rm(slot.value.path, { force: true }).catch(() => undefined);
+  }
+
+  async #apply(staged: StagedImport, input: ApplyAgentImportInput, context: ImportContext): Promise<AgentImportResult> {
     const selected = staged.agents.filter((agent) => input.keys.includes(agent.key));
     if (selected.length !== input.keys.length) throw new Error(sourceText("error.import.agentNotInExport"));
     const selectedChannels = staged.channels.filter((channel) => input.channelKeys.includes(channel.key));
@@ -194,7 +313,7 @@ export class AgentImportService {
     const agentIds = new Map<string, string>();
     for (const agent of selected) {
       try {
-        const summary = await this.importAgent(bytes, staged, agent, warnings);
+        const summary = await this.importAgent(bytes, staged, agent, context, warnings);
         imported.push(summary);
         agentIds.set(agent.key, summary.id);
       } catch (error) {
@@ -205,7 +324,7 @@ export class AgentImportService {
     const skippedChannels: AgentImportSkipped[] = [];
     for (const channel of selectedChannels) {
       try {
-        channels.push(await this.importChannel(channel, agentIds, warnings));
+        channels.push(await this.importChannel(channel, agentIds, context, warnings));
       } catch (error) {
         skippedChannels.push({ key: channel.key, name: channel.name, reason: message(error) });
       }
@@ -216,6 +335,7 @@ export class AgentImportService {
   private async importChannel(
     source: ImportChannel,
     agentIds: ReadonlyMap<string, string>,
+    context: ImportContext,
     warnings: string[],
   ): Promise<AgentImportChannel> {
     const members = source.members.flatMap((key) => {
@@ -235,7 +355,7 @@ export class AgentImportService {
     if (!isChannelDraft(draft)) throw new Error("The channel is invalid.");
     const channel = await this.agents.channels.command(
       { type: "save", operationId: randomUUID(), channelId: randomUUID(), draft },
-      this.channelActor(),
+      context.actor,
     );
     try {
       for (const text of source.memories) this.agents.createChannelMemory({ channelId: channel.id, text });
@@ -246,7 +366,7 @@ export class AgentImportService {
             name: routine.name,
             instruction: routine.instruction,
             active: routine.active,
-            timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : this.timezone(),
+            timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
             schedule: routine.schedule,
           });
         } catch (error) {
@@ -270,6 +390,7 @@ export class AgentImportService {
     bytes: Uint8Array,
     staged: StagedImport,
     source: ImportAgent,
+    context: ImportContext,
     warnings: string[],
   ): Promise<AgentSummary> {
     const prefix = `${staged.wrapper}agents/${source.key}/`;
@@ -296,13 +417,18 @@ export class AgentImportService {
       if (source.files)
         await writeImportedFiles(join(agent.workspacePath, IMPORTED_FILES), read(source.files), source.name, warnings);
       for (const skill of skills) {
+        const library = this.skills.library();
+        const current = (await library.list()).find((candidate) => candidate.slug === skill.slug);
+        if (current && !context.reviseSkills) {
+          warnings.push(sourceText("error.import.skillKept", { name: source.name, skill: skill.slug }));
+          await this.skills.installLocal({ agentId: agent.id, skillId: current.id, revision: current.version });
+          continue;
+        }
         const folder = `${SKILL_STAGING}/${skill.slug}`;
         const target = join(agent.workspacePath, ...folder.split("/"));
         try {
           await writeTree(target, skill.files);
           // An earlier import published this skill already: a new revision keeps one library entry.
-          const library = this.skills.library();
-          const current = (await library.list()).find((candidate) => candidate.slug === skill.slug);
           const revision = current
             ? await library.revise(agent.id, current.id, current.version, folder)
             : await library.create(agent.id, folder);
@@ -320,7 +446,7 @@ export class AgentImportService {
               name: routine.name,
               instruction: routine.instruction,
               active: routine.active,
-              timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : this.timezone(),
+              timezone: routine.timezone && validTimezone(routine.timezone) ? routine.timezone : context.timezone,
               schedule: routine.schedule,
             },
             { recordConversationEvent: false },

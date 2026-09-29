@@ -177,12 +177,15 @@ export class RemoteServerClient {
    *
    * `affectsConnection` is false for the remote viewer, whose requests are triggered by page loads
    * rather than by the user and so must not mark a healthy server offline.
+   *
+   * `timeoutMs` applies to HTTP only. A WebRTC request has the transport's own limit.
    */
   async fetch(
     server: StoredRemoteServerView,
     input: string | URL,
     init: RequestInit = {},
     affectsConnection = true,
+    timeoutMs?: number,
   ): Promise<Response> {
     try {
       if (server.transport === "webrtc-v2") {
@@ -223,7 +226,7 @@ export class RemoteServerClient {
         headers.set(TEAM_APP_VERSION_HEADER, this.#appVersion);
         headers.set(TEAM_CAPABILITIES_HEADER, TEAM_CURRENT_CAPABILITIES.join(","));
       }
-      const response = await remoteFetch(input, { ...init, headers });
+      const response = await remoteFetch(input, { ...init, headers }, timeoutMs);
       if (!response.ok) {
         await throwRemoteResponseError(response, init.method ?? "GET", new URL(input).pathname);
       }

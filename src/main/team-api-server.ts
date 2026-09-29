@@ -26,6 +26,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ADMIN_CAPABILITY,
+  AGENT_IMPORT_CAPABILITY,
   AGENT_INSTALL_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
@@ -93,6 +94,7 @@ import {
   stringField,
 } from "./team-api/request-helpers";
 import { routeAgentAdmin } from "./team-api/route-agent-admin";
+import { routeAgentImport } from "./team-api/route-agent-import";
 import { routeAgentInstall } from "./team-api/route-agent-install";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgents } from "./team-api/route-agents";
@@ -622,6 +624,7 @@ export class TeamApiServer {
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeAgentImport(context, this.#options.agentImport)) === "handled") return;
       if (
         (await routeLiveActivityPush(context, this.#options.liveActivityPush, () =>
           this.#hiddenAgentIds(context.protocol, context.capabilities),
@@ -1222,6 +1225,7 @@ export class TeamApiServer {
           return this.#options.admin?.providers !== undefined;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_UPDATE_CAPABILITY) return this.#options.admin?.update !== undefined;
+        if (capability === AGENT_IMPORT_CAPABILITY) return this.#options.agentImport !== undefined;
         if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
         return true;
       }),

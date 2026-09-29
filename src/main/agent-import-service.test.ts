@@ -153,8 +153,12 @@ beforeEach(async () => {
     { library: () => library, installLocal },
     () => ({ id: "local", name: "You" }),
     () => "Europe/Warsaw",
+    join(root, "uploads"),
   );
 });
+
+/** A member of a joined client, who never revises a skill of the host. */
+const member = (id: string) => ({ owner: id, actor: { id, name: "Ada" }, reviseSkills: false });
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true });
@@ -533,5 +537,69 @@ describe("AgentImportService", () => {
     await expect(service.apply({ token: discarded.token, keys: ["research"], channelKeys: [] })).rejects.toThrow(
       "no longer open",
     );
+  });
+
+  it("keeps a member's upload to that member and removes its file when it closes", async () => {
+    const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    const uploads = join(root, "uploads");
+    const applied = await service.stageUpload(async () => bytes, "member-a");
+    const input = { token: applied.token, keys: ["research"], channelKeys: [] };
+    // Another member, and the local user, read the token as closed and cannot release it.
+    await expect(service.apply(input, member("member-b"))).rejects.toThrow("no longer open");
+    await expect(service.apply(input)).rejects.toThrow("no longer open");
+    service.discard(applied.token, "member-b");
+    service.discard(applied.token);
+    expect(await readdir(uploads)).toHaveLength(1);
+    expect((await service.apply(input, member("member-a"))).agents.map((agent) => agent.name)).toEqual(["Research"]);
+    expect(await readdir(uploads)).toEqual([]);
+
+    const discarded = await service.stageUpload(async () => bytes, "member-a");
+    service.discard(discarded.token, "member-a");
+    await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
+  });
+
+  it("releases a member's upload that nobody applies after 30 minutes", async () => {
+    const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    const uploads = join(root, "uploads");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const staged = await service.stageUpload(async () => bytes, "member-a");
+      expect(await readdir(uploads)).toHaveLength(1);
+      vi.advanceTimersByTime(30 * 60_000);
+      await expect(
+        service.apply({ token: staged.token, keys: ["research"], channelKeys: [] }, member("member-a")),
+      ).rejects.toThrow("no longer open");
+    } finally {
+      vi.useRealTimers();
+    }
+    await vi.waitFor(async () => expect(await readdir(uploads)).toEqual([]));
+  });
+
+  it("refuses a fifth upload before it reads the body", async () => {
+    const bytes = zipSync({ "openbot-import.json": manifest([manifestAgent("research")]) });
+    for (const owner of ["member-a", "member-b", "member-c", "member-d"])
+      await service.stageUpload(async () => bytes, owner);
+    const read = vi.fn(async () => bytes);
+    await expect(service.stageUpload(read, "member-e")).rejects.toThrow("reading other exports");
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("installs a skill the server already has as it is when a member imports", async () => {
+    const files = {
+      "openbot-import.json": manifest([manifestAgent("research", { skills: ["agents/research/skills/web-brief"] })]),
+      "agents/research/skills/web-brief/SKILL.md": encode(SKILL),
+    };
+    const local = await service.stage(await exportFile(files));
+    await service.apply({ token: local.token, keys: ["research"], channelKeys: [] });
+    const upload = await service.stageUpload(async () => zipSync(files), "member-a");
+    const result = await service.apply(
+      { token: upload.token, keys: ["research"], channelKeys: [] },
+      member("member-a"),
+    );
+
+    const [skill] = await library.list();
+    expect(skill?.version).toBe(1);
+    expect(installLocal).toHaveBeenLastCalledWith({ agentId: result.agents[0]?.id, skillId: skill?.id, revision: 1 });
+    expect(result.warnings).toEqual([expect.stringContaining("already has the skill")]);
   });
 });
