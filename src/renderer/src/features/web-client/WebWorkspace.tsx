@@ -658,27 +658,36 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     for (const request of workspace.state.takeovers) takeovers[request.agentId] = request;
     return takeovers;
   });
-  const sidebarActivity = createMemo(() => ({
-    agentIds: workspace.state.agents.map((agent) => agent.id),
-    activeTurns: Object.fromEntries(
-      Object.entries(workspace.state.conversations).map(([id, conversation]) => [
-        id,
-        workspace.state.status === "online" ? (conversation.page?.activeTurnId ?? null) : null,
-      ]),
-    ),
-    queues: workspace.state.queues,
-    unreadReplies: {},
-    recentReplies: {},
-    failedTurns: {},
-    // One wait per agent: a question replaces a browser takeover for the same agent.
-    pendingPrompts: Object.fromEntries([
-      ...workspace.state.takeovers.map(
-        (request) => [request.agentId, { type: "browser-takeover-requested", request } as const] as const,
+  const sidebarActivity = createMemo(() => {
+    // The agent conversation shows only the waits of the agent's own thread. A wait in a channel
+    // thread stays out of "Needs you", because selecting the row cannot answer it.
+    const agentThreads = new Map(workspace.state.agents.map((agent) => [agent.id, agent.threadId]));
+    const inAgentThread = (item: { agentId: string; threadId?: string }) =>
+      item.threadId !== undefined && agentThreads.get(item.agentId) === item.threadId;
+    return {
+      agentIds: workspace.state.agents.map((agent) => agent.id),
+      activeTurns: Object.fromEntries(
+        Object.entries(workspace.state.conversations).map(([id, conversation]) => [
+          id,
+          workspace.state.status === "online" ? (conversation.page?.activeTurnId ?? null) : null,
+        ]),
       ),
-      ...workspace.state.prompts.map((prompt) => [prompt.agentId, prompt] as const),
-    ]),
-    pendingApprovals: Object.fromEntries(workspace.state.approvals.map((approval) => [approval.agentId, approval])),
-  }));
+      queues: workspace.state.queues,
+      unreadReplies: {},
+      recentReplies: {},
+      failedTurns: {},
+      // One wait per agent: a question replaces a browser takeover for the same agent.
+      pendingPrompts: Object.fromEntries([
+        ...workspace.state.takeovers
+          .filter(inAgentThread)
+          .map((request) => [request.agentId, { type: "browser-takeover-requested", request } as const] as const),
+        ...workspace.state.prompts.filter(inAgentThread).map((prompt) => [prompt.agentId, prompt] as const),
+      ]),
+      pendingApprovals: Object.fromEntries(
+        workspace.state.approvals.filter(inAgentThread).map((approval) => [approval.agentId, approval]),
+      ),
+    };
+  });
   const sidebarAgentStates = createMemo(() => computeSidebarAgentStates(sidebarActivity()));
   const sidebarAgentMoods = createMemo(() => computeAgentAvatarMoods(sidebarActivity()));
   const browserEnabled = createMemo(
