@@ -35,6 +35,7 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
+import { markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
 import { composerAction } from "../model/voice-dictation";
@@ -760,7 +761,9 @@ export function ChatComposer({
                           });
                         return;
                       }
-                      const next = editMentionDraft(latestTextRef.current, text);
+                      const listEdit = markdownListReturn(mentionDraft(latestTextRef.current).text, text, cursor);
+                      if (listEdit) pendingCursor.current = listEdit.caret;
+                      const next = editMentionDraft(latestTextRef.current, listEdit?.text ?? text);
                       latestTextRef.current = next;
                       onChangeDraft(next);
                     }}

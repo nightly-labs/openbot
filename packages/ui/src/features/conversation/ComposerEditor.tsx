@@ -2,6 +2,7 @@ import { attachmentReferenceIds, serializeAttachmentReference } from "@openbot/c
 import { type ChatTagKind, chatTagReferences, serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment, InstalledSkill, McpServerConfig } from "@openbot/contracts/ipc";
+import { markdownListLineBreak } from "@openbot/contracts/markdown-lists";
 import { Badge, Blocks, Bot, File, Folder, Listbox, Plug, Puzzle, ShieldCheck, Store } from "@openbot/ui";
 import { referenceChipClasses } from "@openbot/ui/reference-chip";
 import { usesTouchLayout } from "@openbot/ui/utils";
@@ -540,7 +541,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (event.key === "Enter" && event.shiftKey) {
       event.preventDefault();
       if (!editor) return;
-      insertPlainText(editor, "\n");
+      insertLineBreak(editor);
       emitValue();
       updateMention();
       scrollToEndIfCaretAtEnd();
@@ -1095,6 +1096,42 @@ function insertPlainText(editor: HTMLDivElement, text: string): void {
   if (!caretRange) return;
   selection?.removeAllRanges();
   selection?.addRange(caretRange);
+}
+
+/*
+ * Continues or ends a Markdown list, as `markdownListLineBreak` describes. The edit works in the
+ * editor's text offsets, where a chip counts as its visible text, and it changes only the current
+ * line, so chips stay in place.
+ */
+function insertLineBreak(editor: HTMLDivElement): void {
+  const selection = window.getSelection();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  if (!range?.collapsed || !editor.contains(range.commonAncestorContainer)) {
+    insertPlainText(editor, "\n");
+    return;
+  }
+  const before = range.cloneRange();
+  before.selectNodeContents(editor);
+  before.setEnd(range.startContainer, range.startOffset);
+  const after = range.cloneRange();
+  after.selectNodeContents(editor);
+  after.setStart(range.endContainer, range.endOffset);
+  const text = before.toString() + after.toString();
+  const caret = before.toString().length;
+  const edit = markdownListLineBreak(text, caret);
+  if (!edit) {
+    insertPlainText(editor, "\n");
+    return;
+  }
+  if (edit.caret > caret) {
+    insertPlainText(editor, edit.text.slice(caret, edit.caret));
+    return;
+  }
+  const marker = rangeFromTextOffsets(editor, edit.caret, edit.caret + text.length - edit.text.length);
+  if (!marker) return;
+  selection?.removeAllRanges();
+  selection?.addRange(marker);
+  insertPlainText(editor, "");
 }
 
 function syncTrailingLineSentinel(editor: HTMLDivElement, value = serializeEditor(editor)): void {
