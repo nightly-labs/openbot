@@ -83,12 +83,16 @@ describe("listSiblingOpenBotInstances", () => {
     ).rejects.toThrow("scan failed");
   });
 
-  it("does not scan where ps is unavailable", async () => {
-    const listProcesses = vi.fn(async () => PS_OUTPUT);
+  it.each([
+    ["win32", PS_OUTPUT],
+    // Chromium children on Linux run the main executable, so a scan would find this session itself.
+    ["linux", "  101  1000 /tmp/.mount_OpenBo/openbot\n  102  1000 /tmp/.mount_OpenBo/openbot --type=zygote"],
+  ] as const)("does not scan on %s", async (platform, output) => {
+    const listProcesses = vi.fn(async () => output);
     const siblings = await listSiblingOpenBotInstances({
-      executablePath: EXECUTABLE,
+      executablePath: platform === "linux" ? "/tmp/.mount_OpenBo/openbot" : EXECUTABLE,
       currentPid: 101,
-      platform: "win32",
+      platform,
       listProcesses,
     });
     expect(listProcesses).not.toHaveBeenCalled();
