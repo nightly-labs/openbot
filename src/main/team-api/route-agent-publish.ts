@@ -3,6 +3,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { isString } from "@openbot/contracts/runtime-values";
 import { AGENT_PUBLISH_CAPABILITY, AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import { parsePublishAgentTemplate } from "../ipc/agent-template-handlers";
 import { requireString } from "../ipc/validation";
 import type { TeamApiAdmin } from "./dependencies";
@@ -68,10 +69,28 @@ function publishInput(body: DynamicRecord) {
   }
 }
 
-/** `avatarUrl` names a file of this computer, so it stays here; the avatar travels as its bytes. */
+/**
+ * `avatarUrl` names a file of this computer, so it stays here; the avatar travels as its bytes.
+ * Every text leaves redacted: the preview is read before publishing checks for secrets, and a
+ * secret stays on the host. Publishing still refuses it, because the host reads the agent again.
+ */
 function previewBody({ avatarUrl: _avatarUrl, avatarImage, publication, ...preview }: AgentTemplatePreview) {
   return {
     ...preview,
+    name: redactText(preview.name),
+    title: redactText(preview.title),
+    description: redactText(preview.description),
+    skills: preview.skills.map((skill) =>
+      skill.kind === "embedded"
+        ? { ...skill, name: redactText(skill.name), markdown: redactText(skill.markdown) }
+        : { ...skill, name: redactText(skill.name) },
+    ),
+    routines: preview.routines.map((routine) => ({
+      ...routine,
+      name: redactText(routine.name),
+      instruction: redactText(routine.instruction),
+    })),
+    skillsError: preview.skillsError === null ? null : redactText(preview.skillsError),
     avatarImage: avatarImage
       ? { mimeType: avatarImage.mimeType, data: Buffer.from(avatarImage.bytes).toString("base64") }
       : null,

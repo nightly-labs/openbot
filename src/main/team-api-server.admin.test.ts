@@ -288,7 +288,10 @@ const CARD = new Uint8Array([
 ]);
 
 describe("Team API agent-publish-v1", () => {
-  it("lets only an admin publish a host agent, and keeps the host's avatar path on the host", async () => {
+  it("lets only an admin publish a host agent, and keeps the host's avatar path and secrets on the host", async () => {
+    // As the credential store does for a saved key, so the preview can mask it.
+    const secret = "agent-publish-preview-secret-7f3c";
+    registerSecretValue(secret);
     const publication = {
       templateId: "tpl_chief",
       shareUrl: "https://openbot.run/agents/tpl_chief",
@@ -305,11 +308,18 @@ describe("Team API agent-publish-v1", () => {
         return {
           name: "Chief",
           title: "Chief of staff",
-          description: "Plan the week.",
+          description: `Plan the week. Use ${secret}.`,
           avatarSeed: "chief",
           avatarHue: null,
-          skills: [],
-          routines: [],
+          skills: [{ kind: "embedded", slug: "brief", name: "Brief", markdown: `# Brief\nToken: ${secret}` }],
+          routines: [
+            {
+              name: "Weekly plan",
+              instruction: `Call the API with ${secret}.`,
+              active: true,
+              schedule: { kind: "daily", time: "09:00" },
+            },
+          ],
           agentId,
           avatarUrl: "file:///private/avatars/chief.png",
           avatarImage: { mimeType: "image/png", bytes: CARD },
@@ -344,6 +354,8 @@ describe("Team API agent-publish-v1", () => {
     expect(preview.avatarUrl).toBeUndefined();
     expect(preview.avatarImage).toEqual({ mimeType: "image/png", data: card });
     expect(preview.publication).toEqual(publication);
+    expect(JSON.stringify(preview)).not.toContain(secret);
+    expect(preview.description).toContain("[redacted]");
 
     expect(await (await post("/v1/admin/agents/template-publish", { agentId: "chief", card })).json()).toEqual(
       publication,
