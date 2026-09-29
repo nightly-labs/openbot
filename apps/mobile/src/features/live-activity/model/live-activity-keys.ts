@@ -1,6 +1,7 @@
 import {
   LIVE_ACTIVITY_SECRET_BYTES,
   type LiveActivityKeys,
+  liveActivityHostSecret,
   liveActivityKeys,
 } from "@openbot/team-client/live-activity-seal";
 import * as Crypto from "expo-crypto";
@@ -8,21 +9,28 @@ import * as SecureStore from "expo-secure-store";
 
 const key = "openbot.mobile.live-activity-secret.v1";
 
-let loaded: { secret: Uint8Array; keys: LiveActivityKeys } | null = null;
-let loading: Promise<{ secret: Uint8Array; keys: LiveActivityKeys }> | null = null;
+/** The secret and keys that one host has. */
+export interface LiveActivityHostKeys {
+  secret: Uint8Array;
+  keys: LiveActivityKeys;
+}
+
+let loaded: Uint8Array | null = null;
+let loading: Promise<Uint8Array> | null = null;
+const hosts = new Map<string, LiveActivityHostKeys>();
 
 /**
- * The secret that seals the Live Activity content and signs its button links. Only this phone and
- * the host it gives it to know it, so Apple and the OpenBot relay cannot read or change an update.
+ * The phone secret. Each host gets its own secret made from it, which seals the Live Activity
+ * content and signs its button links. So Apple and the OpenBot relay cannot read or change an
+ * update, and one host cannot sign an action for another.
  */
-export function loadLiveActivitySecret(): Promise<{ secret: Uint8Array; keys: LiveActivityKeys }> {
+export function loadLiveActivitySecret(): Promise<Uint8Array> {
   if (loaded) return Promise.resolve(loaded);
   loading ??= (async () => {
     try {
       const stored = await SecureStore.getItemAsync(key);
       const secret = stored ? fromHex(stored) : null;
-      const value = secret?.length === LIVE_ACTIVITY_SECRET_BYTES ? secret : await createSecret();
-      loaded = { secret: value, keys: liveActivityKeys(value) };
+      loaded = secret?.length === LIVE_ACTIVITY_SECRET_BYTES ? secret : await createSecret();
       return loaded;
     } finally {
       loading = null;
@@ -31,9 +39,20 @@ export function loadLiveActivitySecret(): Promise<{ secret: Uint8Array; keys: Li
   return loading;
 }
 
+/** The secret and keys of one host, made from the phone secret. */
+export function liveActivityHostKeys(phoneSecret: Uint8Array, serverId: string): LiveActivityHostKeys {
+  const cached = hosts.get(serverId);
+  if (cached) return cached;
+  const secret = liveActivityHostSecret(phoneSecret, serverId);
+  const value = { secret, keys: liveActivityKeys(secret) };
+  hosts.set(serverId, value);
+  return value;
+}
+
 /** Sign-out makes a new secret, so a host of the removed workspace cannot update the next activity. */
 export async function resetLiveActivitySecret(): Promise<void> {
   loaded = null;
+  hosts.clear();
   await SecureStore.deleteItemAsync(key);
 }
 

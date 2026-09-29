@@ -1303,13 +1303,15 @@ waits 5 seconds and has priority 5. An unchanged state is sent again every 10 mi
 date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
 state ends the activity.
 
-`live-activity-seal.ts` seals the props with keys derived from a secret that the phone makes. The
+`live-activity-seal.ts` seals the props with keys derived from a secret that the phone makes for
+that host (an HMAC of the phone secret and the server ID). The
 host sends the sealed text to `POST /v2/remote/hosts/:hostId/live-activity` with its machine
 credential. The Worker checks the credential and a per-host rate limit, makes the APNs payload and
 provider token itself, and forwards the request. It stores and logs nothing. The widget cannot load a
 library, so the phone composes its layout with the two widget keys and the App Group folder, and
 `live-activity-open.ts` opens the sealed props with its own SHA-256. Button links that change host
-state carry an HMAC signature, which the app checks before it acts.
+state carry an HMAC signature, which the app checks with the key of the host that the action goes
+to, so one host cannot sign an action for another.
 
 ## Shared channel chats
 

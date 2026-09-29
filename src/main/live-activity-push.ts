@@ -231,9 +231,10 @@ export class LiveActivityPushService {
       ),
     );
     coordinator.replaceUnreadReplies(value.serverId, Object.fromEntries(counts));
+    // An agent with its notifications off is not in the island, so it is not in the list.
     const unreadAgents: LiveActivityUnreadAgent[] = snapshot.agents.flatMap((agent) => {
       const count = counts.get(agent.id);
-      return count ? [{ ...agent, serverId: value.serverId, count }] : [];
+      return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
     });
     return liveActivityView(coordinator.presentation([value.serverId]), {
       t: phoneText(value.locale),

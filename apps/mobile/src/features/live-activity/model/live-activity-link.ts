@@ -3,7 +3,6 @@ import {
   type LiveActivityLink,
   readLiveActivityLink,
 } from "@openbot/team-client/live-activity-props";
-import type { LiveActivityKeys } from "@openbot/team-client/live-activity-seal";
 
 /** An action from a signed button link. `command` is the command that Approve runs, shown again first. */
 export interface LiveActivityRequest {
@@ -14,7 +13,8 @@ export interface LiveActivityRequest {
 let listener: ((request: LiveActivityRequest) => void) | null = null;
 let navigate: ((agentId: string | null) => void) | null = null;
 let pending: LiveActivityRequest | null = null;
-let keys: LiveActivityKeys | null = null;
+/** The action key of each host. `null` before the phone secret loads. */
+let keyFor: ((serverId: string) => Uint8Array) | null = null;
 /** A button link that came before the keys loaded. It is checked when they load. */
 let unchecked: string | null = null;
 
@@ -22,16 +22,16 @@ let unchecked: string | null = null;
 export function resetLiveActivityActions(): void {
   pending = null;
   unchecked = null;
-  keys = null;
+  keyFor = null;
 }
 
 /** The keys that check the button links. A link from before they load is checked then. */
-export function setLiveActivityLinkKeys(loaded: LiveActivityKeys): void {
-  keys = loaded;
+export function setLiveActivityLinkKeys(actionKey: (serverId: string) => Uint8Array): void {
+  keyFor = actionKey;
   const path = unchecked;
   unchecked = null;
   if (path === null) return;
-  const link = readLiveActivityLink(path, loaded.action);
+  const link = readLiveActivityLink(path, actionKey);
   if (link.type !== "action") return;
   receive(link);
   navigate?.(link.action.agentId);
@@ -74,12 +74,12 @@ export function isLiveActivityLink(path: string): boolean {
  * again and loads again. So the running app opens the route itself and this returns `null`.
  */
 export function liveActivityRoute(path: string, initial = true): string | null {
-  if (!keys && new URL(path).searchParams.has("sig")) {
+  if (!keyFor && new URL(path).searchParams.has("sig")) {
     // At launch the link can come before the keys load. It is checked when they do.
     unchecked = path;
     return open(null, initial);
   }
-  const link = readLiveActivityLink(path, keys?.action ?? null);
+  const link = readLiveActivityLink(path, keyFor ?? (() => null));
   if (link.type === "action") receive(link);
   return open(targetAgent(link), initial);
 }

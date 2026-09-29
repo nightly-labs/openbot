@@ -30,7 +30,7 @@ afterEach(resetLiveActivityActions);
 
 describe("Live Activity links", () => {
   it("opens the chat the link names, or the chat list", () => {
-    setLiveActivityLinkKeys(keys);
+    setLiveActivityLinkKeys(() => keys.action);
 
     expect(liveActivityRoute(openUrl)).toBe("/chat/agent%201");
     expect(liveActivityRoute(LIVE_ACTIVITY_LIST_URL)).toBe("/");
@@ -38,7 +38,7 @@ describe("Live Activity links", () => {
   });
 
   it("opens the chat in the running app without a new screen", () => {
-    setLiveActivityLinkKeys(keys);
+    setLiveActivityLinkKeys(() => keys.action);
     const open = vi.fn<(agentId: string | null) => void>();
     const stop = setLiveActivityNavigator(open);
 
@@ -48,7 +48,7 @@ describe("Live Activity links", () => {
   });
 
   it("sends an answer only from a link with the phone signature, as any app can open a link", () => {
-    setLiveActivityLinkKeys(keys);
+    setLiveActivityLinkKeys(() => keys.action);
     const receive = vi.fn<(request: LiveActivityRequest) => void>();
     const stop = onLiveActivityAction(receive);
     const signed = liveActivityActionUrl(approve, keys.action, "npm test");
@@ -67,7 +67,7 @@ describe("Live Activity links", () => {
 
     expect(liveActivityRoute(liveActivityActionUrl(approve, keys.action))).toBe("/");
     expect(receive).not.toHaveBeenCalled();
-    setLiveActivityLinkKeys(keys);
+    setLiveActivityLinkKeys(() => keys.action);
     expect(receive).toHaveBeenCalledWith({ action: approve, command: null });
     stop();
   });

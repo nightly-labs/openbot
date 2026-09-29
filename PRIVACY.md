@@ -578,9 +578,11 @@ host connection.
 
 When iOS stops the app in the background, the active host updates the view through Apple Push
 Notification service (APNs). For this, the phone gives that host, over the encrypted host
-connection, the push token of the Live Activity, a random 32-byte secret, its interface language,
-and the file names of the agent pictures that it saved on the phone. The phone keeps the secret in
-its secure storage and makes a new one when the user signs out. The host keeps these values in
+connection, the push token of the Live Activity, a 32-byte secret for that host, its interface
+language, and the file names of the agent pictures that it saved on the phone. The phone makes each
+host secret from one random phone secret, so one host cannot seal an update or sign a button for
+another host. The phone keeps its secret in its secure storage and makes a new one when the user
+signs out. The host keeps these values in
 memory only, for the session that gave them. It forgets them when the phone removes them, when the
 session ends, when Apple refuses the token, after 12 hours, and when the host stops.
 

@@ -475,25 +475,35 @@ export type LiveActivityLink =
 
 /**
  * Reads a Live Activity link. Any app can open an `openbot://` link, so a link that changes host
- * state counts only with a valid signature. Without `key`, or with a wrong signature, it opens the list.
+ * state counts only with a valid signature. The key is the one of the host that the action goes to,
+ * so one host cannot sign an action for another. Without a key, or with a wrong signature, the link
+ * opens the list.
  */
-export function readLiveActivityLink(url: string, key: Uint8Array | null): LiveActivityLink {
+export function readLiveActivityLink(url: string, keyFor: (serverId: string) => Uint8Array | null): LiveActivityLink {
   const params = new URL(url).searchParams;
   const serverId = params.get("server");
   const agentId = params.get("agent");
   if (serverId && agentId) return { type: "open", serverId, agentId };
   const payload = params.get("action");
   const signature = params.get("sig");
-  if (!key || payload === null || signature === null || !verifyLiveActivityLink(payload, signature, key)) {
-    return { type: "list" };
-  }
-  return signedLink(JSON.parse(payload));
+  if (payload === null || signature === null) return { type: "list" };
+  const link = signedPayload(payload);
+  const key = link.type === "action" ? keyFor(link.action.serverId) : null;
+  return key && verifyLiveActivityLink(payload, signature, key) ? link : { type: "list" };
 }
 
 /** The host or this app signed the link, so its action has the shape that one of them built. */
 function signedLink(value: unknown): LiveActivityLink {
   if (!isDynamicRecord(value) || !isLiveActivityAction(value.action)) return { type: "list" };
   return { type: "action", action: value.action, command: isString(value.command) ? value.command : null };
+}
+
+function signedPayload(payload: string): LiveActivityLink {
+  try {
+    return signedLink(JSON.parse(payload));
+  } catch {
+    return { type: "list" };
+  }
 }
 
 function isLiveActivityAction(value: unknown): value is LiveActivityAction {

@@ -123,6 +123,12 @@ export class DynamicIslandCoordinator {
     );
   }
 
+  /** The agents whose notifications are off. The island does not show them. */
+  mutedAgentIds(serverId: string): ReadonlySet<string> {
+    const agents = this.#servers.get(serverId)?.agents ?? [];
+    return new Set(agents.filter((agent) => !agent.notifications).map((agent) => agent.id));
+  }
+
   retainServers(serverIds: readonly string[]): void {
     const retained = new Set(serverIds);
     for (const serverId of this.#servers.keys()) {

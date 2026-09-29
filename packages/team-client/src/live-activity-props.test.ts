@@ -8,11 +8,14 @@ import {
   liveActivityView,
   readLiveActivityLink,
 } from "./live-activity-props";
-import { LIVE_ACTIVITY_SECRET_BYTES, liveActivityKeys } from "./live-activity-seal";
+import { LIVE_ACTIVITY_SECRET_BYTES, liveActivityHostSecret, liveActivityKeys } from "./live-activity-seal";
 
 const t = mobileTranslateFor("en");
 const text = { t, agentColor: () => "#8b5cf6" };
-const keys = liveActivityKeys(new Uint8Array(LIVE_ACTIVITY_SECRET_BYTES).fill(7));
+const phoneSecret = new Uint8Array(LIVE_ACTIVITY_SECRET_BYTES).fill(7);
+const hostKeys = (serverId: string) => liveActivityKeys(liveActivityHostSecret(phoneSecret, serverId));
+const keys = hostKeys("server-1");
+const keyFor = (serverId: string) => hostKeys(serverId).action;
 const agent = { id: "agent-1", name: "Ada", avatarSeed: "ada", avatarHue: null, avatarUrl: null };
 
 describe("Live Activity buttons", () => {
@@ -109,12 +112,12 @@ describe("Live Activity buttons", () => {
       actionKey: keys.action,
     });
 
-    expect(props && readLiveActivityLink(props.tapUrl, keys.action)).toEqual({
+    expect(props && readLiveActivityLink(props.tapUrl, keyFor)).toEqual({
       type: "open",
       serverId: "server-1",
       agentId: "agent-1",
     });
-    expect(props?.buttons.map((button) => readLiveActivityLink(button.url, keys.action))).toEqual([
+    expect(props?.buttons.map((button) => readLiveActivityLink(button.url, keyFor))).toEqual([
       {
         type: "action",
         action: { type: "open-failure", serverId: "server-1", agentId: "agent-1", turnId: "turn-1" },
@@ -125,23 +128,23 @@ describe("Live Activity buttons", () => {
 });
 
 describe("Live Activity links", () => {
-  it("accepts an answer only with the signature of the phone key, as any app can open the link", () => {
+  it("accepts an answer only with the key of the host that the answer goes to", () => {
     const presentation = approval({}, "npm test");
-    const input = { ...text, avatar: () => "", unreadAgents: [], actionKey: keys.action };
-    const [, approve] = liveActivityView(presentation, input)?.buttons ?? [];
-    const url = approve?.url ?? "";
+    const signed = (actionKey: Uint8Array) =>
+      liveActivityView(presentation, { ...text, avatar: () => "", unreadAgents: [], actionKey })?.buttons[1]?.url ?? "";
+    const url = signed(keys.action);
 
-    expect(readLiveActivityLink(url, keys.action)).toEqual({
+    expect(readLiveActivityLink(url, keyFor)).toEqual({
       type: "action",
       action: { type: "respond-approval", serverId: "server-1", agentId: "agent-1", requestId: 7, decision: "accept" },
       command: "npm test",
     });
-    const other = liveActivityKeys(new Uint8Array(LIVE_ACTIVITY_SECRET_BYTES).fill(8));
-    expect(readLiveActivityLink(url, other.action)).toEqual({ type: "list" });
-    expect(readLiveActivityLink(url, null)).toEqual({ type: "list" });
+    // Another host of this phone knows its own key only, and cannot approve for server-1.
+    expect(readLiveActivityLink(signed(hostKeys("server-2").action), keyFor)).toEqual({ type: "list" });
+    expect(readLiveActivityLink(url, () => null)).toEqual({ type: "list" });
     const changed = new URL(url);
     changed.searchParams.set("action", (changed.searchParams.get("action") ?? "").replace("accept", "decline"));
-    expect(readLiveActivityLink(changed.toString(), keys.action)).toEqual({ type: "list" });
+    expect(readLiveActivityLink(changed.toString(), keyFor)).toEqual({ type: "list" });
   });
 });
 

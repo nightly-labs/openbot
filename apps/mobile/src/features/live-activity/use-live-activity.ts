@@ -28,7 +28,7 @@ import type { MobileAgent, MobileServer } from "@/features/workspace/model/works
 import { currentLocale, currentText } from "@/shared/lib/text";
 import { agentLiveActivity } from "./agent-live-activity";
 import type { AgentLiveActivityNative } from "./agent-live-activity.types";
-import { loadLiveActivitySecret, resetLiveActivitySecret } from "./model/live-activity-keys";
+import { liveActivityHostKeys, loadLiveActivitySecret, resetLiveActivitySecret } from "./model/live-activity-keys";
 import {
   type LiveActivityRequest,
   onLiveActivityAction,
@@ -91,7 +91,8 @@ export function useLiveActivity({
   }, []);
   const sync = useRef<LiveActivitySync<AgentLiveActivityProps> | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
-  const [secret, setSecret] = useState<{ value: string; action: Uint8Array } | null>(null);
+  /** The phone secret. Each host gets its own secret and keys made from it. */
+  const [secret, setSecret] = useState<Uint8Array | null>(null);
   const secretRef = useRef(secret);
   secretRef.current = secret;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,8 +185,8 @@ export function useLiveActivity({
         return;
       }
       // The buttons need the keys. Their load publishes again.
-      const actionKey = secretRef.current?.action;
-      if (!actionKey) return;
+      const phoneSecret = secretRef.current;
+      if (!phoneSecret) return;
       const presentation = live.coordinator.presentation(serverOrder.current);
       const { unreadAgentIds, unreadCounts } = liveState.get();
       const unread = new Set(unreadAgentIds);
@@ -195,7 +196,13 @@ export function useLiveActivity({
         agentColor: getBloubAvatarColor,
         avatar,
         unreadAgents: agentsRef.current
-          .filter((agent) => unread.has(agent.id) && servers.has(agent.serverId))
+          // An agent with its notifications off is not in the island, so it is not in the list.
+          .filter(
+            (agent) =>
+              unread.has(agent.id) &&
+              servers.has(agent.serverId) &&
+              !live.coordinator.mutedAgentIds(agent.serverId).has(agent.id),
+          )
           .map((agent) => ({
             id: agent.id,
             serverId: agent.serverId,
@@ -205,7 +212,8 @@ export function useLiveActivity({
             avatarUrl: agent.avatarUrl ?? null,
             count: Math.max(1, unreadCounts[agent.id] ?? 1),
           })),
-        actionKey,
+        // Only the host that the buttons answer can sign them too.
+        actionKey: liveActivityHostKeys(phoneSecret, presentation.serverId).keys.action,
       });
       if (avatars.current.size !== keptAvatars.current) keepAvatars();
       const mode = props?.mode ?? null;
@@ -276,20 +284,16 @@ export function useLiveActivity({
     [live, schedule],
   );
 
-  // The keys seal host updates and sign the buttons. The widget gets its two keys in its layout.
+  // The keys seal host updates and sign the buttons. Each button link is checked with the key of
+  // the host that it answers.
   useEffect(() => {
     if (!live) return;
     let cancelled = false;
     void loadLiveActivitySecret().then(
-      ({ secret: value, keys }) => {
+      (phoneSecret) => {
         if (cancelled || disposed.current) return;
-        const { t } = currentText();
-        live.native.setSealKeys(
-          { seal: encodeLiveActivityBytes(keys.seal), tag: encodeLiveActivityBytes(keys.tag) },
-          unreadableProps(t),
-        );
-        setSecret({ value: encodeLiveActivityBytes(value), action: keys.action });
-        setLiveActivityLinkKeys(keys);
+        setSecret(phoneSecret);
+        setLiveActivityLinkKeys((serverId) => liveActivityHostKeys(phoneSecret, serverId).keys.action);
       },
       // Without the keys the activity has no buttons, and only this app updates it.
       () => undefined,
@@ -302,6 +306,18 @@ export function useLiveActivity({
   useEffect(() => {
     if (secret) publish();
   }, [secret, publish]);
+
+  // The widget opens the updates of the active host only, with the two keys in its layout. A host
+  // that the phone used before cannot update the activity after a change of host.
+  useEffect(() => {
+    if (!live || !secret) return;
+    const { t } = currentText();
+    const keys = activeServerId ? liveActivityHostKeys(secret, activeServerId).keys : null;
+    live.native.setSealKeys(
+      keys && { seal: encodeLiveActivityBytes(keys.seal), tag: encodeLiveActivityBytes(keys.tag) },
+      unreadableProps(t),
+    );
+  }, [live, secret, activeServerId]);
 
   useEffect(() => {
     if (!live) return;
@@ -415,6 +431,8 @@ export function useLiveActivity({
       // The host also forgets it when the session ends, so a failed request leaves nothing behind.
       void post(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
     }
+    // A host that restarts keeps registrations in memory only, so a new connection registers again.
+    if (!pushServerOnline && registered.current) registered.current = { ...registered.current, key: "" };
     if (!pushServerId || !pushServerOnline || !pushToken || !secret) return;
     let cancelled = false;
     const serverAgents = agentsRef.current.filter((agent) => agent.serverId === pushServerId);
@@ -439,7 +457,7 @@ export function useLiveActivity({
         serverId: pushServerId,
         token: pushToken,
         environment: pushEnvironment(),
-        secret: secret.value,
+        secret: encodeLiveActivityBytes(liveActivityHostKeys(secret, pushServerId).secret),
         locale: currentLocale(),
         away: !foreground,
         photos: serverAgents.flatMap((agent) => {

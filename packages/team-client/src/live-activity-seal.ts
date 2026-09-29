@@ -34,6 +34,14 @@ export function liveActivityKeys(secret: Uint8Array): LiveActivityKeys {
   return { seal: derive("seal"), tag: derive("tag"), action: derive("action") };
 }
 
+/**
+ * The secret that the phone gives one host. Each host gets its own, made from the phone secret, so
+ * a host cannot seal content or sign a button link for another host.
+ */
+export function liveActivityHostSecret(phoneSecret: Uint8Array, serverId: string): Uint8Array {
+  return hmac(sha256, phoneSecret, utf8ToBytes(`openbot live activity host ${serverId}`));
+}
+
 /** Seals `text` for the widget extension. Use a new random `nonce` for each seal. */
 export function sealLiveActivity(
   text: string,
