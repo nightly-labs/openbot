@@ -263,8 +263,7 @@ export function projectChatMessages(messages: ConversationMessage[]): ChatMessag
     const routine = projectRoutineMarker(message, latestRuns);
     if (routine) result.push(routine);
     if (message.routine) continue;
-    if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine)
-      continue;
+    if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;
       result.push(
