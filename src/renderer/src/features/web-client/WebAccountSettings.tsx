@@ -23,7 +23,7 @@ import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfil
 import { createSettingsHostedSitesStore } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { useText } from "@openbot/ui/text";
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 import { isCompletionSoundEnabled, setCompletionSoundEnabled } from "../../completion-sound";
 import type { WebAccountCalls } from "./web-account";
 import { openWebLink } from "./web-attachments";
@@ -69,6 +69,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const { t } = useText();
   const [activeTab, setActiveTab] = createSignal<WebAccountSettingsTab>("profile");
   const [completionSound, setCompletionSound] = createSignal(isCompletionSoundEnabled());
+  // Playback reads the stored value on each event, so the switch follows a change from another tab.
+  const readCompletionSound = () => setCompletionSound(isCompletionSoundEnabled());
+  window.addEventListener("storage", readCompletionSound);
+  onCleanup(() => window.removeEventListener("storage", readCompletionSound));
   let modalElement: HTMLElement | undefined;
 
   const profile = createSettingsProfileStore(
