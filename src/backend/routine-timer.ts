@@ -36,11 +36,7 @@ export class RoutineTimer {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     if (this.#suspended || !this.isRunning()) return;
-    let earliest: string | null = null;
-    for (const source of this.sources()) {
-      const dueAt = source.nextDueAt();
-      if (dueAt && (!earliest || dueAt < earliest)) earliest = dueAt;
-    }
+    const earliest = this.nextDueAt();
     if (!earliest) return;
     const delay = Math.max(0, Math.min(new Date(earliest).getTime() - Date.now(), MAX_DELAY));
     this.#timer = setTimeout(() => {
@@ -48,6 +44,16 @@ export class RoutineTimer {
       void this.#fire();
     }, delay);
     this.#timer.unref?.();
+  }
+
+  /** The earliest due time of all sources, or null when no routine is scheduled. */
+  nextDueAt(): string | null {
+    let earliest: string | null = null;
+    for (const source of this.sources()) {
+      const dueAt = source.nextDueAt();
+      if (dueAt && (!earliest || dueAt < earliest)) earliest = dueAt;
+    }
+    return earliest;
   }
 
   /**

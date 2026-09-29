@@ -13,7 +13,8 @@
   owner included. A server with no plan keeps 3. When a plan goes down or ends, no member is
   removed, but no new member can join until there is a free seat.
 - A hosted server stops 15 to 20 minutes after its last use and keeps its data. It starts again when you
-  connect to it.
+  connect to it, and a few minutes before its next scheduled routine. An open app that sends no
+  request or message for 1 hour does not keep the server on.
 
 ### Changed
 

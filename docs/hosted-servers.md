@@ -3,10 +3,11 @@
 A hosted server is an OpenBot server that runs in a [boat](https://boat.dev) sandbox, so it works
 when the user's computer is off. Each server is one boat sandbox for one account. The sandbox runs
 the Linux build of OpenBot under Xvfb. The server runs while it is in use. After 15 minutes with no
-use, the Worker stops it and keeps its data, and the next client starts it again. A connected client
-counts as use, also a member's desktop app that is open in the background: the app keeps a
-connection to each stored server and starts a stopped one again. This is a product decision: a fast
-answer is more important than the cost of a server that stays on.
+use, the Worker stops it and keeps its data. The next client starts it again, and the Worker cron
+starts it before its next routine run. A connected client counts as use for 1 hour after its last
+request or typing event (`CLIENT_USE_WINDOW_MS`). A desktop app that is open in the background keeps
+a connection to each stored server but sends no request, so it does not keep the server on for
+longer than that. When the user comes back, the app starts the stopped server again.
 
 The Worker enables hosted servers only when it has the boat and Stripe secrets and
 `HOSTED_SERVER_TEMPLATE`, and only for the account IDs in `HOSTED_SERVERS_ALLOWED_USER_IDS` (`*`
@@ -24,7 +25,7 @@ has its own Stripe plan. Its machine comes from the plan
 | Server template | `scripts/hosting/` | Builds the boat named snapshot that each server starts from. |
 | Server bootstrap | `src/main/hosted-server-bootstrap.ts` | On the first start, redeems the claim, signs in, and publishes the host. |
 | Start retry | `src/main/hosted-server-start-retry.ts` | Publishes the host again after a failed start. |
-| Activity report | `src/main/hosted-server-activity.ts` | Tells the Worker each minute that the server is in use. |
+| Activity report | `src/main/hosted-server-activity.ts` | Tells the Worker that the server is in use, and when its next routine runs. |
 | Billing link | `apps/auth-api/src/server/hosted-billing.ts`, `billing-service.ts` | Opens Stripe Checkout for a new server. Tells the hosting service when a subscription changes. |
 | Desktop and web clients | `AddServerOverlay`, `SettingsHostedServersTab`, `hosted-server-service.ts`, `web-hosted-servers.ts`, `web-hosted-server-wake.ts` | Pick a plan, pay, list, start, renew and delete. Start a stopped server when a connection fails. |
 
@@ -64,19 +65,30 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
 4. **First boot.** OpenBot starts with `OPENBOT_HOSTED_SERVER=1`. It redeems the claim at
    `POST /v2/hosting/claims/redeem`, signs in as the owner, keeps the host ID, and publishes the
    host. `registerHost` refuses the host ID for any other account.
-5. **In use.** Each minute while a remote client is connected (an open Team API event stream), a
-   remote desktop or browser view is open, a file moves, or an agent works, OpenBot sends
-   `POST /v2/hosting/servers/:id/activity` with the session from its claim. The Worker accepts only
-   that session, not the owner's own sessions, and stores `last_active_at`. When boat reports
+5. **In use.** OpenBot checks each minute whether the server is in use: an agent works, a remote
+   desktop or browser view is open, a file moves, or a remote client is connected (an open Team API
+   event stream) and sent a request or a typing event in the last hour. It sends
+   `POST /v2/hosting/servers/:id/activity` with `{inUse, nextRunAt}` and the session from its claim:
+   at once when the use starts, then at most each 5 minutes while the use continues, and each time
+   the next routine run changes. The Worker accepts only that session, not the owner's own sessions.
+   It stores `last_active_at` for a report with use, and `next_run_at` (null for a time that is not
+   in the future). A report with no body is from an older server: it counts as use and keeps
+   `next_run_at`. When boat reports
    `archived` for a server in use (for example, after maintenance), the webhook resumes the sandbox
    at once. The Worker cron (each minute on `test`) resumes a server that stays `stopped` for 2
    minutes.
 
    **Idle.** The cron stops a running server with no activity and no state change for 15 minutes:
-   `desired_state = 'idle'`, and boat saves the disk. The webhook and the cron do not resume an
-   idle server. The next wake (step 6) sets it to `running` and resumes it. A start and a resume
-   count as activity, so the first client has 15 minutes to connect. A scheduled automation does
-   not start an idle server: it runs when a client starts the server again.
+   `desired_state = 'idle'`, and boat saves the disk. It does not stop a server whose next routine
+   run is less than 10 minutes away. The webhook does not resume an idle server. The next wake
+   (step 6) sets it to `running` and resumes it. A start and a resume count as activity, so the first
+   client has 15 minutes to connect.
+
+   **Scheduled start.** The cron starts an idle server when its `next_run_at` is less than 10 minutes
+   away (one cron interval and the start time), with the wake reason `schedule`. It clears
+   `next_run_at` in the same update, so a server that does not report again starts only once for
+   that run. After the start, OpenBot runs each routine that is due, and each run that it missed
+   becomes one run.
 
    **Lease.** boat has no idle timer, and a boat trial refuses a sandbox with no auto-stop. Each
    create and resume sends `ttlSeconds: 7200`, so boat stops a sandbox that the Worker loses. An

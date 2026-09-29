@@ -100,7 +100,7 @@ lifecycle. A malformed preference fails closed; a missing preference uses the do
 | `content_article_read` | Is an article read or abandoned? | The body reached `start`, `half`, or `end` in the viewport, at most once each per view. It measures position, not attention, and never elapsed time |
 | `join_page_action` | Does the invitation web flow reach the app? | Anonymous view, download, or app-open action |
 | `billing_action` | Do accounts start, pay for, change and keep paid plans? | `action`: `checkout_started`, `checkout_expired`, `plan_started`, `payment_succeeded`, `payment_failed`, `plan_changed`, `cancel_scheduled`, `cancel_withdrawn`, `plan_ended`, or `portal_opened`, as the account service stores it. Optional `plan`, `interval`, `currency`, `amount` (minor units of `currency`, from Stripe) and `flow` (Portal) |
-| `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message` or `restart`) and `error` (an allowlisted hosted server error code) |
+| `hosted_server_action` | Do paid hosted servers start, stay in use and come back? | `action`: `provisioned`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`message`, `restart` or `schedule`) and `error` (an allowlisted hosted server error code) |
 
 ## Privacy and runtime validation
 

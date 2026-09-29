@@ -172,7 +172,8 @@ async function setup() {
   const state = (serverId: string) =>
     database
       .prepare(
-        `SELECT desired_state, observed_state, observed_error, last_wake_reason, checkout_session_id, size, pending_size
+        `SELECT desired_state, observed_state, observed_error, last_wake_reason, checkout_session_id, size, pending_size,
+           next_run_at
          FROM hosted_servers WHERE server_id = ?`,
       )
       .get(serverId);
@@ -773,9 +774,11 @@ describe("hosted servers", () => {
     );
 
     // Only the session of the server can keep it running.
-    await expect(context.service.reportActivity(ownerToken, server.serverId)).rejects.toMatchObject({ status: 404 });
+    await expect(context.service.reportActivity(ownerToken, server.serverId, { inUse: true })).rejects.toMatchObject({
+      status: 404,
+    });
     context.clock.now += 14 * MINUTE;
-    await context.service.reportActivity(sessionToken, server.serverId);
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
     context.clock.now += 14 * MINUTE;
     await context.service.tick(context.clock.now);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "running" });
@@ -783,9 +786,9 @@ describe("hosted servers", () => {
 
     // Use near the end of the boat lease moves the lease.
     context.clock.now += 33 * MINUTE;
-    await context.service.reportActivity(sessionToken, server.serverId);
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
     expect(leases().map((call) => [call.method, call.body])).toEqual([["PATCH", { ttlSeconds: LEASE }]]);
-    await context.service.reportActivity(sessionToken, server.serverId);
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
     expect(leases()).toHaveLength(1);
 
     context.clock.now += 15 * MINUTE;
@@ -794,7 +797,7 @@ describe("hosted servers", () => {
     expect(calls("/sandboxes/bx_1/stop")).toHaveLength(1);
     context.clock.now += MINUTE;
     await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
-    await context.service.reportActivity(sessionToken, server.serverId);
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
     await context.service.tick(context.clock.now + 5 * MINUTE);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", observed_state: "stopped" });
     expect(calls("/sandboxes/bx_1/resume")).toHaveLength(0);
@@ -803,6 +806,50 @@ describe("hosted servers", () => {
     await expect(context.service.wake(owner, server.serverId)).resolves.toMatchObject({ state: "waking" });
     expect(calls("/sandboxes/bx_1/resume").map((call) => call.body)).toEqual([{ ttlSeconds: LEASE }]);
     expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", last_wake_reason: "message" });
+  });
+
+  it("starts an idle server before its next routine run, once for each reported run", async () => {
+    const context = await setup();
+    const server = await createRunningServer(context);
+    const { sessionToken } = await context.service.redeemClaim(context.claims[0]);
+    const resumes = () => context.boatCalls.filter((call) => call.path === "/sandboxes/bx_1/resume");
+    const runAt = context.clock.now + 40 * MINUTE;
+
+    // A report with no use keeps the idle time, and a run that is due now is not stored.
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: context.clock.now });
+    expect(context.state(server.serverId)).toMatchObject({ next_run_at: null });
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt: runAt });
+    context.clock.now += 16 * MINUTE;
+    await context.service.tick(context.clock.now);
+    expect(context.state(server.serverId)).toMatchObject({ desired_state: "idle", next_run_at: runAt });
+    context.clock.now += MINUTE;
+    await context.service.handleWebhook(context.boatWebhook("sandbox.archived", "archived"));
+
+    context.clock.now = runAt - 11 * MINUTE;
+    await context.service.tick(context.clock.now);
+    expect(resumes()).toHaveLength(0);
+    context.clock.now = runAt - 9 * MINUTE;
+    await context.service.tick(context.clock.now);
+    await context.service.tick(context.clock.now);
+    expect(resumes()).toHaveLength(1);
+    expect(context.state(server.serverId)).toMatchObject({
+      desired_state: "running",
+      observed_state: "waking",
+      last_wake_reason: "schedule",
+      next_run_at: null,
+    });
+
+    // A server with no use does not stop just before its next run.
+    await context.service.handleWebhook(context.boatWebhook("sandbox.ready", "ready"));
+    const nextRunAt = context.clock.now + 20 * MINUTE;
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: false, nextRunAt });
+    context.clock.now += 16 * MINUTE;
+    await context.service.tick(context.clock.now);
+    expect(context.state(server.serverId)).toMatchObject({ desired_state: "running", observed_state: "running" });
+
+    // A report with no body is from an older server: it is use and keeps the stored run.
+    await context.service.reportActivity(sessionToken, server.serverId, { inUse: true });
+    expect(context.state(server.serverId)).toMatchObject({ next_run_at: nextRunAt });
   });
 });
 

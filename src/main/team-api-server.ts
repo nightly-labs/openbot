@@ -180,6 +180,7 @@ export class TeamApiServer {
   readonly #lifecycle = new LifecycleGate<number>();
   #port: number | null = null;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
+  #lastClientRequestAt: number | null = null;
   #agentListener: ((event: AgentEvent) => void) | null = null;
   #sidebarLayoutListener: ((layout: SidebarLayoutSnapshot) => void) | null = null;
   #localTypingAgentId: string | null = null;
@@ -343,6 +344,14 @@ export class TeamApiServer {
   /** Remote clients with an open event stream. Each WebRTC client opens one after it signs in. */
   connectedClientCount(): number {
     return this.#eventClients.size;
+  }
+
+  /**
+   * The last signed-in request or typing event from a client, or null for none. A client that is only
+   * open sends neither: it gets its updates on the event stream.
+   */
+  lastClientRequestAt(): number | null {
+    return this.#lastClientRequestAt;
   }
 
   setLocalTyping(agentId: string | null, typing: boolean): void {
@@ -564,6 +573,7 @@ export class TeamApiServer {
       if (!authenticated || !token) {
         return this.#json(response, 401, { error: sourceText("error.team.authenticationRequired") });
       }
+      this.#lastClientRequestAt = Date.now();
       const context = this.#requestContext(request, response, url, token, authenticated);
       const agents = this.#options.agents.listAgents();
       const hidden = hiddenProviderAgentIds(agents, context.protocol);
@@ -970,6 +980,7 @@ export class TeamApiServer {
   }
 
   #setClientTyping(connection: EventClientState, agentId: string | null): void {
+    this.#lastClientRequestAt = Date.now();
     const changed = connection.typingAgentId !== agentId;
     connection.typingAgentId = agentId;
     if (connection.typingTimer) clearTimeout(connection.typingTimer);
@@ -986,6 +997,7 @@ export class TeamApiServer {
   }
 
   #setClientDirectTyping(connection: EventClientState, recipientMemberId: string | null): void {
+    this.#lastClientRequestAt = Date.now();
     const previousRecipientId = connection.directTypingRecipientId;
     const changed = previousRecipientId !== recipientMemberId;
     const recipientAlreadyActive = recipientMemberId

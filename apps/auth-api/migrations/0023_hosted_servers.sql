@@ -34,7 +34,7 @@ CREATE TABLE hosted_servers (
   ),
   -- The creation time of the newest provider event applied. Older events that arrive late are ignored.
   provider_event_at INTEGER,
-  last_wake_reason TEXT CHECK(last_wake_reason IS NULL OR last_wake_reason IN ('create', 'message', 'restart')),
+  last_wake_reason TEXT CHECK(last_wake_reason IS NULL OR last_wake_reason IN ('create', 'message', 'restart', 'schedule')),
   claim_token_hash TEXT UNIQUE,
   claim_expires_at INTEGER,
   claim_redeemed_at INTEGER,
@@ -43,6 +43,8 @@ CREATE TABLE hosted_servers (
   last_active_at INTEGER,
   -- When boat stops the sandbox by itself. Each create and resume sets it, and activity extends it.
   lease_until INTEGER,
+  -- The next routine run that the server reported. The cron starts an idle server before it.
+  next_run_at INTEGER,
   idempotency_key TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,

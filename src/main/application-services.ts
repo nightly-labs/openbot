@@ -91,7 +91,7 @@ import { performDynamicIslandCriticalAction } from "./dynamic-island-actions";
 import { DynamicIslandWindowController } from "./dynamic-island-window";
 import { HostService } from "./host-service";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
-import { HostedServerActivity } from "./hosted-server-activity";
+import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import { applyHostedServerAccount, type HostedServerEnvironment } from "./hosted-server-bootstrap";
 import { HostedServerDesktopService } from "./hosted-server-service";
 import { HostedServerStartRetry } from "./hosted-server-start-retry";
@@ -1315,10 +1315,19 @@ export async function createApplicationServices({
     const hostedServerActivity = new HostedServerActivity({
       hostId: hostedServer.hostId,
       inUse: () =>
-        host.connectedClientCount() > 0 ||
+        service.hasActiveWork().length > 0 ||
         host.describeRestartBlockers().length > 0 ||
-        service.hasActiveWork().length > 0,
-      report: async (path) => centralAuth.requestAuthorized(path, { method: "POST" }, () => undefined),
+        (host.connectedClientCount() > 0 && Date.now() - (host.lastClientRequestAt() ?? 0) < CLIENT_USE_WINDOW_MS),
+      nextRunAt: () => {
+        const dueAt = service.nextRoutineDueAt();
+        return dueAt ? Date.parse(dueAt) : null;
+      },
+      report: async (path, report) =>
+        centralAuth.requestAuthorized(
+          path,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) },
+          () => undefined,
+        ),
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
     hostedServerActivity.start();

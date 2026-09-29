@@ -185,11 +185,11 @@ the avatar without an account session.
 
 ## Hosted servers
 
-Hosted servers are available only to the accounts that the account service allows. A hosted server is an
+Each account can buy hosted servers. A hosted server is a Linux
 OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
 France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
 team data, the same as your own computer would. The server stops 15 to 20 minutes after its last use and
-starts again when you connect. When boat stops the sandbox, boat keeps a snapshot of its disk until
+starts again when you connect, or a few minutes before its next scheduled routine run. When boat stops the sandbox, boat keeps a snapshot of its disk until
 the server starts again. Deleting the server
 deletes the sandbox.
 
@@ -197,8 +197,8 @@ For each hosted server, the account service stores the owner, name, size and the
 plan change, the plan, billing interval and currency, the open Stripe Checkout session ID, desired
 and reported state, a reason code when the server fails to start, the reason for its last start, the
 boat sandbox ID, a hash of the setup claim with its expiry and first-use times, the ID of the account
-session that the server signed in with, the time of its last use, the end of its boat stop timer, and
-creation, update and deletion times. After a
+session that the server signed in with, the time of its last use, the end of its boat stop timer, the time of
+its next scheduled routine run (not the routine or its instructions), and creation, update and deletion times. After a
 server is deleted, its record stays so that the service never loses track of a sandbox. It also
 stores the ID and receive time of each boat webhook delivery for 7 days. The account service does
 not receive the server's conversations, files or commands, and its boat key cannot read them.

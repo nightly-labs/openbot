@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
+  type HostedServerActivityReport,
   type HostedServerCatalog,
   type HostedServerCheckout,
   type HostedServerClaim,
@@ -73,6 +74,13 @@ const IDLE_STOP_AFTER_MS = 15 * 60_000;
 const LEASE_TTL_SECONDS = 2 * 60 * 60;
 const LEASE_EXTEND_BEFORE_MS = 60 * 60_000;
 /**
+ * The cron starts an idle server this long before its next routine run: one cron interval (5 minutes)
+ * and the time that the server takes to start. A server does not stop for no use in this time.
+ */
+const SCHEDULE_WAKE_BEFORE_MS = 10 * 60_000;
+/** A server can report a routine run at most this far ahead. A later run is reported when it comes nearer. */
+const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
+/**
  * The VM of the row has no session that works: it never signed in, or the owner revoked its session.
  * Only then does the claim work again.
  */
@@ -108,7 +116,7 @@ export class HostedServerServiceError extends Error {
  * (`stopped`). An idle server starts again on the next use; a stopped one only on renewal.
  */
 type DesiredState = "running" | "idle" | "stopped" | "deleted";
-type WakeReason = "create" | "message" | "restart";
+type WakeReason = "create" | "message" | "restart" | "schedule";
 
 interface HostedServerRow {
   server_id: string;
@@ -129,13 +137,14 @@ interface HostedServerRow {
   auth_session_id: string | null;
   last_active_at: number | null;
   lease_until: number | null;
+  next_run_at: number | null;
   created_at: number;
   updated_at: number;
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
-  last_active_at, lease_until, created_at, updated_at`;
+  last_active_at, lease_until, next_run_at, created_at, updated_at`;
 
 /** The billing calls that hosted servers use. */
 export type HostedServerBilling = Pick<
@@ -168,6 +177,7 @@ export interface HostedServerTickResult {
   abandoned: number;
   resized: number;
   idle: number;
+  scheduled: number;
   failed: number;
 }
 
@@ -394,10 +404,11 @@ export class HostedServerService {
   }
 
   /**
-   * The server reports that it is in use: a client is connected or an agent works. Only the session
-   * that the server got from its claim can report for it.
+   * The server reports whether it is in use (a client works with it or an agent works) and when its next
+   * routine runs. Only the session that the server got from its claim can report for it. A report with
+   * no body is from an older server: it is in use and does not change the next run.
    */
-  async reportActivity(sessionToken: string, serverId: string): Promise<void> {
+  async reportActivity(sessionToken: string, serverId: string, report: HostedServerActivityReport): Promise<void> {
     const now = this.#now();
     const row = await this.#database
       .prepare(
@@ -409,13 +420,26 @@ export class HostedServerService {
       .bind(serverId, await sha256(sessionToken), now)
       .first<HostedServerRow>();
     if (!row) throw notFound();
-    // An idle server already stops. Its next start comes from a client.
-    if (row.desired_state !== "running") return;
+    // A run that is due now is the server's own work: it runs, so the cron has no start to make for it.
+    const reported = report.nextRunAt;
+    const nextRunAt =
+      reported === undefined
+        ? row.next_run_at
+        : reported !== null && reported > now && reported <= now + NEXT_RUN_MAX_AHEAD_MS
+          ? reported
+          : null;
+    // An idle server already stops. Its next start comes from a client or from its next run.
+    const active = report.inUse && row.desired_state === "running";
+    if (!active && nextRunAt === row.next_run_at) return;
     await this.#database
-      .prepare("UPDATE hosted_servers SET last_active_at = ? WHERE server_id = ? AND desired_state = 'running'")
-      .bind(now, row.server_id)
+      .prepare(
+        `UPDATE hosted_servers SET next_run_at = ?,
+           last_active_at = CASE WHEN ? AND desired_state = 'running' THEN ? ELSE last_active_at END
+         WHERE server_id = ? AND desired_state != 'deleted'`,
+      )
+      .bind(nextRunAt, active ? 1 : 0, now, row.server_id)
       .run();
-    await this.#extendLease(row, now);
+    if (active) await this.#extendLease(row, now);
   }
 
   async redeemClaim(claim: unknown): Promise<HostedServerClaim> {
@@ -509,6 +533,7 @@ export class HostedServerService {
       abandoned: 0,
       resized: 0,
       idle: 0,
+      scheduled: 0,
       failed: 0,
     };
     await this.#database
@@ -600,11 +625,22 @@ export class HostedServerService {
       .prepare(
         `SELECT ${ROW_COLUMNS} FROM hosted_servers
          WHERE desired_state = 'running' AND observed_state = 'running' AND provider_sandbox_id IS NOT NULL
-           AND COALESCE(last_active_at, 0) <= ? AND updated_at <= ? LIMIT ?`,
+           AND COALESCE(last_active_at, 0) <= ? AND updated_at <= ?
+           AND (next_run_at IS NULL OR next_run_at <= ? OR next_run_at > ?) LIMIT ?`,
       )
-      .bind(now - IDLE_STOP_AFTER_MS, now - IDLE_STOP_AFTER_MS, TICK_BATCH_SIZE)
+      .bind(now - IDLE_STOP_AFTER_MS, now - IDLE_STOP_AFTER_MS, now, now + SCHEDULE_WAKE_BEFORE_MS, TICK_BATCH_SIZE)
       .all<HostedServerRow>();
     result.idle = await run(unused.results, (row) => this.#stopIdle(row, now));
+    // An idle server starts before its next routine run. The run is forgotten, so a server that does not
+    // report again is not started again for it.
+    const scheduled = await this.#database
+      .prepare(
+        `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE desired_state = 'idle' AND observed_state = 'stopped' AND next_run_at <= ? LIMIT ?`,
+      )
+      .bind(now + SCHEDULE_WAKE_BEFORE_MS, TICK_BATCH_SIZE)
+      .all<HostedServerRow>();
+    result.scheduled = await run(scheduled.results, (row) => this.#wakeForSchedule(row, now));
     // A server that must stop and still runs: the first stop did not happen.
     const unstopped = await this.#database
       .prepare(
@@ -1026,6 +1062,18 @@ export class HostedServerService {
     if (idle.meta.changes !== 1) return;
     this.#track(row, { name: "hosted_server_action", action: "idle_stopped", plan: row.plan, size: row.size });
     await this.#stop({ ...row, desired_state: "idle" });
+  }
+
+  async #wakeForSchedule(row: HostedServerRow, now: number): Promise<void> {
+    const started = await this.#database
+      .prepare(
+        `UPDATE hosted_servers SET desired_state = 'running', next_run_at = NULL, last_active_at = ?, updated_at = ?
+         WHERE server_id = ? AND desired_state = 'idle' AND next_run_at = ?`,
+      )
+      .bind(now, now, row.server_id, row.next_run_at)
+      .run();
+    if (started.meta.changes !== 1) return;
+    await this.#wake(await this.#requireRow(row.server_id), "schedule");
   }
 
   /** Moves the boat stop time of a server in use, so boat does not stop it. */

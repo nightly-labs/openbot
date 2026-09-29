@@ -296,3 +296,20 @@ export function parseDeleteHostedServerInput(value: unknown): DeleteHostedServer
   if (value.confirmName.length > INPUT_LIMITS.serverName) return null;
   return { serverId: value.serverId, confirmName: value.confirmName };
 }
+
+/** A hosted server sends this to the account server, so that the account server stops and starts it at the right time. */
+export interface HostedServerActivityReport {
+  /** A client works with the server, or an agent works. */
+  inUse: boolean;
+  /** The next routine run, in milliseconds since the epoch, or null for none. Undefined keeps the stored run. */
+  nextRunAt?: number | null;
+}
+
+/** An empty body is from an older server, which reports only when it is in use. */
+export function parseHostedServerActivityReport(value: unknown): HostedServerActivityReport | null {
+  if (value === null) return { inUse: true };
+  if (!isDynamicRecord(value) || !isBoolean(value.inUse)) return null;
+  if (value.nextRunAt === undefined) return { inUse: value.inUse };
+  if (value.nextRunAt !== null && !(isNumber(value.nextRunAt) && Number.isSafeInteger(value.nextRunAt))) return null;
+  return { inUse: value.inUse, nextRunAt: value.nextRunAt };
+}

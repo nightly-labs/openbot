@@ -49,7 +49,7 @@ const HOSTED_SERVER_ACTIONS = [
 type HostedServerAction = (typeof HOSTED_SERVER_ACTIONS)[number];
 
 const PORTAL_FLOWS = ["manage", "update", "cancel"] as const;
-const WAKE_REASONS = ["message", "restart"] as const;
+const WAKE_REASONS = ["message", "restart", "schedule"] as const;
 
 export type AccountAnalyticsEvent =
   | {
