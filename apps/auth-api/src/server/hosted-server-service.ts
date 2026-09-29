@@ -1315,15 +1315,8 @@ export class HostedServerService {
       const request = createRequest(row, row.provider_template, await hostedClaim(secret, row.server_id));
       return (await boat.createSandbox(request)).id;
     } catch (error) {
-      // boat refuses the request itself, for example because the template is gone: no sandbox can come
-      // from it. Any other failure keeps the deletion pending, and the cron asks again.
-      if (error instanceof BoatApiError && [400, 404, 422].includes(error.status)) {
-        console.warn("Hosted server lost sandbox lookup refused.", {
-          serverId: row.server_id,
-          error: safeErrorCode(error),
-        });
-        return null;
-      }
+      // A refusal does not prove that the earlier create made no sandbox: the template can be gone
+      // since. The deletion stays pending, and the cron asks again.
       throw new HostedServerServiceError(
         502,
         "hosted_server_provider_failed",
