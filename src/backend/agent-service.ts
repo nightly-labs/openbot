@@ -1038,9 +1038,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#mcp.changed();
   }
 
-  /** Whether any agent turn is running now. The Computer Use rim is up only while one is. */
-  hasRunningTurns(): boolean {
-    return this.#turn.hasRunningTurns();
+  /**
+   * When the most recent running agent turn started, or null while none runs. The Computer Use rim
+   * is up only for an action made since then.
+   */
+  latestRunningTurnStartedAt(): number | null {
+    return this.#turn.latestRunningTurnStartedAt();
   }
 
   /**

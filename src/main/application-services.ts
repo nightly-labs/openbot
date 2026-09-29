@@ -735,20 +735,23 @@ export async function createApplicationServices({
     readTarget: async (previous) => {
       if (!cuaDriver.mcpServerForProviders()) return null;
       // The rim marks work in progress, so it goes down with the last turn: completed, failed or
-      // cancelled. The driver's lease outlives the turn, and would hold the rim up for no one.
-      // `service` is built below; the controller starts only after it exists.
-      if (!service.hasRunningTurns()) return null;
-      const session = liveSession(await computerUseReads.sessions());
+      // cancelled. The driver's lease outlives the turn, so only an action made since the latest
+      // turn started counts: a lease left by the turn before would put the rim over a turn that
+      // does not touch the desktop. `service` is built below; the controller starts only after it.
+      const turnStartedAt = service.latestRunningTurnStartedAt();
+      if (turnStartedAt === null) return null;
+      const session = liveSession(await computerUseReads.sessions(), (Date.now() - turnStartedAt) / 1000);
       if (!session) return null;
       const windows = await computerUseReads.listWindows();
       const action = cuaDriver.lastAction(COMPUTER_USE_ACTION_MAX_AGE_MS);
-      const target = chooseTarget({ windows, session, action, ownPid: process.pid, previous });
-      if (!target) return null;
-      return {
-        ...target,
-        bounds: computerUseDesktopRect(target.bounds),
-        covered: target.covered.map(computerUseDesktopRect),
-      };
+      return chooseTarget({
+        windows,
+        session,
+        action,
+        ownPid: process.pid,
+        previous,
+        toDesktop: computerUseDesktopRect,
+      });
     },
   });
   // Before the daemon stops, so the rim is gone rather than left over a window nothing drives, and
