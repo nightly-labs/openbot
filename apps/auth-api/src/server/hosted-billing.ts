@@ -50,7 +50,7 @@ export function createHostedBilling(
     : null;
   const hosting = new HostedServerService(bindings, {
     removeHost: options.removeHost,
-    developerKey: options.developerKey,
+    developerKey: options.developerKey ?? null,
     billing,
     analytics,
   });
