@@ -10,8 +10,11 @@ import {
   type CreateElicitationResponse,
   type ElicitationContentValue,
   type InitializeResponse,
+  type LoadSessionRequest,
+  type LoadSessionResponse,
   ndJsonStream,
   type PermissionOption,
+  RequestError,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionConfigOption,
@@ -90,6 +93,9 @@ const MODEL_DISCOVERY_RETURN_MS = 250;
  * exit follows within milliseconds; a CLI that closed stdout and kept running is reported as it was.
  */
 const EXIT_REPORT_WAIT_MS = 2_000;
+
+/** How long OpenCode's second `session/load` waits after an internal service failure. */
+const OPENCODE_LOAD_RETRY_MS = 500;
 
 interface ClientEvents {
   notification: [notification: AppServerNotification];
@@ -703,7 +709,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!this.#loadsSessions) return null;
       await this.#startThread(params, true);
     } catch (error) {
-      this.emit("diagnostic", this.#redact(`ACP session load for a read failed: ${String(error)}`));
+      // The next turn replaces the missing session, so the user has nothing to act on.
+      if (!(error instanceof MissingOpenCodeSessionError)) {
+        this.emit("diagnostic", this.#redact(`ACP session load for a read failed: ${String(error)}`));
+      }
       return null;
     }
     const thread = this.#threads.get(id) ?? null;
@@ -792,7 +801,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = [...handoff.servers, ...mcp.servers];
       if (resume && requestedThreadId) {
-        const response = await connection.loadSession({
+        const response = await this.#loadSession(connection, {
           sessionId: requestedThreadId,
           cwd,
           additionalDirectories,
@@ -830,6 +839,27 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     } catch (error) {
       mcp.close();
       throw error;
+    }
+  }
+
+  /**
+   * OpenCode answers a session missing from its store with the same `-32603` "OpenCode service
+   * failure" as a transient fault of its internal server. One more attempt covers the transient
+   * fault. A second failure is reported as a missing session, so the caller replaces the session
+   * and hands it the transcript, and the user does not see the error on each message.
+   */
+  async #loadSession(connection: ClientSideConnection, request: LoadSessionRequest): Promise<LoadSessionResponse> {
+    try {
+      return await connection.loadSession(request);
+    } catch (error) {
+      if (this.provider !== "opencode" || !isOpenCodeServiceFailure(error)) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, OPENCODE_LOAD_RETRY_MS));
+    try {
+      return await connection.loadSession(request);
+    } catch (error) {
+      if (!isOpenCodeServiceFailure(error)) throw error;
+      throw new MissingOpenCodeSessionError(request.sessionId);
     }
   }
 
@@ -1091,7 +1121,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.provider === "opencode" &&
         /invalid api key|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail)
           ? `OpenCode rejected the selected model's credentials. Update or remove the OpenCode Go key in Settings. If you signed in through the OpenCode CLI, reconnect that provider there. Then retry or choose another model.\n${detail}`
-          : detail;
+          : this.provider === "opencode" && isOpenCodeServiceFailure(error)
+            ? sourceText("error.provider.opencodeServiceFailure")
+            : detail;
       this.emit("notification", {
         method: "error",
         params: { threadId: thread.id, turnId: turn.id, message },
@@ -1449,6 +1481,29 @@ function isDynamicToolResult(value: unknown): value is DynamicToolResult {
         isRecord(item) &&
         ((item.type === "inputText" && isString(item.text)) || (item.type === "inputImage" && isString(item.imageUrl))),
     )
+  );
+}
+
+/** A session load that OpenCode failed twice, taken as a missing session. */
+class MissingOpenCodeSessionError extends Error {
+  constructor(sessionId: string) {
+    // The wording is what `isMissingProviderSessionError` recognizes.
+    super(`OpenCode session not found: ${sessionId} (OpenCode service failure)`);
+    this.name = "MissingOpenCodeSessionError";
+  }
+}
+
+/**
+ * OpenCode's `session/*` wrapper error. It carries no cause: OpenCode maps each failed call to its
+ * internal server that is not an authentication error to this one.
+ */
+function isOpenCodeServiceFailure(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    /\bOpenCode service failure\b/.test(error.message) &&
+    isRecord(error.data) &&
+    error.data.service === "session"
   );
 }
 
