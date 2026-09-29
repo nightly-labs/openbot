@@ -30,19 +30,45 @@ export function requestWebNotificationPermission(again = false): void {
   }
 }
 
-/** Keeps the key of the focused tab current, so that no tab of this browser notifies while one has focus. */
+/** A tab that crashed cannot remove its record, so a record ends unless its focused tab renews it. */
+const FOCUS_RECORD_MS = 60_000;
+
+/** The focused tab and the end of its record, or null. */
+function readFocusRecord(): { tabId: string; until: number } | null {
+  try {
+    const [tabId, until] = (window.localStorage.getItem(FOCUSED_TAB_KEY) ?? "").split(" ");
+    const end = Number(until);
+    return tabId && Number.isFinite(end) ? { tabId, until: end } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps the record of the focused tab current, so that no tab of this browser notifies while one has focus. */
 export function watchWebTabFocus(): () => void {
-  const write = (focused: boolean) => {
+  let renewal: ReturnType<typeof setInterval> | undefined;
+  const mark = () => {
     try {
-      if (focused) window.localStorage.setItem(FOCUSED_TAB_KEY, TAB_ID);
-      else if (window.localStorage.getItem(FOCUSED_TAB_KEY) === TAB_ID) window.localStorage.removeItem(FOCUSED_TAB_KEY);
+      window.localStorage.setItem(FOCUSED_TAB_KEY, `${TAB_ID} ${Date.now() + FOCUS_RECORD_MS}`);
     } catch {
       // Without storage, each tab knows only its own focus.
     }
   };
-  const focus = () => write(true);
-  const blur = () => write(false);
-  write(document.hasFocus());
+  const focus = () => {
+    clearInterval(renewal);
+    mark();
+    renewal = setInterval(mark, FOCUS_RECORD_MS / 2);
+  };
+  const blur = () => {
+    clearInterval(renewal);
+    renewal = undefined;
+    try {
+      if (readFocusRecord()?.tabId === TAB_ID) window.localStorage.removeItem(FOCUSED_TAB_KEY);
+    } catch {
+      // As above.
+    }
+  };
+  if (document.hasFocus()) focus();
   window.addEventListener("focus", focus);
   window.addEventListener("blur", blur);
   window.addEventListener("pagehide", blur);
@@ -56,11 +82,8 @@ export function watchWebTabFocus(): () => void {
 
 function browserFocused(): boolean {
   if (document.hasFocus()) return true;
-  try {
-    return Boolean(window.localStorage.getItem(FOCUSED_TAB_KEY));
-  } catch {
-    return false;
-  }
+  const record = readFocusRecord();
+  return Boolean(record && record.until > Date.now());
 }
 
 /**
