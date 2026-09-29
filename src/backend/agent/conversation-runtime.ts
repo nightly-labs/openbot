@@ -211,12 +211,12 @@ export class ConversationRuntime {
       const persisted = this.#store.database.persistConversation(snapshot, eventType, detail);
       snapshot.revision = persisted.revision;
     }
-    this.publishConversation(snapshot);
+    this.publishConversation(snapshot, signature);
   }
 
-  publishConversation(snapshot: ConversationSnapshot): void {
+  publishConversation(snapshot: ConversationSnapshot, signature = conversationContentSignature(snapshot)): void {
     if (snapshot.threadId && this.#forgottenExecutionThreads.has(snapshot.threadId)) return;
-    this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, conversationContentSignature(snapshot));
+    this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
   }
 
@@ -292,8 +292,12 @@ export class ConversationRuntime {
 
   forgetAgent(agentId: string): void {
     for (const [id, snapshot] of this.#executionSnapshots) {
-      if (snapshot.agentId === agentId) this.#executionSnapshots.delete(id);
+      if (snapshot.agentId !== agentId) continue;
+      this.#executionSnapshots.delete(id);
+      this.#conversationSignatures.delete(id);
     }
+    const threadId = this.#snapshots.get(agentId)?.threadId;
+    if (threadId) this.#conversationSignatures.delete(threadId);
     this.#snapshots.delete(agentId);
     this.#conversationSignatures.delete(agentId);
   }

@@ -22,16 +22,12 @@ import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 import { RoutineChatCard } from "./RoutineChatCard";
 
-/** A message that renders only an action marker, with no bubble of its own. */
+/**
+ * A message that renders only an action marker, with no bubble of its own. A routine instruction is
+ * one: its marker names the routine, and the instruction text stays in the routine settings.
+ */
 function markerOnlyMessage(message: AgentMessage): boolean {
-  const marker = message.actionMarker;
-  if (!marker) return false;
-  return (
-    Boolean(message.exchange) ||
-    !message.routine ||
-    marker.kind === "routine-lifecycle" ||
-    marker.kind === "unavailable"
-  );
+  return Boolean(message.actionMarker);
 }
 
 /**
@@ -499,88 +495,72 @@ export function ConversationTimeline() {
                       when={message()?.questionPrompt}
                       keyed
                       fallback={
-                        <>
-                          <Show when={message()?.routine && message()?.actionMarker}>
-                            {(marker) => (
-                              <ChatActionMarker
-                                onOpenSkill={props.server?.id === "local" ? openSkillSettings : undefined}
-                                marker={marker()}
-                                agents={props.agents}
-                                announce={animateEntrance}
-                                routineAvailable={routineMarkerAvailable(marker(), props.availableRoutineIds)}
-                                onSelectAgent={props.onSelectAgent}
-                                onOpenRoutine={openRoutineSettings}
-                                onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                              />
-                            )}
-                          </Show>
-                          <ChatMessageRow
-                            message={message() ?? initialMessage}
-                            author={author()}
-                            showAuthor={author().kind === "member" && !continuesRun()}
-                            showTime={!continuesRun()}
-                            animate={animateEntrance}
-                            agents={props.agents}
-                            skills={installedSkills()}
-                            referencedMessage={referencedMessage()}
-                            referencedAuthorName={referencedAuthorName()}
-                            reactions={displayedReactions()}
-                            reactionOverflowCount={message()?.reactionSummary?.overflowCount}
-                            onRemoveReaction={() => {
-                              const currentMessage = message();
-                              if (currentMessage) void reactToMessage(currentMessage, null);
-                            }}
-                            data-chat-search-message={message()?.id}
-                            onSelectAgent={props.onSelectAgent}
-                            onOpenLink={(url) => void openExternalMessageUrl(url)}
-                            onPreview={(attachment) => void previewAttachment(attachment)}
-                            onAttachmentAction={attachmentAction}
-                            onOpenSharedFile={openSharedFile}
-                            onOpenWorkspaceFile={openWorkspaceFile}
-                            onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
-                            onDownload={(attachment) => attachmentAction(attachment, "download")}
-                            actions={
-                              <MessageActions
-                                message={message() ?? initialMessage}
-                                pickerOpen={openReactionMessageId() === message()?.id}
-                                moreOpen={openMoreMessageId() === message()?.id}
-                                expandedEmoji={expandedEmojiMessageId() === message()?.id}
-                                copied={copiedMessageId() === message()?.id}
-                                onTogglePicker={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
-                                  setOpenMoreMessageId(null);
-                                  setExpandedEmojiMessageId(null);
-                                }}
-                                onToggleMore={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
-                                  setOpenReactionMessageId(null);
-                                  setExpandedEmojiMessageId(null);
-                                }}
-                                onExpandEmoji={() => {
-                                  const messageId = message()?.id;
-                                  if (!messageId) return;
-                                  setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
-                                }}
-                                onReact={(emoji) => {
-                                  const currentMessage = message();
-                                  if (currentMessage) void reactToMessage(currentMessage, emoji);
-                                }}
-                                onReply={() => {
-                                  const currentMessage = message();
-                                  if (currentMessage) replyToMessage(currentMessage);
-                                }}
-                                onCopy={() => {
-                                  const currentMessage = message();
-                                  if (currentMessage) void copyMessage(currentMessage);
-                                }}
-                              />
-                            }
-                          />
-                        </>
+                        <ChatMessageRow
+                          message={message() ?? initialMessage}
+                          author={author()}
+                          showAuthor={author().kind === "member" && !continuesRun()}
+                          showTime={!continuesRun()}
+                          animate={animateEntrance}
+                          agents={props.agents}
+                          skills={installedSkills()}
+                          referencedMessage={referencedMessage()}
+                          referencedAuthorName={referencedAuthorName()}
+                          reactions={displayedReactions()}
+                          reactionOverflowCount={message()?.reactionSummary?.overflowCount}
+                          onRemoveReaction={() => {
+                            const currentMessage = message();
+                            if (currentMessage) void reactToMessage(currentMessage, null);
+                          }}
+                          data-chat-search-message={message()?.id}
+                          onSelectAgent={props.onSelectAgent}
+                          onOpenLink={(url) => void openExternalMessageUrl(url)}
+                          onPreview={(attachment) => void previewAttachment(attachment)}
+                          onAttachmentAction={attachmentAction}
+                          onOpenSharedFile={openSharedFile}
+                          onOpenWorkspaceFile={openWorkspaceFile}
+                          onDownloadAttachments={props.runtime ? undefined : downloadAttachments}
+                          onDownload={(attachment) => attachmentAction(attachment, "download")}
+                          actions={
+                            <MessageActions
+                              message={message() ?? initialMessage}
+                              pickerOpen={openReactionMessageId() === message()?.id}
+                              moreOpen={openMoreMessageId() === message()?.id}
+                              expandedEmoji={expandedEmojiMessageId() === message()?.id}
+                              copied={copiedMessageId() === message()?.id}
+                              onTogglePicker={() => {
+                                const messageId = message()?.id;
+                                if (!messageId) return;
+                                setOpenReactionMessageId((current) => (current === messageId ? null : messageId));
+                                setOpenMoreMessageId(null);
+                                setExpandedEmojiMessageId(null);
+                              }}
+                              onToggleMore={() => {
+                                const messageId = message()?.id;
+                                if (!messageId) return;
+                                setOpenMoreMessageId((current) => (current === messageId ? null : messageId));
+                                setOpenReactionMessageId(null);
+                                setExpandedEmojiMessageId(null);
+                              }}
+                              onExpandEmoji={() => {
+                                const messageId = message()?.id;
+                                if (!messageId) return;
+                                setExpandedEmojiMessageId((current) => (current === messageId ? null : messageId));
+                              }}
+                              onReact={(emoji) => {
+                                const currentMessage = message();
+                                if (currentMessage) void reactToMessage(currentMessage, emoji);
+                              }}
+                              onReply={() => {
+                                const currentMessage = message();
+                                if (currentMessage) replyToMessage(currentMessage);
+                              }}
+                              onCopy={() => {
+                                const currentMessage = message();
+                                if (currentMessage) void copyMessage(currentMessage);
+                              }}
+                            />
+                          }
+                        />
                       }
                     >
                       {(questionPrompt) => (
