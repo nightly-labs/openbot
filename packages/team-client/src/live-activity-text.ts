@@ -179,7 +179,7 @@ function visibleLength(text: string): number {
 }
 
 /** Writes LaTeX as Unicode text. A command it does not know keeps its name. */
-export function texToUnicode(tex: string): string {
+function texToUnicode(tex: string): string {
   let text = tex;
   for (let pass = 0; pass < 4; pass += 1) {
     text = text
