@@ -7,6 +7,8 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-29
+
 ### Added
 
 - Choose the app language in Settings > General: System default, English, French or Japanese. Text
@@ -39,6 +41,14 @@ the [root changelog](../../CHANGELOG.md).
   source.
 - Turn off the agent color on your messages in Settings > General > Appearance. Your messages then
   use the neutral color. The setting is on by default.
+- The message box continues a Markdown list. Press Return after a `- `, `* ` or `1. ` item to start the next item. Press Return on an empty item to end the list.
+- When you open a hosted server that stopped after it was not in use, the app starts it again and connects when it is ready.
+- The Lock Screen and the Dynamic Island show what your agents do, as the desktop Dynamic Island
+  does: work, new replies, questions, approvals, browser steps, and failed tasks. You can answer an
+  approval or a short question from the Lock Screen. OpenBot asks again before it approves a command.
+  When several agents have new replies, the activity lists them. Settings > General > Live Activities
+  turns this off. When iOS stops OpenBot in the background, the host keeps the activity current
+  through Apple. The update is encrypted for your phone, so Apple and OpenBot cannot read it.
 
 ### Changed
 
