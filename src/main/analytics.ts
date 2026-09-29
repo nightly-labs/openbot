@@ -113,7 +113,7 @@ export interface HostAnalyticsOptions {
   inventoryDay?: AnalyticsInventoryDayStore;
 }
 
-export interface AnalyticsRoutineRun {
+interface AnalyticsRoutineRun {
   runKind: "scheduled" | "manual";
   triggerType: string;
 }

@@ -56,7 +56,7 @@ export function toThreadItem(value: DynamicRecord): ThreadItem | null {
 }
 
 /** What a tool step was, in the closed set product analytics reports. */
-export type ToolUsageKind =
+type ToolUsageKind =
   | "command"
   | "file_change"
   | "file_read"
