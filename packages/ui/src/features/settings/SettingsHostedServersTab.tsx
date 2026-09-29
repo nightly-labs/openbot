@@ -94,7 +94,7 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
         )}
       </Show>
       <Text tone="muted" variant="caption">
-        {t("settings.hostedServers.alwaysOnNote")}
+        {t("settings.hostedServers.usageNote")}
       </Text>
 
       <Show when={state().error}>{(message) => <p class="settings-modal-error">{message()}</p>}</Show>

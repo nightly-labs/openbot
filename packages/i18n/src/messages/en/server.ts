@@ -81,7 +81,7 @@ export const messages = defineMessages("server", {
   "server.hosted.detail.connect.publish": "Adding the server to your account",
   "server.hosted.detail.connect.check": "Checking the connection",
   "server.hosted.readyTitle": "{name} is ready",
-  "server.hosted.readyDescription": "It runs all the time, also when this computer is off.",
+  "server.hosted.readyDescription": "It works also when this computer is off, and starts again when you use it.",
   "server.hosted.open": "Open server",
   "server.hosted.failedTitle": "The server could not start",
   "server.hosted.failedDescription": "Try again. If it fails again, delete the server in Settings.",

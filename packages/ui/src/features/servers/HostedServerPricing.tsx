@@ -312,7 +312,7 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                 </li>
                 <li>
                   <Clock3 aria-hidden="true" />
-                  {t("settings.hostedServers.plan.alwaysOn")}
+                  {t("settings.hostedServers.plan.startsOnUse")}
                 </li>
                 <li>
                   <UsersRound aria-hidden="true" />

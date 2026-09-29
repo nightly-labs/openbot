@@ -244,8 +244,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.add": "Add server",
   "settings.hostedServers.planSpec": "{plan} · {vcpu} vCPU, {memory} GB memory, {disk} GB storage",
   "settings.hostedServers.creating": "Creating…",
-  "settings.hostedServers.alwaysOnNote":
-    "A server runs all the time. Its agents and routines work when this computer is off.",
+  "settings.hostedServers.usageNote":
+    "A server stops after 15 minutes with no use, and starts again for a message or a scheduled routine. Its agents and routines work when this computer is off.",
   "settings.hostedServers.empty": "You do not have a hosted server yet.",
   "settings.hostedServers.state.awaitingPayment": "Waiting for payment",
   "settings.hostedServers.state.planEnded": "Plan ended",
@@ -288,7 +288,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.disk": "{count} GB storage",
   // Each plan is a Linux virtual machine. Agents run Linux commands and apps there, not macOS or Windows ones.
   "settings.hostedServers.plan.linux": "Linux machine",
-  "settings.hostedServers.plan.alwaysOn": "Always on, 24/7",
+  // A server stops when no one uses it, and starts again for a message or a scheduled routine.
+  "settings.hostedServers.plan.startsOnUse": "Starts when you use it",
   // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "Up to {count} member", other: "Up to {count} members" },
   // The speed of a plan compared with Starter. {factor} is a number, such as 2.

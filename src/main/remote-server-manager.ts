@@ -149,6 +149,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
   #localMemberLimit: number | null = null;
   readonly #onHostUnavailable: (serverId: string) => void;
+  #appFocused = true;
   readonly #remoteViewerProxy: RemoteViewerProxy | null;
   #selectChain = Promise.resolve();
   #muteExpiryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -259,7 +260,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#webrtcTransport?.on("error", (serverId, code, message) => {
       if (code === "host_unavailable" && !this.#awaitsHostRestart(serverId)) {
         this.#events.markHostOffline(serverId);
-        this.#onHostUnavailable(serverId);
+        // A hosted server that stopped for no use starts again only for use: the selected server with
+        // the app in focus. A reconnect in the background does not start it.
+        if (this.#appFocused && serverId === this.#store.activeServerId) this.#onHostUnavailable(serverId);
       }
       if (!this.#connections.reportTransportError(serverId, code, message)) this.#events.scheduleReconnect(serverId);
       if (code === "session_revoked") this.emit("directoryInvalidated");
@@ -318,6 +321,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   /** Focus retries an offline host at once. After that, it retries each 5 minutes with focus and each 15 without. */
   setAppFocused(focused: boolean): void {
+    this.#appFocused = focused;
     this.#events.setAppFocused(focused);
   }
 
@@ -376,6 +380,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       }
       this.#emitChanged();
       this.startEventConnections();
+      // The next retry of an offline host can be minutes away, so a selected hosted server starts now.
+      if (this.#events.isHostOffline(serverId)) this.#onHostUnavailable(serverId);
       return this.list();
     });
     this.#selectChain = operation.then(

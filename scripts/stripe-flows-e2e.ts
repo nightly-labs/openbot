@@ -230,7 +230,10 @@ class Account {
        WHERE owner_user_id = ${id} AND provider_sandbox_id IS NOT NULL AND deleted_at IS NULL`,
       sandboxIdSchema,
     );
-    for (const row of left) await boat("DELETE", `/sandboxes/${row.provider_sandbox_id}`);
+    for (const row of left) {
+      const { status } = await boat("DELETE", `/sandboxes/${row.provider_sandbox_id}`);
+      if (status >= 300 && status !== 404) throw new Error(`boat did not delete the VM that a run left: ${status}.`);
+    }
     d1(
       [
         `DELETE FROM hosted_servers WHERE owner_user_id = ${id}`,
