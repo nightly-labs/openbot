@@ -409,7 +409,7 @@ export class RemoteEventStream {
                   for (const event of bufferedAgentEvents) this.#agents.forward(serverId, event, true);
                   bufferedAgentEvents.length = 0;
                 })
-                .catch(() => socket.close(1011, "Initial agent state is unavailable"));
+                .catch(() => socket.close(1000, "Initial agent state is unavailable"));
             }
           },
           { once: true },
@@ -421,7 +421,7 @@ export class RemoteEventStream {
               serverId,
               new RemoteProtocolError("protocol_error", sourceText("error.remote.binaryEvent")),
             );
-            socket.close(1003, "Text event payloads are required");
+            socket.close(1000, "Text event payloads are required");
             return;
           }
           if (Buffer.byteLength(message.data) > REMOTE_EVENT_PAYLOAD_LIMIT) {
@@ -430,7 +430,7 @@ export class RemoteEventStream {
               serverId,
               new RemoteProtocolError("protocol_error", sourceText("error.remote.eventTooLarge")),
             );
-            socket.close(1009, "Event payload is too large");
+            socket.close(1000, "Event payload is too large");
             return;
           }
           try {
@@ -446,7 +446,7 @@ export class RemoteEventStream {
                 serverId,
                 new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidKnownEvent")),
               );
-              socket.close(1003, "Invalid known event payload");
+              socket.close(1000, "Invalid known event payload");
               return;
             }
             const event = decoded.event;
@@ -463,7 +463,7 @@ export class RemoteEventStream {
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {
-                  socket.close(1013, "Initial agent event buffer is full");
+                  socket.close(1000, "Initial agent event buffer is full");
                   return;
                 }
                 bufferedAgentEvents.push(event);
@@ -477,13 +477,13 @@ export class RemoteEventStream {
               serverId,
               new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidJson")),
             );
-            socket.close(1003, "Invalid event payload");
+            socket.close(1000, "Invalid event payload");
           }
         });
         socket.addEventListener(
           "error",
           () => {
-            socket.close(1011, "Remote events are unavailable");
+            socket.close(1000, "Remote events are unavailable");
             reject(new Error(sourceText("error.remote.eventsUnavailable")));
           },
           { once: true },

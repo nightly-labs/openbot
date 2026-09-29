@@ -34,7 +34,8 @@ import { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 
 // A socket the event stream can drive: `readyState` tracks `close()`, and `close` is a spy so a test
-// can name the code the stream chose to close with.
+// can name the code the stream chose to close with. Like the main process's WebSocket, it throws for
+// a code other than 1000 or 3000-4999; a real socket throws that inside a listener, uncaught.
 class FakeEventSocket extends EventTarget {
   static readonly OPEN = 1;
   static readonly CLOSED = 3;
@@ -45,6 +46,9 @@ class FakeEventSocket extends EventTarget {
   readonly openedAt = Date.now();
   readonly send = vi.fn();
   readonly close = vi.fn((code?: number, reason?: string) => {
+    if (code !== undefined && code !== 1000 && (code < 3000 || code > 4999)) {
+      throw new DOMException("invalid code", "InvalidAccessError");
+    }
     if (this.readyState === FakeEventSocket.CLOSED) return;
     this.readyState = FakeEventSocket.CLOSED;
     queueMicrotask(() => this.dispatchEvent(new CloseEvent("close", { code, reason })));
