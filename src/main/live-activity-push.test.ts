@@ -142,8 +142,11 @@ describe("LiveActivityPushService", () => {
     push.register("session-1", viewer, registration);
     await vi.runOnlyPendingTimersAsync();
     expect(send).toHaveBeenCalledTimes(1);
-    // The approval did not change, so only the retry sends it.
-    await vi.runOnlyPendingTimersAsync();
+    // An agent event during the wait does not send before the retry time.
+    listener?.({ type: "agents-changed", agents: [] });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(send).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(send).toHaveBeenCalledTimes(2);
 
     memberActive = false;

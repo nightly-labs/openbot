@@ -72,6 +72,8 @@ interface Registration {
   sending: boolean;
   /** Sends that failed in a row, for the time before the next attempt. */
   failures: number;
+  /** After a failed send, no update runs before this time, also for a new agent event. */
+  retryAt: number;
 }
 
 /**
@@ -123,6 +125,7 @@ export class LiveActivityPushService {
       sent: null,
       sending: false,
       failures: 0,
+      retryAt: 0,
     };
     this.#registrations.set(sessionId, registration);
     this.#schedule(registration, 0);
@@ -150,7 +153,7 @@ export class LiveActivityPushService {
   /** Runs an update after `delay`, or keeps an earlier one that is already planned. */
   #schedule(registration: Registration, delay: number): void {
     if (!away(registration)) return;
-    const at = this.#now() + delay;
+    const at = Math.max(this.#now() + delay, registration.retryAt);
     if (registration.timer && registration.timer.at <= at) return;
     this.#clearTimer(registration);
     registration.timer = {
@@ -158,7 +161,7 @@ export class LiveActivityPushService {
       handle: setTimeout(() => {
         registration.timer = null;
         void this.#update(registration);
-      }, delay),
+      }, at - this.#now()),
     };
   }
 
@@ -200,6 +203,7 @@ export class LiveActivityPushService {
     try {
       const result = await this.#options.send(push);
       registration.failures = 0;
+      registration.retryAt = 0;
       // Apple refused the token: the activity ended, or the app was removed.
       if (result === "gone" || !props) this.#stop(registration);
       else this.#schedule(registration, KEEPALIVE_MS);
@@ -208,8 +212,9 @@ export class LiveActivityPushService {
       // iOS marks the content out of date.
       registration.sent = sent;
       registration.failures += 1;
+      registration.retryAt = this.#now() + Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS);
       this.#options.logger?.warn("Live Activity update was not sent:", toLogValue(error));
-      this.#schedule(registration, Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS));
+      this.#schedule(registration, 0);
     } finally {
       registration.sending = false;
     }

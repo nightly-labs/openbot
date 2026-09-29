@@ -471,11 +471,21 @@ export function useLiveActivity({
       };
       const key = JSON.stringify(registration);
       if (cancelled || disposed.current || registered.current?.key === key) return;
+      // Recorded before the request, so a change of host during it still removes this one.
+      registered.current = { serverId: pushServerId, key: "" };
       await post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.register, { ...registration });
-      if (!disposed.current) registered.current = { serverId: pushServerId, key };
+      if (disposed.current) return;
+      if (registered.current?.serverId !== pushServerId) {
+        // The phone chose another host while this request ran, and its removal can arrive first.
+        void post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}).catch(() => undefined);
+        return;
+      }
+      // A newer run of this effect sends its own registration and records it.
+      if (!cancelled) registered.current = { serverId: pushServerId, key };
     })().catch(() => {
-      // The activity then shows its last state until the app returns, and marks it out of date.
-      registered.current = null;
+      // The activity then shows its last state until the app returns, and marks it out of date. The
+      // host stays recorded, so a change of host still removes it.
+      if (registered.current?.serverId === pushServerId) registered.current = { serverId: pushServerId, key: "" };
     });
     return () => {
       cancelled = true;
