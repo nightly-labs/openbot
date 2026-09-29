@@ -166,8 +166,8 @@ function normalizeKey(key: string): {
  * character, so a named key that has neither does nothing in the page.
  */
 export function namedKey(key: string): {
-  windowsVirtualKeyCode?: number;
-  nativeVirtualKeyCode?: number;
+  windowsVirtualKeyCode?: number | undefined;
+  nativeVirtualKeyCode?: number | undefined;
   text?: string;
 } {
   const alias = KEY_ALIASES[key.toLowerCase()];
