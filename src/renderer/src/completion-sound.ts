@@ -8,7 +8,7 @@ let completionAudioContext: AudioContext | undefined;
 type NotificationAgent = Pick<AgentSummary, "id" | "notifications">;
 type PreferenceStorage = Pick<Storage, "getItem">;
 
-/** The choice for this page when the browser blocks storage. */
+/** The choice for this page after the browser did not save it. It wins over an older saved value. */
 let unsavedPreference: boolean | undefined;
 
 /**
@@ -16,19 +16,21 @@ let unsavedPreference: boolean | undefined;
  * `window.localStorage` throws when the browser blocks storage, so it is read inside the guard.
  */
 export function isCompletionSoundEnabled(storage?: PreferenceStorage): boolean {
+  if (unsavedPreference !== undefined) return unsavedPreference;
   try {
     return (storage ?? window.localStorage).getItem(COMPLETION_SOUND_STORAGE_KEY) !== "false";
   } catch {
-    return unsavedPreference ?? true;
+    return true;
   }
 }
 
 export function setCompletionSoundEnabled(enabled: boolean, storage?: Pick<Storage, "setItem">): void {
-  unsavedPreference = enabled;
   try {
     (storage ?? window.localStorage).setItem(COMPLETION_SOUND_STORAGE_KEY, String(enabled));
+    unsavedPreference = undefined;
   } catch {
-    // Blocked storage keeps the switch for this page only.
+    // Blocked or full storage keeps the switch for this page only.
+    unsavedPreference = enabled;
   }
 }
 
