@@ -117,7 +117,7 @@ interface ImportContext {
 }
 
 /** The owner of the exports the local user stages. A member's owner is the member id. */
-export const LOCAL_IMPORT_OWNER = "local";
+const LOCAL_IMPORT_OWNER = "local";
 /** Uploaded exports kept at one time, across all members. */
 const UPLOAD_SLOTS = 4;
 /** An uploaded export nobody applied is released after this. */
