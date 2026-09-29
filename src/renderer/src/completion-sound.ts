@@ -8,26 +8,34 @@ let completionAudioContext: AudioContext | undefined;
 type NotificationAgent = Pick<AgentSummary, "id" | "notifications">;
 type PreferenceStorage = Pick<Storage, "getItem">;
 
-/** The sound is on unless the user turned it off; it played before the switch was saved. */
-export function isCompletionSoundEnabled(storage: PreferenceStorage = window.localStorage): boolean {
-  return storage.getItem(COMPLETION_SOUND_STORAGE_KEY) !== "false";
+/** The choice for this page when the browser blocks storage. */
+let unsavedPreference: boolean | undefined;
+
+/**
+ * The sound is on unless the user turned it off; it played before the switch was saved. Reading
+ * `window.localStorage` throws when the browser blocks storage, so it is read inside the guard.
+ */
+export function isCompletionSoundEnabled(storage?: PreferenceStorage): boolean {
+  try {
+    return (storage ?? window.localStorage).getItem(COMPLETION_SOUND_STORAGE_KEY) !== "false";
+  } catch {
+    return unsavedPreference ?? true;
+  }
 }
 
-export function setCompletionSoundEnabled(
-  enabled: boolean,
-  storage: Pick<Storage, "setItem"> = window.localStorage,
-): void {
+export function setCompletionSoundEnabled(enabled: boolean, storage?: Pick<Storage, "setItem">): void {
+  unsavedPreference = enabled;
   try {
-    storage.setItem(COMPLETION_SOUND_STORAGE_KEY, String(enabled));
+    (storage ?? window.localStorage).setItem(COMPLETION_SOUND_STORAGE_KEY, String(enabled));
   } catch {
-    // Blocked storage keeps the switch for this session only.
+    // Blocked storage keeps the switch for this page only.
   }
 }
 
 export function shouldPlayCompletionSound(
   event: AgentEvent,
   agents: NotificationAgent[],
-  storage: PreferenceStorage = window.localStorage,
+  storage?: PreferenceStorage,
 ): boolean {
   if (event.type !== "turn-completed" || event.status !== "completed") return false;
   if (!isCompletionSoundEnabled(storage)) return false;
@@ -37,7 +45,7 @@ export function shouldPlayCompletionSound(
 export function playCompletionSoundForAgentEvent(
   event: AgentEvent,
   agents: NotificationAgent[],
-  storage: PreferenceStorage = window.localStorage,
+  storage?: PreferenceStorage,
 ): void {
   if (!shouldPlayCompletionSound(event, agents, storage)) return;
   void playCompletionSound();
