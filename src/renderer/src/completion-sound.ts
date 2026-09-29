@@ -8,13 +8,29 @@ let completionAudioContext: AudioContext | undefined;
 type NotificationAgent = Pick<AgentSummary, "id" | "notifications">;
 type PreferenceStorage = Pick<Storage, "getItem">;
 
+/** The sound is on unless the user turned it off; it played before the switch was saved. */
+export function isCompletionSoundEnabled(storage: PreferenceStorage = window.localStorage): boolean {
+  return storage.getItem(COMPLETION_SOUND_STORAGE_KEY) !== "false";
+}
+
+export function setCompletionSoundEnabled(
+  enabled: boolean,
+  storage: Pick<Storage, "setItem"> = window.localStorage,
+): void {
+  try {
+    storage.setItem(COMPLETION_SOUND_STORAGE_KEY, String(enabled));
+  } catch {
+    // Blocked storage keeps the switch for this session only.
+  }
+}
+
 export function shouldPlayCompletionSound(
   event: AgentEvent,
   agents: NotificationAgent[],
   storage: PreferenceStorage = window.localStorage,
 ): boolean {
   if (event.type !== "turn-completed" || event.status !== "completed") return false;
-  if (storage.getItem(COMPLETION_SOUND_STORAGE_KEY) === "false") return false;
+  if (!isCompletionSoundEnabled(storage)) return false;
   return agents.some((agent) => agent.id === event.agentId && agent.notifications);
 }
 

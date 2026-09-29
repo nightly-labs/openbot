@@ -12,14 +12,14 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
-import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
-import { appPort } from "../../app-port";
+import { useText } from "../../text";
 import type { SettingsHostedSitesStore } from "./stores/hosted-sites-store";
 
 interface SettingsHostedSitesTabProps {
   store: SettingsHostedSitesStore;
   available: boolean;
+  onOpenSite: (url: string) => void;
 }
 
 export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
@@ -53,7 +53,7 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                       class="hosted-sites-link"
                       title={site.hostname}
                       disabled={site.status !== "active"}
-                      onClick={() => void appPort().openUrl(site.url)}
+                      onClick={() => props.onOpenSite(site.url)}
                     >
                       <span class="hosted-sites-link-label">{site.hostname}</span>
                     </Button>
@@ -76,7 +76,7 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                       size="sm"
                       aria-label={t("settings.hostedSites.openLabel", { hostname: site.hostname })}
                       disabled={site.status !== "active"}
-                      onClick={() => void appPort().openUrl(site.url)}
+                      onClick={() => props.onOpenSite(site.url)}
                     >
                       <ExternalLink size={14} aria-hidden="true" />
                       {t("common.open")}

@@ -22,6 +22,7 @@ import {
   Puzzle,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Tooltip,
   UserAvatar,
   UserRound,
@@ -57,6 +58,8 @@ interface AccountDockProps {
   onOpenPermissions?: () => void;
   onOpenProfile?: (() => void) | undefined;
   onOpenBilling?: (() => void) | undefined;
+  /** The account's own settings, for a client where Settings opens the settings of a host. */
+  onOpenAccountSettings?: (() => void) | undefined;
   onOpenSettings?: ((trigger: HTMLElement) => void) | undefined;
   onOpenSkills?: (() => void) | undefined;
   /** Draws the shelf (identity, usage chip, settings) on any platform. By default only the macOS app does. */
@@ -342,7 +345,14 @@ export function AccountDock(props: AccountDockProps) {
           />
           <div class="account-menu-separator" />
         </Show>
-        <Show when={props.onOpenProfile || props.onOpenBilling || (includeDockActions && props.onOpenSettings)}>
+        <Show
+          when={
+            props.onOpenProfile ||
+            props.onOpenBilling ||
+            props.onOpenAccountSettings ||
+            (includeDockActions && props.onOpenSettings)
+          }
+        >
           <section class="account-menu-group" aria-label={t("account.menu.account")}>
             <Show when={props.onOpenProfile}>
               <Button
@@ -370,6 +380,20 @@ export function AccountDock(props: AccountDockProps) {
               >
                 <CreditCard class="account-menu-icon" aria-hidden="true" />
                 <span>{t("account.menu.billing")}</span>
+              </Button>
+            </Show>
+            <Show when={props.onOpenAccountSettings}>
+              <Button
+                variant="ghost"
+                type="button"
+                class="account-menu-row"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenAccountSettings?.();
+                }}
+              >
+                <SlidersHorizontal class="account-menu-icon" aria-hidden="true" />
+                <span>{t("account.menu.accountSettings")}</span>
               </Button>
             </Show>
             <Show when={includeDockActions && props.onOpenSettings}>

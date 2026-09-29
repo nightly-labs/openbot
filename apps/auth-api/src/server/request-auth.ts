@@ -101,14 +101,6 @@ export function hostedSiteErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-export function requireIdempotencyKey(request: Request): string {
-  const key = request.headers.get("Idempotency-Key")?.trim() ?? "";
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u.test(key)) {
-    throw new HostedSiteInputError(400, "invalid_idempotency_key", "A valid Idempotency-Key header is required.");
-  }
-  return key;
-}
-
 export function enforceMarketplaceMutationRateLimit(kind: MarketplaceMutationKind, principal: string): Promise<void> {
   return enforceMarketplaceMutation(requireWorkerBindings(env), kind, principal);
 }

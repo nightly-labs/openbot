@@ -1,16 +1,18 @@
-import type { AccountSession, AvatarImageInput } from "@openbot/contracts/ipc";
+import { parseHostedSiteSummary } from "@openbot/contracts/hosted-sites";
+import type { AccountSession, AvatarImageInput, HostedSitesDesktopApi } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 
 /**
- * The desktop Settings > Profile calls for a signed-in browser. They use the `/api/browser/v1/me/...`
- * operations, which authenticate with the browser cookie instead of a bearer token.
+ * The desktop Settings > Profile and Hosted sites calls for a signed-in browser. They use the
+ * `/api/browser/v1/...` operations, which authenticate with the browser cookie instead of a bearer token.
  */
 export interface WebAccountCalls {
   updateName: (name: string) => Promise<void>;
   updateAvatar: (image: AvatarImageInput | null) => Promise<void>;
   listSessions: () => Promise<AccountSession[]>;
   revokeSession: (sessionId: string) => Promise<void>;
+  hostedSites: Pick<HostedSitesDesktopApi, "list" | "delete">;
 }
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -21,7 +23,7 @@ export function createWebAccountCalls(
 ): WebAccountCalls {
   async function request(
     path: string,
-    init: { method: string; body?: BodyInit; contentType?: string } = { method: "GET" },
+    init: { method: string; body?: BodyInit; contentType?: string; idempotencyKey?: string } = { method: "GET" },
   ): Promise<Response> {
     // As the team client's browser requests: a stalled request fails, so the panel does not stay busy.
     const response = await accountFetch(`/api/browser/${path}`, {
@@ -32,7 +34,11 @@ export function createWebAccountCalls(
       headers:
         init.method === "GET"
           ? {}
-          : { "Content-Type": init.contentType ?? "application/json", "X-OpenBot-Browser": "1" },
+          : {
+              "Content-Type": init.contentType ?? "application/json",
+              "X-OpenBot-Browser": "1",
+              ...(init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
+            },
       ...(init.body === undefined ? {} : { body: init.body }),
     }).catch(() => {
       throw new Error(errorMessage(null));
@@ -63,7 +69,25 @@ export function createWebAccountCalls(
     async revokeSession(sessionId) {
       await request(`v1/me/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", body: "{}" });
     },
+    hostedSites: {
+      async list() {
+        const value = await (await request("v1/sites")).json().catch(() => null);
+        if (!isDynamicRecord(value) || !Array.isArray(value.sites)) throw new Error(errorMessage(null));
+        return value.sites.map((site) => parseHostedSiteSummary(site) ?? invalidResponse());
+      },
+      async delete({ siteId }) {
+        await request(`v1/sites/${encodeURIComponent(siteId)}`, {
+          method: "DELETE",
+          body: "{}",
+          idempotencyKey: `web:delete:${crypto.randomUUID()}`,
+        });
+      },
+    },
   };
+}
+
+function invalidResponse(): never {
+  throw new Error(errorMessage(null));
 }
 
 function errorMessage(value: unknown): string {

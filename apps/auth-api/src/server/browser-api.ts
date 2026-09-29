@@ -6,6 +6,8 @@ import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountA
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
 import { sha256 } from "./crypto";
 import type { HostedServerService } from "./hosted-server-service";
+import { HOSTED_SITE_LIMITS, HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
+import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
@@ -50,6 +52,7 @@ export interface BrowserApiServices {
   /** The billing service, or null when this deployment has no Stripe key. */
   billing: () => Pick<BillingService, "getState" | "createPortal"> | null;
   avatarBucket: () => R2Bucket;
+  hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   signalUrl: () => string;
   sourceIp: (request: Request) => string;
   errorResponse: (error: unknown) => Response;
@@ -177,6 +180,8 @@ export async function handleBrowserApi(request: Request, services: BrowserApiSer
     if (account) return account;
     const hosting = await handleHosting(request, path, user, services);
     if (hosting) return hosting;
+    const hostedSites = await handleHostedSites(request, path, user, services);
+    if (hostedSites) return hostedSites;
     const administration = await handleAdministration(request, path, user, services);
     if (administration) return administration;
     if (request.method !== "POST")
@@ -329,6 +334,30 @@ async function handleHosting(
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
   return null;
+}
+
+/**
+ * The account's published sites: the bearer `/v1/sites/` list and delete routes for a browser.
+ * Publishing reads a local folder, so it stays on the desktop. Returns null for any other path.
+ */
+async function handleHostedSites(
+  request: Request,
+  path: string,
+  user: AuthUser,
+  services: BrowserApiServices,
+): Promise<Response | null> {
+  try {
+    if (path === "v1/sites" && request.method === "GET")
+      return json({ sites: await services.hostedSites().list(user.id), limit: HOSTED_SITE_LIMITS.activeSites });
+    const [, encodedSiteId] = /^v1\/sites\/([^/]+)$/u.exec(path) ?? [];
+    if (encodedSiteId === undefined || request.method !== "DELETE") return null;
+    const key = requireIdempotencyKey(request);
+    await services.hostedSites().delete(user.id, decodeURIComponent(encodedSiteId), key);
+    return json({ deleted: true });
+  } catch (error) {
+    if (error instanceof HostedSiteInputError) return failure(error.status, error.code, error.message);
+    throw error;
+  }
 }
 
 /** Members and invites of one host. Returns null when the path and method are not one of them. */

@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { HOSTED_SITE_LIMITS, parseHostedSiteUploadRequest } from "../../../server/hosted-site-contract";
+import {
+  HOSTED_SITE_LIMITS,
+  parseHostedSiteUploadRequest,
+  requireIdempotencyKey,
+} from "../../../server/hosted-site-contract";
 import { readJsonObject } from "../../../server/json-body";
 import {
   apiError,
@@ -7,7 +11,6 @@ import {
   json,
   requestHostedSiteService,
   requestUser,
-  requireIdempotencyKey,
   requireSitePublishingEnabled,
 } from "../../../server/request-auth";
 
