@@ -165,7 +165,7 @@ webhooks and writes their secrets to that file. It also sets the allow list from
 | Name | Value |
 | --- | --- |
 | `HOSTED_SERVER_TEMPLATE` | The named snapshot from the template build, such as `openbot-server-0-9-0`. |
-| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs or emails that can create servers. `api:deploy:test` sets it from `HOSTED_SERVERS_TEST_ALLOW_LIST` and refuses `*`: the test Worker is public, and its boat account is a trial. |
+| `HOSTED_SERVERS_ALLOWED_USER_IDS` | Comma-separated account IDs or emails that can create servers. `api:deploy:test` sets it from `HOSTED_SERVERS_TEST_ALLOW_LIST` and refuses `*`: the test Worker is public, and it shares its boat account with production. |
 
 The `BOAT_API_KEY` in `.env.shared` is the development key of the boat test account. It also has
 command access, because the e2e script (`scripts/stripe-flows-e2e.ts`) reads the VM with it. Use it
@@ -199,8 +199,9 @@ bun run api:deploy:test
 
 `HOSTED_SERVERS_TEST_ALLOW_LIST` has the account IDs of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, so the e2e scenarios, which send no key, can
-create servers. Use Starter or Standard: the boat trial account has no `large` machine
-and allows 75 sandbox starts each day.
+create servers. The test and production Workers use one paid boat account (plan `box_20`), so
+they share its limits: 100 active sandboxes, 200 starts each day, and 2,000,000 compute seconds
+each month (about 555 hours).
 
 ## Production
 
