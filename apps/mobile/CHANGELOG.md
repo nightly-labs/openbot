@@ -7,6 +7,8 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-29
+
 ### Added
 
 - Choose the app language in Settings > General: System default, English, French or Japanese. Text
