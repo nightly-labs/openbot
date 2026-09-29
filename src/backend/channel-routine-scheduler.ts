@@ -175,8 +175,6 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
         // The trigger advances whether or not the fire succeeds, so a channel builds no backlog.
         this.#routines.advanceTrigger(due.routine.id, due.triggerId, nextRunAt.toISOString());
         changed.add(due.routine.channelId);
-        // An unfinished run already carries this routine's request; a second one would duplicate it.
-        if (this.#routines.activeRuns(due.routine.channelId, due.routine.id).length > 0) continue;
         await this.#fire(due.routine, due.triggerId, scheduledFor.toISOString());
       }
     } finally {
