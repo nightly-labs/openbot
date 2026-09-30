@@ -11,6 +11,7 @@ import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
+import type { SettingsTab } from "./settings-tabs";
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
 
@@ -51,6 +52,10 @@ const Settings = createSimpleContext({
      */
     const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
+    const [appSettingsTabRequest, setAppSettingsTabRequest] = createSignal<{
+      tab: SettingsTab;
+      nonce: number;
+    } | null>(null);
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>({
       ...DEFAULT_GENERAL_SETTINGS,
       taskCompletionSound: isCompletionSoundEnabled(),
@@ -256,10 +261,14 @@ const Settings = createSimpleContext({
       return agentAutoApprovalEnabled({ ...approvalAutomation(), turbo: generalSettings().turboMode }, agentId);
     }
 
-    /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
-    function openAppSettings(trigger?: HTMLElement | null): void {
+    /**
+     * Remembers what to focus when the dialog closes; the dialog itself restores it. A `tab` shows
+     * that tab; without one, the dialog opens on the tab it showed last.
+     */
+    function openAppSettings(trigger?: HTMLElement | null, tab?: SettingsTab): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       appSettingsRestoreTarget = target;
+      if (tab) setAppSettingsTabRequest({ tab, nonce: Date.now() });
       setAppSettingsOpen(true);
     }
 
@@ -366,6 +375,7 @@ const Settings = createSimpleContext({
       setAppSettingsOpen,
       appSettingsRestoreTarget: () => appSettingsRestoreTarget,
       openAppSettings,
+      appSettingsTabRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

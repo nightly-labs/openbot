@@ -60,7 +60,7 @@ async function createHostService(
   const options: HostOptions = {
     appVersion: "0.4.0",
     store,
-    agents: { ...createAgents(), adoptConversationReads: unimplemented },
+    agents: { ...createAgents(), adoptConversationReads: unimplemented, searchConversationFiles: unimplemented },
     skills: { listInstalledForChatTags: unimplemented },
     sidebarLayout: {
       getSnapshot: unimplemented,

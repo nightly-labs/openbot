@@ -1260,6 +1260,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         );
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };
       },
+      searchConversationFiles: async (input) => {
+        const query = input.query.trim().toLocaleLowerCase();
+        const results = agents.flatMap((agent) =>
+          getSnapshot(agent.id).messages.flatMap((message) =>
+            (message.attachments ?? [])
+              .filter((attachment) => attachment.name.toLocaleLowerCase().includes(query))
+              .map((attachment) => ({
+                agentId: agent.id,
+                messageId: message.id,
+                createdAt: message.createdAt,
+                attachment: clone(attachment),
+              })),
+          ),
+        );
+        const offset = Number(input.cursor ?? 0);
+        const end = offset + (input.limit ?? 50);
+        return { results: results.slice(offset, end), nextCursor: end < results.length ? String(end) : null };
+      },
       listConversationReads: async () => ({}),
       markConversationRead: async (input) => ({
         unreadCount: 0,

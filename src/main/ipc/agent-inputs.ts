@@ -36,6 +36,7 @@ import {
   type RespondToApprovalInput,
   type RespondToBrowserTakeoverInput,
   type RespondToPromptInput,
+  type SearchConversationFilesInput,
   type SearchConversationMessagesInput,
   type SendMessageInput,
   type SetAgentAvatarInput,
@@ -378,6 +379,17 @@ export function parseSearchConversationMessages(value: unknown): SearchConversat
       : { agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier) }),
     ...(value.cursor === undefined ? {} : { cursor: requireString(value.cursor, "cursor", 2048) }),
     limit,
+  };
+}
+
+/** An empty query is allowed: it lists the newest files. */
+export function parseSearchConversationFiles(value: unknown): SearchConversationFilesInput {
+  if (!isObject(value) || !isString(value.query)) throw new Error("Invalid conversation file search request.");
+  if (value.query.length > INPUT_LIMITS.attachmentName) throw new Error("query is too long.");
+  return {
+    query: value.query,
+    ...(value.cursor === undefined ? {} : { cursor: requireString(value.cursor, "cursor", 2048) }),
+    limit: parsePageLimit(value.limit),
   };
 }
 

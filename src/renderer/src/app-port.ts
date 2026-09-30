@@ -11,7 +11,10 @@ export interface AppPort {
   openExternal: OpenBotDesktopApi["openExternal"];
   openUrl: OpenBotDesktopApi["openUrl"];
   setAppLanguagePreference: OpenBotDesktopApi["setAppLanguagePreference"];
-  agent: Pick<OpenBotDesktopApi["agent"], "readConversationPage" | "searchConversationMessages">;
+  agent: Pick<
+    OpenBotDesktopApi["agent"],
+    "readConversationPage" | "searchConversationMessages" | "searchConversationFiles" | "listRoutines"
+  >;
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "onOpenLink" | "takePendingLink">;
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];

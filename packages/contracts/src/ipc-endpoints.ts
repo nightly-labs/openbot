@@ -134,6 +134,7 @@ import type {
 } from "./ipc-channel-routines";
 import type { Channel, ChannelCommand, ChannelPage, ChannelReadInput, ChannelSummary } from "./ipc-chat-channels";
 import type {
+  ConversationFileSearchPage,
   ConversationPage,
   ConversationReadState,
   ConversationSearchPage,
@@ -141,6 +142,7 @@ import type {
   MarkConversationReadInput,
   ReadConversationPageInput,
   RespondToPromptInput,
+  SearchConversationFilesInput,
   SearchConversationMessagesInput,
   SendMessageInput,
   SetMessageReactionInput,
@@ -681,6 +683,10 @@ export const IPC_ENDPOINTS = {
     readConversationPage: scopedRequest<ReadConversationPageInput, ConversationPage>()("agent:read-conversation-page"),
     searchConversationMessages: scopedRequest<SearchConversationMessagesInput, ConversationSearchPage>()(
       "agent:search-conversation-messages",
+    ),
+    // Local only: a joined server has no file search route, so the renderer asks only this computer.
+    searchConversationFiles: request<SearchConversationFilesInput, ConversationFileSearchPage>()(
+      "agent:search-conversation-files",
     ),
     listConversationReads: scopedQuery<Record<string, ConversationReadState>>()("agent:list-conversation-reads"),
     markConversationRead: scopedRequest<MarkConversationReadInput, ConversationReadState>()(

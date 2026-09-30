@@ -711,16 +711,18 @@ describe("OpenBot connected desktop shell", () => {
 
     await fireEvent.click(screen.getByRole("tab", { name: "Messages" }));
     await fireEvent.input(input, { target: { value: "sources-hidden-id" } });
-    await screen.findByText("No matching messages or agents");
+    await screen.findByText("No results");
     await fireEvent.input(input, { target: { value: "research" } });
+    await vi.waitFor(() =>
+      expect(window.openbot.agent.searchConversationMessages).toHaveBeenCalledWith({
+        query: "research",
+        limit: 100,
+      }),
+    );
     const messageResult = await screen.findByRole("option", { name: /Ask @Research to use Sources \(skill\)\./ });
     expect(messageResult).not.toHaveTextContent("research-hidden-id");
     await fireEvent.click(messageResult);
     await screen.findByRole("heading", { name: "Sales Outbound" });
-    expect(window.openbot.agent.searchConversationMessages).toHaveBeenCalledWith({
-      query: "research",
-      limit: 100,
-    });
     expect(window.openbot.agent.readConversationPage).toHaveBeenCalledWith({
       agentId: "sales-outbound",
       anchor: { type: "around", messageId: "sales-search-result" },

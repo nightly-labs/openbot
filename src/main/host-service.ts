@@ -6,6 +6,7 @@ import type {
   AvatarImageInput,
   CentralAuthUser,
   ConfigureHostInput,
+  ConversationFileSearchPage,
   ConversationMessageSender,
   ConversationPage,
   ConversationPageAnchor,
@@ -85,7 +86,7 @@ interface HostServiceOptions {
   admin?: ForwardedApiOptions["admin"];
   appVersion: string;
   store: TeamStore;
-  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads">;
+  agents: ForwardedApiOptions["agents"] & Pick<AgentService, "adoptConversationReads" | "searchConversationFiles">;
   skills: NonNullable<ForwardedApiOptions["skills"]>;
   sidebarLayout: NonNullable<ForwardedApiOptions["sidebarLayout"]>;
   mailbox: ForwardedApiOptions["mailbox"];
@@ -799,6 +800,10 @@ export class HostService extends EventEmitter<HostEvents> {
     limit = 100,
   ): ConversationSearchPage {
     return this.#options.agents.searchConversationMessages(query, agentId, cursor, limit);
+  }
+
+  searchAgentConversationFiles(query: string, cursor?: string, limit = 50): ConversationFileSearchPage {
+    return this.#options.agents.searchConversationFiles(query, cursor, limit);
   }
 
   listAgentConversationReads(): Record<string, ConversationReadState> {

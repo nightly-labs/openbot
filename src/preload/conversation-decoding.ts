@@ -5,6 +5,7 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import {
+  type ConversationFileSearchPage,
   type ConversationMessage,
   type ConversationPage,
   type ConversationReadState,
@@ -74,6 +75,24 @@ export function decodeConversationPageFromMain(value: unknown): ConversationPage
       olderCursor: nullableString(pageInfo, "olderCursor"),
     },
     ...(value.readState === undefined ? {} : { readState: decodeReadState(value.readState) }),
+  };
+}
+
+export function decodeConversationFileSearchPage(value: unknown): ConversationFileSearchPage {
+  const item = decodeRecord(value, "conversation file search page");
+  if (!Array.isArray(item.results)) throw new Error("Invalid conversation file search results.");
+  return {
+    results: item.results.map((value) => {
+      const result = decodeRecord(value, "conversation file search result");
+      if (!isAttachmentSummary(result.attachment)) throw new Error("Invalid conversation file search attachment.");
+      return {
+        agentId: requiredString(result, "agentId"),
+        messageId: requiredString(result, "messageId"),
+        createdAt: requiredString(result, "createdAt"),
+        attachment: result.attachment,
+      };
+    }),
+    nextCursor: nullableString(item, "nextCursor"),
   };
 }
 

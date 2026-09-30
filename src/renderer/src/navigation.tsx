@@ -1,3 +1,4 @@
+import type { GlobalSearchPage } from "@openbot/ui/components/GlobalSearch";
 import type { AgentMessage } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
@@ -100,15 +101,29 @@ const Navigation = createSimpleContext({
       setGlobalSearchOpen(open);
     }
 
-    async function searchGlobalMessages(query: string): Promise<Array<{ agentId: string; message: AgentMessage }>> {
+    async function searchGlobalMessages(
+      query: string,
+      cursor?: string,
+    ): Promise<GlobalSearchPage<{ agentId: string; message: AgentMessage }>> {
       const analytics = desktopAnalytics.scope();
       try {
-        const page = await appPort().agent.searchConversationMessages({ query, limit: 100 });
-        analytics.track("search_action", { scope: "global", result: "succeeded", result_count: page.total });
-        return page.results.map((result) => ({
-          agentId: result.agentId,
-          message: toAgentMessage(result.message, result.agentId),
-        }));
+        const page = await appPort().agent.searchConversationMessages({
+          query,
+          ...(cursor === undefined ? {} : { cursor }),
+          limit: 100,
+        });
+        // One search counts once, not once per page.
+        if (cursor === undefined) {
+          analytics.track("search_action", { scope: "global", result: "succeeded", result_count: page.total });
+        }
+        return {
+          results: page.results.map((result) => ({
+            agentId: result.agentId,
+            message: toAgentMessage(result.message, result.agentId),
+          })),
+          total: page.total,
+          nextCursor: page.nextCursor,
+        };
       } catch (error) {
         analytics.track("search_action", { scope: "global", result: "failed", failure_code: "search_failed" });
         throw error;

@@ -34,6 +34,13 @@ import type { ConversationRuntime } from "./conversation-runtime";
  * through only because one direction is `import type`.
  */
 
+/** Opens an agent's settings panel. A `routine` opens that routine's settings in it. */
+export interface AgentSettingsRequest {
+  agentId: string;
+  nonce: number;
+  routine?: { routineId: string; name: string };
+}
+
 export interface ConversationTarget {
   agentId: string;
   serverId: string;
@@ -98,7 +105,7 @@ export interface ConversationProps {
    */
   mcpSettingsOpen?: boolean;
   globalOverlayOpen: boolean;
-  settingsRequest: { agentId: string; nonce: number } | null;
+  settingsRequest: AgentSettingsRequest | null;
   /** The account Profile panel, for a client that has no settings dialog. `profileRequest` opens it. */
   accountProfile?: Pick<
     AccountProfilePanelProps,

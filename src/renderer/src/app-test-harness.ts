@@ -840,6 +840,7 @@ export function installOpenbotStub(): void {
         };
       }),
       searchConversationMessages: vi.fn().mockResolvedValue({ results: [], total: 0, nextCursor: null }),
+      searchConversationFiles: vi.fn().mockResolvedValue({ results: [], nextCursor: null }),
       listConversationReads: vi.fn().mockResolvedValue({}),
       markConversationRead: vi.fn().mockImplementation(async (input) => ({
         unreadCount: 0,

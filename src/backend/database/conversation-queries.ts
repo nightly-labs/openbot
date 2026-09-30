@@ -1,4 +1,6 @@
 import type {
+  ConversationFileSearchPage,
+  ConversationFileSearchResult,
   ConversationMessage,
   ConversationPage,
   ConversationPageAnchor,
@@ -7,6 +9,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
+  isAttachmentSummary,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
@@ -335,6 +338,54 @@ export class ConversationQueries {
       total,
       nextCursor: nextOffset < total ? encodeSearchCursor(nextOffset) : null,
     };
+  }
+
+  /**
+   * The files of agent chat messages whose name contains the query, newest first. The owner of a
+   * chat attachment is `${threadId}:${messageId}`, and a thread id has no colon. Channel threads
+   * stay out for the same reason as in the message search.
+   */
+  searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
+    const normalized = query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+    const limit = pageLimit(requestedLimit);
+    const offset = cursor ? decodeSearchCursor(cursor) : 0;
+    const threadId = "substr(attachment.owner_id, 1, instr(attachment.owner_id, ':') - 1)";
+    const messageId = "substr(attachment.owner_id, instr(attachment.owner_id, ':') + 1)";
+    const nameFilter = normalized ? "AND LOWER(attachment.name) LIKE ? ESCAPE '\\'" : "";
+    const parameters = normalized ? [`%${escapeLike(normalized)}%`] : [];
+    const rows = databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT thread.agent_id, message.message_id, attachment.created_at, attachment.metadata_json
+           FROM projection_attachments attachment
+           JOIN projection_threads thread ON thread.thread_id = ${threadId}
+           JOIN projection_thread_messages message
+             ON message.thread_id = thread.thread_id AND message.message_id = ${messageId}
+           WHERE attachment.owner_kind = 'thread-message'
+             AND instr(attachment.owner_id, ':') > 1
+             AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
+             ${nameFilter}
+             ${CHANNEL_THREAD_EXCLUSION}
+           ORDER BY attachment.created_at DESC, attachment.attachment_id DESC
+           LIMIT ? OFFSET ?`,
+        )
+        // One row more than the page tells if another page follows.
+        .all(...parameters, limit + 1, offset),
+    );
+    const hasMore = rows.length > limit;
+    const results = rows.slice(0, limit).flatMap((row): ConversationFileSearchResult[] => {
+      const attachment = JSON.parse(requiredStringColumn(row, "metadata_json"));
+      if (!isAttachmentSummary(attachment)) return [];
+      return [
+        {
+          agentId: requiredStringColumn(row, "agent_id"),
+          messageId: requiredStringColumn(row, "message_id"),
+          createdAt: requiredStringColumn(row, "created_at"),
+          attachment,
+        },
+      ];
+    });
+    return { results, nextCursor: hasMore ? encodeSearchCursor(offset + limit) : null };
   }
 
   #conversationPageRows(

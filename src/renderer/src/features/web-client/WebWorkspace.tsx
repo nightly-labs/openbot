@@ -57,6 +57,7 @@ import { createEffect, createMemo, createSignal, Loading, lazy, onCleanup, onSet
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, unlockCompletionSound } from "../../completion-sound";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { globalSearchChannels } from "../../global-search-sources";
 import { LayoutProvider, useLayout } from "../../layout";
 import { PlatformProvider } from "../../platform";
 import { WorkspaceFrame } from "../../WorkspaceFrame";
@@ -531,13 +532,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     window.addEventListener("keydown", toggleSearch);
     return () => window.removeEventListener("keydown", toggleSearch);
   });
-  async function searchAllMessages(query: string) {
-    if (workspace.state.status !== "online") return [];
-    const page = await workspace.runtime.search(undefined, query);
-    return page.results.map((result) => ({
-      agentId: result.agentId,
-      message: toAgentMessage(result.message, result.agentId),
-    }));
+  async function searchAllMessages(query: string, cursor?: string) {
+    if (workspace.state.status !== "online") return { results: [], nextCursor: null };
+    const page = await workspace.runtime.search(undefined, query, cursor);
+    return {
+      results: page.results.map((result) => ({
+        agentId: result.agentId,
+        message: toAgentMessage(result.message, result.agentId),
+      })),
+      total: page.total,
+      nextCursor: page.nextCursor,
+    };
   }
   /** Opens an agent at one message, for a global search result and a stored file's message. */
   async function openMessage(agentId: string, messageId: string) {
@@ -1376,11 +1381,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               <GlobalSearchOverlay
                 open={searchOpen()}
                 agents={workspace.profiles()}
+                channels={channels.supported() ? globalSearchChannels(channels.state.channels) : undefined}
                 onSearchMessages={searchAllMessages}
                 onOpenChange={setSearchOpen}
                 onSelectAgent={(id) => {
                   setMobilePane("conversation");
                   void select(id);
+                }}
+                onSelectChannel={(id) => {
+                  setMobilePane("conversation");
+                  void channels.open(id);
                 }}
                 onSelectMessage={(agentId, messageId) => void openMessage(agentId, messageId)}
               />

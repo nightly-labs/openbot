@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   AgentProviderId,
   AgentSummary,
+  ConversationFileSearchPage,
   ConversationMessage,
   ConversationPage,
   ConversationPageAnchor,
@@ -199,6 +200,10 @@ export class OpenBotDatabase {
     requestedLimit = 100,
   ): ConversationSearchPage {
     return this.#conversations.searchConversationMessages(query, agentId, cursor, requestedLimit);
+  }
+
+  searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
+    return this.#conversations.searchConversationFiles(query, cursor, requestedLimit);
   }
 
   persistConversation(
