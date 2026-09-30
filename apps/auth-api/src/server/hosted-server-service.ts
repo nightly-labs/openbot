@@ -800,8 +800,8 @@ export class HostedServerService {
       .prepare(
         `UPDATE hosted_servers SET plan = ?, size = ?, billing_interval = ?, currency = ?, idempotency_key = ?,
            checkout_session_id = NULL, updated_at = ?
-         WHERE server_id = ? AND checkout_session_id IS ? AND observed_state = 'awaiting_payment'
-           AND desired_state = 'running'`,
+         WHERE server_id = ? AND checkout_session_id IS ? AND idempotency_key = ?
+           AND observed_state = 'awaiting_payment' AND desired_state = 'running'`,
       )
       .bind(
         choice.plan,
@@ -812,12 +812,14 @@ export class HostedServerService {
         this.#now(),
         row.server_id,
         previous,
+        row.idempotency_key,
       )
       .run();
-    // A second request changed the server first.
-    if (updated.meta.changes !== 1)
+    const claimed = await this.#requireRow(row.server_id);
+    // A second request changed the server first, or changed it again before its page was made.
+    if (updated.meta.changes !== 1 || claimed.idempotency_key !== idempotencyKey)
       throw new HostedServerServiceError(409, "hosted_server_conflict", "Try the request again.");
-    return this.#checkout(await this.#requireRow(row.server_id), user, billing, returnTo);
+    return this.#checkout(claimed, user, billing, returnTo);
   }
 
   /**
