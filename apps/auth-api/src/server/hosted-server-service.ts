@@ -787,6 +787,11 @@ export class HostedServerService {
   ): Promise<HostedServerCheckout> {
     const previous = row.checkout_session_id;
     if (previous && (await billing.closeCheckout(previous)) === "paid") {
+      // A retry of this request then returns the same server, and does not add a second one.
+      await this.#database
+        .prepare("UPDATE OR IGNORE hosted_servers SET idempotency_key = ? WHERE server_id = ?")
+        .bind(idempotencyKey, row.server_id)
+        .run();
       return { server: summary(await this.#requireRow(row.server_id)), checkoutUrl: null };
     }
     const updated = await this.#database

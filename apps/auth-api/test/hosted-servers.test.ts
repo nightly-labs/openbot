@@ -475,6 +475,9 @@ describe("hosted servers", () => {
     );
     const paid = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
     expect(paid).toMatchObject({ server: { serverId: server.serverId, plan: "pro" }, checkoutUrl: null });
+    // A retry of that request returns the same server.
+    const retried = await context.service.create(owner, STARTER, "create-key-0000003", RETURN);
+    expect(retried).toMatchObject({ server: { serverId: server.serverId }, checkoutUrl: null });
 
     // The paid server is not reused.
     const next = await context.service.create(owner, STARTER, "create-key-0000004", RETURN);

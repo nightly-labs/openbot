@@ -256,12 +256,6 @@ function trackHostedSiteDelete(): (result: HostedSiteDeleteResult) => void {
 export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>(untrack(() => props.initialTab) ?? "general");
-  createEffect(
-    () => (props.open ? props.openTab : undefined),
-    (tab) => {
-      if (tab) setActiveTab(tab);
-    },
-  );
   let modalElement: HTMLElement | undefined;
   const providerKeyState = createProviderKeyState(props);
 
@@ -319,6 +313,16 @@ export function SettingsModal(props: SettingsModalProps) {
       (hostedServers.state.loaded || hostedServers.state.error !== null || !props.hostedServersApi),
     (hidden) => {
       if (hidden) setActiveTab("general");
+    },
+  );
+  // The Hosted servers tab exists only after its list loads. A tab with no trigger falls back to General.
+  createEffect(
+    () => {
+      const tab = props.open ? props.openTab : undefined;
+      return tab === "hosted-servers" && !hostedServersShown() ? undefined : tab;
+    },
+    (tab) => {
+      if (tab) setActiveTab(tab);
     },
   );
   const visibleNavItems = () =>
