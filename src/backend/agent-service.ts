@@ -1524,6 +1524,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#hostedSites.dispose();
     this.#compaction.dispose();
     this.#deltas.dispose();
+    this.#conversation.dispose();
     this.#threads.dispose();
     this.#memories.clearPending();
     this.#tables?.dispose();
