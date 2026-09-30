@@ -30,6 +30,7 @@ import { isUsageLimitDiagnostic } from "./agent/provider-diagnostics";
 import { AgentProcessExitError, type AgentProvider } from "./agent-client";
 import { type AgentCliInfo, cliSpawnTarget } from "./cli";
 import { IdleThreadPool } from "./idle-thread-pool";
+import { LineTooLongError, limitLineLength } from "./jsonl";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
   acpMcpServers,
@@ -343,11 +344,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       windowsHide: true,
     });
     this.#process = child;
+    // The SDK holds a line until its newline with no limit. At the limit the connection closes with
+    // the error, so each open request fails with it, and the process ends.
+    const stdout = child.stdout.pipe(
+      limitLineLength(() => {
+        const error = new LineTooLongError(this.#label);
+        this.#fail(error, child);
+        void endProcess(child);
+        return error;
+      }),
+    );
     const stream = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
-      Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+      Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
     this.#connection = new ClientSideConnection(
       () => ({
@@ -396,19 +407,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.rejectAll("ACP session stopped.");
     await this.#bridge.close();
     if (!child || child.exitCode !== null) return;
-    child.stdin.end();
-    // A `.cmd` agent runs under `cmd.exe`; a kill of the wrapper alone leaves the agent running.
-    if (process.platform === "win32") return stopWindowsProcessTree(child);
-    await new Promise<void>((resolve) => {
-      const forceKill = setTimeout(() => {
-        if (child.exitCode === null) child.kill("SIGKILL");
-      }, 2_000);
-      child.once("exit", () => {
-        clearTimeout(forceKill);
-        resolve();
-      });
-      child.kill("SIGTERM");
-    });
+    await endProcess(child);
   }
 
   releaseIdleThreads(): void {
@@ -1314,6 +1313,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#process = null;
     if (!this.#stopping) this.emit("exit", error);
   }
+}
+
+/** Ends the agent process with SIGTERM, and with SIGKILL when it is still running after 2 seconds. */
+async function endProcess(child: ChildProcessWithoutNullStreams): Promise<void> {
+  child.stdin.end();
+  // A `.cmd` agent runs under `cmd.exe`; a kill of the wrapper alone leaves the agent running.
+  if (process.platform === "win32") return stopWindowsProcessTree(child);
+  await new Promise<void>((resolve) => {
+    const forceKill = setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }, 2_000);
+    child.once("exit", () => {
+      clearTimeout(forceKill);
+      resolve();
+    });
+    child.kill("SIGTERM");
+  });
 }
 
 function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
