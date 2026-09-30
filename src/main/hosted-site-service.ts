@@ -90,7 +90,10 @@ export class HostedSiteDesktopService {
       this.auth.requestAuthorized("/v1/sites/", { method: "GET", headers: serverHeaders(credential) }, decodeSiteList),
       unlinked,
     ]);
-    return { sites: [...server.sites, ...account.sites], limit: server.limit, used: server.used };
+    // A Worker older than server scopes returns every site to both reads. Show each site once.
+    const shown = new Set(server.sites.map((site) => site.id));
+    const unlinkedSites = account.sites.filter((site) => !shown.has(site.id));
+    return { sites: [...server.sites, ...unlinkedSites], limit: server.limit, used: server.used };
   }
 
   publish(input: PublishHostedSiteInput, allowedRoots?: readonly string[]): Promise<HostedSiteSummary> {
@@ -122,12 +125,41 @@ export class HostedSiteDesktopService {
    * account, not to the server, so a member never sees or deletes them.
    */
   async listServerSites(): Promise<HostedSiteList> {
-    const headers = serverHeaders(this.requireServerCredential());
-    return this.auth.requestAuthorized("/v1/sites/", { method: "GET", headers }, decodeSiteList);
+    const credential = this.requireServerCredential();
+    const list = await this.auth.requestAuthorized(
+      "/v1/sites/",
+      { method: "GET", headers: serverHeaders(credential) },
+      decodeSiteList,
+    );
+    // A Worker older than server scopes ignores the credential and returns every site of the account.
+    if (list.sites.some((site) => site.serverId !== credential.hostId))
+      throw new Error(sourceText("error.team.hostedSitesUnsupported"));
+    return list;
   }
 
   async deleteServerSite(siteId: string): Promise<void> {
+    // The list refuses a Worker that ignores the credential, which would delete any site of the owner.
+    await this.listServerSites();
     return this.deleteSite(siteId, operationKey("delete"), serverHeaders(this.requireServerCredential()));
+  }
+
+  /**
+   * A site that this computer published before it was a registered server is in the account's unlinked
+   * bucket. The Worker refuses it in the server scope before it claims the key, so the same key can update it.
+   */
+  private async createSession(
+    create: (headers: Record<string, string>, query?: string) => Promise<UploadSession>,
+    siteId: string | null,
+  ): Promise<UploadSession> {
+    const credential = this.serverCredential();
+    if (!credential) return create({});
+    try {
+      return await create(serverHeaders(credential));
+    } catch (error) {
+      if (siteId === null || !(error instanceof Error && "code" in error && error.code === "site_other_server"))
+        throw error;
+      return create({}, UNLINKED_SCOPE);
+    }
   }
 
   private requireServerCredential(): HostedSiteServerCredential {
@@ -181,17 +213,16 @@ export class HostedSiteDesktopService {
     prepared: PreparedSite,
     pending: PendingUpload,
   ): Promise<HostedSiteSummary> {
-    const session =
-      pending.session ??
-      (await retryTransport(() =>
+    const createSession = (headers: Record<string, string>, query = "") =>
+      retryTransport(() =>
         this.auth.requestAuthorized(
-          "/v1/sites/",
+          `/v1/sites/${query}`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Idempotency-Key": pending.uploadKey,
-              ...serverHeaders(this.serverCredential()),
+              ...headers,
             },
             body: JSON.stringify({
               title: input.title,
@@ -206,7 +237,8 @@ export class HostedSiteDesktopService {
           },
           decodeUploadSession,
         ),
-      ));
+      );
+    const session = pending.session ?? (await this.createSession(createSession, siteId));
     pending.session = session;
     for (const file of prepared.files) {
       if (pending.uploadedPaths.has(file.path)) continue;

@@ -1110,7 +1110,7 @@ request with no server headers creates only into the account's unlinked bucket (
 `server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
 the released meaning of `/v1/sites`. Replace and delete in a server scope refuse a site of another
 bucket with 409 `site_other_server`. A downgrade deletes nothing: a server above its limit cannot
-create a site, but it can replace one, and the extra sites end at their expiry.
+create a site, but it can replace one, and the extra sites end at their expiry. Removing a server moves its sites to the owner's unlinked bucket, so the owner's desktop can still delete them. A registered server updates a site that it published before registration in the unlinked scope.
 
 `hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
 optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and

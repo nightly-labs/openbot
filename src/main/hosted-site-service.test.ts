@@ -187,12 +187,30 @@ describe("hosted sites of a joined server", () => {
 
     await expect(service.listServerSites()).resolves.toEqual({ sites: [], limit: 3, used: 0 });
     await expect(service.deleteServerSite("site-unlinked")).rejects.toThrow("another server");
-    expect(requests).toEqual(["GET /v1/sites/ host-1", "DELETE /v1/sites/site-unlinked host-1"]);
+    expect(requests).toEqual([
+      "GET /v1/sites/ host-1",
+      "GET /v1/sites/ host-1",
+      "DELETE /v1/sites/site-unlinked host-1",
+    ]);
 
     const unregistered = new HostedSiteDesktopService(auth);
     await expect(unregistered.listServerSites()).rejects.toThrow("not registered");
     await expect(unregistered.deleteServerSite("site-unlinked")).rejects.toThrow("not registered");
-    expect(requests).toHaveLength(2);
+    expect(requests).toHaveLength(3);
+  });
+
+  it("refuses a Worker that ignores the server credential and returns every site of the owner", async () => {
+    const deletes: string[] = [];
+    const auth = authClient(async (path, init) => {
+      if (init.method === "DELETE") deletes.push(path);
+      // A Worker before server scopes: the owner's unlinked site, with no server.
+      return { sites: [hostedSite()], limit: 10 };
+    });
+    const service = new HostedSiteDesktopService(auth, () => ({ hostId: "host-1", machineToken: "token-1" }));
+
+    await expect(service.listServerSites()).rejects.toThrow("not supported");
+    await expect(service.deleteServerSite("site-1")).rejects.toThrow("not supported");
+    expect(deletes).toEqual([]);
   });
 });
 
