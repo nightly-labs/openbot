@@ -145,8 +145,8 @@ mock. The separate web preview implements the browser runtime with that same moc
   with the shape of the host frame.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
-- These stay desktop only: the application Settings dialog (Providers & permissions, app
-  updates), permissions review, hosted site publishing, marketplace publishing, Picture in Picture, the Memories, Routines and Files sections of agent settings, the
+- These stay desktop only: the application Settings dialog (permissions, app updates),
+  permissions review, hosted site publishing, marketplace publishing, Picture in Picture, the Memories, Routines and Files sections of agent settings, the
   conversation Files panel, and file reveal. The browser shows host files in Server settings >
   Storage.
 

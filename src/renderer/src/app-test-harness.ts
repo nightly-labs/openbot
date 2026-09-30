@@ -1141,7 +1141,7 @@ export function installOpenbotStub(): void {
     customAgents: stubGroup(IPC_ENDPOINTS.customAgents, "customAgents", {
       list: vi.fn().mockResolvedValue([]),
     }),
-    // Onboarding and the AI providers tab scan on their own, so a scan finds nothing by default.
+    // Onboarding and the Providers section of Server settings scan on their own, so a scan finds nothing by default.
     providerDetection: stubGroup(IPC_ENDPOINTS.providerDetection, "providerDetection", {
       getSettings: vi.fn().mockResolvedValue({ enabled: true, addresses: [], folders: [], hiddenIds: [] }),
       scanModelServers: vi.fn().mockResolvedValue([]),

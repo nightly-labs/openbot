@@ -1,18 +1,12 @@
 import type {
   AccountSession,
-  AgentProviderId,
-  AgentStatus,
   AppInfo,
   AvatarImageInput,
   BillingDesktopApi,
   CentralAuthUser,
-  CustomProviderRestart,
-  CustomProviderSummary,
   HostedServersDesktopApi,
   MobileConnectedDevice,
   MobileConnectTicket,
-  ProviderRuntimeStatus,
-  SaveCustomProviderInput,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -24,20 +18,12 @@ import {
   Server,
   Settings,
   Smartphone,
-  Sparkles,
   Tabs,
   UserRound,
 } from "@openbot/ui";
 import { BillingPanel } from "@openbot/ui/features/billing/BillingPanel";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
-import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
-import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
-import {
-  ProviderDetectionSettings,
-  type ProviderDetectionSettingsValue,
-} from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import type { ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { ProfileNameSaveBar } from "@openbot/ui/features/settings/ProfileNameSaveBar";
 import { SettingsDialogShell } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedServersTab } from "@openbot/ui/features/settings/SettingsHostedServersTab";
@@ -49,13 +35,10 @@ import { createSettingsMobileConnectStore } from "@openbot/ui/features/settings/
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { createSettingsUpdatesStore } from "@openbot/ui/features/settings/stores/updates-store";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
-import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import { createProviderKeyState, ProviderSettingsDialogs, ProviderSettingsSection } from "./ProviderSettingsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
-import { createSettingsGeneralStore } from "./stores/general-store";
 
 export interface SettingsModalProps {
   open: boolean;
@@ -75,44 +58,6 @@ export interface SettingsModalProps {
   onListAccountSessions?: () => Promise<AccountSession[]>;
   onRevokeAccountSession?: (sessionId: string) => Promise<void>;
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
-  agentStatus?: AgentStatus;
-  providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>>;
-  providerAvailableVersions?: Partial<Record<AgentProviderId, string | null>>;
-  onDownloadProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onCancelProviderDownload?: (provider: AgentProviderId) => void | Promise<void>;
-  onUpdateProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onInstallProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  onConnectProvider?: (provider: AgentProviderId) => void | Promise<void>;
-  /** Accepts a described endpoint from the AI providers tab. Omitted on a remote server, which hides it. */
-  onAddCustomProvider?: (value: SaveCustomProviderInput) => Promise<CustomProviderRestart>;
-  customProviders?: readonly CustomProviderSummary[];
-  onDeleteCustomProvider?: (id: string) => Promise<CustomProviderRestart>;
-  /** Local model servers and ACP agents found on this computer. Omitted on a remote server. */
-  providerDetection?: ProviderDetection;
-  detectedProviderApi?: DetectedProviderApi;
-  /** Saved custom agent IDs, so a found agent's ID is checked before the round trip. */
-  takenAgentIds?: readonly string[];
-  /** The user's own ACP agents. Only the local host passes it. */
-  customAgents?: CustomAgentSettingsApi;
-  /** Where the scan looks. Without it the tab has no detection settings. */
-  detectionSettings?: ProviderDetectionSettingsValue;
-  onDetectionSettingsChange?: (value: ProviderDetectionSettingsValue) => void;
-  /** The last detection settings save failed. The section keeps the rows the user typed. */
-  detectionSettingsError?: string | null;
-  /** Runs each time the AI providers tab is shown, so the found list is current. */
-  onProvidersShown?: () => void;
-  /**
-   * Reads and writes the optional provider keys of the computer the providers run on. Absent when
-   * this window cannot manage them, which is also what takes the row's sign-in button away.
-   */
-  providerKeys?: ProviderKeyApi;
-  /** The joined server whose host runs the listed providers. Absent when this computer runs them. */
-  providerHostName?: string | undefined;
-  /**
-   * The code sign-in, for the providers that offer one. Absent for the same reason as
-   * `providerKeys`.
-   */
-  codeLogin?: ProviderCodeLoginApi;
   billingApi?: BillingDesktopApi;
   /** The account's hosted servers. The tab is shown only when the account server offers them. */
   hostedServersApi?: HostedServersDesktopApi;
@@ -132,7 +77,6 @@ export interface SettingsModalProps {
 
 export type SettingsTab =
   | "general"
-  | "providers"
   | "dynamic-island"
   | "computer-use"
   | "profile"
@@ -159,12 +103,6 @@ const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.general.title",
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
-  },
-  {
-    value: "providers",
-    titleKey: "settings.tab.providers.title",
-    descriptionKey: "settings.tab.providers.description",
-    icon: Sparkles,
   },
   {
     value: "dynamic-island",
@@ -228,23 +166,6 @@ export function SettingsModal(props: SettingsModalProps) {
   const i18n = useI18n();
   const [activeTab, setActiveTab] = createSignal<SettingsTab>(untrack(() => props.initialTab) ?? "general");
   let modalElement: HTMLElement | undefined;
-  const providerKeyState = createProviderKeyState(props);
-
-  const providers = createSettingsGeneralStore({
-    get agentStatus() {
-      return props.agentStatus;
-    },
-    get providerRuntimeStatuses() {
-      return props.providerRuntimeStatuses;
-    },
-    get providerAvailableVersions() {
-      return props.providerAvailableVersions;
-    },
-    openCodeKeyStatus: providerKeyState.openCodeKeyStatus,
-    get providerHostName() {
-      return props.providerHostName;
-    },
-  });
   const profile = createSettingsProfileStore(props, () => activeTab() === "profile");
   const mobileConnect = createSettingsMobileConnectStore(props, () => activeTab() === "mobile-connect");
   const updates = createSettingsUpdatesStore(props);
@@ -253,12 +174,6 @@ export function SettingsModal(props: SettingsModalProps) {
     () => props.open && activeTab() === "billing",
   );
   const hostedServers = createSettingsHostedServersStore(props, () => activeTab() === "hosted-servers");
-  createEffect(
-    () => props.open && activeTab() === "providers",
-    (shown) => {
-      if (shown) untrack(() => props.onProvidersShown?.());
-    },
-  );
 
   // The Dynamic Island exists only on macOS, so other platforms get no tab for it.
   const isMac = () => props.appInfo?.platform === "darwin";
@@ -300,7 +215,6 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
-        value === "providers" ||
         (value === "dynamic-island" && isMac()) ||
         value === "computer-use" ||
         value === "profile" ||
@@ -335,14 +249,6 @@ export function SettingsModal(props: SettingsModalProps) {
         contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
-        floatingContent={
-          <ProviderSettingsDialogs
-            keys={providerKeyState}
-            providerKeys={props.providerKeys}
-            codeLogin={props.codeLogin}
-            onConnectProvider={props.onConnectProvider}
-          />
-        }
         footer={<ProfileNameSaveBar store={profile} />}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
@@ -376,38 +282,6 @@ export function SettingsModal(props: SettingsModalProps) {
                 : undefined
             }
           />
-        </Tabs.Content>
-
-        <Tabs.Content value="providers" class="settings-modal-tab-panel" data-tab="providers">
-          <ProviderSettingsSection
-            store={providers}
-            selectMount={modalElement}
-            onDownloadProvider={props.onDownloadProvider}
-            onCancelProviderDownload={props.onCancelProviderDownload}
-            onUpdateProvider={props.onUpdateProvider}
-            onConnectProvider={props.onConnectProvider}
-            onInstallProvider={props.onInstallProvider}
-            onAddCustomProvider={props.onAddCustomProvider}
-            customProviders={props.customProviders}
-            onDeleteCustomProvider={props.onDeleteCustomProvider}
-            // With detection off there is no list, not an empty one.
-            providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
-            detectedProviderApi={props.detectedProviderApi}
-            takenAgentIds={props.takenAgentIds}
-            customAgents={props.customAgents}
-            onSignInProvider={props.providerKeys ? providerKeyState.openKeyDialog : undefined}
-            onSignInWithCodeProvider={props.codeLogin?.start}
-            codeSignInProviders={props.codeLogin?.providers()}
-          />
-          <Show when={props.detectionSettings}>
-            {(value) => (
-              <ProviderDetectionSettings
-                value={value()}
-                error={props.detectionSettingsError}
-                onChange={(next) => props.onDetectionSettingsChange?.(next)}
-              />
-            )}
-          </Show>
         </Tabs.Content>
 
         <Show when={isMac()}>

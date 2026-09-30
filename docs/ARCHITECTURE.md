@@ -114,8 +114,10 @@ checks it for secrets and publishes it with the account signed in on the host; t
 the share card from the preview. An agent that the host added from a
 listing gets Update when the host serves `agent-update-v1`; the host downloads the current version.
 `web-provider-admin.ts` answers the desktop `providerAdmin` group over the `providers-v1` routes, so
-the Providers tab of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
-sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as desktop Settings. The
+the Providers section of `ServerSettingsModal` uses the same runtime, key, custom provider, and code
+sign-in logic (`provider-code-login.ts`, `ProviderSettingsSection.tsx`) as the desktop app. On
+desktop the section shows the providers of the active server only, because provider state exists
+only for that server; for another server it offers to switch. The
 browser applies host `status` events, and reads the status every 3 seconds while a code sign-in waits.
 A provider key stays in the dialog input until it is sent to the host.
 
@@ -423,7 +425,7 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-Settings starts the shared renderer runtime store. The store announces each provider that gains an
+The Providers section of Server settings starts the shared renderer runtime store. The store announces each provider that gains an
 offer as one notification, from an effect over both the runtime snapshot and the agent status,
 because the two arrive separately and either one can complete an offer. An explicit update opens
 the same notification; revisioned snapshots move it through progress, failure, retry, and

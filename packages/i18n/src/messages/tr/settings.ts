@@ -76,8 +76,6 @@ export const messages = {
     "Hesap kimliğiniz ve e-postanız ile birlikte kullanım ve güvenilirlik meta verilerini OpenBot'un kendi barındırdığı analizlerine gönderin.",
   "settings.tab.general.title": "Genel",
   "settings.tab.general.description": "OpenBot'un bu bilgisayarda nasıl davranacağını kontrol edin.",
-  "settings.tab.providers.title": "Yapay zeka sağlayıcıları",
-  "settings.tab.providers.description": "Ajanlarınızın bu bilgisayarda kullandığı yapay zeka sağlayıcılarını bağlayın.",
   "settings.tab.computerUse.title": "Bilgisayar Kullanımı",
   "settings.tab.computerUse.description":
     "OpenBot'un bu bilgisayardaki uygulamaları görmesine ve bunlarla etkileşime girmesine izin verin.",

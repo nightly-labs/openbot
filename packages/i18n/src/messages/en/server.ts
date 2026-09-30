@@ -301,6 +301,8 @@ export const messages = defineMessages("server", {
   "server.desktop.startHint": "Start Remote Control from the monitor button in the server header.",
   "server.settings.providersTitle": "Providers",
   "server.settings.providersDescription": "Manage the AI providers of the computer that runs this server.",
+  "server.settings.providersSwitchNote": "Switch to {name} to manage its AI providers.",
+  "server.settings.providersSwitch": "Switch to this server",
   // Server Settings > Updates: the OpenBot update of a joined server's host. {name} is the server.
   "server.settings.updatesTitle": "Updates",
   "server.settings.updatesDescription": "Update OpenBot on the computer that runs this server.",

@@ -173,7 +173,7 @@
     "src/renderer/src/features/servers/ServerSettingsModal.tsx": 3,
     "src/renderer/src/features/settings/SettingsGeneralTab.tsx": 2,
     "src/renderer/src/features/settings/SettingsModal.test.tsx": 1,
-    "src/renderer/src/features/settings/SettingsModal.tsx": 3,
+    "src/renderer/src/features/settings/SettingsModal.tsx": 2,
     "src/renderer/src/features/settings/SkillsMarketplaceModal.tsx": 7,
     "src/renderer/src/features/settings/stores/general-store.ts": 1,
     "src/renderer/src/features/sidebar/WorkspaceSidebar.tsx": 1,
@@ -186,7 +186,7 @@
     "src/renderer/src/preview/fixtures.ts": 1,
     "src/renderer/src/preview/mock-openbot.ts": 1,
     "src/renderer/src/preview/mock-web-runtime.ts": 1,
-    "src/renderer/src/WorkspaceOverlays.tsx": 3,
+    "src/renderer/src/WorkspaceOverlays.tsx": 2,
     "src/renderer/src/WorkspaceShell.tsx": 1,
     "src/renderer/stories/AgentSkills.stories.tsx": 1,
     "src/renderer/stories/AgentUsage.stories.tsx": 1,
@@ -205,7 +205,7 @@
     "src/renderer/stories/RoutineScheduleCard.stories.tsx": 1,
     "src/renderer/stories/Select.stories.tsx": 2,
     "src/renderer/stories/ServerSettingsModal.stories.tsx": 1,
-    "src/renderer/stories/SettingsModal.stories.tsx": 2,
+    "src/renderer/stories/SettingsModal.stories.tsx": 1,
     "src/renderer/stories/Sidebar.stories.tsx": 1,
     "src/renderer/stories/SkillsMarketplaceModal.stories.tsx": 2
   }

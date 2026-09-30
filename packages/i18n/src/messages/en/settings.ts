@@ -80,8 +80,6 @@ export const messages = defineMessages("settings", {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
   "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
-  "settings.tab.providers.title": "AI providers",
-  "settings.tab.providers.description": "Connect the AI providers that your agents use on this computer.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description": "Allow OpenBot to see and interact with apps on this computer.",
   "settings.tab.profile.title": "Profile",

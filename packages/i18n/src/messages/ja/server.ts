@@ -248,4 +248,6 @@ export const messages = {
   "server.desktop.startHint": "サーバーのヘッダーにあるモニターボタンからリモート操作を開始してください。",
   "server.settings.providersTitle": "プロバイダー",
   "server.settings.providersDescription": "このサーバーを実行するコンピューターの AI プロバイダーを管理します。",
+  "server.settings.providersSwitchNote": "AI プロバイダーを管理するには {name} に切り替えてください。",
+  "server.settings.providersSwitch": "このサーバーに切り替える",
 } as const satisfies PartialTranslation<typeof source>;

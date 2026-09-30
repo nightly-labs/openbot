@@ -9,7 +9,7 @@ import { createCustomProvidersStore } from "./stores/custom-providers-store";
  * and a server switch must not discard and reload it.
  *
  * Ungated. Nothing waits on the list: the model picker shows OpenCode's own models meanwhile, and
- * Settings shows an empty AI providers list until it arrives.
+ * Server settings shows an empty provider list until it arrives.
  */
 const CustomProviders = createSimpleContext({
   name: "Custom providers",

@@ -554,7 +554,8 @@ on this computer: OpenBot does not show them to team members.
 
 ### Local model servers
 
-When Settings shows the AI providers tab, and once on the onboarding provider step, OpenBot looks
+When Server settings shows the Providers section of this computer, and once on the onboarding
+provider step, OpenBot looks
 for model servers on this computer. It sends `GET <address>/models` to
 `http://127.0.0.1:11434/v1` (Ollama), `http://127.0.0.1:1234/v1` (LM Studio), and each address you
 add under Local detection. These requests

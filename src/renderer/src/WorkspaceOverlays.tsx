@@ -2,7 +2,7 @@ import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
 import type { CustomAgentSettingsApi } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, Loading, Show } from "solid-js";
+import { createEffect, Loading, Show } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAuth } from "./features/account/account-context";
@@ -18,11 +18,12 @@ import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-conte
 import { AddServerOverlay } from "./features/servers/AddServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { useServerActions } from "./features/servers/server-actions";
-import { serverSupportsCapability } from "./features/servers/server-capabilities";
+import { serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
 import { useServers } from "./features/servers/servers-context";
+import type { HostProviderSettings } from "./features/settings/ProviderSettingsSection";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { InitialSetup, RemoteDesktopWorkspace, SettingsModal } from "./lazy-views";
@@ -210,7 +211,34 @@ function ServerSettings() {
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
-  const { toolRuntimeStatuses, providerAdminServerId } = useProviders();
+  const { agentStatus } = useAgents();
+  const {
+    toolRuntimeStatuses,
+    providerAdminServerId,
+    providerRuntimeStatuses,
+    providerAvailableVersions,
+    providerRuntimeDownloadsAvailable,
+    downloadProviderRuntime,
+    startProviderUpdate,
+    cancelProviderRuntimeDownload,
+    connectProvider,
+    openProviderInstallGuide,
+    codeLogin,
+    providerKeys,
+    hostCustomProviders,
+  } = useProviders();
+  const localEndpoints = useCustomProviders();
+  const localAgents = useCustomAgents();
+  const detection = useProviderDetection();
+  /** A custom agent is a command on this computer, so only the local server lists or runs one. */
+  const customAgents: CustomAgentSettingsApi = {
+    get agents() {
+      return localAgents.customAgents();
+    },
+    save: localAgents.saveCustomAgent,
+    remove: localAgents.deleteCustomAgent,
+    check: localAgents.checkCustomAgent,
+  };
   const github = createGitHubConnector();
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -219,6 +247,7 @@ function ServerSettings() {
   const holdsToolRuntimes = (server: ServerSummary) =>
     server.kind === "local" ? providerAdminServerId() === undefined : server.id === providerAdminServerId();
   const {
+    openServerSettings,
     serverSettingsTarget,
     serverSettingsSection,
     serverSettingsOpen,
@@ -257,6 +286,83 @@ function ServerSettings() {
     if (server.active) return open();
     void selectServer(server.id).then((selected) => {
       if (selected) setPendingAgentSelection(agentId);
+    });
+  };
+
+  /**
+   * The providers of the computer the agents of `server` run on: this one, or the host of a joined
+   * server that the account administers over `providers-v1`. The provider state belongs to the
+   * selected server only, so it is read only while `server` is the selected one.
+   */
+  const providerSettings = (server: ServerSummary): HostProviderSettings | undefined => {
+    const local = server.kind === "local";
+    if (!server.active || (!local && server.id !== providerAdminServerId())) return undefined;
+    /**
+     * A named endpoint merges into the `opencode acp` process of that computer. This does not need
+     * `providerRuntimeDownloadsAvailable()`: a build without managed runtime downloads still has custom endpoints.
+     */
+    const endpoints = local ? localEndpoints : hostCustomProviders;
+    return {
+      get agentStatus() {
+        return agentStatus();
+      },
+      get providerRuntimeStatuses() {
+        return providerRuntimeDownloadsAvailable() ? providerRuntimeStatuses() : undefined;
+      },
+      get providerAvailableVersions() {
+        return providerRuntimeDownloadsAvailable() ? providerAvailableVersions() : undefined;
+      },
+      get onUpdateProvider() {
+        return providerRuntimeDownloadsAvailable() ? startProviderUpdate : undefined;
+      },
+      get onDownloadProvider() {
+        return providerRuntimeDownloadsAvailable() ? downloadProviderRuntime : undefined;
+      },
+      get onCancelProviderDownload() {
+        return providerRuntimeDownloadsAvailable() ? cancelProviderRuntimeDownload : undefined;
+      },
+      get customProviders() {
+        return endpoints.customProviders();
+      },
+      onAddCustomProvider: endpoints.saveCustomProvider,
+      onDeleteCustomProvider: endpoints.deleteCustomProvider,
+      get providerKeys() {
+        return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
+      },
+      get codeLogin() {
+        return providerRuntimeDownloadsAvailable() ? codeLogin : undefined;
+      },
+      // The browser sign-in, the install guide, the scan and custom agents are of this computer.
+      get onConnectProvider() {
+        return local && providerRuntimeDownloadsAvailable() ? connectProvider : undefined;
+      },
+      get onInstallProvider() {
+        return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
+      },
+      get providerDetection() {
+        return local ? detection.detection() : undefined;
+      },
+      detectedProviderApi: local ? detection.api : undefined,
+      get takenAgentIds() {
+        return detection.takenAgentIds();
+      },
+      customAgents: local ? customAgents : undefined,
+      get detectionSettings() {
+        return local ? (detection.settingsValue() ?? undefined) : undefined;
+      },
+      onDetectionSettingsChange: detection.setSettings,
+      get detectionSettingsError() {
+        return detection.settingsError();
+      },
+      onShown: local ? () => void detection.scan() : undefined,
+    };
+  };
+
+  /** Another server's providers are managed after a switch to it, in its own Providers section. */
+  const switchToManageProviders = (server: ServerSummary) => {
+    setServerSettingsOpen(false);
+    void selectServer(server.id).then((selected) => {
+      if (selected) openServerSettings(server.id, null, "providers");
     });
   };
 
@@ -310,6 +416,12 @@ function ServerSettings() {
           onSetMcpServerEnabled={setMcpServerEnabled}
           onTestMcpServer={testMcpServer}
           storage={storageOptions(server())}
+          providers={providerSettings(server())}
+          onSwitchToManageProviders={
+            !server().active && serverCanAdminister(server(), "providers-v1")
+              ? () => switchToManageProviders(server())
+              : undefined
+          }
           // This computer, or a remote host with `hosted-sites-v1`. Every member lists; the host deletes
           // only for an owner or admin.
           hostedSites={
@@ -361,8 +473,7 @@ function AppSettings(props: AccountProps) {
   const platform = usePlatform();
   const auth = useAuth();
   const updates = useUpdates();
-  const { agentStatus } = useAgents();
-  const { activeServer, setAddServerOpen } = useServers();
+  const { setAddServerOpen } = useServers();
   const {
     appSettingsOpen,
     setAppSettingsOpen,
@@ -374,52 +485,6 @@ function AppSettings(props: AccountProps) {
     sendTestNotification,
     openNotificationSettings,
   } = useSettings();
-  const {
-    providerRuntimeStatuses,
-    providerAvailableVersions,
-    providerRuntimeDownloadsAvailable,
-    downloadProviderRuntime,
-    startProviderUpdate,
-    cancelProviderRuntimeDownload,
-    connectProvider,
-    openProviderInstallGuide,
-    codeLogin,
-    providerAdminServerId,
-    providerKeys,
-    hostCustomProviders,
-  } = useProviders();
-  const localEndpoints = useCustomProviders();
-  const localAgents = useCustomAgents();
-  const detection = useProviderDetection();
-  /** A custom agent is a command on this computer, so only the local host lists or runs one. */
-  const customAgents: CustomAgentSettingsApi = {
-    get agents() {
-      return localAgents.customAgents();
-    },
-    save: localAgents.saveCustomAgent,
-    remove: localAgents.deleteCustomAgent,
-    check: localAgents.checkCustomAgent,
-  };
-  const local = () => activeServer()?.kind === "local";
-  /**
-   * The providers of the computer the agents run on: this one, or the host of a joined server the
-   * account administers over `providers-v1`. Any other server shows none of these controls.
-   */
-  const providerDownloads = createMemo(
-    () => (local() || providerAdminServerId() !== undefined) && providerRuntimeDownloadsAvailable(),
-  );
-  /** The browser sign-in and the install guide open on this computer, so they stay local. */
-  const localProviderDownloads = createMemo(() => local() && providerRuntimeDownloadsAvailable());
-  /**
-   * A named endpoint merges into the `opencode acp` process of the computer the agents run on, so a
-   * server this window cannot manage shows no custom row, no list and no Add. This is not
-   * `providerDownloads()`: that one also needs `providerRuntimeDownloadsAvailable()`, which is about
-   * managed runtime downloads and would hide this feature on a build without them.
-   */
-  const endpoints = createMemo(() =>
-    local() ? localEndpoints : providerAdminServerId() !== undefined ? hostCustomProviders : undefined,
-  );
-
   return (
     <Loading>
       <SettingsModal
@@ -439,31 +504,6 @@ function AppSettings(props: AccountProps) {
         onRevokeMobileConnectedDevice={auth.revokeMobileConnectedDevice}
         onListAccountSessions={auth.listAccountSessions}
         onRevokeAccountSession={auth.revokeAccountSession}
-        agentStatus={agentStatus()}
-        providerRuntimeStatuses={providerDownloads() ? providerRuntimeStatuses() : undefined}
-        providerAvailableVersions={providerDownloads() ? providerAvailableVersions() : undefined}
-        onUpdateProvider={providerDownloads() ? startProviderUpdate : undefined}
-        onDownloadProvider={providerDownloads() ? downloadProviderRuntime : undefined}
-        onCancelProviderDownload={providerDownloads() ? cancelProviderRuntimeDownload : undefined}
-        onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
-        onInstallProvider={localProviderDownloads() ? openProviderInstallGuide : undefined}
-        customProviders={endpoints()?.customProviders()}
-        onAddCustomProvider={endpoints()?.saveCustomProvider}
-        onDeleteCustomProvider={endpoints()?.deleteCustomProvider}
-        customAgents={local() ? customAgents : undefined}
-        // The scan is of this computer, so a joined server's tab shows no found list and no Edit.
-        providerDetection={local() ? detection.detection() : undefined}
-        detectedProviderApi={local() ? detection.api : undefined}
-        takenAgentIds={detection.takenAgentIds()}
-        detectionSettings={local() ? (detection.settingsValue() ?? undefined) : undefined}
-        onDetectionSettingsChange={detection.setSettings}
-        detectionSettingsError={detection.settingsError()}
-        onProvidersShown={() => {
-          if (local()) void detection.scan();
-        }}
-        providerKeys={providerDownloads() ? providerKeys() : undefined}
-        providerHostName={providerAdminServerId() === undefined ? undefined : activeServer()?.name}
-        codeLogin={providerDownloads() ? codeLogin : undefined}
         billingApi={appPort().billing}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {

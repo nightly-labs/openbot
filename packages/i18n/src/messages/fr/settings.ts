@@ -85,8 +85,6 @@ export const messages = {
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
-  "settings.tab.providers.title": "Fournisseurs d’IA",
-  "settings.tab.providers.description": "Connecter les fournisseurs d’IA que vos agents utilisent sur cet ordinateur.",
   "settings.tab.computerUse.title": "Computer Use",
   "settings.tab.computerUse.description":
     "Autoriser OpenBot à voir et à interagir avec les applications de cet ordinateur.",

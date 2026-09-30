@@ -26,6 +26,10 @@ import type {
   DetectedProviderApi,
   ProviderDetection,
 } from "@openbot/ui/features/custom-providers/detected-providers";
+import {
+  ProviderDetectionSettings,
+  type ProviderDetectionSettingsValue,
+} from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { OpenCodeKeyDialog, type ProviderKeyApi } from "@openbot/ui/features/settings/OpenCodeKeyDialog";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import type { ProviderCodeLoginApi } from "../../components/provider-code-login-api";
@@ -279,7 +283,7 @@ export function ProviderSettingsDialogs(props: {
   );
 }
 
-/** The providers of a joined server's host, as a server settings section takes them. */
+/** The providers of one server's computer, as its server settings section takes them. */
 export interface HostProviderSettings {
   agentStatus: AgentStatus;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
@@ -292,11 +296,27 @@ export interface HostProviderSettings {
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
   providerKeys?: ProviderKeyApi | undefined;
   codeLogin?: ProviderCodeLoginApi | undefined;
+  /** The browser sign-in and the install guide open on this computer, so only its section has them. */
+  onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /** The scan is of this computer, so a joined server's section shows no found list. */
+  providerDetection?: ProviderDetection | undefined;
+  detectedProviderApi?: DetectedProviderApi | undefined;
+  takenAgentIds?: readonly string[] | undefined;
+  customAgents?: CustomAgentSettingsApi | undefined;
+  detectionSettings?: ProviderDetectionSettingsValue | undefined;
+  onDetectionSettingsChange?: ((value: ProviderDetectionSettingsValue) => void) | undefined;
+  detectionSettingsError?: string | null | undefined;
+  /** Called each time the section is shown, for the scan of this computer. */
+  onShown?: (() => void) | undefined;
 }
 
-/** The whole Providers section for a host: its list, and the dialogs it opens. */
+/**
+ * The whole Providers section for a server: its list, and the dialogs it opens. Without `hostName`
+ * the providers are this computer's.
+ */
 export function HostProviderSettingsPanel(
-  props: HostProviderSettings & { hostName: string; selectMount: HTMLElement | undefined },
+  props: HostProviderSettings & { hostName?: string | undefined; selectMount: HTMLElement | undefined },
 ) {
   const keys = createProviderKeyState({
     open: true,
@@ -327,14 +347,35 @@ export function HostProviderSettingsPanel(
         onDownloadProvider={props.onDownloadProvider}
         onCancelProviderDownload={props.onCancelProviderDownload}
         onUpdateProvider={props.onUpdateProvider}
+        onConnectProvider={props.onConnectProvider}
+        onInstallProvider={props.onInstallProvider}
         onAddCustomProvider={props.onAddCustomProvider}
         customProviders={props.customProviders}
         onDeleteCustomProvider={props.onDeleteCustomProvider}
+        // With detection off there is no list, not an empty one.
+        providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
+        detectedProviderApi={props.detectedProviderApi}
+        takenAgentIds={props.takenAgentIds}
+        customAgents={props.customAgents}
         onSignInProvider={props.providerKeys ? keys.openKeyDialog : undefined}
         onSignInWithCodeProvider={props.codeLogin?.start}
         codeSignInProviders={props.codeLogin?.providers()}
       />
-      <ProviderSettingsDialogs keys={keys} providerKeys={props.providerKeys} codeLogin={props.codeLogin} />
+      <Show when={props.detectionSettings}>
+        {(value) => (
+          <ProviderDetectionSettings
+            value={value()}
+            error={props.detectionSettingsError}
+            onChange={(next) => props.onDetectionSettingsChange?.(next)}
+          />
+        )}
+      </Show>
+      <ProviderSettingsDialogs
+        keys={keys}
+        providerKeys={props.providerKeys}
+        codeLogin={props.codeLogin}
+        onConnectProvider={props.onConnectProvider}
+      />
     </>
   );
 }
